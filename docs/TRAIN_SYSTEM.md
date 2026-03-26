@@ -228,6 +228,21 @@ in host lists: Google is the only current relay match, Google plus Apple MLX
 close the current validator quorum, and Google plus RunPod remain the current
 checkpoint-authority pair.
 
+The repo now also owns the first elastic device mesh contract in
+`crates/psionic-train/src/elastic_device_mesh_contract.rs`, the binary
+`elastic_device_mesh_contract`, the checker
+`scripts/check-elastic-device-mesh-contract.sh`, the focused reference doc
+`docs/ELASTIC_DEVICE_MESH_REFERENCE.md`, and the committed fixture
+`fixtures/training/elastic_device_mesh_contract_v1.json`. That surface turns
+the registry into runtime-managed mesh truth: role-specific lease policy,
+current member leases, retained heartbeat samples, explicit deathrattle
+notices, and typed revision receipts for activation, replacement, and refusal.
+It proves one real public-role replacement path, with Apple MLX promoted after
+the RTX 4080 miner deathrattle, while keeping one critical honesty boundary:
+live dense remove-without-replacement still refuses and remains explicitly
+bound to the older refused topology and recovery scenarios until later runtime
+and transport issues close.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker

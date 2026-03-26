@@ -1,0 +1,341 @@
+{
+  "schema_version": "psionic.elastic_device_mesh_contract.v1",
+  "contract_id": "psionic.elastic_device_mesh_contract.v1",
+  "network_id": "psionic.decentralized_training.testnet.v1",
+  "governance_revision_id": "psionic.decentralized_training_governance.v1",
+  "current_epoch_id": "network_epoch_00000123",
+  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
+  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
+  "dense_topology_revision_contract_digest": "6fcd1c8872e888d34159ed10fe85b5d7a48c80fba478d2ec71a4d75ca7907cb6",
+  "dense_rank_recovery_contract_digest": "1084d44b21e975950ba6b27b25eb6fe421237461258dc56f4c153454111ea7b4",
+  "role_lease_policies": [
+    {
+      "role_class": "public_miner",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "deathrattle_grace_seconds": 4,
+      "detail": "Public miner leases stay short and heartbeat-bound so contributor-window replacement can happen quickly when a miner departs or dies on the permissioned testnet."
+    },
+    {
+      "role_class": "public_validator",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "deathrattle_grace_seconds": 4,
+      "detail": "Public validator leases match miner cadence so quorum liveness remains explicit and failure-detection timing does not drift into operator folklore."
+    },
+    {
+      "role_class": "relay",
+      "lease_duration_seconds": 10,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 2,
+      "deathrattle_grace_seconds": 4,
+      "detail": "Relay leases stay especially short because route support must fail over quickly when the single current relay disappears."
+    },
+    {
+      "role_class": "checkpoint_authority",
+      "lease_duration_seconds": 16,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 4,
+      "deathrattle_grace_seconds": 6,
+      "detail": "Checkpoint-authority leases stay slightly longer than miner and validator leases to avoid flapping the durable-state lane while still making failure detection explicit."
+    },
+    {
+      "role_class": "aggregator",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "deathrattle_grace_seconds": 4,
+      "detail": "Aggregator lease policy is frozen now even though the current mesh does not yet retain an active aggregator lease set in this issue."
+    }
+  ],
+  "member_leases": [
+    {
+      "lease_id": "lease.public_miner.google.active",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "role_class": "public_miner",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111208000,
+      "expires_at_unix_ms": 1711111220000,
+      "source_selection_id": "public_miner_window_offer_v1",
+      "detail": "Google remains one of the two active contributor-window miner leases after the mesh closes its first replacement event."
+    },
+    {
+      "lease_id": "lease.public_miner.local_rtx4080.departing",
+      "registry_record_id": "local_rtx4080_workstation.registry",
+      "role_class": "public_miner",
+      "assignment_state": "active",
+      "status": "graceful_departure_requested",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111207000,
+      "expires_at_unix_ms": 1711111219000,
+      "source_selection_id": "public_miner_window_offer_v1",
+      "detail": "The RTX 4080 miner lease is still retained in mesh history but has already requested graceful departure through a deathrattle notice."
+    },
+    {
+      "lease_id": "lease.public_miner.local_mlx.promoted",
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "role_class": "public_miner",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "issued_at_unix_ms": 1711111210000,
+      "last_heartbeat_unix_ms": 1711111216000,
+      "expires_at_unix_ms": 1711111228000,
+      "source_selection_id": "promote_public_miner_standby_after_deathrattle_v1",
+      "detail": "The Apple MLX miner lease is active because the mesh promoted the prior standby node after the RTX 4080 deathrattle arrived."
+    },
+    {
+      "lease_id": "lease.public_validator.google.active",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "role_class": "public_validator",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111208000,
+      "expires_at_unix_ms": 1711111220000,
+      "source_selection_id": "validator_quorum_offer_v1",
+      "detail": "Google remains one active validator lease in the current two-validator quorum."
+    },
+    {
+      "lease_id": "lease.public_validator.local_mlx.active",
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "role_class": "public_validator",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 12,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 3,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111209000,
+      "expires_at_unix_ms": 1711111221000,
+      "source_selection_id": "validator_quorum_offer_v1",
+      "detail": "The Apple MLX node remains the second active validator lease in the current quorum."
+    },
+    {
+      "lease_id": "lease.checkpoint_authority.google.active",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "role_class": "checkpoint_authority",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 16,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 4,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111210000,
+      "expires_at_unix_ms": 1711111226000,
+      "source_selection_id": "checkpoint_promotion_offer_v1",
+      "detail": "Google remains one active checkpoint-authority lease for promoted public state."
+    },
+    {
+      "lease_id": "lease.checkpoint_authority.runpod.active",
+      "registry_record_id": "runpod_8xh100_dense_node.registry",
+      "role_class": "checkpoint_authority",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 16,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 4,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111210000,
+      "expires_at_unix_ms": 1711111226000,
+      "source_selection_id": "checkpoint_promotion_offer_v1",
+      "detail": "RunPod remains the second active checkpoint-authority lease for promoted public state."
+    },
+    {
+      "lease_id": "lease.relay.google.active",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "role_class": "relay",
+      "assignment_state": "active",
+      "status": "active",
+      "current_epoch_id": "network_epoch_00000123",
+      "lease_duration_seconds": 10,
+      "heartbeat_interval_seconds": 2,
+      "max_missed_heartbeats": 2,
+      "issued_at_unix_ms": 1711111200000,
+      "last_heartbeat_unix_ms": 1711111208000,
+      "expires_at_unix_ms": 1711111218000,
+      "source_selection_id": "discover_relay_nodes",
+      "detail": "Google remains the single active relay lease in the current permissioned mesh."
+    }
+  ],
+  "heartbeat_samples": [
+    {
+      "heartbeat_id": "heartbeat.public_miner.google.1",
+      "lease_id": "lease.public_miner.google.active",
+      "observed_at_unix_ms": 1711111208500,
+      "round_trip_latency_ms": 34,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "Google public miner heartbeat remains fresh."
+    },
+    {
+      "heartbeat_id": "heartbeat.public_miner.local_rtx4080.1",
+      "lease_id": "lease.public_miner.local_rtx4080.departing",
+      "observed_at_unix_ms": 1711111207500,
+      "round_trip_latency_ms": 19,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "The departing RTX 4080 miner heartbeat stayed fresh long enough to publish a graceful deathrattle instead of vanishing silently."
+    },
+    {
+      "heartbeat_id": "heartbeat.public_miner.local_mlx.1",
+      "lease_id": "lease.public_miner.local_mlx.promoted",
+      "observed_at_unix_ms": 1711111216500,
+      "round_trip_latency_ms": 27,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "The promoted Apple MLX miner lease heartbeats cleanly after standby replacement."
+    },
+    {
+      "heartbeat_id": "heartbeat.public_validator.google.1",
+      "lease_id": "lease.public_validator.google.active",
+      "observed_at_unix_ms": 1711111208600,
+      "round_trip_latency_ms": 35,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "Google validator heartbeat remains fresh."
+    },
+    {
+      "heartbeat_id": "heartbeat.public_validator.local_mlx.1",
+      "lease_id": "lease.public_validator.local_mlx.active",
+      "observed_at_unix_ms": 1711111209400,
+      "round_trip_latency_ms": 29,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "Apple MLX validator heartbeat remains fresh."
+    },
+    {
+      "heartbeat_id": "heartbeat.checkpoint_authority.google.1",
+      "lease_id": "lease.checkpoint_authority.google.active",
+      "observed_at_unix_ms": 1711111210300,
+      "round_trip_latency_ms": 41,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "Google checkpoint-authority heartbeat remains fresh."
+    },
+    {
+      "heartbeat_id": "heartbeat.checkpoint_authority.runpod.1",
+      "lease_id": "lease.checkpoint_authority.runpod.active",
+      "observed_at_unix_ms": 1711111210400,
+      "round_trip_latency_ms": 52,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "RunPod checkpoint-authority heartbeat remains fresh."
+    },
+    {
+      "heartbeat_id": "heartbeat.relay.google.1",
+      "lease_id": "lease.relay.google.active",
+      "observed_at_unix_ms": 1711111208550,
+      "round_trip_latency_ms": 23,
+      "missed_heartbeats": 0,
+      "status": "fresh",
+      "detail": "Google relay heartbeat remains fresh."
+    }
+  ],
+  "deathrattles": [
+    {
+      "deathrattle_id": "deathrattle.public_miner.local_rtx4080.1",
+      "lease_id": "lease.public_miner.local_rtx4080.departing",
+      "registry_record_id": "local_rtx4080_workstation.registry",
+      "requested_effective_unix_ms": 1711111211000,
+      "replacement_registry_record_id": "local_mlx_mac_workstation.registry",
+      "detail": "The RTX 4080 miner published a graceful departure notice with Apple MLX named as the replacement target instead of forcing the mesh to infer failure from silence."
+    }
+  ],
+  "revision_receipts": [
+    {
+      "revision_id": "activate_public_miner_window_mesh_v1",
+      "revision_kind": "activate_lease_set",
+      "trigger_kind": "admission_grant",
+      "outcome": "applied",
+      "affected_registry_record_ids": [
+        "google_l4_validator_node.registry",
+        "local_rtx4080_workstation.registry"
+      ],
+      "source_selection_id": "public_miner_window_offer_v1",
+      "detail": "The first miner lease-set activation applied directly from the contributor-window offer: Google plus the RTX 4080 node entered the active mesh as the initial public miner pair."
+    },
+    {
+      "revision_id": "activate_validator_quorum_mesh_v1",
+      "revision_kind": "activate_lease_set",
+      "trigger_kind": "admission_grant",
+      "outcome": "applied",
+      "affected_registry_record_ids": [
+        "google_l4_validator_node.registry",
+        "local_mlx_mac_workstation.registry"
+      ],
+      "source_selection_id": "validator_quorum_offer_v1",
+      "detail": "The first validator lease-set activation applied directly from the registry's validator quorum offer: Google plus Apple MLX became the active validator pair."
+    },
+    {
+      "revision_id": "activate_checkpoint_authority_mesh_v1",
+      "revision_kind": "activate_lease_set",
+      "trigger_kind": "admission_grant",
+      "outcome": "applied",
+      "affected_registry_record_ids": [
+        "google_l4_validator_node.registry",
+        "runpod_8xh100_dense_node.registry"
+      ],
+      "source_selection_id": "checkpoint_promotion_offer_v1",
+      "detail": "The first checkpoint-authority lease-set activation applied directly from the registry's checkpoint promotion offer: Google plus RunPod became the active authority pair."
+    },
+    {
+      "revision_id": "promote_public_miner_standby_after_deathrattle_v1",
+      "revision_kind": "promote_standby_replacement",
+      "trigger_kind": "deathrattle_notice",
+      "outcome": "applied",
+      "affected_registry_record_ids": [
+        "local_rtx4080_workstation.registry",
+        "local_mlx_mac_workstation.registry"
+      ],
+      "source_selection_id": "public_miner_window_offer_v1",
+      "replacement_registry_record_id": "local_mlx_mac_workstation.registry",
+      "detail": "The first mesh-side standby promotion applied after the RTX 4080 miner deathrattle: Apple MLX was promoted from the contributor-window standby lane into the active public miner set."
+    },
+    {
+      "revision_id": "refuse_live_dense_world_change_without_checkpoint_barrier_v1",
+      "revision_kind": "refuse_dense_world_change",
+      "trigger_kind": "barrier_required",
+      "outcome": "refused",
+      "affected_registry_record_ids": [
+        "google_l4_validator_node.registry",
+        "runpod_8xh100_dense_node.registry",
+        "local_mlx_mac_workstation.registry"
+      ],
+      "source_selection_id": "dense_runtime_barrier_control",
+      "referenced_topology_revision_id": "dense_topology.remove_rank_without_replacement.live_refused",
+      "referenced_recovery_scenario_id": "dense_rank.provider_loss.rank3.shrink_world_refused",
+      "detail": "The mesh keeps live dense world-size change honest: runtime-managed public-role replacement is admitted, but live dense remove-without-replacement still refuses until the older topology and recovery surfaces widen beyond checkpoint-barrier-only closure."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/elastic_device_mesh_contract_v1.json",
+    "check_script_path": "scripts/check-elastic-device-mesh-contract.sh",
+    "reference_doc_path": "docs/ELASTIC_DEVICE_MESH_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract closes the first runtime-managed public mesh object above the registry: role-specific lease policy, current leases, current heartbeat samples, deathrattle notices, and typed membership revision receipts. It proves graceful public-role replacement and explicit dense-world live-change refusal. It does not yet claim full dense live elasticity, NAT traversal, or WAN-grade transport policy.",
+  "contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc"
+}
