@@ -1,0 +1,89 @@
+{
+  "schema_version": "psionic.decentralized_network_contract.v1",
+  "contract_id": "psionic.decentralized_network_contract.v1",
+  "network_id": "psionic.decentralized_training.testnet.v1",
+  "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "run_graph_schema_version": "psionic.cross_provider_program_run_graph.v1",
+  "run_graph_digest": "d323bce8c1b324e9d4ab12e50f17678624d48272ae3aaaa913bb8ad61be751be",
+  "validator_promotion_contract_id": "psionic.shared_validator_promotion_contract.v1",
+  "governance_revision": {
+    "governance_revision_id": "psionic.decentralized_training_governance.v1",
+    "governance_revision_number": 1,
+    "registration_mode": "permissioned_testnet",
+    "checkpoint_promotion_mode": "multi_validator_quorum",
+    "minimum_validator_quorum": 2,
+    "detail": "The first decentralized network contract stays at a permissioned testnet posture. Public roles, epoch truth, validator quorum, checkpoint-promotion policy, and settlement posture are frozen before public registration or reward execution widens further."
+  },
+  "epoch_cadence": {
+    "cadence_kind": "fixed_window_cadence",
+    "epoch_id_template": "network_epoch_${NETWORK_EPOCH}",
+    "epoch_zero_unix_ms": 1711111111000,
+    "epoch_duration_seconds": 900,
+    "heartbeat_interval_seconds": 2,
+    "stale_peer_timeout_seconds": 10,
+    "checkpoint_barrier_every_epochs": 8,
+    "settlement_publish_every_epochs": 4
+  },
+  "settlement_backend": {
+    "backend_kind": "signed_ledger_bundle",
+    "settlement_namespace": "psionic.decentralized_training.settlement.v1",
+    "ledger_export_template": "runs/${RUN_ID}/decentralized/ledger/network_epoch_${NETWORK_EPOCH}.json",
+    "payout_export_template": "runs/${RUN_ID}/decentralized/payouts/network_epoch_${NETWORK_EPOCH}.json",
+    "detail": "The first network contract keeps settlement posture explicit through signed off-chain ledger bundles and payout-ready exports. It does not claim live chain publication or real reward execution yet."
+  },
+  "checkpoint_authority_policy": {
+    "promotion_mode": "multi_validator_quorum",
+    "minimum_checkpoint_authorities": 1,
+    "minimum_validator_quorum": 2,
+    "requires_shard_signature": true,
+    "admitted_authority_roles": [
+      "checkpoint_authority",
+      "public_validator"
+    ],
+    "detail": "Checkpoint authority remains explicit. Dedicated checkpoint-authority participants write durable state, and at least two validators must agree before new public checkpoint state is treated as promoted network truth."
+  },
+  "role_bindings": [
+    {
+      "role_class": "public_miner",
+      "binding_kind": "direct_execution_binding",
+      "execution_class": "validated_contributor_window",
+      "run_graph_role": "contributor_only",
+      "detail": "The first public miner role binds to the retained validated-contributor execution class. This keeps decentralized miner work attached to the existing contributor-window lineage instead of inventing a second hidden train loop."
+    },
+    {
+      "role_class": "public_validator",
+      "binding_kind": "direct_execution_binding",
+      "execution_class": "validator",
+      "run_graph_role": "contributor_only",
+      "detail": "The first public validator role binds to the retained validator execution class and shared validator-promotion vocabulary already carried by the whole-program run graph."
+    },
+    {
+      "role_class": "relay",
+      "binding_kind": "network_only_support_role",
+      "detail": "Relay remains a network-only support role in this issue. The contract freezes its existence and governance posture without pretending the current run graph already has a dedicated relay execution class."
+    },
+    {
+      "role_class": "checkpoint_authority",
+      "binding_kind": "direct_execution_binding",
+      "execution_class": "checkpoint_writer",
+      "run_graph_role": "trainer_contributor",
+      "detail": "Checkpoint authority binds directly to the retained checkpoint-writer seam in the whole-program run graph so durable promoted state stays attached to an existing machine-legible execution class."
+    },
+    {
+      "role_class": "aggregator",
+      "binding_kind": "direct_execution_binding",
+      "execution_class": "data_builder",
+      "run_graph_role": "contributor_only",
+      "detail": "Aggregator binds to the current data-builder seam as the nearest retained support participant while the decentralized network is still freezing vocabulary. This issue does not yet claim a separate public aggregator execution class."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/decentralized_network_contract_v1.json",
+    "check_script_path": "scripts/check-decentralized-network-contract.sh",
+    "reference_doc_path": "docs/DECENTRALIZED_NETWORK_CONTRACT_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract closes one canonical decentralized network epoch, role, governance, settlement, and checkpoint-authority object above the retained cross-provider training-program manifest and whole-program run graph. It does not claim public node registration, public discovery, live public miner or validator runtime, reward execution, or permissionless participation.",
+  "contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda"
+}

@@ -178,6 +178,23 @@ shared run id can carry dense ranks, validated contributor windows, validators,
 checkpoint writers, eval workers, and data builders at the same time without
 splitting provider-local side jobs into hidden program identities.
 
+The repo now also owns the first decentralized network epoch, role, and
+governance contract in
+`crates/psionic-train/src/decentralized_network_contract.rs`, the binary
+`decentralized_network_contract`, the checker
+`scripts/check-decentralized-network-contract.sh`, the focused reference doc
+`docs/DECENTRALIZED_NETWORK_CONTRACT_REFERENCE.md`, and the committed fixture
+`fixtures/training/decentralized_network_contract_v1.json`. That surface binds
+the current provider-neutral program manifest, whole-program run graph, and
+shared validator-promotion vocabulary into one explicit decentralized network
+object: network id, governance revision, permissioned-testnet registration
+posture, fixed public epoch cadence, signed-ledger settlement posture,
+checkpoint-authority quorum policy, and one retained public role set covering
+`public_miner`, `public_validator`, `relay`, `checkpoint_authority`, and
+`aggregator`. It keeps `relay` explicit as a network-only support role instead
+of pretending the current run graph already ships a dedicated public relay
+execution class.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker
