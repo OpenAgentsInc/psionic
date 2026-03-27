@@ -1,0 +1,120 @@
+{
+  "schema_version": "psionic.quantized_outer_sync_contract.v1",
+  "contract_id": "psionic.quantized_outer_sync_contract.v1",
+  "current_epoch_id": "network_epoch_00000123",
+  "elastic_device_mesh_contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc",
+  "wan_overlay_route_contract_digest": "3f8ac57a330f37acfed56c582353643cd09072f6b1792472917165db979922e4",
+  "live_checkpoint_catchup_contract_digest": "3589f9e87675511227b73ec95e226ab99354f09cba35cc9c0d72c1608d9a10d8",
+  "delta_policies": [
+    {
+      "policy_id": "policy.int8_pseudogradient_outer_sync",
+      "delta_family": "quantized_pseudo_gradient",
+      "quantization_kind": "int8_blockwise",
+      "chunk_bytes": 4194304,
+      "expected_compression_ratio_bps": 2200,
+      "cpu_offload_required": true,
+      "detail": "Google emits blockwise int8 pseudo-gradients so WAN exchange stays smaller than the checkpoint payload and can run through the direct checkpoint-authority lane."
+    },
+    {
+      "policy_id": "policy.nf4_residual_outer_sync",
+      "delta_family": "quantized_residual_delta",
+      "quantization_kind": "nf4_residual",
+      "chunk_bytes": 2097152,
+      "expected_compression_ratio_bps": 1400,
+      "cpu_offload_required": true,
+      "detail": "Apple MLX emits NF4 residual deltas so the newly rejoined miner can contribute over the overlay route without pretending full-density sync is free."
+    },
+    {
+      "policy_id": "policy.fp16_dense_allreduce_refused",
+      "delta_family": "full_precision_dense_all_reduce",
+      "quantization_kind": "fp16_uncompressed",
+      "chunk_bytes": 8388608,
+      "expected_compression_ratio_bps": 10000,
+      "cpu_offload_required": false,
+      "detail": "The old dense all-reduce story remains explicit as a refusal target for WAN links rather than an implied fallback."
+    }
+  ],
+  "exchange_receipts": [
+    {
+      "receipt_id": "exchange.public_miner.google_to_runpod.int8.1",
+      "epoch_anchor_catchup_receipt_id": "catchup.public_miner.local_mlx.after_deathrattle",
+      "source_registry_record_id": "google_l4_validator_node.registry",
+      "destination_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "route_id": "route.checkpoint_authority.google_runpod.direct",
+      "delta_policy_id": "policy.int8_pseudogradient_outer_sync",
+      "uncompressed_bytes": 100663296,
+      "compressed_bytes": 20971520,
+      "round_trip_latency_ms": 34,
+      "disposition": "applied",
+      "detail": "Google contributes a quantized pseudo-gradient package directly to the RunPod checkpoint authority after the MLX replacement catch-up closes."
+    },
+    {
+      "receipt_id": "exchange.public_miner.local_mlx_to_runpod.nf4.1",
+      "epoch_anchor_catchup_receipt_id": "catchup.public_miner.local_mlx.after_deathrattle",
+      "source_registry_record_id": "local_mlx_mac_workstation.registry",
+      "destination_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "delta_policy_id": "policy.nf4_residual_outer_sync",
+      "uncompressed_bytes": 67108864,
+      "compressed_bytes": 8388608,
+      "round_trip_latency_ms": 62,
+      "disposition": "applied",
+      "detail": "Apple MLX contributes an NF4 residual package over the overlay route so the rejoined miner has a WAN-feasible outer-sync lane."
+    },
+    {
+      "receipt_id": "exchange.public_miner.local_mlx_to_runpod.fp16_refused.1",
+      "epoch_anchor_catchup_receipt_id": "catchup.public_miner.local_mlx.after_deathrattle",
+      "source_registry_record_id": "local_mlx_mac_workstation.registry",
+      "destination_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "delta_policy_id": "policy.fp16_dense_allreduce_refused",
+      "uncompressed_bytes": 201326592,
+      "compressed_bytes": 0,
+      "round_trip_latency_ms": 62,
+      "disposition": "refused",
+      "refusal": "full-precision dense all-reduce over the WAN overlay is not admitted once the public path leaves provider-local networking",
+      "detail": "The contract keeps one honest refusal explicit so later reports cannot quietly upgrade WAN outer sync into dense all-reduce closure."
+    }
+  ],
+  "aggregation_receipts": [
+    {
+      "aggregation_id": "aggregation.outer_sync.runpod.round_2056",
+      "authority_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "authority_role_class": "checkpoint_authority",
+      "input_receipt_ids": [
+        "exchange.public_miner.google_to_runpod.int8.1",
+        "exchange.public_miner.local_mlx_to_runpod.nf4.1"
+      ],
+      "anchored_advertisement_id": "advertisement.checkpoint_authority.runpod.primary",
+      "bandwidth_accounted_bytes": 29360128,
+      "published_checkpoint_step": 2056,
+      "detail": "RunPod aggregates the two admitted quantized exchanges and publishes the next checkpoint-authority step after accounting for the actual compressed bytes transferred."
+    }
+  ],
+  "correctness_receipts": [
+    {
+      "receipt_id": "correctness.int8_pseudogradient.google_to_runpod.1",
+      "delta_policy_id": "policy.int8_pseudogradient_outer_sync",
+      "exchange_receipt_id": "exchange.public_miner.google_to_runpod.int8.1",
+      "max_abs_error_ppm": 840,
+      "checksum_match": true,
+      "detail": "The int8 pseudo-gradient path stays under the admitted quantization error budget and matches the retained checksum family."
+    },
+    {
+      "receipt_id": "correctness.nf4_residual.local_mlx_to_runpod.1",
+      "delta_policy_id": "policy.nf4_residual_outer_sync",
+      "exchange_receipt_id": "exchange.public_miner.local_mlx_to_runpod.nf4.1",
+      "max_abs_error_ppm": 1260,
+      "checksum_match": true,
+      "detail": "The NF4 residual path stays inside the admitted correctness envelope for WAN outer sync."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/quantized_outer_sync_contract_v1.json",
+    "check_script_path": "scripts/check-quantized-outer-sync-contract.sh",
+    "reference_doc_path": "docs/QUANTIZED_OUTER_SYNC_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first WAN-aware outer-sync surface above live catch-up: quantized delta policies, applied exchange receipts, checkpoint-authority aggregation, correctness receipts, bandwidth accounting, and one explicit refusal for full-precision dense all-reduce over WAN paths. It does not yet claim public internet fault or soak closure.",
+  "contract_digest": "1b67541b4b4c9b316a8ba78625c4e745c9c3da0f447eacf8585b9e2cafbd5fc2"
+}

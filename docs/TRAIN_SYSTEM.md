@@ -271,6 +271,19 @@ through RunPod over the overlay path while keeping one critical honesty
 boundary explicit: active-peer sidecars are not equivalent to full
 checkpoint-authority recovery.
 
+The repo now also owns the first quantized outer-sync contract in
+`crates/psionic-train/src/quantized_outer_sync_contract.rs`, the binary
+`quantized_outer_sync_contract`, the checker
+`scripts/check-quantized-outer-sync-contract.sh`, the focused reference doc
+`docs/QUANTIZED_OUTER_SYNC_REFERENCE.md`, and the committed fixture
+`fixtures/training/quantized_outer_sync_contract_v1.json`. That surface turns
+live catch-up into a WAN-feasible synchronization story: explicit quantized
+delta policies, applied exchange receipts into a checkpoint authority,
+bandwidth accounting, correctness receipts, and one refused full-precision WAN
+path. It proves Google plus Apple MLX can both contribute compressed deltas to
+RunPod after the MLX rejoin while keeping the dense all-reduce honesty
+boundary explicit.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker
