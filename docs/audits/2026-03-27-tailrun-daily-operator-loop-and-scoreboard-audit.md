@@ -29,6 +29,11 @@ The daily operator entry point now lives at:
 
 - `scripts/run-tailrun-daily-loop.sh`
 
+The current best-known default profile for that loop is now:
+
+- batch size `8`
+- documented in `docs/audits/2026-03-27-tailrun-batch8-best-known-profile-audit.md`
+
 Its job is to run or reuse the three retained stages:
 
 1. admitted-device same-node matrix
@@ -66,6 +71,7 @@ scripts/run-open-adapter-tailnet-matrix.sh \
   --run-id <run_id> \
   --bundle-dir <matrix_root> \
   --target-seconds 600 \
+  --batch-size 8 \
   --remote-host archlinux
 ```
 
@@ -78,6 +84,7 @@ cargo run -q -p psionic-train --bin open_adapter_pgolfish_quality_compare -- \
   --m5-bundle <matrix_root>/m5_mlx/portable_bundle.safetensors \
   --cuda-report <matrix_root>/archlinux_cuda/report.json \
   --cuda-bundle <matrix_root>/archlinux_cuda/portable_bundle.safetensors \
+  --batch-size 8 \
   --admitted-home-summary \
     fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json
 ```
@@ -177,6 +184,7 @@ It does claim:
 - the exact commands are frozen
 - the scorekeeping threshold is explicit
 - the M2 no longer blocks the daily operator flow
+- the current best-known default profile is now batch size `8`
 - later tuning can now be judged against a stable scorecard instead of ad hoc
   memory
 

@@ -1,0 +1,22 @@
+{
+  "schema_version": "psionic.tailrun_open_adapter_near_equivalent_report.v1",
+  "source_report_path": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/matrix/m5_mlx/report.json",
+  "source_bundle_path": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/matrix/m5_mlx/portable_bundle.safetensors",
+  "output_root": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/near_equivalent",
+  "carrier_model_path": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/near_equivalent/carrier_model.gguf",
+  "adapter_artifact_path": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/near_equivalent/lm_head_lora_adapter.safetensors",
+  "prompt_token_id": 7,
+  "expected_target_token_id": 37,
+  "direct_inference_predicted_token_id": 37,
+  "baseline_served_output_tokens": [
+    1023
+  ],
+  "overlay_served_output_tokens": [
+    37
+  ],
+  "baseline_served_output_text": "tok1023",
+  "overlay_served_output_text": "tok0037",
+  "adapter_binding_digest": "1bca052075d6fab4d427eb6809e59f82be1f677abd12b0ba14a0709ee4d76e73",
+  "runtime_support_level": "lm_head_lora_cpu",
+  "claim_boundary": "This retained near-equivalent proves that one bounded home-device-trained open-adapter artifact can be materialized into a direct-loadable LM-head LoRA safetensors file, can predict the anchored training token directly, and can be bound into `psionic-serve` over a prompt-aligned dense CPU GGUF carrier model. It does not claim that the artifact is already a strict Parameter Golf promoted decoder bundle, a production gpt-oss serving artifact, or a mixed-device promoted swarm output."
+}

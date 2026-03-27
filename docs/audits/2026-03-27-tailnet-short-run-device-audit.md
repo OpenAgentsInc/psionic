@@ -246,6 +246,7 @@ This audit is now paired with:
 
 - `docs/audits/2026-03-27-tailrun-pgolfish-quality-comparison-audit.md`
 - `docs/audits/2026-03-27-tailrun-daily-operator-loop-and-scoreboard-audit.md`
+- `docs/audits/2026-03-27-tailrun-batch8-best-known-profile-audit.md`
 
 That follow-up matters because the current same-node throughput advantage does
 **not** yet turn into a held-out quality advantage on the shared PGOLF-ish

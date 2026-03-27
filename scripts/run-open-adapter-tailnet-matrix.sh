@@ -7,7 +7,7 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 run_id=""
 bundle_dir=""
 target_seconds="600"
-batch_size="16"
+batch_size="8"
 git_ref=""
 remote_host="archlinux"
 remote_worktree_dir="/tmp/psionic-tailrun-matrix"
@@ -23,7 +23,7 @@ Options:
   --run-id <id>                 Stable run identifier.
   --bundle-dir <path>           Local artifact root.
   --target-seconds <seconds>    Shared benchmark wallclock. Default: 600
-  --batch-size <size>           PGOLF-ish training batch size. Default: 16
+  --batch-size <size>           PGOLF-ish training batch size. Default: 8
   --git-ref <ref>               Git ref used for the remote worktree. Default: local HEAD
   --remote-host <host>          Remote admitted host. Default: archlinux
   --remote-worktree-dir <path>  Remote clean worktree. Default: /tmp/psionic-tailrun-matrix

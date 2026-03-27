@@ -1,0 +1,37 @@
+{
+  "schema_version": "psionic.open_adapter_same_node_wallclock_benchmark.v1",
+  "host": "ChristohersMBP2.lan",
+  "backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "logical_device_kind": "metal",
+  "logical_device_label": "metal:0",
+  "target_wallclock_seconds": 600,
+  "calibration": {
+    "run_id": "same-node-wallclock-calibration-mlx",
+    "max_steps": 12,
+    "observed_wallclock_ms": 54,
+    "estimated_step_ms": 5,
+    "final_mean_loss": 14.992276
+  },
+  "retained_run": {
+    "run_id": "same-node-wallclock-retained-mlx",
+    "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+    "completed_steps": 174080,
+    "observed_wallclock_ms": 571992,
+    "steps_per_second": 304.3399208380537,
+    "samples_per_second": 38955.50986727087,
+    "source_tokens_per_second": 8706556.45533504,
+    "batch_count": 16,
+    "sample_count": 128,
+    "initial_mean_loss": 6.9547067,
+    "final_mean_loss": 0.0,
+    "loss_delta": 6.9547067,
+    "final_state_dict_digest": "92c5caa956351698fa5fdb1b996ac6c1311e7805f381801d3d20ef7894cc001e",
+    "bundle_artifact_path": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/matrix/m5_mlx/portable_bundle.safetensors"
+  },
+  "improvement": {
+    "calibration_to_retained_loss_delta": 14.992276,
+    "retained_vs_calibration_steps_gain": 174068,
+    "retained_vs_calibration_wallclock_gain_ms": 571938
+  },
+  "claim_boundary": "This report measures one same-node Rust-only open-adapter training/export lane on the selected MLX Metal or CUDA backend, then keeps the fixed-budget run alive until most of the requested wallclock budget is consumed. It compares like-for-like backend execution on the repo-owned first-swarm supervision set. It does not claim Parameter Golf challenge parity, full-model dense training, or mixed-backend distributed convergence."
+}

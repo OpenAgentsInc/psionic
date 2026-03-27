@@ -1,0 +1,85 @@
+{
+  "schema_version": "psionic.tailrun_daily_scoreboard.v1",
+  "run_id": "tailrun-daily-batch8-retained-20260327",
+  "created_at_utc": "2026-03-27T19:31:40Z",
+  "target_wallclock_seconds": 600,
+  "tuned_batch_size": 8,
+  "admitted_daily_operator_ordering": [
+    "Run the local M5 MLX same-node lane first.",
+    "Run the remote archlinux RTX 4080 CUDA lane in the same matrix second.",
+    "Run the PGOLF-ish held-out quality compare on the just-produced bundles third.",
+    "Run the M5 near-equivalent infer/serve bridge fourth.",
+    "Treat the M2 as opportunistic only and do not block the daily loop on it."
+  ],
+  "command_contract": {
+    "matrix": "scripts/run-open-adapter-tailnet-matrix.sh --run-id <run_id> --bundle-dir <matrix_root> --target-seconds 600 --batch-size <size> --remote-host archlinux",
+    "quality": "cargo run -q -p psionic-train --bin open_adapter_pgolfish_quality_compare -- --output-root <quality_root> --m5-report <matrix_root>/m5_mlx/report.json --m5-bundle <matrix_root>/m5_mlx/portable_bundle.safetensors --cuda-report <matrix_root>/archlinux_cuda/report.json --cuda-bundle <matrix_root>/archlinux_cuda/portable_bundle.safetensors --admitted-home-summary fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json --batch-size <size>",
+    "near_equivalent": "cargo run -q -p psionic-serve --example tailrun_open_adapter_near_equivalent_operator -- --source-report <matrix_root>/m5_mlx/report.json --source-bundle <matrix_root>/m5_mlx/portable_bundle.safetensors --output-root <near_equivalent_root>"
+  },
+  "current_paths": {
+    "matrix_report": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/matrix/matrix_report.json",
+    "quality_report": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/quality/quality_report.json",
+    "near_equivalent_report": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/near_equivalent/near_equivalent_report.json"
+  },
+  "baseline_paths": {
+    "matrix_report": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+    "quality_report": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/runs/tailrun_pgolfish_quality_compare_20260327/quality_report.json",
+    "near_equivalent_report": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/promoted/tailrun_m5_near_equivalent_20260327/near_equivalent_report.json"
+  },
+  "improvement_thresholds": {
+    "throughput_gain_pct_min": 5,
+    "heldout_loss_improvement_pct_min": 1,
+    "infer_bridge_requires_direct_and_served_target_match": true
+  },
+  "current_metrics": {
+    "matrix": {
+      "m5_steps_per_second": 304.3399208380537,
+      "cuda_steps_per_second": 122.27966003430116,
+      "local_over_remote_steps_gain_pct": 148.88842572238266
+    },
+    "quality": {
+      "best_heldout_artifact_id": "same_node_m5_mlx",
+      "best_heldout_mean_loss": 15.942383766174316,
+      "m5_heldout_mean_loss": 15.942383766174316,
+      "cuda_heldout_mean_loss": 15.942383766174316
+    },
+    "near_equivalent": {
+      "expected_target_token_id": 37,
+      "direct_inference_predicted_token_id": 37,
+      "overlay_served_output_token_id": 37,
+      "runtime_support_level": "lm_head_lora_cpu"
+    }
+  },
+  "baseline_metrics": {
+    "matrix": {
+      "m5_steps_per_second": 162.53061053630358,
+      "cuda_steps_per_second": 82.40252049829174
+    },
+    "quality": {
+      "best_heldout_artifact_id": "same_node_m5_mlx",
+      "best_heldout_mean_loss": 15.942383766174316,
+      "m5_heldout_mean_loss": 15.942383766174316,
+      "cuda_heldout_mean_loss": 15.942383766174316
+    },
+    "near_equivalent": {
+      "expected_target_token_id": 37,
+      "direct_inference_predicted_token_id": 37,
+      "overlay_served_output_token_id": 37
+    }
+  },
+  "comparison": {
+    "m5_steps_gain_pct_vs_baseline": 87.25083221789468,
+    "cuda_steps_gain_pct_vs_baseline": 48.39310653954584,
+    "best_heldout_loss_improvement_pct_vs_baseline": 0,
+    "near_equivalent_direct_match": true,
+    "near_equivalent_served_match": true
+  },
+  "verdict": {
+    "m5_throughput": "meaningful_improvement",
+    "cuda_throughput": "meaningful_improvement",
+    "heldout_quality": "noise_band",
+    "near_equivalent_bridge": "passed",
+    "overall": "throughput_improved"
+  },
+  "claim_boundary": "This scoreboard tracks the admitted daily home-Tailnet operator loop over the local M5 MLX lane, the remote archlinux RTX 4080 CUDA lane, the PGOLF-ish held-out comparison, and the same-node M5 near-equivalent infer/serve bridge. It does not claim that the M2 participated, that the mixed-device swarm artifact already has the same inferable bundle path, or that this lane is exact PGOLF or full decentralized internet training."
+}

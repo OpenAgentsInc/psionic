@@ -1,0 +1,103 @@
+{
+  "schema_version": "psionic.open_adapter_tailnet_admitted_device_matrix.v1",
+  "run_id": "tailrun-daily-batch8-retained-20260327",
+  "git_ref": "f49c84b4f3d07a7dad1a6bf08c62d1f107dc1ca6",
+  "target_wallclock_seconds": 600,
+  "batch_size": 8,
+  "admitted_device_set": [
+    {
+      "host": "ChristohersMBP2.lan",
+      "backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "report_path": "m5_mlx/report.json",
+      "bundle_path": "m5_mlx/portable_bundle.safetensors"
+    },
+    {
+      "host": "archlinux",
+      "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "report_path": "archlinux_cuda/report.json",
+      "bundle_path": "archlinux_cuda/portable_bundle.safetensors"
+    }
+  ],
+  "local_report": {
+    "schema_version": "psionic.open_adapter_same_node_wallclock_benchmark.v1",
+    "host": "ChristohersMBP2.lan",
+    "backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+    "logical_device_kind": "metal",
+    "logical_device_label": "metal:0",
+    "target_wallclock_seconds": 600,
+    "calibration": {
+      "run_id": "same-node-wallclock-calibration-mlx",
+      "max_steps": 12,
+      "observed_wallclock_ms": 54,
+      "estimated_step_ms": 5,
+      "final_mean_loss": 14.992276
+    },
+    "retained_run": {
+      "run_id": "same-node-wallclock-retained-mlx",
+      "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+      "completed_steps": 174080,
+      "observed_wallclock_ms": 571992,
+      "steps_per_second": 304.3399208380537,
+      "samples_per_second": 38955.50986727087,
+      "source_tokens_per_second": 8706556.45533504,
+      "batch_count": 16,
+      "sample_count": 128,
+      "initial_mean_loss": 6.9547067,
+      "final_mean_loss": 0.0,
+      "loss_delta": 6.9547067,
+      "final_state_dict_digest": "92c5caa956351698fa5fdb1b996ac6c1311e7805f381801d3d20ef7894cc001e",
+      "bundle_artifact_path": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-batch8-retained-20260327/matrix/m5_mlx/portable_bundle.safetensors"
+    },
+    "improvement": {
+      "calibration_to_retained_loss_delta": 14.992276,
+      "retained_vs_calibration_steps_gain": 174068,
+      "retained_vs_calibration_wallclock_gain_ms": 571938
+    },
+    "claim_boundary": "This report measures one same-node Rust-only open-adapter training/export lane on the selected MLX Metal or CUDA backend, then keeps the fixed-budget run alive until most of the requested wallclock budget is consumed. It compares like-for-like backend execution on the repo-owned first-swarm supervision set. It does not claim Parameter Golf challenge parity, full-model dense training, or mixed-backend distributed convergence."
+  },
+  "remote_report": {
+    "schema_version": "psionic.open_adapter_same_node_wallclock_benchmark.v1",
+    "host": "archlinux",
+    "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+    "logical_device_kind": "cuda",
+    "logical_device_label": "cuda:0",
+    "target_wallclock_seconds": 600,
+    "calibration": {
+      "run_id": "same-node-wallclock-calibration-cuda",
+      "max_steps": 12,
+      "observed_wallclock_ms": 59,
+      "estimated_step_ms": 5,
+      "final_mean_loss": 14.992119
+    },
+    "retained_run": {
+      "run_id": "same-node-wallclock-retained-cuda",
+      "checkpoint_family": "benchmark.open_adapter.same_node.cuda.retained",
+      "completed_steps": 70656,
+      "observed_wallclock_ms": 577823,
+      "steps_per_second": 122.27966003430116,
+      "samples_per_second": 15651.796484390548,
+      "source_tokens_per_second": 3498176.5142612876,
+      "batch_count": 16,
+      "sample_count": 128,
+      "initial_mean_loss": 6.9547067,
+      "final_mean_loss": 0.0,
+      "loss_delta": 6.9547067,
+      "final_state_dict_digest": "f753827d2b35553c74ee6208dc87f1d8d32333c8071de3f706683a32383c0b4b",
+      "bundle_artifact_path": "/tmp/tailrun-daily-batch8-retained-20260327-archlinux/portable_bundle.safetensors"
+    },
+    "improvement": {
+      "calibration_to_retained_loss_delta": 14.992119,
+      "retained_vs_calibration_steps_gain": 70644,
+      "retained_vs_calibration_wallclock_gain_ms": 577764
+    },
+    "claim_boundary": "This report measures one same-node Rust-only open-adapter training/export lane on the selected MLX Metal or CUDA backend, then keeps the fixed-budget run alive until most of the requested wallclock budget is consumed. It compares like-for-like backend execution on the repo-owned first-swarm supervision set. It does not claim Parameter Golf challenge parity, full-model dense training, or mixed-backend distributed convergence."
+  },
+  "comparison": {
+    "steps_per_second_gain_pct_local_over_remote": 148.88842572238266,
+    "samples_per_second_gain_pct_local_over_remote": 148.88842572238266,
+    "source_tokens_per_second_gain_pct_local_over_remote": 148.88842572238266,
+    "local_to_remote_steps_ratio": 2.488884257223827,
+    "local_to_remote_loss_delta_gap": 0
+  },
+  "claim_boundary": "This matrix report compares the admitted home-Tailnet operator set only: the local M5 MLX path and the remote archlinux RTX 4080 CUDA path. It does not claim that sleeping or unreachable nodes were part of the retained comparison."
+}

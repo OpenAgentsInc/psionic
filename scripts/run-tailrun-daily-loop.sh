@@ -7,7 +7,7 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 run_id=""
 root_dir=""
 target_seconds="600"
-batch_size="16"
+batch_size="8"
 remote_host="archlinux"
 matrix_root=""
 quality_root=""
@@ -30,7 +30,7 @@ Options:
   --run-id <id>                         Stable daily run identifier.
   --root-dir <path>                     Daily artifact root. Default: fixtures/apple_adapter/daily/<run_id>
   --target-seconds <seconds>            Shared matrix wallclock. Default: 600
-  --batch-size <size>                   PGOLF-ish training and eval batch size. Default: 16
+  --batch-size <size>                   PGOLF-ish training and eval batch size. Default: 8
   --remote-host <host>                  Remote admitted CUDA host. Default: archlinux
   --matrix-root <path>                  Matrix artifact root. Default: <root-dir>/matrix
   --quality-root <path>                 Quality artifact root. Default: <root-dir>/quality
