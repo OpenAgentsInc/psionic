@@ -3397,6 +3397,15 @@ fn attention_forward(
     let sequence_length = input.sequence_length();
     let head_dim = config.model_dim / config.num_heads;
     let kv_dim = config.num_kv_heads * head_dim;
+    if attention_window_size == Some(1) && sequence_length == 1 {
+        return attention_forward_single_token_window_one(
+            attention,
+            input,
+            config,
+            layer_index,
+            value_embedding,
+        );
+    }
     let q_proj = linear_forward(&attention.q_proj, input);
     let k_proj = linear_forward(&attention.k_proj, input);
     let mut v_proj = linear_forward(&attention.v_proj, input);
@@ -3632,6 +3641,96 @@ fn attention_forward(
                         )],
                     );
                 }
+            }
+        }
+    }
+    debug_assert_eq!(kv_dim, attention.k_proj.out_features);
+    linear_forward(&attention.out_proj, &merged)
+}
+
+fn attention_forward_single_token_window_one(
+    attention: &ParameterGolfAttentionWeights,
+    input: &ParameterGolfTensor3,
+    config: &ParameterGolfConfig,
+    layer_index: usize,
+    value_embedding: Option<&ParameterGolfTensor3>,
+) -> ParameterGolfTensor3 {
+    let batch_size = input.batch_size();
+    let sequence_length = input.sequence_length();
+    debug_assert_eq!(sequence_length, 1);
+    let head_dim = config.model_dim / config.num_heads;
+    let kv_dim = config.num_kv_heads * head_dim;
+    let mut v_proj = linear_forward(&attention.v_proj, input);
+    if let Some(value_embedding) = value_embedding {
+        add_in_place(&mut v_proj, value_embedding);
+    }
+
+    let group_size = config.num_heads / config.num_kv_heads;
+    let mut value_heads = vec![0.0_f32; batch_size * config.num_kv_heads * sequence_length * head_dim];
+    let mut attended = vec![0.0_f32; batch_size * config.num_heads * sequence_length * head_dim];
+    for batch in 0..batch_size {
+        for kv_head in 0..config.num_kv_heads {
+            for feature in 0..head_dim {
+                let value = v_proj.get(batch, 0, kv_head * head_dim + feature);
+                value_heads[tensor4_index(
+                    batch_size,
+                    config.num_kv_heads,
+                    sequence_length,
+                    head_dim,
+                    batch,
+                    kv_head,
+                    0,
+                    feature,
+                )] = value;
+                for group_head in 0..group_size {
+                    let head = kv_head * group_size + group_head;
+                    attended[tensor4_index(
+                        batch_size,
+                        config.num_heads,
+                        sequence_length,
+                        head_dim,
+                        batch,
+                        head,
+                        0,
+                        feature,
+                    )] = value;
+                }
+            }
+        }
+    }
+
+    if config.xsa_applies_to_layer(layer_index) {
+        apply_xsa_to_attended_in_place(
+            attended.as_mut_slice(),
+            value_heads.as_slice(),
+            batch_size,
+            config.num_heads,
+            config.num_kv_heads,
+            sequence_length,
+            head_dim,
+            PARAMETER_GOLF_DEFAULT_RMS_NORM_EPSILON,
+        );
+    }
+
+    let mut merged = ParameterGolfTensor3::zeros([batch_size, sequence_length, config.model_dim]);
+    for batch in 0..batch_size {
+        for head in 0..config.num_heads {
+            for feature in 0..head_dim {
+                merged.set(
+                    batch,
+                    0,
+                    head * head_dim + feature,
+                    attended[tensor4_index(
+                        batch_size,
+                        config.num_heads,
+                        sequence_length,
+                        head_dim,
+                        batch,
+                        head,
+                        0,
+                        feature,
+                    )],
+                );
             }
         }
     }
@@ -4664,6 +4763,55 @@ mod tests {
                 attention_window_size: 0
             }
         ));
+    }
+
+    #[test]
+    fn single_token_window_one_matches_dense_forward_path() {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture model should build");
+        let input_ids = vec![vec![1_u32]];
+        let dense_logits = model
+            .forward_logits(input_ids.as_slice())
+            .expect("dense logits should compute");
+        let windowed_logits = model
+            .forward_logits_with_attention_window(input_ids.as_slice(), 1)
+            .expect("single-token window logits should compute");
+        let max_abs_diff = dense_logits
+            .max_abs_diff(&windowed_logits)
+            .expect("single-token shapes should match");
+        assert!(
+            max_abs_diff < 1e-6,
+            "unexpected single-token dense/windowed drift: {max_abs_diff}"
+        );
+    }
+
+    #[test]
+    fn single_token_window_one_matches_dense_forward_path_with_xsa() {
+        let baseline = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture should build");
+        let model = ParameterGolfReferenceModel::new(
+            baseline.descriptor().model.clone(),
+            ParameterGolfConfig {
+                xsa_last_n: 2,
+                ..baseline.descriptor().config.clone()
+            },
+            baseline.weights().clone(),
+        )
+        .expect("xsa variant should build");
+        let input_ids = vec![vec![1_u32]];
+        let dense_logits = model
+            .forward_logits(input_ids.as_slice())
+            .expect("dense xsa logits should compute");
+        let windowed_logits = model
+            .forward_logits_with_attention_window(input_ids.as_slice(), 1)
+            .expect("single-token xsa window logits should compute");
+        let max_abs_diff = dense_logits
+            .max_abs_diff(&windowed_logits)
+            .expect("single-token xsa shapes should match");
+        assert!(
+            max_abs_diff < 1e-6,
+            "unexpected single-token xsa dense/windowed drift: {max_abs_diff}"
+        );
     }
 
     #[test]
