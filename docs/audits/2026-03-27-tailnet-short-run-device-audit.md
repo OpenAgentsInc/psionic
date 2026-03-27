@@ -18,8 +18,7 @@ The answer is now:
 
 - yes for the local M5 MLX host
 - yes for the remote RTX 4080 CUDA host
-- not yet for the remote M2 host, because SSH access still failed before a run
-  could start
+- not as part of the admitted daily operator set for the remote M2 host
 
 ## What Changed During This Pass
 
@@ -142,31 +141,41 @@ The honest reading is:
 - the current CUDA path still needs systems work before it wins on this class
   of bounded same-node training run
 
+## Admitted Device Set
+
+The current admitted daily operator set is:
+
+- local M5 MLX host
+- remote RTX 4080 CUDA host on `archlinux`
+
+Those are the devices that can be reached and used honestly without turning the
+daily loop into a wait-on-another-machine exercise.
+
 ## M2 Status
 
-The M2 never reached benchmark execution in this pass.
+The M2 is no longer treated as part of the admitted daily operator set.
 
-What was attempted:
+What changed after the original pass:
 
-- normal SSH with existing local key material
-- normal SSH with explicit password auth using the stored local Tailnet secret
-- `tailscale ssh`
-- MagicDNS host-key seeding for `macbook-pro-m2.tailaeab8f.ts.net`
-
-What happened:
-
-- key auth failed
-- password auth failed repeatedly with the stored secret
-- `tailscale ssh` still failed host-key validation / auth setup for that host
+- `scripts/bootstrap-tailnet-key-auth.sh` now exists and can install this
+  machine's SSH public key on a reachable Tailnet host with one password-based
+  bootstrap
+- that script successfully established non-interactive key auth to the M2 once
+- the M2 then went offline mid-benchmark before it emitted a retained report
+  or portable bundle
 
 So the current honest state is:
 
-- Tailnet reachability: yes
-- benchmark command ready: yes
-- unattended shell access for the M2 from this machine: no
+What was attempted:
 
-Until the M2 accepts either a trusted SSH key or a working Tailscale SSH user
-path, it cannot be part of the retained three-device comparison.
+- Tailnet reachability: intermittent
+- benchmark command ready: yes
+- unattended shell access from this machine: yes after SSH key bootstrap
+- retained benchmark artifact: no, because the host did not stay online long
+  enough to finish the bounded run
+
+Until the M2 stays awake and reachable for the full run budget, it is not part
+of the admitted comparison set for the daily loop.
 
 ## Operational Recommendation
 
@@ -175,8 +184,8 @@ Use this ordering today:
 1. Run short bounded same-node training on the local M5 first.
 2. Use the RTX 4080 host as the second machine only after validating that the
    workload is large enough to justify the CUDA path.
-3. Fix M2 SSH admission before spending more time trying to make the three-way
-   home Tailnet comparison look complete.
+3. Treat the M2 as opportunistic only. Use it when it is awake and reachable,
+   but do not block the daily loop on it.
 
 If the immediate goal is better useful-model progress in ten-minute windows,
 the next sensible step is not a bigger audit. It is one more benchmark or
@@ -199,4 +208,6 @@ It does claim:
 - the benchmark was improved from a misleading toy shape into a retained
   backend-heavy short-run profile
 - the retained M5 and RTX 4080 ten-minute runs are real and comparable
-- the current M2 blocker is authentication, not missing code
+- the current admitted operator set is the M5 plus the RTX 4080 host
+- the M2 now has a working SSH bootstrap path, but it is still excluded from
+  the daily admitted set because availability is not stable enough yet

@@ -95,6 +95,13 @@ Default to:
 - Use the repo status vocabulary consistently:
   `implemented`, `implemented_early`, `partial`,
   `partial_outside_psionic`, and `planned`.
+- If a host, credential, external machine, or network path is blocked, do not
+  sit idle waiting for the user by default.
+- Route around the obstacle when possible: keep working on accessible devices,
+  reduce the active scope to the honest reachable set, and update issues or
+  docs so the recorded plan matches reality.
+- Only stop to ask the user when the blocked dependency is mandatory for the
+  next honest step and there is no meaningful non-blocked work left.
 
 ## Worktree Hygiene
 
