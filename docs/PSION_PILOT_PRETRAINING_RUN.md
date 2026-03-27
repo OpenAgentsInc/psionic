@@ -20,7 +20,9 @@ promoted PGOLF-shaped first-model proof path now lives separately at:
 - `crates/psionic-train/examples/parameter_golf_promoted_reference_run.rs`
 
 That promoted path is the honest closure target for the first serious
-train/checkpoint/restore/resume artifact family; this Psion pilot remains the
+train/checkpoint/restore/resume artifact family and now emits the canonical
+`descriptor.json` + `model.safetensors` + `tokenizer.json` + `generation_config.json`
+bundle surface for later inference and serve work; this Psion pilot remains the
 bounded smoke-test and receipt lane.
 
 The canonical bounded accelerator-backed single-node trainer now exists

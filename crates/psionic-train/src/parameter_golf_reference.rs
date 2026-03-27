@@ -8,7 +8,7 @@ use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use half::f16;
 use psionic_data::{
     ParameterGolfDataError, ParameterGolfSentencePieceByteLuts,
-    ParameterGolfSentencePieceTokenEntry,
+    ParameterGolfSentencePieceTokenEntry, ParameterGolfSentencePieceTokenKind,
 };
 use psionic_eval::{
     evaluate_parameter_golf_validation, ParameterGolfValidationEvalError,
@@ -16,9 +16,16 @@ use psionic_eval::{
 };
 use psionic_models::{
     ParameterGolfBankedWeights, ParameterGolfExecutionError, ParameterGolfModelDescriptor,
-    ParameterGolfModelError, ParameterGolfParameterVector, ParameterGolfPromotedProfileContract,
-    ParameterGolfPromotedProfileKind, ParameterGolfReferenceModel,
-    PARAMETER_GOLF_BASELINE_VOCAB_SIZE,
+    ParameterGolfModelError, ParameterGolfParameterVector, ParameterGolfPromotedBundleArtifactRef,
+    ParameterGolfPromotedBundleArtifacts, ParameterGolfPromotedBundleLineage,
+    ParameterGolfPromotedBundleManifest, ParameterGolfPromotedGenerationConfig,
+    ParameterGolfPromotedProfileContract, ParameterGolfPromotedProfileKind,
+    ParameterGolfPromotedTokenizerAsset, ParameterGolfPromotedTokenizerAssetFormat,
+    ParameterGolfPromotedTokenizerFamily, ParameterGolfPromotedTokenizerToken,
+    ParameterGolfPromotedTokenizerTokenKind, ParameterGolfReferenceModel,
+    PARAMETER_GOLF_BASELINE_VOCAB_SIZE, PARAMETER_GOLF_PROMOTED_BUNDLE_MANIFEST_SCHEMA_VERSION,
+    PARAMETER_GOLF_PROMOTED_GENERATION_CONFIG_SCHEMA_VERSION,
+    PARAMETER_GOLF_PROMOTED_TOKENIZER_ASSET_SCHEMA_VERSION,
 };
 use psionic_runtime::TrainingCheckpointReference;
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
@@ -87,6 +94,20 @@ pub fn parameter_golf_strict_challenge_profile_contract() -> PortableModelProfil
         ParameterGolfPromotedProfileKind::StrictPgolfChallenge,
     ))
 }
+
+const PARAMETER_GOLF_PROMOTED_BUNDLE_MANIFEST_FILE: &str =
+    "parameter_golf_promoted_bundle_manifest.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_DESCRIPTOR_FILE: &str = "descriptor.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_MODEL_FILE: &str = "model.safetensors";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_TOKENIZER_FILE: &str = "tokenizer.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_GENERATION_CONFIG_FILE: &str = "generation_config.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_PROFILE_CONTRACT_FILE: &str = "profile_contract.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_TRAINING_CONFIG_FILE: &str = "training_config.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_SUMMARY_FILE: &str = "summary.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_CHECKPOINT_MANIFEST_FILE: &str = "checkpoint_manifest.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_CHECKPOINT_SURFACE_REPORT_FILE: &str =
+    "checkpoint_surface_report.json";
+const PARAMETER_GOLF_PROMOTED_BUNDLE_RESUME_PROOF_FILE: &str = "resume_proof.json";
 
 fn portable_parameter_golf_profile_contract(
     contract: ParameterGolfPromotedProfileContract,
@@ -1228,6 +1249,12 @@ pub struct ParameterGolfPromotedReferenceRun {
     pub checkpoint_surface_report: ParameterGolfPromotedCheckpointSurfaceReport,
     /// Restore/resume parity proof.
     pub resume_proof: ParameterGolfPromotedResumeProof,
+    /// Runtime-loadable tokenizer asset for the promoted bundle.
+    pub tokenizer_asset: ParameterGolfPromotedTokenizerAsset,
+    /// Default generation config for the promoted bundle.
+    pub generation_config: ParameterGolfPromotedGenerationConfig,
+    /// Canonical on-disk bundle manifest for the promoted runtime bundle.
+    pub bundle_manifest: ParameterGolfPromotedBundleManifest,
     /// Final summary for operator-facing proof-run output.
     pub summary: ParameterGolfPromotedReferenceRunSummary,
 }
@@ -1931,17 +1958,13 @@ pub fn run_parameter_golf_promoted_reference_run(
     }
 
     let resume_proof = promoted_resume_proof(fixture, &profile_contract, &training_outcome)?;
+    let tokenizer_asset = build_parameter_golf_promoted_tokenizer_asset(fixture, config)?;
+    let generation_config =
+        build_parameter_golf_promoted_generation_config(config, &model_descriptor)?;
     let summary = ParameterGolfPromotedReferenceRunSummary {
         schema_version: String::from("psionic.parameter_golf_promoted_reference_run.v1"),
         profile_id: profile_contract.profile_id.clone(),
-        profile_kind: match config.promoted_profile.kind {
-            ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder => {
-                String::from("general_psion_small_decoder")
-            }
-            ParameterGolfPromotedProfileKind::StrictPgolfChallenge => {
-                String::from("strict_pgolf_challenge")
-            }
-        },
+        profile_kind: profile_kind_label(config.promoted_profile.kind),
         run_id: config.run_id.clone(),
         checkpoint_family: config.checkpoint_family.clone(),
         descriptor_digest: model_descriptor.stable_digest(),
@@ -1960,15 +1983,86 @@ pub fn run_parameter_golf_promoted_reference_run(
             "Promoted PGOLF first-model proof run trained the full parameter_golf_decoder baseline, verified that the emitted checkpoint surface exactly matched the promoted descriptor, and proved restore-plus-resume parity from the emitted checkpoint lineage.",
         ),
     };
-    Ok(ParameterGolfPromotedReferenceRun {
+    let mut run = ParameterGolfPromotedReferenceRun {
         profile_contract,
         training_config: config.clone(),
         model_descriptor,
         training_outcome,
         checkpoint_surface_report,
         resume_proof,
+        tokenizer_asset,
+        generation_config,
+        bundle_manifest: ParameterGolfPromotedBundleManifest {
+            schema_version: String::new(),
+            bundle_id: String::new(),
+            family_id: String::new(),
+            model_family: String::new(),
+            model_id: String::new(),
+            model_revision: String::new(),
+            profile_id: String::new(),
+            profile_kind: String::new(),
+            artifacts: ParameterGolfPromotedBundleArtifacts {
+                descriptor: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                model: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                tokenizer_asset: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                generation_config: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                profile_contract: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                training_config: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                summary: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                checkpoint_manifest: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                checkpoint_surface_report: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+                resume_proof: ParameterGolfPromotedBundleArtifactRef {
+                    relative_path: String::new(),
+                    sha256: String::new(),
+                },
+            },
+            lineage: ParameterGolfPromotedBundleLineage {
+                run_id: String::new(),
+                checkpoint_family: String::new(),
+                final_checkpoint_ref: String::new(),
+                final_checkpoint_manifest_digest: String::new(),
+                checkpoint_artifact_digest: String::new(),
+                descriptor_digest: String::new(),
+                training_dataset_digest: String::new(),
+                validation_dataset_digest: String::new(),
+                profile_id: String::new(),
+                profile_kind: String::new(),
+                detail: String::new(),
+            },
+            detail: String::new(),
+            bundle_digest: String::new(),
+        },
         summary,
-    })
+    };
+    run.bundle_manifest = build_parameter_golf_promoted_bundle_manifest(&run)?;
+    Ok(run)
 }
 
 /// Writes one promoted PGOLF first-model proof run into a self-contained output
@@ -1978,6 +2072,84 @@ pub fn write_parameter_golf_promoted_reference_run(
     output_dir: &Path,
 ) -> Result<(), ParameterGolfReferenceTrainingError> {
     std::fs::create_dir_all(output_dir)?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_MANIFEST_FILE)
+            .as_path(),
+        &run.bundle_manifest,
+        "parameter golf promoted bundle manifest export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_DESCRIPTOR_FILE)
+            .as_path(),
+        &run.model_descriptor,
+        "parameter golf promoted bundle descriptor export",
+    )?;
+    std::fs::write(
+        output_dir.join(PARAMETER_GOLF_PROMOTED_BUNDLE_MODEL_FILE),
+        run.training_outcome
+            .final_checkpoint
+            .weights_artifact
+            .bytes
+            .as_slice(),
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_TOKENIZER_FILE)
+            .as_path(),
+        &run.tokenizer_asset,
+        "parameter golf promoted bundle tokenizer asset export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_GENERATION_CONFIG_FILE)
+            .as_path(),
+        &run.generation_config,
+        "parameter golf promoted bundle generation config export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_PROFILE_CONTRACT_FILE)
+            .as_path(),
+        &run.profile_contract,
+        "parameter golf promoted bundle profile contract export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_TRAINING_CONFIG_FILE)
+            .as_path(),
+        &run.training_config,
+        "parameter golf promoted bundle training config export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_SUMMARY_FILE)
+            .as_path(),
+        &run.summary,
+        "parameter golf promoted bundle summary export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_CHECKPOINT_MANIFEST_FILE)
+            .as_path(),
+        &run.training_outcome.final_checkpoint.manifest,
+        "parameter golf promoted bundle checkpoint manifest export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_CHECKPOINT_SURFACE_REPORT_FILE)
+            .as_path(),
+        &run.checkpoint_surface_report,
+        "parameter golf promoted bundle checkpoint surface report export",
+    )?;
+    write_json_file(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_RESUME_PROOF_FILE)
+            .as_path(),
+        &run.resume_proof,
+        "parameter golf promoted bundle resume proof export",
+    )?;
     write_json_file(
         output_dir
             .join("parameter_golf_promoted_profile_contract.json")
@@ -2057,6 +2229,7 @@ pub fn write_parameter_golf_promoted_reference_run(
             .bytes
             .as_slice(),
     )?;
+    check_parameter_golf_promoted_bundle(output_dir)?;
     Ok(())
 }
 
@@ -2065,14 +2238,556 @@ fn write_json_file<T: Serialize>(
     value: &T,
     context: &'static str,
 ) -> Result<(), ParameterGolfReferenceTrainingError> {
-    let bytes = serde_json::to_vec_pretty(value).map_err(|error| {
+    let bytes = json_bytes_pretty(value, context)?;
+    std::fs::write(path, bytes)?;
+    Ok(())
+}
+
+fn json_bytes_pretty<T: Serialize>(
+    value: &T,
+    context: &'static str,
+) -> Result<Vec<u8>, ParameterGolfReferenceTrainingError> {
+    serde_json::to_vec_pretty(value).map_err(|error| {
         ParameterGolfReferenceTrainingError::Serialization {
             context,
             message: error.to_string(),
         }
+    })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    hex::encode(Sha256::digest(bytes))
+}
+
+fn profile_kind_label(kind: ParameterGolfPromotedProfileKind) -> String {
+    match kind {
+        ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder => {
+            String::from("general_psion_small_decoder")
+        }
+        ParameterGolfPromotedProfileKind::StrictPgolfChallenge => {
+            String::from("strict_pgolf_challenge")
+        }
+    }
+}
+
+fn map_promoted_token_kind(
+    kind: ParameterGolfSentencePieceTokenKind,
+) -> ParameterGolfPromotedTokenizerTokenKind {
+    match kind {
+        ParameterGolfSentencePieceTokenKind::Normal => {
+            ParameterGolfPromotedTokenizerTokenKind::Normal
+        }
+        ParameterGolfSentencePieceTokenKind::Byte => ParameterGolfPromotedTokenizerTokenKind::Byte,
+        ParameterGolfSentencePieceTokenKind::Control => {
+            ParameterGolfPromotedTokenizerTokenKind::Control
+        }
+        ParameterGolfSentencePieceTokenKind::Unknown => {
+            ParameterGolfPromotedTokenizerTokenKind::Unknown
+        }
+        ParameterGolfSentencePieceTokenKind::Unused => {
+            ParameterGolfPromotedTokenizerTokenKind::Unused
+        }
+    }
+}
+
+fn build_parameter_golf_promoted_tokenizer_asset(
+    fixture: &ParameterGolfLocalReferenceFixture,
+    config: &ParameterGolfReferenceTrainingConfig,
+) -> Result<ParameterGolfPromotedTokenizerAsset, ParameterGolfReferenceTrainingError> {
+    let mut pieces_by_id = fixture
+        .sentencepiece_entries
+        .iter()
+        .map(|entry| {
+            (
+                entry.token_id as usize,
+                ParameterGolfPromotedTokenizerToken {
+                    token_id: entry.token_id,
+                    piece: entry.piece.clone(),
+                    kind: map_promoted_token_kind(entry.kind),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    pieces_by_id
+        .entry(0)
+        .or_insert_with(|| ParameterGolfPromotedTokenizerToken {
+            token_id: 0,
+            piece: String::from("<unk>"),
+            kind: ParameterGolfPromotedTokenizerTokenKind::Unknown,
+        });
+
+    let pieces = (0..fixture.tokenizer_vocab_size)
+        .map(|token_id| {
+            pieces_by_id
+                .remove(&token_id)
+                .unwrap_or(ParameterGolfPromotedTokenizerToken {
+                    token_id: token_id as u32,
+                    piece: format!("<reserved_{token_id:04}>"),
+                    kind: ParameterGolfPromotedTokenizerTokenKind::Unused,
+                })
+        })
+        .collect::<Vec<_>>();
+
+    let tokenizer_id = match config.promoted_profile.tokenizer_identity {
+        ParameterGolfPromotedTokenizerIdentity::RepoLocalReferenceSentencePiece => {
+            format!(
+                "{}.local_reference_sentencepiece",
+                config.promoted_profile.profile_id
+            )
+        }
+        ParameterGolfPromotedTokenizerIdentity::ChallengeSp1024SentencePiece => {
+            format!(
+                "{}.challenge_sp1024_sentencepiece",
+                config.promoted_profile.profile_id
+            )
+        }
+    };
+    let mut asset = ParameterGolfPromotedTokenizerAsset {
+        schema_version: String::from(PARAMETER_GOLF_PROMOTED_TOKENIZER_ASSET_SCHEMA_VERSION),
+        profile_id: config.promoted_profile.profile_id.clone(),
+        tokenizer_id,
+        tokenizer_version: String::from("repo-2026-03-26"),
+        family: ParameterGolfPromotedTokenizerFamily::SentencePiece,
+        asset_format: ParameterGolfPromotedTokenizerAssetFormat::SentencePiecePieceTableJson,
+        vocab_size: fixture.tokenizer_vocab_size as u32,
+        add_bos: false,
+        add_eos: false,
+        bos_token_id: None,
+        eos_token_ids: Vec::new(),
+        pad_token_id: None,
+        unknown_token_id: Some(0),
+        pieces,
+        tokenizer_digest: String::new(),
+        asset_digest: String::new(),
+        detail: String::from(
+            "Runtime-loadable SentencePiece-style piece table for the promoted PGOLF-shaped local-reference bundle.",
+        ),
+    };
+    asset.tokenizer_digest = asset.tokenizer_contract_digest();
+    asset.asset_digest = asset.stable_digest();
+    asset
+        .validate()
+        .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted tokenizer asset",
+            message: error.to_string(),
+        })?;
+    Ok(asset)
+}
+
+fn build_parameter_golf_promoted_generation_config(
+    config: &ParameterGolfReferenceTrainingConfig,
+    descriptor: &ParameterGolfModelDescriptor,
+) -> Result<ParameterGolfPromotedGenerationConfig, ParameterGolfReferenceTrainingError> {
+    let mut generation_config = ParameterGolfPromotedGenerationConfig {
+        schema_version: String::from(PARAMETER_GOLF_PROMOTED_GENERATION_CONFIG_SCHEMA_VERSION),
+        profile_id: config.promoted_profile.profile_id.clone(),
+        prompt_format: String::from("plain_text"),
+        max_context: descriptor.config.max_context,
+        default_max_new_tokens: descriptor.config.max_context.min(32),
+        default_sampling_mode: String::from("greedy"),
+        default_temperature: 0.0,
+        default_top_k: None,
+        stop_on_eos: false,
+        config_digest: String::new(),
+        detail: String::from(
+            "Default CPU-first generation posture for the promoted PGOLF-shaped local-reference bundle.",
+        ),
+    };
+    generation_config.config_digest = generation_config.stable_digest();
+    generation_config.validate().map_err(|error| {
+        ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted generation config",
+            message: error.to_string(),
+        }
     })?;
-    std::fs::write(path, bytes)?;
-    Ok(())
+    Ok(generation_config)
+}
+
+fn build_bundle_artifact_ref(
+    relative_path: &str,
+    bytes: &[u8],
+) -> ParameterGolfPromotedBundleArtifactRef {
+    ParameterGolfPromotedBundleArtifactRef {
+        relative_path: String::from(relative_path),
+        sha256: sha256_hex(bytes),
+    }
+}
+
+fn build_parameter_golf_promoted_bundle_manifest(
+    run: &ParameterGolfPromotedReferenceRun,
+) -> Result<ParameterGolfPromotedBundleManifest, ParameterGolfReferenceTrainingError> {
+    let descriptor_bytes = json_bytes_pretty(
+        &run.model_descriptor,
+        "parameter golf promoted bundle descriptor export",
+    )?;
+    let tokenizer_asset_bytes = json_bytes_pretty(
+        &run.tokenizer_asset,
+        "parameter golf promoted bundle tokenizer export",
+    )?;
+    let generation_config_bytes = json_bytes_pretty(
+        &run.generation_config,
+        "parameter golf promoted bundle generation config export",
+    )?;
+    let profile_contract_bytes = json_bytes_pretty(
+        &run.profile_contract,
+        "parameter golf promoted bundle profile contract export",
+    )?;
+    let training_config_bytes = json_bytes_pretty(
+        &run.training_config,
+        "parameter golf promoted bundle training config export",
+    )?;
+    let summary_bytes = json_bytes_pretty(
+        &run.summary,
+        "parameter golf promoted bundle summary export",
+    )?;
+    let checkpoint_manifest_bytes = json_bytes_pretty(
+        &run.training_outcome.final_checkpoint.manifest,
+        "parameter golf promoted bundle checkpoint manifest export",
+    )?;
+    let checkpoint_surface_report_bytes = json_bytes_pretty(
+        &run.checkpoint_surface_report,
+        "parameter golf promoted bundle checkpoint surface report export",
+    )?;
+    let resume_proof_bytes = json_bytes_pretty(
+        &run.resume_proof,
+        "parameter golf promoted bundle resume proof export",
+    )?;
+
+    let profile_kind = profile_kind_label(run.profile_contract.kind);
+    let mut manifest = ParameterGolfPromotedBundleManifest {
+        schema_version: String::from(PARAMETER_GOLF_PROMOTED_BUNDLE_MANIFEST_SCHEMA_VERSION),
+        bundle_id: format!(
+            "{}:{}",
+            run.profile_contract.profile_id, run.summary.final_checkpoint_ref
+        ),
+        family_id: run.profile_contract.family_id.clone(),
+        model_family: run.model_descriptor.model.family.clone(),
+        model_id: run.model_descriptor.model.model_id.clone(),
+        model_revision: run.model_descriptor.model.revision.clone(),
+        profile_id: run.profile_contract.profile_id.clone(),
+        profile_kind: profile_kind.clone(),
+        artifacts: ParameterGolfPromotedBundleArtifacts {
+            descriptor: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_DESCRIPTOR_FILE,
+                descriptor_bytes.as_slice(),
+            ),
+            model: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_MODEL_FILE,
+                run.training_outcome
+                    .final_checkpoint
+                    .weights_artifact
+                    .bytes
+                    .as_slice(),
+            ),
+            tokenizer_asset: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_TOKENIZER_FILE,
+                tokenizer_asset_bytes.as_slice(),
+            ),
+            generation_config: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_GENERATION_CONFIG_FILE,
+                generation_config_bytes.as_slice(),
+            ),
+            profile_contract: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_PROFILE_CONTRACT_FILE,
+                profile_contract_bytes.as_slice(),
+            ),
+            training_config: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_TRAINING_CONFIG_FILE,
+                training_config_bytes.as_slice(),
+            ),
+            summary: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_SUMMARY_FILE,
+                summary_bytes.as_slice(),
+            ),
+            checkpoint_manifest: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_CHECKPOINT_MANIFEST_FILE,
+                checkpoint_manifest_bytes.as_slice(),
+            ),
+            checkpoint_surface_report: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_CHECKPOINT_SURFACE_REPORT_FILE,
+                checkpoint_surface_report_bytes.as_slice(),
+            ),
+            resume_proof: build_bundle_artifact_ref(
+                PARAMETER_GOLF_PROMOTED_BUNDLE_RESUME_PROOF_FILE,
+                resume_proof_bytes.as_slice(),
+            ),
+        },
+        lineage: ParameterGolfPromotedBundleLineage {
+            run_id: run.summary.run_id.clone(),
+            checkpoint_family: run.summary.checkpoint_family.clone(),
+            final_checkpoint_ref: run.summary.final_checkpoint_ref.clone(),
+            final_checkpoint_manifest_digest: run.summary.final_checkpoint_manifest_digest.clone(),
+            checkpoint_artifact_digest: run
+                .training_outcome
+                .final_checkpoint
+                .weights_artifact
+                .artifact_digest
+                .clone(),
+            descriptor_digest: run.summary.descriptor_digest.clone(),
+            training_dataset_digest: run.summary.training_dataset_digest.clone(),
+            validation_dataset_digest: run.summary.validation_dataset_digest.clone(),
+            profile_id: run.summary.profile_id.clone(),
+            profile_kind,
+            detail: String::from(
+                "This promoted bundle is the exact runtime handoff from the bounded PGOLF-shaped proof run into later load, prompt, and serve work.",
+            ),
+        },
+        detail: String::from(
+            "Self-contained promoted PGOLF-shaped model bundle carrying descriptor, weights, runtime tokenizer asset, generation defaults, and proof-lineage metadata.",
+        ),
+        bundle_digest: String::new(),
+    };
+    manifest.bundle_digest = manifest.stable_digest();
+    manifest
+        .validate()
+        .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle manifest",
+            message: error.to_string(),
+        })?;
+    Ok(manifest)
+}
+
+pub fn check_parameter_golf_promoted_bundle(
+    output_dir: &Path,
+) -> Result<ParameterGolfPromotedBundleManifest, ParameterGolfReferenceTrainingError> {
+    let manifest_bytes = std::fs::read(
+        output_dir
+            .join(PARAMETER_GOLF_PROMOTED_BUNDLE_MANIFEST_FILE)
+            .as_path(),
+    )?;
+    let manifest: ParameterGolfPromotedBundleManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle manifest import",
+            message: error.to_string(),
+        })?;
+    manifest
+        .validate()
+        .map_err(|error| ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle manifest import",
+            message: error.to_string(),
+        })?;
+
+    let load_bytes = |artifact: &ParameterGolfPromotedBundleArtifactRef,
+                      context: &'static str|
+     -> Result<Vec<u8>, ParameterGolfReferenceTrainingError> {
+        let bytes = std::fs::read(output_dir.join(artifact.relative_path.as_str()).as_path())?;
+        let actual_sha256 = sha256_hex(bytes.as_slice());
+        if actual_sha256 != artifact.sha256 {
+            return Err(ParameterGolfReferenceTrainingError::Serialization {
+                context,
+                message: format!(
+                    "artifact `{}` SHA-256 drifted: expected `{}`, found `{actual_sha256}`",
+                    artifact.relative_path, artifact.sha256
+                ),
+            });
+        }
+        Ok(bytes)
+    };
+
+    let descriptor_bytes = load_bytes(
+        &manifest.artifacts.descriptor,
+        "parameter golf promoted bundle descriptor",
+    )?;
+    let model_bytes = load_bytes(
+        &manifest.artifacts.model,
+        "parameter golf promoted bundle model",
+    )?;
+    let tokenizer_asset_bytes = load_bytes(
+        &manifest.artifacts.tokenizer_asset,
+        "parameter golf promoted bundle tokenizer asset",
+    )?;
+    let generation_config_bytes = load_bytes(
+        &manifest.artifacts.generation_config,
+        "parameter golf promoted bundle generation config",
+    )?;
+    let profile_contract_bytes = load_bytes(
+        &manifest.artifacts.profile_contract,
+        "parameter golf promoted bundle profile contract",
+    )?;
+    let training_config_bytes = load_bytes(
+        &manifest.artifacts.training_config,
+        "parameter golf promoted bundle training config",
+    )?;
+    let summary_bytes = load_bytes(
+        &manifest.artifacts.summary,
+        "parameter golf promoted bundle summary",
+    )?;
+    let checkpoint_manifest_bytes = load_bytes(
+        &manifest.artifacts.checkpoint_manifest,
+        "parameter golf promoted bundle checkpoint manifest",
+    )?;
+    let checkpoint_surface_report_bytes = load_bytes(
+        &manifest.artifacts.checkpoint_surface_report,
+        "parameter golf promoted bundle checkpoint surface report",
+    )?;
+    let resume_proof_bytes = load_bytes(
+        &manifest.artifacts.resume_proof,
+        "parameter golf promoted bundle resume proof",
+    )?;
+
+    let descriptor: ParameterGolfModelDescriptor =
+        serde_json::from_slice(descriptor_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle descriptor import",
+                message: error.to_string(),
+            }
+        })?;
+    let tokenizer_asset: ParameterGolfPromotedTokenizerAsset =
+        serde_json::from_slice(tokenizer_asset_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle tokenizer asset import",
+                message: error.to_string(),
+            }
+        })?;
+    tokenizer_asset.validate().map_err(|error| {
+        ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle tokenizer asset import",
+            message: error.to_string(),
+        }
+    })?;
+    let generation_config: ParameterGolfPromotedGenerationConfig =
+        serde_json::from_slice(generation_config_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle generation config import",
+                message: error.to_string(),
+            }
+        })?;
+    generation_config.validate().map_err(|error| {
+        ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle generation config import",
+            message: error.to_string(),
+        }
+    })?;
+    let profile_contract: ParameterGolfPromotedProfileContract =
+        serde_json::from_slice(profile_contract_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle profile contract import",
+                message: error.to_string(),
+            }
+        })?;
+    let training_config: ParameterGolfReferenceTrainingConfig =
+        serde_json::from_slice(training_config_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle training config import",
+                message: error.to_string(),
+            }
+        })?;
+    let summary: ParameterGolfPromotedReferenceRunSummary =
+        serde_json::from_slice(summary_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle summary import",
+                message: error.to_string(),
+            }
+        })?;
+    let checkpoint_manifest: ParameterGolfCheckpointManifest =
+        serde_json::from_slice(checkpoint_manifest_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle checkpoint manifest import",
+                message: error.to_string(),
+            }
+        })?;
+    let checkpoint_surface_report: ParameterGolfPromotedCheckpointSurfaceReport =
+        serde_json::from_slice(checkpoint_surface_report_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle checkpoint surface report import",
+                message: error.to_string(),
+            }
+        })?;
+    let resume_proof: ParameterGolfPromotedResumeProof =
+        serde_json::from_slice(resume_proof_bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted bundle resume proof import",
+                message: error.to_string(),
+            }
+        })?;
+
+    if descriptor.stable_digest() != manifest.lineage.descriptor_digest {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle descriptor import",
+            message: String::from("descriptor digest drifted from bundle lineage"),
+        });
+    }
+    if tokenizer_asset.profile_id != manifest.profile_id {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle tokenizer asset import",
+            message: String::from("tokenizer asset profile id drifted from bundle manifest"),
+        });
+    }
+    if generation_config.profile_id != manifest.profile_id {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle generation config import",
+            message: String::from("generation config profile id drifted from bundle manifest"),
+        });
+    }
+    if profile_contract.profile_id != manifest.profile_id
+        || training_config.promoted_profile.profile_id != manifest.profile_id
+        || summary.profile_id != manifest.profile_id
+        || checkpoint_manifest.promoted_profile.profile_id != manifest.profile_id
+        || checkpoint_surface_report.profile_id != manifest.profile_id
+        || resume_proof.profile_id != manifest.profile_id
+    {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle profile alignment",
+            message: String::from("bundle profile identity drifted across emitted artifacts"),
+        });
+    }
+    if summary.final_checkpoint_ref != manifest.lineage.final_checkpoint_ref
+        || checkpoint_manifest.checkpoint_ref != manifest.lineage.final_checkpoint_ref
+    {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle checkpoint alignment",
+            message: String::from("final checkpoint ref drifted across emitted artifacts"),
+        });
+    }
+    if checkpoint_manifest.stable_digest() != manifest.lineage.final_checkpoint_manifest_digest
+        || summary.final_checkpoint_manifest_digest
+            != manifest.lineage.final_checkpoint_manifest_digest
+    {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle checkpoint alignment",
+            message: String::from(
+                "final checkpoint manifest digest drifted across emitted artifacts",
+            ),
+        });
+    }
+    if summary.training_dataset_digest != manifest.lineage.training_dataset_digest
+        || summary.validation_dataset_digest != manifest.lineage.validation_dataset_digest
+        || checkpoint_manifest.training_dataset_digest != manifest.lineage.training_dataset_digest
+        || checkpoint_manifest.validation_dataset_digest
+            != manifest.lineage.validation_dataset_digest
+    {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle lineage alignment",
+            message: String::from("dataset lineage drifted across emitted artifacts"),
+        });
+    }
+    let recomputed_surface_report = promoted_checkpoint_surface_report(
+        &profile_contract,
+        &descriptor,
+        &ParameterGolfTrainingArtifact::new(
+            "parameter_golf_model_safetensors",
+            manifest.artifacts.model.relative_path.clone(),
+            model_bytes,
+        ),
+    )?;
+    if recomputed_surface_report.expected_tensors != checkpoint_surface_report.expected_tensors
+        || recomputed_surface_report.actual_tensors != checkpoint_surface_report.actual_tensors
+        || recomputed_surface_report.missing_tensors != checkpoint_surface_report.missing_tensors
+        || recomputed_surface_report.unexpected_tensors
+            != checkpoint_surface_report.unexpected_tensors
+        || recomputed_surface_report.shape_mismatches != checkpoint_surface_report.shape_mismatches
+        || recomputed_surface_report.exact_name_match != checkpoint_surface_report.exact_name_match
+        || recomputed_surface_report.exact_shape_match
+            != checkpoint_surface_report.exact_shape_match
+        || recomputed_surface_report.exact_match != checkpoint_surface_report.exact_match
+        || recomputed_surface_report.detail != checkpoint_surface_report.detail
+    {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted bundle checkpoint surface report",
+            message: String::from("checkpoint surface report drifted from emitted model bytes"),
+        });
+    }
+    Ok(manifest)
 }
 
 fn validate_promoted_reference_descriptor(
@@ -3933,7 +4648,7 @@ mod tests {
     };
 
     use super::{
-        checkpoint_async_writeback_payload,
+        check_parameter_golf_promoted_bundle, checkpoint_async_writeback_payload,
         export_parameter_golf_banked_full_precision_model_bytes,
         export_parameter_golf_full_precision_model_bytes,
         export_parameter_golf_quantized_model_artifact, promoted_checkpoint_surface_report,
@@ -4249,6 +4964,18 @@ mod tests {
         assert!(run.checkpoint_surface_report.exact_match);
         assert!(run.resume_proof.exact_final_parity);
         assert_eq!(
+            run.tokenizer_asset.profile_id,
+            config.promoted_profile.profile_id
+        );
+        assert_eq!(
+            run.generation_config.profile_id,
+            config.promoted_profile.profile_id
+        );
+        assert_eq!(
+            run.bundle_manifest.profile_id,
+            config.promoted_profile.profile_id
+        );
+        assert_eq!(
             run.summary.final_checkpoint_manifest_digest,
             run.training_outcome
                 .final_checkpoint
@@ -4284,6 +5011,16 @@ mod tests {
             .path()
             .join("parameter_golf_promoted_resume_proof.json")
             .exists());
+        assert!(output_dir.path().join("descriptor.json").exists());
+        assert!(output_dir.path().join("model.safetensors").exists());
+        assert!(output_dir.path().join("tokenizer.json").exists());
+        assert!(output_dir.path().join("generation_config.json").exists());
+        assert!(output_dir
+            .path()
+            .join("parameter_golf_promoted_bundle_manifest.json")
+            .exists());
+        let checked_manifest = check_parameter_golf_promoted_bundle(output_dir.path())?;
+        assert_eq!(checked_manifest, run.bundle_manifest);
         Ok(())
     }
 

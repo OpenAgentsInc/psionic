@@ -591,6 +591,10 @@ Status update after the promoted PGOLF-family work already landed:
   inheriting them implicitly or pretending they are already true
 - promoted checkpoint manifests now carry the chosen profile policy surface so
   later bundle/load/serve work can enforce it without guessing
+- the promoted proof lane now also emits one checker-backed runtime bundle with
+  `descriptor.json`, `model.safetensors`, `tokenizer.json`,
+  `generation_config.json`, and a canonical bundle manifest tying those files
+  back to profile identity, checkpoint lineage, and proof outputs
 
 ## Roadmap: Everything Needed To Make Trained Psion Models Inferable
 

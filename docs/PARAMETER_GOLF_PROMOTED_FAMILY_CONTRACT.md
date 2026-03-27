@@ -127,18 +127,37 @@ tokenizer, FineWeb lane, legal score-first TTT path, contest BPB accounting,
 and exported artifact-cap accounting exist, the lane now refuses explicitly
 instead of silently pretending those prerequisites are satisfied.
 
+The promoted proof path now also emits one canonical runtime bundle directory
+with:
+
+- `parameter_golf_promoted_bundle_manifest.json`
+- `descriptor.json`
+- `model.safetensors`
+- `tokenizer.json`
+- `generation_config.json`
+- `profile_contract.json`
+- `training_config.json`
+- `summary.json`
+- `checkpoint_manifest.json`
+- `checkpoint_surface_report.json`
+- `resume_proof.json`
+
+That bundle is checker-backed in `check_parameter_golf_promoted_bundle(...)`
+and is now the canonical handoff surface from training into later runtime-load,
+prompt, and serve work.
+
 For train-to-infer work, this promoted PGOLF path is now the primary first-model
 target. The older `PsionCompactDecoderReferencePilotModel` remains the bounded
 smoke-test lane for receipt and pipeline closure only.
 
 ## Scope Boundary
 
-This contract freeze does not itself:
+The promoted-family lane still does not itself:
 
-- emit the later self-contained promoted bundle
 - load the bundle for inference
 - run local generation
 - wire `psionic-serve`
 
-Those remain the later PINF issues. This document only freezes the family and
-profile identity so the rest of the work can converge on one honest target.
+Those remain the later PINF issues. This document now freezes the family and
+profile identity and records the canonical emitted bundle shape that the later
+runtime surfaces are expected to load.
