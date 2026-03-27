@@ -4644,6 +4644,7 @@ dependencies = [
  "psionic-runtime",
  "psionic-sandbox",
  "psionic-transformer",
+ "rayon",
  "safetensors",
  "serde",
  "serde_json",

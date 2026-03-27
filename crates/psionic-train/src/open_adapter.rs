@@ -10,6 +10,7 @@ use psionic_adapters::{
 use psionic_array::{ArrayContext, ArrayError};
 use psionic_core::{DType, Device, DeviceKind, QuantizationMode, Shape, TensorSpec};
 use psionic_data::TokenizerDigest;
+use rayon::prelude::*;
 use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -355,6 +356,13 @@ pub struct OpenAdapterTrainingExecutionBackend {
     frozen_base_projection: Vec<f32>,
 }
 
+#[derive(Clone, Debug)]
+struct OpenAdapterSampleGradientAccumulator {
+    grad_a: Vec<f32>,
+    grad_b: Vec<f32>,
+    mean_loss: f32,
+}
+
 impl OpenAdapterTrainingExecutionBackend {
     /// Builds the repo-owned open adapter execution backend from bounded supervision samples.
     pub fn new(
@@ -569,23 +577,69 @@ impl OpenAdapterTrainingExecutionBackend {
         let group_b = self.training_group(run, group_b_id.as_str())?;
         let a_values = dense_values(group_a, group_a_id.as_str())?;
         let b_values = dense_values(group_b, group_b_id.as_str())?;
-        let mut grad_a = vec![0.0_f32; a_values.len()];
-        let mut grad_b = vec![0.0_f32; b_values.len()];
-        let mut mean_loss = 0.0_f32;
+        let (mut grad_a, mut grad_b, mut mean_loss) =
+            if self.config.execution_backend_label == OPEN_ADAPTER_CUDA_BACKEND_LABEL {
+                let accumulated = batch
+                    .samples
+                    .par_iter()
+                    .map(|sample| {
+                        let forward = self.forward_sample(sample, a_values, b_values);
+                        let mut grad_a = vec![0.0_f32; a_values.len()];
+                        let mut grad_b = vec![0.0_f32; b_values.len()];
+                        accumulate_lm_head_gradients(
+                            grad_a.as_mut_slice(),
+                            grad_b.as_mut_slice(),
+                            b_values,
+                            sample.hidden_state.as_slice(),
+                            forward.intermediate.as_slice(),
+                            forward.logits_gradient.as_slice(),
+                            target.scale(),
+                        );
+                        OpenAdapterSampleGradientAccumulator {
+                            grad_a,
+                            grad_b,
+                            mean_loss: forward.loss,
+                        }
+                    })
+                    .reduce(
+                        || OpenAdapterSampleGradientAccumulator {
+                            grad_a: vec![0.0_f32; a_values.len()],
+                            grad_b: vec![0.0_f32; b_values.len()],
+                            mean_loss: 0.0_f32,
+                        },
+                        |mut left, right| {
+                            add_assign(left.grad_a.as_mut_slice(), right.grad_a.as_slice());
+                            add_assign(left.grad_b.as_mut_slice(), right.grad_b.as_slice());
+                            left.mean_loss += right.mean_loss;
+                            left
+                        },
+                    );
+                (
+                    accumulated.grad_a,
+                    accumulated.grad_b,
+                    accumulated.mean_loss,
+                )
+            } else {
+                let mut grad_a = vec![0.0_f32; a_values.len()];
+                let mut grad_b = vec![0.0_f32; b_values.len()];
+                let mut mean_loss = 0.0_f32;
 
-        for sample in &batch.samples {
-            let forward = self.forward_sample(sample, a_values, b_values);
-            mean_loss += forward.loss;
-            accumulate_lm_head_gradients(
-                grad_a.as_mut_slice(),
-                grad_b.as_mut_slice(),
-                b_values,
-                sample.hidden_state.as_slice(),
-                forward.intermediate.as_slice(),
-                forward.logits_gradient.as_slice(),
-                target.scale(),
-            );
-        }
+                for sample in &batch.samples {
+                    let forward = self.forward_sample(sample, a_values, b_values);
+                    mean_loss += forward.loss;
+                    accumulate_lm_head_gradients(
+                        grad_a.as_mut_slice(),
+                        grad_b.as_mut_slice(),
+                        b_values,
+                        sample.hidden_state.as_slice(),
+                        forward.intermediate.as_slice(),
+                        forward.logits_gradient.as_slice(),
+                        target.scale(),
+                    );
+                }
+
+                (grad_a, grad_b, mean_loss)
+            };
 
         let scale = 1.0_f32 / batch.samples.len() as f32;
         for value in &mut grad_a {
@@ -1252,6 +1306,12 @@ fn mat_vec(matrix: &[f32], rows: usize, cols: usize, vector: &[f32]) -> Vec<f32>
 fn add_scaled(dst: &mut [f32], src: &[f32], scale: f32) {
     for (left, right) in dst.iter_mut().zip(src) {
         *left += right * scale;
+    }
+}
+
+fn add_assign(dst: &mut [f32], src: &[f32]) {
+    for (left, right) in dst.iter_mut().zip(src) {
+        *left += right;
     }
 }
 

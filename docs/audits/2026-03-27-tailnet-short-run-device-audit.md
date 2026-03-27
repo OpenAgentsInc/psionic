@@ -45,6 +45,20 @@ commit `330266e3`:
 
 That widened profile made the backend split real enough to keep.
 
+The next retained improvement in this audit was to fix the most important
+short-run CUDA bottleneck:
+
+- the current so-called CUDA lane was still doing the actual open-adapter
+  forward and gradient accumulation math on the host CPU
+- the CUDA label was real provenance, but not yet a full GPU-resident training
+  hot path
+- the retained fix parallelized per-sample gradient accumulation across the
+  batch for the CUDA-labeled lane using Rayon
+
+That does **not** make this full dense CUDA training, but it does make the
+current admitted short-run CUDA lane materially faster and honestly closer to
+the M5 result.
+
 ## Exact Command
 
 Local M5 MLX:
@@ -90,27 +104,42 @@ target/debug/open_adapter_same_node_wallclock_benchmark \
 - host: `archlinux`
 - backend: `open_adapter_backend.cuda.gpt_oss_lm_head`
 - logical device: `cuda:0`
-- calibration: `12` steps in `141 ms`
-- calibration final loss: `15.942384`
-- retained wallclock: `573532 ms`
-- retained completed steps: `49152`
-- retained steps per second: `85.7005`
-- retained samples per second: `10969.6686`
-- retained source tokens per second: `2451720.9432`
-- retained initial loss: `6.932116`
+- calibration: `12` steps in `73 ms`
+- calibration final loss: `15.942385`
+- retained wallclock: `574944 ms`
+- retained completed steps: `70656`
+- retained steps per second: `122.8920`
+- retained samples per second: `15730.1720`
+- retained source tokens per second: `3515693.4380`
+- retained initial loss: `6.9321165`
 - retained final loss: `0.0`
-- retained loss delta: `6.932116`
+- retained loss delta: `6.9321165`
+
+### CUDA Before/After
+
+Using the admitted-device matrix run as the retained before value:
+
+- before CUDA steps per second: `82.4025`
+- after CUDA steps per second: `122.8920`
+- retained CUDA gain: `49.14%`
+
+The current admitted-device gap is now much smaller:
+
+- local M5 MLX: `162.5306 steps/s`
+- remote RTX 4080 CUDA after the retained fix: `122.8920 steps/s`
+- M5-over-CUDA gap: `32.25%`
 
 ### Relative Result
 
-On the retained widened profile, the M5 beat the RTX 4080 box by:
+On the retained current profile, the M5 still beats the RTX 4080 box by:
 
-- `88.71%` on steps per second
-- `88.71%` on samples per second
-- `88.71%` on source tokens per second
+- `32.25%` on steps per second
+- `32.25%` on samples per second
+- `32.25%` on source tokens per second
 
 In plain language: on this current Rust-only same-node open-adapter training
-lane, the local M5 is materially faster than the current 4080 CUDA path.
+lane, the local M5 is still faster, but the retained CUDA fix made the remote
+4080 clearly competitive instead of badly lagging.
 
 ## Why The Result Flips Against GPU Intuition
 
@@ -128,8 +157,12 @@ It is one backend-comparable open-adapter lane with:
 But it is still bounded by current `psionic` implementation details:
 
 - the workload is adapter-only, not full-model dense training
-- the MLX path is currently stronger than the CUDA path for this exact Rust
+- the so-called CUDA lane is still not full GPU-resident math for this exact
   benchmark shape
+- the retained speedup came from parallelizing host-side per-sample gradient
+  accumulation for the CUDA-labeled lane
+- the MLX path is still currently stronger than the CUDA path for this exact
+  Rust benchmark shape
 - this does not prove that Apple Silicon will stay faster once the workload
   changes to a denser or more fused training path
 
@@ -138,8 +171,11 @@ So the honest reading is not "M5 always beats 4080 for training."
 The honest reading is:
 
 - for this current `psionic` home-network short-run lane, use the M5 first
-- the current CUDA path still needs systems work before it wins on this class
-  of bounded same-node training run
+- the current CUDA path is now strong enough to keep in the daily loop instead
+  of treating it as obviously second-rate
+- the next CUDA work should be about moving more of this lane into genuinely
+  device-resident math, not just squeezing more host parallelism out of the
+  current reference path
 
 ## Admitted Device Set
 
@@ -182,15 +218,15 @@ of the admitted comparison set for the daily loop.
 Use this ordering today:
 
 1. Run short bounded same-node training on the local M5 first.
-2. Use the RTX 4080 host as the second machine only after validating that the
-   workload is large enough to justify the CUDA path.
+2. Run the RTX 4080 host in the same daily loop as the comparison and second
+   retained lane, because the current CUDA path is now close enough to matter.
 3. Treat the M2 as opportunistic only. Use it when it is awake and reachable,
    but do not block the daily loop on it.
 
 If the immediate goal is better useful-model progress in ten-minute windows,
-the next sensible step is not a bigger audit. It is one more benchmark or
-runtime iteration aimed specifically at why the current CUDA path is slower on
-this widened adapter benchmark.
+the next sensible step is not more same-node profiling. It is one retained
+multi-device bounded run using the admitted M5 plus RTX 4080 pair, then adding
+the M2 only when it stays awake for the whole window.
 
 ## Admitted Matrix Runner
 
@@ -222,6 +258,17 @@ Retained admitted-matrix result:
 That retained matrix run uses the admitted device set only and intentionally
 does not block on the M2.
 
+## Retained CUDA Improvement Artifact
+
+The retained after-fix CUDA artifact now lives at:
+
+- `fixtures/apple_adapter/runs/tailrun_cuda_parallel_20260327/report.json`
+- `fixtures/apple_adapter/runs/tailrun_cuda_parallel_20260327/portable_bundle.safetensors`
+
+That retained run used the same benchmark family and the same ten-minute budget
+as the admitted matrix baseline, but with the CUDA-labeled batch accumulation
+path parallelized across samples.
+
 ## Honest Boundary
 
 This audit does **not** claim:
@@ -238,6 +285,8 @@ It does claim:
 - the benchmark was improved from a misleading toy shape into a retained
   backend-heavy short-run profile
 - the retained M5 and RTX 4080 ten-minute runs are real and comparable
+- the retained CUDA follow-up run improved the remote RTX 4080 lane by `49.14%`
+  without changing the benchmark family
 - the current admitted operator set is the M5 plus the RTX 4080 host
 - the M2 now has a working SSH bootstrap path, but it is still excluded from
   the daily admitted set because availability is not stable enough yet

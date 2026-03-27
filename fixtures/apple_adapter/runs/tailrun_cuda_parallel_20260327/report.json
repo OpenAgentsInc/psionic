@@ -1,0 +1,37 @@
+{
+  "schema_version": "psionic.open_adapter_same_node_wallclock_benchmark.v1",
+  "host": "archlinux",
+  "backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+  "logical_device_kind": "cuda",
+  "logical_device_label": "cuda:0",
+  "target_wallclock_seconds": 600,
+  "calibration": {
+    "run_id": "same-node-wallclock-calibration-cuda",
+    "max_steps": 12,
+    "observed_wallclock_ms": 73,
+    "estimated_step_ms": 7,
+    "final_mean_loss": 15.942385
+  },
+  "retained_run": {
+    "run_id": "same-node-wallclock-retained-cuda",
+    "checkpoint_family": "benchmark.open_adapter.same_node.cuda.retained",
+    "completed_steps": 70656,
+    "observed_wallclock_ms": 574944,
+    "steps_per_second": 122.89196860911672,
+    "samples_per_second": 15730.17198196694,
+    "source_tokens_per_second": 3515693.437969611,
+    "batch_count": 8,
+    "sample_count": 128,
+    "initial_mean_loss": 6.9321165,
+    "final_mean_loss": 0.0,
+    "loss_delta": 6.9321165,
+    "final_state_dict_digest": "a07d28e3d953f6c8456ea3d710f6b5d4757e7db2066d8467168d77b9d3a22ca3",
+    "bundle_artifact_path": "/tmp/tailrun-cuda-after-20260327/portable_bundle.safetensors"
+  },
+  "improvement": {
+    "calibration_to_retained_loss_delta": 15.942385,
+    "retained_vs_calibration_steps_gain": 70644,
+    "retained_vs_calibration_wallclock_gain_ms": 574871
+  },
+  "claim_boundary": "This report measures one same-node Rust-only open-adapter training/export lane on the selected MLX Metal or CUDA backend, then keeps the fixed-budget run alive until most of the requested wallclock budget is consumed. It compares like-for-like backend execution on the repo-owned first-swarm supervision set. It does not claim Parameter Golf challenge parity, full-model dense training, or mixed-backend distributed convergence."
+}
