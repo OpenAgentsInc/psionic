@@ -1,0 +1,84 @@
+{
+  "schema_version": "psionic.open_public_decentralized_run_contract.v1",
+  "contract_id": "psionic.open_public_decentralized_run_contract.v1",
+  "public_testnet_readiness_contract_digest": "bf39625ba7482a9698c8c873be7c41c39c763d6a85d4c9956e421fa83d41c041",
+  "curated_decentralized_run_contract_digest": "17310438fe3baacd455d34490558b33440ebf53927602fa02d7341e81d9af9f2",
+  "public_run_explorer_contract_digest": "6ef8e0ebf8a3475fb5ff8514dc44ca158419cb9db6c563b0b28163745c656828",
+  "participants": [
+    {
+      "participant_id": "participant.google.public_miner",
+      "candidate_id": "candidate.public_miner.google",
+      "role_class": "public_miner",
+      "admitted_tier": "reward_eligible",
+      "detail": "Google stays in the open run as a reward-eligible anchor miner."
+    },
+    {
+      "participant_id": "participant.local_mlx.public_validator",
+      "candidate_id": "candidate.public_validator.local_mlx",
+      "role_class": "public_validator",
+      "admitted_tier": "reward_eligible",
+      "detail": "Apple MLX stays in the open run as a reward-eligible anchor validator."
+    },
+    {
+      "participant_id": "participant.community_rtx4090.public_miner",
+      "candidate_id": "candidate.public_miner.community_rtx4090_east",
+      "role_class": "public_miner",
+      "admitted_tier": "canary",
+      "detail": "One outside RTX 4090 operator joins as a canary miner."
+    },
+    {
+      "participant_id": "participant.community_h100.public_validator",
+      "candidate_id": "candidate.public_validator.community_h100_central",
+      "role_class": "public_validator",
+      "admitted_tier": "canary",
+      "detail": "One outside H100 operator joins as a canary validator."
+    }
+  ],
+  "events": [
+    {
+      "event_id": "event.community_rtx4090.admitted",
+      "event_kind": "candidate_admitted",
+      "reference_id": "candidate.public_miner.community_rtx4090_east",
+      "detail": "The open run admits the outside RTX 4090 miner through the canary gate."
+    },
+    {
+      "event_id": "event.community_h100.admitted",
+      "event_kind": "candidate_admitted",
+      "reference_id": "candidate.public_validator.community_h100_central",
+      "detail": "The open run admits the outside H100 validator through the canary gate."
+    },
+    {
+      "event_id": "event.scoreboard.published",
+      "event_kind": "score_published",
+      "reference_id": "pane.scoreboard",
+      "detail": "The explorer scoreboard stays public during the open participation window."
+    },
+    {
+      "event_id": "event.rtx4080.blocked",
+      "event_kind": "fraud_blocked",
+      "reference_id": "decision.local_rtx4080.blocked",
+      "detail": "The blocked RTX 4080 candidate remains excluded during the open window."
+    }
+  ],
+  "outcome": {
+    "outcome_id": "outcome.open_public_run.window1232",
+    "outside_candidate_ids": [
+      "candidate.public_miner.community_rtx4090_east",
+      "candidate.public_validator.community_h100_central"
+    ],
+    "handled_attack_reference_ids": [
+      "decision.local_rtx4080.blocked"
+    ],
+    "audit_doc_path": "docs/audits/2026-03-26-open-public-miner-validator-run-audit.md",
+    "detail": "The first open public run retains outside-operator participation and blocked-fraud evidence."
+  },
+  "authority_paths": {
+    "fixture_path": "fixtures/training/open_public_decentralized_run_contract_v1.json",
+    "check_script_path": "scripts/check-open-public-decentralized-run-contract.sh",
+    "reference_doc_path": "docs/OPEN_PUBLIC_DECENTRALIZED_RUN_REFERENCE.md",
+    "audit_doc_path": "docs/audits/2026-03-26-open-public-miner-validator-run-audit.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first open public miner-validator participation window: outside canary candidates, public score visibility, and one retained blocked-fraud example. It does not yet claim canary payouts.",
+  "contract_digest": "6aa7955fa12c5ee2865dadbf48c31940bd7ccbaa946b96fc7b39a11955be9775"
+}

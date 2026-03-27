@@ -438,6 +438,42 @@ refuse public participants through one machine-legible staged onboarding path
 instead of treating first contact with the internet as the only validation
 mechanism.
 
+The repo now also owns the first curated decentralized run contract in
+`crates/psionic-train/src/curated_decentralized_run_contract.rs`, the binary
+`curated_decentralized_run_contract`, the checker
+`scripts/check-curated-decentralized-run-contract.sh`, the focused reference
+doc `docs/CURATED_DECENTRALIZED_RUN_REFERENCE.md`, the committed fixture
+`fixtures/training/curated_decentralized_run_contract_v1.json`, and the
+after-action audit
+`docs/audits/2026-03-26-curated-decentralized-run-after-action-audit.md`. That
+surface turns the first permissioned internet run into retained proof: explicit
+participants, one retained evidence bundle, and one honest after-action audit.
+
+The repo now also owns the first open public decentralized run contract in
+`crates/psionic-train/src/open_public_decentralized_run_contract.rs`, the
+binary `open_public_decentralized_run_contract`, the checker
+`scripts/check-open-public-decentralized-run-contract.sh`, the focused
+reference doc `docs/OPEN_PUBLIC_DECENTRALIZED_RUN_REFERENCE.md`, the committed
+fixture `fixtures/training/open_public_decentralized_run_contract_v1.json`, and
+the public participation audit
+`docs/audits/2026-03-26-open-public-miner-validator-run-audit.md`. That
+surface turns the first outside-operator participation window into retained
+proof: outside canary candidates, public score visibility, and explicit
+blocked-fraud evidence.
+
+The repo now also owns the first incentivized decentralized run contract in
+`crates/psionic-train/src/incentivized_decentralized_run_contract.rs`, the
+binary `incentivized_decentralized_run_contract`, the checker
+`scripts/check-incentivized-decentralized-run-contract.sh`, the focused
+reference doc `docs/INCENTIVIZED_DECENTRALIZED_RUN_REFERENCE.md`, the
+committed fixture
+`fixtures/training/incentivized_decentralized_run_contract_v1.json`, and the
+incentives-focused audit
+`docs/audits/2026-03-26-incentivized-decentralized-run-audit.md`. That surface
+turns the first rewarded decentralized closeout into retained proof: paid
+participants, payout publication, published validator weights, and one explicit
+incentives audit.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker

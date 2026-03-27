@@ -1,0 +1,55 @@
+{
+  "schema_version": "psionic.incentivized_decentralized_run_contract.v1",
+  "contract_id": "psionic.incentivized_decentralized_run_contract.v1",
+  "reward_ledger_contract_digest": "42d7dc87c9dc416023ee2a96f838946533fb366780ec7449a1f9feed8002f103",
+  "settlement_publication_contract_digest": "ca13e653115f6001022f0573d7d8f09da1b8f778fe811301c9c712f26072ed65",
+  "open_public_decentralized_run_contract_digest": "6aa7955fa12c5ee2865dadbf48c31940bd7ccbaa946b96fc7b39a11955be9775",
+  "participants": [
+    {
+      "participant_id": "participant.local_mlx.paid",
+      "node_identity_id": "local_mlx_mac_workstation.identity",
+      "allocation_id": "allocation.local_mlx.window1231",
+      "detail": "Apple MLX remains the largest paid participant."
+    },
+    {
+      "participant_id": "participant.google.paid",
+      "node_identity_id": "google_l4_validator_node.identity",
+      "allocation_id": "allocation.google.window1231",
+      "detail": "Google remains the second paid participant."
+    },
+    {
+      "participant_id": "participant.runpod.paid",
+      "node_identity_id": "runpod_8xh100_dense_node.identity",
+      "allocation_id": "allocation.runpod.window1231",
+      "detail": "RunPod remains the third paid participant."
+    }
+  ],
+  "payout_publication": {
+    "publication_id": "publication.incentivized_run.window1231",
+    "settlement_record_id": "settlement.window1231.signed",
+    "payout_export_ids": [
+      "payout.local_mlx.window1231",
+      "payout.google.window1231",
+      "payout.runpod.window1231"
+    ],
+    "detail": "The first incentivized run publishes the signed-ledger payout bundle."
+  },
+  "outcome": {
+    "outcome_id": "outcome.incentivized_run.window1231",
+    "published_weight_publication_ids": [
+      "validator_weight.google.window1231",
+      "validator_weight.local_mlx.window1231"
+    ],
+    "audit_doc_path": "docs/audits/2026-03-26-incentivized-decentralized-run-audit.md",
+    "detail": "The first incentivized run retains published weights and payout-ready exports."
+  },
+  "authority_paths": {
+    "fixture_path": "fixtures/training/incentivized_decentralized_run_contract_v1.json",
+    "check_script_path": "scripts/check-incentivized-decentralized-run-contract.sh",
+    "reference_doc_path": "docs/INCENTIVIZED_DECENTRALIZED_RUN_REFERENCE.md",
+    "audit_doc_path": "docs/audits/2026-03-26-incentivized-decentralized-run-audit.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first incentivized decentralized run surface: retained paid participants, one payout publication bundle, and one incentive-focused audit. It does not claim canary payouts.",
+  "contract_digest": "1b4379c607674ef2198424370c3ad8a2940d1a9d2aea752b54219a3fff5e4e90"
+}

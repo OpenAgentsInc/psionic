@@ -1,0 +1,68 @@
+{
+  "schema_version": "psionic.curated_decentralized_run_contract.v1",
+  "contract_id": "psionic.curated_decentralized_run_contract.v1",
+  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
+  "public_testnet_readiness_contract_digest": "bf39625ba7482a9698c8c873be7c41c39c763d6a85d4c9956e421fa83d41c041",
+  "public_run_explorer_contract_digest": "6ef8e0ebf8a3475fb5ff8514dc44ca158419cb9db6c563b0b28163745c656828",
+  "settlement_publication_contract_digest": "ca13e653115f6001022f0573d7d8f09da1b8f778fe811301c9c712f26072ed65",
+  "participants": [
+    {
+      "participant_id": "participant.google.public_miner",
+      "role_class": "public_miner",
+      "authority_reference_id": "decision.google.reward_eligible",
+      "runtime_reference_id": "candidate.public_miner.google",
+      "detail": "Google participates as the curated public miner."
+    },
+    {
+      "participant_id": "participant.local_mlx.public_validator",
+      "role_class": "public_validator",
+      "authority_reference_id": "decision.local_mlx.reward_eligible",
+      "runtime_reference_id": "candidate.public_validator.local_mlx",
+      "detail": "Apple MLX participates as the curated public validator."
+    },
+    {
+      "participant_id": "participant.google.relay",
+      "role_class": "relay",
+      "authority_reference_id": "google_l4_validator_node.registry",
+      "runtime_reference_id": "pane.node_status",
+      "detail": "Google carries the relay role for the curated run."
+    },
+    {
+      "participant_id": "participant.runpod.checkpoint_authority",
+      "role_class": "checkpoint_authority",
+      "authority_reference_id": "runpod_8xh100_dense_node.registry",
+      "runtime_reference_id": "settlement.window1231.signed",
+      "detail": "RunPod carries the mirrored checkpoint-authority role."
+    }
+  ],
+  "evidence_bundle": {
+    "bundle_id": "bundle.curated_decentralized_run.window1231",
+    "explorer_snapshot_id": "snapshot.public_run.window1231",
+    "settlement_record_id": "settlement.window1231.signed",
+    "retained_paths": [
+      "artifacts/curated-run/window1231/network-contract.json",
+      "artifacts/curated-run/window1231/explorer-snapshot.json",
+      "artifacts/curated-run/window1231/settlement-record.json",
+      "artifacts/curated-run/window1231/event-log.ndjson"
+    ],
+    "after_action_audit_path": "docs/audits/2026-03-26-curated-decentralized-run-after-action-audit.md",
+    "detail": "The first curated run retains a full evidence bundle and after-action audit."
+  },
+  "outcome": {
+    "outcome_id": "outcome.curated_decentralized_run.window1231",
+    "start_epoch_id": "window1231",
+    "end_epoch_id": "window1232",
+    "participation_mode": "curated_permissioned",
+    "promotion_status": "held_no_promotion",
+    "detail": "The curated run closes truthfully with retained evidence and held-no-promotion."
+  },
+  "authority_paths": {
+    "fixture_path": "fixtures/training/curated_decentralized_run_contract_v1.json",
+    "check_script_path": "scripts/check-curated-decentralized-run-contract.sh",
+    "reference_doc_path": "docs/CURATED_DECENTRALIZED_RUN_REFERENCE.md",
+    "audit_doc_path": "docs/audits/2026-03-26-curated-decentralized-run-after-action-audit.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first curated internet-scale decentralized run: permissioned participants, one retained evidence bundle, and one after-action audit. It does not yet claim outside-operator admission or canary payouts.",
+  "contract_digest": "17310438fe3baacd455d34490558b33440ebf53927602fa02d7341e81d9af9f2"
+}
