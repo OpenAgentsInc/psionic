@@ -1,0 +1,211 @@
+{
+  "schema_version": "psionic.internet_fault_harness_contract.v1",
+  "contract_id": "psionic.internet_fault_harness_contract.v1",
+  "current_epoch_id": "network_epoch_00000123",
+  "elastic_device_mesh_contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc",
+  "wan_overlay_route_contract_digest": "3f8ac57a330f37acfed56c582353643cd09072f6b1792472917165db979922e4",
+  "live_checkpoint_catchup_contract_digest": "3589f9e87675511227b73ec95e226ab99354f09cba35cc9c0d72c1608d9a10d8",
+  "quantized_outer_sync_contract_digest": "1b67541b4b4c9b316a8ba78625c4e745c9c3da0f447eacf8585b9e2cafbd5fc2",
+  "fault_profiles": [
+    {
+      "profile_id": "profile.packet_loss_public_miner_failover",
+      "profile_kind": "packet_loss_failover",
+      "injected_latency_ms": 120,
+      "packet_loss_bps": 450,
+      "bandwidth_limit_mbps": 600,
+      "delayed_checkpoint_ms": 0,
+      "detail": "The packet-loss failover profile degrades the local public-miner path until the relay-only route must promote the overlay fallback."
+    },
+    {
+      "profile_id": "profile.delayed_checkpoint_catchup",
+      "profile_kind": "delayed_checkpoint_catchup",
+      "injected_latency_ms": 85,
+      "packet_loss_bps": 25,
+      "bandwidth_limit_mbps": 800,
+      "delayed_checkpoint_ms": 4500,
+      "detail": "The delayed-catchup profile stretches checkpoint delivery without changing the admitted route so the join-time resume window has to stay honest."
+    },
+    {
+      "profile_id": "profile.bandwidth_throttle_outer_sync",
+      "profile_kind": "bandwidth_throttle_outer_sync",
+      "injected_latency_ms": 70,
+      "packet_loss_bps": 15,
+      "bandwidth_limit_mbps": 160,
+      "delayed_checkpoint_ms": 0,
+      "detail": "The bandwidth-throttle profile squeezes the WAN lane hard enough that only the admitted quantized outer-sync receipts still pass."
+    },
+    {
+      "profile_id": "profile.validator_loss_hold",
+      "profile_kind": "validator_loss_hold",
+      "injected_latency_ms": 60,
+      "packet_loss_bps": 5,
+      "bandwidth_limit_mbps": 1000,
+      "delayed_checkpoint_ms": 0,
+      "validator_loss_registry_record_id": "local_mlx_mac_workstation.registry",
+      "detail": "The validator-loss profile removes the Apple MLX validator from the current two-validator quorum and proves the run holds instead of pretending quorum survived."
+    }
+  ],
+  "throughput_baselines": [
+    {
+      "baseline_id": "baseline.catchup.local_mlx_runpod.overlay",
+      "route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "referenced_catchup_receipt_id": "catchup.public_miner.local_mlx.after_deathrattle",
+      "sustained_bandwidth_mbps": 910,
+      "maximum_latency_ms": 70,
+      "detail": "The overlay catch-up path between Apple MLX and RunPod defines the current join-time recovery baseline."
+    },
+    {
+      "baseline_id": "baseline.outer_sync.google_runpod.direct",
+      "route_id": "route.checkpoint_authority.google_runpod.direct",
+      "referenced_outer_sync_receipt_id": "exchange.public_miner.google_to_runpod.int8.1",
+      "sustained_bandwidth_mbps": 6170,
+      "maximum_latency_ms": 40,
+      "detail": "The Google-to-RunPod direct lane defines the high-water WAN baseline for the int8 outer-sync path."
+    },
+    {
+      "baseline_id": "baseline.outer_sync.local_mlx_runpod.overlay",
+      "route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "referenced_outer_sync_receipt_id": "exchange.public_miner.local_mlx_to_runpod.nf4.1",
+      "sustained_bandwidth_mbps": 820,
+      "maximum_latency_ms": 70,
+      "detail": "The Apple MLX overlay lane defines the admitted lower-bandwidth baseline for the NF4 outer-sync path."
+    }
+  ],
+  "soak_suites": [
+    {
+      "suite_id": "suite.internet_fault_matrix_day",
+      "profile_ids": [
+        "profile.packet_loss_public_miner_failover",
+        "profile.delayed_checkpoint_catchup",
+        "profile.bandwidth_throttle_outer_sync",
+        "profile.validator_loss_hold"
+      ],
+      "minimum_duration_seconds": 7200,
+      "required_pass_count": 3,
+      "detail": "The day fault matrix demands passed evidence for failover, catch-up, and outer sync while still retaining one held validator-loss case."
+    },
+    {
+      "suite_id": "suite.internet_soak_night",
+      "profile_ids": [
+        "profile.packet_loss_public_miner_failover",
+        "profile.delayed_checkpoint_catchup",
+        "profile.bandwidth_throttle_outer_sync"
+      ],
+      "minimum_duration_seconds": 28800,
+      "required_pass_count": 3,
+      "detail": "The night soak suite repeats the admitted non-quorum-breaking profiles long enough that decentralized-runtime claims cannot rest on a single daytime pass."
+    }
+  ],
+  "run_receipts": [
+    {
+      "receipt_id": "run.packet_loss_failover.day1",
+      "suite_id": "suite.internet_fault_matrix_day",
+      "profile_id": "profile.packet_loss_public_miner_failover",
+      "observed_failover_receipt_ids": [
+        "failover.public_miner.local_rtx4080_local_mlx.1"
+      ],
+      "observed_catchup_receipt_ids": [],
+      "observed_outer_sync_receipt_ids": [],
+      "observed_aggregation_receipt_ids": [],
+      "validator_quorum_preserved": true,
+      "disposition": "passed",
+      "detail": "Day fault-matrix run: packet loss crossed the relay threshold and the overlay failover receipt closed without losing the active run."
+    },
+    {
+      "receipt_id": "run.delayed_checkpoint_catchup.day1",
+      "suite_id": "suite.internet_fault_matrix_day",
+      "profile_id": "profile.delayed_checkpoint_catchup",
+      "observed_failover_receipt_ids": [],
+      "observed_catchup_receipt_ids": [
+        "catchup.public_miner.local_mlx.after_deathrattle"
+      ],
+      "observed_outer_sync_receipt_ids": [],
+      "observed_aggregation_receipt_ids": [],
+      "validator_quorum_preserved": true,
+      "disposition": "passed",
+      "detail": "Day fault-matrix run: delayed checkpoint delivery still closed inside the admitted live-join window."
+    },
+    {
+      "receipt_id": "run.bandwidth_throttle_outer_sync.day1",
+      "suite_id": "suite.internet_fault_matrix_day",
+      "profile_id": "profile.bandwidth_throttle_outer_sync",
+      "observed_failover_receipt_ids": [],
+      "observed_catchup_receipt_ids": [],
+      "observed_outer_sync_receipt_ids": [
+        "exchange.public_miner.google_to_runpod.int8.1",
+        "exchange.public_miner.local_mlx_to_runpod.nf4.1"
+      ],
+      "observed_aggregation_receipt_ids": [
+        "aggregation.outer_sync.runpod.round_2056"
+      ],
+      "validator_quorum_preserved": true,
+      "disposition": "passed",
+      "detail": "Day fault-matrix run: the throttled WAN lane still closed through the admitted quantized outer-sync path and published the aggregated checkpoint step."
+    },
+    {
+      "receipt_id": "run.validator_loss_hold.day1",
+      "suite_id": "suite.internet_fault_matrix_day",
+      "profile_id": "profile.validator_loss_hold",
+      "observed_failover_receipt_ids": [],
+      "observed_catchup_receipt_ids": [],
+      "observed_outer_sync_receipt_ids": [],
+      "observed_aggregation_receipt_ids": [],
+      "validator_quorum_preserved": false,
+      "disposition": "held",
+      "detail": "Day fault-matrix run: removing the MLX validator broke the two-validator quorum and the run held at the barrier instead of pretending validation continuity survived."
+    },
+    {
+      "receipt_id": "run.packet_loss_failover.night1",
+      "suite_id": "suite.internet_soak_night",
+      "profile_id": "profile.packet_loss_public_miner_failover",
+      "observed_failover_receipt_ids": [
+        "failover.public_miner.local_rtx4080_local_mlx.1"
+      ],
+      "observed_catchup_receipt_ids": [],
+      "observed_outer_sync_receipt_ids": [],
+      "observed_aggregation_receipt_ids": [],
+      "validator_quorum_preserved": true,
+      "disposition": "passed",
+      "detail": "Night soak run: packet-loss failover remained repeatable and did not regress into silent transport death."
+    },
+    {
+      "receipt_id": "run.delayed_checkpoint_catchup.night1",
+      "suite_id": "suite.internet_soak_night",
+      "profile_id": "profile.delayed_checkpoint_catchup",
+      "observed_failover_receipt_ids": [],
+      "observed_catchup_receipt_ids": [
+        "catchup.public_miner.local_mlx.after_deathrattle"
+      ],
+      "observed_outer_sync_receipt_ids": [],
+      "observed_aggregation_receipt_ids": [],
+      "validator_quorum_preserved": true,
+      "disposition": "passed",
+      "detail": "Night soak run: catch-up still closed under stretched checkpoint delay after hours of continuous traffic."
+    },
+    {
+      "receipt_id": "run.bandwidth_throttle_outer_sync.night1",
+      "suite_id": "suite.internet_soak_night",
+      "profile_id": "profile.bandwidth_throttle_outer_sync",
+      "observed_failover_receipt_ids": [],
+      "observed_catchup_receipt_ids": [],
+      "observed_outer_sync_receipt_ids": [
+        "exchange.public_miner.google_to_runpod.int8.1",
+        "exchange.public_miner.local_mlx_to_runpod.nf4.1"
+      ],
+      "observed_aggregation_receipt_ids": [
+        "aggregation.outer_sync.runpod.round_2056"
+      ],
+      "validator_quorum_preserved": true,
+      "disposition": "passed",
+      "detail": "Night soak run: throttled outer sync stayed repeatable long enough to count as retained evidence rather than one short lucky pass."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/internet_fault_harness_contract_v1.json",
+    "check_script_path": "scripts/check-internet-fault-harness-contract.sh",
+    "reference_doc_path": "docs/INTERNET_FAULT_HARNESS_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first public-internet realism harness above route, catch-up, and outer-sync truth: fault profiles, throughput baselines, soak suites, repeated passed runs, and one explicit held validator-loss case. It does not yet claim incentive settlement or global public-network promotion beyond the retained evidence set.",
+  "contract_digest": "56f2e8a50e2623e97e3f33c650f6013409a24f9e6487158a568ec3d1e61957b1"
+}

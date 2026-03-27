@@ -284,6 +284,19 @@ path. It proves Google plus Apple MLX can both contribute compressed deltas to
 RunPod after the MLX rejoin while keeping the dense all-reduce honesty
 boundary explicit.
 
+The repo now also owns the first internet fault and soak harness contract in
+`crates/psionic-train/src/internet_fault_harness_contract.rs`, the binary
+`internet_fault_harness_contract`, the checker
+`scripts/check-internet-fault-harness-contract.sh`, the focused reference doc
+`docs/INTERNET_FAULT_HARNESS_REFERENCE.md`, and the committed fixture
+`fixtures/training/internet_fault_harness_contract_v1.json`. That surface turns
+route, catch-up, and outer-sync truth into a real promotion gate: explicit
+fault profiles, retained throughput baselines, suite-level pass thresholds,
+repeated passed runs, and one held validator-loss result. It proves Psionic can
+retain day plus night evidence for failover, catch-up, and throttled outer
+sync while keeping one non-negotiable stop condition explicit: losing the MLX
+validator collapses the current quorum and the run holds.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker
