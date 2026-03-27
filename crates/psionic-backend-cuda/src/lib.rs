@@ -2047,6 +2047,29 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Executes one qwen35-style depthwise causal conv1d decode step and
+    /// applies SiLU to the result in one CUDA kernel.
+    pub fn depthwise_causal_conv1d_step_silu_f32(
+        &mut self,
+        input: &CudaBuffer,
+        state: &CudaBuffer,
+        weights: &CudaBuffer,
+        channels: usize,
+        kernel_size: usize,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_depthwise_causal_conv1d_step_silu_f32(
+            &input.platform,
+            &state.platform,
+            &weights.platform,
+            channels,
+            kernel_size,
+            &output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Derives qwen35 SSM decay and beta vectors from projected alpha/beta
     /// logits and static SSM parameters.
     pub fn qwen35_ssm_decay_beta_f32(
@@ -9251,6 +9274,15 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_depthwise_causal_conv1d_step_silu_f32(
+            input: *const c_void,
+            state: *mut c_void,
+            weights: *const c_void,
+            channels: c_int,
+            kernel_size: c_int,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_qwen35_ssm_decay_beta_f32(
             input: *const c_void,
             alpha_offset: c_int,
@@ -12076,6 +12108,42 @@ mod platform {
                     )
                 },
                 "psionic_cuda_depthwise_causal_conv1d_step_f32",
+            )
+        }
+
+        pub(super) fn encode_depthwise_causal_conv1d_step_silu_f32(
+            &mut self,
+            input: &PlatformBuffer,
+            state: &PlatformBuffer,
+            weights: &PlatformBuffer,
+            channels: usize,
+            kernel_size: usize,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let channels = c_int::try_from(channels).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 depthwise conv+silu channel count exceeds c_int",
+                ))
+            })?;
+            let kernel_size = c_int::try_from(kernel_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 depthwise conv+silu kernel size exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_depthwise_causal_conv1d_step_silu_f32(
+                        input.inner.device_ptr.cast(),
+                        state.inner.device_ptr.cast(),
+                        weights.inner.device_ptr.cast(),
+                        channels,
+                        kernel_size,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_depthwise_causal_conv1d_step_silu_f32",
             )
         }
 
@@ -15440,6 +15508,20 @@ mod platform {
         }
 
         pub(super) fn encode_depthwise_causal_conv1d_step_f32(
+            &mut self,
+            _input: &PlatformBuffer,
+            _state: &PlatformBuffer,
+            _weights: &PlatformBuffer,
+            _channels: usize,
+            _kernel_size: usize,
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_depthwise_causal_conv1d_step_silu_f32(
             &mut self,
             _input: &PlatformBuffer,
             _state: &PlatformBuffer,
@@ -20785,6 +20867,82 @@ mod tests {
             &separate_output.read_f32()?,
             1e-6,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_depthwise_causal_conv1d_step_silu_matches_separate_kernels()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let channels = 64usize;
+        let kernel_size = 4usize;
+        let state_tokens = kernel_size - 1;
+        let input = (0..channels)
+            .map(|index| ((index as f32 % 13.0) - 6.0) * 0.125)
+            .collect::<Vec<_>>();
+        let state = (0..channels * state_tokens)
+            .map(|index| ((index as f32 % 17.0) - 8.0) * 0.0625)
+            .collect::<Vec<_>>();
+        let weights = (0..channels * kernel_size)
+            .map(|index| (((index as f32 % 11.0) - 5.0) * 0.03125) + 0.25)
+            .collect::<Vec<_>>();
+        let ones = vec![1.0_f32; channels];
+
+        let input_buffer = backend.input_buffer(Shape::new(vec![channels]), input)?;
+        let weights_buffer =
+            backend.input_buffer(Shape::new(vec![channels * kernel_size]), weights)?;
+        let ones_buffer = backend.input_buffer(Shape::new(vec![channels]), ones)?;
+
+        let separate_state = backend.input_buffer(Shape::new(vec![state.len()]), state.clone())?;
+        let separate_conv = backend.f32_buffer(channels)?;
+        let separate_output = backend.f32_buffer(channels)?;
+
+        let fused_state = backend.input_buffer(Shape::new(vec![state.len()]), state)?;
+        let fused_output = backend.f32_buffer(channels)?;
+
+        let mut separate = backend.begin_submission()?;
+        separate.depthwise_causal_conv1d_step_f32(
+            &input_buffer,
+            &separate_state,
+            &weights_buffer,
+            channels,
+            kernel_size,
+            &separate_conv,
+        )?;
+        separate.silu_mul_f32(
+            &separate_conv,
+            0,
+            &ones_buffer,
+            0,
+            channels,
+            &separate_output,
+        )?;
+        let separate_report = separate.commit(CudaCommandWait::Completed)?;
+        assert_eq!(separate_report.encoded_operations, 2);
+
+        let mut fused = backend.begin_submission()?;
+        fused.depthwise_causal_conv1d_step_silu_f32(
+            &input_buffer,
+            &fused_state,
+            &weights_buffer,
+            channels,
+            kernel_size,
+            &fused_output,
+        )?;
+        let fused_report = fused.commit(CudaCommandWait::Completed)?;
+        assert_eq!(fused_report.encoded_operations, 1);
+
+        assert_close(
+            &fused_output.read_f32()?,
+            &separate_output.read_f32()?,
+            1e-6,
+        );
+        assert_close(&fused_state.read_f32()?, &separate_state.read_f32()?, 1e-6);
         Ok(())
     }
 

@@ -799,6 +799,25 @@ int psionic_cuda_depthwise_causal_conv1d_step_f32(
     return 1;
 }
 
+int psionic_cuda_depthwise_causal_conv1d_step_silu_f32(
+    const void *input,
+    void *state,
+    const void *weights,
+    int channels,
+    int kernel_size,
+    void *output,
+    void *stream
+) {
+    (void)input;
+    (void)state;
+    (void)weights;
+    (void)channels;
+    (void)kernel_size;
+    (void)output;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_qwen35_ssm_decay_beta_f32(
     const void *input,
     int alpha_offset,

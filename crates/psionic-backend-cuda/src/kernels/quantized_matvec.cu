@@ -1302,6 +1302,36 @@ __global__ void depthwise_causal_conv1d_step_f32_kernel(
     }
 }
 
+__global__ void depthwise_causal_conv1d_step_silu_f32_kernel(
+    const float *input,
+    float *state,
+    const float *weights,
+    int channels,
+    int kernel_size,
+    float *output
+) {
+    const int channel = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (channel >= channels) {
+        return;
+    }
+    const int state_tokens = kernel_size - 1;
+    const float *channel_weights = weights + channel * kernel_size;
+    float *channel_state = state + channel * state_tokens;
+
+    float sum = input[channel] * channel_weights[state_tokens];
+    for (int token = 0; token < state_tokens; ++token) {
+        sum += channel_state[token] * channel_weights[token];
+    }
+    output[channel] = silu_single(sum);
+
+    for (int token = 0; token + 1 < state_tokens; ++token) {
+        channel_state[token] = channel_state[token + 1];
+    }
+    if (state_tokens > 0) {
+        channel_state[state_tokens - 1] = input[channel];
+    }
+}
+
 __global__ void qwen35_ssm_decay_beta_f32_kernel(
     const float *input,
     int alpha_offset,
@@ -6497,6 +6527,32 @@ extern "C" int psionic_cuda_depthwise_causal_conv1d_step_f32(
 ) {
     const int blocks = (channels + kBlockSize - 1) / kBlockSize;
     depthwise_causal_conv1d_step_f32_kernel<<<blocks, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const float *>(input),
+        static_cast<float *>(state),
+        static_cast<const float *>(weights),
+        channels,
+        kernel_size,
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_depthwise_causal_conv1d_step_silu_f32(
+    const void *input,
+    void *state,
+    const void *weights,
+    int channels,
+    int kernel_size,
+    void *output,
+    void *stream
+) {
+    const int blocks = (channels + kBlockSize - 1) / kBlockSize;
+    depthwise_causal_conv1d_step_silu_f32_kernel<<<
+        blocks,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
         static_cast<const float *>(input),
         static_cast<float *>(state),
         static_cast<const float *>(weights),

@@ -2054,20 +2054,12 @@ impl Qwen35Layer {
             None,
             &plan.matvec_output_buffer,
         )?;
-        submission.depthwise_causal_conv1d_step_f32(
+        submission.depthwise_causal_conv1d_step_silu_f32(
             &plan.matvec_output_buffer,
             &state.conv_state,
             &hybrid.ssm_conv1d_device,
             qkv_rows,
             hybrid.conv_kernel,
-            &plan.conv_buffer,
-        )?;
-        submission.silu_mul_f32(
-            &plan.conv_buffer,
-            0,
-            &plan.ones_buffer,
-            0,
-            qkv_rows,
             &plan.conv_buffer,
         )?;
         submission.qwen35_ssm_decay_beta_f32(
@@ -2822,20 +2814,12 @@ impl Qwen35Layer {
             None,
             &plan.matvec_output_buffer,
         )?;
-        submission.depthwise_causal_conv1d_step_f32(
+        submission.depthwise_causal_conv1d_step_silu_f32(
             &plan.matvec_output_buffer,
             &state.conv_state,
             &hybrid.ssm_conv1d_device,
             qkv_rows,
             hybrid.conv_kernel,
-            &plan.conv_buffer,
-        )?;
-        submission.silu_mul_f32(
-            &plan.conv_buffer,
-            0,
-            &plan.ones_buffer,
-            0,
-            qkv_rows,
             &plan.conv_buffer,
         )?;
         submission.qwen35_ssm_decay_beta_f32(
@@ -3366,7 +3350,6 @@ struct Qwen35CudaStepPlan {
     activated_q8_1_buffer: CudaBuffer,
     decay_buffer: CudaBuffer,
     beta_buffer: CudaBuffer,
-    ones_buffer: CudaBuffer,
     logits_buffer: CudaBuffer,
     next_token_host_buffer: CudaHostBuffer,
     next_token_buffer: CudaBuffer,
@@ -3389,12 +3372,6 @@ impl Qwen35CudaStepPlan {
         let q8_1_bytes = ggml_q8_1_storage_bytes(1, max_input_columns)
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let activated_q8_1_bytes = ggml_q8_1_storage_bytes(1, max_output_rows)
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        let mut ones_buffer = backend
-            .f32_buffer(max_output_rows)
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        ones_buffer
-            .write_f32(&vec![1.0_f32; max_output_rows])
             .map_err(ReferenceTextGenerationError::Runtime)?;
         Ok(Self {
             matvec_input_buffer: backend
@@ -3451,7 +3428,6 @@ impl Qwen35CudaStepPlan {
             beta_buffer: backend
                 .f32_buffer(max_output_rows)
                 .map_err(ReferenceTextGenerationError::Runtime)?,
-            ones_buffer,
             logits_buffer: backend
                 .f32_buffer(vocab_size)
                 .map_err(ReferenceTextGenerationError::Runtime)?,
