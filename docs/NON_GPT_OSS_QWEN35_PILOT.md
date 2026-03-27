@@ -116,8 +116,8 @@ The pilot is intentionally bounded:
 Measured on this host on March 27, 2026 with the downloaded
 `qwen3.5:0.8b-q8_0.gguf`, the same one-sentence prompt, and a `128` token cap:
 
-- Psionic native CUDA qwen35 decode throughput: about `486.78 tok/s`
-- local Ollama `qwen3.5:0.8b` decode throughput: about `326.14 tok/s`
+- Psionic native CUDA qwen35 decode throughput: about `514.13 tok/s`
+- local Ollama `qwen3.5:0.8b` decode throughput: about `329.34 tok/s`
 Measured again on the same host and prompt after the next decode-kernel pass:
 
 - Psionic native CUDA qwen35 decode throughput: about `492.31 tok/s`
@@ -155,7 +155,17 @@ conv1d and the immediate SiLU activation into one CUDA kernel across the same
 - Psionic native CUDA qwen35 decode throughput: about `515.24 tok/s`
 - local Ollama `qwen3.5:0.8b` decode throughput: about `329.34 tok/s`
 
-This improvement now comes from nine architectural changes inside the native
+Later in the same March 27, 2026 session, after restoring the clean head and
+rebuilding locally again, the clean restored head remeasured at about
+`509.54 tok/s` decode on the same prompt. Switching the q8_1 output-head
+argmax path from the shared-input launcher to the MMVQ argmax kernel then
+remeasured at:
+
+- Psionic native CUDA qwen35 decode throughput: about `514.13 tok/s`
+- local Ollama `qwen3.5:0.8b` decode throughput: about `329.34 tok/s`
+
+The current bounded lane now depends on ten architectural changes inside the
+native
 Psionic runtime:
 
 - qwen35 derives hybrid-layer SSM `decay` and `beta` on CUDA and normalizes
@@ -179,6 +189,8 @@ Psionic runtime:
 - qwen35 hybrid blocks now also fuse depthwise causal conv1d with the
   immediately following SiLU activation instead of writing and rereading a
   separate pre-activation buffer
+- the qwen35 output head now routes q8_1 argmax decode through the MMVQ kernel
+  instead of the older shared-input argmax launcher
 
 This pilot therefore proves native CUDA execution correctness, honest
 publication, and a wider throughput win over the local Ollama baseline on this
@@ -198,6 +210,8 @@ runtime:
 
 - token embedding gather still enters the decode path through a less
   device-native route than it should
+- the output-head full-logit path still does not reuse the faster MMVQ argmax
+  kernel shape that now serves greedy decode
 - the full-attention path still enters the attention kernel through a separate
   q/gate normalization pass instead of a more integrated decode kernel
 - the host-seeded hidden vector still reaches the device outside the captured

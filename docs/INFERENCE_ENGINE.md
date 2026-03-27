@@ -55,8 +55,9 @@ than just run tensor math.
   submissions through a second captured CUDA graph, and then fusing qwen35
   hybrid q/k RMSNorm plus v staging into one CUDA kernel, and then fusing
   qwen35 hybrid depthwise conv1d plus immediate SiLU activation into one CUDA
+  kernel, and then switching the q8_1 output-head argmax path onto the MMVQ
   kernel, the local `qwen3.5:0.8b` benchmark on this host measured about
-  `515 tok/s` decode on Psionic versus
+  `514 tok/s` decode on Psionic versus
   about `329 tok/s` decode on local Ollama for the same one-sentence prompt
   and `128` token cap.
 - The qwen35 lane is now ahead on decode throughput for this host and prompt,

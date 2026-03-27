@@ -915,6 +915,33 @@ static void launch_quantized_matvec_q8_1_argmax_regular(
     );
 }
 
+template <typename DotFn, int Vdr, int Qi>
+static void launch_quantized_matvec_q8_1_argmax_mmvq(
+    const uint8_t *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const Q81Block *input_q8_1,
+    const float *bias,
+    unsigned long long *argmax_state,
+    cudaStream_t stream,
+    DotFn dot_fn
+) {
+    const int block_count = cols / kQ81ElementsPerBlock;
+    const dim3 grid_dims(rows, 1, 1);
+    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);
+    quantized_matvec_q8_1_mmvq_argmax_kernel<DotFn, Vdr, Qi><<<grid_dims, block_dims, 0, stream>>>(
+        weights,
+        row_stride,
+        rows,
+        block_count,
+        input_q8_1,
+        bias,
+        argmax_state,
+        dot_fn
+    );
+}
+
 __global__ void argmax_f32_kernel(
     const float *input,
     int32_t *output,
@@ -5792,7 +5819,7 @@ extern "C" int psionic_cuda_q8_0_matvec_q8_1_argmax(
     void *output,
     void *stream
 ) {
-    launch_quantized_matvec_q8_1_argmax_regular(
+    launch_quantized_matvec_q8_1_argmax_mmvq<Q80Q81Dot, kQ80Q81MmvqVdr, kQ80Qi>(
         static_cast<const uint8_t *>(weights),
         rows,
         cols,
@@ -5816,7 +5843,7 @@ extern "C" int psionic_cuda_mxfp4_matvec_q8_1_argmax(
     void *output,
     void *stream
 ) {
-    launch_quantized_matvec_q8_1_argmax_regular(
+    launch_quantized_matvec_q8_1_argmax_mmvq<Mxfp4Q81Dot, kMxfp4Q81MmvqVdr, kMxfp4Qi>(
         static_cast<const uint8_t *>(weights),
         rows,
         cols,
