@@ -1960,6 +1960,71 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// RMS-normalizes qwen35 hybrid q and k regions per state group and copies
+    /// the v region into the packed qkv output buffer in one kernel.
+    #[allow(clippy::too_many_arguments)]
+    pub fn pack_qwen35_hybrid_qkv_rms_norm_f32(
+        &mut self,
+        input: &CudaBuffer,
+        q_offset: usize,
+        k_offset: usize,
+        v_offset: usize,
+        group_count: usize,
+        state_size: usize,
+        v_size: usize,
+        q_weight: &CudaBuffer,
+        k_weight: &CudaBuffer,
+        epsilon: f32,
+        output: &CudaBuffer,
+        output_q_offset: usize,
+        output_k_offset: usize,
+        output_v_offset: usize,
+    ) -> Result<(), RuntimeError> {
+        let q_size = group_count.saturating_mul(state_size);
+        let k_size = q_size;
+        if q_weight.spec().storage_size() != state_size {
+            return Err(RuntimeError::Backend(format!(
+                "cuda qwen35 fused hybrid q rms norm requires state width {state_size}, have {}",
+                q_weight.spec().storage_size(),
+            )));
+        }
+        if k_weight.spec().storage_size() != state_size {
+            return Err(RuntimeError::Backend(format!(
+                "cuda qwen35 fused hybrid k rms norm requires state width {state_size}, have {}",
+                k_weight.spec().storage_size(),
+            )));
+        }
+        if input.spec().storage_size() < v_offset.saturating_add(v_size)
+            || output.spec().storage_size() < output_v_offset.saturating_add(v_size)
+            || input.spec().storage_size() < q_offset.saturating_add(q_size)
+            || output.spec().storage_size() < output_q_offset.saturating_add(q_size)
+            || input.spec().storage_size() < k_offset.saturating_add(k_size)
+            || output.spec().storage_size() < output_k_offset.saturating_add(k_size)
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda qwen35 fused hybrid qkv pack requires buffers large enough for the requested layout",
+            )));
+        }
+        self.platform.encode_pack_qwen35_hybrid_qkv_rms_norm_f32(
+            &input.platform,
+            q_offset,
+            k_offset,
+            v_offset,
+            group_count,
+            state_size,
+            v_size,
+            &q_weight.platform,
+            &k_weight.platform,
+            epsilon,
+            &output.platform,
+            output_q_offset,
+            output_k_offset,
+            output_v_offset,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Executes one qwen35-style depthwise causal conv1d decode step.
     pub fn depthwise_causal_conv1d_step_f32(
         &mut self,
@@ -8875,6 +8940,23 @@ mod platform {
         c_int,
         CudaStream,
     ) -> CudaError;
+    type PackQwen35HybridQkvRmsNormF32Kernel = unsafe extern "C" fn(
+        *const c_void,
+        c_int,
+        c_int,
+        c_int,
+        c_int,
+        c_int,
+        c_int,
+        *const c_void,
+        *const c_void,
+        f32,
+        *mut c_void,
+        c_int,
+        c_int,
+        c_int,
+        CudaStream,
+    ) -> CudaError;
 
     unsafe extern "C" {
         fn psionic_cuda_quantized_kernels_compiled() -> c_int;
@@ -9141,6 +9223,23 @@ mod platform {
             output: *mut c_void,
             output_key_offset: c_int,
             output_value_offset: c_int,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_pack_qwen35_hybrid_qkv_rms_norm_f32(
+            input: *const c_void,
+            q_offset: c_int,
+            k_offset: c_int,
+            v_offset: c_int,
+            group_count: c_int,
+            state_size: c_int,
+            v_size: c_int,
+            q_weight: *const c_void,
+            k_weight: *const c_void,
+            epsilon: f32,
+            output: *mut c_void,
+            output_q_offset: c_int,
+            output_k_offset: c_int,
+            output_v_offset: c_int,
             stream: CudaStream,
         ) -> CudaError;
         fn psionic_cuda_depthwise_causal_conv1d_step_f32(
@@ -11613,9 +11712,7 @@ mod platform {
                 ))
             })?;
             let rhs_offset = c_int::try_from(rhs_offset).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda silu_mul_q8_1 rhs offset exceeds c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda silu_mul_q8_1 rhs offset exceeds c_int"))
             })?;
             let element_count = c_int::try_from(element_count).map_err(|_| {
                 RuntimeError::Backend(String::from(
@@ -11856,6 +11953,95 @@ mod platform {
                     )
                 },
                 "psionic_cuda_pack_qwen35_key_value_rms_norm_f32",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_pack_qwen35_hybrid_qkv_rms_norm_f32(
+            &mut self,
+            input: &PlatformBuffer,
+            q_offset: usize,
+            k_offset: usize,
+            v_offset: usize,
+            group_count: usize,
+            state_size: usize,
+            v_size: usize,
+            q_weight: &PlatformBuffer,
+            k_weight: &PlatformBuffer,
+            epsilon: f32,
+            output: &PlatformBuffer,
+            output_q_offset: usize,
+            output_k_offset: usize,
+            output_v_offset: usize,
+        ) -> Result<(), RuntimeError> {
+            let q_offset = c_int::try_from(q_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid q offset exceeds c_int",
+                ))
+            })?;
+            let k_offset = c_int::try_from(k_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid k offset exceeds c_int",
+                ))
+            })?;
+            let v_offset = c_int::try_from(v_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid v offset exceeds c_int",
+                ))
+            })?;
+            let group_count = c_int::try_from(group_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid group count exceeds c_int",
+                ))
+            })?;
+            let state_size = c_int::try_from(state_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid state size exceeds c_int",
+                ))
+            })?;
+            let v_size = c_int::try_from(v_size).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid v size exceeds c_int",
+                ))
+            })?;
+            let output_q_offset = c_int::try_from(output_q_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid output q offset exceeds c_int",
+                ))
+            })?;
+            let output_k_offset = c_int::try_from(output_k_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid output k offset exceeds c_int",
+                ))
+            })?;
+            let output_v_offset = c_int::try_from(output_v_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 fused hybrid output v offset exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    (psionic_cuda_pack_qwen35_hybrid_qkv_rms_norm_f32
+                        as PackQwen35HybridQkvRmsNormF32Kernel)(
+                        input.inner.device_ptr.cast(),
+                        q_offset,
+                        k_offset,
+                        v_offset,
+                        group_count,
+                        state_size,
+                        v_size,
+                        q_weight.inner.device_ptr.cast(),
+                        k_weight.inner.device_ptr.cast(),
+                        epsilon,
+                        output.inner.device_ptr.cast(),
+                        output_q_offset,
+                        output_k_offset,
+                        output_v_offset,
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_pack_qwen35_hybrid_qkv_rms_norm_f32",
             )
         }
 
@@ -15224,6 +15410,29 @@ mod platform {
             _output: &PlatformBuffer,
             _output_key_offset: usize,
             _output_value_offset: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_pack_qwen35_hybrid_qkv_rms_norm_f32(
+            &mut self,
+            _input: &PlatformBuffer,
+            _q_offset: usize,
+            _k_offset: usize,
+            _v_offset: usize,
+            _group_count: usize,
+            _state_size: usize,
+            _v_size: usize,
+            _q_weight: &PlatformBuffer,
+            _k_weight: &PlatformBuffer,
+            _epsilon: f32,
+            _output: &PlatformBuffer,
+            _output_q_offset: usize,
+            _output_k_offset: usize,
+            _output_v_offset: usize,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda quantized text-generation kernels require Linux CUDA support",
@@ -20483,6 +20692,103 @@ mod tests {
     }
 
     #[test]
+    fn cuda_submission_pack_qwen35_hybrid_qkv_rms_norm_matches_separate_kernels()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let group_count = 3usize;
+        let state_size = 8usize;
+        let q_size = group_count * state_size;
+        let k_size = q_size;
+        let v_size = 20usize;
+        let q_offset = 4usize;
+        let k_offset = q_offset + q_size;
+        let v_offset = k_offset + k_size;
+        let output_q_offset = 6usize;
+        let output_k_offset = output_q_offset + q_size;
+        let output_v_offset = output_k_offset + k_size;
+        let input = (0..(v_offset + v_size))
+            .map(|index| ((index as f32 % 23.0) - 11.0) * 0.0625)
+            .collect::<Vec<_>>();
+        let q_weight = (0..state_size)
+            .map(|index| 0.5_f32 + (index as f32 % 7.0) * 0.0625)
+            .collect::<Vec<_>>();
+        let k_weight = (0..state_size)
+            .map(|index| 0.75_f32 + (index as f32 % 5.0) * 0.09375)
+            .collect::<Vec<_>>();
+        let epsilon = 1.0e-6_f32;
+
+        let input_buffer = backend.input_buffer(Shape::new(vec![input.len()]), input)?;
+        let q_weight_buffer = backend.input_buffer(Shape::new(vec![q_weight.len()]), q_weight)?;
+        let k_weight_buffer = backend.input_buffer(Shape::new(vec![k_weight.len()]), k_weight)?;
+        let output_len = output_v_offset + v_size;
+        let mut separate_output = backend.f32_buffer(output_len)?;
+        separate_output.write_f32(&vec![13.0_f32; output_len])?;
+        let mut fused_output = backend.f32_buffer(output_len)?;
+        fused_output.write_f32(&vec![13.0_f32; output_len])?;
+
+        let mut separate = backend.begin_submission()?;
+        separate.rms_norm_region(
+            &input_buffer,
+            q_offset,
+            &q_weight_buffer,
+            &separate_output,
+            output_q_offset,
+            q_size,
+            epsilon,
+        )?;
+        separate.rms_norm_region(
+            &input_buffer,
+            k_offset,
+            &k_weight_buffer,
+            &separate_output,
+            output_k_offset,
+            k_size,
+            epsilon,
+        )?;
+        separate.copy_buffer_region(
+            &input_buffer,
+            v_offset.saturating_mul(std::mem::size_of::<f32>()),
+            &separate_output,
+            output_v_offset.saturating_mul(std::mem::size_of::<f32>()),
+            v_size.saturating_mul(std::mem::size_of::<f32>()),
+        )?;
+        let separate_report = separate.commit(CudaCommandWait::Completed)?;
+        assert_eq!(separate_report.encoded_operations, 3);
+
+        let mut fused = backend.begin_submission()?;
+        fused.pack_qwen35_hybrid_qkv_rms_norm_f32(
+            &input_buffer,
+            q_offset,
+            k_offset,
+            v_offset,
+            group_count,
+            state_size,
+            v_size,
+            &q_weight_buffer,
+            &k_weight_buffer,
+            epsilon,
+            &fused_output,
+            output_q_offset,
+            output_k_offset,
+            output_v_offset,
+        )?;
+        let fused_report = fused.commit(CudaCommandWait::Completed)?;
+        assert_eq!(fused_report.encoded_operations, 1);
+
+        assert_close(
+            &fused_output.read_f32()?,
+            &separate_output.read_f32()?,
+            1e-6,
+        );
+        Ok(())
+    }
+
+    #[test]
     fn cuda_submission_router_topk_delayed_softmax_matches_fused_router_kernel_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
@@ -20876,8 +21182,8 @@ mod tests {
     }
 
     #[test]
-    fn cuda_submission_silu_mul_q8_1_matches_separate_kernels() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn cuda_submission_silu_mul_q8_1_matches_separate_kernels()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
             assert_eq!(backend.health().status, HealthStatus::Offline);
@@ -20891,16 +21197,28 @@ mod tests {
         let rhs = activation
             .iter()
             .enumerate()
-            .map(|(index, value)| if index & 1 == 0 { *value * 0.25 } else { -*value * 0.125 })
+            .map(|(index, value)| {
+                if index & 1 == 0 {
+                    *value * 0.25
+                } else {
+                    -*value * 0.125
+                }
+            })
             .collect::<Vec<_>>();
         let activation_buffer =
             backend.input_buffer(Shape::new(vec![activation.len()]), activation.clone())?;
         let rhs_buffer = backend.input_buffer(Shape::new(vec![rhs.len()]), rhs.clone())?;
         let separate_output = backend.f32_buffer(activation.len())?;
         let separate_q8_1 =
-            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, activation.len())?])?;
+            backend.byte_buffer(&vec![
+                0_u8;
+                crate::ggml_q8_1_storage_bytes(1, activation.len())?
+            ])?;
         let fused_q8_1 =
-            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, activation.len())?])?;
+            backend.byte_buffer(&vec![
+                0_u8;
+                crate::ggml_q8_1_storage_bytes(1, activation.len())?
+            ])?;
 
         let mut separate = backend.begin_submission()?;
         separate.silu_mul_f32(
@@ -20947,15 +21265,27 @@ mod tests {
         let gate = values
             .iter()
             .enumerate()
-            .map(|(index, value)| if index % 3 == 0 { *value * 0.5 } else { -*value * 0.25 })
+            .map(|(index, value)| {
+                if index % 3 == 0 {
+                    *value * 0.5
+                } else {
+                    -*value * 0.25
+                }
+            })
             .collect::<Vec<_>>();
         let values_buffer = backend.input_buffer(Shape::new(vec![values.len()]), values.clone())?;
         let gate_buffer = backend.input_buffer(Shape::new(vec![gate.len()]), gate.clone())?;
         let separate_output = backend.f32_buffer(values.len())?;
         let separate_q8_1 =
-            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, values.len())?])?;
+            backend.byte_buffer(&vec![
+                0_u8;
+                crate::ggml_q8_1_storage_bytes(1, values.len())?
+            ])?;
         let fused_q8_1 =
-            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, values.len())?])?;
+            backend.byte_buffer(&vec![
+                0_u8;
+                crate::ggml_q8_1_storage_bytes(1, values.len())?
+            ])?;
 
         let mut separate = backend.begin_submission()?;
         separate.sigmoid_mul_f32(

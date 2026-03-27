@@ -2031,7 +2031,6 @@ impl Qwen35Layer {
         let z_offset = qkv_rows;
         let alpha_offset = z_offset.saturating_add(z_rows);
         let beta_offset = alpha_offset.saturating_add(alpha_rows);
-        let v_bytes = v_size.saturating_mul(std::mem::size_of::<f32>());
 
         if let Some(token) = initial_token {
             *bytes_moved = bytes_moved.saturating_add(
@@ -2081,30 +2080,21 @@ impl Qwen35Layer {
             &plan.decay_buffer,
             &plan.beta_buffer,
         )?;
-        submission.rms_norm_region(
+        submission.pack_qwen35_hybrid_qkv_rms_norm_f32(
             &plan.conv_buffer,
             0,
+            q_size,
+            v_offset,
+            hybrid.group_count,
+            hybrid.state_size,
+            v_size,
             &hybrid.q_scale_device,
+            &hybrid.k_scale_device,
+            1e-6,
             &plan.qkv_norm_buffer,
             0,
             q_size,
-            1e-6,
-        )?;
-        submission.rms_norm_region(
-            &plan.conv_buffer,
-            q_size,
-            &hybrid.k_scale_device,
-            &plan.qkv_norm_buffer,
-            q_size,
-            k_size,
-            1e-6,
-        )?;
-        submission.copy_buffer_region(
-            &plan.conv_buffer,
-            v_offset.saturating_mul(std::mem::size_of::<f32>()),
-            &plan.qkv_norm_buffer,
-            v_offset.saturating_mul(std::mem::size_of::<f32>()),
-            v_bytes,
+            v_offset,
         )?;
         submission.gated_delta_step_f32(
             &plan.qkv_norm_buffer,

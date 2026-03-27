@@ -1213,6 +1213,65 @@ __global__ void pack_qwen35_key_value_rms_norm_f32_kernel(
     }
 }
 
+__global__ void pack_qwen35_hybrid_qkv_rms_norm_f32_kernel(
+    const float *input,
+    int q_offset,
+    int k_offset,
+    int v_offset,
+    int group_count,
+    int state_size,
+    int v_size,
+    const float *q_weight,
+    const float *k_weight,
+    float epsilon,
+    float *output,
+    int output_q_offset,
+    int output_k_offset,
+    int output_v_offset
+) {
+    const int block_index = static_cast<int>(blockIdx.x);
+    __shared__ float scratch[kBlockSize];
+
+    if (block_index < group_count) {
+        const int q_input_base = q_offset + block_index * state_size;
+        const int q_output_base = output_q_offset + block_index * state_size;
+        float mean_square_partial = 0.0f;
+        for (int feature = threadIdx.x; feature < state_size; feature += blockDim.x) {
+            const float value = input[q_input_base + feature];
+            mean_square_partial += value * value;
+        }
+        const float mean_square_sum = reduce_block_sum(mean_square_partial, scratch);
+        const float inv_rms = rsqrtf(mean_square_sum / static_cast<float>(state_size) + epsilon);
+        for (int feature = threadIdx.x; feature < state_size; feature += blockDim.x) {
+            output[q_output_base + feature] =
+                input[q_input_base + feature] * q_weight[feature] * inv_rms;
+        }
+    }
+
+    __syncthreads();
+
+    if (block_index < group_count) {
+        const int k_input_base = k_offset + block_index * state_size;
+        const int k_output_base = output_k_offset + block_index * state_size;
+        float mean_square_partial = 0.0f;
+        for (int feature = threadIdx.x; feature < state_size; feature += blockDim.x) {
+            const float value = input[k_input_base + feature];
+            mean_square_partial += value * value;
+        }
+        const float mean_square_sum = reduce_block_sum(mean_square_partial, scratch);
+        const float inv_rms = rsqrtf(mean_square_sum / static_cast<float>(state_size) + epsilon);
+        for (int feature = threadIdx.x; feature < state_size; feature += blockDim.x) {
+            output[k_output_base + feature] =
+                input[k_input_base + feature] * k_weight[feature] * inv_rms;
+        }
+    }
+
+    const int v_index = block_index * static_cast<int>(blockDim.x) + static_cast<int>(threadIdx.x);
+    if (v_index < v_size) {
+        output[output_v_offset + v_index] = input[v_offset + v_index];
+    }
+}
+
 __global__ void depthwise_causal_conv1d_step_f32_kernel(
     const float *input,
     float *state,
@@ -6377,6 +6436,52 @@ extern "C" int psionic_cuda_pack_qwen35_key_value_rms_norm_f32(
         static_cast<float *>(output),
         output_key_offset,
         output_value_offset
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_pack_qwen35_hybrid_qkv_rms_norm_f32(
+    const void *input,
+    int q_offset,
+    int k_offset,
+    int v_offset,
+    int group_count,
+    int state_size,
+    int v_size,
+    const void *q_weight,
+    const void *k_weight,
+    float epsilon,
+    void *output,
+    int output_q_offset,
+    int output_k_offset,
+    int output_v_offset,
+    void *stream
+) {
+    if (group_count <= 0 || state_size <= 0 || v_size < 0 || !isfinite(epsilon) || epsilon <= 0.0f) {
+        return static_cast<int>(cudaErrorInvalidValue);
+    }
+    const int v_blocks = (v_size + kBlockSize - 1) / kBlockSize;
+    const int block_count = max(group_count, v_blocks);
+    pack_qwen35_hybrid_qkv_rms_norm_f32_kernel<<<
+        block_count,
+        kBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(input),
+        q_offset,
+        k_offset,
+        v_offset,
+        group_count,
+        state_size,
+        v_size,
+        static_cast<const float *>(q_weight),
+        static_cast<const float *>(k_weight),
+        epsilon,
+        static_cast<float *>(output),
+        output_q_offset,
+        output_k_offset,
+        output_v_offset
     );
     return static_cast<int>(cudaGetLastError());
 }

@@ -183,6 +183,41 @@ int psionic_cuda_pack_qwen35_key_value_rms_norm_f32(
     return 1;
 }
 
+int psionic_cuda_pack_qwen35_hybrid_qkv_rms_norm_f32(
+    const void *input,
+    int q_offset,
+    int k_offset,
+    int v_offset,
+    int group_count,
+    int state_size,
+    int v_size,
+    const void *q_weight,
+    const void *k_weight,
+    float epsilon,
+    void *output,
+    int output_q_offset,
+    int output_k_offset,
+    int output_v_offset,
+    void *stream
+) {
+    (void)input;
+    (void)q_offset;
+    (void)k_offset;
+    (void)v_offset;
+    (void)group_count;
+    (void)state_size;
+    (void)v_size;
+    (void)q_weight;
+    (void)k_weight;
+    (void)epsilon;
+    (void)output;
+    (void)output_q_offset;
+    (void)output_k_offset;
+    (void)output_v_offset;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_mxfp4_matvec_q8_1_argmax(
     const void *weights,
     int rows,

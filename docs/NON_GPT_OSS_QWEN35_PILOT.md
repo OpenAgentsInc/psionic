@@ -142,7 +142,13 @@ Measured again on the same host and prompt after replaying qwen35 prompt-prefix
 - Psionic native CUDA qwen35 decode throughput: about `507.29 tok/s`
 - local Ollama `qwen3.5:0.8b` decode throughput: about `329.34 tok/s`
 
-This improvement now comes from seven architectural changes inside the native
+Measured again on the same host and prompt after fusing qwen35 hybrid q/k
+RMSNorm plus v staging into one CUDA kernel across the `18` hybrid blocks:
+
+- Psionic native CUDA qwen35 decode throughput: about `507.82 tok/s`
+- local Ollama `qwen3.5:0.8b` decode throughput: about `329.34 tok/s`
+
+This improvement now comes from eight architectural changes inside the native
 Psionic runtime:
 
 - qwen35 derives hybrid-layer SSM `decay` and `beta` on CUDA and normalizes
@@ -161,6 +167,8 @@ Psionic runtime:
   quantization before the output projection matvec
 - qwen35 prompt-prefix replay now reuses a dedicated captured CUDA graph for
   `NoOutput` prompt tokens instead of launching each submission separately
+- qwen35 hybrid blocks now fuse q RMSNorm, k RMSNorm, and v staging into one
+  CUDA kernel before the recurrent gated-delta step
 
 This pilot therefore proves native CUDA execution correctness, honest
 publication, and a wider throughput win over the local Ollama baseline on this

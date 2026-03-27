@@ -52,8 +52,10 @@ than just run tensor math.
   qwen35 dense and hybrid SiLU activation tails directly into GGML `Q8_1`
   scratch, and then fusing the full-attention sigmoid gating tail directly
   into GGML `Q8_1` scratch, and then replaying qwen35 prompt-prefix `NoOutput`
-  submissions through a second captured CUDA graph, the local `qwen3.5:0.8b`
-  benchmark on this host measured about `507 tok/s` decode on Psionic versus
+  submissions through a second captured CUDA graph, and then fusing qwen35
+  hybrid q/k RMSNorm plus v staging into one CUDA kernel, the local
+  `qwen3.5:0.8b` benchmark on this host measured about `508 tok/s` decode on
+  Psionic versus
   about `329 tok/s` decode on local Ollama for the same one-sentence prompt
   and `128` token cap.
 - The qwen35 lane is now ahead on decode throughput for this host and prompt,
