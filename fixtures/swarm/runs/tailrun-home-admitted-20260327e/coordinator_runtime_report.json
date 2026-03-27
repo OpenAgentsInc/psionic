@@ -1,0 +1,460 @@
+{
+  "schema_version": "swarm.first_trusted_lan_runtime_report.v1",
+  "run_id": "tailrun-home-admitted-20260327e",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "topology_contract_digest": "144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07",
+  "workflow_plan_digest": "573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821",
+  "cluster_id": "25e884aca8ccb18b70cbde13b9cfa74c373f1cff8f988b559396dda69e453ea0",
+  "node_id": "swarm-mac-a",
+  "role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+  "runtime_role": "coordinator",
+  "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "local_endpoint": "100.127.107.31:35200",
+  "peer_endpoint": "100.108.56.85:35201",
+  "membership_receipt": {
+    "training_run_id": "tailrun-home-admitted-20260327e",
+    "stage_id": "stage-general_sft",
+    "topology_revision_id": "tailrun-home-admitted-20260327e-topology-1",
+    "eligible_node_ids": [
+      "swarm-linux-4080-a",
+      "swarm-mac-a"
+    ],
+    "blocked_node_ids": [],
+    "contributor_statuses": [
+      {
+        "node_id": "swarm-linux-4080-a",
+        "role": "executor_only",
+        "membership_status": "ready",
+        "matched_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+        "backend_readiness": "ready",
+        "stability": "stable",
+        "free_memory_bytes": 21474836480,
+        "accelerator_count": 1,
+        "eligibility": "eligible",
+        "priority_bps": 4783,
+        "reliability_bps": 9500,
+        "contribution_state": "standby"
+      },
+      {
+        "node_id": "swarm-mac-a",
+        "role": "mixed",
+        "membership_status": "ready",
+        "matched_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+        "backend_readiness": "ready",
+        "stability": "stable",
+        "free_memory_bytes": 25769803776,
+        "accelerator_count": 1,
+        "eligibility": "eligible",
+        "priority_bps": 5560,
+        "reliability_bps": 9500,
+        "contribution_state": "standby"
+      }
+    ],
+    "observed_at_ms": 1774635609773,
+    "receipt_digest": "1acc1449d91a73e9fd7a1084979f102d8494ab12f09267c8b39e33a330d320ff"
+  },
+  "window_plan": {
+    "training_run_id": "tailrun-home-admitted-20260327e",
+    "stage_id": "stage-general_sft",
+    "window_id": "tailrun-home-admitted-20260327e-window-1",
+    "topology_revision_id": "tailrun-home-admitted-20260327e-topology-1",
+    "contributor_set_revision_id": "tailrun-home-admitted-20260327e-contributors-1",
+    "assignment_seed": 5395033036559423963,
+    "selected_node_ids": [
+      "swarm-mac-a",
+      "swarm-linux-4080-a"
+    ],
+    "standby_node_ids": [],
+    "dataset_slices": [
+      {
+        "dataset_id": "dataset://openagents/swarm/open_adapter_sft@2026.03.24",
+        "split_name": "train",
+        "slice_id": "swarm_mac_mlx_coordinator_validator_contributor-1",
+        "slice_digest": "17cf24a60ef70a91201f6329f91a8b4a7e01c0be67ee84324c6fd41d9bbb8147"
+      },
+      {
+        "dataset_id": "dataset://openagents/swarm/open_adapter_sft@2026.03.24",
+        "split_name": "train",
+        "slice_id": "swarm_linux_cuda_rtx4080_contributor-2",
+        "slice_digest": "ddb820e4c989d15b538b23bdc568e12cc4669fc56f6bc753fc5b4a428e6d492f"
+      }
+    ],
+    "adapter_target": {
+      "adapter_target_id": "mlx.adapter.target",
+      "adapter_family": "gpt_oss.decoder_lm_head_lora",
+      "base_model_ref": "gpt-oss-20b@swarm-local-v1",
+      "adapter_format": "safetensors"
+    },
+    "input_policy_revision": {
+      "policy_family": "mlx.recipe.policy",
+      "revision_id": "first-swarm-live-plan-r1",
+      "revision_number": 1,
+      "policy_digest": "sha256:b09a64cee683e24268b32db3607c326f2d7006648ff42942ac473520ca4f411d",
+      "produced_at_ms": 1000
+    },
+    "input_checkpoint_pointer": {
+      "scope": {
+        "kind": "window",
+        "scope_id": "first-swarm-live-plan-window-1"
+      },
+      "checkpoint_family": "swarm.open_adapter",
+      "checkpoint": {
+        "checkpoint_family": "swarm.open_adapter",
+        "stream_id": "stream://swarm/first-swarm-live-plan/policy",
+        "manifest_digest": "manifest://swarm/first-swarm-live-plan/policy",
+        "object_digest": "object://swarm/first-swarm-live-plan/policy",
+        "writer_node_id": "swarm-mac-a",
+        "membership_epoch": 1,
+        "cluster_state_digest": "ab3c0de68eb223c6e07efed3b164c06e5bc8ece3a6ba06ab66c11ba3ccdd12fe",
+        "topology_digest": "b2f375e87e347a75144269ac2c4ec5ae938f94a9362ecec052e45b578cc85bf6",
+        "started_at_ms": 1774409201000,
+        "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+        "step": 12
+      },
+      "manifest_digest": "007b3709823cc31f85a79ec775095eb1929da16eee6bd7e82b125cf00dca4337",
+      "updated_at_ms": 1774409201000,
+      "pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8"
+    },
+    "planned_at_ms": 1774635609783,
+    "receipt_digest": "b1d0d9ccd8b44a9dac654bfcd019ced15575e290f679b82152ee5d0ed71e0507"
+  },
+  "heartbeat_receipts": [
+    {
+      "receipt_id": "tailrun-home-admitted-20260327e-window-1-heartbeat-swarm-mac-a",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-mac-a",
+      "session_id": "swarm-mac-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "observed_at_ms": 1774635609793,
+      "next_required_heartbeat_at_ms": 1774637409793,
+      "receipt_digest": "acf9e52c4c1db4ed8e4ffd4e51e970e8ebb8ea83671e678e02b68381be1fe113"
+    },
+    {
+      "receipt_id": "tailrun-home-admitted-20260327e-window-1-heartbeat-swarm-linux-4080-a",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-linux-4080-a",
+      "session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "observed_at_ms": 1774635670162,
+      "next_required_heartbeat_at_ms": 1774637470162,
+      "receipt_digest": "1e465daa460b31f9d78bd14c9ff1fb6781dd0d2b8d2dbb6c4488ac226891834c"
+    },
+    {
+      "receipt_id": "tailrun-home-admitted-20260327e-window-1-heartbeat-swarm-linux-4080-a",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-linux-4080-a",
+      "session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "active_claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0-claim-1",
+      "progress": {
+        "completed_steps": 4,
+        "processed_samples": 4
+      },
+      "observed_at_ms": 1774635670173,
+      "next_required_heartbeat_at_ms": 1774637470173,
+      "receipt_digest": "506f8f64af0f47441a4232845f1e27b59ade2bbf8a0b0916610c3c2ff5eb2b43"
+    },
+    {
+      "receipt_id": "tailrun-home-admitted-20260327e-window-1-heartbeat-swarm-linux-4080-a",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-linux-4080-a",
+      "session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "active_claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0-claim-1",
+      "progress": {
+        "completed_steps": 8,
+        "processed_samples": 8
+      },
+      "observed_at_ms": 1774635670579,
+      "next_required_heartbeat_at_ms": 1774637470579,
+      "receipt_digest": "c3d2611b80953e8afe13038d321c785f9671d7aa2bad1d4dd0d08b9576563d09"
+    },
+    {
+      "receipt_id": "tailrun-home-admitted-20260327e-window-1-heartbeat-swarm-mac-a",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-mac-a",
+      "session_id": "swarm-mac-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "active_claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0-claim-1",
+      "progress": {
+        "completed_steps": 12,
+        "processed_samples": 12
+      },
+      "observed_at_ms": 1774635670989,
+      "next_required_heartbeat_at_ms": 1774637470989,
+      "receipt_digest": "ead223b89cb0a8d2623c6829da281aa337e7ef01a47a50152ade39a8ea937b3a"
+    },
+    {
+      "receipt_id": "tailrun-home-admitted-20260327e-window-1-heartbeat-swarm-mac-a",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-mac-a",
+      "session_id": "swarm-mac-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "active_claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0-claim-1",
+      "progress": {
+        "completed_steps": 12,
+        "processed_samples": 12
+      },
+      "observed_at_ms": 1774635670989,
+      "next_required_heartbeat_at_ms": 1774637470989,
+      "receipt_digest": "ead223b89cb0a8d2623c6829da281aa337e7ef01a47a50152ade39a8ea937b3a"
+    }
+  ],
+  "acknowledgement_receipts": [
+    {
+      "receipt_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0-claim-1-ack",
+      "claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0-claim-1",
+      "assignment_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+      "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+      "worker_id": "swarm-mac-a",
+      "session_id": "swarm-mac-a-session-tailrun-home-admitted-20260327e",
+      "acknowledged_at_ms": 1774635609804,
+      "receipt_digest": "d432eeac3f3eb42f630f415edde8701096858ca639b5740dea86aa8e3cecc6c3"
+    },
+    {
+      "receipt_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0-claim-1-ack",
+      "claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0-claim-1",
+      "assignment_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+      "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+      "worker_id": "swarm-linux-4080-a",
+      "session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260327e",
+      "acknowledged_at_ms": 1774635670162,
+      "receipt_digest": "0779a0a548e9c84701e279c42f4e525138f816619093748abaa22488f127e3de"
+    }
+  ],
+  "submission_receipts": [
+    {
+      "receipt_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0-claim-1-submission",
+      "claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0-claim-1",
+      "assignment_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+      "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-linux-4080-a",
+      "session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "target_policy_revision_id": "first-swarm-live-plan-r1",
+      "source_policy_revision_id": "first-swarm-live-plan-r1",
+      "target_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+      "source_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+      "upload_expectation": {
+        "subject": "adapter_package",
+        "window_id": "tailrun-home-admitted-20260327e-window-1",
+        "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+        "adapter_target_id": "mlx.adapter.target",
+        "target_policy_revision_id": "first-swarm-live-plan-r1",
+        "target_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+        "upload_reference_prefix": "object://adapter-window/tailrun-home-admitted-20260327e-window-1/adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+        "expectation_digest": "dfe620c66f27971c890aa1636d1de5c371dde335e3b0fa17271381ddd4f18afd"
+      },
+      "execution_summary": {
+        "started_at_ms": 1774635670192,
+        "completed_at_ms": 1774635670194,
+        "local_step_count": 12,
+        "sample_count": 12,
+        "average_loss_bps": 0,
+        "adapter_delta_digest": "9a0ac2c1aae05a3926c66e087721f8a2889635d998d046f710a5171377ad8fd1"
+      },
+      "upload": {
+        "upload_reference": "object://adapter-window/tailrun-home-admitted-20260327e-window-1/adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0/artifact-linux-contributor",
+        "upload_manifest_digest": "c34a0ae3f235d8a0f915c66f558082ddc8786218d23fed34f6bd78a56c31e6a0",
+        "payload_bytes": 1480
+      },
+      "outcome": "accepted",
+      "observed_at_ms": 1774635670989,
+      "receipt_digest": "fa1da90e4f4aac5534b32cf96f9eaf3390dd1b005edb3ea0097c78c68eeac5ee"
+    },
+    {
+      "receipt_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0-claim-1-submission",
+      "claim_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0-claim-1",
+      "assignment_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+      "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+      "window_id": "tailrun-home-admitted-20260327e-window-1",
+      "worker_id": "swarm-mac-a",
+      "session_id": "swarm-mac-a-session-tailrun-home-admitted-20260327e",
+      "trust_class": "semi_trusted_contributor",
+      "target_policy_revision_id": "first-swarm-live-plan-r1",
+      "source_policy_revision_id": "first-swarm-live-plan-r1",
+      "target_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+      "source_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+      "upload_expectation": {
+        "subject": "adapter_package",
+        "window_id": "tailrun-home-admitted-20260327e-window-1",
+        "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+        "adapter_target_id": "mlx.adapter.target",
+        "target_policy_revision_id": "first-swarm-live-plan-r1",
+        "target_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+        "upload_reference_prefix": "object://adapter-window/tailrun-home-admitted-20260327e-window-1/adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+        "expectation_digest": "3274dc0fd6fd7b8a7344154c5950d9de84a99cafb0421a056067ea42ad22f20a"
+      },
+      "execution_summary": {
+        "started_at_ms": 1774635609765,
+        "completed_at_ms": 1774635609883,
+        "local_step_count": 12,
+        "sample_count": 12,
+        "average_loss_bps": 0,
+        "adapter_delta_digest": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9"
+      },
+      "upload": {
+        "upload_reference": "object://adapter-window/tailrun-home-admitted-20260327e-window-1/adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0/artifact-mac-coordinator",
+        "upload_manifest_digest": "12c0ae3fb642a45c475bac4c53fcc7808d156292cd9011376f9339c67fec3bce",
+        "payload_bytes": 1472
+      },
+      "outcome": "accepted",
+      "observed_at_ms": 1774635670990,
+      "receipt_digest": "9de0372da95e133666e47c4f60f024249c3c68fc9c7b9b72abbc230d773091fb"
+    }
+  ],
+  "validator_summary": {
+    "validator_policy_id": "validator.open_adapter.reference",
+    "window_id": "tailrun-home-admitted-20260327e-window-1",
+    "total_contributions": 2,
+    "admitted_contributions": 2,
+    "accepted_contributions": 2,
+    "quarantined_contributions": 0,
+    "rejected_contributions": 0,
+    "replay_required_contributions": 0,
+    "replay_checked_contributions": 2,
+    "promotion_ready": false,
+    "scored_at_ms": 1774635671091,
+    "summary_digest": "74f88784fc274ffb9bfca93d3d677063da2e373928d6653d0149c36d8babd90c"
+  },
+  "promotion_receipt": {
+    "aggregation_rule": "weighted_manifest_digest_merge_v1",
+    "training_run_id": "tailrun-home-admitted-20260327e",
+    "stage_id": "stage-general_sft",
+    "window_id": "tailrun-home-admitted-20260327e-window-1",
+    "contributor_set_revision_id": "tailrun-home-admitted-20260327e-contributors-1",
+    "adapter_target_id": "mlx.adapter.target",
+    "input_policy_revision_id": "first-swarm-live-plan-r1",
+    "input_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+    "window_summary_digest": "74f88784fc274ffb9bfca93d3d677063da2e373928d6653d0149c36d8babd90c",
+    "accepted_contributions": [
+      {
+        "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0",
+        "worker_id": "swarm-linux-4080-a",
+        "artifact_id": "adapter_contribution:tailrun-home-admitted-20260327e-window-1:adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-linux-4080-a:0:c34a0ae3f235d8a0f915c66f558082ddc8786218d23fed34f6bd78a56c31e6a0",
+        "manifest_digest": "c34a0ae3f235d8a0f915c66f558082ddc8786218d23fed34f6bd78a56c31e6a0",
+        "object_digest": "9a0ac2c1aae05a3926c66e087721f8a2889635d998d046f710a5171377ad8fd1",
+        "aggregation_weight_bps": 10000,
+        "validator_receipt_digest": "4ebb1364cb25d15a64c0d4caccfa9319eb50621bf6450f8bac13e2184cfd0fcb",
+        "security_receipt_digest": "79af39c460b4a12c69a8b8e9dc94d939e44ef200bf9bae41632d0c78ac947c7a",
+        "provenance_bundle_digest": "e0ea6b56070ec3a94b106741cab0b0a270b6cbe86fc8ddba6a3666287cba05ae"
+      },
+      {
+        "contribution_id": "adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+        "worker_id": "swarm-mac-a",
+        "artifact_id": "adapter_contribution:tailrun-home-admitted-20260327e-window-1:adapter-contribution:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0:12c0ae3fb642a45c475bac4c53fcc7808d156292cd9011376f9339c67fec3bce",
+        "manifest_digest": "12c0ae3fb642a45c475bac4c53fcc7808d156292cd9011376f9339c67fec3bce",
+        "object_digest": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9",
+        "aggregation_weight_bps": 10000,
+        "validator_receipt_digest": "a003f0837233391dac727934edd43d5a18056997a3b7f995fd7f2963ec25c25f",
+        "security_receipt_digest": "04c55698b6f6446de7dd0d54036ba128b7cdb2b49ffb9624c09573e8aa621741",
+        "provenance_bundle_digest": "3dc780bd0025b7f5710ed99bfa3e2533ac54fc5cc0d4f4d045b8281b20463352"
+      }
+    ],
+    "aggregated_delta_digest": "499d6290c90d2c3384729fb3352f945d79307543e58b6c115a7a24e5422a1bf8",
+    "promotion_disposition": "held",
+    "hold_reason_codes": [
+      "validator_window_not_promotion_ready"
+    ],
+    "aggregated_at_ms": 1774635671141,
+    "receipt_digest": "144e7f0b407aba4150aecd3e4d39cadb143eeeddf0613391284293676539b554"
+  },
+  "aggregation_compatibility": {
+    "receipt_contract_digest": "f9caea55f9ebdd1580f14b3de578a5831e115121d24d9f26bff015dce78e258c",
+    "shared_replay_identity_digest": "05f957065eaa2d1cf2a8bc90b9726722cb1d223728113e09d492d024a028af2c",
+    "contributor_role_ids": [
+      "swarm.mac.mlx.coordinator_validator_contributor",
+      "swarm.linux.cuda.rtx4080.contributor"
+    ],
+    "execution_backend_labels": [
+      "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "open_adapter_backend.cuda.gpt_oss_lm_head"
+    ],
+    "contributor_receipt_digests": [
+      "64c76605de58fbc91e368acaeef8432121f31146048f51e18260534ddf6236c9",
+      "06b7960f77bfe0fe03f863bf7e353bab9e40a25101522f6a516f6947ff363243"
+    ]
+  },
+  "replay_receipt_digests": [
+    "4074b45eaf5cb81c0b1ebf1caeda35b5ec0fd0ed0a09d26bd1c40d0f101d98aa",
+    "0c06e42adce0fabb016ea05b2e3d3d98a45fe121704f1704565d6c2207b4acdc"
+  ],
+  "local_contribution": {
+    "run_id": "tailrun-home-admitted-20260327e",
+    "assignment_id": "adapter-assignment:tailrun-home-admitted-20260327e-window-1:swarm-mac-a:0",
+    "worker_id": "swarm-mac-a",
+    "session_id": "swarm-mac-a-session-tailrun-home-admitted-20260327e",
+    "role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+    "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+    "adapter_artifact_digest": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9",
+    "adapter_identity_digest": "5cc5120747b7bc90220ae109ab9fd2f076106523658ea46d606cb98458ad8925",
+    "adapter_delta_digest": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9",
+    "payload_sha256": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9",
+    "payload_bytes": 1472,
+    "final_mean_loss": 5.364421e-7,
+    "executed_steps": 12,
+    "batch_count": 2,
+    "contributor_receipt": {
+      "schema_version": "swarm.open_adapter.contributor_receipt.v1",
+      "manifest": {
+        "receipt_contract_digest": "f9caea55f9ebdd1580f14b3de578a5831e115121d24d9f26bff015dce78e258c",
+        "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+        "swarm_contract_digest": "203e652752f0cfc350b59d3ad9d3c17ae65b6012106c5ebbd9191ba44aaa39f0",
+        "dataset_ref": "dataset://openagents/swarm/open_adapter_sft",
+        "dataset_manifest_digest": "82b74a2b1cb7d53ecb1da68c12b3ce990937c29d28c54aa1ba7053ae0892884c",
+        "validator_policy_id": "validator.open_adapter.reference",
+        "aggregation_policy_id": "aggregation.open_adapter.mean_delta",
+        "replay_policy_id": "replay.open_adapter.strict",
+        "contributor_role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+        "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+        "logical_device_kind": "metal",
+        "logical_device_label": "metal:0",
+        "admissible_model_family": "gpt_oss_decoder_lm_head_lora",
+        "adapter_family": "gpt_oss.decoder_lm_head_lora",
+        "adapter_format": "safetensors",
+        "precision_policy": "f32_reference",
+        "base_model_id": "gpt-oss-20b",
+        "base_model_revision": "swarm-local-v1",
+        "base_served_artifact_digest": "sha256:swarm-open-adapter-base",
+        "tokenizer_digest": "swarm-open-adapter-tokenizer-v1",
+        "tokenizer_contract_digest": "978a733f8b8f48aa9d77ea658fd640b6d61a40c18bd3f692cad93065237fff51",
+        "hidden_size": 4,
+        "vocab_size": 4,
+        "lora_rank": 2,
+        "lora_alpha": 8.0,
+        "batch_size": 2,
+        "sample_count": 4,
+        "shared_replay_identity_digest": "05f957065eaa2d1cf2a8bc90b9726722cb1d223728113e09d492d024a028af2c",
+        "manifest_digest": "ae1eb75121ef341f8f28bc223b2169d8b06ab7becb96f560b3965d57f23bbcbf"
+      },
+      "run_id": "tailrun-home-admitted-20260327e-swarm-mac-a",
+      "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260327e",
+      "executed_steps": 12,
+      "batch_count": 2,
+      "final_mean_loss": 5.364421e-7,
+      "adapter_artifact_digest": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9",
+      "adapter_identity_digest": "5cc5120747b7bc90220ae109ab9fd2f076106523658ea46d606cb98458ad8925",
+      "initial_state_dict_digest": "e8a86d6d0834a4c70db0ff525db5ccbb2c77ba5efa119d4f306ab19e10b5455c",
+      "final_state_dict_digest": "9dd6409b56822d30eaabf3d7e360df992154201747afe001cbe1ada81cb62db1",
+      "execution_provenance_digest": "be502b5a9df9483b6fc559e059dc21e001daa35d27bfbcb0dcd4998f3999e140",
+      "deterministic_probe_top_token_id": 2,
+      "unsupported_precision_refusal": "open adapter backend does not yet support precision policy `Bf16Mixed`",
+      "receipt_digest": "64c76605de58fbc91e368acaeef8432121f31146048f51e18260534ddf6236c9"
+    },
+    "execution_summary": {
+      "started_at_ms": 1774635609765,
+      "completed_at_ms": 1774635609883,
+      "local_step_count": 12,
+      "sample_count": 12,
+      "average_loss_bps": 0,
+      "adapter_delta_digest": "c881f1d710d0fc3383a6828e8eab322e63772ffb3548e6f6c45cb7e9fda33dc9"
+    }
+  },
+  "protocol_detail": "The Mac coordinator ran one MLX open-adapter contribution locally, admitted one Linux CUDA contributor over the trusted-LAN cluster port, compared the retained contributor receipts across both backends, and sealed validator, replay, and aggregation truth through the generic adapter-cluster state machines.",
+  "claim_boundary": "This runtime proves one bounded trusted-LAN mixed-hardware open-adapter window across one Mac MLX coordinator and one Linux RTX 4080 CUDA contributor. It does not claim full-model mixed-backend dense training, internet discovery, elastic membership, or automatic served promotion.",
+  "started_at_ms": 1774635609763,
+  "finished_at_ms": 1774635670992,
+  "observed_wallclock_ms": 61228,
+  "report_digest": "cd805a44149cc77aba72c9abdedaa284ccaef7a96d64e5ae7b376d48487461f8"
+}

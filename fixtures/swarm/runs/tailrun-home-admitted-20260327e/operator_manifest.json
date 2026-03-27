@@ -1,0 +1,22 @@
+{
+  "schema_version": "swarm.first_trusted_tailnet_operator_manifest.v1",
+  "created_at_utc": "2026-03-27T18:20:07Z",
+  "run_id": "tailrun-home-admitted-20260327e",
+  "git_ref": "dc868e1803365c7f1938431c84ba48dcf28fef4e",
+  "topology_contract_path": "fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json",
+  "workflow_plan_path": "fixtures/swarm/first_swarm_live_workflow_plan_v1.json",
+  "bundle_dir": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e",
+  "coordinator": {
+    "host": "local",
+    "tailnet_ip": "100.127.107.31",
+    "cluster_port": 35200,
+    "endpoint": "100.127.107.31:35200"
+  },
+  "contributor": {
+    "host": "archlinux",
+    "tailnet_ip": "100.108.56.85",
+    "cluster_port": 35201,
+    "endpoint": "100.108.56.85:35201"
+  },
+  "claim_boundary": "This manifest records one admitted-device Tailnet operator run over the first-swarm trusted-home protocol. It freezes the endpoints, git revision, and retained bundle location, but does not itself claim contributor success, validator acceptance, aggregation, or publication."
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "swarm.first_trusted_lan_real_run_bundle.v1",
+  "run_id": "tailrun-home-admitted-20260327e",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "result_classification": "bounded_success",
+  "operator_manifest_sha256": "a08631ebe784f591c3c6bc1a77a8c43f56a12685db2337d40aeba50009148f05",
+  "topology_contract_digest": "144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07",
+  "workflow_plan_digest": "573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821",
+  "coordinator_report_sha256": "a55ea43f4dd9b567bc213203a022aa62eafcf839e725f84f5643b74125c7cc18",
+  "contributor_report_sha256": "b09eb8417025e11adc11d79900828fc69b0723b56b741f1353f002840673b886",
+  "coordinator_endpoint": "100.127.107.31:35200",
+  "contributor_endpoint": "100.108.56.85:35201",
+  "coordinator_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "contributor_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+  "coordinator_contributor_receipt_digest": "64c76605de58fbc91e368acaeef8432121f31146048f51e18260534ddf6236c9",
+  "contributor_contributor_receipt_digest": "06b7960f77bfe0fe03f863bf7e353bab9e40a25101522f6a516f6947ff363243",
+  "aggregation_compatibility_digest": "baafac63afaa4a1f3e514c3ae77da82e8eec36b06803e2be1b64759350c5fb79",
+  "validator_summary_digest": "74f88784fc274ffb9bfca93d3d677063da2e373928d6653d0149c36d8babd90c",
+  "promotion_receipt_digest": "144e7f0b407aba4150aecd3e4d39cadb143eeeddf0613391284293676539b554",
+  "promotion_disposition": "held",
+  "promotion_hold_reason_codes": [
+    "validator_window_not_promotion_ready"
+  ],
+  "total_contributions": 2,
+  "accepted_contributions": 2,
+  "replay_checked_contributions": 2,
+  "submission_receipt_count": 2,
+  "replay_receipt_digests": [
+    "4074b45eaf5cb81c0b1ebf1caeda35b5ec0fd0ed0a09d26bd1c40d0f101d98aa",
+    "0c06e42adce0fabb016ea05b2e3d3d98a45fe121704f1704565d6c2207b4acdc"
+  ],
+  "merge_disposition": "merged",
+  "publish_disposition": "refused",
+  "publish_reason": "Publication is refused because the bounded admitted-device Tailnet run stopped at contributor, validator, replay, and aggregation truth without a promoted snapshot.",
+  "artifacts": {
+    "operator_manifest_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json",
+    "topology_contract_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json",
+    "workflow_plan_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/first_swarm_live_workflow_plan_v1.json",
+    "coordinator_report_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/coordinator_runtime_report.json",
+    "contributor_report_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/contributor_runtime_report.json"
+  },
+  "claim_boundary": "This bundle proves one real admitted-device Tailnet mixed-hardware open-adapter run across a local M5 MLX coordinator and a Linux RTX 4080 contributor, with explicit contributor receipts, submission receipts, validator summary, replay receipts, and aggregation outcome. It does not claim M2 participation, full-model mixed-backend dense training, or automatic published-model promotion.",
+  "bundle_sha256": "bbefac6f4ab99f6a0ee446bfd657de62a17c37caa9c9cdcf8551619ad0450817"
+}

@@ -258,6 +258,20 @@ Retained admitted-matrix result:
 That retained matrix run uses the admitted device set only and intentionally
 does not block on the M2.
 
+## Admitted Multi-Device Proof
+
+The admitted-device home-Tailnet mixed-hardware proof now also exists at:
+
+- `scripts/run-first-swarm-tailnet-admitted-live.sh`
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json`
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json`
+- `docs/audits/2026-03-27-tailrun-admitted-home-tailnet-run-audit.md`
+
+That proof is not the same thing as the same-node benchmark lane in this audit.
+It proves that the admitted M5 plus RTX 4080 pair can contribute real work in
+one bounded shared run. This audit remains the correct place for the direct
+same-node throughput comparison.
+
 ## Retained CUDA Improvement Artifact
 
 The retained after-fix CUDA artifact now lives at:

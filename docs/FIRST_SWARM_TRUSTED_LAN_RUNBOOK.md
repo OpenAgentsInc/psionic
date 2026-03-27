@@ -38,6 +38,14 @@ a general cluster rehearsal.
   `fixtures/swarm/runs/first-swarm-live-20260327-real-2/coordinator_runtime_report.json`
 - retained contributor runtime report:
   `fixtures/swarm/runs/first-swarm-live-20260327-real-2/contributor_runtime_report.json`
+- admitted Tailnet operator:
+  `scripts/run-first-swarm-tailnet-admitted-live.sh`
+- retained admitted Tailnet run bundle:
+  `fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json`
+- retained admitted Tailnet per-device summary:
+  `fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json`
+- retained admitted Tailnet audit:
+  `docs/audits/2026-03-27-tailrun-admitted-home-tailnet-run-audit.md`
 - retained real-run after-action audit:
   `docs/audits/2026-03-27-first-swarm-trusted-lan-real-run-audit.md`
 - retained local snapshot publication report:
@@ -216,6 +224,47 @@ Current retained real-run outcome:
   contributions, one shared validator summary, and one aggregated bounded
   result across the Mac MLX coordinator and Linux RTX 4080 contributor, but it
   still stopped short of a promoted published snapshot
+
+## Current Admitted Tailnet Proof
+
+The canonical admitted-device Tailnet proof now lives at:
+
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json`
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json`
+
+Validate the retained bundle with:
+
+```bash
+scripts/check-first-swarm-trusted-lan-real-run.sh \
+  --bundle fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json
+```
+
+Rerun the admitted-device Tailnet operator path with fresh ports:
+
+```bash
+RUN_ID="tailrun-home-admitted-$(date -u +%Y%m%dT%H%M%SZ)"
+scripts/run-first-swarm-tailnet-admitted-live.sh \
+  --run-id "${RUN_ID}" \
+  --bundle-dir "fixtures/swarm/runs/${RUN_ID}" \
+  --coordinator-port 35200 \
+  --contributor-port 35201
+```
+
+Current retained admitted-Tailnet outcome:
+
+- result classification: `bounded_success`
+- merge: `merged`
+- publish: `refused`
+- promotion: `held`
+- admitted device set:
+  local M5 MLX coordinator plus `archlinux` RTX 4080 CUDA contributor
+- contribution split:
+  two accepted contributions and two replay-checked contributions, one from
+  each admitted device
+
+The matching operator audit now lives at:
+
+- `docs/audits/2026-03-27-tailrun-admitted-home-tailnet-run-audit.md`
 
 ## Current Publication Proof
 

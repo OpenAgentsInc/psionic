@@ -1,0 +1,62 @@
+{
+  "schema_version": "swarm.tailrun_admitted_home_run_summary.v1",
+  "run_id": "tailrun-home-admitted-20260327e",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "result_classification": "bounded_success",
+  "admitted_device_set": [
+    "local_m5_mlx",
+    "archlinux_rtx4080_cuda"
+  ],
+  "accepted_contributions": 2,
+  "replay_checked_contributions": 2,
+  "submission_receipt_count": 2,
+  "merge_disposition": "merged",
+  "publish_disposition": "refused",
+  "promotion_disposition": "held",
+  "per_device_contributions": [
+    {
+      "node_id": "swarm-mac-a",
+      "runtime_role": "coordinator",
+      "role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+      "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "endpoint": "100.127.107.31:35200",
+      "observed_wallclock_ms": 61228,
+      "local_execution_wallclock_ms": 118,
+      "executed_steps": 12,
+      "batch_count": 2,
+      "sample_count": 12,
+      "payload_bytes": 1472,
+      "final_mean_loss": 5.364421e-07,
+      "contributor_receipt_digest": "64c76605de58fbc91e368acaeef8432121f31146048f51e18260534ddf6236c9",
+      "estimated_steps_per_second": 101.69491525423729,
+      "estimated_samples_per_second": 101.69491525423729,
+      "contribution_share": 0.5
+    },
+    {
+      "node_id": "swarm-linux-4080-a",
+      "runtime_role": "contributor",
+      "role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "endpoint": "100.108.56.85:35201",
+      "observed_wallclock_ms": 843,
+      "local_execution_wallclock_ms": 2,
+      "executed_steps": 12,
+      "batch_count": 2,
+      "sample_count": 12,
+      "payload_bytes": 1480,
+      "final_mean_loss": 5.364421e-07,
+      "contributor_receipt_digest": "06b7960f77bfe0fe03f863bf7e353bab9e40a25101522f6a516f6947ff363243",
+      "estimated_steps_per_second": 6000.0,
+      "estimated_samples_per_second": 6000.0,
+      "contribution_share": 0.5
+    }
+  ],
+  "artifacts": {
+    "operator_manifest_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json",
+    "bundle_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json",
+    "coordinator_report_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/coordinator_runtime_report.json",
+    "contributor_report_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/contributor_runtime_report.json"
+  },
+  "claim_boundary": "This summary records per-device contribution accounting for one admitted-device home-Tailnet run. It does not claim M2 participation, open internet swarm membership, or full dense training parity.",
+  "summary_sha256": "2f7f12b81998a10f76122a4865ddda642ff0e633679c65e35fbb1d52a6171aeb"
+}
