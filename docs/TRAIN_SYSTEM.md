@@ -297,6 +297,18 @@ retain day plus night evidence for failover, catch-up, and throttled outer
 sync while keeping one non-negotiable stop condition explicit: losing the MLX
 validator collapses the current quorum and the run holds.
 
+The repo now also owns the first public window clock and deterministic work
+assignment contract in `crates/psionic-train/src/public_work_assignment_contract.rs`,
+the binary `public_work_assignment_contract`, the checker
+`scripts/check-public-work-assignment-contract.sh`, the focused reference doc
+`docs/PUBLIC_WORK_ASSIGNMENT_REFERENCE.md`, and the committed fixture
+`fixtures/training/public_work_assignment_contract_v1.json`. That surface turns
+the public mesh into network-time work truth: explicit public windows,
+deterministic miner assignments, deterministic validator challenges, assignment
+receipts, and one late-window refusal. It proves the network can say exactly
+why Google and Apple MLX worked on one page slice in one window while keeping
+window-closure discipline explicit.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker

@@ -1,0 +1,221 @@
+{
+  "schema_version": "psionic.public_work_assignment_contract.v1",
+  "contract_id": "psionic.public_work_assignment_contract.v1",
+  "network_id": "psionic.decentralized_training.testnet.v1",
+  "governance_revision_id": "psionic.decentralized_training_governance.v1",
+  "current_epoch_id": "network_epoch_00000123",
+  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
+  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
+  "elastic_device_mesh_contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc",
+  "windows": [
+    {
+      "window_id": "window.public.1230",
+      "window_number": 1230,
+      "assignment_seed": "seed.window.1230.public",
+      "opens_at_unix_ms": 1711111220000,
+      "closes_at_unix_ms": 1711111280000,
+      "checkpoint_authority_registry_record_ids": [
+        "google_l4_validator_node.registry",
+        "runpod_8xh100_dense_node.registry"
+      ],
+      "detail": "The first public work window binds one deterministic seed, one active miner pair, one active validator pair, and the current checkpoint-authority pair."
+    },
+    {
+      "window_id": "window.public.1231",
+      "window_number": 1231,
+      "assignment_seed": "seed.window.1231.public",
+      "opens_at_unix_ms": 1711111281000,
+      "closes_at_unix_ms": 1711111341000,
+      "checkpoint_authority_registry_record_ids": [
+        "google_l4_validator_node.registry",
+        "runpod_8xh100_dense_node.registry"
+      ],
+      "detail": "The second public work window advances the clock but keeps the same checkpoint-authority pair, so the network-time and assignment-time boundary remains machine legible."
+    }
+  ],
+  "assignments": [
+    {
+      "assignment_id": "assignment.public_miner.window1230.google",
+      "assignment_kind": "public_miner_train",
+      "window_id": "window.public.1230",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "allowed_execution_class": "validated_contributor_window",
+      "dataset_page_selector": "dataset.page.train.0001_0004",
+      "checkpoint_authority_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "planned_local_steps": 64,
+      "assignment_seed_material": "seed.window.1230.public|miner|google|ordinal1",
+      "detail": "Google receives the first public miner page slice in window 1230."
+    },
+    {
+      "assignment_id": "assignment.public_miner.window1230.local_mlx",
+      "assignment_kind": "public_miner_train",
+      "window_id": "window.public.1230",
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "allowed_execution_class": "validated_contributor_window",
+      "dataset_page_selector": "dataset.page.train.0005_0008",
+      "checkpoint_authority_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "planned_local_steps": 64,
+      "assignment_seed_material": "seed.window.1230.public|miner|local_mlx|ordinal2",
+      "detail": "Apple MLX receives the second public miner page slice in window 1230 after the standby promotion closed."
+    },
+    {
+      "assignment_id": "assignment.public_validator.window1230.google",
+      "assignment_kind": "public_validator_challenge",
+      "window_id": "window.public.1230",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "allowed_execution_class": "validator",
+      "dataset_page_selector": "dataset.page.validation.challenge.0001",
+      "challenged_assignment_id": "assignment.public_miner.window1230.local_mlx",
+      "checkpoint_authority_registry_record_id": "google_l4_validator_node.registry",
+      "planned_local_steps": 16,
+      "assignment_seed_material": "seed.window.1230.public|validator|google|ordinal1",
+      "detail": "Google validates the Apple MLX miner slice for window 1230."
+    },
+    {
+      "assignment_id": "assignment.public_validator.window1230.local_mlx",
+      "assignment_kind": "public_validator_challenge",
+      "window_id": "window.public.1230",
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "allowed_execution_class": "validator",
+      "dataset_page_selector": "dataset.page.validation.challenge.0002",
+      "challenged_assignment_id": "assignment.public_miner.window1230.google",
+      "checkpoint_authority_registry_record_id": "google_l4_validator_node.registry",
+      "planned_local_steps": 16,
+      "assignment_seed_material": "seed.window.1230.public|validator|local_mlx|ordinal2",
+      "detail": "Apple MLX validates the Google miner slice for window 1230."
+    },
+    {
+      "assignment_id": "assignment.public_miner.window1231.google",
+      "assignment_kind": "public_miner_train",
+      "window_id": "window.public.1231",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "allowed_execution_class": "validated_contributor_window",
+      "dataset_page_selector": "dataset.page.train.0009_0012",
+      "checkpoint_authority_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "planned_local_steps": 64,
+      "assignment_seed_material": "seed.window.1231.public|miner|google|ordinal1",
+      "detail": "Google receives the first public miner page slice in window 1231."
+    },
+    {
+      "assignment_id": "assignment.public_miner.window1231.local_mlx",
+      "assignment_kind": "public_miner_train",
+      "window_id": "window.public.1231",
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "allowed_execution_class": "validated_contributor_window",
+      "dataset_page_selector": "dataset.page.train.0013_0016",
+      "checkpoint_authority_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "planned_local_steps": 64,
+      "assignment_seed_material": "seed.window.1231.public|miner|local_mlx|ordinal2",
+      "detail": "Apple MLX receives the second public miner page slice in window 1231."
+    },
+    {
+      "assignment_id": "assignment.public_validator.window1231.google",
+      "assignment_kind": "public_validator_challenge",
+      "window_id": "window.public.1231",
+      "registry_record_id": "google_l4_validator_node.registry",
+      "allowed_execution_class": "validator",
+      "dataset_page_selector": "dataset.page.validation.challenge.0003",
+      "challenged_assignment_id": "assignment.public_miner.window1231.local_mlx",
+      "checkpoint_authority_registry_record_id": "google_l4_validator_node.registry",
+      "planned_local_steps": 16,
+      "assignment_seed_material": "seed.window.1231.public|validator|google|ordinal1",
+      "detail": "Google validates the Apple MLX miner slice for window 1231."
+    },
+    {
+      "assignment_id": "assignment.public_validator.window1231.local_mlx",
+      "assignment_kind": "public_validator_challenge",
+      "window_id": "window.public.1231",
+      "registry_record_id": "local_mlx_mac_workstation.registry",
+      "allowed_execution_class": "validator",
+      "dataset_page_selector": "dataset.page.validation.challenge.0004",
+      "challenged_assignment_id": "assignment.public_miner.window1231.google",
+      "checkpoint_authority_registry_record_id": "google_l4_validator_node.registry",
+      "planned_local_steps": 16,
+      "assignment_seed_material": "seed.window.1231.public|validator|local_mlx|ordinal2",
+      "detail": "Apple MLX validates the Google miner slice for window 1231."
+    }
+  ],
+  "assignment_receipts": [
+    {
+      "receipt_id": "receipt.assignment.public_miner.window1230.google",
+      "assignment_id": "assignment.public_miner.window1230.google",
+      "selection_source_id": "public_miner_window_offer_v1",
+      "selection_ordinal": 1,
+      "assignment_digest": "c0c424df45a35187ad7c8cf0ba730237e2620a9e6a1301acb0363a531d38a647",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_miner.window1230.google`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_miner.window1230.local_mlx",
+      "assignment_id": "assignment.public_miner.window1230.local_mlx",
+      "selection_source_id": "public_miner_window_offer_v1",
+      "selection_ordinal": 2,
+      "assignment_digest": "58f4efa6057bc00c5719ce4a019332db1c3f22a04149833eb05a20b793ac0cbb",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_miner.window1230.local_mlx`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_validator.window1230.google",
+      "assignment_id": "assignment.public_validator.window1230.google",
+      "selection_source_id": "validator_quorum_offer_v1",
+      "selection_ordinal": 1,
+      "assignment_digest": "3fd8b06010c1f98a221d9b6a861327b9bcf1b171b236fe3dfa9ed8d10a0dadbe",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_validator.window1230.google`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_validator.window1230.local_mlx",
+      "assignment_id": "assignment.public_validator.window1230.local_mlx",
+      "selection_source_id": "validator_quorum_offer_v1",
+      "selection_ordinal": 2,
+      "assignment_digest": "c28ecc7234b493a46e9207ba9d776e17343906f034a4bac0ba44ce2be04cf775",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_validator.window1230.local_mlx`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_miner.window1231.google",
+      "assignment_id": "assignment.public_miner.window1231.google",
+      "selection_source_id": "public_miner_window_offer_v1",
+      "selection_ordinal": 1,
+      "assignment_digest": "2d2c717d61099a9597a41a2f4b778ab62231b861ed2f7a6e8eb5dde79084b880",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_miner.window1231.google`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_miner.window1231.local_mlx",
+      "assignment_id": "assignment.public_miner.window1231.local_mlx",
+      "selection_source_id": "public_miner_window_offer_v1",
+      "selection_ordinal": 2,
+      "assignment_digest": "6569f6102a5a38f0dc99ca0e6cb4c7da3d6feaae3b85fb4259df90f9f94dceab",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_miner.window1231.local_mlx`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_validator.window1231.google",
+      "assignment_id": "assignment.public_validator.window1231.google",
+      "selection_source_id": "validator_quorum_offer_v1",
+      "selection_ordinal": 1,
+      "assignment_digest": "4d794cfed72d5390adf0d46e27798c9869c92a645cbb46b8c5aa93480e9193ac",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_validator.window1231.google`."
+    },
+    {
+      "receipt_id": "receipt.assignment.public_validator.window1231.local_mlx",
+      "assignment_id": "assignment.public_validator.window1231.local_mlx",
+      "selection_source_id": "validator_quorum_offer_v1",
+      "selection_ordinal": 2,
+      "assignment_digest": "10b7d7e2e912ddad0e24429a5cffe3471cf0838b34fc68b9ba337a93f1545fef",
+      "detail": "The network retains the deterministic selection receipt for `assignment.public_validator.window1231.local_mlx`."
+    }
+  ],
+  "late_window_refusals": [
+    {
+      "refusal_id": "late_refusal.window1230.google.replay",
+      "assignment_id": "assignment.public_miner.window1230.google",
+      "refusal_kind": "late_window_replay_refused",
+      "attempted_at_unix_ms": 1711111286000,
+      "detail": "A post-close replay attempt against the first Google miner assignment is refused because the assignment belongs to the already sealed window 1230."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/public_work_assignment_contract_v1.json",
+    "check_script_path": "scripts/check-public-work-assignment-contract.sh",
+    "reference_doc_path": "docs/PUBLIC_WORK_ASSIGNMENT_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first deterministic public-work surface: public window clocks, miner and validator assignments, assignment receipts, and one late-window refusal. It does not yet claim page-proofed data authority, content-addressed artifact exchange, or the full public miner execution protocol.",
+  "contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601"
+}
