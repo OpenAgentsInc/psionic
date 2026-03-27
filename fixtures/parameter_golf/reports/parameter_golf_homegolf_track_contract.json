@@ -88,15 +88,26 @@
       ]
     },
     {
+      "surface_id": "clustered_homegolf_score_surface",
+      "status": "satisfied",
+      "detail": "HOMEGOLF now has a first honest clustered score surface that binds one real two-device home-Tailnet admitted run to one exact-family HOMEGOLF bundle and val_bpb proof with an explicit composed-surface claim boundary.",
+      "evidence_refs": [
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+        "crates/psionic-train/src/parameter_golf_homegolf_clustered.rs",
+        "docs/audits/2026-03-27-homegolf-clustered-run-surface.md"
+      ]
+    },
+    {
       "surface_id": "mixed_device_dense_home_cluster_execution",
       "status": "blocked",
-      "detail": "The exact dense PGOLF baseline is still H100-only in its live trainer surface; admitted mixed-device home-cluster dense execution remains the next implementation step.",
+      "detail": "The exact dense PGOLF baseline is still H100-only in its live trainer surface; the new clustered score surface composes retained home-device contribution truth with the exact-family score proof, but admitted mixed-device live dense execution remains the next implementation step.",
       "evidence_refs": [
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
         "crates/psionic-train/src/first_same_job_mixed_backend_dense_run.rs",
         "docs/audits/2026-03-27-tailnet-short-run-device-audit.md"
       ]
     }
   ],
-  "claim_boundary": "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It does not yet claim that the dense baseline executes on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it.",
-  "report_digest": "a8e58d02ee764feab17c85236c838b205b94cbb954e6a71cb2146adc0155afcf"
+  "claim_boundary": "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it.",
+  "report_digest": "a012d8c0481848179d968c801435fafa13acea4986dcdd6f2f7471a02ee34f2e"
 }

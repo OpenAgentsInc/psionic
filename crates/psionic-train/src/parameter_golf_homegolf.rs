@@ -194,12 +194,31 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
+            surface_id: String::from("clustered_homegolf_score_surface"),
+            status: ParameterGolfHomegolfSurfaceStatus::Satisfied,
+            detail: String::from(
+                "HOMEGOLF now has a first honest clustered score surface that binds one real two-device home-Tailnet admitted run to one exact-family HOMEGOLF bundle and val_bpb proof with an explicit composed-surface claim boundary.",
+            ),
+            evidence_refs: vec![
+                String::from(
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+                ),
+                String::from(
+                    "crates/psionic-train/src/parameter_golf_homegolf_clustered.rs",
+                ),
+                String::from("docs/audits/2026-03-27-homegolf-clustered-run-surface.md"),
+            ],
+        },
+        ParameterGolfHomegolfRequiredSurface {
             surface_id: String::from("mixed_device_dense_home_cluster_execution"),
             status: ParameterGolfHomegolfSurfaceStatus::Blocked,
             detail: String::from(
-                "The exact dense PGOLF baseline is still H100-only in its live trainer surface; admitted mixed-device home-cluster dense execution remains the next implementation step.",
+                "The exact dense PGOLF baseline is still H100-only in its live trainer surface; the new clustered score surface composes retained home-device contribution truth with the exact-family score proof, but admitted mixed-device live dense execution remains the next implementation step.",
             ),
             evidence_refs: vec![
+                String::from(
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+                ),
                 String::from("crates/psionic-train/src/first_same_job_mixed_backend_dense_run.rs"),
                 String::from("docs/audits/2026-03-27-tailnet-short-run-device-audit.md"),
             ],
@@ -280,7 +299,7 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
         comparison_policy,
         required_surfaces,
         claim_boundary: format!(
-            "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It does not yet claim that the dense baseline executes on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it."
+            "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it."
         ),
         report_digest: String::new(),
     };
@@ -341,6 +360,11 @@ mod tests {
             .required_surfaces
             .iter()
             .any(|surface| surface.surface_id == "dense_trainer_entrypoint"
+                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
+        assert!(report
+            .required_surfaces
+            .iter()
+            .any(|surface| surface.surface_id == "clustered_homegolf_score_surface"
                 && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
         assert!(report
             .required_surfaces

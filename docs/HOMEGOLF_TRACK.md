@@ -112,6 +112,37 @@ What it does not prove:
 - that the public FineWeb/SP1024 scorepath now closes locally
 - that mixed-device `10` minute HOMEGOLF execution is already solved
 
+## First Clustered HOMEGOLF Surface
+
+HOMEGOLF now also has a first honest clustered score surface:
+
+- retained clustered surface report:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json`
+- generator:
+  `crates/psionic-train/src/parameter_golf_homegolf_clustered.rs`
+- entrypoint:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_clustered_run_surface.rs`
+- checker:
+  `scripts/check-parameter-golf-homegolf-clustered-run-surface.sh`
+
+What this proves:
+
+- one real two-device home-Tailnet admitted run stayed inside the `600s` budget
+- the current admitted device inventory and per-device contribution receipts are
+  frozen in one HOMEGOLF report
+- that same report binds the current exact-family HOMEGOLF train-to-infer bundle
+  proof and final `val_bpb`
+- operators can now compare real clustered home-device work against exact-family
+  score progress without pretending the dense exact-baseline trainer already ran
+  live across the admitted home cluster
+
+What it does not prove:
+
+- that one exact dense mixed-device home-cluster run directly produced the
+  scored bundle
+- that the current exact dense HOMEGOLF trainer already has live MLX plus home
+  CUDA execution parity
+
 ## Comparison Policy
 
 Allowed wording:

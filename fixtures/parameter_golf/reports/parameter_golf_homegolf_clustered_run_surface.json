@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.homegolf_clustered_run_surface.v1",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "run_id": "tailrun-home-admitted-20260327e+parameter-golf-homegolf-dense-bundle-proof",
+  "wallclock_cap_seconds": 600,
+  "observed_cluster_wallclock_ms": 61228,
+  "source_track_contract_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+  "source_admitted_home_run_summary_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json",
+  "source_dense_bundle_proof_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_dense_bundle_proof.json",
+  "admitted_device_set": [
+    "local_m5_mlx",
+    "archlinux_rtx4080_cuda"
+  ],
+  "per_device_contributions": [
+    {
+      "node_id": "swarm-mac-a",
+      "runtime_role": "coordinator",
+      "role_id": "swarm.mac.mlx.coordinator_validator_contributor",
+      "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "endpoint": "100.127.107.31:35200",
+      "observed_wallclock_ms": 61228,
+      "local_execution_wallclock_ms": 118,
+      "executed_steps": 12,
+      "batch_count": 2,
+      "sample_count": 12,
+      "payload_bytes": 1472,
+      "final_mean_loss": 5.364421e-7,
+      "contributor_receipt_digest": "64c76605de58fbc91e368acaeef8432121f31146048f51e18260534ddf6236c9",
+      "estimated_steps_per_second": 101.69491525423727,
+      "estimated_samples_per_second": 101.69491525423727,
+      "contribution_share": 0.5
+    },
+    {
+      "node_id": "swarm-linux-4080-a",
+      "runtime_role": "contributor",
+      "role_id": "swarm.linux.cuda.rtx4080.contributor",
+      "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "endpoint": "100.108.56.85:35201",
+      "observed_wallclock_ms": 843,
+      "local_execution_wallclock_ms": 2,
+      "executed_steps": 12,
+      "batch_count": 2,
+      "sample_count": 12,
+      "payload_bytes": 1480,
+      "final_mean_loss": 5.364421e-7,
+      "contributor_receipt_digest": "06b7960f77bfe0fe03f863bf7e353bab9e40a25101522f6a516f6947ff363243",
+      "estimated_steps_per_second": 6000.0,
+      "estimated_samples_per_second": 6000.0,
+      "contribution_share": 0.5
+    }
+  ],
+  "merge_disposition": "merged",
+  "publish_disposition": "refused",
+  "promotion_disposition": "held",
+  "merged_bundle_descriptor_digest": "8a111f908acf02174554a75e83e13092852ee7caa534f65c43be897bd4c606ee",
+  "merged_bundle_tokenizer_digest": "49b44264442058c20b2b95a947f3aac60e8729fd57d63db8b8754de8edb98a6d",
+  "final_validation_mean_loss": 8.60598874092102,
+  "final_validation_bits_per_byte": 9.93265382277841,
+  "model_artifact_bytes": 68248296,
+  "prompt_text": "abcd",
+  "direct_generated_tokens": [
+    7,
+    2,
+    7,
+    2
+  ],
+  "served_generated_tokens": [
+    7,
+    2,
+    7,
+    2
+  ],
+  "direct_and_served_match": true,
+  "surface_status": "bounded_composed_surface",
+  "claim_boundary": "This is the first honest clustered HOMEGOLF score surface, not a fake claim that one exact dense mixed-device home-cluster run already produced the scored bundle directly. The admitted-device Tailnet run provides real home-cluster contribution truth under the 600s cap, while the exact 9x512 HOMEGOLF-compatible bundle proof provides the current merged inferable artifact and final val_bpb. The report composes those adjacent retained surfaces explicitly so operators can compare clustered-device work and exact-family score progress without overstating live dense mixed-device closure.",
+  "summary": "The current HOMEGOLF clustered surface combines one real two-device home-Tailnet admitted run and one real exact-family HOMEGOLF train-to-infer proof. It freezes the current admitted device inventory, contribution receipts, merged bundle digests, and final val_bpb into one explicit bounded-composed report while live exact dense mixed-device execution remains follow-on work.",
+  "report_digest": "2920b2bce8dc9b24cce802609b9f1f24a4dc6c693b7de0b3acbf3be0833cdfd5"
+}
