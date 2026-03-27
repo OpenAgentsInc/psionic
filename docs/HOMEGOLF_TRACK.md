@@ -376,7 +376,9 @@ Current truth:
 - HOMEGOLF now has one committed mixed-manifest example that includes a future
   H100 slot
 - the H100 slot is admitted without creating a second benchmark philosophy
-- this does not claim that a retained H100-backed HOMEGOLF run already exists
+- the manifest is no longer the only H100 surface:
+  - the retained live dense HOMEGOLF run already includes `optional_h100_node`
+    in `fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json`
 
 ## Comparison Policy
 

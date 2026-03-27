@@ -80,6 +80,9 @@ The repo can now truthfully say:
 
 - HOMEGOLF has one retained dense mixed-device runtime surface
 - that surface preserves real MLX-plus-CUDA participant receipts
+- the admitted CUDA side is already carrying the `optional_h100_node` device
+  class from the HOMEGOLF manifest law, so H100 support is no longer
+  manifest-only
 - that same surface now carries the exact dense challenge export bytes instead
   of the old promoted-bundle surrogate
 - the canonical HOMEGOLF score/comparison/accounting path is now anchored to

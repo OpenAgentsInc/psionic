@@ -1,6 +1,9 @@
 # HOMEGOLF Mixed Hardware Manifest Audit
 
-`HOMEGOLF-6` closes the H100-admission gap at the contract level without pretending that a retained H100-backed run already happened.
+`HOMEGOLF-6` closes the H100-admission gap at the contract level. This audit
+is still about the manifest surface itself, but it no longer stands alone:
+the retained live dense HOMEGOLF surface now also carries one admitted H100
+participant class.
 
 ## What Landed
 
@@ -47,14 +50,17 @@ The retained mixed manifest now includes four declared members:
 
 ## Honest Boundary
 
-This is a retained manifest surface, not a retained H100 execution proof.
+This is still a retained manifest surface, not the execution proof itself.
 
 The current truth is:
 
 - the H100 slot is admitted
 - the H100 slot is declared in one committed mixed-manifest example
 - the score semantics stay frozen
-- no retained H100-backed HOMEGOLF run is claimed yet
+- the retained live dense HOMEGOLF execution proof now exists separately at:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json`
+- this manifest audit still does not claim that the current home-RTX node has
+  already been swapped for or combined with a locally controlled H100
 
 ## Verification
 
