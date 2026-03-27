@@ -861,7 +861,7 @@ impl ParameterGolfReferenceTrainingConfig {
         config.run_id = String::from("parameter-golf-promoted-general-xtrain-baseline");
         config.checkpoint_family = String::from("train.parameter_golf.promoted_general_xtrain");
         config.step_duration_ms = 75;
-        config.max_steps = 8;
+        config.max_steps = 12;
         config.finite_difference_epsilon = 0.005;
         config.geometry = ParameterGolfBatchGeometry {
             world_size: 1,
@@ -938,38 +938,38 @@ fn promoted_xtrain_coordinate_budget() -> Vec<ParameterGolfTrainableCoordinate> 
     let mut coordinates = Vec::new();
 
     for token_id in promoted_xtrain_reference_token_ids(&fixture, 8) {
-        for dim in evenly_spaced_flat_indices(model_dim, 1) {
+        for dim in evenly_spaced_flat_indices(model_dim, 2) {
             coordinates.push(ParameterGolfTrainableCoordinate {
                 parameter_id: String::from("tok_emb.weight"),
                 flat_index: token_id.saturating_mul(model_dim).saturating_add(dim),
             });
         }
     }
-    push_evenly_spaced_parameter_coordinates(&mut coordinates, &model, "skip_weights", 1);
+    push_evenly_spaced_parameter_coordinates(&mut coordinates, &model, "skip_weights", 2);
     for layer_index in 0..1 {
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.attn.q_gain").as_str(),
-            2,
+            4,
         );
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.attn_scale").as_str(),
-            1,
+            2,
         );
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.mlp_scale").as_str(),
-            1,
+            2,
         );
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.resid_mix").as_str(),
-            1,
+            2,
         );
         for tensor_name in [
             format!("blocks.{layer_index}.attn.c_q.weight"),
@@ -979,7 +979,7 @@ fn promoted_xtrain_coordinate_budget() -> Vec<ParameterGolfTrainableCoordinate> 
                 &mut coordinates,
                 &model,
                 tensor_name.as_str(),
-                1,
+                2,
             );
         }
     }
