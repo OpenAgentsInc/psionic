@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.homegolf_strict_challenge_lane.v1",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "source_track_contract_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+  "strict_profile": {
+    "profile_id": "parameter_golf_challenge_sp1024_v0",
+    "kind": "strict_pgolf_challenge",
+    "tokenizer_identity": "challenge_sp1024_sentence_piece",
+    "dataset_identity": "challenge_fineweb_sp1024",
+    "evaluation_policy": {
+      "evaluation_identity": "challenge_bits_per_byte",
+      "legal_score_first_ttt_required": true,
+      "contest_bits_per_byte_accounting_required": true
+    },
+    "artifact_policy": {
+      "exact_compressed_artifact_cap_required": true,
+      "compressed_artifact_cap_bytes": 16000000
+    }
+  },
+  "canonical_lane_entrypoint": "crates/psionic-train/src/bin/parameter_golf_homegolf_strict_challenge_lane.rs",
+  "canonical_dense_trainer_entrypoint": "crates/psionic-train/src/bin/parameter_golf_single_h100_train.rs",
+  "required_final_validation_mode": "both",
+  "required_validation_eval_mode": {
+    "mode": "sliding_window",
+    "stride": 64
+  },
+  "required_validation_batch_sequences": 1024,
+  "required_score_first_ttt": {
+    "stride": 64,
+    "chunk_tokens": 32768,
+    "epochs": 3,
+    "freeze_blocks": 0,
+    "learning_rate": 0.002,
+    "momentum": 0.9,
+    "batch_sequences": 32,
+    "grad_clip_norm": 1.0
+  },
+  "exact_compressed_artifact_cap_bytes": 16000000,
+  "dense_training_command_template": "cargo run -q -p psionic-train --bin parameter_golf_single_h100_train -- <dataset_root> <tokenizer_path> <training_report_path> both sliding_window:64 legal_score_first_ttt",
+  "challenge_inputs": {
+    "expected_dataset_root_shell_path": "~/code/parameter-golf/data/datasets/fineweb10B_sp1024",
+    "expected_tokenizer_shell_path": "~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model",
+    "dataset_root_status": "not_supplied",
+    "tokenizer_path_status": "not_supplied"
+  },
+  "disposition": "refused_missing_challenge_inputs",
+  "refusal": {
+    "code": "serialization_incompatibility",
+    "scope": "runtime",
+    "subject": "parameter_golf_homegolf_strict_challenge_inputs",
+    "detail": "dataset_root must be supplied as the exact FineWeb SP1024 lane `~/code/parameter-golf/data/datasets/fineweb10B_sp1024`; tokenizer_path must be supplied as the exact SP1024 tokenizer `~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model`; local-reference fallback is denied for the strict HOMEGOLF lane"
+  },
+  "claim_boundary": "This is the canonical strict HOMEGOLF challenge lane surface. It freezes the exact strict profile, exact challenge-input requirements, sliding-window:64 evaluation posture, legal score-first TTT overlay, and exact 16,000,000-byte artifact-cap law. It is a runnable preflight lane, not yet the retained live dense score run itself.",
+  "summary": "HOMEGOLF now has one canonical strict challenge lane command that either binds the real contest overlay or refuses explicitly when the exact FineWeb/SP1024 inputs are absent, instead of silently falling back to the old local-reference proof profile.",
+  "report_digest": "3028278f90f4f57b0dddecdd078d3a4c6b24b61ad5fc2bedf8dadbe8a5fbad84"
+}

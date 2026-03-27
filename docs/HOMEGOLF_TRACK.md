@@ -44,6 +44,7 @@ Checker:
 
 - `scripts/check-parameter-golf-homegolf-track-contract.sh`
 - `scripts/check-parameter-golf-homegolf-dense-baseline-surface.sh`
+- `scripts/check-parameter-golf-homegolf-strict-challenge-lane.sh`
 - `scripts/check-parameter-golf-homegolf-dense-bundle-proof.sh`
 
 ## Current Baseline Surfaces
@@ -85,6 +86,41 @@ What this freezes:
 - the honest claim boundary that this is the first HOMEGOLF dense baseline
   surface, not yet a mixed-device 10-minute HOMEGOLF score
 
+## Strict Challenge Runnable Lane
+
+HOMEGOLF now has one canonical strict runnable lane surface:
+
+- retained lane report:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_strict_challenge_lane.json`
+- lane generator:
+  `crates/psionic-train/src/parameter_golf_homegolf_strict_challenge.rs`
+- lane entrypoint:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_strict_challenge_lane.rs`
+- latest audit:
+  `docs/audits/2026-03-27-homegolf-strict-challenge-lane-audit.md`
+- checker:
+  `scripts/check-parameter-golf-homegolf-strict-challenge-lane.sh`
+
+What this proves:
+
+- the canonical runnable HOMEGOLF lane now binds the strict PGOLF challenge
+  overlay instead of the old general local-reference profile
+- the emitted lane surface keeps:
+  - exact challenge tokenizer identity
+  - exact FineWeb `SP1024` data-lane requirement
+  - `sliding_window:64` evaluation
+  - legal score-first TTT
+  - contest bits-per-byte accounting
+  - exact `16,000,000`-byte artifact-cap law
+- missing challenge inputs now produce an explicit typed refusal instead of a
+  silent local-reference fallback
+
+What it does not prove:
+
+- that the exact challenge inputs are already present on every machine
+- that the live dense strict HOMEGOLF run has already been retained
+- that the mixed-device home cluster already produces the scored bundle
+
 ## Train-To-Infer Closure
 
 HOMEGOLF now also has one retained train-to-infer closure proof for the exact
@@ -113,6 +149,10 @@ What it does not prove:
   model bytes
 - that the public FineWeb/SP1024 scorepath now closes locally
 - that mixed-device `10` minute HOMEGOLF execution is already solved
+
+After `HOMEGOLF-8`, this is no longer the canonical runnable contest-lane
+surface. It remains the secondary exact-family train-to-infer proof, while the
+strict challenge runnable lane is the canonical HOMEGOLF command surface.
 
 ## First Clustered HOMEGOLF Surface
 

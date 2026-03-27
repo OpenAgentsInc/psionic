@@ -118,6 +118,16 @@
       ]
     },
     {
+      "surface_id": "strict_challenge_runnable_lane",
+      "status": "satisfied",
+      "detail": "HOMEGOLF now has one canonical strict challenge runnable lane surface that binds the exact contest overlay and refuses explicitly when the exact FineWeb/SP1024 inputs are not supplied, instead of silently falling back to the old local-reference bundle proof.",
+      "evidence_refs": [
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_strict_challenge_lane.json",
+        "crates/psionic-train/src/parameter_golf_homegolf_strict_challenge.rs",
+        "docs/audits/2026-03-27-homegolf-strict-challenge-lane-audit.md"
+      ]
+    },
+    {
       "surface_id": "mixed_hardware_manifest_surface",
       "status": "satisfied",
       "detail": "HOMEGOLF now also has one explicit retained mixed-hardware manifest example showing that optional H100 capacity can join the same track without changing score semantics, wallclock policy, artifact accounting, or public-comparison language.",
@@ -138,6 +148,6 @@
       ]
     }
   ],
-  "claim_boundary": "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof and one explicit mixed-hardware manifest example that keeps future H100 capacity inside the same track law, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it.",
-  "report_digest": "c74149c87c056855e37b784797b3578a5e04650086652c1711526d9bcdad9499"
+  "claim_boundary": "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one canonical strict challenge runnable lane surface that binds the exact contest overlay and fails closed when the exact FineWeb/SP1024 inputs are absent, one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof, and one explicit mixed-hardware manifest example that keeps future H100 capacity inside the same track law, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it.",
+  "report_digest": "42b077ac577acbf035083bfdd00bc8b9260e3b95929335fdf2257a0dcaad32ad"
 }

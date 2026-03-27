@@ -4,6 +4,14 @@
 
 This audit records the first HOMEGOLF train-to-infer closure proof.
 
+After `HOMEGOLF-8`, this is no longer the canonical runnable contest-lane
+surface. The strict runnable lane is now:
+
+- `crates/psionic-train/src/bin/parameter_golf_homegolf_strict_challenge_lane.rs`
+- `fixtures/parameter_golf/reports/parameter_golf_homegolf_strict_challenge_lane.json`
+
+This dense bundle proof remains the secondary exact-family train-to-infer proof.
+
 ## What Ran
 
 Runner:

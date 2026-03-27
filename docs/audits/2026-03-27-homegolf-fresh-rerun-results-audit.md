@@ -3,6 +3,13 @@
 This audit records one fresh HOMEGOLF rerun on 2026-03-27 and compares it
 against the currently committed HOMEGOLF and public Parameter Golf surfaces.
 
+Historical note after `HOMEGOLF-8`: this rerun remains a valid exact-family
+bundle proof, but it is no longer the canonical runnable HOMEGOLF contest-lane
+surface. The canonical runnable lane is now the strict preflight surface at:
+
+- `crates/psionic-train/src/bin/parameter_golf_homegolf_strict_challenge_lane.rs`
+- `fixtures/parameter_golf/reports/parameter_golf_homegolf_strict_challenge_lane.json`
+
 ## What Ran
 
 Command:

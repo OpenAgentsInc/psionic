@@ -1,12 +1,9 @@
-use std::{
-    fs,
-    path::Path,
-};
+use std::{fs, path::Path};
 
 use psionic_eval::PARAMETER_GOLF_CHALLENGE_REVIEW_BENCHMARK_REF;
 use psionic_models::{
-    ParameterGolfPromotedProfileContract, PARAMETER_GOLF_BASELINE_MODEL_ID,
-    PARAMETER_GOLF_BASELINE_REVISION, PARAMETER_GOLF_PROMOTED_CHALLENGE_PROFILE_ID,
+    PARAMETER_GOLF_BASELINE_MODEL_ID, PARAMETER_GOLF_BASELINE_REVISION,
+    PARAMETER_GOLF_PROMOTED_CHALLENGE_PROFILE_ID, ParameterGolfPromotedProfileContract,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -141,8 +138,8 @@ pub enum ParameterGolfHomegolfTrackContractError {
 
 /// Builds the canonical HOMEGOLF benchmark-track contract report.
 #[must_use]
-pub fn build_parameter_golf_homegolf_track_contract_report(
-) -> ParameterGolfHomegolfTrackContractReport {
+pub fn build_parameter_golf_homegolf_track_contract_report()
+-> ParameterGolfHomegolfTrackContractReport {
     let strict_profile = ParameterGolfPromotedProfileContract::strict_pgolf_challenge_v0();
     let required_surfaces = vec![
         ParameterGolfHomegolfRequiredSurface {
@@ -203,9 +200,7 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
                 String::from(
                     "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
                 ),
-                String::from(
-                    "crates/psionic-train/src/parameter_golf_homegolf_clustered.rs",
-                ),
+                String::from("crates/psionic-train/src/parameter_golf_homegolf_clustered.rs"),
                 String::from("docs/audits/2026-03-27-homegolf-clustered-run-surface.md"),
             ],
         },
@@ -219,12 +214,8 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
                 String::from(
                     "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
                 ),
-                String::from(
-                    "crates/psionic-train/src/parameter_golf_homegolf_comparison.rs",
-                ),
-                String::from(
-                    "docs/audits/2026-03-27-homegolf-public-comparison-audit.md",
-                ),
+                String::from("crates/psionic-train/src/parameter_golf_homegolf_comparison.rs"),
+                String::from("docs/audits/2026-03-27-homegolf-public-comparison-audit.md"),
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
@@ -237,12 +228,24 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
                 String::from(
                     "fixtures/parameter_golf/reports/parameter_golf_homegolf_artifact_accounting.json",
                 ),
+                String::from("crates/psionic-train/src/parameter_golf_homegolf_accounting.rs"),
+                String::from("docs/audits/2026-03-27-homegolf-artifact-accounting-audit.md"),
+            ],
+        },
+        ParameterGolfHomegolfRequiredSurface {
+            surface_id: String::from("strict_challenge_runnable_lane"),
+            status: ParameterGolfHomegolfSurfaceStatus::Satisfied,
+            detail: String::from(
+                "HOMEGOLF now has one canonical strict challenge runnable lane surface that binds the exact contest overlay and refuses explicitly when the exact FineWeb/SP1024 inputs are not supplied, instead of silently falling back to the old local-reference bundle proof.",
+            ),
+            evidence_refs: vec![
                 String::from(
-                    "crates/psionic-train/src/parameter_golf_homegolf_accounting.rs",
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_strict_challenge_lane.json",
                 ),
                 String::from(
-                    "docs/audits/2026-03-27-homegolf-artifact-accounting-audit.md",
+                    "crates/psionic-train/src/parameter_golf_homegolf_strict_challenge.rs",
                 ),
+                String::from("docs/audits/2026-03-27-homegolf-strict-challenge-lane-audit.md"),
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
@@ -255,12 +258,8 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
                 String::from(
                     "fixtures/parameter_golf/reports/parameter_golf_homegolf_mixed_hardware_manifest.json",
                 ),
-                String::from(
-                    "crates/psionic-train/src/parameter_golf_homegolf_manifest.rs",
-                ),
-                String::from(
-                    "docs/audits/2026-03-27-homegolf-mixed-hardware-manifest-audit.md",
-                ),
+                String::from("crates/psionic-train/src/parameter_golf_homegolf_manifest.rs"),
+                String::from("docs/audits/2026-03-27-homegolf-mixed-hardware-manifest-audit.md"),
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
@@ -353,12 +352,13 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
         comparison_policy,
         required_surfaces,
         claim_boundary: format!(
-            "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof and one explicit mixed-hardware manifest example that keeps future H100 capacity inside the same track law, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it."
+            "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one canonical strict challenge runnable lane surface that binds the exact contest overlay and fails closed when the exact FineWeb/SP1024 inputs are absent, one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof, and one explicit mixed-hardware manifest example that keeps future H100 capacity inside the same track law, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it."
         ),
         report_digest: String::new(),
     };
     let _ = strict_profile; // keep the strict-profile contract linked in code generation.
-    report.report_digest = stable_digest(b"psionic_parameter_golf_homegolf_track_contract|", &report);
+    report.report_digest =
+        stable_digest(b"psionic_parameter_golf_homegolf_track_contract|", &report);
     report
 }
 
@@ -397,9 +397,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
+        PARAMETER_GOLF_HOMEGOLF_TRACK_CONTRACT_REPORT_REF, ParameterGolfHomegolfSurfaceStatus,
         build_parameter_golf_homegolf_track_contract_report,
         write_parameter_golf_homegolf_track_contract_report,
-        ParameterGolfHomegolfSurfaceStatus, PARAMETER_GOLF_HOMEGOLF_TRACK_CONTRACT_REPORT_REF,
     };
 
     #[test]
@@ -410,42 +410,71 @@ mod tests {
         assert!(report.exact_fineweb_sp1024_identity_required);
         assert!(report.exact_contest_bpb_accounting_required);
         assert!(report.inferable_bundle_required);
-        assert!(report
-            .required_surfaces
-            .iter()
-            .any(|surface| surface.surface_id == "dense_trainer_entrypoint"
-                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
-        assert!(report
-            .required_surfaces
-            .iter()
-            .any(|surface| surface.surface_id == "clustered_homegolf_score_surface"
-                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
-        assert!(report
-            .required_surfaces
-            .iter()
-            .any(|surface| surface.surface_id == "mixed_hardware_manifest_surface"
-                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
-        assert!(report
-            .required_surfaces
-            .iter()
-            .any(|surface| surface.surface_id == "public_comparison_report"
-                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
-        assert!(report
-            .required_surfaces
-            .iter()
-            .any(|surface| surface.surface_id == "artifact_accounting_report"
-                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
-        assert!(report
-            .required_surfaces
-            .iter()
-            .any(|surface| surface.surface_id == "mixed_device_dense_home_cluster_execution"
-                && surface.status == ParameterGolfHomegolfSurfaceStatus::Blocked));
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(|surface| surface.surface_id == "dense_trainer_entrypoint"
+                    && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied)
+        );
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(
+                    |surface| surface.surface_id == "clustered_homegolf_score_surface"
+                        && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied
+                )
+        );
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(
+                    |surface| surface.surface_id == "mixed_hardware_manifest_surface"
+                        && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied
+                )
+        );
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(|surface| surface.surface_id == "public_comparison_report"
+                    && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied)
+        );
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(|surface| surface.surface_id == "artifact_accounting_report"
+                    && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied)
+        );
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(
+                    |surface| surface.surface_id == "strict_challenge_runnable_lane"
+                        && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied
+                )
+        );
+        assert!(
+            report
+                .required_surfaces
+                .iter()
+                .any(
+                    |surface| surface.surface_id == "mixed_device_dense_home_cluster_execution"
+                        && surface.status == ParameterGolfHomegolfSurfaceStatus::Blocked
+                )
+        );
     }
 
     #[test]
     fn write_homegolf_track_contract_report_persists_current_truth() {
         let output = tempfile::tempdir().expect("tempdir");
-        let path = output.path().join("parameter_golf_homegolf_track_contract.json");
+        let path = output
+            .path()
+            .join("parameter_golf_homegolf_track_contract.json");
         let written =
             write_parameter_golf_homegolf_track_contract_report(path.as_path()).expect("write");
         let encoded = std::fs::read(path.as_path()).expect("read");
