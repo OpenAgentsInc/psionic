@@ -1522,79 +1522,6 @@ __global__ void silu_mul_q8_1_kernel(
     }
 }
 
-template <typename DotFn, int Vdr, int Qi>
-__launch_bounds__(8 * kWarpSize, 1)
-__global__ void gate_up_silu_q8_1_quantized_kernel(
-    const uint8_t *weights,
-    int row_stride,
-    int weight_block_count,
-    int input_block_count,
-    int gate_rows,
-    int up_rows,
-    const Q81Block *input,
-    const float *gate_bias,
-    const float *up_bias,
-    Q81Block *output_q8_1,
-    DotFn dot_fn
-) {
-    extern __shared__ unsigned char shared_storage[];
-    Q81Block *shared_input = reinterpret_cast<Q81Block *>(shared_storage);
-    __shared__ float activated_values[kQ81ElementsPerBlock];
-
-    const int linear_tid = static_cast<int>(threadIdx.y) * kWarpSize + static_cast<int>(threadIdx.x);
-    const int thread_count = 8 * kWarpSize;
-    for (int block_index = linear_tid; block_index < input_block_count; block_index += thread_count) {
-        shared_input[block_index] = input[block_index];
-    }
-    __syncthreads();
-
-    const int output_block_index = static_cast<int>(blockIdx.x);
-    const int row_base = output_block_index * kQ81ElementsPerBlock;
-    const int row_block_offset = static_cast<int>(threadIdx.y) * 4;
-
-#pragma unroll
-    for (int row_offset = 0; row_offset < 4; ++row_offset) {
-        const int activated_index = row_block_offset + row_offset;
-        const int row = row_base + activated_index;
-        float gate_sum = 0.0f;
-        float up_sum = 0.0f;
-        if (row < gate_rows && row < up_rows) {
-            const uint8_t *gate_row =
-                weights + static_cast<size_t>(row) * static_cast<size_t>(row_stride);
-            const uint8_t *up_row =
-                weights +
-                static_cast<size_t>(gate_rows + row) * static_cast<size_t>(row_stride);
-            constexpr int warp_blocks_per_iter = Vdr * kWarpSize / Qi;
-            const int block_start = static_cast<int>(threadIdx.x) / (Qi / Vdr);
-            const int quant_index = Vdr * (static_cast<int>(threadIdx.x) % (Qi / Vdr));
-            for (int block_index = block_start;
-                 block_index < weight_block_count;
-                 block_index += warp_blocks_per_iter) {
-                gate_sum += dot_fn(gate_row, shared_input, block_index, block_index, quant_index);
-                up_sum += dot_fn(up_row, shared_input, block_index, block_index, quant_index);
-            }
-            gate_sum = warp_reduce_sum(gate_sum);
-            up_sum = warp_reduce_sum(up_sum);
-            if (threadIdx.x == 0) {
-                const float gate = gate_sum + (gate_bias != nullptr ? gate_bias[row] : 0.0f);
-                const float up = up_sum + (up_bias != nullptr ? up_bias[row] : 0.0f);
-                activated_values[activated_index] = silu_single(gate) * up;
-            }
-        } else if (threadIdx.x == 0) {
-            activated_values[activated_index] = 0.0f;
-        }
-    }
-    __syncthreads();
-
-    if (threadIdx.y == 0) {
-        quantize_q8_1_shared_block(
-            activated_values,
-            output_q8_1 + static_cast<size_t>(output_block_index),
-            static_cast<int>(threadIdx.x)
-        );
-    }
-}
-
 __global__ void sigmoid_mul_f32_kernel(
     const float *values,
     int values_offset,
@@ -7063,49 +6990,6 @@ extern "C" int psionic_cuda_silu_mul_q8_1(
         rhs_offset,
         element_count,
         static_cast<Q81Block *>(output_q8_1)
-    );
-    return static_cast<int>(cudaGetLastError());
-}
-
-extern "C" int psionic_cuda_q4_k_gate_up_silu_q8_1(
-    const void *weights,
-    int row_stride,
-    int columns,
-    int gate_rows,
-    int up_rows,
-    const void *input_q8_1,
-    const void *gate_bias,
-    const void *up_bias,
-    void *output_q8_1,
-    void *stream
-) {
-    if (gate_rows != up_rows ||
-        gate_rows % kQ81ElementsPerBlock != 0 ||
-        columns % 256 != 0 ||
-        columns % kQ81ElementsPerBlock != 0) {
-        return static_cast<int>(cudaErrorInvalidValue);
-    }
-
-    const int weight_block_count = columns / 256;
-    const int input_block_count = columns / kQ81ElementsPerBlock;
-    gate_up_silu_q8_1_quantized_kernel<Q4KQ81Dot, kQ4KQ81MmvqVdr, kQ4KQi><<<
-        static_cast<unsigned int>(gate_rows / kQ81ElementsPerBlock),
-        dim3(kWarpSize, 8, 1),
-        static_cast<size_t>(input_block_count) * sizeof(Q81Block),
-        static_cast<cudaStream_t>(stream)
-    >>>(
-        static_cast<const uint8_t *>(weights),
-        row_stride,
-        weight_block_count,
-        input_block_count,
-        gate_rows,
-        up_rows,
-        static_cast<const Q81Block *>(input_q8_1),
-        static_cast<const float *>(gate_bias),
-        static_cast<const float *>(up_bias),
-        static_cast<Q81Block *>(output_q8_1)
-        ,
-        Q4KQ81Dot{}
     );
     return static_cast<int>(cudaGetLastError());
 }

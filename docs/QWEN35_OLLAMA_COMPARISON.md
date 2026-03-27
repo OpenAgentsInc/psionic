@@ -32,7 +32,7 @@ Token cap:
 | --- | --- | --- | ---: | ---: | --- | --- |
 | `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `523.20` | `328.72` | `implemented_early`, ahead | Current pushed checkpoint `c5bc0ba2` |
 | `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `247.21` | `203.23` | `implemented_early`, ahead | Fresh March 27 rerun from the current native CUDA head on the same `128` token decode benchmark |
-| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `167.06` | `141.36` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row. The current head keeps the `Q6_K` output fix and also fuses the dense `Q4_K` gate/up FFN path directly into `Q8_1` activation blocks before `ffn_down` |
+| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `166.61` | `141.36` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row. The win required fixing the fused decode output head to use `Q8_1` projection plus `argmax_f32` for `Q6_K` output weights |
 | `qwen3.5:9b` | pending | pending | pending | pending | pending | pull, harvest, benchmark, optimize |
 
 ## Current Notes
@@ -43,8 +43,5 @@ Token cap:
   output path. The hot decode branch now routes `Q6_K` output weights through a
   `Q8_1` projection plus `argmax_f32` instead of the slower generic quantized
   matvec path.
-- The next 4B checkpoint also fuses the dense `Q4_K` gate/up FFN path into
-  direct `Q8_1` activation blocks before `ffn_down`, which lifts the local
-  10-run rerun to about `167.06 tok/s`.
 - The next delivery bar is to harvest and benchmark `9b`, then push the native
   CUDA lane further on `2b`, `4b`, and `9b`.

@@ -1799,42 +1799,6 @@ impl CudaSubmission {
         Ok(())
     }
 
-    /// Executes a packed `Q4_K` gate/up projection, applies `SiLU(gate) * up`,
-    /// and writes the activated result directly as GGML `Q8_1`.
-    pub fn q4_k_gate_up_silu_q8_1(
-        &mut self,
-        weights: &CudaBuffer,
-        row_stride: usize,
-        columns: usize,
-        gate_rows: usize,
-        up_rows: usize,
-        input_q8_1: &CudaBuffer,
-        gate_bias: Option<&CudaBuffer>,
-        up_bias: Option<&CudaBuffer>,
-        output_q8_1: &CudaBuffer,
-    ) -> Result<(), RuntimeError> {
-        let required_bytes = ggml_q8_1_storage_bytes(1, gate_rows)?;
-        if output_q8_1.byte_len() < required_bytes {
-            return Err(RuntimeError::Backend(format!(
-                "cuda q4_k gate/up output buffer too small: need {required_bytes} bytes for 1x{gate_rows}, have {}",
-                output_q8_1.byte_len()
-            )));
-        }
-        self.platform.encode_q4_k_gate_up_silu_q8_1(
-            &weights.platform,
-            row_stride,
-            columns,
-            gate_rows,
-            up_rows,
-            &input_q8_1.platform,
-            gate_bias.map(|buffer| &buffer.platform),
-            up_bias.map(|buffer| &buffer.platform),
-            &output_q8_1.platform,
-        )?;
-        self.encoded_operations += 1;
-        Ok(())
-    }
-
     /// Applies sigmoid to one source region and multiplies it elementwise by a
     /// second source region.
     pub fn sigmoid_mul_f32(
@@ -9285,18 +9249,6 @@ mod platform {
             output_q8_1: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
-        fn psionic_cuda_q4_k_gate_up_silu_q8_1(
-            weights: *const c_void,
-            row_stride: c_int,
-            columns: c_int,
-            gate_rows: c_int,
-            up_rows: c_int,
-            input_q8_1: *const c_void,
-            gate_bias: *const c_void,
-            up_bias: *const c_void,
-            output_q8_1: *mut c_void,
-            stream: CudaStream,
-        ) -> CudaError;
         fn psionic_cuda_sigmoid_mul_f32(
             values: *const c_void,
             values_offset: c_int,
@@ -11869,59 +11821,6 @@ mod platform {
                     )
                 },
                 "psionic_cuda_silu_mul_q8_1",
-            )
-        }
-
-        pub(super) fn encode_q4_k_gate_up_silu_q8_1(
-            &mut self,
-            weights: &PlatformBuffer,
-            row_stride: usize,
-            columns: usize,
-            gate_rows: usize,
-            up_rows: usize,
-            input_q8_1: &PlatformBuffer,
-            gate_bias: Option<&PlatformBuffer>,
-            up_bias: Option<&PlatformBuffer>,
-            output_q8_1: &PlatformBuffer,
-        ) -> Result<(), RuntimeError> {
-            if !quantized_kernels_compiled() {
-                return Err(RuntimeError::Backend(String::from(
-                    "cuda quantized text-generation kernels are not available in this build",
-                )));
-            }
-            let row_stride = c_int::try_from(row_stride).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda q4_k gate/up row stride exceeds c_int"))
-            })?;
-            let columns = c_int::try_from(columns).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda q4_k gate/up columns exceed c_int"))
-            })?;
-            let gate_rows = c_int::try_from(gate_rows).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda q4_k gate rows exceed c_int"))
-            })?;
-            let up_rows = c_int::try_from(up_rows).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda q4_k up rows exceed c_int"))
-            })?;
-            self.runtime.set_device()?;
-            self.runtime.check(
-                unsafe {
-                    psionic_cuda_q4_k_gate_up_silu_q8_1(
-                        weights.inner.device_ptr.cast(),
-                        row_stride,
-                        columns,
-                        gate_rows,
-                        up_rows,
-                        input_q8_1.inner.device_ptr.cast(),
-                        gate_bias
-                            .map(|buffer| buffer.inner.device_ptr.cast())
-                            .unwrap_or(std::ptr::null_mut()),
-                        up_bias
-                            .map(|buffer| buffer.inner.device_ptr.cast())
-                            .unwrap_or(std::ptr::null_mut()),
-                        output_q8_1.inner.device_ptr.cast(),
-                        self.stream,
-                    )
-                },
-                "psionic_cuda_q4_k_gate_up_silu_q8_1",
             )
         }
 
@@ -15561,23 +15460,6 @@ mod platform {
             _rhs: &PlatformBuffer,
             _rhs_offset: usize,
             _element_count: usize,
-            _output_q8_1: &PlatformBuffer,
-        ) -> Result<(), RuntimeError> {
-            Err(RuntimeError::Backend(String::from(
-                "cuda quantized text-generation kernels require Linux CUDA support",
-            )))
-        }
-
-        pub(super) fn encode_q4_k_gate_up_silu_q8_1(
-            &mut self,
-            _weights: &PlatformBuffer,
-            _row_stride: usize,
-            _columns: usize,
-            _gate_rows: usize,
-            _up_rows: usize,
-            _input_q8_1: &PlatformBuffer,
-            _gate_bias: Option<&PlatformBuffer>,
-            _up_bias: Option<&PlatformBuffer>,
             _output_q8_1: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
@@ -22131,98 +22013,6 @@ mod tests {
         assert_eq!(fused_report.encoded_operations, 2);
 
         assert_eq!(output_q8_1.read_bytes()?, separate_q8_1.read_bytes()?);
-        Ok(())
-    }
-
-    #[test]
-    fn cuda_submission_executes_q4_k_gate_up_silu_q8_1_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let mut backend = CudaBackend::new();
-        let Some(_selected) = backend.selected_device().cloned() else {
-            assert_eq!(backend.health().status, HealthStatus::Offline);
-            return Ok(());
-        };
-        if !backend.quantized_kernels_available() {
-            return Ok(());
-        }
-
-        let input = sample_q8_1_exact_vector_256();
-        let gate_rows = 32usize;
-        let up_rows = 32usize;
-        let rows_per_projection = gate_rows + up_rows;
-        let row_byte_len = sample_q4_k_row(0.5, 0.125, 3).len();
-        let mut weights_bytes = Vec::with_capacity(rows_per_projection * row_byte_len);
-        for row_index in 0..rows_per_projection {
-            let scale = if row_index % 2 == 0 { 0.5 } else { 0.375 };
-            let minimum = if row_index % 3 == 0 { 0.125 } else { 0.25 };
-            let offset = ((row_index * 7) % 16) as u8;
-            weights_bytes.extend(sample_q4_k_row(scale, minimum, offset));
-        }
-        let weights = backend.byte_buffer(&weights_bytes)?;
-        let input_buffer = backend.input_buffer(Shape::new(vec![input.len()]), input)?;
-        let input_q8_1 = backend.byte_buffer(&vec![
-            0_u8;
-            crate::ggml_q8_1_storage_bytes(
-                1,
-                256
-            )?
-        ])?;
-        let matvec_output = backend.f32_buffer(rows_per_projection)?;
-        let fused_q8_1 = backend.byte_buffer(&vec![
-            0_u8;
-            crate::ggml_q8_1_storage_bytes(
-                1,
-                gate_rows
-            )?
-        ])?;
-        let separate_q8_1 = backend.byte_buffer(&vec![
-            0_u8;
-            crate::ggml_q8_1_storage_bytes(
-                1,
-                gate_rows
-            )?
-        ])?;
-
-        let mut separate = backend.begin_submission()?;
-        separate.quantize_f32_to_q8_1(&input_buffer, 1, 256, &input_q8_1)?;
-        separate.quantized_matvec_q8_1(
-            &weights,
-            0,
-            QuantizationMode::GgmlQ4K,
-            rows_per_projection,
-            256,
-            &input_q8_1,
-            None,
-            &matvec_output,
-        )?;
-        separate.silu_mul_q8_1(
-            &matvec_output,
-            0,
-            &matvec_output,
-            gate_rows,
-            gate_rows,
-            &separate_q8_1,
-        )?;
-        let separate_report = separate.commit(CudaCommandWait::Completed)?;
-        assert_eq!(separate_report.encoded_operations, 3);
-
-        let mut fused = backend.begin_submission()?;
-        fused.quantize_f32_to_q8_1(&input_buffer, 1, 256, &input_q8_1)?;
-        fused.q4_k_gate_up_silu_q8_1(
-            &weights,
-            row_byte_len,
-            256,
-            gate_rows,
-            up_rows,
-            &input_q8_1,
-            None,
-            None,
-            &fused_q8_1,
-        )?;
-        let fused_report = fused.commit(CudaCommandWait::Completed)?;
-        assert_eq!(fused_report.encoded_operations, 2);
-
-        assert_eq!(fused_q8_1.read_bytes()?, separate_q8_1.read_bytes()?);
         Ok(())
     }
 

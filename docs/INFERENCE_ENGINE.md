@@ -75,8 +75,6 @@ than just run tensor math.
   output head for mixed `Q4_K` and `Q6_K` weights. Greedy `ArgmaxOnly` decode
   now routes `Q6_K` output weights through `Q8_1` projection plus `argmax_f32`
   instead of falling back to the slower generic quantized matvec path.
-- The next 4B checkpoint also fuses the dense `Q4_K` gate/up FFN path directly
-  into `Q8_1` activation blocks before `ffn_down` on the native CUDA lane.
 - The qwen35 lane is now ahead on decode throughput for this host and prompt,
   but it is still not architecture-closed. Greedy prompt replay is materially
   faster than the earlier pilot, but the remaining headroom is still in the
