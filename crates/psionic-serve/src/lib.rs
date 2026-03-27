@@ -66,7 +66,6 @@ pub use psion_capability_matrix::*;
 pub use psion_capability_withdrawal::*;
 pub use psion_served_evidence::*;
 pub use psion_served_output_claim_posture::*;
-pub use qwen35::*;
 pub use psionic_adapters::*;
 use psionic_backend_cpu::CpuBackend;
 use psionic_backend_cuda::{
@@ -90,7 +89,9 @@ pub use psionic_models::{
     GgufEmbeddingTensorLayout, GgufPromptTemplateFamily, GgufPromptTemplateRenderer,
     GptOssHarmonyParsedOutput, ModelArtifactGovernance, ModelArtifactLicenseEntry,
     ModelArtifactLicenseFacts, ModelArtifactProvenance, ModelArtifactProvenanceKind,
-    ModelDescriptor, ModelLoadError, PromptMessage, PromptMessageRole, PromptRenderError,
+    ModelDescriptor, ModelLoadError, ParameterGolfMlpActivation,
+    ParameterGolfPromotedGenerationError, ParameterGolfPromotedRuntimeBundle,
+    ParameterGolfPromotedRuntimeLoadError, PromptMessage, PromptMessageRole, PromptRenderError,
     ReferenceWordDecoder, RenderedPrompt, SmokeByteEmbedder, TokenId, TokenSequence,
     TokenVocabulary, TokenizerBoundary, WeightArtifactMetadata, WeightBundleMetadata, WeightFormat,
     WeightSource, WeightTensorMetadata, apply_context_window, digest_generation_defaults,
@@ -123,6 +124,7 @@ pub use psionic_transformer::{
     ActivationFunction, DecoderAttentionConfig, DecoderBlockConfig, DecoderConfig,
     DecoderFeedForwardConfig,
 };
+pub use qwen35::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use tassadar::*;
@@ -256,10 +258,15 @@ pub fn supported_decoder_kv_cache_encoding_policies(
     model: &DecoderModelDescriptor,
     runtime_backend: &str,
 ) -> Vec<KvCacheEncodingPolicy> {
-    let mut policies = vec![default_decoder_kv_cache_encoding_policy(model, runtime_backend)];
+    let mut policies = vec![default_decoder_kv_cache_encoding_policy(
+        model,
+        runtime_backend,
+    )];
     if let Some(turboquant_policy) =
         supported_turboquant_decoder_kv_cache_encoding_policy(model, runtime_backend)
-        && !policies.iter().any(|existing| existing == &turboquant_policy)
+        && !policies
+            .iter()
+            .any(|existing| existing == &turboquant_policy)
     {
         policies.push(turboquant_policy);
     }
@@ -4192,6 +4199,64 @@ fn context_window_diagnostic(error: &ContextWindowError) -> LocalRuntimeDiagnost
     )
 }
 
+fn promoted_parameter_golf_bundle_load_diagnostic(
+    error: &ParameterGolfPromotedRuntimeLoadError,
+) -> LocalRuntimeDiagnostic {
+    match error {
+        ParameterGolfPromotedRuntimeLoadError::Io { source, .. }
+            if source.kind() == std::io::ErrorKind::NotFound =>
+        {
+            LocalRuntimeDiagnostic::new(
+                LocalRuntimeErrorCode::ArtifactMissing,
+                404,
+                error.to_string(),
+            )
+        }
+        ParameterGolfPromotedRuntimeLoadError::Io { .. }
+        | ParameterGolfPromotedRuntimeLoadError::Json { .. }
+        | ParameterGolfPromotedRuntimeLoadError::Bundle(_)
+        | ParameterGolfPromotedRuntimeLoadError::Model(_)
+        | ParameterGolfPromotedRuntimeLoadError::InvalidBundle { .. }
+        | ParameterGolfPromotedRuntimeLoadError::FieldMismatch { .. }
+        | ParameterGolfPromotedRuntimeLoadError::SafeTensors { .. }
+        | ParameterGolfPromotedRuntimeLoadError::MissingArtifactTensor { .. }
+        | ParameterGolfPromotedRuntimeLoadError::ArtifactTensorShape { .. }
+        | ParameterGolfPromotedRuntimeLoadError::TensorDecode { .. } => {
+            LocalRuntimeDiagnostic::new(
+                LocalRuntimeErrorCode::ArtifactInvalid,
+                422,
+                error.to_string(),
+            )
+        }
+    }
+}
+
+fn promoted_parameter_golf_generation_diagnostic(
+    error: &ParameterGolfPromotedGenerationError,
+) -> LocalRuntimeDiagnostic {
+    match error {
+        ParameterGolfPromotedGenerationError::EmptyPrompt
+        | ParameterGolfPromotedGenerationError::InvalidMaxNewTokens => LocalRuntimeDiagnostic::new(
+            LocalRuntimeErrorCode::InvalidRequest,
+            400,
+            error.to_string(),
+        ),
+        ParameterGolfPromotedGenerationError::PromptTooLong { .. } => LocalRuntimeDiagnostic::new(
+            LocalRuntimeErrorCode::ContextOverflow,
+            400,
+            error.to_string(),
+        ),
+        ParameterGolfPromotedGenerationError::MissingLogits => {
+            LocalRuntimeDiagnostic::new(LocalRuntimeErrorCode::Internal, 500, error.to_string())
+        }
+        ParameterGolfPromotedGenerationError::Model(_) => LocalRuntimeDiagnostic::new(
+            LocalRuntimeErrorCode::BackendExecutionFailed,
+            500,
+            error.to_string(),
+        ),
+    }
+}
+
 fn loaded_model_registry_diagnostic(error: &LoadedModelRegistryError) -> LocalRuntimeDiagnostic {
     match error {
         LoadedModelRegistryError::ModelNotLoaded(model_id) => LocalRuntimeDiagnostic::new(
@@ -4320,6 +4385,9 @@ pub enum ReferenceTextGenerationError {
     /// Loading or validating a model artifact failed.
     #[error(transparent)]
     Model(#[from] ModelLoadError),
+    /// Loading or validating a promoted PGOLF runtime bundle failed.
+    #[error(transparent)]
+    PromotedBundleLoad(#[from] ParameterGolfPromotedRuntimeLoadError),
     /// Prompt context-window budgeting failed before execution.
     #[error(transparent)]
     ContextWindow(#[from] ContextWindowError),
@@ -4341,6 +4409,9 @@ pub enum ReferenceTextGenerationError {
     /// CPU runtime execution failed.
     #[error(transparent)]
     Runtime(#[from] RuntimeError),
+    /// Promoted PGOLF runtime generation failed after load.
+    #[error(transparent)]
+    PromotedBundleGeneration(#[from] ParameterGolfPromotedGenerationError),
     /// Structured-output fallback request compilation failed.
     #[error(transparent)]
     StructuredOutput(#[from] StructuredOutputError),
@@ -4400,6 +4471,9 @@ impl ReferenceTextGenerationError {
                 self.to_string(),
             ),
             Self::Model(error) => model_load_error_diagnostic(error),
+            Self::PromotedBundleLoad(error) => {
+                promoted_parameter_golf_bundle_load_diagnostic(error)
+            }
             Self::ContextWindow(error) => context_window_diagnostic(error),
             Self::Compile(_) | Self::Graph(_) | Self::MissingOutput(_) => {
                 LocalRuntimeDiagnostic::new(LocalRuntimeErrorCode::Internal, 500, self.to_string())
@@ -4408,6 +4482,9 @@ impl ReferenceTextGenerationError {
             Self::LoadedModelRegistry(error) => loaded_model_registry_diagnostic(error),
             Self::Cache(error) => kv_cache_diagnostic(error),
             Self::Runtime(error) => runtime_error_diagnostic(error).with_backend(backend),
+            Self::PromotedBundleGeneration(error) => {
+                promoted_parameter_golf_generation_diagnostic(error).with_backend(backend)
+            }
         };
         match self {
             Self::LoadedModelRegistry(LoadedModelRegistryError::AdmissionRefused(refusal)) => {
@@ -5321,6 +5398,1049 @@ impl ManagedTextGenerationRuntime for CpuModelTextGenerationService {
         model_id: &str,
     ) -> Result<LoadedModelView, <Self as TextGenerationExecutor>::Error> {
         CpuModelTextGenerationService::unload_model(self, model_id)
+    }
+}
+
+const PROMOTED_PARAMETER_GOLF_TOKENIZER_FAMILY: &str = "parameter_golf_sentencepiece_promoted";
+const PROMOTED_PARAMETER_GOLF_DUMMY_KV_WIDTH: usize = 1;
+
+fn promoted_parameter_golf_invalid_bundle(
+    detail: impl Into<String>,
+) -> ReferenceTextGenerationError {
+    ReferenceTextGenerationError::PromotedBundleLoad(
+        ParameterGolfPromotedRuntimeLoadError::InvalidBundle {
+            detail: detail.into(),
+        },
+    )
+}
+
+fn promoted_parameter_golf_decoder_descriptor(
+    bundle: &ParameterGolfPromotedRuntimeBundle,
+) -> Result<DecoderModelDescriptor, ReferenceTextGenerationError> {
+    let config = &bundle.descriptor().config;
+    let head_dim = config
+        .head_dim()
+        .map_err(|error| promoted_parameter_golf_invalid_bundle(error.to_string()))?;
+    let rotary_dim = config
+        .effective_rope_rotary_dim()
+        .map_err(|error| promoted_parameter_golf_invalid_bundle(error.to_string()))?;
+    let intermediate_size = config
+        .mlp_hidden_dim()
+        .map_err(|error| promoted_parameter_golf_invalid_bundle(error.to_string()))?;
+    let activation = match config.mlp_activation {
+        ParameterGolfMlpActivation::ReluSquared
+        | ParameterGolfMlpActivation::LeakyReluSquared { .. } => ActivationFunction::Relu,
+    };
+    Ok(DecoderModelDescriptor::new(
+        bundle.descriptor().model.clone(),
+        DecoderConfig {
+            hidden_size: config.model_dim,
+            layer_count: config.num_layers,
+            vocab_size: config.vocab_size,
+            max_context: config.max_context,
+            block: DecoderBlockConfig {
+                attention: DecoderAttentionConfig {
+                    head_count: config.num_heads,
+                    kv_head_count: config.num_kv_heads,
+                    head_dim,
+                    rotary_dim,
+                },
+                feed_forward: DecoderFeedForwardConfig {
+                    intermediate_size,
+                    activation,
+                },
+            },
+        },
+        PROMOTED_PARAMETER_GOLF_TOKENIZER_FAMILY,
+        bundle.descriptor().weights.clone(),
+    ))
+}
+
+fn promoted_parameter_golf_execution_plan_digest(
+    bundle: &ParameterGolfPromotedRuntimeBundle,
+    descriptor: &DecoderModelDescriptor,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"psionic.promoted_parameter_golf.execution_plan.v1|");
+    hasher.update(bundle.manifest().bundle_digest.as_bytes());
+    hasher.update(bundle.profile_contract().profile_id.as_bytes());
+    hasher.update(bundle.generation_config().config_digest.as_bytes());
+    hasher.update(descriptor.model.model_id.as_bytes());
+    hasher.update(descriptor.model.revision.as_bytes());
+    hasher.update(descriptor.weights.digest.as_bytes());
+    hasher.update(b"|cpu");
+    hex::encode(hasher.finalize())
+}
+
+fn promoted_parameter_golf_encode_prompt_input(
+    model: &PromotedParameterGolfServedModel,
+    input: &GenerationInput,
+) -> Result<TokenSequence, ReferenceTextGenerationError> {
+    match input {
+        GenerationInput::Text(text) => Ok(model
+            .runtime_bundle()
+            .tokenizer()
+            .encode_with_defaults(text)),
+        GenerationInput::Tokens(tokens) => {
+            let vocab_size = model.runtime_bundle().tokenizer().vocabulary().len();
+            for token in tokens.as_slice() {
+                if token.as_u32() as usize >= vocab_size {
+                    return Err(ReferenceTextGenerationError::InvalidToken {
+                        token: token.as_u32(),
+                        vocab_size,
+                    });
+                }
+            }
+            Ok(tokens.clone())
+        }
+    }
+}
+
+fn promoted_parameter_golf_prefix_state_for_request(
+    request: &GenerationRequest,
+    previous_kv_state: &KvCacheState,
+) -> (PrefixCacheState, Option<PrefixCacheRefusalReason>) {
+    match request.prefix_cache_control.mode {
+        PrefixCacheMode::Bypass => (
+            PrefixCacheState::Bypassed,
+            Some(PrefixCacheRefusalReason::RequestOptOut),
+        ),
+        PrefixCacheMode::Invalidate => (
+            PrefixCacheState::Rebuilt,
+            Some(PrefixCacheRefusalReason::ForcedInvalidation),
+        ),
+        PrefixCacheMode::Auto if previous_kv_state.tokens > 0 => (
+            PrefixCacheState::Bypassed,
+            Some(PrefixCacheRefusalReason::SessionBoundState),
+        ),
+        PrefixCacheMode::Auto => (PrefixCacheState::None, None),
+    }
+}
+
+fn append_promoted_parameter_golf_cache_token(
+    cache: &mut InMemoryKvCache,
+    token: TokenId,
+) -> Result<(), ReferenceTextGenerationError> {
+    cache
+        .append(token, vec![0.0; cache.width()], vec![0.0; cache.width()])
+        .map_err(ReferenceTextGenerationError::from)
+}
+
+#[derive(Clone, Debug)]
+struct PromotedParameterGolfServedModel {
+    descriptor: DecoderModelDescriptor,
+    runtime_bundle: ParameterGolfPromotedRuntimeBundle,
+    execution_plan_digest: String,
+    load_duration_ns: u64,
+}
+
+impl PromotedParameterGolfServedModel {
+    fn new(
+        runtime_bundle: ParameterGolfPromotedRuntimeBundle,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let load_start = Instant::now();
+        let descriptor = promoted_parameter_golf_decoder_descriptor(&runtime_bundle)?;
+        let execution_plan_digest =
+            promoted_parameter_golf_execution_plan_digest(&runtime_bundle, &descriptor);
+        let load_duration_ns = load_start
+            .elapsed()
+            .as_nanos()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        Ok(Self {
+            descriptor,
+            runtime_bundle,
+            execution_plan_digest,
+            load_duration_ns,
+        })
+    }
+
+    fn runtime_bundle(&self) -> &ParameterGolfPromotedRuntimeBundle {
+        &self.runtime_bundle
+    }
+
+    fn execution_plan_digest(&self) -> &str {
+        self.execution_plan_digest.as_str()
+    }
+
+    fn load_duration_ns(&self) -> u64 {
+        self.load_duration_ns
+    }
+}
+
+impl GenerationModelHandle for PromotedParameterGolfServedModel {
+    fn descriptor(&self) -> &DecoderModelDescriptor {
+        &self.descriptor
+    }
+
+    fn cache_width(&self) -> usize {
+        PROMOTED_PARAMETER_GOLF_DUMMY_KV_WIDTH
+    }
+}
+
+/// CPU-backed service that serves repo-trained PGOLF-shaped promoted bundles
+/// through the normal local generation interface.
+#[derive(Clone, Debug)]
+pub struct CpuPromotedParameterGolfTextGenerationService {
+    backend: CpuBackend,
+    models: InMemoryGenerationModelRegistry<PromotedParameterGolfServedModel>,
+    sessions: InMemoryGenerationSessionStore,
+    backend_health: BackendHealthTracker,
+    model_descriptor: DecoderModelDescriptor,
+}
+
+impl CpuPromotedParameterGolfTextGenerationService {
+    /// Loads one promoted PGOLF runtime bundle from a directory and serves it on CPU.
+    pub fn from_bundle_dir(
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let backend = CpuBackend::new();
+        let model = PromotedParameterGolfServedModel::new(
+            ParameterGolfPromotedRuntimeBundle::load_dir(path)?,
+        )?;
+        let model_descriptor = model.descriptor().clone();
+        let mut models = InMemoryGenerationModelRegistry::new();
+        models.warm_with_metadata(
+            model,
+            current_time_millis(),
+            DEFAULT_MODEL_KEEPALIVE_MILLIS,
+            None,
+            Some(String::from("cpu")),
+            None,
+        )?;
+        let mut backend_health = BackendHealthTracker::default();
+        backend_health.observe("cpu", backend.health(), current_time_millis());
+        Ok(Self {
+            backend,
+            models,
+            sessions: InMemoryGenerationSessionStore::new(),
+            backend_health,
+            model_descriptor,
+        })
+    }
+
+    /// Loads or replaces the active promoted PGOLF runtime bundle.
+    pub fn load_bundle_dir(
+        &mut self,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let model = PromotedParameterGolfServedModel::new(
+            ParameterGolfPromotedRuntimeBundle::load_dir(path)?,
+        )?;
+        self.model_descriptor = model.descriptor().clone();
+        self.models.warm_with_metadata(
+            model,
+            current_time_millis(),
+            DEFAULT_MODEL_KEEPALIVE_MILLIS,
+            None,
+            Some(String::from("cpu")),
+            None,
+        )?;
+        Ok(())
+    }
+
+    /// Returns the served descriptor for the active promoted PGOLF bundle.
+    #[must_use]
+    pub fn model_descriptor(&self) -> &DecoderModelDescriptor {
+        &self.model_descriptor
+    }
+
+    /// Returns the execution-plan digest for the loaded promoted bundle.
+    #[must_use]
+    pub fn plan_digest(&self, model_id: &str) -> Option<&str> {
+        self.models
+            .active(model_id)
+            .map(PromotedParameterGolfServedModel::execution_plan_digest)
+    }
+
+    /// Refreshes keepalive for an already loaded promoted bundle.
+    pub fn warm_model(
+        &mut self,
+        model_id: &str,
+        keep_alive_millis: u64,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Ok(self
+            .models
+            .warm_loaded(model_id, current_time_millis(), keep_alive_millis)?)
+    }
+
+    /// Returns the currently loaded promoted models after applying idle expiry.
+    #[must_use]
+    pub fn loaded_models(&mut self) -> LoadedModelsObservation {
+        self.loaded_models_at(current_time_millis())
+    }
+
+    /// Returns the currently loaded promoted models at a caller-provided time.
+    #[must_use]
+    pub fn loaded_models_at(&mut self, now_millis: u64) -> LoadedModelsObservation {
+        self.models.expire_idle(now_millis);
+        self.models.loaded_models_observation()
+    }
+
+    /// Returns runtime observability at a caller-provided time.
+    #[must_use]
+    pub fn observability_at(&mut self, now_millis: u64) -> LocalRuntimeObservability {
+        self.models.expire_idle(now_millis);
+        self.backend_health
+            .observe("cpu", self.backend.health(), now_millis);
+        generation_runtime_observability(
+            &self.models,
+            &self.sessions,
+            &self.backend_health,
+            default_text_generation_execution_profile(),
+        )
+    }
+
+    /// Returns runtime observability after applying idle expiry.
+    #[must_use]
+    pub fn observability(&mut self) -> LocalRuntimeObservability {
+        self.observability_at(current_time_millis())
+    }
+
+    /// Returns explicit loaded-model residency views at a caller-provided time.
+    #[must_use]
+    pub fn loaded_model_views_at(&mut self, now_millis: u64) -> Vec<LoadedModelView> {
+        self.models.expire_idle(now_millis);
+        self.models.loaded_model_views()
+    }
+
+    /// Returns explicit loaded-model residency views after applying idle expiry.
+    #[must_use]
+    pub fn loaded_model_views(&mut self) -> Vec<LoadedModelView> {
+        self.loaded_model_views_at(current_time_millis())
+    }
+
+    /// Unloads one currently loaded promoted bundle explicitly.
+    pub fn unload_model(
+        &mut self,
+        model_id: &str,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Ok(self.models.unload_view(model_id, current_time_millis())?)
+    }
+
+    /// Creates a reusable generation session for the provided promoted bundle model ID.
+    pub fn create_session(
+        &mut self,
+        model_id: &str,
+    ) -> Result<GenerationSession, ReferenceTextGenerationError> {
+        let model = self
+            .models
+            .active(model_id)
+            .ok_or_else(|| ReferenceTextGenerationError::UnsupportedModel(model_id.to_string()))?;
+        Ok(self.sessions.create(
+            model,
+            served_artifact_identity_for_decoder_backend(model.descriptor(), "cpu", &[])
+                .served_artifact_digest,
+        ))
+    }
+
+    /// Resets an existing session.
+    pub fn reset_session(
+        &mut self,
+        session_id: &SessionId,
+    ) -> Result<GenerationSession, ReferenceTextGenerationError> {
+        Ok(self.sessions.reset(session_id)?)
+    }
+
+    /// Closes an existing session.
+    pub fn close_session(
+        &mut self,
+        session_id: &SessionId,
+    ) -> Result<GenerationSession, ReferenceTextGenerationError> {
+        Ok(self.sessions.close(session_id)?)
+    }
+
+    fn stream_for_request<'a>(
+        &'a mut self,
+        request: &GenerationRequest,
+    ) -> Result<PromotedParameterGolfGenerationStream<'a>, ReferenceTextGenerationError> {
+        PromotedParameterGolfGenerationStream::new(&mut self.models, &mut self.sessions, request)
+    }
+}
+
+impl TextGenerationExecutor for CpuPromotedParameterGolfTextGenerationService {
+    type Error = ReferenceTextGenerationError;
+
+    fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
+        self.stream_for_request(request)?.run_to_completion()
+    }
+}
+
+impl StreamingTextGenerationExecutor for CpuPromotedParameterGolfTextGenerationService {
+    type Stream<'a> = Box<dyn GenerationEventStream + 'a>;
+
+    fn generate_stream<'a>(
+        &'a mut self,
+        request: &GenerationRequest,
+    ) -> Result<Self::Stream<'a>, <Self as TextGenerationExecutor>::Error> {
+        Ok(Box::new(self.stream_for_request(request)?))
+    }
+}
+
+impl ManagedTextGenerationRuntime for CpuPromotedParameterGolfTextGenerationService {
+    fn loaded_models(&mut self) -> LoadedModelsObservation {
+        CpuPromotedParameterGolfTextGenerationService::loaded_models(self)
+    }
+
+    fn observability(&mut self) -> LocalRuntimeObservability {
+        CpuPromotedParameterGolfTextGenerationService::observability(self)
+    }
+
+    fn warm_model(
+        &mut self,
+        model_id: &str,
+        keep_alive_millis: u64,
+    ) -> Result<LoadedModelView, <Self as TextGenerationExecutor>::Error> {
+        CpuPromotedParameterGolfTextGenerationService::warm_model(self, model_id, keep_alive_millis)
+    }
+
+    fn unload_model(
+        &mut self,
+        model_id: &str,
+    ) -> Result<LoadedModelView, <Self as TextGenerationExecutor>::Error> {
+        CpuPromotedParameterGolfTextGenerationService::unload_model(self, model_id)
+    }
+}
+
+struct PromotedParameterGolfGenerationStream<'a> {
+    models: &'a mut InMemoryGenerationModelRegistry<PromotedParameterGolfServedModel>,
+    sessions: &'a mut InMemoryGenerationSessionStore,
+    request: GenerationRequest,
+    streaming_policy: GenerationStreamingPolicy,
+    model_id: String,
+    loaded_model: PromotedParameterGolfServedModel,
+    served_artifact: ServedArtifactIdentity,
+    load_state: GenerationLoadState,
+    generation_start: Instant,
+    memory_plan: Option<ModelMemoryPlan>,
+    residency_policy: Option<ModelResidencyPolicy>,
+    residency_snapshot: Option<MemoryResidencySnapshot>,
+    prompt_eval_duration_ns: u64,
+    context_window: ContextWindowAccounting,
+    previous_kv_state: KvCacheState,
+    cache: InMemoryKvCache,
+    request_kv_checkpoint: KvCacheLedgerCheckpoint,
+    sampler: GenerationSampler,
+    session_tokens: Vec<TokenId>,
+    prompt_tokens: TokenSequence,
+    history: Vec<u32>,
+    generated_tokens: Vec<TokenId>,
+    first_token_emitted_at: Option<Instant>,
+    last_token_emitted_at: Option<Instant>,
+    emitted_token_count: usize,
+    emitted_text_bytes: usize,
+    pending_terminal: Option<GenerationStreamTerminal>,
+    request_finished: bool,
+    prefix_state: PrefixCacheState,
+    prefix_cache_refusal_reason: Option<PrefixCacheRefusalReason>,
+}
+
+impl<'a> PromotedParameterGolfGenerationStream<'a> {
+    fn new(
+        models: &'a mut InMemoryGenerationModelRegistry<PromotedParameterGolfServedModel>,
+        sessions: &'a mut InMemoryGenerationSessionStore,
+        request: &GenerationRequest,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        if !generation_product_supported(request) {
+            return Err(ReferenceTextGenerationError::UnsupportedProduct(
+                request.product_id.clone(),
+            ));
+        }
+        if let Some(binding) = &request.adapter_serving {
+            return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: binding.binding_id.clone(),
+                reason: String::from(
+                    "promoted PGOLF bundle serving only supports direct model requests",
+                ),
+            });
+        }
+
+        let model_id = request.model.model.model_id.clone();
+        let loaded_model = models
+            .active(model_id.as_str())
+            .ok_or_else(|| ReferenceTextGenerationError::UnsupportedModel(model_id.clone()))?
+            .clone();
+        if request.model != *loaded_model.descriptor() {
+            return Err(ReferenceTextGenerationError::UnsupportedModel(model_id));
+        }
+
+        let load_state = models
+            .load_state(model_id.as_str())
+            .unwrap_or(GenerationLoadState::Warm);
+        let request_start = current_time_millis();
+        models.begin_request(model_id.as_str(), request_start)?;
+        let memory_plan = models.memory_plan(model_id.as_str()).cloned();
+        let residency_policy = Some(models.residency_policy().clone());
+        let residency_snapshot = Some(models.memory_snapshot());
+        let served_artifact =
+            served_artifact_identity_for_decoder_backend(loaded_model.descriptor(), "cpu", &[]);
+        let effective_served_artifact_digest = effective_generation_served_artifact_digest(
+            &served_artifact,
+            request.adapter_serving.as_ref(),
+        );
+        let prompt_eval_start = Instant::now();
+        let prompt_tokens =
+            match promoted_parameter_golf_encode_prompt_input(&loaded_model, &request.prompt) {
+                Ok(tokens) => tokens,
+                Err(error) => {
+                    let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                    return Err(error);
+                }
+            };
+        if prompt_tokens.is_empty() {
+            let _ = models.finish_request(model_id.as_str(), current_time_millis());
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+
+        let mut session_tokens = Vec::new();
+        let mut cache = InMemoryKvCache::with_policy(
+            loaded_model.descriptor().config.max_context,
+            loaded_model.cache_width(),
+            default_generation_kv_cache_policy(&loaded_model),
+        );
+        cache.bind_owner(request_kv_owner(
+            request,
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        let previous_kv_state = if let Some(session_id) = &request.session_id {
+            if request.reset_session {
+                if let Err(error) = sessions.reset(session_id) {
+                    let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                    return Err(ReferenceTextGenerationError::from(error));
+                }
+            }
+            let state = match sessions.state(session_id) {
+                Ok(state) => state,
+                Err(error) => {
+                    let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                    return Err(ReferenceTextGenerationError::from(error));
+                }
+            };
+            if let Err(error) = validate_session_model(
+                state,
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+            ) {
+                let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                return Err(ReferenceTextGenerationError::from(error));
+            }
+            session_tokens = state.tokens().to_vec();
+            cache = state.cache().clone();
+            state.cache().state()
+        } else {
+            KvCacheState::default()
+        };
+        let preserve_prefix_tokens = usize::from(
+            prompt_tokens.as_slice().first().copied()
+                == Some(
+                    loaded_model
+                        .runtime_bundle()
+                        .tokenizer()
+                        .vocabulary()
+                        .bos_id(),
+                ),
+        );
+        let (prompt_tokens, context_window) = match apply_context_window(
+            &prompt_tokens,
+            loaded_model.descriptor().config.max_context,
+            previous_kv_state.tokens,
+            request.options.max_output_tokens,
+            request.options.context_overflow_policy,
+            preserve_prefix_tokens,
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                return Err(ReferenceTextGenerationError::from(error));
+            }
+        };
+        for token in prompt_tokens.as_slice() {
+            if let Err(error) = append_promoted_parameter_golf_cache_token(&mut cache, *token) {
+                let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                return Err(error);
+            }
+        }
+        let request_kv_checkpoint = cache.checkpoint_with_state(previous_kv_state.clone());
+        let history = session_tokens
+            .iter()
+            .copied()
+            .chain(prompt_tokens.as_slice().iter().copied())
+            .map(TokenId::as_u32)
+            .collect::<Vec<_>>();
+        if history.is_empty() {
+            let _ = models.finish_request(model_id.as_str(), current_time_millis());
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+        let prompt_eval_duration_ns = elapsed_ns(prompt_eval_start);
+        let (prefix_state, prefix_cache_refusal_reason) =
+            promoted_parameter_golf_prefix_state_for_request(request, &previous_kv_state);
+        let sampler = match GenerationSampler::new(&request.options) {
+            Ok(sampler) => sampler,
+            Err(error) => {
+                let _ = models.finish_request(model_id.as_str(), current_time_millis());
+                return Err(error);
+            }
+        };
+        Ok(Self {
+            models,
+            sessions,
+            request: request.clone(),
+            streaming_policy: default_generation_streaming_policy(),
+            model_id,
+            loaded_model,
+            served_artifact,
+            load_state,
+            generation_start: Instant::now(),
+            memory_plan,
+            residency_policy,
+            residency_snapshot,
+            prompt_eval_duration_ns,
+            context_window,
+            previous_kv_state,
+            cache,
+            request_kv_checkpoint,
+            sampler,
+            session_tokens,
+            prompt_tokens,
+            history,
+            generated_tokens: Vec::new(),
+            first_token_emitted_at: None,
+            last_token_emitted_at: None,
+            emitted_token_count: 0,
+            emitted_text_bytes: 0,
+            pending_terminal: None,
+            request_finished: false,
+            prefix_state,
+            prefix_cache_refusal_reason,
+        })
+    }
+
+    fn finish_request_once(&mut self) {
+        if !self.request_finished {
+            let _ = self
+                .models
+                .finish_request(self.model_id.as_str(), current_time_millis());
+            self.request_finished = true;
+        }
+    }
+
+    fn build_response(
+        &self,
+        output_tokens: &[TokenId],
+        termination: TerminationReason,
+        streaming_policy: bool,
+    ) -> GenerationResponse {
+        let generated = TokenSequence::new(output_tokens.to_vec());
+        let usage = GenerationUsage {
+            input_tokens: self.prompt_tokens.len(),
+            output_tokens: generated.len(),
+            cache_tokens: self.cache.len(),
+        };
+        let total_duration_ns = elapsed_ns(self.generation_start);
+        let time_to_first_token_ns = self
+            .first_token_emitted_at
+            .map(|first_token_at| first_token_at.duration_since(self.generation_start))
+            .and_then(|duration| duration.as_nanos().try_into().ok());
+        let inter_token_latency_ns = average_inter_token_latency_ns(
+            self.first_token_emitted_at,
+            self.last_token_emitted_at,
+            usage.output_tokens,
+        );
+        let kv_cache_encoding_policy =
+            default_generation_kv_cache_encoding_policy(&self.loaded_model, "cpu");
+        let kv_residency = host_only_kv_residency(self.cache.policy(), self.cache.state());
+        let metrics = GenerationMetrics {
+            total_duration_ns: Some(total_duration_ns),
+            load_duration_ns: Some(match self.load_state {
+                GenerationLoadState::Cold => self.loaded_model.load_duration_ns(),
+                GenerationLoadState::Warm => 0,
+            }),
+            prompt_eval_count: Some(usage.input_tokens),
+            prompt_eval_duration_ns: Some(self.prompt_eval_duration_ns),
+            context_window: Some(self.context_window.clone()),
+            eval_count: Some(usage.output_tokens),
+            eval_duration_ns: Some(total_duration_ns.saturating_sub(self.prompt_eval_duration_ns)),
+            time_to_first_token_ns,
+            inter_token_latency_ns,
+            kv_cache: Some(KvCacheAccounting::from_states(
+                &self.previous_kv_state,
+                self.cache.state(),
+            )),
+            kv_residency: kv_residency.clone(),
+            kv_cache_encoding: Some(KvCacheEncodingAccounting::active(
+                kv_cache_encoding_policy.clone(),
+            )),
+            prefix_tokens_reused: Some(0),
+            gpt_oss_perf: None,
+        };
+        let provenance = GenerationProvenance {
+            served_artifact: self.served_artifact.clone(),
+            adapter_serving: None,
+            execution_plan_digest: self.loaded_model.execution_plan_digest().to_string(),
+            cluster_execution: None,
+            load_state: self.load_state,
+            isolation_policy: LocalServingIsolationPolicy::in_process_runtime(),
+            streaming_policy: streaming_policy.then(|| self.streaming_policy.clone()),
+            memory_plan: self.memory_plan.clone(),
+            residency_policy: self.residency_policy.clone(),
+            residency_snapshot: self.residency_snapshot.clone(),
+            kv_cache_policy: Some(self.cache.policy().clone()),
+            kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
+            kv_ownership: self.cache.ownership_since(&self.request_kv_checkpoint),
+            prefix_cache_control: Some(self.request.prefix_cache_control.clone()),
+            prefix_cache_state: Some(self.prefix_state),
+            prefix_cache_refusal_reason: self.prefix_cache_refusal_reason,
+            prefix_cache_policy: Some(default_prefix_cache_policy()),
+            prefix_cache_identity: None,
+            compile_path: None,
+            delivery_proof: build_delivery_proof(
+                self.loaded_model.execution_plan_digest().to_string(),
+                0,
+                0,
+                0,
+                0,
+                metrics.kv_cache.as_ref().map(|value| value.growth.clone()),
+                local_prefill_decode_handoff(&self.previous_kv_state),
+                kv_residency,
+            ),
+            cache_observations: generation_cache_observations(
+                self.loaded_model.descriptor(),
+                None,
+                self.load_state,
+                self.request.session_id.as_ref(),
+                self.request.reset_session,
+                &self.previous_kv_state,
+                self.prefix_state,
+                None,
+            ),
+            scheduler: None,
+            structured_output: self.sampler.structured_output_report(),
+            psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
+        };
+        let text = self
+            .loaded_model
+            .runtime_bundle()
+            .tokenizer()
+            .decode(output_tokens);
+        let structured_output_value = self
+            .sampler
+            .structured_output_value(text.as_str())
+            .ok()
+            .flatten();
+        let response = GenerationResponse::new(
+            &self.request,
+            self.request.session_id.clone(),
+            generated,
+            text,
+            usage.input_tokens,
+            usage.cache_tokens,
+            termination,
+        )
+        .with_metrics_and_provenance(metrics, provenance);
+        if let Some(value) = structured_output_value {
+            response.with_structured_output_value(value)
+        } else {
+            response
+        }
+    }
+
+    fn build_terminal(
+        &mut self,
+        status: GenerationStreamStatus,
+        termination: TerminationReason,
+        failure_reason: Option<String>,
+        diagnostic: Option<LocalRuntimeDiagnostic>,
+    ) -> GenerationStreamTerminal {
+        if status == GenerationStreamStatus::Succeeded {
+            if let Some(session_id) = &self.request.session_id {
+                let mut committed_tokens = self.session_tokens.clone();
+                committed_tokens.extend_from_slice(self.prompt_tokens.as_slice());
+                committed_tokens.extend_from_slice(self.generated_tokens.as_slice());
+                let _ = self.sessions.replace_cache(
+                    session_id,
+                    self.loaded_model.descriptor(),
+                    self.served_artifact.served_artifact_digest.as_str(),
+                    self.cache.clone(),
+                    TokenSequence::new(committed_tokens),
+                );
+            }
+        }
+        let response = self.build_response(&self.generated_tokens, termination, true);
+        self.finish_request_once();
+        GenerationStreamTerminal {
+            status,
+            response,
+            failure_reason,
+            diagnostic,
+        }
+    }
+
+    fn maybe_emit_chunk(&mut self, allow_full_flush: bool) -> Option<GenerationStreamChunk> {
+        let tokenizer = self.loaded_model.runtime_bundle().tokenizer();
+        let full_text = tokenizer.decode(self.generated_tokens.as_slice());
+        let reserved_chars = if allow_full_flush {
+            0
+        } else {
+            self.request
+                .options
+                .stop_sequences
+                .iter()
+                .filter(|stop| !stop.is_empty())
+                .map(|stop| stop.chars().count())
+                .max()
+                .unwrap_or(0)
+                .saturating_sub(1)
+        };
+        let safe_text = text_prefix_without_trailing_chars(full_text.as_str(), reserved_chars);
+        let safe_token_count =
+            token_count_for_decoded_prefix(tokenizer, self.generated_tokens.as_slice(), safe_text);
+        if safe_token_count <= self.emitted_token_count {
+            return None;
+        }
+        let delta_tokens =
+            self.generated_tokens[self.emitted_token_count..safe_token_count].to_vec();
+        let delta_text = safe_text[self.emitted_text_bytes..].to_string();
+        self.emitted_token_count = safe_token_count;
+        self.emitted_text_bytes = safe_text.len();
+        Some(GenerationStreamChunk {
+            request_id: self.request.request_id.clone(),
+            model_id: self.request.model.model.model_id.clone(),
+            session_id: self.request.session_id.clone(),
+            output: GenerationOutput {
+                tokens: TokenSequence::new(delta_tokens),
+                text: delta_text,
+                structured: None,
+                harmony: None,
+            },
+            cumulative_output_tokens: self.emitted_token_count,
+        })
+    }
+
+    fn emit_terminal_or_chunk(
+        &mut self,
+        status: GenerationStreamStatus,
+        termination: TerminationReason,
+        failure_reason: Option<String>,
+        diagnostic: Option<LocalRuntimeDiagnostic>,
+    ) -> GenerationStreamEvent {
+        let terminal = self.build_terminal(status, termination, failure_reason, diagnostic);
+        if let Some(chunk) = self.maybe_emit_chunk(true) {
+            self.pending_terminal = Some(terminal);
+            GenerationStreamEvent::Chunk(chunk)
+        } else {
+            GenerationStreamEvent::Terminal(terminal)
+        }
+    }
+
+    fn next_event_inner(
+        &mut self,
+    ) -> Result<Option<GenerationStreamEvent>, ReferenceTextGenerationError> {
+        if let Some(terminal) = self.pending_terminal.take() {
+            return Ok(Some(GenerationStreamEvent::Terminal(terminal)));
+        }
+        if self.request_finished {
+            return Ok(None);
+        }
+
+        loop {
+            if self.generated_tokens.len() >= self.request.options.max_output_tokens {
+                return Ok(Some(self.emit_terminal_or_chunk(
+                    GenerationStreamStatus::Succeeded,
+                    TerminationReason::MaxOutputTokens,
+                    None,
+                    None,
+                )));
+            }
+            if self.cache.len() >= self.cache.max_context() {
+                return Ok(Some(self.emit_terminal_or_chunk(
+                    GenerationStreamStatus::Succeeded,
+                    TerminationReason::ContextLimit,
+                    None,
+                    None,
+                )));
+            }
+
+            let logits = self
+                .loaded_model
+                .runtime_bundle()
+                .model()
+                .forward_logits(&[self.history.clone()])
+                .map_err(ParameterGolfPromotedGenerationError::from)?;
+            let width = logits.width();
+            let sequence_length = logits.sequence_length();
+            let last_row_start = sequence_length
+                .checked_sub(1)
+                .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?
+                .saturating_mul(width);
+            let last_logits = logits
+                .values()
+                .get(last_row_start..last_row_start.saturating_add(width))
+                .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
+            let next_token = match self.sampler.select_next_token_from_history(
+                self.loaded_model.runtime_bundle().tokenizer(),
+                last_logits,
+                self.history.as_slice(),
+                self.generated_tokens.as_slice(),
+            )? {
+                GenerationSelection::Token(token) => token,
+                GenerationSelection::Terminate => {
+                    return Ok(Some(self.emit_terminal_or_chunk(
+                        GenerationStreamStatus::Succeeded,
+                        TerminationReason::EndOfSequence,
+                        None,
+                        None,
+                    )));
+                }
+            };
+            if self
+                .loaded_model
+                .runtime_bundle()
+                .tokenizer()
+                .is_end_of_sequence(next_token)
+            {
+                return Ok(Some(self.emit_terminal_or_chunk(
+                    GenerationStreamStatus::Succeeded,
+                    TerminationReason::EndOfSequence,
+                    None,
+                    None,
+                )));
+            }
+
+            self.history.push(next_token.as_u32());
+            self.generated_tokens.push(next_token);
+            append_promoted_parameter_golf_cache_token(&mut self.cache, next_token)?;
+            let emitted_at = Instant::now();
+            if self.first_token_emitted_at.is_none() {
+                self.first_token_emitted_at = Some(emitted_at);
+            }
+            self.last_token_emitted_at = Some(emitted_at);
+
+            if truncate_generated_text(
+                self.loaded_model.runtime_bundle().tokenizer(),
+                &mut self.generated_tokens,
+                &self.request.options.stop_sequences,
+            )
+            .is_some()
+            {
+                self.history = self
+                    .session_tokens
+                    .iter()
+                    .copied()
+                    .chain(self.prompt_tokens.as_slice().iter().copied())
+                    .chain(self.generated_tokens.iter().copied())
+                    .map(TokenId::as_u32)
+                    .collect();
+                self.cache.truncate(
+                    self.session_tokens.len()
+                        + self.prompt_tokens.len()
+                        + self.generated_tokens.len(),
+                );
+                return Ok(Some(self.emit_terminal_or_chunk(
+                    GenerationStreamStatus::Succeeded,
+                    TerminationReason::EndOfSequence,
+                    None,
+                    None,
+                )));
+            }
+
+            if let Some(chunk) = self.maybe_emit_chunk(false) {
+                return Ok(Some(GenerationStreamEvent::Chunk(chunk)));
+            }
+        }
+    }
+
+    fn run_to_completion(mut self) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        loop {
+            match self.next_event_inner()? {
+                Some(GenerationStreamEvent::Chunk(_)) => continue,
+                Some(GenerationStreamEvent::Terminal(terminal)) => {
+                    if terminal.status == GenerationStreamStatus::Succeeded {
+                        return Ok(terminal.response);
+                    }
+                    return Err(ReferenceTextGenerationError::MissingOutput(
+                        "promoted_pgolf_terminal_failure",
+                    ));
+                }
+                None => {
+                    return Err(ReferenceTextGenerationError::MissingOutput(
+                        "promoted_pgolf_generation_terminal",
+                    ));
+                }
+            }
+        }
+    }
+}
+
+impl GenerationEventStream for PromotedParameterGolfGenerationStream<'_> {
+    fn policy(&self) -> &GenerationStreamingPolicy {
+        &self.streaming_policy
+    }
+
+    fn next_event(&mut self) -> Option<GenerationStreamEvent> {
+        match self.next_event_inner() {
+            Ok(event) => event,
+            Err(error) => Some(
+                self.emit_terminal_or_chunk(
+                    GenerationStreamStatus::Failed,
+                    TerminationReason::Error,
+                    Some(error.to_string()),
+                    Some(
+                        error
+                            .diagnostic_for_request(&self.request)
+                            .with_backend("cpu"),
+                    ),
+                ),
+            ),
+        }
+    }
+
+    fn cancel(&mut self) -> Option<GenerationStreamTerminal> {
+        if self.request_finished {
+            return None;
+        }
+        Some(
+            self.build_terminal(
+                GenerationStreamStatus::Cancelled,
+                TerminationReason::Cancelled,
+                Some(String::from("stream cancelled by caller")),
+                Some(diagnostic_with_request_context(
+                    LocalRuntimeDiagnostic::new(
+                        LocalRuntimeErrorCode::Cancelled,
+                        499,
+                        "stream cancelled by caller",
+                    )
+                    .with_backend("cpu"),
+                    &self.request.product_id,
+                    &self.request.model.model.model_id,
+                )),
+            ),
+        )
+    }
+
+    fn disconnect(&mut self) -> Option<GenerationStreamTerminal> {
+        if self.request_finished {
+            return None;
+        }
+        Some(
+            self.build_terminal(
+                GenerationStreamStatus::Disconnected,
+                TerminationReason::Disconnected,
+                Some(String::from("stream disconnected by caller")),
+                Some(diagnostic_with_request_context(
+                    LocalRuntimeDiagnostic::new(
+                        LocalRuntimeErrorCode::Disconnected,
+                        499,
+                        "stream disconnected by caller",
+                    )
+                    .with_backend("cpu"),
+                    &self.request.product_id,
+                    &self.request.model.model.model_id,
+                )),
+            ),
+        )
     }
 }
 
