@@ -11,6 +11,7 @@ struct GoldenPromptCase {
     mode: String,
     #[serde(default)]
     seed: Option<u64>,
+    expected_text: String,
     detail: String,
 }
 
@@ -104,9 +105,20 @@ fn main() {
         let output = bundle
             .generate_text(case.prompt.as_str(), &options)
             .expect("generate suite prompt");
+        assert_eq!(
+            output.text, case.expected_text,
+            "golden prompt `{}` drifted from the checked-in promoted PGOLF suite",
+            case.prompt_id
+        );
         println!(
-            "[{}] mode={} termination={:?} prompt=\"{}\" output=\"{}\" note=\"{}\"",
-            case.prompt_id, case.mode, output.termination, case.prompt, output.text, case.detail
+            "[{}] mode={} termination={:?} prompt=\"{}\" output=\"{}\" expected=\"{}\" note=\"{}\"",
+            case.prompt_id,
+            case.mode,
+            output.termination,
+            case.prompt,
+            output.text,
+            case.expected_text,
+            case.detail
         );
     }
 }
