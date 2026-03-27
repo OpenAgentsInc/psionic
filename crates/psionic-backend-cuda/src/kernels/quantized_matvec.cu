@@ -16,6 +16,8 @@ constexpr int kMaxWarpsPerBlock = 1024 / kWarpSize;
 constexpr int kQ81ElementsPerBlock = 32;
 constexpr int kQ80BlockBytes = 34;
 constexpr int kQ81BlockBytes = 36;
+constexpr int kQ4KBlockBytes = 144;
+constexpr int kQ6KBlockBytes = 210;
 constexpr int kAttentionMaxPositions = 1024;
 constexpr int kMoeMaxExperts = 128;
 constexpr int kMoeMaxSelected = 32;
@@ -76,6 +78,19 @@ __device__ __forceinline__ float mxfp4_value(uint8_t nibble) {
         case 0xf: return -12.0f;
         default: return 0.0f;
     }
+}
+
+__device__ __forceinline__ int2 decode_q4_k_scale_min(int index, const uint8_t *packed) {
+    if (index < 4) {
+        return make_int2(
+            static_cast<int>(packed[index] & 63),
+            static_cast<int>(packed[index + 4] & 63)
+        );
+    }
+    return make_int2(
+        static_cast<int>((packed[index + 4] & 0x0f) | ((packed[index - 4] >> 6) << 4)),
+        static_cast<int>((packed[index + 4] >> 4) | ((packed[index] >> 6) << 4))
+    );
 }
 
 __device__ __forceinline__ float swiglu_oai_single(
@@ -151,6 +166,10 @@ static __device__ __forceinline__ int get_int_b2(const void *x, const int i32) {
     return x32;
 }
 
+static __device__ __forceinline__ int get_int_b4(const void *x, const int i32) {
+    return static_cast<const int *>(x)[i32];
+}
+
 static __device__ __forceinline__ int2 get_int_from_table_16(const int q4, const int8_t *table) {
     const uint32_t *table32 = reinterpret_cast<const uint32_t *>(table);
     uint32_t tmp[2];
@@ -171,6 +190,10 @@ static __device__ __forceinline__ int2 get_int_from_table_16(const int q4, const
 
 __device__ __constant__ int8_t kMxfp4IntTable[16] = {
     0, 1, 2, 3, 4, 6, 8, 12, 0, -1, -2, -3, -4, -6, -8, -12,
+};
+
+__device__ __constant__ int8_t kQ4KIntTable[16] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 };
 
 __device__ __forceinline__ float dot_q8_0_q8_1_block(
@@ -296,6 +319,10 @@ constexpr int kQ80Q81MmvqVdr = 2;
 constexpr int kQ80Qi = kQ81ElementsPerBlock / 4;
 constexpr int kMxfp4Q81MmvqVdr = 2;
 constexpr int kMxfp4Qi = kQ81ElementsPerBlock / 8;
+constexpr int kQ4KQ81MmvqVdr = 2;
+constexpr int kQ4KQi = 32;
+constexpr int kQ6KQ81MmvqVdr = 1;
+constexpr int kQ6KQi = 32;
 template <typename DotFn>
 __global__ void quantized_matvec_kernel(
     const uint8_t *weights,
@@ -353,6 +380,72 @@ struct Mxfp4Dot {
         const uint8_t packed = block[1 + (lane & 15)];
         const uint8_t nibble = lane < 16 ? (packed & 0x0f) : ((packed >> 4) & 0x0f);
         return mxfp4_value(nibble) * scale * 0.5f * input;
+    }
+};
+
+struct Q4KDot {
+    __device__ __forceinline__ float operator()(const uint8_t *row_weights, int index, float input) const {
+        const int block_index = index >> 8;
+        const int lane = index & 255;
+        const uint8_t *block = row_weights + block_index * kQ4KBlockBytes;
+        const float scale = half_to_float(load_u16_le(block));
+        const float minimum = half_to_float(load_u16_le(block + 2));
+        const uint8_t *scales = block + 4;
+        const uint8_t *quants = block + 16;
+        const int quant_chunk = lane >> 6;
+        const int chunk_offset = lane & 63;
+        const int quant_byte_index = chunk_offset & 31;
+        const int scale_index = quant_chunk * 2 + (chunk_offset >> 5);
+        const int2 scale_min = decode_q4_k_scale_min(scale_index, scales);
+        const uint8_t packed = quants[quant_chunk * 32 + quant_byte_index];
+        const float quantized = static_cast<float>(chunk_offset < 32 ? (packed & 0x0f) : ((packed >> 4) & 0x0f));
+        return (scale * static_cast<float>(scale_min.x) * quantized -
+            minimum * static_cast<float>(scale_min.y)) * input;
+    }
+};
+
+struct Q6KDot {
+    __device__ __forceinline__ float operator()(const uint8_t *row_weights, int index, float input) const {
+        const int block_index = index >> 8;
+        const int lane = index & 255;
+        const uint8_t *block = row_weights + block_index * kQ6KBlockBytes;
+        const uint8_t *ql = block;
+        const uint8_t *qh = block + 128;
+        const int8_t *scales = reinterpret_cast<const int8_t *>(block + 192);
+        const float scale = half_to_float(load_u16_le(block + 208));
+        const int chunk_index = lane >> 7;
+        const int lane_in_chunk = lane & 127;
+        const int group = lane_in_chunk >> 5;
+        const int l = lane_in_chunk & 31;
+        const uint8_t *ql_chunk = ql + chunk_index * 64;
+        const uint8_t qh_value = qh[chunk_index * 32 + l];
+        const int scale_index_base = chunk_index * 8 + (l / 16);
+        int quantized = 0;
+        int scale_index = 0;
+        switch (group) {
+            case 0:
+                quantized = static_cast<int>(ql_chunk[l] & 0x0f) |
+                    (static_cast<int>((qh_value >> 0) & 0x03) << 4);
+                scale_index = scale_index_base;
+                break;
+            case 1:
+                quantized = static_cast<int>(ql_chunk[l + 32] & 0x0f) |
+                    (static_cast<int>((qh_value >> 2) & 0x03) << 4);
+                scale_index = scale_index_base + 2;
+                break;
+            case 2:
+                quantized = static_cast<int>(ql_chunk[l] >> 4) |
+                    (static_cast<int>((qh_value >> 4) & 0x03) << 4);
+                scale_index = scale_index_base + 4;
+                break;
+            default:
+                quantized = static_cast<int>(ql_chunk[l + 32] >> 4) |
+                    (static_cast<int>((qh_value >> 6) & 0x03) << 4);
+                scale_index = scale_index_base + 6;
+                break;
+        }
+        return scale * static_cast<float>(scales[scale_index]) *
+            static_cast<float>(quantized - 32) * input;
     }
 };
 
@@ -621,6 +714,92 @@ struct Mxfp4Q81Dot {
     }
 };
 
+struct Q4KQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *weights,
+        const Q81Block *input,
+        int weight_block_index,
+        int input_block_index,
+        int quant_index
+    ) const {
+        const uint8_t *weight_block =
+            weights + static_cast<size_t>(weight_block_index) * kQ4KBlockBytes;
+        const int input_block_offset = input_block_index * 8;
+        const int bq8_offset = 2 * ((quant_index >> 1) / 4);
+        const int q4_offset = 4 * ((quant_index >> 1) % 4);
+        const int *q4 = reinterpret_cast<const int *>(weight_block + 16 + 16 * bq8_offset + q4_offset);
+        const uint16_t *scale_words = reinterpret_cast<const uint16_t *>(weight_block + 4);
+        uint16_t aux[2];
+        const int scale_group = bq8_offset / 2;
+        if (scale_group < 2) {
+            aux[0] = scale_words[scale_group + 0] & 0x3f3f;
+            aux[1] = scale_words[scale_group + 2] & 0x3f3f;
+        } else {
+            aux[0] = ((scale_words[scale_group + 2] >> 0) & 0x0f0f) |
+                ((scale_words[scale_group - 2] & 0xc0c0) >> 2);
+            aux[1] = ((scale_words[scale_group + 2] >> 4) & 0x0f0f) |
+                ((scale_words[scale_group - 0] & 0xc0c0) >> 2);
+        }
+        const uint8_t *scales = reinterpret_cast<const uint8_t *>(aux);
+        const uint8_t *mins = scales + 2;
+        const int q8_index = (quant_index >> 1) % 4;
+
+        float sumf_d = 0.0f;
+        float sumf_m = 0.0f;
+#pragma unroll
+        for (int group_index = 0; group_index < 2; ++group_index) {
+            const Q81Block *input_block = input + input_block_offset + bq8_offset + group_index;
+            const float input_scale = half_to_float(load_u16_le(input_block->bytes));
+            const int q8_low = get_int_b4(input_block->bytes + 4, q8_index + 0);
+            const int q8_high = get_int_b4(input_block->bytes + 4, q8_index + 4);
+            const int q4_low = (q4[0] >> (4 * group_index)) & 0x0f0f0f0f;
+            const int q4_high = (q4[4] >> (4 * group_index)) & 0x0f0f0f0f;
+            const int dot = dp4a_i8(q4_high, q8_high, dp4a_i8(q4_low, q8_low, 0));
+            const int q8_sum = dp4a_i8(0x01010101, q8_high, dp4a_i8(0x01010101, q8_low, 0));
+            sumf_d += input_scale * (static_cast<float>(dot) * static_cast<float>(scales[group_index]));
+            sumf_m += input_scale * (static_cast<float>(q8_sum) * static_cast<float>(mins[group_index]));
+        }
+        const float base_scale = half_to_float(load_u16_le(weight_block));
+        const float base_min = half_to_float(load_u16_le(weight_block + 2));
+        return base_scale * sumf_d - base_min * sumf_m;
+    }
+};
+
+struct Q6KQ81Dot {
+    __device__ __forceinline__ float operator()(
+        const uint8_t *weights,
+        const Q81Block *input,
+        int weight_block_index,
+        int input_block_index,
+        int quant_index
+    ) const {
+        const uint8_t *weight_block =
+            weights + static_cast<size_t>(weight_block_index) * kQ6KBlockBytes;
+        const int input_block_offset = input_block_index * 8;
+        const int bq8_offset = 4 * (quant_index / 16) + ((quant_index % 16) / 8);
+        const int scale_offset = 8 * (quant_index / 16) + ((quant_index % 16) / 4);
+        const int vh_shift = 2 * ((quant_index % 16) / 8);
+        const int vl = get_int_b2(weight_block, quant_index);
+        const int vh = get_int_b2(weight_block + 128, 8 * (quant_index / 16) + (quant_index % 8)) >> vh_shift;
+        const int8_t *scales = reinterpret_cast<const int8_t *>(weight_block + 192) + scale_offset;
+        const float base_scale = half_to_float(load_u16_le(weight_block + 208));
+
+        float sumf = 0.0f;
+#pragma unroll
+        for (int group_index = 0; group_index < 2; ++group_index) {
+            const int scale = static_cast<int>(scales[4 * group_index]);
+            const int q6_low = (vl >> (4 * group_index)) & 0x0f0f0f0f;
+            const int q6_high = ((vh >> (4 * group_index)) << 4) & 0x30303030;
+            const int q6 = __vsubss4(q6_low | q6_high, 0x20202020);
+            const Q81Block *input_block = input + input_block_offset + bq8_offset + 2 * group_index;
+            const int q8 = get_int_b4(input_block->bytes + 4, quant_index % 8);
+            const float input_scale = half_to_float(load_u16_le(input_block->bytes));
+            sumf += input_scale * static_cast<float>(dp4a_i8(q6, q8, 0) * scale);
+        }
+        return base_scale * sumf;
+    }
+};
+
 template <typename DotFn, int Vdr, int Qi>
 __launch_bounds__(kMmvqWarps * kWarpSize, 1)
 __global__ void quantized_matvec_q8_1_mmvq_kernel(
@@ -699,6 +878,70 @@ __global__ void quantized_matvec_q8_1_grouped_mmvq_kernel(
     for (int block_index = tid / (Qi / Vdr); block_index < block_count; block_index += blocks_per_iter) {
         const int quant_index = Vdr * (tid % (Qi / Vdr));
         sum += dot_fn(row_weights, input, block_index, block_index, quant_index);
+    }
+
+    __shared__ float partials[RowsPerBlock][WarpsPerRow - 1 > 0 ? WarpsPerRow - 1 : 1][kWarpSize];
+    if (warp_in_row > 0) {
+        partials[row_in_block][warp_in_row - 1][threadIdx.x] = sum;
+    }
+    __syncthreads();
+
+    if (warp_in_row > 0) {
+        return;
+    }
+
+#pragma unroll
+    for (int other_warp = 0; other_warp < WarpsPerRow - 1; ++other_warp) {
+        sum += partials[row_in_block][other_warp][threadIdx.x];
+    }
+
+    sum = warp_reduce_sum(sum);
+    if (threadIdx.x == 0) {
+        output[row] = sum + (bias != nullptr ? bias[row] : 0.0f);
+    }
+}
+
+template <typename DotFn, int Vdr, int Qi, int RowsPerBlock, int WarpsPerRow>
+__launch_bounds__(RowsPerBlock * WarpsPerRow * kWarpSize, 1)
+__global__ void quantized_matvec_q8_1_grouped_mmvq_shared_input_kernel(
+    const uint8_t *weights,
+    int row_stride,
+    int rows,
+    int weight_block_count,
+    int input_block_count,
+    const Q81Block *input,
+    const float *bias,
+    float *output,
+    DotFn dot_fn
+) {
+    extern __shared__ unsigned char shared_storage[];
+    Q81Block *shared_input = reinterpret_cast<Q81Block *>(shared_storage);
+
+    const int linear_tid = kWarpSize * static_cast<int>(threadIdx.y) + static_cast<int>(threadIdx.x);
+    const int thread_count = RowsPerBlock * WarpsPerRow * kWarpSize;
+    for (int input_index = linear_tid; input_index < input_block_count; input_index += thread_count) {
+        shared_input[input_index] = input[input_index];
+    }
+    __syncthreads();
+
+    const int warp_index = static_cast<int>(threadIdx.y);
+    const int row_in_block = warp_index / WarpsPerRow;
+    const int warp_in_row = warp_index % WarpsPerRow;
+    const int row = static_cast<int>(blockIdx.x) * RowsPerBlock + row_in_block;
+    if (row >= rows) {
+        return;
+    }
+
+    constexpr int blocks_per_iter = Vdr * WarpsPerRow * kWarpSize / Qi;
+    const int tid = kWarpSize * warp_in_row + static_cast<int>(threadIdx.x);
+    const uint8_t *row_weights = weights + static_cast<size_t>(row) * static_cast<size_t>(row_stride);
+
+    float sum = 0.0f;
+    for (int weight_block_index = tid / (Qi / Vdr);
+         weight_block_index < weight_block_count;
+         weight_block_index += blocks_per_iter) {
+        const int quant_index = Vdr * (tid % (Qi / Vdr));
+        sum += dot_fn(row_weights, shared_input, weight_block_index, weight_block_index, quant_index);
     }
 
     __shared__ float partials[RowsPerBlock][WarpsPerRow - 1 > 0 ? WarpsPerRow - 1 : 1][kWarpSize];
@@ -1577,6 +1820,7 @@ __global__ void gated_delta_step_f32_kernel(
     int value_head_count,
     int key_dim,
     int value_dim,
+    int v_head_reordered,
     float *output
 ) {
     const int lane = static_cast<int>(threadIdx.x);
@@ -1586,7 +1830,9 @@ __global__ void gated_delta_step_f32_kernel(
         return;
     }
     const int repeat_factor = value_head_count / key_head_count;
-    const int key_head_index = repeat_factor > 0 ? value_head_index / repeat_factor : 0;
+    const int key_head_index = v_head_reordered != 0
+        ? (key_head_count > 0 ? value_head_index % key_head_count : 0)
+        : (repeat_factor > 0 ? value_head_index / repeat_factor : 0);
     const float *query = qkv + query_offset + key_head_index * key_dim;
     const float *key = qkv + key_offset + key_head_index * key_dim;
     const float *value = qkv + value_offset + value_head_index * value_dim;
@@ -2544,8 +2790,8 @@ __device__ __forceinline__ float rope_neox_component(
     );
     const float x0 = values[index0];
     const float x1 = values[index1];
-    return dim < rotary_pairs ? x0 * cos_theta + x1 * sin_theta
-                              : -x0 * sin_theta + x1 * cos_theta;
+    return dim < rotary_pairs ? x0 * cos_theta - x1 * sin_theta
+                              : x0 * sin_theta + x1 * cos_theta;
 }
 
 template <typename T>
@@ -5815,6 +6061,48 @@ extern "C" int psionic_cuda_mxfp4_matvec(
     return static_cast<int>(cudaGetLastError());
 }
 
+extern "C" int psionic_cuda_q4_k_matvec(
+    const void *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const void *input,
+    void *output,
+    void *stream
+) {
+    quantized_matvec_kernel<<<rows, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const uint8_t *>(weights),
+        row_stride,
+        rows,
+        cols,
+        static_cast<const float *>(input),
+        static_cast<float *>(output),
+        Q4KDot{}
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_q6_k_matvec(
+    const void *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const void *input,
+    void *output,
+    void *stream
+) {
+    quantized_matvec_kernel<<<rows, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const uint8_t *>(weights),
+        row_stride,
+        rows,
+        cols,
+        static_cast<const float *>(input),
+        static_cast<float *>(output),
+        Q6KDot{}
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
 extern "C" int psionic_cuda_quantize_q8_1(
     const void *input,
     int rows,
@@ -6008,6 +6296,66 @@ extern "C" int psionic_cuda_mxfp4_matvec_q8_1(
     return static_cast<int>(cudaGetLastError());
 }
 
+extern "C" int psionic_cuda_q4_k_matvec_q8_1(
+    const void *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const void *input_q8_1,
+    const void *bias,
+    void *output,
+    void *stream
+) {
+    const int block_count = cols / 256;
+    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);
+    quantized_matvec_q8_1_mmvq_kernel<Q4KQ81Dot, kQ4KQ81MmvqVdr, kQ4KQi><<<
+        rows,
+        block_dims,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const uint8_t *>(weights),
+        row_stride,
+        rows,
+        block_count,
+        static_cast<const Q81Block *>(input_q8_1),
+        static_cast<const float *>(bias),
+        static_cast<float *>(output),
+        Q4KQ81Dot{}
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_q6_k_matvec_q8_1(
+    const void *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const void *input_q8_1,
+    const void *bias,
+    void *output,
+    void *stream
+) {
+    const int block_count = cols / 256;
+    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);
+    quantized_matvec_q8_1_mmvq_kernel<Q6KQ81Dot, kQ6KQ81MmvqVdr, kQ6KQi><<<
+        rows,
+        block_dims,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const uint8_t *>(weights),
+        row_stride,
+        rows,
+        block_count,
+        static_cast<const Q81Block *>(input_q8_1),
+        static_cast<const float *>(bias),
+        static_cast<float *>(output),
+        Q6KQ81Dot{}
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
 extern "C" int psionic_cuda_q8_0_matvec_q8_1_argmax(
     const void *weights,
     int rows,
@@ -6035,6 +6383,68 @@ extern "C" int psionic_cuda_q8_0_matvec_q8_1_argmax(
         static_cast<unsigned long long *>(output),
         static_cast<cudaStream_t>(stream),
         Q80Q81Dot{}
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_q4_k_matvec_q8_1_argmax(
+    const void *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const void *input_q8_1,
+    const void *bias,
+    void *output,
+    void *stream
+) {
+    constexpr int rows_per_block = 4;
+    constexpr int warps_per_row = 1;
+    launch_quantized_matvec_q8_1_grouped_argmax_mmvq<
+        Q4KQ81Dot,
+        kQ4KQ81MmvqVdr,
+        kQ4KQi,
+        rows_per_block,
+        warps_per_row>(
+        static_cast<const uint8_t *>(weights),
+        rows,
+        cols,
+        row_stride,
+        static_cast<const Q81Block *>(input_q8_1),
+        static_cast<const float *>(bias),
+        static_cast<unsigned long long *>(output),
+        static_cast<cudaStream_t>(stream),
+        Q4KQ81Dot{}
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_q6_k_matvec_q8_1_argmax(
+    const void *weights,
+    int rows,
+    int cols,
+    int row_stride,
+    const void *input_q8_1,
+    const void *bias,
+    void *output,
+    void *stream
+) {
+    constexpr int rows_per_block = 2;
+    constexpr int warps_per_row = 2;
+    launch_quantized_matvec_q8_1_grouped_argmax_mmvq<
+        Q6KQ81Dot,
+        kQ6KQ81MmvqVdr,
+        kQ6KQi,
+        rows_per_block,
+        warps_per_row>(
+        static_cast<const uint8_t *>(weights),
+        rows,
+        cols,
+        row_stride,
+        static_cast<const Q81Block *>(input_q8_1),
+        static_cast<const float *>(bias),
+        static_cast<unsigned long long *>(output),
+        static_cast<cudaStream_t>(stream),
+        Q6KQ81Dot{}
     );
     return static_cast<int>(cudaGetLastError());
 }
@@ -6833,6 +7243,7 @@ extern "C" int psionic_cuda_gated_delta_step_f32(
     int value_head_count,
     int key_dim,
     int value_dim,
+    int v_head_reordered,
     void *output,
     void *stream
 ) {
@@ -6850,6 +7261,7 @@ extern "C" int psionic_cuda_gated_delta_step_f32(
         value_head_count,
         key_dim,
         value_dim,
+        v_head_reordered,
         static_cast<float *>(output)
     );
     return static_cast<int>(cudaGetLastError());

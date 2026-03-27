@@ -1364,6 +1364,8 @@ pub fn quantized_row_dot(
             QuantizationMode::GgmlMxfp4 => dot_mxfp4_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_0 => dot_q4_0_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_1 => dot_q4_1_block(lhs_block, block_bytes)?,
+            QuantizationMode::GgmlQ4K => dot_q4_k_block(lhs_block, block_bytes)?,
+            QuantizationMode::GgmlQ6K => dot_q6_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ8_0 => dot_q8_0_block(lhs_block, block_bytes)?,
             QuantizationMode::None | QuantizationMode::Int8Symmetric => {
                 return Err(RuntimeError::Backend(format!(
@@ -1436,6 +1438,8 @@ pub fn decode_quantized_row_into(
             QuantizationMode::GgmlMxfp4 => decode_mxfp4_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_0 => decode_q4_0_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_1 => decode_q4_1_block_into(block_bytes, output)?,
+            QuantizationMode::GgmlQ4K => decode_q4_k_block_into(block_bytes, output)?,
+            QuantizationMode::GgmlQ6K => decode_q6_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ8_0 => decode_q8_0_block_into(block_bytes, output)?,
             QuantizationMode::None | QuantizationMode::Int8Symmetric => {
                 return Err(RuntimeError::Backend(format!(
@@ -1500,6 +1504,85 @@ fn dot_q4_1_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
         let high = min + f32::from(quant >> 4) * scale;
         sum += lhs[pair_index] * low;
         sum += lhs[pair_index + 16] * high;
+    }
+    Ok(sum)
+}
+
+fn dot_q4_k_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
+    if bytes.len() != 144 || lhs.len() != 256 {
+        return Err(RuntimeError::Backend(String::from(
+            "q4_k block dot requires 256 lhs values and 144 bytes",
+        )));
+    }
+    let scale = decode_f16_le(bytes[0], bytes[1]);
+    let minimum = decode_f16_le(bytes[2], bytes[3]);
+    let scales = &bytes[4..16];
+    let quants = &bytes[16..144];
+    let mut sum = 0.0;
+    let mut scale_index = 0usize;
+    let mut lhs_offset = 0usize;
+    for quant_chunk in quants.chunks_exact(32) {
+        let (low_scale, low_min) = decode_q4_k_scale_min(scale_index, scales);
+        let low_scale = scale * f32::from(low_scale);
+        let low_min = minimum * f32::from(low_min);
+        for (lhs_value, quant) in lhs[lhs_offset..lhs_offset + 32]
+            .iter()
+            .copied()
+            .zip(quant_chunk.iter().copied())
+        {
+            sum += lhs_value * (low_scale * f32::from(quant & 0x0f) - low_min);
+        }
+        lhs_offset = lhs_offset.saturating_add(32);
+        scale_index = scale_index.saturating_add(1);
+
+        let (high_scale, high_min) = decode_q4_k_scale_min(scale_index, scales);
+        let high_scale = scale * f32::from(high_scale);
+        let high_min = minimum * f32::from(high_min);
+        for (lhs_value, quant) in lhs[lhs_offset..lhs_offset + 32]
+            .iter()
+            .copied()
+            .zip(quant_chunk.iter().copied())
+        {
+            sum += lhs_value * (high_scale * f32::from((quant >> 4) & 0x0f) - high_min);
+        }
+        lhs_offset = lhs_offset.saturating_add(32);
+        scale_index = scale_index.saturating_add(1);
+    }
+    Ok(sum)
+}
+
+fn dot_q6_k_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
+    if bytes.len() != 210 || lhs.len() != 256 {
+        return Err(RuntimeError::Backend(String::from(
+            "q6_k block dot requires 256 lhs values and 210 bytes",
+        )));
+    }
+    let ql = &bytes[0..128];
+    let qh = &bytes[128..192];
+    let scales = &bytes[192..208];
+    let scale = decode_f16_le(bytes[208], bytes[209]);
+    let mut sum = 0.0;
+    for chunk_index in 0..2 {
+        let ql_chunk = &ql[chunk_index * 64..(chunk_index + 1) * 64];
+        let qh_chunk = &qh[chunk_index * 32..(chunk_index + 1) * 32];
+        let scale_chunk = &scales[chunk_index * 8..(chunk_index + 1) * 8];
+        let lhs_chunk = &lhs[chunk_index * 128..(chunk_index + 1) * 128];
+        for l in 0..32 {
+            let is = l / 16;
+            let q1 = (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
+            let q2 =
+                (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
+            let q3 = (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
+            let q4 =
+                (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
+            sum += lhs_chunk[l] * (scale * f32::from(scale_chunk[is] as i8) * f32::from(q1));
+            sum += lhs_chunk[l + 32]
+                * (scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
+            sum += lhs_chunk[l + 64]
+                * (scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
+            sum += lhs_chunk[l + 96]
+                * (scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4));
+        }
     }
     Ok(sum)
 }
@@ -1572,6 +1655,85 @@ fn decode_q4_1_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), Run
         output[start + pair_index + 16] = min + f32::from(quant >> 4) * scale;
     }
     Ok(())
+}
+
+fn decode_q4_k_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), RuntimeError> {
+    if bytes.len() != 144 {
+        return Err(RuntimeError::Backend(String::from(
+            "q4_k block decode requires 144 bytes",
+        )));
+    }
+    let scale = decode_f16_le(bytes[0], bytes[1]);
+    let minimum = decode_f16_le(bytes[2], bytes[3]);
+    let scales = &bytes[4..16];
+    let quants = &bytes[16..144];
+    let mut scale_index = 0usize;
+    for quant_chunk in quants.chunks_exact(32) {
+        let (low_scale, low_min) = decode_q4_k_scale_min(scale_index, scales);
+        let low_scale = scale * f32::from(low_scale);
+        let low_min = minimum * f32::from(low_min);
+        for quant in quant_chunk {
+            output.push(low_scale * f32::from(quant & 0x0f) - low_min);
+        }
+        scale_index = scale_index.saturating_add(1);
+
+        let (high_scale, high_min) = decode_q4_k_scale_min(scale_index, scales);
+        let high_scale = scale * f32::from(high_scale);
+        let high_min = minimum * f32::from(high_min);
+        for quant in quant_chunk {
+            output.push(high_scale * f32::from((quant >> 4) & 0x0f) - high_min);
+        }
+        scale_index = scale_index.saturating_add(1);
+    }
+    Ok(())
+}
+
+fn decode_q6_k_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), RuntimeError> {
+    if bytes.len() != 210 {
+        return Err(RuntimeError::Backend(String::from(
+            "q6_k block decode requires 210 bytes",
+        )));
+    }
+    let ql = &bytes[0..128];
+    let qh = &bytes[128..192];
+    let scales = &bytes[192..208];
+    let scale = decode_f16_le(bytes[208], bytes[209]);
+    let start = output.len();
+    output.resize(start + 256, 0.0);
+    for chunk_index in 0..2 {
+        let ql_chunk = &ql[chunk_index * 64..(chunk_index + 1) * 64];
+        let qh_chunk = &qh[chunk_index * 32..(chunk_index + 1) * 32];
+        let scale_chunk = &scales[chunk_index * 8..(chunk_index + 1) * 8];
+        let chunk_start = start + chunk_index * 128;
+        for l in 0..32 {
+            let is = l / 16;
+            let q1 = (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
+            let q2 =
+                (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
+            let q3 = (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
+            let q4 =
+                (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
+            output[chunk_start + l] = scale * f32::from(scale_chunk[is] as i8) * f32::from(q1);
+            output[chunk_start + l + 32] =
+                scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2);
+            output[chunk_start + l + 64] =
+                scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3);
+            output[chunk_start + l + 96] =
+                scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4);
+        }
+    }
+    Ok(())
+}
+
+fn decode_q4_k_scale_min(index: usize, packed: &[u8]) -> (u8, u8) {
+    if index < 4 {
+        (packed[index] & 63, packed[index + 4] & 63)
+    } else {
+        (
+            (packed[index + 4] & 0x0f) | ((packed[index - 4] >> 6) << 4),
+            (packed[index + 4] >> 4) | ((packed[index] >> 6) << 4),
+        )
+    }
 }
 
 fn decode_q8_0_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), RuntimeError> {
@@ -2476,6 +2638,36 @@ mod tests {
     }
 
     #[test]
+    fn cpu_quantized_row_helpers_cover_ggml_k_modes() -> Result<(), RuntimeError> {
+        let reference = sample_reference_vector_256();
+
+        let q4_k = sample_q4_k_row(0.5, 0.125, 3);
+        let mut decoded_q4_k = Vec::new();
+        super::decode_quantized_row_into(QuantizationMode::GgmlQ4K, &q4_k, &mut decoded_q4_k)?;
+        let dot_q4_k = super::quantized_row_dot(&reference, QuantizationMode::GgmlQ4K, &q4_k)?;
+        let expected_q4_k: f32 = reference
+            .iter()
+            .zip(decoded_q4_k.iter())
+            .map(|(lhs, rhs)| lhs * rhs)
+            .sum();
+        assert!((dot_q4_k - expected_q4_k).abs() <= 1e-4);
+        assert_eq!(decoded_q4_k.len(), 256);
+
+        let q6_k = sample_q6_k_row(0.25, -3);
+        let mut decoded_q6_k = Vec::new();
+        super::decode_quantized_row_into(QuantizationMode::GgmlQ6K, &q6_k, &mut decoded_q6_k)?;
+        let dot_q6_k = super::quantized_row_dot(&reference, QuantizationMode::GgmlQ6K, &q6_k)?;
+        let expected_q6_k: f32 = reference
+            .iter()
+            .zip(decoded_q6_k.iter())
+            .map(|(lhs, rhs)| lhs * rhs)
+            .sum();
+        assert!((dot_q6_k - expected_q6_k).abs() <= 1e-4);
+        assert_eq!(decoded_q6_k.len(), 256);
+        Ok(())
+    }
+
+    #[test]
     fn cpu_backend_outputs_quantized_constant_storage_truth() -> Result<(), RuntimeError> {
         let mut builder = GraphBuilder::new(Device::cpu());
         let rhs = builder
@@ -2655,5 +2847,94 @@ mod tests {
 
     fn sample_q8_0_like_reference_vector() -> Vec<f32> {
         (0..32).map(|index| index as f32 / 8.0 - 2.0).collect()
+    }
+
+    fn sample_reference_vector_256() -> Vec<f32> {
+        (0..256)
+            .map(|index| ((index as i32 * 13) % 29 - 14) as f32 / 3.0)
+            .collect()
+    }
+
+    fn f32_to_f16_bits(value: f32) -> u16 {
+        let bits = value.to_bits();
+        let sign = ((bits >> 31) as u16) << 15;
+        let exponent = ((bits >> 23) & 0xff) as i32;
+        let mantissa = bits & 0x7f_ffff;
+        if exponent == 0xff {
+            let nan_payload = if mantissa == 0 { 0 } else { 0x0200 };
+            return sign | 0x7c00 | nan_payload;
+        }
+        let half_exponent = exponent - 127 + 15;
+        if half_exponent >= 0x1f {
+            return sign | 0x7c00;
+        }
+        if half_exponent <= 0 {
+            if half_exponent < -10 {
+                return sign;
+            }
+            let mantissa_with_hidden = mantissa | 0x80_0000;
+            let shift = (14 - half_exponent) as u32;
+            let mut half_mantissa = (mantissa_with_hidden >> shift) as u16;
+            let round_bit = 1_u32 << (shift.saturating_sub(1));
+            let remainder_mask = round_bit.saturating_sub(1);
+            let round_remainder = mantissa_with_hidden & remainder_mask;
+            let round = (mantissa_with_hidden & round_bit) != 0
+                && (round_remainder != 0 || (half_mantissa & 1) != 0);
+            if round {
+                half_mantissa = half_mantissa.wrapping_add(1);
+            }
+            return sign | half_mantissa;
+        }
+        let mut half_mantissa = (mantissa >> 13) as u16;
+        let round = (mantissa & 0x1fff) > 0x1000
+            || ((mantissa & 0x1fff) == 0x1000 && (half_mantissa & 1) != 0);
+        let mut half_exponent_u16 = half_exponent as u16;
+        if round {
+            half_mantissa = half_mantissa.wrapping_add(1);
+            if half_mantissa == 0x0400 {
+                half_mantissa = 0;
+                half_exponent_u16 = half_exponent_u16.wrapping_add(1);
+                if half_exponent_u16 >= 0x1f {
+                    return sign | 0x7c00;
+                }
+            }
+        }
+        sign | (half_exponent_u16 << 10) | half_mantissa
+    }
+
+    fn sample_q4_k_row(scale: f32, minimum: f32, offset: u8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(144);
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes.extend_from_slice(&f32_to_f16_bits(minimum).to_le_bytes());
+        for index in 0..12_u8 {
+            bytes.push(offset.wrapping_add(index.wrapping_mul(7)));
+        }
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (15_u8).wrapping_sub(index & 0x0f) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        bytes
+    }
+
+    fn sample_q6_k_row(scale: f32, offset: i8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(210);
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (index.wrapping_mul(3)) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        for index in 0..64_u8 {
+            let b0 = index & 0x03;
+            let b1 = (index.wrapping_add(1)) & 0x03;
+            let b2 = (index.wrapping_add(2)) & 0x03;
+            let b3 = (index.wrapping_add(3)) & 0x03;
+            bytes.push(b0 | (b1 << 2) | (b2 << 4) | (b3 << 6));
+        }
+        for index in 0..16_i8 {
+            bytes.push(offset.saturating_add(index).to_le_bytes()[0]);
+        }
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes
     }
 }

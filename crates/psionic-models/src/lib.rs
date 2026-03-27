@@ -1655,6 +1655,8 @@ impl GgufTensorType {
             Self::MXFP4 => Some(QuantizationMode::GgmlMxfp4),
             Self::Q4_0 => Some(QuantizationMode::GgmlQ4_0),
             Self::Q4_1 => Some(QuantizationMode::GgmlQ4_1),
+            Self::Q4K => Some(QuantizationMode::GgmlQ4K),
+            Self::Q6K => Some(QuantizationMode::GgmlQ6K),
             Self::Q8_0 => Some(QuantizationMode::GgmlQ8_0),
             Self::F32
             | Self::F16
@@ -1664,9 +1666,7 @@ impl GgufTensorType {
             | Self::Q8_1
             | Self::Q2K
             | Self::Q3K
-            | Self::Q4K
             | Self::Q5K
-            | Self::Q6K
             | Self::Q8K
             | Self::Unknown(_) => None,
         }
@@ -3110,6 +3110,9 @@ fn supported_prompt_template_family(digest: &str) -> Option<GgufPromptTemplateFa
             Some(GgufPromptTemplateFamily::Qwen2)
         }
         "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80" => {
+            Some(GgufPromptTemplateFamily::Qwen35)
+        }
+        "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715" => {
             Some(GgufPromptTemplateFamily::Qwen35)
         }
         "9db2cf47ce03bfd0aab6ec59942503714fa0372f09f7e1d54cbcd71a1110b863" => {
@@ -5274,11 +5277,13 @@ fn build_gguf_decoder_tensor_layout(
                 let ssm_alpha =
                     required_tensor_info(content, &format!("{prefix}.ssm_alpha.weight"))?;
                 let (ssm_alpha_rows, ssm_alpha_columns) = tensor_matrix_shape(ssm_alpha)?;
-                if ssm_alpha_rows != ssm_group_count || ssm_alpha_columns != config.hidden_size {
+                if ssm_alpha_rows != ssm_time_step_rank
+                    || ssm_alpha_columns != config.hidden_size
+                {
                     return Err(artifact_format_error(
                         "gguf",
                         format!(
-                            "{} shape [{ssm_alpha_rows}, {ssm_alpha_columns}] does not match expected [{ssm_group_count}, {}]",
+                            "{} shape [{ssm_alpha_rows}, {ssm_alpha_columns}] does not match expected [{ssm_time_step_rank}, {}]",
                             ssm_alpha.name, config.hidden_size
                         ),
                     ));
@@ -5310,11 +5315,11 @@ fn build_gguf_decoder_tensor_layout(
 
                 let ssm_a = required_tensor_info(content, &format!("{prefix}.ssm_a"))?;
                 let ssm_a_width = tensor_vector_shape(ssm_a)?;
-                if ssm_a_width != ssm_group_count {
+                if ssm_a_width != ssm_time_step_rank {
                     return Err(artifact_format_error(
                         "gguf",
                         format!(
-                            "{} width {ssm_a_width} does not match expected {ssm_group_count}",
+                            "{} width {ssm_a_width} does not match expected {ssm_time_step_rank}",
                             ssm_a.name
                         ),
                     ));
@@ -5322,11 +5327,11 @@ fn build_gguf_decoder_tensor_layout(
 
                 let ssm_dt = required_tensor_info(content, &format!("{prefix}.ssm_dt"))?;
                 let ssm_dt_width = tensor_vector_shape(ssm_dt)?;
-                if ssm_dt_width != ssm_group_count {
+                if ssm_dt_width != ssm_time_step_rank {
                     return Err(artifact_format_error(
                         "gguf",
                         format!(
-                            "{} width {ssm_dt_width} does not match expected {ssm_group_count}",
+                            "{} width {ssm_dt_width} does not match expected {ssm_time_step_rank}",
                             ssm_dt.name
                         ),
                     ));
@@ -7099,8 +7104,10 @@ fn quantization_priority(quantization: QuantizationMode) -> u8 {
         QuantizationMode::Int8Symmetric => 1,
         QuantizationMode::GgmlQ4_0 => 2,
         QuantizationMode::GgmlQ4_1 => 3,
-        QuantizationMode::GgmlQ8_0 => 4,
-        QuantizationMode::GgmlMxfp4 => 5,
+        QuantizationMode::GgmlQ4K => 4,
+        QuantizationMode::GgmlQ6K => 5,
+        QuantizationMode::GgmlQ8_0 => 6,
+        QuantizationMode::GgmlMxfp4 => 7,
     }
 }
 
@@ -7827,6 +7834,8 @@ fn decode_ggml_quantized_values(
         QuantizationMode::GgmlMxfp4 => decode_mxfp4_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(layout, bytes),
+        QuantizationMode::GgmlQ4K => decode_q4_k_blocks(layout, bytes),
+        QuantizationMode::GgmlQ6K => decode_q6_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(layout, bytes),
         QuantizationMode::None | QuantizationMode::Int8Symmetric => {
             Err(ModelLoadError::UnsupportedQuantizedTensorMode { quantization })
@@ -7902,6 +7911,70 @@ fn decode_q4_1_blocks(
     })
 }
 
+fn decode_q4_k_blocks(
+    layout: QuantizedBlockLayout,
+    bytes: &[u8],
+) -> Result<Vec<f32>, ModelLoadError> {
+    decode_fixed_width_blocks(layout, bytes, 144, |block, output| {
+        let scale = decode_f16([block[0], block[1]]);
+        let minimum = decode_f16([block[2], block[3]]);
+        let scales = &block[4..16];
+        let quants = &block[16..144];
+        let mut scale_index = 0usize;
+        for quant_chunk in quants.chunks_exact(32) {
+            let (low_scale, low_min) = decode_q4_k_scale_min(scale_index, scales);
+            let low_scale = scale * f32::from(low_scale);
+            let low_min = minimum * f32::from(low_min);
+            for quant in quant_chunk {
+                output.push(low_scale * f32::from(quant & 0x0f) - low_min);
+            }
+            scale_index = scale_index.saturating_add(1);
+
+            let (high_scale, high_min) = decode_q4_k_scale_min(scale_index, scales);
+            let high_scale = scale * f32::from(high_scale);
+            let high_min = minimum * f32::from(high_min);
+            for quant in quant_chunk {
+                output.push(high_scale * f32::from((quant >> 4) & 0x0f) - high_min);
+            }
+            scale_index = scale_index.saturating_add(1);
+        }
+    })
+}
+
+fn decode_q6_k_blocks(
+    layout: QuantizedBlockLayout,
+    bytes: &[u8],
+) -> Result<Vec<f32>, ModelLoadError> {
+    decode_fixed_width_blocks(layout, bytes, 210, |block, output| {
+        let ql = &block[0..128];
+        let qh = &block[128..192];
+        let scales = &block[192..208];
+        let scale = decode_f16([block[208], block[209]]);
+        for chunk_index in 0..2 {
+            let ql_chunk = &ql[chunk_index * 64..(chunk_index + 1) * 64];
+            let qh_chunk = &qh[chunk_index * 32..(chunk_index + 1) * 32];
+            let scale_chunk = &scales[chunk_index * 8..(chunk_index + 1) * 8];
+            for l in 0..32 {
+                let is = l / 16;
+                let q1 =
+                    (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
+                let q2 = (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4))
+                    as i8)
+                    - 32;
+                let q3 =
+                    (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
+                let q4 = (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4))
+                    as i8)
+                    - 32;
+                output.push(scale * f32::from(scale_chunk[is] as i8) * f32::from(q1));
+                output.push(scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
+                output.push(scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
+                output.push(scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4));
+            }
+        }
+    })
+}
+
 fn decode_fixed_width_blocks(
     layout: QuantizedBlockLayout,
     bytes: &[u8],
@@ -7928,8 +8001,21 @@ fn quantization_from_block_bytes(bytes_per_block: usize) -> QuantizationMode {
         17 => QuantizationMode::GgmlMxfp4,
         18 => QuantizationMode::GgmlQ4_0,
         20 => QuantizationMode::GgmlQ4_1,
+        144 => QuantizationMode::GgmlQ4K,
+        210 => QuantizationMode::GgmlQ6K,
         34 => QuantizationMode::GgmlQ8_0,
         _ => QuantizationMode::None,
+    }
+}
+
+fn decode_q4_k_scale_min(index: usize, packed: &[u8]) -> (u8, u8) {
+    if index < 4 {
+        (packed[index] & 63, packed[index + 4] & 63)
+    } else {
+        (
+            (packed[index + 4] & 0x0f) | ((packed[index - 4] >> 6) << 4),
+            (packed[index + 4] >> 4) | ((packed[index] >> 6) << 4),
+        )
     }
 }
 
@@ -9429,19 +9515,19 @@ mod tests {
             &[TestGgufTensor::new(
                 "unsupported",
                 vec![32],
-                GgufTensorType::Q6K,
+                GgufTensorType::Q8K,
                 Vec::new(),
             )],
         )?;
 
         let error = GgufWeightBundleLoader
             .load_path(&path)
-            .expect_err("q6_k should remain unsupported in PSI-110");
+            .expect_err("q8_k should remain unsupported in PSI-110");
         assert!(matches!(
             error,
             super::ModelLoadError::UnsupportedGgufTensorType {
                 name,
-                tensor_type: GgufTensorType::Q6K
+                tensor_type: GgufTensorType::Q8K
             } if name == "unsupported"
         ));
         Ok(())

@@ -574,7 +574,8 @@ impl CudaGgufQwen35TextGenerationService {
 }
 
 fn qwen35_fast_greedy_path(options: &GenerationOptions) -> bool {
-    matches!(options.decode_strategy, crate::DecodeStrategy::Greedy)
+    std::env::var_os("PSIONIC_QWEN35_DISABLE_FAST_GREEDY").is_none()
+        && matches!(options.decode_strategy, crate::DecodeStrategy::Greedy)
         && options.temperature.is_none()
         && options.top_k.is_none()
         && options.top_p.is_none()
@@ -583,11 +584,35 @@ fn qwen35_fast_greedy_path(options: &GenerationOptions) -> bool {
         && options.frequency_penalty.is_none()
 }
 
-fn can_use_q8_1_mmvq(mode: QuantizationMode) -> bool {
+fn can_use_q8_1_quantized_matvec(mode: QuantizationMode) -> bool {
     matches!(
         mode,
-        QuantizationMode::GgmlQ8_0 | QuantizationMode::GgmlMxfp4
+        QuantizationMode::GgmlQ8_0
+            | QuantizationMode::GgmlQ4K
+            | QuantizationMode::GgmlQ6K
+            | QuantizationMode::GgmlMxfp4
     )
+}
+
+fn can_use_q8_1_argmax(mode: QuantizationMode) -> bool {
+    matches!(
+        mode,
+        QuantizationMode::GgmlQ8_0 | QuantizationMode::GgmlQ4K | QuantizationMode::GgmlMxfp4
+    )
+}
+
+fn can_use_cuda_quantized_matvec(mode: QuantizationMode) -> bool {
+    matches!(
+        mode,
+        QuantizationMode::GgmlQ8_0
+            | QuantizationMode::GgmlMxfp4
+            | QuantizationMode::GgmlQ4K
+            | QuantizationMode::GgmlQ6K
+    )
+}
+
+fn qwen35_requires_dense_f16_mirror(mode: QuantizationMode) -> bool {
+    !can_use_cuda_quantized_matvec(mode)
 }
 
 fn initial_cuda_argmax_pair_bytes() -> [u8; std::mem::size_of::<u64>()] {
@@ -917,6 +942,7 @@ impl CudaQwen35Model {
                         backend,
                         plan,
                         self,
+                        layer_index,
                         hybrid_state,
                         position,
                         initial_token,
@@ -932,6 +958,7 @@ impl CudaQwen35Model {
                         backend,
                         plan,
                         self,
+                        layer_index,
                         full_attention,
                         full_attention_state,
                         initial_token,
@@ -961,6 +988,7 @@ impl CudaQwen35Model {
                         &current_hidden_buffer,
                         &output_norm_device,
                         self.family_metadata.rms_norm_epsilon,
+                        self.output.transposed_f16.as_ref(),
                         &self.output.storage,
                         self.output.host.mode,
                         self.output.host.rows,
@@ -976,6 +1004,7 @@ impl CudaQwen35Model {
                         &current_hidden_buffer,
                         &output_norm_device,
                         self.family_metadata.rms_norm_epsilon,
+                        self.output.transposed_f16.as_ref(),
                         &self.output.storage,
                         self.output.host.mode,
                         self.output.host.rows,
@@ -1192,9 +1221,13 @@ impl CudaQwen35Model {
             });
         }
 
+        let output_uses_q8_1_argmax =
+            self.output.transposed_f16.is_none() && can_use_q8_1_argmax(self.output.host.mode);
+        let output_uses_f16_argmax = self.output.transposed_f16.is_some();
+
         if output_mode == CudaStepOutputMode::ArgmaxOnly
             && self.token_embedding_f16.is_none()
-            && can_use_q8_1_mmvq(self.output.host.mode)
+            && (output_uses_q8_1_argmax || output_uses_f16_argmax)
         {
             let decode_params = [
                 i32::try_from(position).map_err(|_| {
@@ -1223,11 +1256,17 @@ impl CudaQwen35Model {
             let decode_params_bytes = (decode_params.len() * std::mem::size_of::<i32>())
                 .try_into()
                 .unwrap_or(u64::MAX);
-            let argmax_bytes = std::mem::size_of::<u64>().try_into().unwrap_or(u64::MAX);
-            bytes_moved = bytes_moved
-                .saturating_add(decode_params_bytes)
-                .saturating_add(argmax_bytes)
-                .saturating_add(argmax_bytes);
+            if output_uses_q8_1_argmax {
+                let argmax_bytes = std::mem::size_of::<u64>().try_into().unwrap_or(u64::MAX);
+                bytes_moved = bytes_moved
+                    .saturating_add(decode_params_bytes)
+                    .saturating_add(argmax_bytes)
+                    .saturating_add(argmax_bytes);
+            } else {
+                bytes_moved = bytes_moved.saturating_add(decode_params_bytes).saturating_add(
+                    std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX),
+                );
+            }
             let decode_graph_cache_identity = qwen35_decode_graph_cache_identity(state);
             let mut reused_graph_exec = false;
             let report = if plan.decode_graph_cache_identity.as_ref()
@@ -1291,37 +1330,80 @@ impl CudaQwen35Model {
                             }
                         }
                     }
-                    submission
-                        .rms_norm_q8_1(
-                            &plan.current_hidden_buffer,
-                            &self.output_norm_device,
-                            &plan.matvec_input_q8_1_buffer,
+                    if let Some(transposed_f16) = self.output.transposed_f16.as_ref() {
+                        submission
+                            .rms_norm(
+                                &plan.current_hidden_buffer,
+                                &self.output_norm_device,
+                                &plan.matvec_input_buffer,
+                                self.output.host.columns,
+                                self.family_metadata.rms_norm_epsilon,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                        submission
+                            .cast_f32_to_f16(
+                                &plan.matvec_input_buffer,
+                                &plan.vector_f16_buffer,
+                                self.output.host.columns,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                        submission
+                            .matmul_f16_to_f32(
+                                &plan.vector_f16_buffer,
+                                transposed_f16,
+                                &plan.logits_buffer,
+                                1,
+                                self.output.host.columns,
+                                self.output.host.rows,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                        submission
+                            .argmax_f32(
+                                &plan.logits_buffer,
+                                1,
+                                self.output.host.rows,
+                                &plan.next_token_buffer,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                        submission
+                            .copy_device_to_host(
+                                &plan.next_token_buffer,
+                                &plan.next_token_host_buffer,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    } else {
+                        submission
+                            .rms_norm_q8_1(
+                                &plan.current_hidden_buffer,
+                                &self.output_norm_device,
+                                &plan.matvec_input_q8_1_buffer,
+                                self.output.host.columns,
+                                self.family_metadata.rms_norm_epsilon,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                        submission
+                            .copy_host_to_device(
+                                &plan.argmax_state_host_buffer,
+                                &plan.argmax_state_buffer,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                        submission.quantized_matvec_q8_1_argmax(
+                            &self.output.storage,
+                            0,
+                            self.output.host.mode,
+                            self.output.host.rows,
                             self.output.host.columns,
-                            self.family_metadata.rms_norm_epsilon,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
-                    submission
-                        .copy_host_to_device(
-                            &plan.argmax_state_host_buffer,
+                            &plan.matvec_input_q8_1_buffer,
+                            None,
                             &plan.argmax_state_buffer,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
-                    submission.quantized_matvec_q8_1_argmax(
-                        &self.output.storage,
-                        0,
-                        self.output.host.mode,
-                        self.output.host.rows,
-                        self.output.host.columns,
-                        &plan.matvec_input_q8_1_buffer,
-                        None,
-                        &plan.argmax_state_buffer,
-                    )?;
-                    submission
-                        .copy_device_to_host(
-                            &plan.argmax_state_buffer,
-                            &plan.argmax_state_host_buffer,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                        )?;
+                        submission
+                            .copy_device_to_host(
+                                &plan.argmax_state_buffer,
+                                &plan.argmax_state_host_buffer,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
                     let (report, graph_exec) = submission
                         .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -1381,31 +1463,80 @@ impl CudaQwen35Model {
                         }
                     }
                 }
-                submission
-                    .rms_norm_q8_1(
-                        &plan.current_hidden_buffer,
-                        &self.output_norm_device,
-                        &plan.matvec_input_q8_1_buffer,
+                if let Some(transposed_f16) = self.output.transposed_f16.as_ref() {
+                    submission
+                        .rms_norm(
+                            &plan.current_hidden_buffer,
+                            &self.output_norm_device,
+                            &plan.matvec_input_buffer,
+                            self.output.host.columns,
+                            self.family_metadata.rms_norm_epsilon,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .cast_f32_to_f16(
+                            &plan.matvec_input_buffer,
+                            &plan.vector_f16_buffer,
+                            self.output.host.columns,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .matmul_f16_to_f32(
+                            &plan.vector_f16_buffer,
+                            transposed_f16,
+                            &plan.logits_buffer,
+                            1,
+                            self.output.host.columns,
+                            self.output.host.rows,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .argmax_f32(
+                            &plan.logits_buffer,
+                            1,
+                            self.output.host.rows,
+                            &plan.next_token_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .copy_device_to_host(
+                            &plan.next_token_buffer,
+                            &plan.next_token_host_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                } else {
+                    submission
+                        .rms_norm_q8_1(
+                            &plan.current_hidden_buffer,
+                            &self.output_norm_device,
+                            &plan.matvec_input_q8_1_buffer,
+                            self.output.host.columns,
+                            self.family_metadata.rms_norm_epsilon,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .copy_host_to_device(
+                            &plan.argmax_state_host_buffer,
+                            &plan.argmax_state_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission.quantized_matvec_q8_1_argmax(
+                        &self.output.storage,
+                        0,
+                        self.output.host.mode,
+                        self.output.host.rows,
                         self.output.host.columns,
-                        self.family_metadata.rms_norm_epsilon,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                submission
-                    .copy_host_to_device(&plan.argmax_state_host_buffer, &plan.argmax_state_buffer)
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                submission.quantized_matvec_q8_1_argmax(
-                    &self.output.storage,
-                    0,
-                    self.output.host.mode,
-                    self.output.host.rows,
-                    self.output.host.columns,
-                    &plan.matvec_input_q8_1_buffer,
-                    None,
-                    &plan.argmax_state_buffer,
-                )?;
-                submission
-                    .copy_device_to_host(&plan.argmax_state_buffer, &plan.argmax_state_host_buffer)
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                        &plan.matvec_input_q8_1_buffer,
+                        None,
+                        &plan.argmax_state_buffer,
+                    )?;
+                    submission
+                        .copy_device_to_host(
+                            &plan.argmax_state_buffer,
+                            &plan.argmax_state_host_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
                 let (report, graph_exec) = submission
                     .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                     .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -1422,11 +1553,138 @@ impl CudaQwen35Model {
                 }
             }
             state.position = state.position.saturating_add(1);
-            let selected_token =
-                cuda_argmax_token_from_packed_host_buffer(&plan.argmax_state_host_buffer)?;
+            let selected_token = if output_uses_q8_1_argmax {
+                cuda_argmax_token_from_packed_host_buffer(&plan.argmax_state_host_buffer)?
+            } else {
+                cuda_argmax_token_id(
+                    plan.next_token_host_buffer
+                        .read_i32()
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                )?
+            };
             return Ok(Qwen35ForwardStep {
                 logits: Vec::new(),
                 selected_token: Some(selected_token),
+                kernel_count,
+                bytes_moved,
+            });
+        }
+
+        if std::env::var_os("PSIONIC_QWEN35_DEBUG_FUSED_LAYERS").is_some() {
+            for (layer_index, (layer, layer_state)) in
+                self.layers.iter().zip(state.layers.iter_mut()).enumerate()
+            {
+                let initial_token = (layer_index == 0)
+                    .then_some(token)
+                    .filter(|_| self.token_embedding_f16.is_some());
+                let mut submission = backend
+                    .begin_submission()
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                match (&layer.kind, &mut *layer_state) {
+                    (Qwen35LayerKind::Hybrid(_), Qwen35LayerState::Hybrid(hybrid_state)) => {
+                        layer.encode_hybrid_device_submission(
+                            backend,
+                            &mut submission,
+                            plan,
+                            self,
+                            hybrid_state,
+                            position,
+                            initial_token,
+                            &mut bytes_moved,
+                        )?;
+                    }
+                    (
+                        Qwen35LayerKind::FullAttention(full_attention),
+                        Qwen35LayerState::FullAttention(full_attention_state),
+                    ) => {
+                        layer.encode_full_attention_device_submission(
+                            backend,
+                            &mut submission,
+                            plan,
+                            self,
+                            full_attention,
+                            full_attention_state,
+                            position,
+                            initial_token,
+                            false,
+                            &mut bytes_moved,
+                        )?;
+                    }
+                    _ => {
+                        return Err(ReferenceTextGenerationError::Runtime(
+                            crate::RuntimeError::Backend(String::from(
+                                "qwen35 layer state kind mismatch",
+                            )),
+                        ));
+                    }
+                }
+                let report = submission
+                    .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                kernel_count = kernel_count.saturating_add(report.encoded_operations);
+                if let (Qwen35LayerKind::Hybrid(hybrid), Qwen35LayerState::Hybrid(hybrid_state)) =
+                    (&layer.kind, &*layer_state)
+                {
+                    emit_qwen35_hybrid_intermediate_debug(
+                        position,
+                        layer_index,
+                        hybrid,
+                        hybrid_state,
+                        plan,
+                        self.descriptor.config.hidden_size,
+                    )?;
+                }
+                emit_qwen35_hidden_debug(
+                    position,
+                    layer_index,
+                    &layer.kind,
+                    &plan.current_hidden_buffer,
+                    self.descriptor.config.hidden_size,
+                )?;
+            }
+            let current_hidden_buffer = plan.current_hidden_buffer.clone();
+            let output_norm_device = self.output_norm_device.clone();
+            let (logits, selected_token, output_stats) = match output_mode {
+                CudaStepOutputMode::NoOutput => (Vec::new(), None, zero_cuda_matvec_stats()),
+                CudaStepOutputMode::FullLogits => {
+                    let (logits, stats) = plan
+                        .run_output_logits_from_device(
+                            backend,
+                            &current_hidden_buffer,
+                            &output_norm_device,
+                            self.family_metadata.rms_norm_epsilon,
+                            self.output.transposed_f16.as_ref(),
+                            &self.output.storage,
+                            self.output.host.mode,
+                            self.output.host.rows,
+                            self.output.host.columns,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (logits, None, stats)
+                }
+                CudaStepOutputMode::ArgmaxOnly => {
+                    let (selected, stats) = plan
+                        .run_output_argmax_from_device(
+                            backend,
+                            &current_hidden_buffer,
+                            &output_norm_device,
+                            self.family_metadata.rms_norm_epsilon,
+                            self.output.transposed_f16.as_ref(),
+                            &self.output.storage,
+                            self.output.host.mode,
+                            self.output.host.rows,
+                            self.output.host.columns,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (Vec::new(), Some(selected), stats)
+                }
+            };
+            bytes_moved = bytes_moved.saturating_add(cuda_stats_bytes(output_stats));
+            kernel_count = kernel_count.saturating_add(output_stats.kernel_launches);
+            state.position = state.position.saturating_add(1);
+            return Ok(Qwen35ForwardStep {
+                logits,
+                selected_token,
                 kernel_count,
                 bytes_moved,
             });
@@ -1483,11 +1741,35 @@ impl CudaQwen35Model {
 
         let output_rows = self.output.host.rows;
         let output_cols = self.output.host.columns;
-        let output_mode_q8_1 = can_use_q8_1_mmvq(self.output.host.mode);
+        let output_mode_q8_1_projection = self.output.transposed_f16.is_none()
+            && can_use_q8_1_quantized_matvec(self.output.host.mode);
+        let output_mode_q8_1_argmax =
+            output_mode_q8_1_projection && can_use_q8_1_argmax(self.output.host.mode);
         match output_mode {
             CudaStepOutputMode::NoOutput => {}
             CudaStepOutputMode::FullLogits => {
-                if output_mode_q8_1 {
+                if let Some(transposed_f16) = self.output.transposed_f16.as_ref() {
+                    submission.rms_norm(
+                        &plan.current_hidden_buffer,
+                        &self.output_norm_device,
+                        &plan.matvec_input_buffer,
+                        output_cols,
+                        self.family_metadata.rms_norm_epsilon,
+                    )?;
+                    submission.cast_f32_to_f16(
+                        &plan.matvec_input_buffer,
+                        &plan.vector_f16_buffer,
+                        output_cols,
+                    )?;
+                    submission.matmul_f16_to_f32(
+                        &plan.vector_f16_buffer,
+                        transposed_f16,
+                        &plan.logits_buffer,
+                        1,
+                        output_cols,
+                        output_rows,
+                    )?;
+                } else if output_mode_q8_1_projection {
                     submission.rms_norm_q8_1(
                         &plan.current_hidden_buffer,
                         &self.output_norm_device,
@@ -1531,7 +1813,39 @@ impl CudaQwen35Model {
                 );
             }
             CudaStepOutputMode::ArgmaxOnly => {
-                if output_mode_q8_1 {
+                if let Some(transposed_f16) = self.output.transposed_f16.as_ref() {
+                    submission.rms_norm(
+                        &plan.current_hidden_buffer,
+                        &self.output_norm_device,
+                        &plan.matvec_input_buffer,
+                        output_cols,
+                        self.family_metadata.rms_norm_epsilon,
+                    )?;
+                    submission.cast_f32_to_f16(
+                        &plan.matvec_input_buffer,
+                        &plan.vector_f16_buffer,
+                        output_cols,
+                    )?;
+                    submission.matmul_f16_to_f32(
+                        &plan.vector_f16_buffer,
+                        transposed_f16,
+                        &plan.logits_buffer,
+                        1,
+                        output_cols,
+                        output_rows,
+                    )?;
+                    submission.argmax_f32(
+                        &plan.logits_buffer,
+                        1,
+                        output_rows,
+                        &plan.next_token_buffer,
+                    )?;
+                    submission
+                        .copy_device_to_host(&plan.next_token_buffer, &plan.next_token_host_buffer)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    bytes_moved = bytes_moved
+                        .saturating_add(std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX));
+                } else if output_mode_q8_1_argmax {
                     plan.argmax_state_host_buffer
                         .write_bytes(initial_cuda_argmax_pair_bytes().as_slice())
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -1568,6 +1882,35 @@ impl CudaQwen35Model {
                     bytes_moved = bytes_moved
                         .saturating_add(argmax_bytes)
                         .saturating_add(argmax_bytes);
+                } else if output_mode_q8_1_projection {
+                    submission.rms_norm_q8_1(
+                        &plan.current_hidden_buffer,
+                        &self.output_norm_device,
+                        &plan.matvec_input_q8_1_buffer,
+                        output_cols,
+                        self.family_metadata.rms_norm_epsilon,
+                    )?;
+                    submission.quantized_matvec_q8_1(
+                        &self.output.storage,
+                        0,
+                        self.output.host.mode,
+                        output_rows,
+                        output_cols,
+                        &plan.matvec_input_q8_1_buffer,
+                        None,
+                        &plan.logits_buffer,
+                    )?;
+                    submission.argmax_f32(
+                        &plan.logits_buffer,
+                        1,
+                        output_rows,
+                        &plan.next_token_buffer,
+                    )?;
+                    submission
+                        .copy_device_to_host(&plan.next_token_buffer, &plan.next_token_host_buffer)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    bytes_moved = bytes_moved
+                        .saturating_add(std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX));
                 } else {
                     submission.rms_norm(
                         &plan.current_hidden_buffer,
@@ -1614,7 +1957,7 @@ impl CudaQwen35Model {
             _ => Vec::new(),
         };
         let selected_token = match output_mode {
-            CudaStepOutputMode::ArgmaxOnly if output_mode_q8_1 => Some(
+            CudaStepOutputMode::ArgmaxOnly if output_mode_q8_1_argmax => Some(
                 cuda_argmax_token_from_packed_host_buffer(&plan.argmax_state_host_buffer)?,
             ),
             CudaStepOutputMode::ArgmaxOnly => Some(cuda_argmax_token_id(
@@ -1645,6 +1988,180 @@ struct Qwen35Layer {
 }
 
 impl Qwen35Layer {
+    fn encode_full_attention_qkv_native_submission(
+        &self,
+        submission: &mut CudaSubmission,
+        plan: &mut Qwen35CudaStepPlan,
+        full_attention: &Qwen35FullAttentionLayer,
+        hidden_size: usize,
+        epsilon: f32,
+        head_count: usize,
+        head_dim: usize,
+        query_width: usize,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let native_qkv = full_attention.native_qkv.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "qwen35 full-attention native qkv path requested without native matrices",
+            )))
+        })?;
+        let query_bytes = query_width.saturating_mul(std::mem::size_of::<f32>());
+        let kv_bytes = full_attention
+            .kv_width
+            .saturating_mul(std::mem::size_of::<f32>());
+        submission.rms_norm_q8_1(
+            &plan.current_hidden_buffer,
+            &self.attention_norm_device,
+            &plan.matvec_input_q8_1_buffer,
+            hidden_size,
+            epsilon,
+        )?;
+        submission.quantized_matvec_q8_1(
+            &native_qkv.query_gate.storage,
+            0,
+            native_qkv.query_gate.host.mode,
+            native_qkv.query_gate.host.rows,
+            native_qkv.query_gate.host.columns,
+            &plan.matvec_input_q8_1_buffer,
+            None,
+            &plan.matvec_output_buffer,
+        )?;
+        submission.split_interleaved_query_gate_rms_norm_f32(
+            &plan.matvec_output_buffer,
+            head_count,
+            head_dim,
+            &full_attention.query_norm_device,
+            epsilon,
+            &plan.qkv_norm_buffer,
+            &plan.gate_buffer,
+        )?;
+        submission.quantized_matvec_q8_1(
+            &native_qkv.key.storage,
+            0,
+            native_qkv.key.host.mode,
+            native_qkv.key.host.rows,
+            native_qkv.key.host.columns,
+            &plan.matvec_input_q8_1_buffer,
+            None,
+            &plan.k_buffer,
+        )?;
+        submission.rms_norm(
+            &plan.k_buffer,
+            &full_attention.key_norm_device,
+            &plan.q_buffer,
+            full_attention.kv_width,
+            epsilon,
+        )?;
+        submission.copy_buffer_region(&plan.q_buffer, 0, &plan.qkv_norm_buffer, query_bytes, kv_bytes)?;
+        submission.quantized_matvec_q8_1(
+            &native_qkv.value.storage,
+            0,
+            native_qkv.value.host.mode,
+            native_qkv.value.host.rows,
+            native_qkv.value.host.columns,
+            &plan.matvec_input_q8_1_buffer,
+            None,
+            &plan.k_buffer,
+        )?;
+        submission.copy_buffer_region(
+            &plan.k_buffer,
+            0,
+            &plan.qkv_norm_buffer,
+            query_bytes.saturating_add(kv_bytes),
+            kv_bytes,
+        )?;
+        Ok(())
+    }
+
+    fn encode_full_attention_qkv_native_debug_submission(
+        &self,
+        submission: &mut CudaSubmission,
+        plan: &mut Qwen35CudaStepPlan,
+        full_attention: &Qwen35FullAttentionLayer,
+        hidden_size: usize,
+        epsilon: f32,
+        head_count: usize,
+        head_dim: usize,
+        query_width: usize,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let native_qkv = full_attention.native_qkv.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "qwen35 full-attention native debug qkv path requested without native matrices",
+            )))
+        })?;
+        let query_bytes = query_width.saturating_mul(std::mem::size_of::<f32>());
+        let kv_bytes = full_attention
+            .kv_width
+            .saturating_mul(std::mem::size_of::<f32>());
+        submission.rms_norm_q8_1(
+            &plan.current_hidden_buffer,
+            &self.attention_norm_device,
+            &plan.matvec_input_q8_1_buffer,
+            hidden_size,
+            epsilon,
+        )?;
+        submission.quantized_matvec_q8_1(
+            &native_qkv.query_gate.storage,
+            0,
+            native_qkv.query_gate.host.mode,
+            native_qkv.query_gate.host.rows,
+            native_qkv.query_gate.host.columns,
+            &plan.matvec_input_q8_1_buffer,
+            None,
+            &plan.matvec_output_buffer,
+        )?;
+        submission.split_interleaved_query_gate_f32(
+            &plan.matvec_output_buffer,
+            head_count,
+            head_dim,
+            &plan.q_buffer,
+            &plan.gate_buffer,
+        )?;
+        submission.rms_norm(
+            &plan.q_buffer,
+            &full_attention.query_norm_device,
+            &plan.q_buffer,
+            query_width,
+            epsilon,
+        )?;
+        submission.quantized_matvec_q8_1(
+            &native_qkv.key.storage,
+            0,
+            native_qkv.key.host.mode,
+            native_qkv.key.host.rows,
+            native_qkv.key.host.columns,
+            &plan.matvec_input_q8_1_buffer,
+            None,
+            &plan.k_buffer,
+        )?;
+        submission.rms_norm(
+            &plan.k_buffer,
+            &full_attention.key_norm_device,
+            &plan.k_buffer,
+            full_attention.kv_width,
+            epsilon,
+        )?;
+        submission.copy_buffer_region(&plan.q_buffer, 0, &plan.qkv_norm_buffer, 0, query_bytes)?;
+        submission.copy_buffer_region(&plan.k_buffer, 0, &plan.qkv_norm_buffer, query_bytes, kv_bytes)?;
+        submission.quantized_matvec_q8_1(
+            &native_qkv.value.storage,
+            0,
+            native_qkv.value.host.mode,
+            native_qkv.value.host.rows,
+            native_qkv.value.host.columns,
+            &plan.matvec_input_q8_1_buffer,
+            None,
+            &plan.matvec_output_buffer,
+        )?;
+        submission.copy_buffer_region(
+            &plan.matvec_output_buffer,
+            0,
+            &plan.qkv_norm_buffer,
+            query_bytes.saturating_add(kv_bytes),
+            kv_bytes,
+        )?;
+        Ok(())
+    }
+
     fn load(
         backend: &mut CudaBackend,
         artifact: &GgufBlobArtifact,
@@ -1822,44 +2339,97 @@ impl Qwen35Layer {
                 model.encode_token_embedding_lookup(submission, plan, token, position)?,
             );
         }
-        submission.rms_norm_q8_1(
-            &plan.current_hidden_buffer,
-            &self.attention_norm_device,
-            &plan.matvec_input_q8_1_buffer,
-            hidden_size,
-            epsilon,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &full_attention.qkv.storage,
-            0,
-            full_attention.qkv.mode,
-            full_attention.qkv.total_rows(),
-            full_attention.qkv.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
-        submission.split_interleaved_query_gate_rms_norm_f32(
-            &plan.matvec_output_buffer,
-            head_count,
-            head_dim,
-            &full_attention.query_norm_device,
-            epsilon,
-            &plan.qkv_norm_buffer,
-            &plan.gate_buffer,
-        )?;
-        submission.pack_qwen35_key_value_rms_norm_f32(
-            &plan.matvec_output_buffer,
-            query_gate_rows,
-            query_gate_rows.saturating_add(key_rows),
-            kv_head_count,
-            head_dim,
-            &full_attention.key_norm_device,
-            epsilon,
-            &plan.qkv_norm_buffer,
-            query_width,
-            query_width.saturating_add(full_attention.kv_width),
-        )?;
+        if full_attention.native_qkv.is_some() {
+            self.encode_full_attention_qkv_native_submission(
+                submission,
+                plan,
+                full_attention,
+                hidden_size,
+                epsilon,
+                head_count,
+                head_dim,
+                query_width,
+            )?;
+        } else if let Some(transposed_f16) = full_attention.qkv.transposed_f16.as_ref() {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                full_attention.qkv.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                full_attention.qkv.columns,
+                full_attention.qkv.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(full_attention.qkv.mode) {
+            submission.rms_norm_q8_1(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.matvec_input_q8_1_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &full_attention.qkv.storage,
+                0,
+                full_attention.qkv.mode,
+                full_attention.qkv.total_rows(),
+                full_attention.qkv.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec(
+                &full_attention.qkv.storage,
+                0,
+                full_attention.qkv.mode,
+                full_attention.qkv.total_rows(),
+                full_attention.qkv.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
+        if full_attention.native_qkv.is_none() {
+            submission.split_interleaved_query_gate_rms_norm_f32(
+                &plan.matvec_output_buffer,
+                head_count,
+                head_dim,
+                &full_attention.query_norm_device,
+                epsilon,
+                &plan.qkv_norm_buffer,
+                &plan.gate_buffer,
+            )?;
+            submission.pack_qwen35_key_value_rms_norm_f32(
+                &plan.matvec_output_buffer,
+                query_gate_rows,
+                query_gate_rows.saturating_add(key_rows),
+                kv_head_count,
+                head_dim,
+                &full_attention.key_norm_device,
+                epsilon,
+                &plan.qkv_norm_buffer,
+                query_width,
+                query_width.saturating_add(full_attention.kv_width),
+            )?;
+        }
         if use_graph_attention {
             submission.attention_decode_rope_cache_f16_kv_graph(
                 &plan.qkv_norm_buffer,
@@ -1908,24 +2478,66 @@ impl Qwen35Layer {
                 &plan.gated_delta_buffer,
             )?;
         }
-        submission.sigmoid_mul_q8_1(
-            &plan.gated_delta_buffer,
-            0,
-            &plan.gate_buffer,
-            0,
-            query_width,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &full_attention.output.storage,
-            0,
-            full_attention.output.host.mode,
-            full_attention.output.host.rows,
-            full_attention.output.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = full_attention.output.transposed_f16.as_ref() {
+            submission.sigmoid_mul_f32(
+                &plan.gated_delta_buffer,
+                0,
+                &plan.gate_buffer,
+                0,
+                query_width,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                full_attention.output.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                full_attention.output.host.columns,
+                full_attention.output.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(full_attention.output.host.mode) {
+            submission.sigmoid_mul_q8_1(
+                &plan.gated_delta_buffer,
+                0,
+                &plan.gate_buffer,
+                0,
+                query_width,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &full_attention.output.storage,
+                0,
+                full_attention.output.host.mode,
+                full_attention.output.host.rows,
+                full_attention.output.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.sigmoid_mul_f32(
+                &plan.gated_delta_buffer,
+                0,
+                &plan.gate_buffer,
+                0,
+                query_width,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &full_attention.output.storage,
+                0,
+                full_attention.output.host.mode,
+                full_attention.output.host.rows,
+                full_attention.output.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_residual_rms_norm_q8_1(
             &plan.projected_buffer,
             &plan.current_hidden_buffer,
@@ -1937,16 +2549,42 @@ impl Qwen35Layer {
             hidden_size,
             epsilon,
         )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_gate_up.storage,
-            0,
-            self.ffn_gate_up.mode,
-            self.ffn_gate_up.total_rows(),
-            self.ffn_gate_up.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_gate_up.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                self.ffn_gate_up.columns,
+                self.ffn_gate_up.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_gate_up.mode) {
+            submission.quantized_matvec_q8_1(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.quantized_matvec(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
         let gate_rows = self.ffn_gate_up.rows_per_projection[0];
         let up_rows = self.ffn_gate_up.rows_per_projection[1];
         if gate_rows != up_rows {
@@ -1957,24 +2595,66 @@ impl Qwen35Layer {
                 )),
             ));
         }
-        submission.silu_mul_q8_1(
-            &plan.matvec_output_buffer,
-            0,
-            &plan.matvec_output_buffer,
-            gate_rows,
-            gate_rows,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_down.storage,
-            0,
-            self.ffn_down.host.mode,
-            self.ffn_down.host.rows,
-            self.ffn_down.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_down.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                self.ffn_down.host.columns,
+                self.ffn_down.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
+            submission.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_f32_in_place(
             &plan.current_hidden_buffer,
             0,
@@ -2037,23 +2717,63 @@ impl Qwen35Layer {
                 model.encode_token_embedding_lookup(submission, plan, token, position)?,
             );
         }
-        submission.rms_norm_q8_1(
-            &plan.current_hidden_buffer,
-            &self.attention_norm_device,
-            &plan.matvec_input_q8_1_buffer,
-            hidden_size,
-            epsilon,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &hybrid.qkv_gate_alpha_beta.storage,
-            0,
-            hybrid.qkv_gate_alpha_beta.mode,
-            hybrid.qkv_gate_alpha_beta.total_rows(),
-            hybrid.qkv_gate_alpha_beta.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
+        if let Some(transposed_f16) = hybrid.qkv_gate_alpha_beta.transposed_f16.as_ref() {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                hybrid.qkv_gate_alpha_beta.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                hybrid.qkv_gate_alpha_beta.columns,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(hybrid.qkv_gate_alpha_beta.mode) {
+            submission.rms_norm_q8_1(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.matvec_input_q8_1_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &hybrid.qkv_gate_alpha_beta.storage,
+                0,
+                hybrid.qkv_gate_alpha_beta.mode,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+                hybrid.qkv_gate_alpha_beta.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec(
+                &hybrid.qkv_gate_alpha_beta.storage,
+                0,
+                hybrid.qkv_gate_alpha_beta.mode,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+                hybrid.qkv_gate_alpha_beta.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
         submission.depthwise_causal_conv1d_step_silu_f32(
             &plan.matvec_output_buffer,
             &state.conv_state,
@@ -2100,33 +2820,78 @@ impl Qwen35Layer {
             hybrid.time_step_rank,
             hybrid.state_size,
             hybrid.state_size,
+            hybrid.v_head_reordered,
             &plan.gated_delta_buffer,
         )?;
-        submission.rms_norm(
+        submission.rms_norm_region(
             &plan.gated_delta_buffer,
+            0,
             &hybrid.ssm_norm_device,
             &plan.hybrid_norm_buffer,
+            0,
             v_size,
             epsilon,
         )?;
-        submission.silu_mul_q8_1(
-            &plan.matvec_output_buffer,
-            z_offset,
-            &plan.hybrid_norm_buffer,
-            0,
-            v_size,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &hybrid.ssm_out.storage,
-            0,
-            hybrid.ssm_out.host.mode,
-            hybrid.ssm_out.host.rows,
-            hybrid.ssm_out.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = hybrid.ssm_out.transposed_f16.as_ref() {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                hybrid.ssm_out.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                hybrid.ssm_out.host.columns,
+                hybrid.ssm_out.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(hybrid.ssm_out.host.mode) {
+            submission.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &hybrid.ssm_out.storage,
+                0,
+                hybrid.ssm_out.host.mode,
+                hybrid.ssm_out.host.rows,
+                hybrid.ssm_out.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &hybrid.ssm_out.storage,
+                0,
+                hybrid.ssm_out.host.mode,
+                hybrid.ssm_out.host.rows,
+                hybrid.ssm_out.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_residual_rms_norm_q8_1(
             &plan.projected_buffer,
             &plan.current_hidden_buffer,
@@ -2138,16 +2903,42 @@ impl Qwen35Layer {
             hidden_size,
             epsilon,
         )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_gate_up.storage,
-            0,
-            self.ffn_gate_up.mode,
-            self.ffn_gate_up.total_rows(),
-            self.ffn_gate_up.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_gate_up.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                self.ffn_gate_up.columns,
+                self.ffn_gate_up.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_gate_up.mode) {
+            submission.quantized_matvec_q8_1(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.quantized_matvec(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
         let gate_rows = self.ffn_gate_up.rows_per_projection[0];
         let up_rows = self.ffn_gate_up.rows_per_projection[1];
         if gate_rows != up_rows {
@@ -2158,24 +2949,66 @@ impl Qwen35Layer {
                 )),
             ));
         }
-        submission.silu_mul_q8_1(
-            &plan.matvec_output_buffer,
-            0,
-            &plan.matvec_output_buffer,
-            gate_rows,
-            gate_rows,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_down.storage,
-            0,
-            self.ffn_down.host.mode,
-            self.ffn_down.host.rows,
-            self.ffn_down.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_down.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                self.ffn_down.host.columns,
+                self.ffn_down.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
+            submission.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_f32_in_place(
             &plan.current_hidden_buffer,
             0,
@@ -2209,6 +3042,7 @@ impl Qwen35Layer {
         backend: &mut CudaBackend,
         plan: &mut Qwen35CudaStepPlan,
         model: &CudaQwen35Model,
+        layer_index: usize,
         full_attention: &Qwen35FullAttentionLayer,
         state: &mut Qwen35FullAttentionState,
         initial_token: Option<TokenId>,
@@ -2294,68 +3128,104 @@ impl Qwen35Layer {
                     model.encode_token_embedding_lookup(&mut prep, plan, token, position)?,
                 );
             }
-            prep.rms_norm_q8_1(
-                &plan.current_hidden_buffer,
-                &self.attention_norm_device,
-                &plan.matvec_input_q8_1_buffer,
-                hidden_size,
-                epsilon,
-            )?;
-            prep.quantized_matvec_q8_1(
-                &full_attention.qkv.storage,
-                0,
-                full_attention.qkv.mode,
-                full_attention.qkv.total_rows(),
-                full_attention.qkv.columns,
-                &plan.matvec_input_q8_1_buffer,
-                None,
-                &plan.matvec_output_buffer,
-            )?;
-            prep.split_interleaved_query_gate_f32(
-                &plan.matvec_output_buffer,
-                head_count,
-                head_dim,
-                &plan.q_buffer,
-                &plan.gate_buffer,
-            )?;
-            prep.copy_buffer_region(
-                &plan.matvec_output_buffer,
-                query_gate_rows.saturating_mul(std::mem::size_of::<f32>()),
-                &plan.k_buffer,
-                0,
-                kv_bytes,
-            )?;
-            prep.rms_norm(
-                &plan.q_buffer,
-                &full_attention.query_norm_device,
-                &plan.q_buffer,
-                query_width,
-                epsilon,
-            )?;
-            prep.rms_norm(
-                &plan.k_buffer,
-                &full_attention.key_norm_device,
-                &plan.k_buffer,
-                full_attention.kv_width,
-                epsilon,
-            )?;
-            prep.copy_buffer_region(&plan.q_buffer, 0, &plan.qkv_norm_buffer, 0, query_bytes)?;
-            prep.copy_buffer_region(
-                &plan.k_buffer,
-                0,
-                &plan.qkv_norm_buffer,
-                query_bytes,
-                kv_bytes,
-            )?;
-            prep.copy_buffer_region(
-                &plan.matvec_output_buffer,
-                query_gate_rows
-                    .saturating_add(key_rows)
-                    .saturating_mul(std::mem::size_of::<f32>()),
-                &plan.qkv_norm_buffer,
-                query_bytes.saturating_add(kv_bytes),
-                kv_bytes,
-            )?;
+            if full_attention.native_qkv.is_some() {
+                self.encode_full_attention_qkv_native_debug_submission(
+                    &mut prep,
+                    plan,
+                    full_attention,
+                    hidden_size,
+                    epsilon,
+                    head_count,
+                    head_dim,
+                    query_width,
+                )?;
+            } else if let Some(transposed_f16) = full_attention.qkv.transposed_f16.as_ref() {
+                prep.rms_norm(
+                    &plan.current_hidden_buffer,
+                    &self.attention_norm_device,
+                    &plan.hidden_norm_buffer,
+                    hidden_size,
+                    epsilon,
+                )?;
+                prep.cast_f32_to_f16(
+                    &plan.hidden_norm_buffer,
+                    &plan.vector_f16_buffer,
+                    full_attention.qkv.columns,
+                )?;
+                prep.matmul_f16_to_f32(
+                    &plan.vector_f16_buffer,
+                    transposed_f16,
+                    &plan.matvec_output_buffer,
+                    1,
+                    full_attention.qkv.columns,
+                    full_attention.qkv.total_rows(),
+                )?;
+            } else {
+                prep.rms_norm_q8_1(
+                    &plan.current_hidden_buffer,
+                    &self.attention_norm_device,
+                    &plan.matvec_input_q8_1_buffer,
+                    hidden_size,
+                    epsilon,
+                )?;
+                prep.quantized_matvec_q8_1(
+                    &full_attention.qkv.storage,
+                    0,
+                    full_attention.qkv.mode,
+                    full_attention.qkv.total_rows(),
+                    full_attention.qkv.columns,
+                    &plan.matvec_input_q8_1_buffer,
+                    None,
+                    &plan.matvec_output_buffer,
+                )?;
+            }
+            if full_attention.native_qkv.is_none() {
+                prep.split_interleaved_query_gate_f32(
+                    &plan.matvec_output_buffer,
+                    head_count,
+                    head_dim,
+                    &plan.q_buffer,
+                    &plan.gate_buffer,
+                )?;
+                prep.copy_buffer_region(
+                    &plan.matvec_output_buffer,
+                    query_gate_rows.saturating_mul(std::mem::size_of::<f32>()),
+                    &plan.k_buffer,
+                    0,
+                    kv_bytes,
+                )?;
+                prep.rms_norm(
+                    &plan.q_buffer,
+                    &full_attention.query_norm_device,
+                    &plan.q_buffer,
+                    query_width,
+                    epsilon,
+                )?;
+                prep.rms_norm(
+                    &plan.k_buffer,
+                    &full_attention.key_norm_device,
+                    &plan.k_buffer,
+                    full_attention.kv_width,
+                    epsilon,
+                )?;
+                prep.copy_buffer_region(&plan.q_buffer, 0, &plan.qkv_norm_buffer, 0, query_bytes)?;
+                prep.copy_buffer_region(
+                    &plan.k_buffer,
+                    0,
+                    &plan.qkv_norm_buffer,
+                    query_bytes,
+                    kv_bytes,
+                )?;
+                prep.copy_buffer_region(
+                    &plan.matvec_output_buffer,
+                    query_gate_rows
+                        .saturating_add(key_rows)
+                        .saturating_mul(std::mem::size_of::<f32>()),
+                    &plan.qkv_norm_buffer,
+                    query_bytes.saturating_add(kv_bytes),
+                    kv_bytes,
+                )?;
+            }
             let prep_report = prep.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
             *kernel_count = kernel_count.saturating_add(prep_report.encoded_operations);
 
@@ -2455,6 +3325,40 @@ impl Qwen35Layer {
                 .zip(gate_host.iter().copied())
                 .map(|(value, gate)| value * sigmoid(gate))
                 .collect::<Vec<_>>();
+            let input_hidden = plan
+                .current_hidden_buffer
+                .read_f32_at_offset(0, hidden_size)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            let host_projected = full_attention
+                .output
+                .host_matvec(host_gated.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            let host_post_attention = add_vectors(host_projected.as_slice(), input_hidden.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            let host_post_attention_norm = rms_norm(
+                host_post_attention.as_slice(),
+                self.post_attention_norm.as_slice(),
+                epsilon,
+            );
+            let host_gate_up = self
+                .ffn_gate_up
+                .host_matvec(host_post_attention_norm.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            let host_ffn = silu_glu(
+                host_gate_up
+                    .slice(0)
+                    .map_err(ReferenceTextGenerationError::Runtime)?,
+                host_gate_up
+                    .slice(1)
+                    .map_err(ReferenceTextGenerationError::Runtime)?,
+            );
+            let host_ffn_down = self
+                .ffn_down
+                .host_matvec(host_ffn.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            let host_final_hidden =
+                add_vectors(host_post_attention.as_slice(), host_ffn_down.as_slice())
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
 
             let mut attention = backend
                 .begin_submission()
@@ -2511,22 +3415,38 @@ impl Qwen35Layer {
             let mut tail = backend
                 .begin_submission()
                 .map_err(ReferenceTextGenerationError::Runtime)?;
-            tail.quantize_f32_to_q8_1(
-                &plan.gated_delta_buffer,
-                1,
-                query_width,
-                &plan.activated_q8_1_buffer,
-            )?;
-            tail.quantized_matvec_q8_1(
-                &full_attention.output.storage,
-                0,
-                full_attention.output.host.mode,
-                full_attention.output.host.rows,
-                full_attention.output.host.columns,
-                &plan.activated_q8_1_buffer,
-                None,
-                &plan.projected_buffer,
-            )?;
+            if let Some(transposed_f16) = full_attention.output.transposed_f16.as_ref() {
+                tail.cast_f32_to_f16(
+                    &plan.gated_delta_buffer,
+                    &plan.vector_f16_buffer,
+                    full_attention.output.host.columns,
+                )?;
+                tail.matmul_f16_to_f32(
+                    &plan.vector_f16_buffer,
+                    transposed_f16,
+                    &plan.projected_buffer,
+                    1,
+                    full_attention.output.host.columns,
+                    full_attention.output.host.rows,
+                )?;
+            } else {
+                tail.quantize_f32_to_q8_1(
+                    &plan.gated_delta_buffer,
+                    1,
+                    query_width,
+                    &plan.activated_q8_1_buffer,
+                )?;
+                tail.quantized_matvec_q8_1(
+                    &full_attention.output.storage,
+                    0,
+                    full_attention.output.host.mode,
+                    full_attention.output.host.rows,
+                    full_attention.output.host.columns,
+                    &plan.activated_q8_1_buffer,
+                    None,
+                    &plan.projected_buffer,
+                )?;
+            }
             tail.add_residual_rms_norm_q8_1(
                 &plan.projected_buffer,
                 &plan.current_hidden_buffer,
@@ -2538,16 +3458,32 @@ impl Qwen35Layer {
                 hidden_size,
                 epsilon,
             )?;
-            tail.quantized_matvec_q8_1(
-                &self.ffn_gate_up.storage,
-                0,
-                self.ffn_gate_up.mode,
-                self.ffn_gate_up.total_rows(),
-                self.ffn_gate_up.columns,
-                &plan.matvec_input_q8_1_buffer,
-                None,
-                &plan.matvec_output_buffer,
-            )?;
+            if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+                tail.cast_f32_to_f16(
+                    &plan.hidden_norm_buffer,
+                    &plan.vector_f16_buffer,
+                    self.ffn_gate_up.columns,
+                )?;
+                tail.matmul_f16_to_f32(
+                    &plan.vector_f16_buffer,
+                    transposed_f16,
+                    &plan.matvec_output_buffer,
+                    1,
+                    self.ffn_gate_up.columns,
+                    self.ffn_gate_up.total_rows(),
+                )?;
+            } else {
+                tail.quantized_matvec_q8_1(
+                    &self.ffn_gate_up.storage,
+                    0,
+                    self.ffn_gate_up.mode,
+                    self.ffn_gate_up.total_rows(),
+                    self.ffn_gate_up.columns,
+                    &plan.matvec_input_q8_1_buffer,
+                    None,
+                    &plan.matvec_output_buffer,
+                )?;
+            }
             let gate_rows = self.ffn_gate_up.rows_per_projection[0];
             let up_rows = self.ffn_gate_up.rows_per_projection[1];
             if gate_rows != up_rows {
@@ -2558,24 +3494,48 @@ impl Qwen35Layer {
                     )),
                 ));
             }
-            tail.silu_mul_q8_1(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.activated_q8_1_buffer,
-            )?;
-            tail.quantized_matvec_q8_1(
-                &self.ffn_down.storage,
-                0,
-                self.ffn_down.host.mode,
-                self.ffn_down.host.rows,
-                self.ffn_down.host.columns,
-                &plan.activated_q8_1_buffer,
-                None,
-                &plan.projected_buffer,
-            )?;
+            if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+                tail.silu_mul_f32(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.gated_delta_buffer,
+                )?;
+                tail.cast_f32_to_f16(
+                    &plan.gated_delta_buffer,
+                    &plan.vector_f16_buffer,
+                    self.ffn_down.host.columns,
+                )?;
+                tail.matmul_f16_to_f32(
+                    &plan.vector_f16_buffer,
+                    transposed_f16,
+                    &plan.projected_buffer,
+                    1,
+                    self.ffn_down.host.columns,
+                    self.ffn_down.host.rows,
+                )?;
+            } else {
+                tail.silu_mul_q8_1(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.activated_q8_1_buffer,
+                )?;
+                tail.quantized_matvec_q8_1(
+                    &self.ffn_down.storage,
+                    0,
+                    self.ffn_down.host.mode,
+                    self.ffn_down.host.rows,
+                    self.ffn_down.host.columns,
+                    &plan.activated_q8_1_buffer,
+                    None,
+                    &plan.projected_buffer,
+                )?;
+            }
             tail.add_f32_in_place(
                 &plan.current_hidden_buffer,
                 0,
@@ -2584,7 +3544,18 @@ impl Qwen35Layer {
             )?;
             let tail_report = tail.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
             *kernel_count = kernel_count.saturating_add(tail_report.encoded_operations);
+            let device_final_hidden = plan
+                .current_hidden_buffer
+                .read_f32_at_offset(0, hidden_size)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
             state.len = state.len.saturating_add(1);
+            eprintln!(
+                "qwen35_debug layer={} position={} state_len={} max_gated_diff={max_diff:.6} final_hidden_diff={:.6}",
+                layer_index,
+                position,
+                state.len.saturating_sub(1),
+                max_abs_diff(device_final_hidden.as_slice(), host_final_hidden.as_slice())?,
+            );
             return Ok(());
         }
 
@@ -2599,44 +3570,76 @@ impl Qwen35Layer {
                 position,
             )?);
         }
-        submission.rms_norm_q8_1(
-            &plan.current_hidden_buffer,
-            &self.attention_norm_device,
-            &plan.matvec_input_q8_1_buffer,
-            hidden_size,
-            epsilon,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &full_attention.qkv.storage,
-            0,
-            full_attention.qkv.mode,
-            full_attention.qkv.total_rows(),
-            full_attention.qkv.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
-        submission.split_interleaved_query_gate_rms_norm_f32(
-            &plan.matvec_output_buffer,
-            head_count,
-            head_dim,
-            &full_attention.query_norm_device,
-            epsilon,
-            &plan.qkv_norm_buffer,
-            &plan.gate_buffer,
-        )?;
-        submission.pack_qwen35_key_value_rms_norm_f32(
-            &plan.matvec_output_buffer,
-            query_gate_rows,
-            query_gate_rows.saturating_add(key_rows),
-            kv_head_count,
-            head_dim,
-            &full_attention.key_norm_device,
-            epsilon,
-            &plan.qkv_norm_buffer,
-            query_width,
-            query_width.saturating_add(full_attention.kv_width),
-        )?;
+        if full_attention.native_qkv.is_some() {
+            self.encode_full_attention_qkv_native_submission(
+                &mut submission,
+                plan,
+                full_attention,
+                hidden_size,
+                epsilon,
+                head_count,
+                head_dim,
+                query_width,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(full_attention.qkv.mode) {
+            submission.rms_norm_q8_1(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.matvec_input_q8_1_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &full_attention.qkv.storage,
+                0,
+                full_attention.qkv.mode,
+                full_attention.qkv.total_rows(),
+                full_attention.qkv.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec(
+                &full_attention.qkv.storage,
+                0,
+                full_attention.qkv.mode,
+                full_attention.qkv.total_rows(),
+                full_attention.qkv.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
+        if full_attention.native_qkv.is_none() {
+            submission.split_interleaved_query_gate_rms_norm_f32(
+                &plan.matvec_output_buffer,
+                head_count,
+                head_dim,
+                &full_attention.query_norm_device,
+                epsilon,
+                &plan.qkv_norm_buffer,
+                &plan.gate_buffer,
+            )?;
+            submission.pack_qwen35_key_value_rms_norm_f32(
+                &plan.matvec_output_buffer,
+                query_gate_rows,
+                query_gate_rows.saturating_add(key_rows),
+                kv_head_count,
+                head_dim,
+                &full_attention.key_norm_device,
+                epsilon,
+                &plan.qkv_norm_buffer,
+                query_width,
+                query_width.saturating_add(full_attention.kv_width),
+            )?;
+        }
         submission.attention_decode_rope_cache_f16_kv(
             &plan.qkv_norm_buffer,
             0,
@@ -2660,24 +3663,44 @@ impl Qwen35Layer {
             None,
             &plan.gated_delta_buffer,
         )?;
-        submission.sigmoid_mul_q8_1(
-            &plan.gated_delta_buffer,
-            0,
-            &plan.gate_buffer,
-            0,
-            query_width,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &full_attention.output.storage,
-            0,
-            full_attention.output.host.mode,
-            full_attention.output.host.rows,
-            full_attention.output.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if can_use_q8_1_quantized_matvec(full_attention.output.host.mode) {
+            submission.sigmoid_mul_q8_1(
+                &plan.gated_delta_buffer,
+                0,
+                &plan.gate_buffer,
+                0,
+                query_width,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &full_attention.output.storage,
+                0,
+                full_attention.output.host.mode,
+                full_attention.output.host.rows,
+                full_attention.output.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.sigmoid_mul_f32(
+                &plan.gated_delta_buffer,
+                0,
+                &plan.gate_buffer,
+                0,
+                query_width,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &full_attention.output.storage,
+                0,
+                full_attention.output.host.mode,
+                full_attention.output.host.rows,
+                full_attention.output.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_residual_rms_norm_q8_1(
             &plan.projected_buffer,
             &plan.current_hidden_buffer,
@@ -2689,16 +3712,42 @@ impl Qwen35Layer {
             hidden_size,
             epsilon,
         )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_gate_up.storage,
-            0,
-            self.ffn_gate_up.mode,
-            self.ffn_gate_up.total_rows(),
-            self.ffn_gate_up.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_gate_up.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                self.ffn_gate_up.columns,
+                self.ffn_gate_up.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_gate_up.mode) {
+            submission.quantized_matvec_q8_1(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.quantized_matvec(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
         let gate_rows = self.ffn_gate_up.rows_per_projection[0];
         let up_rows = self.ffn_gate_up.rows_per_projection[1];
         if gate_rows != up_rows {
@@ -2709,24 +3758,66 @@ impl Qwen35Layer {
                 )),
             ));
         }
-        submission.silu_mul_q8_1(
-            &plan.matvec_output_buffer,
-            0,
-            &plan.matvec_output_buffer,
-            gate_rows,
-            gate_rows,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_down.storage,
-            0,
-            self.ffn_down.host.mode,
-            self.ffn_down.host.rows,
-            self.ffn_down.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_down.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                self.ffn_down.host.columns,
+                self.ffn_down.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
+            submission.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_f32_in_place(
             &plan.current_hidden_buffer,
             0,
@@ -2744,6 +3835,7 @@ impl Qwen35Layer {
         backend: &mut CudaBackend,
         plan: &mut Qwen35CudaStepPlan,
         model: &CudaQwen35Model,
+        layer_index: usize,
         state: &mut Qwen35HybridState,
         position: usize,
         initial_token: Option<TokenId>,
@@ -2757,6 +3849,20 @@ impl Qwen35Layer {
                 )),
             ));
         };
+        if qwen35_hybrid_compare_enabled(layer_index, position) {
+            return self.forward_hybrid_device_debug_compare(
+                backend,
+                plan,
+                model,
+                layer_index,
+                hybrid,
+                state,
+                position,
+                initial_token,
+                kernel_count,
+                bytes_moved,
+            );
+        }
         let hidden_size = model.descriptor.config.hidden_size;
         let epsilon = model.family_metadata.rms_norm_epsilon;
         let qkv_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[0];
@@ -2797,23 +3903,63 @@ impl Qwen35Layer {
                 position,
             )?);
         }
-        submission.rms_norm_q8_1(
-            &plan.current_hidden_buffer,
-            &self.attention_norm_device,
-            &plan.matvec_input_q8_1_buffer,
-            hidden_size,
-            epsilon,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &hybrid.qkv_gate_alpha_beta.storage,
-            0,
-            hybrid.qkv_gate_alpha_beta.mode,
-            hybrid.qkv_gate_alpha_beta.total_rows(),
-            hybrid.qkv_gate_alpha_beta.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
+        if let Some(transposed_f16) = hybrid.qkv_gate_alpha_beta.transposed_f16.as_ref() {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                hybrid.qkv_gate_alpha_beta.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                hybrid.qkv_gate_alpha_beta.columns,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(hybrid.qkv_gate_alpha_beta.mode) {
+            submission.rms_norm_q8_1(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.matvec_input_q8_1_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &hybrid.qkv_gate_alpha_beta.storage,
+                0,
+                hybrid.qkv_gate_alpha_beta.mode,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+                hybrid.qkv_gate_alpha_beta.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            submission.quantized_matvec(
+                &hybrid.qkv_gate_alpha_beta.storage,
+                0,
+                hybrid.qkv_gate_alpha_beta.mode,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+                hybrid.qkv_gate_alpha_beta.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
         submission.depthwise_causal_conv1d_step_silu_f32(
             &plan.matvec_output_buffer,
             &state.conv_state,
@@ -2869,33 +4015,78 @@ impl Qwen35Layer {
             hybrid.time_step_rank,
             hybrid.state_size,
             hybrid.state_size,
+            hybrid.v_head_reordered,
             &plan.gated_delta_buffer,
         )?;
-        submission.rms_norm(
+        submission.rms_norm_region(
             &plan.gated_delta_buffer,
+            0,
             &hybrid.ssm_norm_device,
             &plan.hybrid_norm_buffer,
+            0,
             v_size,
             epsilon,
         )?;
-        submission.silu_mul_q8_1(
-            &plan.matvec_output_buffer,
-            z_offset,
-            &plan.hybrid_norm_buffer,
-            0,
-            v_size,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &hybrid.ssm_out.storage,
-            0,
-            hybrid.ssm_out.host.mode,
-            hybrid.ssm_out.host.rows,
-            hybrid.ssm_out.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = hybrid.ssm_out.transposed_f16.as_ref() {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                hybrid.ssm_out.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                hybrid.ssm_out.host.columns,
+                hybrid.ssm_out.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(hybrid.ssm_out.host.mode) {
+            submission.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &hybrid.ssm_out.storage,
+                0,
+                hybrid.ssm_out.host.mode,
+                hybrid.ssm_out.host.rows,
+                hybrid.ssm_out.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &hybrid.ssm_out.storage,
+                0,
+                hybrid.ssm_out.host.mode,
+                hybrid.ssm_out.host.rows,
+                hybrid.ssm_out.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_residual_rms_norm_q8_1(
             &plan.projected_buffer,
             &plan.current_hidden_buffer,
@@ -2907,16 +4098,42 @@ impl Qwen35Layer {
             hidden_size,
             epsilon,
         )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_gate_up.storage,
-            0,
-            self.ffn_gate_up.mode,
-            self.ffn_gate_up.total_rows(),
-            self.ffn_gate_up.columns,
-            &plan.matvec_input_q8_1_buffer,
-            None,
-            &plan.matvec_output_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+            submission.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_gate_up.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                self.ffn_gate_up.columns,
+                self.ffn_gate_up.total_rows(),
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_gate_up.mode) {
+            submission.quantized_matvec_q8_1(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        } else {
+            submission.quantized_matvec(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.hidden_norm_buffer,
+                &plan.matvec_output_buffer,
+            )?;
+        }
         let gate_rows = self.ffn_gate_up.rows_per_projection[0];
         let up_rows = self.ffn_gate_up.rows_per_projection[1];
         if gate_rows != up_rows {
@@ -2927,24 +4144,66 @@ impl Qwen35Layer {
                 )),
             ));
         }
-        submission.silu_mul_q8_1(
-            &plan.matvec_output_buffer,
-            0,
-            &plan.matvec_output_buffer,
-            gate_rows,
-            gate_rows,
-            &plan.activated_q8_1_buffer,
-        )?;
-        submission.quantized_matvec_q8_1(
-            &self.ffn_down.storage,
-            0,
-            self.ffn_down.host.mode,
-            self.ffn_down.host.rows,
-            self.ffn_down.host.columns,
-            &plan.activated_q8_1_buffer,
-            None,
-            &plan.projected_buffer,
-        )?;
+        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_down.host.columns,
+            )?;
+            submission.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                self.ffn_down.host.columns,
+                self.ffn_down.host.rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
+            submission.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else {
+            submission.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            submission.quantized_matvec(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.gated_delta_buffer,
+                &plan.projected_buffer,
+            )?;
+        }
         submission.add_f32_in_place(
             &plan.current_hidden_buffer,
             0,
@@ -2954,6 +4213,555 @@ impl Qwen35Layer {
         let report = submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
         *kernel_count = kernel_count.saturating_add(report.encoded_operations);
         Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn forward_hybrid_device_debug_compare(
+        &self,
+        backend: &mut CudaBackend,
+        plan: &mut Qwen35CudaStepPlan,
+        model: &CudaQwen35Model,
+        layer_index: usize,
+        hybrid: &Qwen35HybridLayer,
+        state: &mut Qwen35HybridState,
+        position: usize,
+        initial_token: Option<TokenId>,
+        kernel_count: &mut usize,
+        bytes_moved: &mut u64,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let hidden_size = model.descriptor.config.hidden_size;
+        let epsilon = model.family_metadata.rms_norm_epsilon;
+        let qkv_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[0];
+        let z_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[1];
+        let alpha_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[2];
+        let beta_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[3];
+        if alpha_rows != beta_rows
+            || alpha_rows != hybrid.ssm_a.len()
+            || alpha_rows != hybrid.ssm_dt.len()
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 hybrid cuda path requires aligned alpha/beta widths, got alpha={} beta={} ssm_a={} ssm_dt={}",
+                    alpha_rows,
+                    beta_rows,
+                    hybrid.ssm_a.len(),
+                    hybrid.ssm_dt.len()
+                )),
+            ));
+        }
+        let q_size = hybrid.group_count.saturating_mul(hybrid.state_size);
+        let k_size = q_size;
+        let v_size = hybrid.inner_size;
+        let v_offset = q_size.saturating_add(k_size);
+        let z_offset = qkv_rows;
+        let alpha_offset = z_offset.saturating_add(z_rows);
+        let beta_offset = alpha_offset.saturating_add(alpha_rows);
+
+        let input_hidden = if let Some(token) = initial_token {
+            model.token_embedding.decode_row(token.as_u32() as usize)?
+        } else {
+            plan.current_hidden_buffer
+                .read_f32_at_offset(0, hidden_size)
+                .map_err(ReferenceTextGenerationError::Runtime)?
+        };
+        let conv_state_before = state
+            .conv_state
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let delta_state_before = state
+            .delta_state
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let host = self.compute_qwen35_hybrid_host_debug(
+            hybrid,
+            input_hidden.as_slice(),
+            conv_state_before.as_slice(),
+            delta_state_before.as_slice(),
+            epsilon,
+        )?;
+
+        let mut attention = backend
+            .begin_submission()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(token) = initial_token {
+            *bytes_moved = bytes_moved.saturating_add(model.encode_token_embedding_lookup(
+                &mut attention,
+                plan,
+                token,
+                position,
+            )?);
+        }
+        if let Some(transposed_f16) = hybrid.qkv_gate_alpha_beta.transposed_f16.as_ref() {
+            attention.rms_norm(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.hidden_norm_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            attention.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                hybrid.qkv_gate_alpha_beta.columns,
+            )?;
+            attention.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                hybrid.qkv_gate_alpha_beta.columns,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+            )?;
+        } else {
+            attention.rms_norm_q8_1(
+                &plan.current_hidden_buffer,
+                &self.attention_norm_device,
+                &plan.matvec_input_q8_1_buffer,
+                hidden_size,
+                epsilon,
+            )?;
+            attention.quantized_matvec_q8_1(
+                &hybrid.qkv_gate_alpha_beta.storage,
+                0,
+                hybrid.qkv_gate_alpha_beta.mode,
+                hybrid.qkv_gate_alpha_beta.total_rows(),
+                hybrid.qkv_gate_alpha_beta.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        }
+        attention.depthwise_causal_conv1d_step_silu_f32(
+            &plan.matvec_output_buffer,
+            &state.conv_state,
+            &hybrid.ssm_conv1d_device,
+            qkv_rows,
+            hybrid.conv_kernel,
+            &plan.conv_buffer,
+        )?;
+        attention.qwen35_ssm_decay_beta_f32(
+            &plan.matvec_output_buffer,
+            alpha_offset,
+            beta_offset,
+            &hybrid.ssm_a_device,
+            &hybrid.ssm_dt_device,
+            alpha_rows,
+            &plan.decay_buffer,
+            &plan.beta_buffer,
+        )?;
+        attention.pack_qwen35_hybrid_qkv_rms_norm_f32(
+            &plan.conv_buffer,
+            0,
+            q_size,
+            v_offset,
+            hybrid.group_count,
+            hybrid.state_size,
+            v_size,
+            &hybrid.q_scale_device,
+            &hybrid.k_scale_device,
+            1e-6,
+            &plan.qkv_norm_buffer,
+            0,
+            q_size,
+            v_offset,
+        )?;
+        attention.gated_delta_step_f32(
+            &plan.qkv_norm_buffer,
+            0,
+            q_size,
+            v_offset,
+            &plan.decay_buffer,
+            &plan.beta_buffer,
+            &state.delta_state,
+            hybrid.group_count,
+            hybrid.time_step_rank,
+            hybrid.state_size,
+            hybrid.state_size,
+            hybrid.v_head_reordered,
+            &plan.gated_delta_buffer,
+        )?;
+        attention.rms_norm_region(
+            &plan.gated_delta_buffer,
+            0,
+            &hybrid.ssm_norm_device,
+            &plan.hybrid_norm_buffer,
+            0,
+            v_size,
+            epsilon,
+        )?;
+        if let Some(transposed_f16) = hybrid.ssm_out.transposed_f16.as_ref() {
+            attention.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.gated_delta_buffer,
+            )?;
+            attention.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                hybrid.ssm_out.host.columns,
+            )?;
+            attention.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                hybrid.ssm_out.host.columns,
+                hybrid.ssm_out.host.rows,
+            )?;
+        } else {
+            attention.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                z_offset,
+                &plan.hybrid_norm_buffer,
+                0,
+                v_size,
+                &plan.activated_q8_1_buffer,
+            )?;
+            attention.quantized_matvec_q8_1(
+                &hybrid.ssm_out.storage,
+                0,
+                hybrid.ssm_out.host.mode,
+                hybrid.ssm_out.host.rows,
+                hybrid.ssm_out.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        }
+        let attention_report = attention
+            .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        *kernel_count = kernel_count.saturating_add(attention_report.encoded_operations);
+
+        let device_conv = plan
+            .conv_buffer
+            .read_f32_at_offset(0, qkv_rows)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_decay = plan
+            .decay_buffer
+            .read_f32_at_offset(0, alpha_rows)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_beta = plan
+            .beta_buffer
+            .read_f32_at_offset(0, alpha_rows)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_qkv_norm = plan
+            .qkv_norm_buffer
+            .read_f32_at_offset(0, v_offset.saturating_add(v_size))
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_gated_delta = plan
+            .gated_delta_buffer
+            .read_f32_at_offset(0, v_size)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_hybrid_norm = plan
+            .hybrid_norm_buffer
+            .read_f32_at_offset(0, v_size)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_projected = plan
+            .projected_buffer
+            .read_f32_at_offset(0, hidden_size)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_conv_state = state
+            .conv_state
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device_delta_state = state
+            .delta_state
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+
+        let mut tail = backend
+            .begin_submission()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        tail.add_residual_rms_norm_q8_1(
+            &plan.projected_buffer,
+            &plan.current_hidden_buffer,
+            None,
+            &self.post_attention_norm_device,
+            &plan.current_hidden_buffer,
+            &plan.hidden_norm_buffer,
+            &plan.matvec_input_q8_1_buffer,
+            hidden_size,
+            epsilon,
+        )?;
+        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+            tail.cast_f32_to_f16(
+                &plan.hidden_norm_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_gate_up.columns,
+            )?;
+            tail.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.matvec_output_buffer,
+                1,
+                self.ffn_gate_up.columns,
+                self.ffn_gate_up.total_rows(),
+            )?;
+        } else {
+            tail.quantized_matvec_q8_1(
+                &self.ffn_gate_up.storage,
+                0,
+                self.ffn_gate_up.mode,
+                self.ffn_gate_up.total_rows(),
+                self.ffn_gate_up.columns,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                &plan.matvec_output_buffer,
+            )?;
+        }
+        let gate_rows = self.ffn_gate_up.rows_per_projection[0];
+        let up_rows = self.ffn_gate_up.rows_per_projection[1];
+        if gate_rows != up_rows {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 dense ffn gate/up width mismatch: gate={} up={}",
+                    gate_rows, up_rows
+                )),
+            ));
+        }
+        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+            tail.silu_mul_f32(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.gated_delta_buffer,
+            )?;
+            tail.cast_f32_to_f16(
+                &plan.gated_delta_buffer,
+                &plan.vector_f16_buffer,
+                self.ffn_down.host.columns,
+            )?;
+            tail.matmul_f16_to_f32(
+                &plan.vector_f16_buffer,
+                transposed_f16,
+                &plan.projected_buffer,
+                1,
+                self.ffn_down.host.columns,
+                self.ffn_down.host.rows,
+            )?;
+        } else {
+            tail.silu_mul_q8_1(
+                &plan.matvec_output_buffer,
+                0,
+                &plan.matvec_output_buffer,
+                gate_rows,
+                gate_rows,
+                &plan.activated_q8_1_buffer,
+            )?;
+            tail.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        }
+        tail.add_f32_in_place(
+            &plan.current_hidden_buffer,
+            0,
+            &plan.projected_buffer,
+            hidden_size,
+        )?;
+        let tail_report = tail
+            .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        *kernel_count = kernel_count.saturating_add(tail_report.encoded_operations);
+
+        let device_final_hidden = plan
+            .current_hidden_buffer
+            .read_f32_at_offset(0, hidden_size)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        eprintln!(
+            "qwen35_hybrid_compare position={} layer={} conv_diff={:.6} decay_diff={:.6} beta_diff={:.6} qkv_norm_diff={:.6} gated_diff={:.6} hybrid_norm_diff={:.6} projected_diff={:.6} conv_state_diff={:.6} delta_state_diff={:.6} final_hidden_diff={:.6}",
+            position,
+            layer_index,
+            max_abs_diff(device_conv.as_slice(), host.conv.as_slice())?,
+            max_abs_diff(device_decay.as_slice(), host.decay.as_slice())?,
+            max_abs_diff(device_beta.as_slice(), host.beta.as_slice())?,
+            max_abs_diff(device_qkv_norm.as_slice(), host.qkv_norm.as_slice())?,
+            max_abs_diff(device_gated_delta.as_slice(), host.gated_delta.as_slice())?,
+            max_abs_diff(device_hybrid_norm.as_slice(), host.hybrid_norm.as_slice())?,
+            max_abs_diff(device_projected.as_slice(), host.projected.as_slice())?,
+            max_abs_diff(device_conv_state.as_slice(), host.next_conv_state.as_slice())?,
+            max_abs_diff(device_delta_state.as_slice(), host.next_delta_state.as_slice())?,
+            max_abs_diff(device_final_hidden.as_slice(), host.final_hidden.as_slice())?,
+        );
+        Ok(())
+    }
+
+    fn compute_qwen35_hybrid_host_debug(
+        &self,
+        hybrid: &Qwen35HybridLayer,
+        input_hidden: &[f32],
+        conv_state: &[f32],
+        delta_state: &[f32],
+        epsilon: f32,
+    ) -> Result<Qwen35HybridHostDebug, ReferenceTextGenerationError> {
+        let hidden_norm = rms_norm(input_hidden, self.attention_norm.as_slice(), epsilon);
+        let projected = hybrid.qkv_gate_alpha_beta.host_matvec(hidden_norm.as_slice())?;
+        let qkv = projected
+            .slice(0)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let z = projected
+            .slice(1)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let alpha = projected
+            .slice(2)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let beta = projected
+            .slice(3)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let q_size = hybrid.group_count.saturating_mul(hybrid.state_size);
+        let k_size = q_size;
+        let v_size = hybrid.inner_size;
+        let v_offset = q_size.saturating_add(k_size);
+
+        let mut next_conv_state = conv_state.to_vec();
+        let mut conv = vec![0.0_f32; qkv.len()];
+        causal_depthwise_conv1d_step_in_place(
+            qkv,
+            next_conv_state.as_mut_slice(),
+            &hybrid.ssm_conv1d,
+            hybrid.conv_kernel,
+            conv.as_mut_slice(),
+        )?;
+        silu_forward_in_place(conv.as_mut_slice());
+
+        let mut gate_preexp = vec![0.0_f32; alpha.len()];
+        let mut decay = vec![0.0_f32; alpha.len()];
+        let mut beta_sigmoid = vec![0.0_f32; beta.len()];
+        for index in 0..alpha.len() {
+            let gate = softplus(alpha[index] + hybrid.ssm_dt[index]) * hybrid.ssm_a[index];
+            gate_preexp[index] = gate;
+            decay[index] = gate.exp();
+            beta_sigmoid[index] = sigmoid(beta[index]);
+        }
+
+        let q_scale = vec![1.0_f32 / hybrid.state_size as f32; hybrid.state_size];
+        let k_scale = vec![1.0_f32 / (hybrid.state_size as f32).sqrt(); hybrid.state_size];
+        let mut qkv_norm = vec![0.0_f32; v_offset.saturating_add(v_size)];
+        per_head_rms_norm_into(
+            &conv[..q_size],
+            hybrid.group_count,
+            hybrid.state_size,
+            q_scale.as_slice(),
+            1e-6,
+            &mut qkv_norm[..q_size],
+        );
+        per_head_rms_norm_into(
+            &conv[q_size..q_size + k_size],
+            hybrid.group_count,
+            hybrid.state_size,
+            k_scale.as_slice(),
+            1e-6,
+            &mut qkv_norm[q_size..q_size + k_size],
+        );
+        qkv_norm[v_offset..v_offset + v_size].copy_from_slice(&conv[v_offset..v_offset + v_size]);
+
+        let mut next_delta_state = delta_state.to_vec();
+        let mut gated_delta = vec![0.0_f32; v_size];
+        let mut norm_q = vec![0.0_f32; hybrid.state_size];
+        let mut norm_k = vec![0.0_f32; hybrid.state_size];
+        let mut kv_mem = vec![0.0_f32; hybrid.state_size];
+        let mut delta = vec![0.0_f32; hybrid.state_size];
+        let repeat_factor = hybrid.time_step_rank / hybrid.group_count.max(1);
+        for value_head_index in 0..hybrid.time_step_rank {
+            let key_head_index = if hybrid.v_head_reordered {
+                value_head_index % hybrid.group_count.max(1)
+            } else if repeat_factor > 0 {
+                value_head_index / repeat_factor
+            } else {
+                0
+            };
+            let q = &qkv_norm[key_head_index * hybrid.state_size
+                ..(key_head_index + 1) * hybrid.state_size];
+            let k = &qkv_norm[q_size + key_head_index * hybrid.state_size
+                ..q_size + (key_head_index + 1) * hybrid.state_size];
+            let v = &qkv_norm[v_offset + value_head_index * hybrid.state_size
+                ..v_offset + (value_head_index + 1) * hybrid.state_size];
+            let state_slice = &mut next_delta_state[value_head_index
+                .saturating_mul(hybrid.state_size)
+                .saturating_mul(hybrid.state_size)
+                ..(value_head_index + 1)
+                    .saturating_mul(hybrid.state_size)
+                    .saturating_mul(hybrid.state_size)];
+            let output_slice = &mut gated_delta[value_head_index * hybrid.state_size
+                ..(value_head_index + 1) * hybrid.state_size];
+            delta_net_autoregressive_step_in_place(
+                q,
+                k,
+                v,
+                gate_preexp[value_head_index],
+                beta_sigmoid[value_head_index],
+                state_slice,
+                norm_q.as_mut_slice(),
+                norm_k.as_mut_slice(),
+                kv_mem.as_mut_slice(),
+                delta.as_mut_slice(),
+                output_slice,
+            );
+        }
+
+        let hybrid_norm = per_head_rms_norm(
+            gated_delta.as_slice(),
+            hybrid.time_step_rank,
+            hybrid.state_size,
+            hybrid.ssm_norm.as_slice(),
+            epsilon,
+        );
+        let activated = hybrid_norm
+            .iter()
+            .copied()
+            .zip(z.iter().copied())
+            .map(|(value, gate)| value * silu_scalar(gate))
+            .collect::<Vec<_>>();
+        let projected = hybrid
+            .ssm_out
+            .host_matvec(activated.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let post_attention = add_vectors(projected.as_slice(), input_hidden)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let post_attention_norm =
+            rms_norm(post_attention.as_slice(), self.post_attention_norm.as_slice(), epsilon);
+        let gate_up = self
+            .ffn_gate_up
+            .host_matvec(post_attention_norm.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let ffn = silu_glu(
+            gate_up
+                .slice(0)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            gate_up
+                .slice(1)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+        );
+        let ffn_down = self
+            .ffn_down
+            .host_matvec(ffn.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let final_hidden = add_vectors(post_attention.as_slice(), ffn_down.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        Ok(Qwen35HybridHostDebug {
+            conv,
+            decay,
+            beta: beta_sigmoid,
+            qkv_norm,
+            gated_delta,
+            hybrid_norm,
+            projected,
+            next_conv_state,
+            next_delta_state,
+            final_hidden,
+        })
     }
 }
 
@@ -2982,6 +4790,7 @@ struct Qwen35HybridLayer {
     group_count: usize,
     time_step_rank: usize,
     conv_kernel: usize,
+    v_head_reordered: bool,
 }
 
 impl Qwen35HybridLayer {
@@ -3008,6 +4817,11 @@ impl Qwen35HybridLayer {
             required_tensor_name(layout.ssm_norm_weight.as_deref(), "ssm_norm")?,
         )?;
         let state_size = family_fact_usize(metadata, "qwen35.ssm.state_size")?;
+        // Ollama applies L2 normalization to q/k, then scales q by
+        // `1 / sqrt(head_v_dim)`. Our CUDA kernels use RMS-style normalization
+        // with constant weights, so the weights must absorb the
+        // `sqrt(state_size)` conversion from RMS to L2 space:
+        // q = RMSNorm(x) * (1 / state_size), k = RMSNorm(x) * (1 / sqrt(state_size)).
         let q_scale = 1.0_f32 / state_size as f32;
         let k_scale = 1.0_f32 / (state_size as f32).sqrt();
         Ok(Self {
@@ -3053,6 +4867,7 @@ impl Qwen35HybridLayer {
             group_count: family_fact_usize(metadata, "qwen35.ssm.group_count")?,
             time_step_rank: family_fact_usize(metadata, "qwen35.ssm.time_step_rank")?,
             conv_kernel: family_fact_usize(metadata, "qwen35.ssm.conv_kernel")?,
+            v_head_reordered: family_fact_bool(metadata, "qwen35.ssm.v_head_reordered")?,
         })
     }
 
@@ -3139,12 +4954,20 @@ struct Qwen35HybridState {
 #[derive(Clone, Debug)]
 struct Qwen35FullAttentionLayer {
     qkv: CudaQuantizedProjectionGroup,
+    native_qkv: Option<CudaQwen35FullAttentionQkv>,
     query_norm: Vec<f32>,
     query_norm_device: CudaBuffer,
     key_norm: Vec<f32>,
     key_norm_device: CudaBuffer,
     output: CudaQuantizedMatrix,
     kv_width: usize,
+}
+
+#[derive(Clone, Debug)]
+struct CudaQwen35FullAttentionQkv {
+    query_gate: CudaQuantizedMatrix,
+    key: CudaQuantizedMatrix,
+    value: CudaQuantizedMatrix,
 }
 
 impl Qwen35FullAttentionLayer {
@@ -3154,15 +4977,34 @@ impl Qwen35FullAttentionLayer {
         layout: &psionic_models::GgufDecoderLayerTensorLayout,
         _metadata: &GgufDecoderFamilyMetadata,
     ) -> Result<Self, ModelLoadError> {
-        let qkv = load_cuda_quantized_projection_group(
+        let query_name = required_tensor_name(layout.attention_query_weight.as_deref(), "attn_q")?;
+        let key_name = required_tensor_name(layout.attention_key_weight.as_deref(), "attn_k")?;
+        let value_name = required_tensor_name(layout.attention_value_weight.as_deref(), "attn_v")?;
+        let mut qkv = load_cuda_quantized_projection_group(
             backend,
             artifact,
-            &[
-                required_tensor_name(layout.attention_query_weight.as_deref(), "attn_q")?,
-                required_tensor_name(layout.attention_key_weight.as_deref(), "attn_k")?,
-                required_tensor_name(layout.attention_value_weight.as_deref(), "attn_v")?,
-            ],
+            &[query_name, key_name, value_name],
         )?;
+        let native_qkv = if qkv
+            .host_parts
+            .iter()
+            .all(|part| can_use_q8_1_quantized_matvec(part.mode))
+            && qkv
+                .host_parts
+                .windows(2)
+                .any(|window| window[0].mode != window[1].mode)
+        {
+            Some(CudaQwen35FullAttentionQkv {
+                query_gate: load_cuda_quantized_matrix(backend, artifact, query_name)?,
+                key: load_cuda_quantized_matrix(backend, artifact, key_name)?,
+                value: load_cuda_quantized_matrix(backend, artifact, value_name)?,
+            })
+        } else {
+            None
+        };
+        if native_qkv.is_some() {
+            qkv.transposed_f16 = None;
+        }
         let query_norm = load_dense_vector(
             artifact,
             required_tensor_name(layout.attention_query_norm.as_deref(), "attn_q_norm")?,
@@ -3174,6 +5016,7 @@ impl Qwen35FullAttentionLayer {
         Ok(Self {
             kv_width: qkv.rows_per_projection[1],
             qkv,
+            native_qkv,
             query_norm_device: upload_f32_buffer(
                 backend,
                 query_norm.as_slice(),
@@ -3334,6 +5177,7 @@ struct Qwen35ForwardStep {
 struct Qwen35CudaStepPlan {
     matvec_input_buffer: CudaBuffer,
     matvec_input_q8_1_buffer: CudaBuffer,
+    vector_f16_buffer: CudaBuffer,
     matvec_output_buffer: CudaBuffer,
     current_hidden_buffer: CudaBuffer,
     decode_params_host_buffer: CudaHostBuffer,
@@ -3379,6 +5223,9 @@ impl Qwen35CudaStepPlan {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             matvec_input_q8_1_buffer: backend
                 .byte_buffer(&vec![0_u8; q8_1_bytes])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            vector_f16_buffer: backend
+                .f16_buffer(max_input_columns)
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             matvec_output_buffer: backend
                 .f32_buffer(max_output_rows)
@@ -3469,7 +5316,7 @@ impl Qwen35CudaStepPlan {
         }
         self.matvec_input_buffer.write_f32_at_offset(0, input)?;
         let mut submission = backend.begin_submission()?;
-        if can_use_q8_1_mmvq(mode) {
+        if can_use_q8_1_quantized_matvec(mode) {
             submission.quantize_f32_to_q8_1(
                 &self.matvec_input_buffer,
                 1,
@@ -3532,7 +5379,7 @@ impl Qwen35CudaStepPlan {
         }
         self.matvec_input_buffer.write_f32_at_offset(0, input)?;
         let mut submission = backend.begin_submission()?;
-        if can_use_q8_1_mmvq(mode) {
+        if can_use_q8_1_quantized_matvec(mode) {
             submission.quantize_f32_to_q8_1(
                 &self.matvec_input_buffer,
                 1,
@@ -3587,13 +5434,29 @@ impl Qwen35CudaStepPlan {
         input: &CudaBuffer,
         norm_weight: &CudaBuffer,
         epsilon: f32,
+        transposed_f16: Option<&CudaBuffer>,
         weights: &CudaBuffer,
         mode: QuantizationMode,
         rows: usize,
         cols: usize,
     ) -> Result<(Vec<f32>, CudaQuantizedMatvecStats), crate::RuntimeError> {
         let mut submission = backend.begin_submission()?;
-        if can_use_q8_1_mmvq(mode) {
+        if let Some(transposed_f16) = transposed_f16 {
+            submission.rms_norm(input, norm_weight, &self.matvec_input_buffer, cols, epsilon)?;
+            submission.cast_f32_to_f16(
+                &self.matvec_input_buffer,
+                &self.vector_f16_buffer,
+                cols,
+            )?;
+            submission.matmul_f16_to_f32(
+                &self.vector_f16_buffer,
+                transposed_f16,
+                &self.logits_buffer,
+                1,
+                cols,
+                rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(mode) {
             submission.rms_norm_q8_1(
                 input,
                 norm_weight,
@@ -3657,7 +5520,7 @@ impl Qwen35CudaStepPlan {
         }
         self.matvec_input_buffer.write_f32_at_offset(0, input)?;
         let mut submission = backend.begin_submission()?;
-        let (selected, device_to_host_bytes, kernel_launches) = if can_use_q8_1_mmvq(mode) {
+        let (selected, device_to_host_bytes, kernel_launches) = if can_use_q8_1_argmax(mode) {
             self.argmax_state_host_buffer
                 .write_bytes(initial_cuda_argmax_pair_bytes().as_slice())?;
             submission.quantize_f32_to_q8_1(
@@ -3689,6 +5552,37 @@ impl Qwen35CudaStepPlan {
                     },
                 )?,
                 std::mem::size_of::<u64>().try_into().unwrap_or(u64::MAX),
+                report.encoded_operations,
+            )
+        } else if can_use_q8_1_quantized_matvec(mode) {
+            submission.quantize_f32_to_q8_1(
+                &self.matvec_input_buffer,
+                1,
+                cols,
+                &self.matvec_input_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                weights,
+                0,
+                mode,
+                rows,
+                cols,
+                &self.matvec_input_q8_1_buffer,
+                None,
+                &self.logits_buffer,
+            )?;
+            submission.argmax_f32(&self.logits_buffer, 1, rows, &self.next_token_buffer)?;
+            submission
+                .copy_device_to_host(&self.next_token_buffer, &self.next_token_host_buffer)?;
+            let report = submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
+            (
+                cuda_argmax_token_id(self.next_token_host_buffer.read_i32()?).map_err(|error| {
+                    match error {
+                        ReferenceTextGenerationError::Runtime(runtime) => runtime,
+                        other => crate::RuntimeError::Backend(other.to_string()),
+                    }
+                })?,
+                std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX),
                 report.encoded_operations,
             )
         } else {
@@ -3739,6 +5633,7 @@ impl Qwen35CudaStepPlan {
         input: &CudaBuffer,
         norm_weight: &CudaBuffer,
         epsilon: f32,
+        transposed_f16: Option<&CudaBuffer>,
         weights: &CudaBuffer,
         mode: QuantizationMode,
         rows: usize,
@@ -3746,7 +5641,43 @@ impl Qwen35CudaStepPlan {
     ) -> Result<(TokenId, CudaQuantizedMatvecStats), crate::RuntimeError> {
         let mut submission = backend.begin_submission()?;
         let (selected, host_to_device_bytes, device_to_host_bytes, kernel_launches) =
-            if can_use_q8_1_mmvq(mode) {
+            if let Some(transposed_f16) = transposed_f16 {
+                submission.rms_norm(
+                    input,
+                    norm_weight,
+                    &self.matvec_input_buffer,
+                    cols,
+                    epsilon,
+                )?;
+                submission.cast_f32_to_f16(
+                    &self.matvec_input_buffer,
+                    &self.vector_f16_buffer,
+                    cols,
+                )?;
+                submission.matmul_f16_to_f32(
+                    &self.vector_f16_buffer,
+                    transposed_f16,
+                    &self.logits_buffer,
+                    1,
+                    cols,
+                    rows,
+                )?;
+                submission.argmax_f32(&self.logits_buffer, 1, rows, &self.next_token_buffer)?;
+                submission
+                    .copy_device_to_host(&self.next_token_buffer, &self.next_token_host_buffer)?;
+                let report = submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
+                (
+                    cuda_argmax_token_id(self.next_token_host_buffer.read_i32()?).map_err(
+                        |error| match error {
+                            ReferenceTextGenerationError::Runtime(runtime) => runtime,
+                            other => crate::RuntimeError::Backend(other.to_string()),
+                        },
+                    )?,
+                    0,
+                    std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX),
+                    report.encoded_operations,
+                )
+            } else if can_use_q8_1_argmax(mode) {
                 self.argmax_state_host_buffer
                     .write_bytes(initial_cuda_argmax_pair_bytes().as_slice())?;
                 submission.rms_norm_q8_1(
@@ -3783,6 +5714,39 @@ impl Qwen35CudaStepPlan {
                         })?,
                     std::mem::size_of::<u64>().try_into().unwrap_or(u64::MAX),
                     std::mem::size_of::<u64>().try_into().unwrap_or(u64::MAX),
+                    report.encoded_operations,
+                )
+            } else if can_use_q8_1_quantized_matvec(mode) {
+                submission.rms_norm_q8_1(
+                    input,
+                    norm_weight,
+                    &self.matvec_input_q8_1_buffer,
+                    cols,
+                    epsilon,
+                )?;
+                submission.quantized_matvec_q8_1(
+                    weights,
+                    0,
+                    mode,
+                    rows,
+                    cols,
+                    &self.matvec_input_q8_1_buffer,
+                    None,
+                    &self.logits_buffer,
+                )?;
+                submission.argmax_f32(&self.logits_buffer, 1, rows, &self.next_token_buffer)?;
+                submission
+                    .copy_device_to_host(&self.next_token_buffer, &self.next_token_host_buffer)?;
+                let report = submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
+                (
+                    cuda_argmax_token_id(self.next_token_host_buffer.read_i32()?).map_err(
+                        |error| match error {
+                            ReferenceTextGenerationError::Runtime(runtime) => runtime,
+                            other => crate::RuntimeError::Backend(other.to_string()),
+                        },
+                    )?,
+                    0,
+                    std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX),
                     report.encoded_operations,
                 )
             } else {
@@ -3990,6 +5954,21 @@ impl DenseMatrix {
     fn host_residency_bytes(&self) -> usize {
         vec_f32_bytes(self.values.as_slice())
     }
+
+    fn matvec(&self, input: &[f32]) -> Result<Vec<f32>, crate::RuntimeError> {
+        if input.len() != self.columns {
+            return Err(crate::RuntimeError::Backend(format!(
+                "dense matvec input width mismatch: expected {}, actual {}",
+                self.columns,
+                input.len()
+            )));
+        }
+        Ok(self
+            .values
+            .chunks_exact(self.columns)
+            .map(|row| dot(row, input))
+            .collect())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -4022,17 +6001,42 @@ impl QuantizedMatrix {
         decode_quantized_row_into(self.mode, bytes, &mut output)?;
         Ok(output)
     }
+
+    fn matvec(&self, input: &[f32]) -> Result<Vec<f32>, crate::RuntimeError> {
+        if input.len() != self.columns {
+            return Err(crate::RuntimeError::Backend(format!(
+                "quantized matvec input width mismatch: expected {}, actual {}",
+                self.columns,
+                input.len()
+            )));
+        }
+        let bytes = self.storage.bytes().map_err(model_load_runtime_error)?;
+        let mut decoded = Vec::with_capacity(self.columns);
+        let mut output = Vec::with_capacity(self.rows);
+        for row_bytes in bytes.chunks_exact(self.row_byte_len) {
+            decoded.clear();
+            decode_quantized_row_into(self.mode, row_bytes, &mut decoded)?;
+            output.push(dot(decoded.as_slice(), input));
+        }
+        Ok(output)
+    }
 }
 
 #[derive(Clone, Debug)]
 struct CudaQuantizedMatrix {
     storage: CudaBuffer,
     host: QuantizedMatrix,
+    transposed_f16: Option<CudaBuffer>,
 }
 
 impl CudaQuantizedMatrix {
     fn device_residency_bytes(&self) -> usize {
-        self.storage.byte_len()
+        self.storage.byte_len().saturating_add(
+            self.transposed_f16
+                .as_ref()
+                .map(CudaBuffer::byte_len)
+                .unwrap_or(0),
+        )
     }
 
     fn matvec_profiled(
@@ -4053,20 +6057,49 @@ impl CudaQuantizedMatrix {
             output,
         )
     }
+
+    fn host_matvec(&self, input: &[f32]) -> Result<Vec<f32>, crate::RuntimeError> {
+        self.host.matvec(input)
+    }
 }
 
 #[derive(Clone, Debug)]
 struct CudaQuantizedProjectionGroup {
     storage: CudaBuffer,
+    host_parts: Vec<QuantizedMatrix>,
     rows_per_projection: Vec<usize>,
     columns: usize,
     mode: QuantizationMode,
+    transposed_f16: Option<CudaBuffer>,
 }
 
 #[derive(Clone, Debug)]
 struct ProjectionOutputs {
     values: Vec<f32>,
     spans: Vec<(usize, usize)>,
+}
+
+#[derive(Clone, Debug)]
+struct Qwen35HybridHostDebug {
+    conv: Vec<f32>,
+    decay: Vec<f32>,
+    beta: Vec<f32>,
+    qkv_norm: Vec<f32>,
+    gated_delta: Vec<f32>,
+    hybrid_norm: Vec<f32>,
+    projected: Vec<f32>,
+    next_conv_state: Vec<f32>,
+    next_delta_state: Vec<f32>,
+    final_hidden: Vec<f32>,
+}
+
+struct LoadedQuantizedProjectionPart {
+    name: String,
+    mode: QuantizationMode,
+    rows: usize,
+    columns: usize,
+    row_byte_len: usize,
+    bytes: Vec<u8>,
 }
 
 impl ProjectionOutputs {
@@ -4090,7 +6123,12 @@ impl CudaQuantizedProjectionGroup {
     }
 
     fn device_residency_bytes(&self) -> usize {
-        self.storage.byte_len()
+        self.storage.byte_len().saturating_add(
+            self.transposed_f16
+                .as_ref()
+                .map(CudaBuffer::byte_len)
+                .unwrap_or(0),
+        )
     }
 
     fn matvec_profiled(
@@ -4114,6 +6152,21 @@ impl CudaQuantizedProjectionGroup {
             ProjectionOutputs::new(self.rows_per_projection.as_slice(), values)?,
             stats,
         ))
+    }
+
+    fn host_matvec(&self, input: &[f32]) -> Result<ProjectionOutputs, crate::RuntimeError> {
+        if input.len() != self.columns {
+            return Err(crate::RuntimeError::Backend(format!(
+                "packed projection host matvec input width mismatch: expected {}, actual {}",
+                self.columns,
+                input.len()
+            )));
+        }
+        let mut values = Vec::with_capacity(self.total_rows());
+        for matrix in &self.host_parts {
+            values.extend(matrix.matvec(input)?);
+        }
+        ProjectionOutputs::new(self.rows_per_projection.as_slice(), values)
     }
 }
 
@@ -4182,13 +6235,38 @@ fn load_cuda_quantized_matrix(
     name: &str,
 ) -> Result<CudaQuantizedMatrix, ModelLoadError> {
     let host = load_quantized_matrix(artifact, name)?;
+    let transposed_f16 = if qwen35_requires_dense_f16_mirror(host.mode) {
+        Some(
+            try_build_cuda_transposed_f16_mirror(
+                backend,
+                name,
+                host.mode,
+                host.rows,
+                host.columns,
+                host.row_byte_len,
+                host.storage.bytes()?,
+            )?
+            .ok_or_else(|| ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!(
+                    "failed to build required qwen35 cuda f16 transpose mirror for `{name}`"
+                ),
+            })?,
+        )
+    } else {
+        None
+    };
     let storage = backend
         .byte_buffer(host.storage.bytes()?)
         .map_err(|error| ModelLoadError::ArtifactFormat {
             format: String::from("gguf"),
             message: format!("failed to upload `{name}` to cuda: {error}"),
         })?;
-    Ok(CudaQuantizedMatrix { storage, host })
+    Ok(CudaQuantizedMatrix {
+        storage,
+        host,
+        transposed_f16,
+    })
 }
 
 fn load_cuda_quantized_projection_group(
@@ -4200,18 +6278,14 @@ fn load_cuda_quantized_projection_group(
     let mut columns = None;
     let mut row_byte_len = None;
     let mut rows_per_projection = Vec::with_capacity(names.len());
-    let mut projection_bytes = Vec::with_capacity(names.len());
+    let mut host_parts = Vec::with_capacity(names.len());
+    let mut projections = Vec::with_capacity(names.len());
+    let mut mixed_quantization = false;
     for name in names {
         let projection = load_quantized_matrix(artifact, name)?;
         if let Some(expected_mode) = mode {
             if projection.mode != expected_mode {
-                return Err(ModelLoadError::ArtifactFormat {
-                    format: String::from("gguf"),
-                    message: format!(
-                        "packed qwen35 cuda projection requires matching quantization; `{name}` had {:?} but expected {:?}",
-                        projection.mode, expected_mode
-                    ),
-                });
+                mixed_quantization = true;
             }
         } else {
             mode = Some(projection.mode);
@@ -4231,24 +6305,26 @@ fn load_cuda_quantized_projection_group(
         }
         if let Some(expected_row_byte_len) = row_byte_len {
             if projection.row_byte_len != expected_row_byte_len {
-                return Err(ModelLoadError::ArtifactFormat {
-                    format: String::from("gguf"),
-                    message: format!(
-                        "packed qwen35 cuda projection requires matching row layout; `{name}` had {} but expected {}",
-                        projection.row_byte_len, expected_row_byte_len
-                    ),
-                });
+                mixed_quantization = true;
             }
         } else {
             row_byte_len = Some(projection.row_byte_len);
         }
         rows_per_projection.push(projection.rows);
-        projection_bytes.push(projection.storage.bytes()?.to_vec());
+        host_parts.push(projection.clone());
+        projections.push(LoadedQuantizedProjectionPart {
+            name: String::from(*name),
+            mode: projection.mode,
+            rows: projection.rows,
+            columns: projection.columns,
+            row_byte_len: projection.row_byte_len,
+            bytes: projection.storage.bytes()?.to_vec(),
+        });
     }
     let packed = pack_quantized_projection_bytes(
-        projection_bytes
+        projections
             .iter()
-            .map(Vec::as_slice)
+            .map(|projection| projection.bytes.as_slice())
             .collect::<Vec<_>>()
             .as_slice(),
     );
@@ -4256,6 +6332,30 @@ fn load_cuda_quantized_projection_group(
     let resolved_columns = columns.expect("projection group should resolve columns");
     let _resolved_row_byte_len =
         row_byte_len.expect("projection group should resolve row byte length");
+    let total_rows = rows_per_projection
+        .iter()
+        .copied()
+        .fold(0usize, usize::saturating_add);
+    let transposed_f16 = if mixed_quantization || qwen35_requires_dense_f16_mirror(resolved_mode) {
+        Some(
+            try_build_cuda_projection_group_transposed_f16_mirror(
+                backend,
+                names.join(", ").as_str(),
+                projections.as_slice(),
+                total_rows,
+                resolved_columns,
+            )?
+            .ok_or_else(|| ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!(
+                    "failed to build required qwen35 cuda f16 transpose mirror for packed projection `{}`",
+                    names.join(", ")
+                ),
+            })?,
+        )
+    } else {
+        None
+    };
     let storage =
         backend
             .byte_buffer(packed.as_slice())
@@ -4268,9 +6368,11 @@ fn load_cuda_quantized_projection_group(
             })?;
     Ok(CudaQuantizedProjectionGroup {
         storage,
+        host_parts,
         rows_per_projection,
         columns: resolved_columns,
         mode: resolved_mode,
+        transposed_f16,
     })
 }
 
@@ -4284,6 +6386,144 @@ fn pack_quantized_projection_bytes(projections: &[&[u8]]) -> Vec<u8> {
         packed.extend_from_slice(bytes);
     }
     packed
+}
+
+fn decode_quantized_projection_group_bytes_transposed_f16(
+    projections: &[LoadedQuantizedProjectionPart],
+    total_rows: usize,
+    columns: usize,
+    name: &str,
+) -> Result<Vec<u8>, ModelLoadError> {
+    let mut transposed = vec![
+        0_u8;
+        total_rows
+            .saturating_mul(columns)
+            .saturating_mul(std::mem::size_of::<u16>())
+    ];
+    let mut decoded_row = Vec::with_capacity(columns);
+    let mut row_offset = 0usize;
+    for projection in projections {
+        if projection.columns != columns {
+            return Err(ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!(
+                    "packed projection `{name}` width mismatch while building f16 transpose: expected {columns}, actual {} for `{}`",
+                    projection.columns, projection.name
+                ),
+            });
+        }
+        let expected_bytes = projection.rows.saturating_mul(projection.row_byte_len);
+        if projection.bytes.len() != expected_bytes {
+            return Err(ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!(
+                    "packed projection `{name}` byte length mismatch while building f16 transpose for `{}`: expected {expected_bytes}, actual {}",
+                    projection.name,
+                    projection.bytes.len()
+                ),
+            });
+        }
+        for (row_index, row_bytes) in projection
+            .bytes
+            .chunks_exact(projection.row_byte_len)
+            .enumerate()
+        {
+            decoded_row.clear();
+            decode_quantized_row_into(projection.mode, row_bytes, &mut decoded_row).map_err(
+                |error| ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "failed to decode quantized tensor `{}` while building packed projection f16 transpose `{name}`: {error}",
+                        projection.name
+                    ),
+                },
+            )?;
+            if decoded_row.len() != columns {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "packed projection `{name}` decode width mismatch for `{}` while building f16 transpose: expected {columns}, actual {}",
+                        projection.name,
+                        decoded_row.len()
+                    ),
+                });
+            }
+            let packed_row_index = row_offset.saturating_add(row_index);
+            for (column_index, value) in decoded_row.iter().copied().enumerate() {
+                let offset = column_index
+                    .saturating_mul(total_rows)
+                    .saturating_add(packed_row_index)
+                    .saturating_mul(std::mem::size_of::<u16>());
+                transposed[offset..offset + std::mem::size_of::<u16>()]
+                    .copy_from_slice(&f32_to_f16_bits(value).to_le_bytes());
+            }
+        }
+        row_offset = row_offset.saturating_add(projection.rows);
+    }
+    if row_offset != total_rows {
+        return Err(ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "packed projection `{name}` row count mismatch while building f16 transpose: expected {total_rows}, actual {row_offset}"
+            ),
+        });
+    }
+    Ok(transposed)
+}
+
+fn try_build_cuda_projection_group_transposed_f16_mirror(
+    backend: &mut CudaBackend,
+    name: &str,
+    projections: &[LoadedQuantizedProjectionPart],
+    total_rows: usize,
+    columns: usize,
+) -> Result<Option<CudaBuffer>, ModelLoadError> {
+    let transposed = if projections
+        .windows(2)
+        .all(|window| {
+            window[0].mode == window[1].mode && window[0].row_byte_len == window[1].row_byte_len
+        })
+        && !projections.is_empty()
+    {
+        try_build_cuda_transposed_f16_mirror(
+            backend,
+            name,
+            projections[0].mode,
+            total_rows,
+            columns,
+            projections[0].row_byte_len,
+            pack_quantized_projection_bytes(
+                projections
+                    .iter()
+                    .map(|projection| projection.bytes.as_slice())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .as_slice(),
+        )?
+        .map(Some)
+        .unwrap_or(None)
+    } else {
+        let transposed = decode_quantized_projection_group_bytes_transposed_f16(
+            projections,
+            total_rows,
+            columns,
+            name,
+        )?;
+        match backend.byte_buffer(transposed.as_slice()) {
+            Ok(buffer) => Some(buffer),
+            Err(error) if error.to_string().contains("out of memory") => None,
+            Err(error) => {
+                return Err(ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "failed to upload packed projection f16 transpose mirror for `{name}` to cuda: {error}"
+                    ),
+                })
+            }
+        }
+    };
+    Ok(transposed)
 }
 
 fn family_fact_usize(
@@ -4301,8 +6541,250 @@ fn family_fact_usize(
         })
 }
 
+fn family_fact_bool(
+    metadata: &GgufDecoderFamilyMetadata,
+    key: &str,
+) -> Result<bool, ModelLoadError> {
+    metadata
+        .family_facts
+        .get(key)
+        .and_then(GgufMetadataValue::as_bool)
+        .ok_or_else(|| ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!("missing required qwen35 family fact `{key}`"),
+        })
+}
+
 fn gguf_local_blob_open_options() -> LocalBlobOpenOptions {
     LocalBlobOpenOptions::default().with_integrity_policy(BlobIntegrityPolicy::LocalUnverifiedLabel)
+}
+
+fn emit_qwen35_hidden_debug(
+    position: usize,
+    layer_index: usize,
+    kind: &Qwen35LayerKind,
+    buffer: &CudaBuffer,
+    element_count: usize,
+) -> Result<(), ReferenceTextGenerationError> {
+    let values = buffer
+        .read_f32_at_offset(0, element_count)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let mut finite_count = 0usize;
+    let mut nan_count = 0usize;
+    let mut inf_count = 0usize;
+    let mut max_abs = 0.0_f32;
+    for value in values.iter().copied() {
+        if value.is_nan() {
+            nan_count = nan_count.saturating_add(1);
+            continue;
+        }
+        if !value.is_finite() {
+            inf_count = inf_count.saturating_add(1);
+            continue;
+        }
+        finite_count = finite_count.saturating_add(1);
+        max_abs = max_abs.max(value.abs());
+    }
+    let kind = match kind {
+        Qwen35LayerKind::Hybrid(_) => "hybrid",
+        Qwen35LayerKind::FullAttention(_) => "full_attention",
+    };
+    eprintln!(
+        "qwen35_fused_debug position={} layer={} kind={} finite={} nan={} inf={} max_abs={:.6}",
+        position, layer_index, kind, finite_count, nan_count, inf_count, max_abs
+    );
+    Ok(())
+}
+
+fn emit_qwen35_buffer_debug(
+    position: usize,
+    layer_index: usize,
+    label: &str,
+    buffer: &CudaBuffer,
+    element_offset: usize,
+    element_count: usize,
+) -> Result<(), ReferenceTextGenerationError> {
+    if element_count == 0 {
+        return Ok(());
+    }
+    let values = buffer
+        .read_f32_at_offset(element_offset, element_count)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let mut finite_count = 0usize;
+    let mut nan_count = 0usize;
+    let mut inf_count = 0usize;
+    let mut max_abs = 0.0_f32;
+    for value in values.iter().copied() {
+        if value.is_nan() {
+            nan_count = nan_count.saturating_add(1);
+            continue;
+        }
+        if !value.is_finite() {
+            inf_count = inf_count.saturating_add(1);
+            continue;
+        }
+        finite_count = finite_count.saturating_add(1);
+        max_abs = max_abs.max(value.abs());
+    }
+    eprintln!(
+        "qwen35_hybrid_debug position={} layer={} buffer={} offset={} count={} finite={} nan={} inf={} max_abs={:.6}",
+        position,
+        layer_index,
+        label,
+        element_offset,
+        element_count,
+        finite_count,
+        nan_count,
+        inf_count,
+        max_abs
+    );
+    Ok(())
+}
+
+fn emit_qwen35_hybrid_intermediate_debug(
+    position: usize,
+    layer_index: usize,
+    hybrid: &Qwen35HybridLayer,
+    hybrid_state: &Qwen35HybridState,
+    plan: &Qwen35CudaStepPlan,
+    hidden_size: usize,
+) -> Result<(), ReferenceTextGenerationError> {
+    let debug_layer = std::env::var("PSIONIC_QWEN35_DEBUG_HYBRID_LAYER")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok());
+    if debug_layer.is_some() && debug_layer != Some(layer_index) {
+        return Ok(());
+    }
+    let debug_position_min = std::env::var("PSIONIC_QWEN35_DEBUG_HYBRID_POSITION_MIN")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0);
+    if position < debug_position_min {
+        return Ok(());
+    }
+    let qkv_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[0];
+    let z_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[1];
+    let alpha_rows = hybrid.qkv_gate_alpha_beta.rows_per_projection[2];
+    let q_size = hybrid.group_count.saturating_mul(hybrid.state_size);
+    let k_size = q_size;
+    let v_size = hybrid.inner_size;
+    let v_offset = q_size.saturating_add(k_size);
+    let alpha_offset = qkv_rows.saturating_add(z_rows);
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "matvec_output_qkv",
+        &plan.matvec_output_buffer,
+        0,
+        qkv_rows,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "matvec_output_z",
+        &plan.matvec_output_buffer,
+        qkv_rows,
+        z_rows,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "matvec_output_alpha",
+        &plan.matvec_output_buffer,
+        alpha_offset,
+        alpha_rows,
+    )?;
+    emit_qwen35_buffer_debug(position, layer_index, "conv", &plan.conv_buffer, 0, qkv_rows)?;
+    emit_qwen35_buffer_debug(position, layer_index, "decay", &plan.decay_buffer, 0, alpha_rows)?;
+    emit_qwen35_buffer_debug(position, layer_index, "beta", &plan.beta_buffer, 0, alpha_rows)?;
+    emit_qwen35_buffer_debug(position, layer_index, "qkv_norm_q", &plan.qkv_norm_buffer, 0, q_size)?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "qkv_norm_k",
+        &plan.qkv_norm_buffer,
+        q_size,
+        k_size,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "qkv_norm_v",
+        &plan.qkv_norm_buffer,
+        v_offset,
+        v_size,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "gated_delta",
+        &plan.gated_delta_buffer,
+        0,
+        v_size,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "hybrid_norm",
+        &plan.hybrid_norm_buffer,
+        0,
+        v_size,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "projected",
+        &plan.projected_buffer,
+        0,
+        hidden_size,
+    )?;
+    emit_qwen35_buffer_debug(
+        position,
+        layer_index,
+        "delta_state",
+        &hybrid_state.delta_state,
+        0,
+        hybrid
+            .time_step_rank
+            .saturating_mul(hybrid.state_size)
+            .saturating_mul(hybrid.state_size),
+    )?;
+    Ok(())
+}
+
+fn qwen35_hybrid_compare_enabled(layer_index: usize, position: usize) -> bool {
+    if std::env::var_os("PSIONIC_QWEN35_DEBUG_HYBRID_COMPARE").is_none() {
+        return false;
+    }
+    let debug_layer = std::env::var("PSIONIC_QWEN35_DEBUG_HYBRID_LAYER")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok());
+    if debug_layer.is_some() && debug_layer != Some(layer_index) {
+        return false;
+    }
+    let debug_position_min = std::env::var("PSIONIC_QWEN35_DEBUG_HYBRID_POSITION_MIN")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0);
+    position >= debug_position_min
+}
+
+fn max_abs_diff(left: &[f32], right: &[f32]) -> Result<f32, ReferenceTextGenerationError> {
+    if left.len() != right.len() {
+        return Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(format!(
+                "vector width mismatch during qwen35 diff: left={} right={}",
+                left.len(),
+                right.len()
+            )),
+        ));
+    }
+    Ok(left
+        .iter()
+        .copied()
+        .zip(right.iter().copied())
+        .map(|(left, right)| (left - right).abs())
+        .fold(0.0_f32, f32::max))
 }
 
 fn digest_qwen35_cuda_plan(
@@ -4378,6 +6860,88 @@ fn try_build_cuda_host_matrix_row_major_f16_mirror(
         Err(error) => Err(ModelLoadError::ArtifactFormat {
             format: String::from("gguf"),
             message: format!("failed to upload row-major f16 mirror for `{name}` to cuda: {error}"),
+        }),
+    }
+}
+
+fn decode_quantized_matrix_bytes_transposed_f16(
+    mode: QuantizationMode,
+    rows: usize,
+    columns: usize,
+    row_byte_len: usize,
+    bytes: &[u8],
+    name: &str,
+) -> Result<Vec<u8>, ModelLoadError> {
+    let expected_bytes = rows.saturating_mul(row_byte_len);
+    if bytes.len() != expected_bytes {
+        return Err(ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "quantized tensor `{name}` byte length mismatch while building f16 transpose: expected {expected_bytes}, actual {}",
+                bytes.len()
+            ),
+        });
+    }
+    let mut transposed = vec![
+        0_u8;
+        rows.saturating_mul(columns)
+            .saturating_mul(std::mem::size_of::<u16>())
+    ];
+    let mut decoded_row = Vec::with_capacity(columns);
+    for (row_index, row_bytes) in bytes.chunks_exact(row_byte_len).enumerate() {
+        decoded_row.clear();
+        decode_quantized_row_into(mode, row_bytes, &mut decoded_row).map_err(|error| {
+            ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!(
+                    "failed to decode quantized tensor `{name}` while building f16 transpose: {error}"
+                ),
+            }
+        })?;
+        if decoded_row.len() != columns {
+            return Err(ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!(
+                    "quantized tensor `{name}` decode width mismatch while building f16 transpose: expected {columns}, actual {}",
+                    decoded_row.len()
+                ),
+            });
+        }
+        for (column_index, value) in decoded_row.iter().copied().enumerate() {
+            let offset = column_index
+                .saturating_mul(rows)
+                .saturating_add(row_index)
+                .saturating_mul(std::mem::size_of::<u16>());
+            transposed[offset..offset + std::mem::size_of::<u16>()]
+                .copy_from_slice(&f32_to_f16_bits(value).to_le_bytes());
+        }
+    }
+    Ok(transposed)
+}
+
+fn try_build_cuda_transposed_f16_mirror(
+    backend: &mut CudaBackend,
+    name: &str,
+    mode: QuantizationMode,
+    rows: usize,
+    columns: usize,
+    row_byte_len: usize,
+    bytes: &[u8],
+) -> Result<Option<CudaBuffer>, ModelLoadError> {
+    let transposed = decode_quantized_matrix_bytes_transposed_f16(
+        mode,
+        rows,
+        columns,
+        row_byte_len,
+        bytes,
+        name,
+    )?;
+    match backend.byte_buffer(transposed.as_slice()) {
+        Ok(buffer) => Ok(Some(buffer)),
+        Err(error) if error.to_string().contains("out of memory") => Ok(None),
+        Err(error) => Err(ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!("failed to upload f16 transpose mirror for `{name}` to cuda: {error}"),
         }),
     }
 }

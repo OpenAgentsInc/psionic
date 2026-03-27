@@ -1458,6 +1458,10 @@ pub enum QuantizationMode {
     GgmlQ4_0,
     /// GGML/GGUF Q4_1 block quantization.
     GgmlQ4_1,
+    /// GGML/GGUF Q4_K block quantization.
+    GgmlQ4K,
+    /// GGML/GGUF Q6_K block quantization.
+    GgmlQ6K,
     /// GGML/GGUF Q8_0 block quantization.
     GgmlQ8_0,
 }
@@ -1472,6 +1476,8 @@ impl QuantizationMode {
             Self::GgmlMxfp4 => "ggml_mxfp4",
             Self::GgmlQ4_0 => "ggml_q4_0",
             Self::GgmlQ4_1 => "ggml_q4_1",
+            Self::GgmlQ4K => "ggml_q4_k",
+            Self::GgmlQ6K => "ggml_q6_k",
             Self::GgmlQ8_0 => "ggml_q8_0",
         }
     }
@@ -1483,6 +1489,8 @@ impl QuantizationMode {
             Self::GgmlMxfp4 => Some((32, 17)),
             Self::GgmlQ4_0 => Some((32, 18)),
             Self::GgmlQ4_1 => Some((32, 20)),
+            Self::GgmlQ4K => Some((256, 144)),
+            Self::GgmlQ6K => Some((256, 210)),
             Self::GgmlQ8_0 => Some((32, 34)),
             Self::None | Self::Int8Symmetric => None,
         }

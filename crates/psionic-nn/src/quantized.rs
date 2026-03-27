@@ -916,6 +916,8 @@ fn decode_quantized_values(
         QuantizationMode::GgmlMxfp4 => decode_mxfp4_blocks(path, quantized),
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(path, quantized),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(path, quantized),
+        QuantizationMode::GgmlQ4K => decode_q4_k_blocks(path, quantized),
+        QuantizationMode::GgmlQ6K => decode_q6_k_blocks(path, quantized),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(path, quantized),
         QuantizationMode::None => Err(QuantizationError::UnsupportedMode {
             mode: QuantizationMode::None,
@@ -1014,6 +1016,76 @@ fn decode_q4_1_blocks(
     Ok(output)
 }
 
+fn decode_q4_k_blocks(
+    path: &str,
+    quantized: &QuantizedTensorData,
+) -> Result<Vec<f32>, QuantizationError> {
+    validate_ggml_block_layout(path, quantized, 256, 144)?;
+    let mut output = Vec::with_capacity(quantized.layout.element_count());
+    for block in quantized.bytes.chunks_exact(144) {
+        let scale = decode_f16_le(block[0], block[1]);
+        let min = decode_f16_le(block[2], block[3]);
+        let scales = &block[4..16];
+        let quants = &block[16..144];
+        let mut scale_index = 0usize;
+        for quant_chunk in quants.chunks_exact(32) {
+            let (low_scale, low_min) = decode_q4_k_scale_min(scale_index, scales);
+            let low_scale = scale * f32::from(low_scale);
+            let low_min = min * f32::from(low_min);
+            for quant in quant_chunk {
+                output.push(low_scale * f32::from(quant & 0x0f) - low_min);
+            }
+            scale_index = scale_index.saturating_add(1);
+
+            let (high_scale, high_min) = decode_q4_k_scale_min(scale_index, scales);
+            let high_scale = scale * f32::from(high_scale);
+            let high_min = min * f32::from(high_min);
+            for quant in quant_chunk {
+                output.push(high_scale * f32::from((quant >> 4) & 0x0f) - high_min);
+            }
+            scale_index = scale_index.saturating_add(1);
+        }
+    }
+    Ok(output)
+}
+
+fn decode_q6_k_blocks(
+    path: &str,
+    quantized: &QuantizedTensorData,
+) -> Result<Vec<f32>, QuantizationError> {
+    validate_ggml_block_layout(path, quantized, 256, 210)?;
+    let mut output = Vec::with_capacity(quantized.layout.element_count());
+    for block in quantized.bytes.chunks_exact(210) {
+        let ql = &block[0..128];
+        let qh = &block[128..192];
+        let scales = &block[192..208];
+        let scale = decode_f16_le(block[208], block[209]);
+        for chunk_index in 0..2 {
+            let ql_chunk = &ql[chunk_index * 64..(chunk_index + 1) * 64];
+            let qh_chunk = &qh[chunk_index * 32..(chunk_index + 1) * 32];
+            let scale_chunk = &scales[chunk_index * 8..(chunk_index + 1) * 8];
+            for l in 0..32 {
+                let is = l / 16;
+                let q1 =
+                    (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
+                let q2 = (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4))
+                    as i8)
+                    - 32;
+                let q3 =
+                    (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
+                let q4 = (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4))
+                    as i8)
+                    - 32;
+                output.push(scale * f32::from(scale_chunk[is] as i8) * f32::from(q1));
+                output.push(scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
+                output.push(scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
+                output.push(scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4));
+            }
+        }
+    }
+    Ok(output)
+}
+
 fn decode_q8_0_blocks(
     path: &str,
     quantized: &QuantizedTensorData,
@@ -1030,6 +1102,17 @@ fn decode_q8_0_blocks(
         );
     }
     Ok(output)
+}
+
+fn decode_q4_k_scale_min(index: usize, packed: &[u8]) -> (u8, u8) {
+    if index < 4 {
+        (packed[index] & 63, packed[index + 4] & 63)
+    } else {
+        (
+            (packed[index + 4] & 0x0f) | ((packed[index - 4] >> 6) << 4),
+            (packed[index + 4] >> 4) | ((packed[index] >> 6) << 4),
+        )
+    }
 }
 
 fn validate_ggml_block_layout(

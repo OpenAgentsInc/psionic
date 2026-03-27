@@ -240,6 +240,18 @@ This pilot therefore proves native CUDA execution correctness, honest
 publication, and a wider throughput win over the local Ollama baseline on this
 host.
 
+The same native qwen35 CUDA lane now also beats local Ollama on the harvested
+registry `2b` and `4b` rows on this host under the same one-sentence prompt and
+`128` token-cap contract:
+
+- `qwen3.5:2b`: Psionic about `247.21 tok/s`, Ollama about `203.23 tok/s`
+- `qwen3.5:4b`: Psionic about `166.61 tok/s`, Ollama about `141.36 tok/s`
+
+The 4B row needed one extra runtime fix. Its output path includes `Q6_K`
+weights, so the fused greedy decode branch now uses `Q8_1` projection plus
+`argmax_f32` for that output head instead of the slower generic quantized
+matvec path.
+
 The same March 27, 2026 benchmark also shows the current boundary clearly:
 
 - Psionic greedy prompt replay for this prompt now spends about `35-38 ms` on

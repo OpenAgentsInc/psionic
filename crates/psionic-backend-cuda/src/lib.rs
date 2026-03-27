@@ -2112,6 +2112,7 @@ impl CudaSubmission {
         value_head_count: usize,
         key_dim: usize,
         value_dim: usize,
+        v_head_reordered: bool,
         output: &CudaBuffer,
     ) -> Result<(), RuntimeError> {
         self.platform.encode_gated_delta_step_f32(
@@ -2126,6 +2127,7 @@ impl CudaSubmission {
             value_head_count,
             key_dim,
             value_dim,
+            v_head_reordered,
             &output.platform,
         )?;
         self.encoded_operations += 1;
@@ -8992,6 +8994,24 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_q4_k_matvec(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q6_k_matvec(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_mxfp4_matvec(
             weights: *const c_void,
             rows: c_int,
@@ -9072,7 +9092,37 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_q4_k_matvec_q8_1(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q6_k_matvec_q8_1(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_q8_0_matvec_q8_1_argmax(
+            weights: *const c_void,
+            rows: c_int,
+            cols: c_int,
+            row_stride: c_int,
+            input_q8_1: *const c_void,
+            bias: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_q4_k_matvec_q8_1_argmax(
             weights: *const c_void,
             rows: c_int,
             cols: c_int,
@@ -9306,6 +9356,7 @@ mod platform {
             value_head_count: c_int,
             key_dim: c_int,
             value_dim: c_int,
+            v_head_reordered: c_int,
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
@@ -10796,6 +10847,8 @@ mod platform {
             })?;
             let kernel: QuantizedMatvecKernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_matvec,
+                QuantizationMode::GgmlQ4K => psionic_cuda_q4_k_matvec,
+                QuantizationMode::GgmlQ6K => psionic_cuda_q6_k_matvec,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_matvec,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -10968,6 +11021,8 @@ mod platform {
             })?;
             let kernel: QuantizedMatvecQ81Kernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_matvec_q8_1,
+                QuantizationMode::GgmlQ4K => psionic_cuda_q4_k_matvec_q8_1,
+                QuantizationMode::GgmlQ6K => psionic_cuda_q6_k_matvec_q8_1,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_matvec_q8_1,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -11038,6 +11093,7 @@ mod platform {
             })?;
             let kernel: QuantizedMatvecQ81ArgmaxKernel = match mode {
                 QuantizationMode::GgmlQ8_0 => psionic_cuda_q8_0_matvec_q8_1_argmax,
+                QuantizationMode::GgmlQ4K => psionic_cuda_q4_k_matvec_q8_1_argmax,
                 QuantizationMode::GgmlMxfp4 => psionic_cuda_mxfp4_matvec_q8_1_argmax,
                 _ => {
                     return Err(RuntimeError::Backend(format!(
@@ -12200,6 +12256,7 @@ mod platform {
             value_head_count: usize,
             key_dim: usize,
             value_dim: usize,
+            v_head_reordered: bool,
             output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             let query_offset = c_int::try_from(query_offset).map_err(|_| {
@@ -12242,6 +12299,7 @@ mod platform {
                         value_head_count,
                         key_dim,
                         value_dim,
+                        c_int::from(v_head_reordered),
                         output.inner.device_ptr.cast(),
                         self.stream,
                     )
@@ -15565,6 +15623,7 @@ mod platform {
             _value_head_count: usize,
             _key_dim: usize,
             _value_dim: usize,
+            _v_head_reordered: bool,
             _output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
@@ -19556,6 +19615,62 @@ mod tests {
     }
 
     #[test]
+    fn cuda_backend_executes_q4_k_quantized_matvec_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_reference_vector_256();
+        let row_a = sample_q4_k_row(0.5, 0.125, 3);
+        let row_b = sample_q4_k_row(0.375, 0.25, 11);
+        let expected = vec![
+            quantized_row_dot(&input, QuantizationMode::GgmlQ4K, &row_a)?,
+            quantized_row_dot(&input, QuantizationMode::GgmlQ4K, &row_b)?,
+        ];
+        let mut bytes = row_a.clone();
+        bytes.extend_from_slice(&row_b);
+        let weights = backend.byte_buffer(&bytes)?;
+        let actual =
+            backend.quantized_matvec(&weights, QuantizationMode::GgmlQ4K, 2, 256, &input)?;
+        assert_close(&actual, &expected, 1e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_executes_q6_k_quantized_matvec_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_reference_vector_256();
+        let row_a = sample_q6_k_row(0.25, -3);
+        let row_b = sample_q6_k_row(0.5, 2);
+        let expected = vec![
+            quantized_row_dot(&input, QuantizationMode::GgmlQ6K, &row_a)?,
+            quantized_row_dot(&input, QuantizationMode::GgmlQ6K, &row_b)?,
+        ];
+        let mut bytes = row_a.clone();
+        bytes.extend_from_slice(&row_b);
+        let weights = backend.byte_buffer(&bytes)?;
+        let actual =
+            backend.quantized_matvec(&weights, QuantizationMode::GgmlQ6K, 2, 256, &input)?;
+        assert_close(&actual, &expected, 1e-3);
+        Ok(())
+    }
+
+    #[test]
     fn cuda_backend_dequantizes_mxfp4_row_when_available() -> Result<(), Box<dyn std::error::Error>>
     {
         let mut backend = CudaBackend::new();
@@ -20571,6 +20686,144 @@ mod tests {
     }
 
     #[test]
+    fn cuda_submission_gated_delta_matches_host_for_grouped_and_reordered_v_heads()
+    -> Result<(), Box<dyn std::error::Error>> {
+        fn host_gated_delta_step(
+            qkv: &[f32],
+            query_offset: usize,
+            key_offset: usize,
+            value_offset: usize,
+            decay: &[f32],
+            beta: &[f32],
+            state: &mut [f32],
+            key_head_count: usize,
+            value_head_count: usize,
+            key_dim: usize,
+            value_dim: usize,
+            v_head_reordered: bool,
+            output: &mut [f32],
+        ) {
+            let repeat_factor = value_head_count / key_head_count.max(1);
+            for value_head_index in 0..value_head_count {
+                let key_head_index = if v_head_reordered {
+                    value_head_index % key_head_count.max(1)
+                } else if repeat_factor > 0 {
+                    value_head_index / repeat_factor
+                } else {
+                    0
+                };
+                let query =
+                    &qkv[query_offset + key_head_index * key_dim..query_offset + (key_head_index + 1) * key_dim];
+                let key =
+                    &qkv[key_offset + key_head_index * key_dim..key_offset + (key_head_index + 1) * key_dim];
+                let value = &qkv
+                    [value_offset + value_head_index * value_dim..value_offset + (value_head_index + 1) * value_dim];
+                for value_dim_index in 0..value_dim {
+                    let row_offset =
+                        (value_head_index * value_dim + value_dim_index).saturating_mul(key_dim);
+                    let state_row = &mut state[row_offset..row_offset + key_dim];
+                    for entry in state_row.iter_mut() {
+                        *entry *= decay[value_head_index];
+                    }
+                    let kv_mem = state_row
+                        .iter()
+                        .zip(key.iter())
+                        .map(|(left, right)| left * right)
+                        .sum::<f32>();
+                    let delta =
+                        (value[value_dim_index] - kv_mem) * beta[value_head_index];
+                    for (entry, key_value) in state_row.iter_mut().zip(key.iter().copied()) {
+                        *entry += key_value * delta;
+                    }
+                    output[value_head_index * value_dim + value_dim_index] = state_row
+                        .iter()
+                        .zip(query.iter())
+                        .map(|(left, right)| left * right)
+                        .sum::<f32>();
+                }
+            }
+        }
+
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+
+        let query_offset = 0usize;
+        let key_offset = 4usize;
+        let value_offset = 8usize;
+        let key_head_count = 2usize;
+        let value_head_count = 4usize;
+        let key_dim = 2usize;
+        let value_dim = 2usize;
+        let qkv = vec![
+            0.5_f32, -0.25, 0.75, 0.125,   // q
+            -0.2, 0.6, 0.4, -0.3,          // k
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, // v
+        ];
+        let decay = vec![0.9_f32, 0.8, 0.7, 0.6];
+        let beta = vec![0.2_f32, 0.3, 0.4, 0.5];
+        let initial_state = vec![
+            0.05_f32, -0.01, 0.02, 0.03,
+            -0.02, 0.04, 0.01, -0.05,
+            0.06, -0.02, -0.03, 0.07,
+            0.01, 0.08, -0.04, 0.02,
+        ];
+
+        for v_head_reordered in [false, true] {
+            let mut expected_state = initial_state.clone();
+            let mut expected_output = vec![0.0_f32; value_head_count * value_dim];
+            host_gated_delta_step(
+                &qkv,
+                query_offset,
+                key_offset,
+                value_offset,
+                decay.as_slice(),
+                beta.as_slice(),
+                expected_state.as_mut_slice(),
+                key_head_count,
+                value_head_count,
+                key_dim,
+                value_dim,
+                v_head_reordered,
+                expected_output.as_mut_slice(),
+            );
+
+            let qkv_buffer = backend.input_buffer(Shape::new(vec![qkv.len()]), qkv.clone())?;
+            let decay_buffer = backend.input_buffer(Shape::new(vec![decay.len()]), decay.clone())?;
+            let beta_buffer = backend.input_buffer(Shape::new(vec![beta.len()]), beta.clone())?;
+            let state_buffer =
+                backend.input_buffer(Shape::new(vec![initial_state.len()]), initial_state.clone())?;
+            let output_buffer = backend.f32_buffer(value_head_count * value_dim)?;
+
+            let mut submission = backend.begin_submission()?;
+            submission.gated_delta_step_f32(
+                &qkv_buffer,
+                query_offset,
+                key_offset,
+                value_offset,
+                &decay_buffer,
+                &beta_buffer,
+                &state_buffer,
+                key_head_count,
+                value_head_count,
+                key_dim,
+                value_dim,
+                v_head_reordered,
+                &output_buffer,
+            )?;
+            let report = submission.commit(CudaCommandWait::Completed)?;
+            assert_eq!(report.encoded_operations, 1);
+
+            assert_close(&state_buffer.read_f32()?, &expected_state, 1e-6);
+            assert_close(&output_buffer.read_f32()?, &expected_output, 1e-6);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn cuda_submission_rms_norm_region_matches_host_formula()
     -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
@@ -21192,6 +21445,153 @@ mod tests {
         let actual_index = (packed >> 32) as usize;
         let expected_index = if expected[0] >= expected[1] { 0 } else { 1 };
         assert_eq!(actual_index, expected_index);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_q4_k_quantized_matvec_q8_1_fast_path_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_q8_1_exact_vector_256();
+        let row_a = sample_q4_k_row(0.5, 0.125, 3);
+        let row_b = sample_q4_k_row(0.375, 0.25, 11);
+        let expected = vec![
+            quantized_row_dot(&input, QuantizationMode::GgmlQ4K, &row_a)?,
+            quantized_row_dot(&input, QuantizationMode::GgmlQ4K, &row_b)?,
+        ];
+        let mut bytes = row_a.clone();
+        bytes.extend_from_slice(&row_b);
+        let weights = backend.byte_buffer(&bytes)?;
+        let input_buffer = backend.input_buffer(Shape::new(vec![input.len()]), input)?;
+        let q8_1_buffer =
+            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, 256)?])?;
+        let output = backend.f32_buffer(2)?;
+        let mut submission = backend.begin_submission()?;
+        submission.quantize_f32_to_q8_1(&input_buffer, 1, 256, &q8_1_buffer)?;
+        submission.quantized_matvec_q8_1(
+            &weights,
+            0,
+            QuantizationMode::GgmlQ4K,
+            2,
+            256,
+            &q8_1_buffer,
+            None,
+            &output,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 2);
+        assert_close(&output.read_f32()?, &expected, 1e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_q4_k_quantized_matvec_q8_1_argmax_fast_path_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_q8_1_exact_vector_256();
+        let row_a = sample_q4_k_row(0.5, 0.125, 3);
+        let row_b = sample_q4_k_row(0.375, 0.25, 11);
+        let bias = vec![0.75_f32, -1.25_f32];
+        let expected = [
+            quantized_row_dot(&input, QuantizationMode::GgmlQ4K, &row_a)? + bias[0],
+            quantized_row_dot(&input, QuantizationMode::GgmlQ4K, &row_b)? + bias[1],
+        ];
+        let mut bytes = row_a.clone();
+        bytes.extend_from_slice(&row_b);
+        let weights = backend.byte_buffer(&bytes)?;
+        let input_buffer = backend.input_buffer(Shape::new(vec![input.len()]), input)?;
+        let bias_buffer = backend.input_buffer(Shape::new(vec![bias.len()]), bias)?;
+        let q8_1_buffer =
+            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, 256)?])?;
+        let mut argmax_output = backend.byte_buffer(&vec![0_u8; std::mem::size_of::<u64>()])?;
+        let mut submission = backend.begin_submission()?;
+        submission.quantize_f32_to_q8_1(&input_buffer, 1, 256, &q8_1_buffer)?;
+        argmax_output.write_bytes(
+            &(((u64::from(i32::MAX as u32)) << 32) | u64::from(f32::NEG_INFINITY.to_bits()))
+                .to_ne_bytes(),
+        )?;
+        submission.quantized_matvec_q8_1_argmax(
+            &weights,
+            0,
+            QuantizationMode::GgmlQ4K,
+            2,
+            256,
+            &q8_1_buffer,
+            Some(&bias_buffer),
+            &argmax_output,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 2);
+
+        let packed_bytes = argmax_output.read_bytes()?;
+        let packed = u64::from_ne_bytes(
+            packed_bytes[..std::mem::size_of::<u64>()]
+                .try_into()
+                .expect("packed argmax buffer should be eight bytes"),
+        );
+        let actual_index = (packed >> 32) as usize;
+        let expected_index = if expected[0] >= expected[1] { 0 } else { 1 };
+        assert_eq!(actual_index, expected_index);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_q6_k_quantized_matvec_q8_1_fast_path_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let input = sample_q8_1_exact_vector_256();
+        let row_a = sample_q6_k_row(0.25, -3);
+        let row_b = sample_q6_k_row(0.5, 2);
+        let expected = vec![
+            quantized_row_dot(&input, QuantizationMode::GgmlQ6K, &row_a)?,
+            quantized_row_dot(&input, QuantizationMode::GgmlQ6K, &row_b)?,
+        ];
+        let mut bytes = row_a.clone();
+        bytes.extend_from_slice(&row_b);
+        let weights = backend.byte_buffer(&bytes)?;
+        let input_buffer = backend.input_buffer(Shape::new(vec![input.len()]), input)?;
+        let q8_1_buffer =
+            backend.byte_buffer(&vec![0_u8; crate::ggml_q8_1_storage_bytes(1, 256)?])?;
+        let output = backend.f32_buffer(2)?;
+        let mut submission = backend.begin_submission()?;
+        submission.quantize_f32_to_q8_1(&input_buffer, 1, 256, &q8_1_buffer)?;
+        submission.quantized_matvec_q8_1(
+            &weights,
+            0,
+            QuantizationMode::GgmlQ6K,
+            2,
+            256,
+            &q8_1_buffer,
+            None,
+            &output,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 2);
+        assert_close(&output.read_f32()?, &expected, 1e-3);
         Ok(())
     }
 
@@ -21937,6 +22337,12 @@ mod tests {
         (0..32).map(|index| (index as f32 + 1.0) * 0.25).collect()
     }
 
+    fn sample_reference_vector_256() -> Vec<f32> {
+        (0..256)
+            .map(|index| ((index as i32 * 13) % 29 - 14) as f32 / 3.0)
+            .collect()
+    }
+
     fn sample_q8_1_exact_vector() -> Vec<f32> {
         let mut values = Vec::with_capacity(32);
         for index in 0..31_i32 {
@@ -21954,6 +22360,13 @@ mod tests {
             .collect()
     }
 
+    fn sample_q8_1_exact_vector_256() -> Vec<f32> {
+        std::iter::repeat_with(sample_q8_1_exact_vector)
+            .take(8)
+            .flatten()
+            .collect()
+    }
+
     fn sample_mxfp4_row(scale_exponent: u8) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(17);
         bytes.push(scale_exponent);
@@ -21962,6 +22375,42 @@ mod tests {
             let high = 0x0f_u8.saturating_sub(pair & 0x07);
             bytes.push(low | (high << 4));
         }
+        bytes
+    }
+
+    fn sample_q4_k_row(scale: f32, minimum: f32, offset: u8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(144);
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes.extend_from_slice(&f32_to_f16_bits(minimum).to_le_bytes());
+        for index in 0..12_u8 {
+            bytes.push(offset.wrapping_add(index.wrapping_mul(7)));
+        }
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (15_u8).wrapping_sub(index & 0x0f) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        bytes
+    }
+
+    fn sample_q6_k_row(scale: f32, offset: i8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(210);
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (index.wrapping_mul(3)) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        for index in 0..64_u8 {
+            let b0 = index & 0x03;
+            let b1 = (index.wrapping_add(1)) & 0x03;
+            let b2 = (index.wrapping_add(2)) & 0x03;
+            let b3 = (index.wrapping_add(3)) & 0x03;
+            bytes.push(b0 | (b1 << 2) | (b2 << 4) | (b3 << 6));
+        }
+        for index in 0..16_i8 {
+            bytes.push(offset.saturating_add(index).to_le_bytes()[0]);
+        }
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
         bytes
     }
 
