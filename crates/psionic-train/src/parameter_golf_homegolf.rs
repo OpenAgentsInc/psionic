@@ -281,6 +281,22 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
+            surface_id: String::from("competitive_variant_ablation_surface"),
+            status: ParameterGolfHomegolfSurfaceStatus::Satisfied,
+            detail: String::from(
+                "HOMEGOLF now freezes one best-known competitive exact-lane variant beyond the naive baseline, plus a retained ablation report showing which already-owned public-winning surfaces are wired in versus still explicitly refused.",
+            ),
+            evidence_refs: vec![
+                String::from(
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_competitive_ablation.json",
+                ),
+                String::from(
+                    "crates/psionic-train/src/parameter_golf_homegolf_competitive_ablation.rs",
+                ),
+                String::from("docs/audits/2026-03-27-homegolf-competitive-ablation-audit.md"),
+            ],
+        },
+        ParameterGolfHomegolfRequiredSurface {
             surface_id: String::from("mixed_device_dense_home_cluster_execution"),
             status: ParameterGolfHomegolfSurfaceStatus::Blocked,
             detail: String::from(
@@ -448,6 +464,13 @@ mod tests {
             .iter()
             .any(
                 |surface| surface.surface_id == "mixed_hardware_manifest_surface"
+                    && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied
+            ));
+        assert!(report
+            .required_surfaces
+            .iter()
+            .any(
+                |surface| surface.surface_id == "competitive_variant_ablation_surface"
                     && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied
             ));
         assert!(report

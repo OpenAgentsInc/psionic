@@ -21,9 +21,9 @@ use psionic_data::{
 use psionic_ir::AutodiffBackwardResult;
 use psionic_ir::{AutodiffError, Graph, GraphBuilder, GraphError, OpKind};
 use psionic_models::{
-    ParameterGolfBankedWeights, ParameterGolfExecutionError, ParameterGolfModelError,
-    ParameterGolfReferenceModel, PARAMETER_GOLF_BASELINE_MODEL_ID,
-    PARAMETER_GOLF_BASELINE_REVISION,
+    ModelDescriptor, ParameterGolfBankedWeights, ParameterGolfConfig, ParameterGolfExecutionError,
+    ParameterGolfModelError, ParameterGolfReferenceModel, ParameterGolfWeights,
+    PARAMETER_GOLF_BASELINE_MODEL_ID, PARAMETER_GOLF_BASELINE_REVISION,
 };
 use psionic_runtime::{
     BufferHandle, DeliveredExecutionContext, DeviceDescriptor, RuntimeError, RuntimeHealth,
@@ -43,19 +43,62 @@ use crate::{
     inspect_local_single_h100_machine, materialize_parameter_golf_baseline_training_gradients,
     parameter_golf_optimizer_plan, parameter_golf_parameter_values_for_bindings,
     restore_parameter_golf_model_from_quantized_artifact, training_batch_from_window_tokens,
-    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph,
-    ParameterGolfBatchGeometry, ParameterGolfBf16MasterWeightStepReceipt,
-    ParameterGolfFinalArtifactConfig, ParameterGolfMatrixExecutionMode,
-    ParameterGolfOptimizerExecution, ParameterGolfOptimizerGroupKind,
-    ParameterGolfOptimizerPlan, ParameterGolfReferenceTrainingError,
-    ParameterGolfSingleH100BringupError,
+    ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
+    ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfFinalArtifactConfig,
+    ParameterGolfMatrixExecutionMode, ParameterGolfOptimizerExecution,
+    ParameterGolfOptimizerGroupKind, ParameterGolfOptimizerPlan,
+    ParameterGolfReferenceTrainingError, ParameterGolfSingleH100BringupError,
     ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100MachineObservation,
     ParameterGolfTrainError, ParameterGolfTrainingHyperparameters, TrainingOptimizerConfig,
     TrainingOptimizerState, TrainingPrecisionMode, PARAMETER_GOLF_SINGLE_H100_DATASET_REF,
     PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION, PARAMETER_GOLF_SINGLE_H100_VARIANT,
 };
 #[cfg(test)]
-use crate::{build_parameter_golf_baseline_eval_graph, build_parameter_golf_baseline_training_graph};
+use crate::{
+    build_parameter_golf_baseline_eval_graph, build_parameter_golf_baseline_training_graph,
+};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfSingleH100ModelVariant {
+    #[default]
+    BaselineSp1024_9x512,
+    CompetitiveHomegolfV1,
+}
+
+impl ParameterGolfSingleH100ModelVariant {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::BaselineSp1024_9x512 => "baseline_sp1024_9x512",
+            Self::CompetitiveHomegolfV1 => "competitive_homegolf_v1",
+        }
+    }
+
+    #[must_use]
+    pub fn model_config(self) -> ParameterGolfConfig {
+        match self {
+            Self::BaselineSp1024_9x512 => ParameterGolfConfig::baseline_sp1024_9x512(),
+            Self::CompetitiveHomegolfV1 => ParameterGolfConfig::competitive_homegolf_v1(),
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, ParameterGolfSingleH100TrainingError> {
+        match value {
+            "baseline" | "baseline_sp1024_9x512" => Ok(Self::BaselineSp1024_9x512),
+            "competitive" | "competitive_homegolf_v1" => Ok(Self::CompetitiveHomegolfV1),
+            other => Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!(
+                    "unsupported parameter golf model variant `{other}`, expected baseline_sp1024_9x512 or competitive_homegolf_v1"
+                ),
+            }),
+        }
+    }
+}
+
+fn default_single_h100_model_config() -> ParameterGolfConfig {
+    ParameterGolfSingleH100ModelVariant::default().model_config()
+}
 
 /// Config for the bounded Rust-owned single-H100 Parameter Golf trainer lane.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -70,6 +113,12 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     pub dataset_key: DatasetKey,
     /// Stable tokenizer or dataset variant label.
     pub variant: String,
+    /// Explicit model family variant surfaced into the exact HOMEGOLF lane.
+    #[serde(default)]
+    pub model_variant: ParameterGolfSingleH100ModelVariant,
+    /// Exact model config for this trainer execution.
+    #[serde(default = "default_single_h100_model_config")]
+    pub model_config: ParameterGolfConfig,
     /// Public single-device challenge geometry.
     pub geometry: ParameterGolfBatchGeometry,
     /// Public baseline optimization contract.
@@ -128,6 +177,8 @@ impl ParameterGolfSingleH100TrainingConfig {
                 PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
             ),
             variant: String::from(PARAMETER_GOLF_SINGLE_H100_VARIANT),
+            model_variant: ParameterGolfSingleH100ModelVariant::BaselineSp1024_9x512,
+            model_config: ParameterGolfConfig::baseline_sp1024_9x512(),
             geometry: ParameterGolfBatchGeometry::challenge_single_device_defaults(),
             max_steps: hyperparameters.iterations,
             warmup_steps: 20,
@@ -172,6 +223,34 @@ impl ParameterGolfSingleH100TrainingConfig {
         config
     }
 
+    #[must_use]
+    pub fn challenge_competitive_homegolf_v1_defaults(
+        dataset_root: impl Into<PathBuf>,
+        tokenizer_path: impl Into<PathBuf>,
+    ) -> Self {
+        let mut config = Self::challenge_defaults(dataset_root, tokenizer_path);
+        config.apply_model_variant(ParameterGolfSingleH100ModelVariant::CompetitiveHomegolfV1);
+        config.validation_eval_mode = ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 };
+        config.validation_batch_sequences = parameter_golf_default_validation_batch_sequences(
+            &config.geometry,
+            &config.validation_eval_mode,
+        );
+        config.score_first_ttt = Some(ParameterGolfScoreFirstTttConfig::leaderboard_defaults());
+        config.ema = Some(ParameterGolfEmaConfig::default());
+        config.swa = Some(ParameterGolfSwaConfig {
+            source_surface: ParameterGolfSwaSourceSurface::Ema,
+            ..Default::default()
+        });
+        config.final_model_surface = ParameterGolfFinalModelSurface::Swa;
+        config.final_artifact_config = ParameterGolfFinalArtifactConfig::competitive_defaults();
+        config
+    }
+
+    pub fn apply_model_variant(&mut self, model_variant: ParameterGolfSingleH100ModelVariant) {
+        self.model_variant = model_variant;
+        self.model_config = model_variant.model_config();
+    }
+
     fn validate(&self) -> Result<(), ParameterGolfSingleH100TrainingError> {
         if self.run_id.trim().is_empty() {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
@@ -205,6 +284,18 @@ impl ParameterGolfSingleH100TrainingConfig {
             return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
                 message: String::from(
                     "single-H100 training requires challenge_single_device_defaults geometry",
+                ),
+            });
+        }
+        self.model_config.validate().map_err(|error| {
+            ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!("model_config is invalid for the trainer lane: {error}"),
+            }
+        })?;
+        if self.model_config != self.model_variant.model_config() {
+            return Err(ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: String::from(
+                    "model_config drifted from the selected model_variant contract",
                 ),
             });
         }
@@ -1069,6 +1160,10 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub machine_contract_satisfied: bool,
     pub baseline_model_id: String,
     pub baseline_model_revision: String,
+    #[serde(default)]
+    pub model_variant: ParameterGolfSingleH100ModelVariant,
+    #[serde(default = "default_single_h100_model_config")]
+    pub model_config: ParameterGolfConfig,
     pub baseline_model_descriptor_digest: String,
     pub optimizer_plan_digest: String,
     pub precision_receipt: ParameterGolfSingleH100PrecisionReceipt,
@@ -1804,6 +1899,26 @@ pub fn build_parameter_golf_single_h100_training_report(
     Ok(report)
 }
 
+fn parameter_golf_single_h100_model_from_config(
+    model_config: &ParameterGolfConfig,
+    model_variant: ParameterGolfSingleH100ModelVariant,
+) -> Result<ParameterGolfReferenceModel, ParameterGolfSingleH100TrainingError> {
+    let weights = ParameterGolfWeights::from_initializer(model_config, Default::default())?;
+    let model_id = match model_variant {
+        ParameterGolfSingleH100ModelVariant::BaselineSp1024_9x512 => {
+            PARAMETER_GOLF_BASELINE_MODEL_ID
+        }
+        ParameterGolfSingleH100ModelVariant::CompetitiveHomegolfV1 => {
+            "parameter-golf-homegolf-competitive-v1"
+        }
+    };
+    Ok(ParameterGolfReferenceModel::new(
+        ModelDescriptor::new(model_id, "parameter_golf_decoder", "v1"),
+        model_config.clone(),
+        weights,
+    )?)
+}
+
 fn build_parameter_golf_single_h100_training_report_inner(
     config: &ParameterGolfSingleH100TrainingConfig,
     output_path: Option<&Path>,
@@ -1826,7 +1941,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         None,
     )?;
     let machine_observation = inspect_local_single_h100_machine();
-    let initial_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
+    let initial_model =
+        parameter_golf_single_h100_model_from_config(&config.model_config, config.model_variant)?;
     let runtime_descriptor = initial_model.banked_descriptor()?;
     let optimizer_plan =
         parameter_golf_optimizer_plan(&runtime_descriptor, &config.hyperparameters)?;
@@ -2353,22 +2469,22 @@ fn build_parameter_golf_single_h100_training_report_inner(
         let validation_started = Instant::now();
         let validation_summary =
             evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
-            &mut cuda_backend,
-            &selected_device.device,
-            final_model.descriptor(),
-            &final_model,
-            validation_tokens.as_slice(),
-            &byte_luts,
-            config.geometry.train_sequence_length,
-            config.validation_batch_sequences,
-            &config.validation_eval_mode,
-            config.score_first_ttt.as_ref(),
-            &mut eval_graph_cache,
-            &mut train_graph_cache,
-            &stage_label,
-            live_visualization_writer.as_mut(),
-            config.matrix_execution_mode,
-        )?;
+                &mut cuda_backend,
+                &selected_device.device,
+                final_model.descriptor(),
+                &final_model,
+                validation_tokens.as_slice(),
+                &byte_luts,
+                config.geometry.train_sequence_length,
+                config.validation_batch_sequences,
+                &config.validation_eval_mode,
+                config.score_first_ttt.as_ref(),
+                &mut eval_graph_cache,
+                &mut train_graph_cache,
+                &stage_label,
+                live_visualization_writer.as_mut(),
+                config.matrix_execution_mode,
+            )?;
         let observed_validation_ms = duration_ms(validation_started);
         pre_export_final_validation_observed_ms = Some(observed_validation_ms);
         pre_export_final_validation = Some(validation_summary.clone());
@@ -2414,22 +2530,22 @@ fn build_parameter_golf_single_h100_training_report_inner(
         let roundtrip_validation_started = Instant::now();
         let roundtrip_validation =
             evaluate_validation_with_optional_score_first_ttt_on_cuda_and_matrix_execution_mode(
-            &mut cuda_backend,
-            &selected_device.device,
-            roundtrip_model.descriptor(),
-            &roundtrip_model,
-            validation_tokens.as_slice(),
-            &byte_luts,
-            config.geometry.train_sequence_length,
-            config.validation_batch_sequences,
-            &config.validation_eval_mode,
-            config.score_first_ttt.as_ref(),
-            &mut eval_graph_cache,
-            &mut train_graph_cache,
-            final_roundtrip_metric_source,
-            live_visualization_writer.as_mut(),
-            config.matrix_execution_mode,
-        )?;
+                &mut cuda_backend,
+                &selected_device.device,
+                roundtrip_model.descriptor(),
+                &roundtrip_model,
+                validation_tokens.as_slice(),
+                &byte_luts,
+                config.geometry.train_sequence_length,
+                config.validation_batch_sequences,
+                &config.validation_eval_mode,
+                config.score_first_ttt.as_ref(),
+                &mut eval_graph_cache,
+                &mut train_graph_cache,
+                final_roundtrip_metric_source,
+                live_visualization_writer.as_mut(),
+                config.matrix_execution_mode,
+            )?;
         let roundtrip_observed_ms = duration_ms(roundtrip_validation_started);
         emit_progress_line(format!(
             "{} val_loss:{:.4} val_bpb:{:.4} eval_time:{}ms compressed_model_bytes={} artifact_ref={} artifact_digest={}",
@@ -2582,6 +2698,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         machine_contract_satisfied: machine_observation.machine_contract_satisfied,
         baseline_model_id: String::from(PARAMETER_GOLF_BASELINE_MODEL_ID),
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
+        model_variant: config.model_variant,
+        model_config: config.model_config.clone(),
         baseline_model_descriptor_digest: final_model.descriptor().stable_digest(),
         optimizer_plan_digest,
         precision_receipt: precision_receipt_from_trainer_state(&trainer_state),
@@ -2676,6 +2794,8 @@ fn refusal_report(
         observed_cuda_devices: machine_observation.observed_cuda_devices.clone(),
         matching_h100_device_count: machine_observation.matching_h100_device_count,
         machine_contract_satisfied: machine_observation.machine_contract_satisfied,
+        model_variant: config.model_variant,
+        model_config: config.model_config.clone(),
         baseline_model_id: String::from(PARAMETER_GOLF_BASELINE_MODEL_ID),
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
         baseline_model_descriptor_digest: initial_model.descriptor().stable_digest(),
@@ -3496,18 +3616,19 @@ fn execute_training_step(
             .window_planning_ms
             .saturating_add(duration_ms(plan_started));
         *cursor = window.end_cursor.clone();
-        let gradient_batch = execute_parameter_golf_training_gradient_batch_with_matrix_execution_mode(
-            cuda_backend,
-            device,
-            bundle,
-            current_model,
-            Some(&current_banked_weights),
-            graph_cache,
-            Some(training_session_cache),
-            geometry,
-            &window,
-            matrix_execution_mode,
-        )?;
+        let gradient_batch =
+            execute_parameter_golf_training_gradient_batch_with_matrix_execution_mode(
+                cuda_backend,
+                device,
+                bundle,
+                current_model,
+                Some(&current_banked_weights),
+                graph_cache,
+                Some(training_session_cache),
+                geometry,
+                &window,
+                matrix_execution_mode,
+            )?;
         window_ids.push(gradient_batch.window_id.clone());
         microbatch_loss_sum += gradient_batch.loss;
         step_profile.accumulate(&gradient_batch.phase_timings);
@@ -7790,6 +7911,47 @@ mod tests {
         assert_eq!(receipt.total_units, 0);
         assert_eq!(receipt.total_batches, 947);
         Ok(())
+    }
+
+    #[test]
+    fn competitive_homegolf_defaults_enable_competitive_surfaces() {
+        let config =
+            ParameterGolfSingleH100TrainingConfig::challenge_competitive_homegolf_v1_defaults(
+                PathBuf::from("."),
+                PathBuf::from("tokenizer.model"),
+            );
+        assert_eq!(
+            config.model_variant,
+            ParameterGolfSingleH100ModelVariant::CompetitiveHomegolfV1
+        );
+        assert_eq!(
+            config.model_config,
+            ParameterGolfConfig::competitive_homegolf_v1()
+        );
+        assert_eq!(
+            config.validation_eval_mode,
+            ParameterGolfValidationEvalMode::SlidingWindow { stride: 64 }
+        );
+        assert!(config.score_first_ttt.is_some());
+        assert!(config.ema.is_some());
+        assert!(config.swa.is_some());
+        assert_eq!(
+            config.final_model_surface,
+            ParameterGolfFinalModelSurface::Swa
+        );
+        assert_eq!(
+            config.final_artifact_config,
+            ParameterGolfFinalArtifactConfig::competitive_defaults()
+        );
+    }
+
+    #[test]
+    fn model_variant_parse_accepts_competitive_label() {
+        assert_eq!(
+            ParameterGolfSingleH100ModelVariant::parse("competitive_homegolf_v1")
+                .expect("competitive label should parse"),
+            ParameterGolfSingleH100ModelVariant::CompetitiveHomegolfV1
+        );
     }
 }
 

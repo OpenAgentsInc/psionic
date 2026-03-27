@@ -410,6 +410,25 @@ impl ParameterGolfConfig {
         }
     }
 
+    /// Returns the first HOMEGOLF competitive variant built from already
+    /// admitted PGOLF family surfaces.
+    #[must_use]
+    pub fn competitive_homegolf_v1() -> Self {
+        Self {
+            num_layers: 10,
+            mlp_mult: 3,
+            bigram_vocab_size: 2_048,
+            bigram_dim: 128,
+            ve_dim: 128,
+            ve_layer_indices: vec![7, 8, 9],
+            mlp_activation: ParameterGolfMlpActivation::leaky_relu_squared_point_five(),
+            rope_rotary_dim: Some(32),
+            layer_norm_scale: ParameterGolfLayerNormScale::InverseSqrtLayerIndexPlusOne,
+            xsa_last_n: 2,
+            ..Self::baseline_sp1024_9x512()
+        }
+    }
+
     /// Validates the config against the public family invariants.
     pub fn validate(&self) -> Result<(), ParameterGolfConfigError> {
         if self.vocab_size == 0 {
@@ -3666,7 +3685,8 @@ fn attention_forward_single_token_window_one(
     }
 
     let group_size = config.num_heads / config.num_kv_heads;
-    let mut value_heads = vec![0.0_f32; batch_size * config.num_kv_heads * sequence_length * head_dim];
+    let mut value_heads =
+        vec![0.0_f32; batch_size * config.num_kv_heads * sequence_length * head_dim];
     let mut attended = vec![0.0_f32; batch_size * config.num_heads * sequence_length * head_dim];
     for batch in 0..batch_size {
         for kv_head in 0..config.num_kv_heads {
@@ -4232,6 +4252,28 @@ mod tests {
     }
 
     #[test]
+    fn competitive_homegolf_v1_enables_competitive_family_surfaces() {
+        let config = ParameterGolfConfig::competitive_homegolf_v1();
+        config
+            .validate()
+            .expect("competitive config should validate");
+        assert_eq!(config.num_layers, 10);
+        assert_eq!(config.mlp_mult, 3);
+        assert_eq!(config.bigram_vocab_size, 2_048);
+        assert_eq!(
+            config.mlp_activation,
+            ParameterGolfMlpActivation::leaky_relu_squared_point_five()
+        );
+        assert_eq!(config.rope_rotary_dim, Some(32));
+        assert_eq!(
+            config.layer_norm_scale,
+            ParameterGolfLayerNormScale::InverseSqrtLayerIndexPlusOne
+        );
+        assert_eq!(config.xsa_last_n, 2);
+        assert_eq!(config.ve_layer_indices, vec![7, 8, 9]);
+    }
+
+    #[test]
     fn bigram_hash_batch_matches_public_reference_formula() {
         let config = ParameterGolfConfig {
             bigram_vocab_size: 1536,
@@ -4681,21 +4723,15 @@ mod tests {
         let vectors = model
             .all_parameter_vectors()
             .expect("combined parameter vectors should materialize");
-        assert!(
-            vectors
-                .iter()
-                .any(|vector| vector.parameter_id == "blocks.0.attn.c_q.weight")
-        );
-        assert!(
-            vectors
-                .iter()
-                .any(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME)
-        );
-        assert!(
-            vectors
-                .iter()
-                .any(|vector| vector.parameter_id == PARAMETER_GOLF_KV_BANK_NAME)
-        );
+        assert!(vectors
+            .iter()
+            .any(|vector| vector.parameter_id == "blocks.0.attn.c_q.weight"));
+        assert!(vectors
+            .iter()
+            .any(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME));
+        assert!(vectors
+            .iter()
+            .any(|vector| vector.parameter_id == PARAMETER_GOLF_KV_BANK_NAME));
     }
 
     #[test]

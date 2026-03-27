@@ -148,6 +148,16 @@
       ]
     },
     {
+      "surface_id": "competitive_variant_ablation_surface",
+      "status": "satisfied",
+      "detail": "HOMEGOLF now freezes one best-known competitive exact-lane variant beyond the naive baseline, plus a retained ablation report showing which already-owned public-winning surfaces are wired in versus still explicitly refused.",
+      "evidence_refs": [
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_competitive_ablation.json",
+        "crates/psionic-train/src/parameter_golf_homegolf_competitive_ablation.rs",
+        "docs/audits/2026-03-27-homegolf-competitive-ablation-audit.md"
+      ]
+    },
+    {
       "surface_id": "mixed_device_dense_home_cluster_execution",
       "status": "blocked",
       "detail": "The upgraded HOMEGOLF runtime now has real score-relevant MLX-plus-H100 dense execution truth, but admitted home-cluster dense closure on the local Apple-plus-home-RTX device set remains the next implementation step.",
@@ -160,5 +170,5 @@
     }
   ],
   "claim_boundary": "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed cluster. It now has one canonical strict challenge runnable lane, one retained live dense mixed-device surface built from real MLX-plus-CUDA dense execution truth plus the exact dense challenge export bytes, and one explicit mixed-hardware manifest example that keeps future H100 capacity inside the same track law. It still does not claim admitted home-RTX dense closure or official 8xH100 leaderboard equivalence.",
-  "report_digest": "d277469b4540de5292d05fb65547a18546f2f27ff310a358637b428e5247909a"
+  "report_digest": "bacbb55e817f3ca41366bd302b2b87927b63c45598daf4534ceeb7a6ba12d851"
 }

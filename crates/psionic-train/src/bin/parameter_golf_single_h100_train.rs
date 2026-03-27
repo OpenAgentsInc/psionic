@@ -2,8 +2,8 @@ use std::{env, path::PathBuf};
 
 use psionic_train::{
     parameter_golf_default_validation_batch_sequences,
-    ParameterGolfMatrixExecutionMode,
-    write_parameter_golf_single_h100_training_report, ParameterGolfScoreFirstTttConfig,
+    write_parameter_golf_single_h100_training_report, ParameterGolfMatrixExecutionMode,
+    ParameterGolfScoreFirstTttConfig, ParameterGolfSingleH100ModelVariant,
     ParameterGolfSingleH100TrainingConfig, ParameterGolfSingleH100ValidationMode,
     ParameterGolfValidationEvalMode,
 };
@@ -29,16 +29,39 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .get(3)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/tmp/parameter_golf_single_h100_training.json"));
+    let selected_model_variant = env::var_os("PSIONIC_PARAMETER_GOLF_MODEL_VARIANT")
+        .map(|value| {
+            let raw = value.to_string_lossy();
+            ParameterGolfSingleH100ModelVariant::parse(raw.as_ref())
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        })
+        .transpose()?;
     let (max_steps, final_validation_mode, validation_eval_mode, score_first_ttt) =
         parse_optional_max_steps_and_validation_mode(&args[4..])?;
-    let mut config = if let Some(max_steps) = max_steps {
-        ParameterGolfSingleH100TrainingConfig::bounded_proof_defaults(
+    let mut config = match (max_steps, selected_model_variant) {
+        (Some(max_steps), Some(model_variant)) => {
+            let mut config = ParameterGolfSingleH100TrainingConfig::bounded_proof_defaults(
+                dataset_root,
+                tokenizer_path,
+                max_steps,
+            );
+            config.apply_model_variant(model_variant);
+            config
+        }
+        (Some(max_steps), None) => ParameterGolfSingleH100TrainingConfig::bounded_proof_defaults(
             dataset_root,
             tokenizer_path,
             max_steps,
-        )
-    } else {
-        ParameterGolfSingleH100TrainingConfig::challenge_defaults(dataset_root, tokenizer_path)
+        ),
+        (None, Some(ParameterGolfSingleH100ModelVariant::CompetitiveHomegolfV1)) => {
+            ParameterGolfSingleH100TrainingConfig::challenge_competitive_homegolf_v1_defaults(
+                dataset_root,
+                tokenizer_path,
+            )
+        }
+        (None, _) => {
+            ParameterGolfSingleH100TrainingConfig::challenge_defaults(dataset_root, tokenizer_path)
+        }
     };
     if let Some(final_validation_mode) = final_validation_mode {
         config.final_validation_mode = final_validation_mode;
@@ -122,7 +145,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "{}_exact val_loss:{:.8} val_bpb:{:.8}",
             roundtrip_receipt.metric_source,
-            roundtrip_receipt.validation.mean_loss, roundtrip_receipt.validation.bits_per_byte
+            roundtrip_receipt.validation.mean_loss,
+            roundtrip_receipt.validation.bits_per_byte
         );
     } else if let Some(final_validation) = report.final_validation {
         println!(

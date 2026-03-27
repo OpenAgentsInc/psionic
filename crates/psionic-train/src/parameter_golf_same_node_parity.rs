@@ -632,6 +632,8 @@ mod tests {
             }],
             matching_h100_device_count: 0,
             machine_contract_satisfied: false,
+            model_variant: crate::ParameterGolfSingleH100ModelVariant::BaselineSp1024_9x512,
+            model_config: psionic_models::ParameterGolfConfig::baseline_sp1024_9x512(),
             baseline_model_id: String::from("baseline-model"),
             baseline_model_revision: String::from("baseline-revision"),
             baseline_model_descriptor_digest: String::from("model-digest"),

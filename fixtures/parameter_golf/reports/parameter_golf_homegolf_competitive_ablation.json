@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.homegolf_competitive_ablation.v1",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "source_track_contract_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+  "source_strict_challenge_lane_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_strict_challenge_lane.json",
+  "source_upstream_opportunity_audit_ref": "docs/audits/2026-03-22-parameter-golf-upstream-leaderboard-and-pr-opportunity-audit.md",
+  "baseline_lane": {
+    "lane_id": "baseline_exact_challenge",
+    "model_variant": "baseline_sp1024_9x512",
+    "model_config": {
+      "vocab_size": 1024,
+      "num_layers": 9,
+      "model_dim": 512,
+      "num_heads": 8,
+      "num_kv_heads": 4,
+      "mlp_mult": 2,
+      "bigram_vocab_size": 0,
+      "bigram_dim": 128,
+      "ve_dim": 128,
+      "mlp_activation": {
+        "kind": "relu_squared"
+      },
+      "max_context": 1024,
+      "tie_embeddings": true,
+      "tied_embed_init_std": 0.005,
+      "logit_softcap": 30.0,
+      "rope_base": 10000.0,
+      "qk_gain_init": 1.5
+    },
+    "validation_eval_mode": {
+      "mode": "non_overlapping"
+    },
+    "validation_batch_sequences": 64,
+    "final_model_surface": "raw",
+    "final_artifact_config": {
+      "quantization": "int8_clean_per_row",
+      "compression": "zlib"
+    },
+    "dense_training_command_template": "PSIONIC_PARAMETER_GOLF_MODEL_VARIANT=baseline_sp1024_9x512 cargo run -q -p psionic-train --bin parameter_golf_single_h100_train -- ~/code/parameter-golf/data/datasets/fineweb10B_sp1024 ~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model <training_report_path> both sliding_window:64 score_first_ttt"
+  },
+  "best_known_lane": {
+    "lane_id": "competitive_homegolf_v1",
+    "model_variant": "competitive_homegolf_v1",
+    "model_config": {
+      "vocab_size": 1024,
+      "num_layers": 10,
+      "model_dim": 512,
+      "num_heads": 8,
+      "num_kv_heads": 4,
+      "mlp_mult": 3,
+      "bigram_vocab_size": 2048,
+      "bigram_dim": 128,
+      "ve_dim": 128,
+      "ve_layer_indices": [
+        7,
+        8,
+        9
+      ],
+      "mlp_activation": {
+        "kind": "leaky_relu_squared",
+        "negative_slope": 1056964608
+      },
+      "max_context": 1024,
+      "tie_embeddings": true,
+      "tied_embed_init_std": 0.005,
+      "logit_softcap": 30.0,
+      "rope_base": 10000.0,
+      "rope_rotary_dim": 32,
+      "layer_norm_scale": "inverse_sqrt_layer_index_plus_one",
+      "xsa_last_n": 2,
+      "qk_gain_init": 1.5
+    },
+    "validation_eval_mode": {
+      "mode": "sliding_window",
+      "stride": 64
+    },
+    "validation_batch_sequences": 1024,
+    "score_first_ttt": {
+      "stride": 64,
+      "chunk_tokens": 32768,
+      "epochs": 3,
+      "freeze_blocks": 0,
+      "learning_rate": 0.002,
+      "momentum": 0.9,
+      "batch_sequences": 32,
+      "grad_clip_norm": 1.0
+    },
+    "ema": {
+      "decay": 0.997
+    },
+    "swa": {
+      "every_steps": 50,
+      "max_learning_rate_multiplier": 0.2,
+      "source_surface": "ema"
+    },
+    "final_model_surface": "swa",
+    "final_artifact_config": {
+      "quantization": "int6_gptq_lite_per_row",
+      "compression": "zstd",
+      "compression_level": 22
+    },
+    "dense_training_command_template": "PSIONIC_PARAMETER_GOLF_MODEL_VARIANT=competitive_homegolf_v1 cargo run -q -p psionic-train --bin parameter_golf_single_h100_train -- ~/code/parameter-golf/data/datasets/fineweb10B_sp1024 ~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model <training_report_path> both sliding_window:64 score_first_ttt"
+  },
+  "technique_rows": [
+    {
+      "technique_id": "bigram_hash",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The exact HOMEGOLF lane now selects hashed bigram context features directly in the best-known competitive variant.",
+      "evidence_refs": [
+        "crates/psionic-models/src/parameter_golf.rs",
+        "crates/psionic-train/src/parameter_golf_single_h100_training.rs"
+      ]
+    },
+    {
+      "technique_id": "deep_layer_xsa",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The best-known competitive HOMEGOLF variant now keeps deep-layer XSA on the exact trainer config instead of only inside general family capability docs.",
+      "evidence_refs": [
+        "crates/psionic-models/src/parameter_golf.rs",
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_competitive_ablation.json"
+      ]
+    },
+    {
+      "technique_id": "partial_rope",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The best-known competitive HOMEGOLF variant now uses an explicit partial RoPE rotary sub-dimension.",
+      "evidence_refs": [
+        "crates/psionic-models/src/parameter_golf.rs"
+      ]
+    },
+    {
+      "technique_id": "leaky_relu_squared_point_five",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The exact HOMEGOLF lane now selects LeakyReLU(0.5)^2 in the best-known competitive variant.",
+      "evidence_refs": [
+        "crates/psionic-models/src/parameter_golf.rs"
+      ]
+    },
+    {
+      "technique_id": "late_layer_value_embeddings",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "Late-layer value embeddings are now part of the best-known exact HOMEGOLF competitive lane.",
+      "evidence_refs": [
+        "crates/psionic-models/src/parameter_golf.rs"
+      ]
+    },
+    {
+      "technique_id": "ema",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "EMA is now explicitly enabled on the best-known exact HOMEGOLF competitive lane.",
+      "evidence_refs": [
+        "crates/psionic-train/src/parameter_golf_single_h100_training.rs",
+        "docs/audits/2026-03-22-parameter-golf-upstream-leaderboard-and-pr-opportunity-audit.md"
+      ]
+    },
+    {
+      "technique_id": "swa",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "SWA is now explicitly enabled on the best-known exact HOMEGOLF competitive lane and consumes EMA snapshots.",
+      "evidence_refs": [
+        "crates/psionic-train/src/parameter_golf_single_h100_training.rs"
+      ]
+    },
+    {
+      "technique_id": "parameter_banking_plus_muon",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The competitive HOMEGOLF lane reuses the existing Parameter Banking plus Muon optimizer grouping already owned by the exact trainer surface.",
+      "evidence_refs": [
+        "crates/psionic-train/src/parameter_golf.rs",
+        "docs/ROADMAP_PARAMETERGOLF.md"
+      ]
+    },
+    {
+      "technique_id": "legal_score_first_ttt",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The best-known exact HOMEGOLF competitive lane now keeps legal score-first TTT enabled under the strict challenge overlay.",
+      "evidence_refs": [
+        "crates/psionic-train/src/parameter_golf_single_h100_training.rs",
+        "crates/psionic-train/src/parameter_golf_homegolf_strict_challenge.rs"
+      ]
+    },
+    {
+      "technique_id": "int6_gptq_lite_export",
+      "status": "wired_in_best_known_variant",
+      "public_signal": "positive_public_signal",
+      "detail": "The best-known competitive lane now selects the existing int6 GPTQ-lite plus zstd export surface instead of the baseline int8-zlib export.",
+      "evidence_refs": [
+        "crates/psionic-train/src/parameter_golf_reference.rs",
+        "crates/psionic-train/src/parameter_golf_single_h100_training.rs"
+      ]
+    },
+    {
+      "technique_id": "smeargate",
+      "status": "not_yet_admitted",
+      "public_signal": "mixed_public_signal",
+      "detail": "SmearGate is still not admitted into the exact HOMEGOLF lane because the current promoted PGOLF family contract does not expose that residual-control surface yet.",
+      "evidence_refs": [
+        "docs/audits/2026-03-22-parameter-golf-upstream-leaderboard-and-pr-opportunity-audit.md"
+      ]
+    },
+    {
+      "technique_id": "mixed_qat_train_time",
+      "status": "not_yet_admitted",
+      "public_signal": "mixed_public_signal",
+      "detail": "Mixed-bit QAT remains out of the exact HOMEGOLF lane for now. The current exact trainer owns competitive roundtrip export, but not yet one train-time mixed-bit QAT contract.",
+      "evidence_refs": [
+        "docs/audits/2026-03-22-parameter-golf-upstream-leaderboard-and-pr-opportunity-audit.md"
+      ]
+    }
+  ],
+  "best_known_variant_replaces_bounded_proof_baseline": true,
+  "claim_boundary": "This report closes the technique-porting and exact-lane wiring gap for HOMEGOLF. It freezes one real competitive exact-lane variant built only from already-admitted family and trainer surfaces, and it records which public-winning techniques are now wired versus still explicitly out of scope. It does not yet claim that this best-known variant has already posted a retained exact-challenge score on local hardware.",
+  "summary": "The best-known exact HOMEGOLF configuration is no longer the naive baseline proof shape. The exact trainer now admits one competitive HOMEGOLF variant with BigramHash, partial RoPE, deep-layer XSA, LeakyReLU(0.5)^2, VE, EMA, SWA, legal score-first TTT, and competitive export defaults, while explicitly refusing the remaining not-yet-admitted frontier tricks.",
+  "report_digest": "9dc82dddcb368fa11fb921de6456b9dddb5f0f25d43d5f2d2eb226d6a3c3f55a"
+}

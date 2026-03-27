@@ -258,6 +258,49 @@ Current boundary:
 
 - the public references are frozen from the reviewed Parameter Golf repo
   snapshot
+
+## Competitive Exact-Lane Ablation Surface
+
+HOMEGOLF now also has one retained competitive exact-lane ablation surface:
+
+- retained ablation report:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_competitive_ablation.json`
+- generator:
+  `crates/psionic-train/src/parameter_golf_homegolf_competitive_ablation.rs`
+- entrypoint:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_competitive_ablation.rs`
+- audit:
+  `docs/audits/2026-03-27-homegolf-competitive-ablation-audit.md`
+- checker:
+  `scripts/check-parameter-golf-homegolf-competitive-ablation.sh`
+
+What this proves:
+
+- the exact HOMEGOLF lane is no longer hard-wired to only the naive baseline
+  model shape
+- the canonical exact trainer now admits one explicit best-known competitive
+  variant: `competitive_homegolf_v1`
+- that best-known exact-lane variant already wires in:
+  - `BigramHash`
+  - partial RoPE
+  - deep-layer XSA
+  - `LeakyReLU(0.5)^2`
+  - late-layer VE
+  - EMA
+  - SWA sourced from EMA
+  - legal score-first TTT
+  - competitive export defaults
+- the retained report also keeps explicit refusals for techniques that are still
+  out of scope on the exact HOMEGOLF lane today
+
+What it does not prove:
+
+- that `competitive_homegolf_v1` has already produced the best retained
+  HOMEGOLF score on local hardware
+- that every public-winning technique is already admitted into the exact
+  Psionic trainer
+- that the admitted home-cluster dense runtime has already been retuned around
+  this competitive variant
 - the HOMEGOLF side now compares using the live dense mixed-device surface, the
   canonical score-relevant runtime report, and the retained exact dense
   challenge export bytes
