@@ -12,11 +12,11 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    FirstSwarmOpenAdapterContributorReceipt, OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
+    OpenAdapterPrecisionPolicy, OpenAdapterTrainingExecutionBackend, SWARM_FIRST_RUN_FAMILY_ID,
     build_first_swarm_open_adapter_contributor_receipt, first_swarm_open_adapter_samples,
     first_swarm_open_adapter_sft_request, first_swarm_open_adapter_training_config,
-    first_swarm_run_contract, run_open_adapter_sft_export, FirstSwarmOpenAdapterContributorReceipt,
-    OpenAdapterPrecisionPolicy, OpenAdapterTrainingExecutionBackend,
-    OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL, SWARM_FIRST_RUN_FAMILY_ID,
+    first_swarm_run_contract, run_open_adapter_sft_export,
 };
 
 /// Stable scope window for the first Mac MLX swarm bring-up report.
@@ -262,8 +262,8 @@ pub fn current_first_swarm_mlx_training_backend_posture() -> FirstSwarmMlxTraini
 }
 
 /// Builds the current Mac MLX swarm bring-up report.
-pub fn build_first_swarm_mac_mlx_bringup_report(
-) -> Result<FirstSwarmMacMlxBringupReport, FirstSwarmMacMlxBringupError> {
+pub fn build_first_swarm_mac_mlx_bringup_report()
+-> Result<FirstSwarmMacMlxBringupReport, FirstSwarmMacMlxBringupError> {
     let started_at_ms = now_ms();
     let started = Instant::now();
     let contract = first_swarm_run_contract();
@@ -310,7 +310,7 @@ pub fn build_first_swarm_mac_mlx_bringup_report(
         FirstSwarmMacMlxBringupDisposition::ReadyToAttempt
     };
     let finished_at_ms = now_ms();
-    let observed_wallclock_ms = started.elapsed().as_millis() as u64;
+    let observed_wallclock_ms = (started.elapsed().as_millis() as u64).max(1);
     let admitted_metal_slice = vec![
         String::from("psionic-array::ArrayContext::metal"),
         String::from("dense_f32.constant"),
@@ -566,13 +566,10 @@ fn run_first_swarm_mac_mlx_overfit_gate() -> Result<FirstSwarmMacMlxOverfitGate,
             precision_policy: OpenAdapterPrecisionPolicy::Bf16Mixed,
             ..backend.config().clone()
         },
-        vec![crate::OpenAdapterHiddenStateSample::new(
-            "unsupported",
-            vec![1.0, 0.0, 0.0, 0.0],
-            2,
-            1,
-        )
-        .map_err(|error| error.to_string())?],
+        vec![
+            crate::OpenAdapterHiddenStateSample::new("unsupported", vec![1.0, 0.0, 0.0, 0.0], 2, 1)
+                .map_err(|error| error.to_string())?,
+        ],
     )
     .expect_err("bf16 should stay unsupported")
     .to_string();
@@ -683,10 +680,12 @@ mod tests {
 
     #[test]
     fn missing_posture_keeps_generic_blocker_explicit() {
-        assert!(training_backend_blocker_detail(
-            FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend
-        )
-        .is_some());
+        assert!(
+            training_backend_blocker_detail(
+                FirstSwarmMlxTrainingBackendPosture::MissingOpenAdapterBackend
+            )
+            .is_some()
+        );
         assert!(
             training_backend_blocker_detail(FirstSwarmMlxTrainingBackendPosture::Ready).is_none()
         );
@@ -749,9 +748,10 @@ mod tests {
         assert_eq!(gate.adapter_family, "gpt_oss.decoder_lm_head_lora");
         assert_eq!(gate.probe_top_token_id, 2);
         assert!(gate.final_mean_loss > 0.0);
-        assert!(gate
-            .unsupported_precision_refusal
-            .contains("does not yet support precision policy"));
+        assert!(
+            gate.unsupported_precision_refusal
+                .contains("does not yet support precision policy")
+        );
         assert!(!gate.adapter_artifact_digest.is_empty());
         assert!(!gate.gate_digest.is_empty());
     }

@@ -11,11 +11,11 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    build_first_swarm_open_adapter_contributor_receipt, first_swarm_open_adapter_samples,
-    first_swarm_open_adapter_sft_request, first_swarm_open_adapter_training_config,
-    first_swarm_run_contract, FirstSwarmOpenAdapterContributorReceipt, OpenAdapterPrecisionPolicy,
-    OpenAdapterTrainingExecutionBackend, ParameterGolfSingleH100BringupReport,
-    OPEN_ADAPTER_CUDA_BACKEND_LABEL,
+    FirstSwarmOpenAdapterContributorReceipt, OPEN_ADAPTER_CUDA_BACKEND_LABEL,
+    OpenAdapterPrecisionPolicy, OpenAdapterTrainingExecutionBackend,
+    ParameterGolfSingleH100BringupReport, build_first_swarm_open_adapter_contributor_receipt,
+    first_swarm_open_adapter_samples, first_swarm_open_adapter_sft_request,
+    first_swarm_open_adapter_training_config, first_swarm_run_contract,
 };
 
 /// Stable retained inventory source for the first Linux RTX 4080 swarm report.
@@ -229,7 +229,7 @@ pub fn build_first_swarm_linux_cuda_bringup_report(
     let parity_harness = run_first_swarm_linux_cuda_parity_harness()?;
     let contract = first_swarm_run_contract();
     let finished_at_ms = now_ms();
-    let observed_wallclock_ms = started.elapsed().as_millis() as u64;
+    let observed_wallclock_ms = (started.elapsed().as_millis() as u64).max(1);
     let mut drift_notes = vec![
         format!(
             "This report reuses retained CUDA inventory from `{}` instead of pretending to probe a remote Linux desktop from the current host.",
@@ -310,8 +310,8 @@ pub fn write_first_swarm_linux_cuda_bringup_report(
     Ok(report)
 }
 
-fn run_first_swarm_linux_cuda_parity_harness(
-) -> Result<FirstSwarmLinuxCudaParityHarnessReport, FirstSwarmLinuxCudaBringupError> {
+fn run_first_swarm_linux_cuda_parity_harness()
+-> Result<FirstSwarmLinuxCudaParityHarnessReport, FirstSwarmLinuxCudaBringupError> {
     let config = first_swarm_open_adapter_training_config(
         "swarm-linux-cuda-parity",
         "swarm.open_adapter.cuda.same_node",
@@ -451,8 +451,10 @@ mod tests {
         assert_eq!(harness.precision_policy, "f32_reference");
         assert!(harness.executed_steps > 0);
         assert!(harness.final_mean_loss > 0.0);
-        assert!(harness
-            .unsupported_precision_refusal
-            .contains("does not yet support precision policy"));
+        assert!(
+            harness
+                .unsupported_precision_refusal
+                .contains("does not yet support precision policy")
+        );
     }
 }
