@@ -1,0 +1,39 @@
+{
+  "schema_version": "psionic.parameter_golf_homegolf_dense_bundle_proof.v1",
+  "report_id": "parameter_golf.homegolf_dense_bundle_proof.seed_000.v1",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "source_dense_baseline_surface_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_dense_baseline_surface.json",
+  "evidence_seed_slot": 0,
+  "run_id": "parameter-golf-homegolf-dense-bundle-proof-seed-000",
+  "profile_id": "psion_small_decoder_pgolf_core_v0",
+  "baseline_model_id": "parameter-golf-sp1024-9x512",
+  "baseline_revision": "public-2026-03-18",
+  "descriptor_digest": "8a111f908acf02174554a75e83e13092852ee7caa534f65c43be897bd4c606ee",
+  "tokenizer_digest": "49b44264442058c20b2b95a947f3aac60e8729fd57d63db8b8754de8edb98a6d",
+  "model_artifact_bytes": 68248296,
+  "final_validation_mean_loss": 8.60598874092102,
+  "final_validation_bits_per_byte": 9.93265382277841,
+  "prompt_tokens": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "prompt_text": "abcd",
+  "direct_generated_tokens": [
+    7,
+    2,
+    7,
+    2
+  ],
+  "direct_generated_text": "gbgb",
+  "served_generated_tokens": [
+    7,
+    2,
+    7,
+    2
+  ],
+  "served_generated_text": "gbgb",
+  "direct_and_served_match": true,
+  "detail": "This is one retained HOMEGOLF repeated proof run for evidence slot 0. The current bounded exact-family HOMEGOLF lane is deterministic, so repeated slots are expected to reproduce the same bundle/runtime result while preserving separate run receipts for later multi-seed packaging."
+}

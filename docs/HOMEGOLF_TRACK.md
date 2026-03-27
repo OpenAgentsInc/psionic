@@ -347,6 +347,49 @@ Current truth:
   - the retained exact dense bundle proof:
     `fixtures/parameter_golf/reports/parameter_golf_homegolf_dense_bundle_proof.json`
 
+## Multi-Seed Package
+
+HOMEGOLF now also has one retained repeated-run package:
+
+- retained package report:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_multiseed_package.json`
+- retained per-run receipts:
+  - `fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_000.json`
+  - `fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_001.json`
+  - `fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_002.json`
+- generator:
+  `crates/psionic-train/src/parameter_golf_homegolf_multiseed_package.rs`
+- entrypoint:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_multiseed_package.rs`
+- checker:
+  `scripts/check-parameter-golf-homegolf-multiseed-package.sh`
+- audit:
+  `docs/audits/2026-03-27-homegolf-multiseed-package-audit.md`
+
+What this keeps explicit:
+
+- three repeated exact HOMEGOLF proof-lane receipts
+- exact per-run `val_bpb`, model bytes, descriptor/tokenizer digests, and
+  direct-versus-served parity
+- mean and spread across the repeated package
+- mean delta versus the public naive baseline and current public best
+- the stronger-claim boundary:
+  - `public-baseline comparable`
+  - `not public-leaderboard equivalent`
+  - no beat claim support yet
+
+Current truth:
+
+- the current HOMEGOLF repeated package is reproducibility-grade, not
+  competitiveness-grade
+- the repeated package is deterministic today:
+  - `mean_validation_bits_per_byte=9.93265382277841`
+  - `stddev_validation_bits_per_byte=0.0`
+- that zero spread is honest because the current exact-family proof lane is
+  deterministic
+- the repeated package is strong enough for honest public-comparison language,
+  but not strong enough for win-style contest rhetoric
+
 ## Mixed Hardware Manifest Example
 
 HOMEGOLF now also has one explicit retained mixed-hardware manifest surface:

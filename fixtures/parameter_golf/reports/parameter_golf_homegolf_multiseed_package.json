@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.homegolf_multiseed_package.v1",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "source_track_contract_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+  "source_public_comparison_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
+  "source_artifact_accounting_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_artifact_accounting.json",
+  "evidence_bar": {
+    "minimum_repeated_run_count": 3,
+    "current_claim_class": "public_baseline_comparable_only",
+    "stronger_claim_requirement": "If HOMEGOLF ever claims to beat the public naive baseline or current public best, the retained package must move beyond this reproducibility-grade bar and include enough repeated exact-lane runs to support the stronger claim honestly.",
+    "detail": "The current HOMEGOLF package is a reproducibility-grade repeated-run package for a deterministic exact-family proof lane. It is enough for honest public-baseline comparison language, but not enough for stronger win-style rhetoric."
+  },
+  "seed_runs": [
+    {
+      "seed_slot": 0,
+      "source_run_report_ref": "fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_000.json",
+      "source_bundle_proof_ref": "fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_000.json",
+      "run_id": "parameter-golf-homegolf-dense-bundle-proof-seed-000",
+      "descriptor_digest": "8a111f908acf02174554a75e83e13092852ee7caa534f65c43be897bd4c606ee",
+      "tokenizer_digest": "49b44264442058c20b2b95a947f3aac60e8729fd57d63db8b8754de8edb98a6d",
+      "model_artifact_bytes": 68248296,
+      "final_validation_mean_loss": 8.60598874092102,
+      "final_validation_bits_per_byte": 9.93265382277841,
+      "direct_and_served_match": true
+    },
+    {
+      "seed_slot": 1,
+      "source_run_report_ref": "fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_001.json",
+      "source_bundle_proof_ref": "fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_001.json",
+      "run_id": "parameter-golf-homegolf-dense-bundle-proof-seed-001",
+      "descriptor_digest": "8a111f908acf02174554a75e83e13092852ee7caa534f65c43be897bd4c606ee",
+      "tokenizer_digest": "49b44264442058c20b2b95a947f3aac60e8729fd57d63db8b8754de8edb98a6d",
+      "model_artifact_bytes": 68248296,
+      "final_validation_mean_loss": 8.60598874092102,
+      "final_validation_bits_per_byte": 9.93265382277841,
+      "direct_and_served_match": true
+    },
+    {
+      "seed_slot": 2,
+      "source_run_report_ref": "fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_002.json",
+      "source_bundle_proof_ref": "fixtures/parameter_golf/reports/homegolf_multiseed/parameter_golf_homegolf_dense_bundle_proof_seed_002.json",
+      "run_id": "parameter-golf-homegolf-dense-bundle-proof-seed-002",
+      "descriptor_digest": "8a111f908acf02174554a75e83e13092852ee7caa534f65c43be897bd4c606ee",
+      "tokenizer_digest": "49b44264442058c20b2b95a947f3aac60e8729fd57d63db8b8754de8edb98a6d",
+      "model_artifact_bytes": 68248296,
+      "final_validation_mean_loss": 8.60598874092102,
+      "final_validation_bits_per_byte": 9.93265382277841,
+      "direct_and_served_match": true
+    }
+  ],
+  "mean_validation_bits_per_byte": 9.93265382277841,
+  "stddev_validation_bits_per_byte": 0.0,
+  "min_validation_bits_per_byte": 9.93265382277841,
+  "max_validation_bits_per_byte": 9.93265382277841,
+  "mean_delta_vs_public_naive_baseline": 8.70828812277841,
+  "mean_delta_vs_current_public_best": 8.813253822778409,
+  "artifact_budget_status": "within_artifact_cap",
+  "comparison_language": [
+    "public-baseline comparable",
+    "not public-leaderboard equivalent"
+  ],
+  "beat_public_naive_baseline_claim_supported": false,
+  "beat_current_public_best_claim_supported": false,
+  "claim_boundary": "This package records repeated exact HOMEGOLF reruns strongly enough to prove reproducibility and honest public-comparison posture for the current deterministic proof lane. It does not claim baseline competitiveness or support beat claims against the public naive baseline or current public best.",
+  "summary": "HOMEGOLF now has a retained multi-run package over the exact-family proof lane. The current repeated runs reproduce the same val_bpb and the same train-to-infer/serve closure, so the spread is zero. That is enough for reproducibility-grade public comparison, but not enough for stronger contest rhetoric.",
+  "report_digest": "e862a62fa0a9090fff21031667e95eecb31592c52093d647461faa653ec953de"
+}
