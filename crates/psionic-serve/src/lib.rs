@@ -6325,7 +6325,7 @@ impl<'a> PromotedParameterGolfGenerationStream<'a> {
                 .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
             let next_token = match self
                 .sampler
-                .select_next_token_from_history_with_disallowed(
+                .select_next_token_from_history_with_allowed(
                     self.loaded_model.runtime_bundle().tokenizer(),
                     last_logits,
                     self.history.as_slice(),
@@ -6333,7 +6333,7 @@ impl<'a> PromotedParameterGolfGenerationStream<'a> {
                     self.loaded_model
                         .runtime_bundle()
                         .tokenizer()
-                        .generation_disallowed_token_ids(),
+                        .generation_allowed_token_ids(),
                 )? {
                 GenerationSelection::Token(token) => token,
                 GenerationSelection::Terminate => {
@@ -6838,6 +6838,61 @@ impl GenerationSampler {
             }
             let index = candidate as usize;
             if let Some(logit) = masked_logits.get_mut(index) {
+                *logit = f32::NEG_INFINITY;
+            }
+        }
+        Err(ReferenceTextGenerationError::StructuredOutputExhausted)
+    }
+
+    fn select_next_token_from_history_with_allowed(
+        &mut self,
+        tokenizer: &dyn TokenizerBoundary,
+        logits: &[f32],
+        history: &[u32],
+        generated_tokens: &[TokenId],
+        allowed_token_ids: &[u32],
+    ) -> Result<GenerationSelection, ReferenceTextGenerationError> {
+        let Some(matcher) = self.structured_output.as_ref() else {
+            return self
+                .sampler
+                .select_next_token_with_allowed(logits, history, allowed_token_ids)
+                .map(TokenId)
+                .map_or(
+                    Err(ReferenceTextGenerationError::MissingOutput("next_token")),
+                    |token| Ok(GenerationSelection::Token(token)),
+                );
+        };
+
+        let current_text = tokenizer.decode(generated_tokens);
+        let current_match = matcher.classify(current_text.as_str());
+        if matcher.prefers_completion_termination()
+            && matches!(current_match.status, StructuredOutputMatchStatus::Complete)
+            && !current_match.can_continue
+        {
+            return Ok(GenerationSelection::Terminate);
+        }
+
+        let mut masked_logits = vec![f32::NEG_INFINITY; logits.len()];
+        for &token_id in allowed_token_ids {
+            if let Some(logit) = logits.get(token_id as usize) {
+                masked_logits[token_id as usize] = *logit;
+            }
+        }
+        for _ in 0..allowed_token_ids.len().max(1) {
+            let Some(candidate) = self
+                .sampler
+                .select_next_token_with_allowed(&masked_logits, history, allowed_token_ids)
+            else {
+                return Err(ReferenceTextGenerationError::StructuredOutputExhausted);
+            };
+            let mut candidate_tokens = generated_tokens.to_vec();
+            candidate_tokens.push(TokenId(candidate));
+            let candidate_text = tokenizer.decode(candidate_tokens.as_slice());
+            let matched = matcher.classify(candidate_text.as_str());
+            if matched.is_allowed() {
+                return Ok(GenerationSelection::Token(TokenId(candidate)));
+            }
+            if let Some(logit) = masked_logits.get_mut(candidate as usize) {
                 *logit = f32::NEG_INFINITY;
             }
         }

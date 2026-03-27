@@ -938,50 +938,39 @@ fn promoted_xtrain_coordinate_budget() -> Vec<ParameterGolfTrainableCoordinate> 
     let mut coordinates = Vec::new();
 
     for token_id in promoted_xtrain_reference_token_ids(&fixture, 8) {
-        for dim in evenly_spaced_flat_indices(model_dim, 2) {
+        for dim in evenly_spaced_flat_indices(model_dim, 4) {
             coordinates.push(ParameterGolfTrainableCoordinate {
                 parameter_id: String::from("tok_emb.weight"),
                 flat_index: token_id.saturating_mul(model_dim).saturating_add(dim),
             });
         }
     }
-    push_evenly_spaced_parameter_coordinates(&mut coordinates, &model, "skip_weights", 2);
+    push_evenly_spaced_parameter_coordinates(&mut coordinates, &model, "skip_weights", 4);
     for layer_index in 0..1 {
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.attn.q_gain").as_str(),
-            4,
+            6,
         );
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.attn_scale").as_str(),
-            2,
+            4,
         );
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.mlp_scale").as_str(),
-            2,
+            4,
         );
         push_evenly_spaced_parameter_coordinates(
             &mut coordinates,
             &model,
             format!("blocks.{layer_index}.resid_mix").as_str(),
-            2,
+            4,
         );
-        for tensor_name in [
-            format!("blocks.{layer_index}.attn.c_q.weight"),
-            format!("blocks.{layer_index}.attn.proj.weight"),
-        ] {
-            push_evenly_spaced_parameter_coordinates(
-                &mut coordinates,
-                &model,
-                tensor_name.as_str(),
-                2,
-            );
-        }
     }
 
     coordinates.sort();
@@ -5313,6 +5302,14 @@ mod tests {
                 .selected_coordinates
                 .iter()
                 .any(|coordinate| coordinate.parameter_id == "blocks.0.attn.q_gain")
+        );
+        assert!(
+            xtrain
+                .selected_coordinates
+                .iter()
+                .filter(|coordinate| coordinate.parameter_id == "tok_emb.weight")
+                .count()
+                >= 32
         );
         Ok(())
     }

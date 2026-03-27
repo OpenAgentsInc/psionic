@@ -5524,6 +5524,53 @@ impl TokenSampler {
         }
         token
     }
+
+    /// Selects the next token while admitting one explicit set of token ids.
+    pub fn select_next_token_with_allowed(
+        &mut self,
+        logits: &[f32],
+        history: &[u32],
+        allowed_token_ids: &[u32],
+    ) -> Option<u32> {
+        if allowed_token_ids.is_empty() {
+            return None;
+        }
+        if !sampling_penalties_are_active(&self.policy)
+            && (self.policy.strategy == SamplingStrategy::Greedy
+                || self.policy.effective_temperature() <= 1e-6)
+        {
+            return select_argmax_token_from_allowed(logits, allowed_token_ids);
+        }
+
+        let mut adjusted_logits = logits.to_vec();
+        apply_sampling_penalties(&mut adjusted_logits, history, &self.policy);
+        let mut allowed_mask = vec![false; adjusted_logits.len()];
+        for &token_id in allowed_token_ids {
+            if let Some(slot) = allowed_mask.get_mut(token_id as usize) {
+                *slot = true;
+            }
+        }
+        for (index, logit) in adjusted_logits.iter_mut().enumerate() {
+            if !allowed_mask[index] {
+                *logit = f32::NEG_INFINITY;
+            }
+        }
+        if !adjusted_logits.iter().any(|value| value.is_finite()) {
+            return None;
+        }
+        if self.policy.strategy == SamplingStrategy::Greedy
+            || self.policy.effective_temperature() <= 1e-6
+        {
+            return select_argmax_token(&adjusted_logits);
+        }
+        let token = sample_token_index(&mut self.rng, &adjusted_logits, &self.policy);
+        if token.is_some() {
+            if let Some(generator_state) = self.generator_state.as_mut() {
+                generator_state.draws = generator_state.draws.saturating_add(1);
+            }
+        }
+        token
+    }
 }
 
 fn stable_child_generator_seed(seed: u64, scope: &GeneratorScope) -> u64 {
@@ -5593,6 +5640,12 @@ pub fn apply_sampling_penalties(logits: &mut [f32], history: &[u32], policy: &Sa
     }
 }
 
+fn sampling_penalties_are_active(policy: &SamplingPolicy) -> bool {
+    (policy.effective_repeat_penalty() - 1.0).abs() > f32::EPSILON
+        || policy.effective_presence_penalty().abs() > f32::EPSILON
+        || policy.effective_frequency_penalty().abs() > f32::EPSILON
+}
+
 /// Selects the highest-logit token index.
 #[must_use]
 pub fn select_argmax_token(logits: &[f32]) -> Option<u32> {
@@ -5601,6 +5654,22 @@ pub fn select_argmax_token(logits: &[f32]) -> Option<u32> {
         .enumerate()
         .max_by(|(_, left), (_, right)| left.total_cmp(right))
         .map(|(index, _)| index as u32)
+}
+
+#[must_use]
+fn select_argmax_token_from_allowed(logits: &[f32], allowed_token_ids: &[u32]) -> Option<u32> {
+    allowed_token_ids
+        .iter()
+        .copied()
+        .filter_map(|token_id| {
+            logits
+                .get(token_id as usize)
+                .copied()
+                .filter(|value| value.is_finite())
+                .map(|value| (token_id, value))
+        })
+        .max_by(|(_, left), (_, right)| left.total_cmp(right))
+        .map(|(token_id, _)| token_id)
 }
 
 fn token_counts(history: &[u32], vocab_size: usize) -> BTreeMap<u32, usize> {
@@ -11727,6 +11796,28 @@ mod tests {
         let selected = sampler
             .select_next_token_with_disallowed(&logits, &[], &[1])
             .expect("disallowed token should be skipped");
+
+        assert_eq!(selected, 2);
+    }
+
+    #[test]
+    fn token_sampler_can_select_from_explicit_allowed_ids() {
+        let policy = SamplingPolicy {
+            strategy: SamplingStrategy::Greedy,
+            temperature: None,
+            top_k: None,
+            top_p: None,
+            repeat_penalty: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            seed: None,
+        };
+        let logits = vec![12.0, 1.0, 11.0];
+        let mut sampler = TokenSampler::new(&policy);
+
+        let selected = sampler
+            .select_next_token_with_allowed(&logits, &[], &[1, 2])
+            .expect("highest allowed token should be selected");
 
         assert_eq!(selected, 2);
     }

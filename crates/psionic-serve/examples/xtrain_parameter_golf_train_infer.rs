@@ -335,7 +335,7 @@ fn decode_variant(
     let mut generated = Vec::with_capacity(max_new_tokens);
     let mut sampler =
         TokenSampler::new(&bundle.default_greedy_generation_options().sampling_policy);
-    let generation_disallowed_token_ids = bundle.tokenizer().generation_disallowed_token_ids();
+    let generation_allowed_token_ids = bundle.tokenizer().generation_allowed_token_ids();
     while generated.len() < max_new_tokens && history.len() < bundle.generation_config().max_context
     {
         let logits = match variant {
@@ -366,10 +366,10 @@ fn decode_variant(
             .get(last_row_start..last_row_start.saturating_add(width))
             .ok_or_else(|| String::from("missing final logits row"))?;
         let next_token = sampler
-            .select_next_token_with_disallowed(
+            .select_next_token_with_allowed(
                 last_logits,
                 history.as_slice(),
-                generation_disallowed_token_ids,
+                generation_allowed_token_ids,
             )
             .ok_or_else(|| String::from("missing greedy next token"))?;
         history.push(next_token);

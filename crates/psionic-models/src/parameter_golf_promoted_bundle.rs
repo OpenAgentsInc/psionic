@@ -638,6 +638,7 @@ pub struct ParameterGolfPromotedRuntimeTokenizer {
     vocabulary: TokenVocabulary,
     lookup: BTreeMap<String, TokenId>,
     eos_token_ids: Vec<TokenId>,
+    generation_allowed_token_ids: Vec<u32>,
     generation_disallowed_token_ids: Vec<u32>,
 }
 
@@ -712,11 +713,26 @@ impl ParameterGolfPromotedRuntimeTokenizer {
                 | ParameterGolfPromotedTokenizerTokenKind::Unused => Some(piece.token_id),
             })
             .collect::<Vec<_>>();
+        let generation_allowed_token_ids = asset
+            .pieces
+            .iter()
+            .filter_map(|piece| match piece.kind {
+                ParameterGolfPromotedTokenizerTokenKind::Normal
+                | ParameterGolfPromotedTokenizerTokenKind::Byte => Some(piece.token_id),
+                ParameterGolfPromotedTokenizerTokenKind::Control => asset
+                    .eos_token_ids
+                    .contains(&piece.token_id)
+                    .then_some(piece.token_id),
+                ParameterGolfPromotedTokenizerTokenKind::Unknown
+                | ParameterGolfPromotedTokenizerTokenKind::Unused => None,
+            })
+            .collect::<Vec<_>>();
         Ok(Self {
             asset,
             vocabulary,
             lookup,
             eos_token_ids,
+            generation_allowed_token_ids,
             generation_disallowed_token_ids,
         })
     }
@@ -731,6 +747,12 @@ impl ParameterGolfPromotedRuntimeTokenizer {
     #[must_use]
     pub fn generation_disallowed_token_ids(&self) -> &[u32] {
         self.generation_disallowed_token_ids.as_slice()
+    }
+
+    /// Returns token ids that inference may emit by default.
+    #[must_use]
+    pub fn generation_allowed_token_ids(&self) -> &[u32] {
+        self.generation_allowed_token_ids.as_slice()
     }
 
     /// Encodes text with explicit BOS/EOS injection.
@@ -1055,7 +1077,7 @@ impl ParameterGolfPromotedRuntimeBundle {
         let mut bounded_history = Vec::with_capacity(bounded_history_capacity);
         let mut generated_tokens = Vec::with_capacity(options.max_new_tokens);
         let mut sampler = TokenSampler::new(&options.sampling_policy);
-        let generation_disallowed_token_ids = self.tokenizer.generation_disallowed_token_ids();
+        let generation_allowed_token_ids = self.tokenizer.generation_allowed_token_ids();
         let termination = loop {
             if generated_tokens.len() >= options.max_new_tokens {
                 break ParameterGolfPromotedGenerationTermination::MaxNewTokens;
@@ -1087,10 +1109,10 @@ impl ParameterGolfPromotedRuntimeBundle {
                 .get(last_row_start..last_row_start.saturating_add(width))
                 .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
             let next_token = sampler
-                .select_next_token_with_disallowed(
+                .select_next_token_with_allowed(
                     last_logits,
                     history.as_slice(),
-                    generation_disallowed_token_ids,
+                    generation_allowed_token_ids,
                 )
                 .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
             let next_token = TokenId(next_token);
@@ -1736,6 +1758,7 @@ mod tests {
 
         let tokenizer = ParameterGolfPromotedRuntimeTokenizer::from_asset(asset)?;
 
+        assert_eq!(tokenizer.generation_allowed_token_ids(), &[2, 3]);
         assert_eq!(tokenizer.generation_disallowed_token_ids(), &[0, 1, 4]);
         Ok(())
     }
