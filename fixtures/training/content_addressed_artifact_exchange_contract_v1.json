@@ -1,0 +1,212 @@
+{
+  "schema_version": "psionic.content_addressed_artifact_exchange_contract.v1",
+  "contract_id": "psionic.content_addressed_artifact_exchange_contract.v1",
+  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
+  "public_work_assignment_contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601",
+  "wan_overlay_route_contract_digest": "3f8ac57a330f37acfed56c582353643cd09072f6b1792472917165db979922e4",
+  "live_checkpoint_catchup_contract_digest": "3589f9e87675511227b73ec95e226ab99354f09cba35cc9c0d72c1608d9a10d8",
+  "quantized_outer_sync_contract_digest": "1b67541b4b4c9b316a8ba78625c4e745c9c3da0f447eacf8585b9e2cafbd5fc2",
+  "remote_train_artifact_backend_contract_digest": "b32eb8e494bbd043e998bed4d50fa939d47184605ee5ecf7f051205eb6c4be12",
+  "exchange_backends": [
+    {
+      "backend_id": "backend.peer.google.seed",
+      "backend_kind": "peer_seed",
+      "serving_registry_record_id": "google_l4_validator_node.registry",
+      "serving_role_class": "public_miner",
+      "preferred_route_id": "route.checkpoint_authority.google_runpod.direct",
+      "ttl_ms": 900000,
+      "detail": "Google seeds miner-owned delta and gradient artifacts directly over the same direct WAN path already admitted for outer sync."
+    },
+    {
+      "backend_id": "backend.peer.local_mlx.seed",
+      "backend_kind": "peer_seed",
+      "serving_registry_record_id": "local_mlx_mac_workstation.registry",
+      "serving_role_class": "public_miner",
+      "preferred_route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "ttl_ms": 900000,
+      "detail": "Apple MLX seeds miner-owned delta artifacts over the overlay path used by the live rejoin and outer-sync receipts."
+    },
+    {
+      "backend_id": "backend.relay.google.cache",
+      "backend_kind": "relay_cache",
+      "serving_registry_record_id": "google_l4_validator_node.registry",
+      "serving_role_class": "relay",
+      "preferred_route_id": "route.checkpoint_authority.google_runpod.direct",
+      "ttl_ms": 1800000,
+      "detail": "Google also exposes the first relay cache so public artifacts can survive short-lived peer churn without becoming coordinator-only state."
+    },
+    {
+      "backend_id": "backend.store.google.bucket",
+      "backend_kind": "authoritative_store",
+      "serving_registry_record_id": "google_l4_validator_node.registry",
+      "serving_role_class": "checkpoint_authority",
+      "linked_remote_backend_id": "google_train_bucket_backend",
+      "ttl_ms": 14400000,
+      "detail": "The canonical cloud bucket remains one authoritative content-addressed store for checkpoints and mirrored score outputs."
+    },
+    {
+      "backend_id": "backend.store.runpod.workspace",
+      "backend_kind": "authoritative_store",
+      "serving_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "serving_role_class": "checkpoint_authority",
+      "linked_remote_backend_id": "runpod_workspace_backend",
+      "ttl_ms": 14400000,
+      "detail": "RunPod keeps a mirrored authoritative store so checkpoint publication and replay do not collapse onto one backend."
+    }
+  ],
+  "published_artifacts": [
+    {
+      "artifact_id": "artifact.delta.google.int8.round2056",
+      "artifact_kind": "quantized_delta",
+      "publisher_registry_record_id": "google_l4_validator_node.registry",
+      "publisher_role_class": "public_miner",
+      "origin_contract_id": "psionic.quantized_outer_sync_contract.v1",
+      "origin_reference_id": "exchange.public_miner.google_to_runpod.int8.1",
+      "content_id": "cid.psionic.v1.5da45093803126e3b253bba6a41a5fd0366e7773595dc7e5c8de9bc0af260533",
+      "sha256": "sha256:artifact_delta_google_int8_round2056_v1",
+      "byte_length": 20971520,
+      "primary_backend_id": "backend.peer.google.seed",
+      "mirror_backend_ids": [
+        "backend.relay.google.cache"
+      ],
+      "detail": "Google publishes its admitted INT8 outer-sync package as one content-addressed delta artifact with one relay-cache mirror."
+    },
+    {
+      "artifact_id": "artifact.delta.local_mlx.nf4.round2056",
+      "artifact_kind": "quantized_delta",
+      "publisher_registry_record_id": "local_mlx_mac_workstation.registry",
+      "publisher_role_class": "public_miner",
+      "origin_contract_id": "psionic.quantized_outer_sync_contract.v1",
+      "origin_reference_id": "exchange.public_miner.local_mlx_to_runpod.nf4.1",
+      "content_id": "cid.psionic.v1.6c737de45853cee2818f6fe60f5b5495bb9a55cb73934d3188fa873625eedeb0",
+      "sha256": "sha256:artifact_delta_local_mlx_nf4_round2056_v1",
+      "byte_length": 8388608,
+      "primary_backend_id": "backend.peer.local_mlx.seed",
+      "mirror_backend_ids": [
+        "backend.relay.google.cache"
+      ],
+      "detail": "Apple MLX publishes its admitted NF4 residual package as a content-addressed delta artifact over the overlay-backed peer seed and relay cache."
+    },
+    {
+      "artifact_id": "artifact.gradient.google.full.round2056",
+      "artifact_kind": "gradient_slice",
+      "publisher_registry_record_id": "google_l4_validator_node.registry",
+      "publisher_role_class": "public_miner",
+      "origin_contract_id": "psionic.quantized_outer_sync_contract.v1",
+      "origin_reference_id": "exchange.public_miner.google_to_runpod.int8.1",
+      "content_id": "cid.psionic.v1.325d52ed142625d8d270b65a4aa8bf5014fb7a96269b680b7dca94a33983278e",
+      "sha256": "sha256:artifact_gradient_google_full_round2056_v1",
+      "byte_length": 100663296,
+      "primary_backend_id": "backend.peer.google.seed",
+      "mirror_backend_ids": [
+        "backend.relay.google.cache"
+      ],
+      "detail": "Google retains the pre-quantization gradient slice under the same content-addressed family even though WAN fetch of the raw slice is still expected to fail closed on mismatch."
+    },
+    {
+      "artifact_id": "artifact.checkpoint.step2048.live",
+      "artifact_kind": "live_checkpoint",
+      "publisher_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "publisher_role_class": "checkpoint_authority",
+      "origin_contract_id": "psionic.live_checkpoint_catchup_contract.v1",
+      "origin_reference_id": "advertisement.checkpoint_authority.runpod.primary",
+      "content_id": "cid.psionic.v1.4d17c4fc874bdadf9e3b37e5345be8787201f3fd7424caa6085396a8eb09741a",
+      "sha256": "sha256:artifact_checkpoint_step2048_live_v1",
+      "byte_length": 402653184,
+      "primary_backend_id": "backend.store.runpod.workspace",
+      "mirror_backend_ids": [
+        "backend.store.google.bucket"
+      ],
+      "authoritative_artifact_class": "checkpoint",
+      "detail": "RunPod publishes the admitted live checkpoint as one content-addressed store object while keeping the Google bucket as an authoritative mirror."
+    },
+    {
+      "artifact_id": "artifact.score.window1230.google.provisional",
+      "artifact_kind": "validator_score",
+      "publisher_registry_record_id": "google_l4_validator_node.registry",
+      "publisher_role_class": "public_validator",
+      "origin_contract_id": "psionic.public_work_assignment_contract.v1",
+      "origin_reference_id": "receipt.assignment.public_validator.window1230.google",
+      "content_id": "cid.psionic.v1.7b97e0d767b969d72a9590c0619c148844997450345b77129cfaf1f317bd4a03",
+      "sha256": "sha256:artifact_score_window1230_google_provisional_v1",
+      "byte_length": 65536,
+      "primary_backend_id": "backend.relay.google.cache",
+      "mirror_backend_ids": [
+        "backend.store.google.bucket"
+      ],
+      "authoritative_artifact_class": "metrics_bundle",
+      "detail": "Google publishes a provisional validator score artifact through the relay cache and mirrors it into the authoritative store; the transport is canonical even though final verdict semantics still wait on the validator contract."
+    }
+  ],
+  "fetch_receipts": [
+    {
+      "receipt_id": "fetch.delta.google.runpod.verified",
+      "artifact_id": "artifact.delta.google.int8.round2056",
+      "requester_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "requester_role_class": "checkpoint_authority",
+      "selected_backend_id": "backend.peer.google.seed",
+      "selected_route_id": "route.checkpoint_authority.google_runpod.direct",
+      "observed_sha256": "sha256:artifact_delta_google_int8_round2056_v1",
+      "observed_byte_length": 20971520,
+      "disposition": "verified",
+      "detail": "RunPod verifies and consumes the Google INT8 delta artifact directly from the peer seed over the direct WAN route."
+    },
+    {
+      "receipt_id": "fetch.delta.local_mlx.runpod.verified",
+      "artifact_id": "artifact.delta.local_mlx.nf4.round2056",
+      "requester_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "requester_role_class": "checkpoint_authority",
+      "selected_backend_id": "backend.peer.local_mlx.seed",
+      "selected_route_id": "route.checkpoint_authority.local_mlx_runpod.overlay",
+      "observed_sha256": "sha256:artifact_delta_local_mlx_nf4_round2056_v1",
+      "observed_byte_length": 8388608,
+      "disposition": "verified",
+      "detail": "RunPod verifies and consumes the Apple MLX NF4 residual artifact over the overlay-backed peer seed."
+    },
+    {
+      "receipt_id": "fetch.checkpoint.local_mlx.google_store.verified",
+      "artifact_id": "artifact.checkpoint.step2048.live",
+      "requester_registry_record_id": "local_mlx_mac_workstation.registry",
+      "requester_role_class": "public_miner",
+      "selected_backend_id": "backend.store.google.bucket",
+      "observed_sha256": "sha256:artifact_checkpoint_step2048_live_v1",
+      "observed_byte_length": 402653184,
+      "disposition": "verified",
+      "detail": "The rejoined Apple MLX miner can fetch the same admitted checkpoint from the authoritative Google store without inventing a new path vocabulary."
+    },
+    {
+      "receipt_id": "fetch.score.runpod.google_relay.verified",
+      "artifact_id": "artifact.score.window1230.google.provisional",
+      "requester_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "requester_role_class": "checkpoint_authority",
+      "selected_backend_id": "backend.relay.google.cache",
+      "selected_route_id": "route.checkpoint_authority.google_runpod.direct",
+      "observed_sha256": "sha256:artifact_score_window1230_google_provisional_v1",
+      "observed_byte_length": 65536,
+      "disposition": "verified",
+      "detail": "RunPod can verify the provisional validator score artifact through the relay cache before the final score-governance issue lands."
+    },
+    {
+      "receipt_id": "fetch.gradient.google.runpod.refused",
+      "artifact_id": "artifact.gradient.google.full.round2056",
+      "requester_registry_record_id": "runpod_8xh100_dense_node.registry",
+      "requester_role_class": "checkpoint_authority",
+      "selected_backend_id": "backend.relay.google.cache",
+      "selected_route_id": "route.checkpoint_authority.google_runpod.direct",
+      "observed_sha256": "sha256:artifact_gradient_google_full_round2056_corrupt_v1",
+      "observed_byte_length": 100663296,
+      "disposition": "refused",
+      "refusal_kind": "digest_mismatch",
+      "refusal": "relay cache fetch is refused because the observed raw-gradient digest mismatched the published content id",
+      "detail": "The contract keeps one corruption refusal explicit so raw artifact exchange cannot silently accept mismatched bytes just because the route itself was healthy."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/content_addressed_artifact_exchange_contract_v1.json",
+    "check_script_path": "scripts/check-content-addressed-artifact-exchange-contract.sh",
+    "reference_doc_path": "docs/CONTENT_ADDRESSED_ARTIFACT_EXCHANGE_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first content-addressed public artifact exchange family: peer seeds, relay caches, authoritative stores, published artifact ids, verified fetch receipts, and one refused digest-mismatch fetch. It does not yet claim validator verdict truth or the full public miner execution protocol.",
+  "contract_digest": "1d2153ccb088b9bac59de0e9a0f7534251b42799590bd97e7a5604c3b22f45ef"
+}

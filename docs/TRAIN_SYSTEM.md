@@ -321,6 +321,19 @@ corpus, admitted miner data receipts, and one refused duplicate claim. It
 proves public work can bind to real shard lineage instead of self-reported page
 names.
 
+The repo now also owns the first content-addressed artifact exchange contract
+in `crates/psionic-train/src/content_addressed_artifact_exchange_contract.rs`,
+the binary `content_addressed_artifact_exchange_contract`, the checker
+`scripts/check-content-addressed-artifact-exchange-contract.sh`, the focused
+reference doc `docs/CONTENT_ADDRESSED_ARTIFACT_EXCHANGE_REFERENCE.md`, and the
+committed fixture
+`fixtures/training/content_addressed_artifact_exchange_contract_v1.json`. That
+surface turns public runtime receipts into portable artifact truth: peer seeds,
+relay caches, authoritative stores, content ids for deltas, gradient slices,
+checkpoints, and provisional score artifacts, plus one explicit
+digest-mismatch refusal. It proves public artifact transport can fail closed on
+corruption instead of quietly trusting whichever path returned bytes first.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker
