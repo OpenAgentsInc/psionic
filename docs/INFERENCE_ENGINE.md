@@ -68,13 +68,19 @@ than just run tensor math.
   about `523 tok/s` decode on Psionic versus about `329 tok/s` decode on local
   Ollama for the same one-sentence prompt and `128` token cap.
 - On the same host, prompt, and token cap, the same native qwen35 CUDA lane now
-  also measures about `247 tok/s` on the local `qwen3.5:2b` artifact versus
-  about `203 tok/s` on local Ollama, and about `167 tok/s` on the local
-  `qwen3.5:4b` artifact versus about `141 tok/s` on local Ollama.
+  also measures about `244 tok/s` on the local `qwen3.5:2b` artifact versus
+  about `205 tok/s` on local Ollama, about `167 tok/s` on the local
+  `qwen3.5:4b` artifact versus about `142 tok/s` on local Ollama, and about
+  `103 tok/s` on the local `qwen3.5:9b` artifact versus about `95 tok/s` on
+  local Ollama.
 - The 4B row only became correct and faster after fixing the fused decode
   output head for mixed `Q4_K` and `Q6_K` weights. Greedy `ArgmaxOnly` decode
   now routes `Q6_K` output weights through `Q8_1` projection plus `argmax_f32`
   instead of falling back to the slower generic quantized matvec path.
+- The 9B row also fits and runs natively on this 16 GB host. The only extra
+  benchmark requirement is operational: unload Ollama's resident GPU caches
+  before measuring Psionic, because Ollama keeps prior model weights live in
+  VRAM.
 - The qwen35 lane is now ahead on decode throughput for this host and prompt,
   but it is still not architecture-closed. Greedy prompt replay is materially
   faster than the earlier pilot, but the remaining headroom is still in the
