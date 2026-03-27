@@ -1,0 +1,19 @@
+{
+  "digest": {
+    "family": "byte_pair_encoding",
+    "tokenizer_digest": "swarm-open-adapter-tokenizer-v1",
+    "vocab_size": 32,
+    "special_tokens_digest": "swarm-open-adapter-specials-v1",
+    "template_digest": "swarm-open-adapter-template-v1"
+  },
+  "asset_format": "tokenizer_json",
+  "asset_version": "gpt-oss-20b@swarm-local-v1",
+  "add_bos": true,
+  "add_eos": false,
+  "bos_token_id": 1,
+  "eos_token_ids": [
+    2
+  ],
+  "pad_token_id": 0,
+  "unknown_token_id": 3
+}

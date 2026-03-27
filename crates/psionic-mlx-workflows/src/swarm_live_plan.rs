@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use psionic_cluster::{
@@ -9,6 +9,7 @@ use psionic_cluster::{
     ClusterMembershipStatus, ClusterNamespace, ClusterNodeIdentity, ClusterNodeTelemetry,
     ClusterSnapshot, ClusterStabilityPosture, ClusterState, NodeEpoch, NodeId, NodeRole,
 };
+use psionic_core::{DType, Device, Shape, TensorData};
 use psionic_environments::EnvironmentPackageKey;
 use psionic_mlx_recipes::{MlxAdapterRecipe, MlxRecipeConfig, MlxRecipeMethod, MlxRecipePlan};
 use psionic_runtime::TrainingCheckpointReference;
@@ -18,7 +19,11 @@ use psionic_train::{
     AdapterContributorEligibility, AdapterDatasetSliceIdentity, AdapterTargetIdentity,
     AdapterTrainingClusterCoordinator, CheckpointPointer, CheckpointScopeBinding,
     CheckpointScopeKind, OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
-    first_swarm_open_adapter_receipt_contract, first_swarm_run_contract,
+    OptimizerStateResidency, PortableModelBundle, PortableModelStateDict,
+    PortableTokenizerAssetFormat, PortableTokenizerBinding, TrainingOptimizerConfig,
+    TrainingOptimizerResidencyPolicy, TrainingOptimizerState, TrainingParameterClass,
+    TrainingParameterGroupState, TrainingTensorBuffer, first_swarm_open_adapter_receipt_contract,
+    first_swarm_run_contract, first_swarm_tokenizer_digest,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -35,6 +40,14 @@ pub const FIRST_SWARM_LIVE_WORKFLOW_PLAN_SCOPE_WINDOW: &str = "first_swarm_live_
 /// Stable fixture path for the first swarm live workflow plan.
 pub const FIRST_SWARM_LIVE_WORKFLOW_PLAN_FIXTURE_PATH: &str =
     "fixtures/swarm/first_swarm_live_workflow_plan_v1.json";
+/// Stable scope window for the first swarm local snapshot publication proof.
+pub const FIRST_SWARM_LOCAL_SNAPSHOT_PUBLICATION_SCOPE_WINDOW: &str =
+    "first_swarm_local_snapshot_publication_v1";
+/// Stable fixture root for the retained first swarm local snapshot publication proof.
+pub const FIRST_SWARM_LOCAL_SNAPSHOT_PUBLICATION_FIXTURE_ROOT: &str = "fixtures/swarm/publications";
+/// Stable fixture path for the retained first swarm local snapshot publication report.
+pub const FIRST_SWARM_LOCAL_SNAPSHOT_PUBLICATION_REPORT_FIXTURE_PATH: &str =
+    "fixtures/swarm/publications/first_swarm_local_snapshot_publication_v1.json";
 
 /// One machine-legible contributor assignment in the first swarm live plan.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +141,61 @@ impl FirstSwarmLiveWorkflowPlan {
         let mut clone = self.clone();
         clone.plan_digest.clear();
         stable_digest(b"psionic_first_swarm_live_workflow_plan|", &clone)
+    }
+}
+
+/// Retained publication proof for one truthful first-swarm local snapshot directory.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FirstSwarmLocalSnapshotPublicationReport {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable scope window.
+    pub scope_window: String,
+    /// Stable run family identifier.
+    pub run_family_id: String,
+    /// Stable workflow-plan digest that bound the publish expectation.
+    pub workflow_plan_digest: String,
+    /// Stable publish identifier.
+    pub publish_id: String,
+    /// Publish target admitted by the workflow package.
+    pub target: MlxPublishTarget,
+    /// Logical repository identifier for the local snapshot.
+    pub repo_id: String,
+    /// Expected relative snapshot directory from the workflow plan.
+    pub expected_local_snapshot_directory: String,
+    /// Relative snapshot root actually written by the proof.
+    pub published_snapshot_root: String,
+    /// Stable merge report digest for the published portable bundle.
+    pub merge_report_digest: String,
+    /// Stable publish manifest digest.
+    pub publish_manifest_digest: String,
+    /// Stable merged bundle state-dict digest.
+    pub merged_state_dict_digest: String,
+    /// Stable merged artifact digest.
+    pub merged_artifact_digest: String,
+    /// Stable base state-dict digest used for the merge proof.
+    pub base_state_dict_digest: String,
+    /// Stable tuned state-dict digest used for the merge proof.
+    pub tuned_state_dict_digest: String,
+    /// Ordered payload files emitted by the published snapshot.
+    pub published_files: Vec<crate::MlxWorkflowFile>,
+    /// Honest bounded notes.
+    pub notes: Vec<String>,
+    /// Honest claim boundary.
+    pub claim_boundary: String,
+    /// Stable report digest.
+    pub report_digest: String,
+}
+
+impl FirstSwarmLocalSnapshotPublicationReport {
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.report_digest.clear();
+        stable_digest(
+            b"psionic_first_swarm_local_snapshot_publication_report|",
+            &clone,
+        )
     }
 }
 
@@ -524,6 +592,101 @@ pub fn write_first_swarm_live_workflow_plan(
         message: error.to_string(),
     })?;
     Ok(plan)
+}
+
+/// Writes the retained first-swarm local snapshot publication proof into one root directory.
+pub fn write_first_swarm_local_snapshot_publication(
+    output_root: impl AsRef<Path>,
+) -> Result<FirstSwarmLocalSnapshotPublicationReport, MlxWorkflowError> {
+    let output_root = output_root.as_ref();
+    fs::create_dir_all(output_root).map_err(|error| MlxWorkflowError::Io {
+        path: output_root.display().to_string(),
+        message: error.to_string(),
+    })?;
+
+    let workspace = MlxWorkflowWorkspace::default();
+    let cluster_state = sample_first_swarm_live_cluster_state();
+    let recipe = first_swarm_recipe_config(
+        "first-swarm-local-publication",
+        cluster_state.cluster_id().as_str(),
+    )?;
+    let dataset = workspace.build_first_swarm_synthetic_sft_dataset()?;
+    let publish = first_swarm_publish_config();
+    let plan = workspace.plan_first_swarm_live_adapter_cluster(
+        &recipe,
+        &dataset,
+        &publish,
+        &cluster_state,
+        1_774_409_200_000,
+        1_774_409_201_000,
+    )?;
+
+    let (base_bundle, tuned_bundle) = first_swarm_publication_reference_bundles()?;
+    let merged = workspace.merge_adapter(
+        &crate::MlxAdapterMergeConfig {
+            merge_id: String::from("first-swarm-local-snapshot-merge"),
+            adapter_id: String::from("first-swarm-open-adapter"),
+        },
+        &base_bundle,
+        &tuned_bundle,
+    )?;
+
+    let snapshot_relative_root = plan
+        .publish_expectation
+        .expected_local_snapshot_directory
+        .clone();
+    let snapshot_root = output_root.join(&snapshot_relative_root);
+    let manifest = workspace.publish_bundle(&publish, &merged.merged_bundle, &snapshot_root)?;
+
+    let mut report = FirstSwarmLocalSnapshotPublicationReport {
+        schema_version: String::from("swarm.first_local_snapshot_publication_report.v1"),
+        scope_window: String::from(FIRST_SWARM_LOCAL_SNAPSHOT_PUBLICATION_SCOPE_WINDOW),
+        run_family_id: plan.run_family_id.clone(),
+        workflow_plan_digest: plan.plan_digest.clone(),
+        publish_id: publish.publish_id.clone(),
+        target: publish.target,
+        repo_id: publish.repo_id.clone(),
+        expected_local_snapshot_directory: plan
+            .publish_expectation
+            .expected_local_snapshot_directory
+            .clone(),
+        published_snapshot_root: snapshot_relative_root,
+        merge_report_digest: merged.report.report_digest.clone(),
+        publish_manifest_digest: manifest.manifest_digest.clone(),
+        merged_state_dict_digest: merged.merged_bundle.state_dict.digest.clone(),
+        merged_artifact_digest: manifest.source_artifact_receipt.artifact_digest.clone(),
+        base_state_dict_digest: base_bundle.state_dict.digest.clone(),
+        tuned_state_dict_digest: tuned_bundle.state_dict.digest.clone(),
+        published_files: manifest.files.clone(),
+        notes: vec![
+            String::from(
+                "This proof uses the exact first-swarm publish target and the existing `psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle` surface to retain one real local Hugging Face-style snapshot directory.",
+            ),
+            String::from(
+                "The published bundle is deterministic and machine-checkable, but it is a bounded publication proof built from a retained portable merge pair rather than the already-closed trusted-LAN live run.",
+            ),
+            String::from(
+                "The retained first-swarm live bundle still truthfully stays `publish_disposition=refused` because that real mixed-hardware run ended at merge truth plus a promotion hold instead of an earned promoted snapshot.",
+            ),
+        ],
+        claim_boundary: String::from(
+            "This report proves that the first-swarm lane now has one truthful retained local snapshot publication path for the frozen `first-swarm-local-snapshot` target. It does not claim that the retained mixed-hardware live run earned publication, that publication is automatic after live promotion, or that any remote/public registry publish has been completed.",
+        ),
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+
+    let report_path = first_swarm_local_snapshot_publication_report_path(output_root);
+    let encoded =
+        serde_json::to_string_pretty(&report).map_err(|error| MlxWorkflowError::Serialization {
+            context: "first swarm local snapshot publication report export",
+            message: error.to_string(),
+        })?;
+    fs::write(&report_path, format!("{encoded}\n")).map_err(|error| MlxWorkflowError::Io {
+        path: report_path.display().to_string(),
+        message: error.to_string(),
+    })?;
+    Ok(report)
 }
 
 fn plan_role_assignments(
@@ -950,6 +1113,115 @@ fn sanitize_label(label: &str) -> String {
         .collect()
 }
 
+fn first_swarm_local_snapshot_publication_report_path(output_root: &Path) -> PathBuf {
+    output_root.join("first_swarm_local_snapshot_publication_v1.json")
+}
+
+fn first_swarm_publication_reference_bundle() -> Result<PortableModelBundle, MlxWorkflowError> {
+    let receipt_contract = first_swarm_open_adapter_receipt_contract();
+    let map_training_error = |detail: String| MlxWorkflowError::FirstSwarmPlan {
+        message: format!(
+            "first swarm publication proof could not build the retained portable bundle: {detail}"
+        ),
+    };
+    let mut embedding = TrainingParameterGroupState::new(
+        "embedding",
+        TrainingParameterClass::Embedding,
+        TrainingTensorBuffer::from_f32(
+            "embedding",
+            psionic_core::TensorSpec::new(Shape::new(vec![2, 2]), DType::F32, Device::cpu()),
+            vec![1.0, 2.0, 3.0, 4.0],
+        )
+        .map_err(|error| map_training_error(error.to_string()))?,
+        TrainingOptimizerConfig::sgd(0.05).with_momentum(0.8),
+        TrainingOptimizerResidencyPolicy::new(
+            OptimizerStateResidency::DeviceResident,
+            OptimizerStateResidency::HostResident,
+        ),
+    )
+    .map_err(|error| map_training_error(error.to_string()))?;
+    embedding.optimizer_state = TrainingOptimizerState::Sgd {
+        momentum_buffer: Some(vec![0.01, 0.02, 0.03, 0.04]),
+    };
+    embedding.optimizer_residency = OptimizerStateResidency::DeviceResident;
+    embedding.applied_steps = 2;
+
+    let mut decoder_head = TrainingParameterGroupState::new(
+        "decoder.head",
+        TrainingParameterClass::Head,
+        TrainingTensorBuffer::from_f32(
+            "decoder.head",
+            psionic_core::TensorSpec::new(Shape::new(vec![2]), DType::F32, Device::cpu()),
+            vec![0.5, -0.5],
+        )
+        .map_err(|error| map_training_error(error.to_string()))?,
+        TrainingOptimizerConfig::adamw(0.01, 0.9, 0.999, 1e-8).with_weight_decay(0.01),
+        TrainingOptimizerResidencyPolicy::new(
+            OptimizerStateResidency::DeviceResident,
+            OptimizerStateResidency::Offloaded,
+        ),
+    )
+    .map_err(|error| map_training_error(error.to_string()))?;
+    decoder_head.optimizer_state = TrainingOptimizerState::AdamW {
+        first_moment: vec![0.01, -0.02],
+        second_moment: vec![0.03, 0.04],
+    };
+    decoder_head.optimizer_residency = OptimizerStateResidency::Offloaded;
+    decoder_head.applied_steps = 4;
+
+    Ok(PortableModelBundle::from_training_groups(
+        receipt_contract.adapter_family,
+        receipt_contract.base_model_revision,
+        String::from("swarm-local-open-adapter"),
+        Some(String::from(
+            "checkpoint://swarm/first_swarm_local_snapshot_publication",
+        )),
+        &[embedding, decoder_head],
+        PortableTokenizerBinding::new(
+            first_swarm_tokenizer_digest(),
+            PortableTokenizerAssetFormat::TokenizerJson,
+            String::from("gpt-oss-20b@swarm-local-v1"),
+        )
+        .with_special_tokens(Some(1), vec![2], Some(0), Some(3), true, false),
+        Some(String::from("swarm-open-adapter-template-v1")),
+    )?)
+}
+
+fn first_swarm_publication_reference_bundles()
+-> Result<(PortableModelBundle, PortableModelBundle), MlxWorkflowError> {
+    let base = first_swarm_publication_reference_bundle()?;
+    let mut tuned = base.clone();
+    let TensorData::F32(values) = &mut tuned
+        .state_dict
+        .tensors
+        .get_mut("model.decoder.head.parameter")
+        .ok_or_else(|| MlxWorkflowError::FirstSwarmPlan {
+            message: String::from(
+                "first swarm publication proof could not find the decoder-head parameter tensor",
+            ),
+        })?
+        .data
+    else {
+        return Err(MlxWorkflowError::FirstSwarmPlan {
+            message: String::from(
+                "first swarm publication proof expected a dense f32 decoder-head tensor",
+            ),
+        });
+    };
+    values[0] += 0.25;
+    values[1] -= 0.5;
+    tuned.state_dict = PortableModelStateDict::new(
+        tuned.state_dict.model_family.clone(),
+        tuned.state_dict.revision.clone(),
+        tuned.state_dict.checkpoint_family.clone(),
+        tuned.state_dict.checkpoint_ref.clone(),
+        tuned.state_dict.source_format,
+        tuned.state_dict.groups.clone(),
+        tuned.state_dict.tensors.clone(),
+    )?;
+    Ok((base, tuned))
+}
+
 fn swarm_sample(
     sample_id: &str,
     prompt: &str,
@@ -967,9 +1239,11 @@ fn swarm_sample(
 #[cfg(test)]
 mod tests {
     use super::{
-        FIRST_SWARM_LIVE_WORKFLOW_PLAN_FIXTURE_PATH, first_swarm_publish_config,
+        FIRST_SWARM_LIVE_WORKFLOW_PLAN_FIXTURE_PATH,
+        FIRST_SWARM_LOCAL_SNAPSHOT_PUBLICATION_REPORT_FIXTURE_PATH, first_swarm_publish_config,
         first_swarm_recipe_config, first_swarm_synthetic_sft_spec,
         sample_first_swarm_live_cluster_state, write_first_swarm_live_workflow_plan,
+        write_first_swarm_local_snapshot_publication,
     };
     use crate::{MlxWorkflowError, MlxWorkflowWorkspace};
 
@@ -1062,6 +1336,41 @@ mod tests {
         let rebuilt = write_first_swarm_live_workflow_plan(
             temp.path().join("first_swarm_live_workflow_plan.json"),
         )?;
+        assert_eq!(retained, rebuilt);
+        Ok(())
+    }
+
+    #[test]
+    fn first_swarm_local_snapshot_publication_proof_writes_expected_snapshot()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let report = write_first_swarm_local_snapshot_publication(temp.path())?;
+        let snapshot_root = temp.path().join(&report.published_snapshot_root);
+        assert!(snapshot_root.join("model.safetensors").exists());
+        assert!(snapshot_root.join("publish_manifest.json").exists());
+        assert_eq!(
+            report.publish_id,
+            String::from("first-swarm-local-snapshot")
+        );
+        assert_eq!(
+            report.published_snapshot_root,
+            report.expected_local_snapshot_directory
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_first_swarm_local_snapshot_publication_fixture_matches_builder()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let retained = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../")
+                .join(FIRST_SWARM_LOCAL_SNAPSHOT_PUBLICATION_REPORT_FIXTURE_PATH),
+        )?;
+        let retained: super::FirstSwarmLocalSnapshotPublicationReport =
+            serde_json::from_str(&retained)?;
+        let temp = tempfile::tempdir()?;
+        let rebuilt = write_first_swarm_local_snapshot_publication(temp.path())?;
         assert_eq!(retained, rebuilt);
         Ok(())
     }

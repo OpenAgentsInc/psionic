@@ -101,4 +101,7 @@ closeout report at
 current lane still ends `publish_refused`, but it also names the exact surface
 that will be used once a later run actually earns promotion:
 `psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle` targeting the
-local snapshot directory frozen in the first swarm workflow plan.
+local snapshot directory frozen in the first swarm workflow plan. The repo now
+also retains one separate bounded publication proof for that target at
+`fixtures/swarm/publications/first_swarm_local_snapshot_publication_v1.json`,
+without rewriting the live-run claim boundary.

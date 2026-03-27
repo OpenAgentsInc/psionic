@@ -23,7 +23,7 @@ use psionic_train::{
     ModelIoError, PortableModelBundle,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -1532,18 +1532,20 @@ mod tests {
         assert_eq!(artifact.dataset_manifest.splits.len(), 2);
         let temp = tempdir()?;
         let write = artifact.write_to_directory(temp.path())?;
-        assert!(write
-            .files
-            .iter()
-            .any(|file| file.relative_path == "train.jsonl"));
+        assert!(
+            write
+                .files
+                .iter()
+                .any(|file| file.relative_path == "train.jsonl")
+        );
         assert!(temp.path().join("dataset_manifest.json").exists());
         assert!(temp.path().join("synthetic_dataset_report.json").exists());
         Ok(())
     }
 
     #[test]
-    fn synthetic_preference_dataset_uses_preference_encoding(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn synthetic_preference_dataset_uses_preference_encoding()
+    -> Result<(), Box<dyn std::error::Error>> {
         let artifact = MlxWorkflowWorkspace::default().build_synthetic_preference_dataset(
             &MlxSyntheticPreferenceDatasetSpec {
                 workflow_id: String::from("workflow.pref"),
@@ -1688,8 +1690,8 @@ mod tests {
     }
 
     #[test]
-    fn adapter_merge_exports_merged_bundle_and_publish_snapshot(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn adapter_merge_exports_merged_bundle_and_publish_snapshot()
+    -> Result<(), Box<dyn std::error::Error>> {
         let base = sample_bundle()?;
         let mut tuned = sample_bundle()?;
         let psionic_core::TensorData::F32(values) = &mut tuned

@@ -36,7 +36,9 @@ The run earned the two-node mixed-hardware execution proof that the older
 historical closeout explicitly said was still missing. It did not publish a
 model snapshot, and it does not need to in order to close `SWARM-0`, because
 the original lane was always a bounded decentralized open-adapter proof rather
-than a full served-model promotion lane.
+than a full served-model promotion lane. A separate retained publication proof
+now exists for the frozen first-swarm local snapshot target, but that proof is
+not the same thing as the live run earning publication.
 
 ## Artifacts Reviewed
 
@@ -179,7 +181,16 @@ The retained run still does not prove:
 - MLX distributed parity with CUDA collectives
 - internet discovery, NAT traversal, or elastic swarm membership
 - automatic served-model promotion
-- one published local or remote snapshot directory
+- a published snapshot directly earned by the retained live run
+
+The repo now does separately retain one truthful local snapshot publication
+proof at:
+
+- `fixtures/swarm/publications/first_swarm_local_snapshot_publication_v1.json`
+- `docs/audits/2026-03-27-first-swarm-local-snapshot-publication-proof.md`
+
+That closes the old “can the publish surface write one real snapshot
+directory” gap without changing the more important live-run claim boundary.
 
 Those are valid future goals. They are not part of the truthful completion bar
 for this exact first swarm issue.

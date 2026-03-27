@@ -1,0 +1,234 @@
+{
+  "state_dict": {
+    "model_family": "gpt_oss.decoder_lm_head_lora",
+    "revision": "swarm-local-v1",
+    "checkpoint_family": "swarm-local-open-adapter",
+    "checkpoint_ref": "checkpoint://swarm/first_swarm_local_snapshot_publication",
+    "source_format": "psionic_state_dict",
+    "groups": [
+      {
+        "group_id": "embedding",
+        "class": "embedding",
+        "model_tree_path": [
+          "embedding"
+        ],
+        "optimizer": {
+          "kind": "sgd",
+          "learning_rate": 0.05,
+          "weight_decay": 0.0,
+          "momentum": 0.8
+        },
+        "parameter_semantics": {
+          "learning_rate_scale": 1.0,
+          "weight_decay_scale": 1.0
+        },
+        "optimizer_residency_policy": {
+          "step_residency": "device_resident",
+          "idle_residency": "host_resident"
+        },
+        "optimizer_residency": "device_resident",
+        "applied_steps": 2,
+        "parameter_key": "model.embedding.parameter",
+        "momentum_buffer_key": "optimizer.embedding.momentum_buffer"
+      },
+      {
+        "group_id": "decoder.head",
+        "class": "head",
+        "model_tree_path": [
+          "decoder",
+          "head"
+        ],
+        "optimizer": {
+          "kind": "adam_w",
+          "learning_rate": 0.01,
+          "weight_decay": 0.01,
+          "beta1": 0.9,
+          "beta2": 0.999,
+          "epsilon": 1e-8
+        },
+        "parameter_semantics": {
+          "learning_rate_scale": 1.0,
+          "weight_decay_scale": 1.0
+        },
+        "optimizer_residency_policy": {
+          "step_residency": "device_resident",
+          "idle_residency": "offloaded"
+        },
+        "optimizer_residency": "offloaded",
+        "applied_steps": 4,
+        "parameter_key": "model.decoder.head.parameter",
+        "first_moment_key": "optimizer.decoder.head.first_moment",
+        "second_moment_key": "optimizer.decoder.head.second_moment"
+      }
+    ],
+    "tensors": {
+      "model.decoder.head.parameter": {
+        "state_key": "model.decoder.head.parameter",
+        "model_tree_path": [
+          "decoder",
+          "head",
+          "parameter"
+        ],
+        "role": "parameter",
+        "spec": {
+          "layout": {
+            "shape": {
+              "dims": [
+                2
+              ]
+            },
+            "strides": [
+              1
+            ],
+            "offset": 0
+          },
+          "dtype": "F32",
+          "device": {
+            "kind": "Cpu",
+            "ordinal": 0,
+            "label": "cpu:0"
+          }
+        }
+      },
+      "model.embedding.parameter": {
+        "state_key": "model.embedding.parameter",
+        "model_tree_path": [
+          "embedding",
+          "parameter"
+        ],
+        "role": "parameter",
+        "spec": {
+          "layout": {
+            "shape": {
+              "dims": [
+                2,
+                2
+              ]
+            },
+            "strides": [
+              2,
+              1
+            ],
+            "offset": 0
+          },
+          "dtype": "F32",
+          "device": {
+            "kind": "Cpu",
+            "ordinal": 0,
+            "label": "cpu:0"
+          }
+        }
+      },
+      "optimizer.decoder.head.first_moment": {
+        "state_key": "optimizer.decoder.head.first_moment",
+        "model_tree_path": [
+          "decoder",
+          "head",
+          "first_moment"
+        ],
+        "role": "adam_first_moment",
+        "spec": {
+          "layout": {
+            "shape": {
+              "dims": [
+                2
+              ]
+            },
+            "strides": [
+              1
+            ],
+            "offset": 0
+          },
+          "dtype": "F32",
+          "device": {
+            "kind": "Cpu",
+            "ordinal": 0,
+            "label": "cpu:0"
+          }
+        }
+      },
+      "optimizer.decoder.head.second_moment": {
+        "state_key": "optimizer.decoder.head.second_moment",
+        "model_tree_path": [
+          "decoder",
+          "head",
+          "second_moment"
+        ],
+        "role": "adam_second_moment",
+        "spec": {
+          "layout": {
+            "shape": {
+              "dims": [
+                2
+              ]
+            },
+            "strides": [
+              1
+            ],
+            "offset": 0
+          },
+          "dtype": "F32",
+          "device": {
+            "kind": "Cpu",
+            "ordinal": 0,
+            "label": "cpu:0"
+          }
+        }
+      },
+      "optimizer.embedding.momentum_buffer": {
+        "state_key": "optimizer.embedding.momentum_buffer",
+        "model_tree_path": [
+          "embedding",
+          "momentum_buffer"
+        ],
+        "role": "sgd_momentum_buffer",
+        "spec": {
+          "layout": {
+            "shape": {
+              "dims": [
+                2,
+                2
+              ]
+            },
+            "strides": [
+              2,
+              1
+            ],
+            "offset": 0
+          },
+          "dtype": "F32",
+          "device": {
+            "kind": "Cpu",
+            "ordinal": 0,
+            "label": "cpu:0"
+          }
+        }
+      }
+    },
+    "digest": "a49be837fd798cea27d25b25a1ba9550490bfc778fe6865f439aa30228c38824"
+  },
+  "tokenizer": {
+    "digest": {
+      "family": "byte_pair_encoding",
+      "tokenizer_digest": "swarm-open-adapter-tokenizer-v1",
+      "vocab_size": 32,
+      "special_tokens_digest": "swarm-open-adapter-specials-v1",
+      "template_digest": "swarm-open-adapter-template-v1"
+    },
+    "asset_format": "tokenizer_json",
+    "asset_version": "gpt-oss-20b@swarm-local-v1",
+    "add_bos": true,
+    "add_eos": false,
+    "bos_token_id": 1,
+    "eos_token_ids": [
+      2
+    ],
+    "pad_token_id": 0,
+    "unknown_token_id": 3
+  },
+  "chat_template_digest": "swarm-open-adapter-template-v1",
+  "preferred_serving_formats": [
+    "safetensors",
+    "torch_state_dict_json"
+  ]
+}

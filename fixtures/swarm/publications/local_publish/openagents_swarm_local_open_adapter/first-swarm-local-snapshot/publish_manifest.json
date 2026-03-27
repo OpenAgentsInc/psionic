@@ -1,0 +1,45 @@
+{
+  "publish_id": "first-swarm-local-snapshot",
+  "target": "hugging_face_snapshot",
+  "repo_id": "openagents/swarm-local-open-adapter",
+  "source_artifact_receipt": {
+    "format": "safetensors",
+    "artifact_digest": "b43355e310a667a80f27266195d0e54a5a046dcc42d415b2e206a8db15154541",
+    "state_dict_digest": "a49be837fd798cea27d25b25a1ba9550490bfc778fe6865f439aa30228c38824",
+    "tokenizer_contract_digest": "978a733f8b8f48aa9d77ea658fd640b6d61a40c18bd3f692cad93065237fff51",
+    "tensor_count": 5
+  },
+  "files": [
+    {
+      "relative_path": "README.md",
+      "byte_length": 486,
+      "sha256": "sha256:50a32c3052c655b5cb536149eb26957e9605bc825675a96f56330d5f4390ec8f"
+    },
+    {
+      "relative_path": "compatibility_contract.json",
+      "byte_length": 3096,
+      "sha256": "sha256:5c30cb890946cc3744f2f55abe8f60ac72234226bed100a4f7a9492e7e062814"
+    },
+    {
+      "relative_path": "model.safetensors",
+      "byte_length": 4400,
+      "sha256": "sha256:b43355e310a667a80f27266195d0e54a5a046dcc42d415b2e206a8db15154541"
+    },
+    {
+      "relative_path": "psionic_bundle_manifest.json",
+      "byte_length": 5908,
+      "sha256": "sha256:3b9bafe42bd420398762434d8989f99a244a5adf191c9a1bcda1c1bef48b20f3"
+    },
+    {
+      "relative_path": "tokenizer_contract.json",
+      "byte_length": 480,
+      "sha256": "sha256:05dc731df60520da8496d1c64cf2e6a308735f5a66bed937fc6169e7fd5b1177"
+    }
+  ],
+  "notes": [
+    "The current publish workflow writes one local Hugging Face-style snapshot directory over the existing safetensors export boundary.",
+    "Direct GGUF export remains an explicit refusal because the current portable model-IO layer imports GGUF but does not emit GGUF.",
+    "The emitted compatibility contract keeps the GGUF export boundary explicit instead of pretending the snapshot is a direct GGUF artifact."
+  ],
+  "manifest_digest": "sha256:26bc09e78a04f120ac06c028042b8cb97a22bd7d4ef9dc591efbf227205b4275"
+}

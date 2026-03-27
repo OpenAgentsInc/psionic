@@ -40,6 +40,12 @@ a general cluster rehearsal.
   `fixtures/swarm/runs/first-swarm-live-20260327-real-2/contributor_runtime_report.json`
 - retained real-run after-action audit:
   `docs/audits/2026-03-27-first-swarm-trusted-lan-real-run-audit.md`
+- retained local snapshot publication report:
+  `fixtures/swarm/publications/first_swarm_local_snapshot_publication_v1.json`
+- retained local snapshot publication root:
+  `fixtures/swarm/publications/local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot`
+- retained local snapshot publication audit:
+  `docs/audits/2026-03-27-first-swarm-local-snapshot-publication-proof.md`
 - first swarm workflow plan:
   `fixtures/swarm/first_swarm_live_workflow_plan_v1.json`
 - Mac bring-up report:
@@ -60,6 +66,8 @@ a general cluster rehearsal.
   `scripts/run-first-swarm-trusted-lan-live.sh`
 - real-run bundle checker:
   `scripts/check-first-swarm-trusted-lan-real-run.sh`
+- local snapshot publication checker:
+  `scripts/check-first-swarm-local-snapshot-publication.sh`
 - shared binder reference:
   `docs/RUNPOD_LOCAL_TRAINING_BINDER_REFERENCE.md`
 
@@ -70,6 +78,8 @@ a general cluster rehearsal.
   configured-peer rollout are part of this lane
 - no claim that bundle materialization is the same thing as a live successful
   two-node training run
+- no claim that the retained real run automatically published or promoted a
+  served model
 
 ## Frozen Host Posture
 
@@ -207,6 +217,42 @@ Current retained real-run outcome:
   result across the Mac MLX coordinator and Linux RTX 4080 contributor, but it
   still stopped short of a promoted published snapshot
 
+## Current Publication Proof
+
+The canonical retained local snapshot publication proof now lives at:
+
+- `fixtures/swarm/publications/first_swarm_local_snapshot_publication_v1.json`
+- `fixtures/swarm/publications/local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot/publish_manifest.json`
+
+Validate it with:
+
+```bash
+scripts/check-first-swarm-local-snapshot-publication.sh
+```
+
+Regenerate it with:
+
+```bash
+cargo run -q -p psionic-mlx-workflows --bin first_swarm_local_snapshot_publication -- \
+  fixtures/swarm/publications
+```
+
+Current retained publication-proof outcome:
+
+- publish target: `hugging_face_snapshot`
+- publish id: `first-swarm-local-snapshot`
+- snapshot root:
+  `local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot`
+- why:
+  the repo now retains one truthful local snapshot directory for the frozen
+  first-swarm publish target, but this proof is separate from the retained live
+  run and does not change that run's `publish=refused` and `promotion=held`
+  outcome
+
+The matching publication audit now lives at:
+
+- `docs/audits/2026-03-27-first-swarm-local-snapshot-publication-proof.md`
+
 ## Current Closeout Outcome
 
 The canonical first swarm closeout report now lives at:
@@ -325,5 +371,7 @@ This runbook proves that the first swarm lane now has one exact trusted-LAN
 topology contract, one exact bundle-materializing launcher, one exact per-host
 preflight path, one exact failure-drill bundle, and one exact rehearsal-grade
 bottleneck report plus one explicit refused live-attempt evidence bundle and
-one explicit no-merge/no-publish closeout report. It does not by itself prove
-that a live two-node swarm run succeeded or promoted a local snapshot.
+one explicit no-merge/no-publish closeout report, one retained real mixed-
+hardware run, and one separate retained local snapshot publication proof. It
+does not by itself prove automatic publication from the real run, full-model
+mixed-backend dense training, or internet-facing swarm operation.

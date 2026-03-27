@@ -1,0 +1,62 @@
+{
+  "model_family": "gpt_oss.decoder_lm_head_lora",
+  "revision": "swarm-local-v1",
+  "state_dict_digest": "a49be837fd798cea27d25b25a1ba9550490bfc778fe6865f439aa30228c38824",
+  "surfaces": [
+    {
+      "surface": "psionic_state_dict",
+      "import_status": "supported",
+      "import_detail": "native typed Psionic state-dict ownership is the canonical import surface",
+      "export_status": "supported",
+      "export_detail": "native typed Psionic state-dict ownership is the canonical export surface",
+      "roundtrip_status": "supported",
+      "roundtrip_detail": "Psionic-native state dicts roundtrip without format conversion"
+    },
+    {
+      "surface": "psionic_manifest_safetensors",
+      "import_status": "supported",
+      "import_detail": "supported for dense `f32` safetensors artifacts that carry the embedded Psionic manifest",
+      "export_status": "supported",
+      "export_detail": "supported for dense `f32` contiguous state dicts with embedded Psionic manifest metadata",
+      "roundtrip_status": "supported",
+      "roundtrip_detail": "dense `f32` manifest-carrying safetensors can roundtrip through the portable bundle"
+    },
+    {
+      "surface": "torch_state_dict_json",
+      "import_status": "supported",
+      "import_detail": "supported as a typed JSON state-dict compatibility shell rather than Python pickle",
+      "export_status": "supported",
+      "export_detail": "supported as a typed JSON state-dict compatibility shell rather than Python pickle",
+      "roundtrip_status": "supported",
+      "roundtrip_detail": "typed JSON compatibility artifacts can roundtrip through the portable bundle"
+    },
+    {
+      "surface": "gguf",
+      "import_status": "supported",
+      "import_detail": "supported through the explicit GGUF import path into portable Psionic state",
+      "export_status": "unsupported",
+      "export_detail": "GGUF export is intentionally unsupported in the current boundary",
+      "roundtrip_status": "unsupported",
+      "roundtrip_detail": "GGUF roundtrip is unsupported because export is intentionally absent"
+    },
+    {
+      "surface": "torch_pickle",
+      "import_status": "unsupported",
+      "import_detail": "opaque Python pickle or `.pt` checkpoint decoding is intentionally unsupported",
+      "export_status": "unsupported",
+      "export_detail": "Psionic does not emit opaque Python pickle checkpoints",
+      "roundtrip_status": "unsupported",
+      "roundtrip_detail": "opaque Python pickle roundtrip is intentionally unsupported"
+    },
+    {
+      "surface": "legacy_opaque_checkpoint",
+      "import_status": "unsupported",
+      "import_detail": "legacy opaque checkpoint archives are outside the current bounded compatibility contract",
+      "export_status": "unsupported",
+      "export_detail": "legacy opaque checkpoint archives are not a Psionic export target",
+      "roundtrip_status": "unsupported",
+      "roundtrip_detail": "legacy opaque checkpoint roundtrip is intentionally unsupported"
+    }
+  ],
+  "contract_digest": "cab002cf91ad03e175a6b3d78a19851e90ca2a0d920e6f52d435e67126afb803"
+}

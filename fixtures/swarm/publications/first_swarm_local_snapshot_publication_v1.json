@@ -1,0 +1,51 @@
+{
+  "schema_version": "swarm.first_local_snapshot_publication_report.v1",
+  "scope_window": "first_swarm_local_snapshot_publication_v1",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "workflow_plan_digest": "491bb0db695cfd4b32f7789e94139de908918c0b711e411f53d8318fc7e62386",
+  "publish_id": "first-swarm-local-snapshot",
+  "target": "hugging_face_snapshot",
+  "repo_id": "openagents/swarm-local-open-adapter",
+  "expected_local_snapshot_directory": "local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot",
+  "published_snapshot_root": "local_publish/openagents_swarm_local_open_adapter/first-swarm-local-snapshot",
+  "merge_report_digest": "sha256:bae8dfe0d336a3efd33e420ad894c4f37fd3644e9665f2ff619d877fb876c785",
+  "publish_manifest_digest": "sha256:26bc09e78a04f120ac06c028042b8cb97a22bd7d4ef9dc591efbf227205b4275",
+  "merged_state_dict_digest": "a49be837fd798cea27d25b25a1ba9550490bfc778fe6865f439aa30228c38824",
+  "merged_artifact_digest": "b43355e310a667a80f27266195d0e54a5a046dcc42d415b2e206a8db15154541",
+  "base_state_dict_digest": "7b9c187166278e8550320e9f09721e7d2dd90aa1445025c3d728bfa7baae5771",
+  "tuned_state_dict_digest": "a49be837fd798cea27d25b25a1ba9550490bfc778fe6865f439aa30228c38824",
+  "published_files": [
+    {
+      "relative_path": "README.md",
+      "byte_length": 486,
+      "sha256": "sha256:50a32c3052c655b5cb536149eb26957e9605bc825675a96f56330d5f4390ec8f"
+    },
+    {
+      "relative_path": "compatibility_contract.json",
+      "byte_length": 3096,
+      "sha256": "sha256:5c30cb890946cc3744f2f55abe8f60ac72234226bed100a4f7a9492e7e062814"
+    },
+    {
+      "relative_path": "model.safetensors",
+      "byte_length": 4400,
+      "sha256": "sha256:b43355e310a667a80f27266195d0e54a5a046dcc42d415b2e206a8db15154541"
+    },
+    {
+      "relative_path": "psionic_bundle_manifest.json",
+      "byte_length": 5908,
+      "sha256": "sha256:3b9bafe42bd420398762434d8989f99a244a5adf191c9a1bcda1c1bef48b20f3"
+    },
+    {
+      "relative_path": "tokenizer_contract.json",
+      "byte_length": 480,
+      "sha256": "sha256:05dc731df60520da8496d1c64cf2e6a308735f5a66bed937fc6169e7fd5b1177"
+    }
+  ],
+  "notes": [
+    "This proof uses the exact first-swarm publish target and the existing `psionic-mlx-workflows::MlxWorkflowWorkspace::publish_bundle` surface to retain one real local Hugging Face-style snapshot directory.",
+    "The published bundle is deterministic and machine-checkable, but it is a bounded publication proof built from a retained portable merge pair rather than the already-closed trusted-LAN live run.",
+    "The retained first-swarm live bundle still truthfully stays `publish_disposition=refused` because that real mixed-hardware run ended at merge truth plus a promotion hold instead of an earned promoted snapshot."
+  ],
+  "claim_boundary": "This report proves that the first-swarm lane now has one truthful retained local snapshot publication path for the frozen `first-swarm-local-snapshot` target. It does not claim that the retained mixed-hardware live run earned publication, that publication is automatic after live promotion, or that any remote/public registry publish has been completed.",
+  "report_digest": "06093a6fe2e1b061444ee373b385263ef5d12be908e1a6c058a6a83bfbc6e735"
+}
