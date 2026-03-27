@@ -309,6 +309,18 @@ receipts, and one late-window refusal. It proves the network can say exactly
 why Google and Apple MLX worked on one page slice in one window while keeping
 window-closure discipline explicit.
 
+The repo now also owns the first public dataset authority contract in
+`crates/psionic-train/src/public_dataset_authority_contract.rs`, the binary
+`public_dataset_authority_contract`, the checker
+`scripts/check-public-dataset-authority-contract.sh`, the focused reference doc
+`docs/PUBLIC_DATASET_AUTHORITY_REFERENCE.md`, and the committed fixture
+`fixtures/training/public_dataset_authority_contract_v1.json`. That surface
+turns deterministic public work into replay-safe data truth: tokenizer and
+packing digests, page definitions, page proofs over the committed tokenized
+corpus, admitted miner data receipts, and one refused duplicate claim. It
+proves public work can bind to real shard lineage instead of self-reported page
+names.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker

@@ -1,0 +1,231 @@
+{
+  "schema_version": "psionic.public_dataset_authority_contract.v1",
+  "contract_id": "psionic.public_dataset_authority_contract.v1",
+  "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
+  "program_manifest_digest": "be2b5f782849e58af8a469cf7aeb8b53289e1655f1f533cb0f5d790ae26fa198",
+  "public_work_assignment_contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601",
+  "tokenized_corpus_dataset_id": "psion_corpus_tokenized",
+  "tokenized_corpus_dataset_version": "v1",
+  "tokenizer_bundle_schema_version": "psion.tokenizer_artifact_bundle.v1",
+  "tokenizer_id": "psion_sentencepiece_seed",
+  "tokenizer_version": "v1",
+  "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+  "tokenizer_config_digest": "sha256:psion_sentencepiece_seed_config_digest_v1",
+  "replay_identity": "psion_corpus_tokenized@v1",
+  "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+  "dataset_pages": [
+    {
+      "page_id": "dataset.page.train.0001_0004",
+      "shard_id": "psion_train_shard_0001",
+      "split_name": "train",
+      "sequence_start_index": 0,
+      "sequence_end_index": 4,
+      "page_token_count": 15360,
+      "detail": "The first public miner page covers the first four train-sequence slots in the canonical tokenized corpus."
+    },
+    {
+      "page_id": "dataset.page.train.0005_0008",
+      "shard_id": "psion_train_shard_0001",
+      "split_name": "train",
+      "sequence_start_index": 4,
+      "sequence_end_index": 8,
+      "page_token_count": 15360,
+      "detail": "The second public miner page covers the next four train-sequence slots in the canonical tokenized corpus."
+    },
+    {
+      "page_id": "dataset.page.validation.challenge.0001",
+      "shard_id": "psion_validation_shard_0001",
+      "split_name": "validation",
+      "sequence_start_index": 0,
+      "sequence_end_index": 4,
+      "page_token_count": 16384,
+      "detail": "The first validator challenge page covers the first four validation sequences."
+    },
+    {
+      "page_id": "dataset.page.validation.challenge.0002",
+      "shard_id": "psion_validation_shard_0001",
+      "split_name": "validation",
+      "sequence_start_index": 4,
+      "sequence_end_index": 8,
+      "page_token_count": 16384,
+      "detail": "The second validator challenge page covers the next four validation sequences."
+    },
+    {
+      "page_id": "dataset.page.train.0009_0012",
+      "shard_id": "psion_train_shard_0001",
+      "split_name": "train",
+      "sequence_start_index": 8,
+      "sequence_end_index": 12,
+      "page_token_count": 15360,
+      "detail": "The third public miner page covers train-sequence slots eight through eleven."
+    },
+    {
+      "page_id": "dataset.page.train.0013_0016",
+      "shard_id": "psion_train_shard_0001",
+      "split_name": "train",
+      "sequence_start_index": 12,
+      "sequence_end_index": 16,
+      "page_token_count": 15360,
+      "detail": "The fourth public miner page covers train-sequence slots twelve through fifteen."
+    },
+    {
+      "page_id": "dataset.page.validation.challenge.0003",
+      "shard_id": "psion_validation_shard_0001",
+      "split_name": "validation",
+      "sequence_start_index": 8,
+      "sequence_end_index": 12,
+      "page_token_count": 16384,
+      "detail": "The third validator challenge page covers validation-sequence slots eight through eleven."
+    },
+    {
+      "page_id": "dataset.page.validation.challenge.0004",
+      "shard_id": "psion_validation_shard_0001",
+      "split_name": "validation",
+      "sequence_start_index": 12,
+      "sequence_end_index": 16,
+      "page_token_count": 16384,
+      "detail": "The fourth validator challenge page covers validation-sequence slots twelve through fifteen."
+    }
+  ],
+  "page_proofs": [
+    {
+      "proof_id": "proof.dataset.page.train.0001_0004",
+      "page_id": "dataset.page.train.0001_0004",
+      "shard_digest": "sha256:psion_train_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "8c152088c488c6784b57fbd0eda60205e8e296da22c05008936604e481ab0ff1",
+      "detail": "The network retains the page proof for `dataset.page.train.0001_0004` against shard `psion_train_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.train.0005_0008",
+      "page_id": "dataset.page.train.0005_0008",
+      "shard_digest": "sha256:psion_train_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "76d5e6b6ee77e563da24f9fb96cad19b42d741678b55d91264a8afead944065c",
+      "detail": "The network retains the page proof for `dataset.page.train.0005_0008` against shard `psion_train_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.validation.challenge.0001",
+      "page_id": "dataset.page.validation.challenge.0001",
+      "shard_digest": "sha256:psion_validation_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "ca0d04728d5505e6a843d1d3f3b11288c46c0cd0ac4acbb2e2d98b33d72d1a63",
+      "detail": "The network retains the page proof for `dataset.page.validation.challenge.0001` against shard `psion_validation_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.validation.challenge.0002",
+      "page_id": "dataset.page.validation.challenge.0002",
+      "shard_digest": "sha256:psion_validation_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "6519fd2f9cbb8d2cec99bc32648399e14ab3d5d3e9d8ffee0de5a666e2504531",
+      "detail": "The network retains the page proof for `dataset.page.validation.challenge.0002` against shard `psion_validation_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.train.0009_0012",
+      "page_id": "dataset.page.train.0009_0012",
+      "shard_digest": "sha256:psion_train_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "ca6a36af3325bd3b5b218c2fafd0a8e230856855da6d4d336efc7c0af0eaf966",
+      "detail": "The network retains the page proof for `dataset.page.train.0009_0012` against shard `psion_train_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.train.0013_0016",
+      "page_id": "dataset.page.train.0013_0016",
+      "shard_digest": "sha256:psion_train_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "a000dd05ef2a4717aeb88ae14e9d1bd2504c3504176159fa8596d5f7c5ae3b6e",
+      "detail": "The network retains the page proof for `dataset.page.train.0013_0016` against shard `psion_train_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.validation.challenge.0003",
+      "page_id": "dataset.page.validation.challenge.0003",
+      "shard_digest": "sha256:psion_validation_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "02fd3308bbf7372bd422e284e9bb8ef7e0643d278682bb37c4fde096ce5bdc3d",
+      "detail": "The network retains the page proof for `dataset.page.validation.challenge.0003` against shard `psion_validation_shard_0001`."
+    },
+    {
+      "proof_id": "proof.dataset.page.validation.challenge.0004",
+      "page_id": "dataset.page.validation.challenge.0004",
+      "shard_digest": "sha256:psion_validation_shard_0001_digest_v1",
+      "source_lineage_digest": "369e9d2c709ff11fc691053a9b3ed7ad3592df0884e9318d167d458435397f2e",
+      "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+      "packing_policy_digest": "c42476ac895eb830c61709584f9afb89996b4b6089a0b63c65b75cff3d6ab8ef",
+      "replay_identity": "psion_corpus_tokenized@v1",
+      "page_digest": "87c4a2b370869e0852db9aaa7949ebba12987749d8ae4c02e2c946e809ca5100",
+      "detail": "The network retains the page proof for `dataset.page.validation.challenge.0004` against shard `psion_validation_shard_0001`."
+    }
+  ],
+  "anti_replay_receipts": [
+    {
+      "receipt_id": "anti_replay.assignment.public_miner.window1230.google",
+      "assignment_id": "assignment.public_miner.window1230.google",
+      "page_id": "dataset.page.train.0001_0004",
+      "claim_fingerprint": "claim.public_miner.window1230.google.v1",
+      "disposition": "admitted",
+      "detail": "The first Google miner claim is admitted against its canonical page proof."
+    },
+    {
+      "receipt_id": "anti_replay.assignment.public_miner.window1230.local_mlx",
+      "assignment_id": "assignment.public_miner.window1230.local_mlx",
+      "page_id": "dataset.page.train.0005_0008",
+      "claim_fingerprint": "claim.public_miner.window1230.local_mlx.v1",
+      "disposition": "admitted",
+      "detail": "The first Apple MLX miner claim is admitted against its canonical page proof."
+    },
+    {
+      "receipt_id": "anti_replay.assignment.public_miner.window1231.google",
+      "assignment_id": "assignment.public_miner.window1231.google",
+      "page_id": "dataset.page.train.0009_0012",
+      "claim_fingerprint": "claim.public_miner.window1231.google.v1",
+      "disposition": "admitted",
+      "detail": "The second Google miner claim is admitted against its canonical page proof."
+    },
+    {
+      "receipt_id": "anti_replay.assignment.public_miner.window1231.local_mlx",
+      "assignment_id": "assignment.public_miner.window1231.local_mlx",
+      "page_id": "dataset.page.train.0013_0016",
+      "claim_fingerprint": "claim.public_miner.window1231.local_mlx.v1",
+      "disposition": "admitted",
+      "detail": "The second Apple MLX miner claim is admitted against its canonical page proof."
+    },
+    {
+      "receipt_id": "anti_replay.assignment.public_miner.window1230.google.duplicate",
+      "assignment_id": "assignment.public_miner.window1230.google",
+      "page_id": "dataset.page.train.0001_0004",
+      "claim_fingerprint": "claim.public_miner.window1230.google.v1",
+      "disposition": "refused_duplicate",
+      "prior_receipt_id": "anti_replay.assignment.public_miner.window1230.google",
+      "detail": "A replayed Google miner claim with the same fingerprint is refused as duplicate work rather than being treated as fresh contribution."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/public_dataset_authority_contract_v1.json",
+    "check_script_path": "scripts/check-public-dataset-authority-contract.sh",
+    "reference_doc_path": "docs/PUBLIC_DATASET_AUTHORITY_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first public data-truth surface above deterministic public work: page definitions, page proofs, tokenizer and packing digests, replay identity, admitted miner data receipts, and one refused duplicate claim. It does not yet claim content-addressed artifact exchange or the full public miner execution protocol.",
+  "contract_digest": "cf87c412eecde92e38d382fc2ec2fae3c6bb17a1b4b9963e91e0f67ed77ffd60"
+}
