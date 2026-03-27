@@ -2312,6 +2312,21 @@ impl ParameterGolfReferenceModel {
         &self.weights
     }
 
+    /// Creates one execution-only model view that reuses the current
+    /// descriptor and swaps in a compatible weight bundle without recomputing
+    /// descriptor digests.
+    ///
+    /// This is intended for ephemeral runtime paths such as finite-difference
+    /// loss probes where the caller already knows the override preserved the
+    /// current model shape contract and does not need fresh persisted metadata.
+    #[must_use]
+    pub fn with_execution_weights_unchecked(&self, weights: ParameterGolfWeights) -> Self {
+        Self {
+            descriptor: self.descriptor.clone(),
+            weights,
+        }
+    }
+
     /// Returns the upstream-style banked matrix surface for the current weights.
     pub fn banked_weights(&self) -> Result<ParameterGolfBankedWeights, ParameterGolfModelError> {
         self.weights.banked(&self.descriptor.config)
@@ -4522,21 +4537,66 @@ mod tests {
     }
 
     #[test]
+    fn execution_weight_override_clone_matches_validated_reference_loss() {
+        let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
+            .expect("baseline fixture model should build");
+        let mut overrides = BTreeMap::new();
+        let mut token_embedding = model
+            .weights()
+            .parameter_vectors(&model.descriptor().config)
+            .into_iter()
+            .find(|vector| vector.parameter_id == "tok_emb.weight")
+            .expect("token embedding should exist")
+            .values;
+        token_embedding[0] += 0.125;
+        overrides.insert(String::from("tok_emb.weight"), token_embedding);
+
+        let overridden = model
+            .weights()
+            .with_parameter_overrides(&model.descriptor().config, &overrides)
+            .expect("weight override should apply");
+        let validated = ParameterGolfReferenceModel::new(
+            model.descriptor().model.clone(),
+            model.descriptor().config.clone(),
+            overridden.clone(),
+        )
+        .expect("validated override model should build");
+        let execution_only = model.with_execution_weights_unchecked(overridden);
+        let input_ids = vec![vec![1_u32, 2, 3, 4]];
+        let target_ids = vec![vec![2_u32, 3, 4, 5]];
+
+        assert_eq!(
+            execution_only
+                .loss(input_ids.as_slice(), target_ids.as_slice())
+                .expect("execution-only loss should execute"),
+            validated
+                .loss(input_ids.as_slice(), target_ids.as_slice())
+                .expect("validated loss should execute"),
+        );
+    }
+
+    #[test]
     fn reference_model_all_parameter_vectors_include_split_and_banked_surfaces() {
         let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())
             .expect("baseline fixture model should build");
         let vectors = model
             .all_parameter_vectors()
             .expect("combined parameter vectors should materialize");
-        assert!(vectors
-            .iter()
-            .any(|vector| vector.parameter_id == "blocks.0.attn.c_q.weight"));
-        assert!(vectors
-            .iter()
-            .any(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME));
-        assert!(vectors
-            .iter()
-            .any(|vector| vector.parameter_id == PARAMETER_GOLF_KV_BANK_NAME));
+        assert!(
+            vectors
+                .iter()
+                .any(|vector| vector.parameter_id == "blocks.0.attn.c_q.weight")
+        );
+        assert!(
+            vectors
+                .iter()
+                .any(|vector| vector.parameter_id == PARAMETER_GOLF_QO_BANK_NAME)
+        );
+        assert!(
+            vectors
+                .iter()
+                .any(|vector| vector.parameter_id == PARAMETER_GOLF_KV_BANK_NAME)
+        );
     }
 
     #[test]

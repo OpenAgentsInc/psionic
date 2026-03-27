@@ -861,7 +861,7 @@ impl ParameterGolfReferenceTrainingConfig {
         config.run_id = String::from("parameter-golf-promoted-general-xtrain-baseline");
         config.checkpoint_family = String::from("train.parameter_golf.promoted_general_xtrain");
         config.step_duration_ms = 75;
-        config.max_steps = 12;
+        config.max_steps = 16;
         config.finite_difference_epsilon = 0.005;
         config.geometry = ParameterGolfBatchGeometry {
             world_size: 1,
@@ -873,7 +873,7 @@ impl ParameterGolfReferenceTrainingConfig {
         config.hyperparameters.tied_embed_lr = 0.2;
         config.hyperparameters.matrix_lr = 0.08;
         config.hyperparameters.scalar_lr = 0.08;
-        config.inference_attention_window_tokens = Some(config.geometry.train_sequence_length);
+        config.inference_attention_window_tokens = Some(1);
         config.selected_coordinates = promoted_xtrain_coordinate_budget();
         config
     }
@@ -4070,11 +4070,7 @@ fn loss_with_parameter_override(
     let weights = current_model
         .weights()
         .with_parameter_overrides(&current_model.descriptor().config, &overrides)?;
-    let perturbed = ParameterGolfReferenceModel::new(
-        current_model.descriptor().model.clone(),
-        current_model.descriptor().config.clone(),
-        weights,
-    )?;
+    let perturbed = current_model.with_execution_weights_unchecked(weights);
     Ok(perturbed.loss(input_ids, target_ids)?)
 }
 
@@ -5285,10 +5281,15 @@ mod tests {
         assert_eq!(xtrain.promoted_profile, proof.promoted_profile);
         assert!(xtrain.max_steps > proof.max_steps);
         assert!(xtrain.geometry.grad_accum_steps < proof.geometry.grad_accum_steps);
+        assert_eq!(
+            xtrain.geometry.train_sequence_length,
+            proof.geometry.train_sequence_length
+        );
         assert!(xtrain.finite_difference_epsilon < proof.finite_difference_epsilon);
         assert!(xtrain.hyperparameters.tied_embed_lr > proof.hyperparameters.tied_embed_lr);
         assert!(xtrain.hyperparameters.matrix_lr > proof.hyperparameters.matrix_lr);
         assert!(xtrain.hyperparameters.scalar_lr > proof.hyperparameters.scalar_lr);
+        assert_eq!(xtrain.inference_attention_window_tokens, Some(1));
         assert!(xtrain.selected_coordinates.len() > proof.selected_coordinates.len());
         assert!(
             xtrain
