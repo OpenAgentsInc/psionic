@@ -2549,7 +2549,52 @@ impl Qwen35Layer {
             hidden_size,
             epsilon,
         )?;
-        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+        let gate_rows = self.ffn_gate_up.rows_per_projection[0];
+        let up_rows = self.ffn_gate_up.rows_per_projection[1];
+        if gate_rows != up_rows {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 dense ffn gate/up width mismatch: gate={} up={}",
+                    gate_rows, up_rows
+                )),
+            ));
+        }
+        let fuse_q4_k_gate_up = self.ffn_gate_up.transposed_f16.is_none()
+            && self.ffn_gate_up.mode == QuantizationMode::GgmlQ4K
+            && can_use_q8_1_quantized_matvec(self.ffn_down.host.mode);
+        if fuse_q4_k_gate_up {
+            let row_byte_len = self
+                .ffn_gate_up
+                .host_parts
+                .first()
+                .map(|part| part.row_byte_len)
+                .ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from("qwen35 dense ffn gate/up projection group was empty"),
+                    ))
+                })?;
+            submission.q4_k_gate_up_silu_q8_1(
+                &self.ffn_gate_up.storage,
+                row_byte_len,
+                self.ffn_gate_up.columns,
+                gate_rows,
+                up_rows,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                None,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
             submission.cast_f32_to_f16(
                 &plan.hidden_norm_buffer,
                 &plan.vector_f16_buffer,
@@ -2584,76 +2629,67 @@ impl Qwen35Layer {
                 &plan.hidden_norm_buffer,
                 &plan.matvec_output_buffer,
             )?;
-        }
-        let gate_rows = self.ffn_gate_up.rows_per_projection[0];
-        let up_rows = self.ffn_gate_up.rows_per_projection[1];
-        if gate_rows != up_rows {
-            return Err(ReferenceTextGenerationError::Runtime(
-                crate::RuntimeError::Backend(format!(
-                    "qwen35 dense ffn gate/up width mismatch: gate={} up={}",
-                    gate_rows, up_rows
-                )),
-            ));
-        }
-        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
-            submission.silu_mul_f32(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.gated_delta_buffer,
-            )?;
-            submission.cast_f32_to_f16(
-                &plan.gated_delta_buffer,
-                &plan.vector_f16_buffer,
-                self.ffn_down.host.columns,
-            )?;
-            submission.matmul_f16_to_f32(
-                &plan.vector_f16_buffer,
-                transposed_f16,
-                &plan.projected_buffer,
-                1,
-                self.ffn_down.host.columns,
-                self.ffn_down.host.rows,
-            )?;
-        } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
-            submission.silu_mul_q8_1(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.activated_q8_1_buffer,
-            )?;
-            submission.quantized_matvec_q8_1(
-                &self.ffn_down.storage,
-                0,
-                self.ffn_down.host.mode,
-                self.ffn_down.host.rows,
-                self.ffn_down.host.columns,
-                &plan.activated_q8_1_buffer,
-                None,
-                &plan.projected_buffer,
-            )?;
         } else {
-            submission.silu_mul_f32(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.gated_delta_buffer,
-            )?;
-            submission.quantized_matvec(
-                &self.ffn_down.storage,
-                0,
-                self.ffn_down.host.mode,
-                self.ffn_down.host.rows,
-                self.ffn_down.host.columns,
-                &plan.gated_delta_buffer,
-                &plan.projected_buffer,
-            )?;
+            if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+                submission.silu_mul_f32(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.gated_delta_buffer,
+                )?;
+                submission.cast_f32_to_f16(
+                    &plan.gated_delta_buffer,
+                    &plan.vector_f16_buffer,
+                    self.ffn_down.host.columns,
+                )?;
+                submission.matmul_f16_to_f32(
+                    &plan.vector_f16_buffer,
+                    transposed_f16,
+                    &plan.projected_buffer,
+                    1,
+                    self.ffn_down.host.columns,
+                    self.ffn_down.host.rows,
+                )?;
+            } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
+                submission.silu_mul_q8_1(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.activated_q8_1_buffer,
+                )?;
+                submission.quantized_matvec_q8_1(
+                    &self.ffn_down.storage,
+                    0,
+                    self.ffn_down.host.mode,
+                    self.ffn_down.host.rows,
+                    self.ffn_down.host.columns,
+                    &plan.activated_q8_1_buffer,
+                    None,
+                    &plan.projected_buffer,
+                )?;
+            } else {
+                submission.silu_mul_f32(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.gated_delta_buffer,
+                )?;
+                submission.quantized_matvec(
+                    &self.ffn_down.storage,
+                    0,
+                    self.ffn_down.host.mode,
+                    self.ffn_down.host.rows,
+                    self.ffn_down.host.columns,
+                    &plan.gated_delta_buffer,
+                    &plan.projected_buffer,
+                )?;
+            }
         }
         submission.add_f32_in_place(
             &plan.current_hidden_buffer,
@@ -2903,7 +2939,52 @@ impl Qwen35Layer {
             hidden_size,
             epsilon,
         )?;
-        if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
+        let gate_rows = self.ffn_gate_up.rows_per_projection[0];
+        let up_rows = self.ffn_gate_up.rows_per_projection[1];
+        if gate_rows != up_rows {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 dense ffn gate/up width mismatch: gate={} up={}",
+                    gate_rows, up_rows
+                )),
+            ));
+        }
+        let fuse_q4_k_gate_up = self.ffn_gate_up.transposed_f16.is_none()
+            && self.ffn_gate_up.mode == QuantizationMode::GgmlQ4K
+            && can_use_q8_1_quantized_matvec(self.ffn_down.host.mode);
+        if fuse_q4_k_gate_up {
+            let row_byte_len = self
+                .ffn_gate_up
+                .host_parts
+                .first()
+                .map(|part| part.row_byte_len)
+                .ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from("qwen35 dense ffn gate/up projection group was empty"),
+                    ))
+                })?;
+            submission.q4_k_gate_up_silu_q8_1(
+                &self.ffn_gate_up.storage,
+                row_byte_len,
+                self.ffn_gate_up.columns,
+                gate_rows,
+                up_rows,
+                &plan.matvec_input_q8_1_buffer,
+                None,
+                None,
+                &plan.activated_q8_1_buffer,
+            )?;
+            submission.quantized_matvec_q8_1(
+                &self.ffn_down.storage,
+                0,
+                self.ffn_down.host.mode,
+                self.ffn_down.host.rows,
+                self.ffn_down.host.columns,
+                &plan.activated_q8_1_buffer,
+                None,
+                &plan.projected_buffer,
+            )?;
+        } else if let Some(transposed_f16) = self.ffn_gate_up.transposed_f16.as_ref() {
             submission.cast_f32_to_f16(
                 &plan.hidden_norm_buffer,
                 &plan.vector_f16_buffer,
@@ -2938,76 +3019,67 @@ impl Qwen35Layer {
                 &plan.hidden_norm_buffer,
                 &plan.matvec_output_buffer,
             )?;
-        }
-        let gate_rows = self.ffn_gate_up.rows_per_projection[0];
-        let up_rows = self.ffn_gate_up.rows_per_projection[1];
-        if gate_rows != up_rows {
-            return Err(ReferenceTextGenerationError::Runtime(
-                crate::RuntimeError::Backend(format!(
-                    "qwen35 dense ffn gate/up width mismatch: gate={} up={}",
-                    gate_rows, up_rows
-                )),
-            ));
-        }
-        if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
-            submission.silu_mul_f32(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.gated_delta_buffer,
-            )?;
-            submission.cast_f32_to_f16(
-                &plan.gated_delta_buffer,
-                &plan.vector_f16_buffer,
-                self.ffn_down.host.columns,
-            )?;
-            submission.matmul_f16_to_f32(
-                &plan.vector_f16_buffer,
-                transposed_f16,
-                &plan.projected_buffer,
-                1,
-                self.ffn_down.host.columns,
-                self.ffn_down.host.rows,
-            )?;
-        } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
-            submission.silu_mul_q8_1(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.activated_q8_1_buffer,
-            )?;
-            submission.quantized_matvec_q8_1(
-                &self.ffn_down.storage,
-                0,
-                self.ffn_down.host.mode,
-                self.ffn_down.host.rows,
-                self.ffn_down.host.columns,
-                &plan.activated_q8_1_buffer,
-                None,
-                &plan.projected_buffer,
-            )?;
         } else {
-            submission.silu_mul_f32(
-                &plan.matvec_output_buffer,
-                0,
-                &plan.matvec_output_buffer,
-                gate_rows,
-                gate_rows,
-                &plan.gated_delta_buffer,
-            )?;
-            submission.quantized_matvec(
-                &self.ffn_down.storage,
-                0,
-                self.ffn_down.host.mode,
-                self.ffn_down.host.rows,
-                self.ffn_down.host.columns,
-                &plan.gated_delta_buffer,
-                &plan.projected_buffer,
-            )?;
+            if let Some(transposed_f16) = self.ffn_down.transposed_f16.as_ref() {
+                submission.silu_mul_f32(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.gated_delta_buffer,
+                )?;
+                submission.cast_f32_to_f16(
+                    &plan.gated_delta_buffer,
+                    &plan.vector_f16_buffer,
+                    self.ffn_down.host.columns,
+                )?;
+                submission.matmul_f16_to_f32(
+                    &plan.vector_f16_buffer,
+                    transposed_f16,
+                    &plan.projected_buffer,
+                    1,
+                    self.ffn_down.host.columns,
+                    self.ffn_down.host.rows,
+                )?;
+            } else if can_use_q8_1_quantized_matvec(self.ffn_down.host.mode) {
+                submission.silu_mul_q8_1(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.activated_q8_1_buffer,
+                )?;
+                submission.quantized_matvec_q8_1(
+                    &self.ffn_down.storage,
+                    0,
+                    self.ffn_down.host.mode,
+                    self.ffn_down.host.rows,
+                    self.ffn_down.host.columns,
+                    &plan.activated_q8_1_buffer,
+                    None,
+                    &plan.projected_buffer,
+                )?;
+            } else {
+                submission.silu_mul_f32(
+                    &plan.matvec_output_buffer,
+                    0,
+                    &plan.matvec_output_buffer,
+                    gate_rows,
+                    gate_rows,
+                    &plan.gated_delta_buffer,
+                )?;
+                submission.quantized_matvec(
+                    &self.ffn_down.storage,
+                    0,
+                    self.ffn_down.host.mode,
+                    self.ffn_down.host.rows,
+                    self.ffn_down.host.columns,
+                    &plan.gated_delta_buffer,
+                    &plan.projected_buffer,
+                )?;
+            }
         }
         submission.add_f32_in_place(
             &plan.current_hidden_buffer,

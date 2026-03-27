@@ -245,12 +245,16 @@ registry `2b` and `4b` rows on this host under the same one-sentence prompt and
 `128` token-cap contract:
 
 - `qwen3.5:2b`: Psionic about `247.21 tok/s`, Ollama about `203.23 tok/s`
-- `qwen3.5:4b`: Psionic about `166.61 tok/s`, Ollama about `141.36 tok/s`
+- `qwen3.5:4b`: Psionic about `167.06 tok/s`, Ollama about `141.36 tok/s`
 
 The 4B row needed one extra runtime fix. Its output path includes `Q6_K`
 weights, so the fused greedy decode branch now uses `Q8_1` projection plus
 `argmax_f32` for that output head instead of the slower generic quantized
 matvec path.
+
+The next 4B checkpoint also fuses the dense `Q4_K` gate/up FFN path directly
+into `Q8_1` activation blocks before `ffn_down`, which lifts the current local
+10-run rerun to about `167.06 tok/s`.
 
 The same March 27, 2026 benchmark also shows the current boundary clearly:
 
