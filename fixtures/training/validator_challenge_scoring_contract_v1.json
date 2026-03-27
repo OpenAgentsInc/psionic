@@ -1,0 +1,81 @@
+{
+  "schema_version": "psionic.validator_challenge_scoring_contract.v1",
+  "contract_id": "psionic.validator_challenge_scoring_contract.v1",
+  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
+  "public_work_assignment_contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601",
+  "public_miner_protocol_contract_digest": "cd5d4fe71a5cd7ceaa43389127266ea38847a33631f8b7071eb44e77650fad65",
+  "shared_validator_promotion_contract_digest": "fce26138afb1719033aabd39e44e751efbc68c08e14a3c27a5bfdb4e8e70aa86",
+  "scoring_policy": {
+    "accepted_min_improvement_bps": 10,
+    "quarantine_min_improvement_bps": -5,
+    "rejected_max_improvement_bps": -25,
+    "replay_required_error_ppm": 100,
+    "detail": "Public validators accept clear positive improvement below the replay-error ceiling, quarantine marginal or ambiguous results, reject clearly regressive outputs, and require replay once replay-error exceeds the admitted ceiling."
+  },
+  "replay_rules": [
+    {
+      "replay_rule_id": "rule.public_validator.google.local_mlx.window1231",
+      "validator_assignment_id": "assignment.public_validator.window1231.google",
+      "challenged_miner_session_id": "session.public_miner.local_mlx.window1231",
+      "required_dataset_receipt_id": "anti_replay.assignment.public_miner.window1231.local_mlx",
+      "required_delta_artifact_id": "artifact.delta.local_mlx.nf4.round2056",
+      "required_checkpoint_reference_id": "catchup.public_miner.local_mlx.after_deathrattle",
+      "detail": "Google validates the rejoined Apple MLX miner session against the exact dataset receipt, delta artifact, and live catch-up reference admitted by the miner protocol."
+    },
+    {
+      "replay_rule_id": "rule.public_validator.local_mlx.google.window1231",
+      "validator_assignment_id": "assignment.public_validator.window1231.local_mlx",
+      "challenged_miner_session_id": "session.public_miner.google.window1231",
+      "required_dataset_receipt_id": "anti_replay.assignment.public_miner.window1231.google",
+      "required_delta_artifact_id": "artifact.delta.google.int8.round2056",
+      "required_checkpoint_reference_id": "advertisement.checkpoint_authority.google.mirror",
+      "detail": "Apple MLX validates the Google miner session against the exact dataset receipt, delta artifact, and mirrored checkpoint reference admitted by the miner protocol."
+    }
+  ],
+  "score_receipts": [
+    {
+      "receipt_id": "score.public_validator.google.local_mlx.window1231",
+      "validator_registry_record_id": "google_l4_validator_node.registry",
+      "validator_assignment_id": "assignment.public_validator.window1231.google",
+      "challenged_miner_session_id": "session.public_miner.local_mlx.window1231",
+      "replay_rule_id": "rule.public_validator.google.local_mlx.window1231",
+      "replay_error_ppm": 18,
+      "before_eval_loss_milli": 10000,
+      "after_eval_loss_milli": 9980,
+      "improvement_bps": 20,
+      "disposition": "accepted",
+      "detail": "Google replays the Apple MLX miner delta against the admitted checkpoint and challenge slice, measures a twenty-basis-point improvement, and accepts the contribution."
+    },
+    {
+      "receipt_id": "score.public_validator.local_mlx.google.window1231",
+      "validator_registry_record_id": "local_mlx_mac_workstation.registry",
+      "validator_assignment_id": "assignment.public_validator.window1231.local_mlx",
+      "challenged_miner_session_id": "session.public_miner.google.window1231",
+      "replay_rule_id": "rule.public_validator.local_mlx.google.window1231",
+      "replay_error_ppm": 1200,
+      "before_eval_loss_milli": 10000,
+      "after_eval_loss_milli": 9998,
+      "improvement_bps": 2,
+      "disposition": "replay_required",
+      "detail": "Apple MLX sees an excessive replay error while validating the Google miner delta, so the contribution stays replay-required instead of being softly accepted."
+    }
+  ],
+  "refusals": [
+    {
+      "refusal_id": "refusal.public_validator.google.local_rtx4080.stale",
+      "validator_registry_record_id": "google_l4_validator_node.registry",
+      "challenged_reference_id": "refusal.public_miner.local_rtx4080.checkpoint_lag",
+      "refusal_kind": "stale_checkpoint",
+      "disposition": "replay_required",
+      "detail": "Google refuses to score the stale RTX 4080 standby miner because the miner protocol already failed the submission on checkpoint-lag grounds, so replay remains the only truthful verdict posture."
+    }
+  ],
+  "authority_paths": {
+    "fixture_path": "fixtures/training/validator_challenge_scoring_contract_v1.json",
+    "check_script_path": "scripts/check-validator-challenge-scoring-contract.sh",
+    "reference_doc_path": "docs/VALIDATOR_CHALLENGE_SCORING_REFERENCE.md",
+    "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
+  },
+  "claim_boundary": "This contract freezes the first public validator challenge and scoring surface: replay rules, improvement thresholds, typed score receipts, and one stale-checkpoint refusal. It does not yet claim multi-validator consensus, checkpoint promotion, or fraud penalties.",
+  "contract_digest": "99ad085b9a12258380dc4fb948c51c0cd86644a91afd6f5137d8a76a13830b25"
+}

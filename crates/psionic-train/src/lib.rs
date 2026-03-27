@@ -195,6 +195,7 @@ mod tassadar_verifier_guided_search_trace_family;
 mod tassadar_weak_supervision_executor;
 mod training_execution_evidence_bundle;
 mod validator_promotion_contract;
+mod validator_challenge_scoring_contract;
 mod wan_overlay_route_contract;
 mod worker_protocol;
 
@@ -373,6 +374,7 @@ pub use tassadar_verifier_guided_search_trace_family::*;
 pub use tassadar_weak_supervision_executor::*;
 pub use training_execution_evidence_bundle::*;
 pub use validator_promotion_contract::*;
+pub use validator_challenge_scoring_contract::*;
 pub use wan_overlay_route_contract::*;
 pub use worker_protocol::*;
 

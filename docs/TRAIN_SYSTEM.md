@@ -346,6 +346,17 @@ delta publication receipts, checkpoint-sync receipts, and one explicit stale
 standby refusal. It proves public miner behavior no longer lives only in
 runbooks or implied runtime sequencing.
 
+The repo now also owns the first validator challenge and scoring contract in
+`crates/psionic-train/src/validator_challenge_scoring_contract.rs`, the binary
+`validator_challenge_scoring_contract`, the checker
+`scripts/check-validator-challenge-scoring-contract.sh`, the focused reference
+doc `docs/VALIDATOR_CHALLENGE_SCORING_REFERENCE.md`, and the committed fixture
+`fixtures/training/validator_challenge_scoring_contract_v1.json`. That surface
+turns public validator work into typed scoring truth: replay rules, improvement
+thresholds, validator receipts, and one stale-checkpoint refusal. It proves the
+network can explain why a contribution was accepted or replay-required without
+falling back to validator-local prose.
+
 The repo now also owns the first dense-rank recovery contract in
 `crates/psionic-train/src/dense_rank_recovery_contract.rs`, the binary
 `dense_rank_recovery_contract`, the checker
