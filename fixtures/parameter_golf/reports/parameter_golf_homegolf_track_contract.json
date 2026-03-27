@@ -108,6 +108,16 @@
       ]
     },
     {
+      "surface_id": "artifact_accounting_report",
+      "status": "satisfied",
+      "detail": "HOMEGOLF now emits one counted-byte report bound to the exact scored clustered surface. The current honest answer is a refused over-cap posture rather than a hidden or implied budget pass.",
+      "evidence_refs": [
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_artifact_accounting.json",
+        "crates/psionic-train/src/parameter_golf_homegolf_accounting.rs",
+        "docs/audits/2026-03-27-homegolf-artifact-accounting-audit.md"
+      ]
+    },
+    {
       "surface_id": "mixed_device_dense_home_cluster_execution",
       "status": "blocked",
       "detail": "The exact dense PGOLF baseline is still H100-only in its live trainer surface; the new clustered score surface composes retained home-device contribution truth with the exact-family score proof, but admitted mixed-device live dense execution remains the next implementation step.",
@@ -119,5 +129,5 @@
     }
   ],
   "claim_boundary": "HOMEGOLF freezes the public baseline geometry, strict scorepath semantics, and custom-hardware comparison law for a mixed home cluster. It now also has one explicit clustered score surface that binds real admitted-device home-Tailnet work to one exact-family HOMEGOLF bundle proof, but it still does not claim that the dense baseline already executes live on the full admitted home-device set; the current exact dense trainer remains the existing H100-backed surface with later HOMEGOLF issues required to extend it.",
-  "report_digest": "e5889754fa218c4e8e3a9f55e8a4b6d9465d74259976468605da22ec261de826"
+  "report_digest": "e02691a5cce2591fbed3a36bb1decd4863a5dc5b81d84a7c00034d26430afa7e"
 }

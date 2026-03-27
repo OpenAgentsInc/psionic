@@ -228,6 +228,24 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
+            surface_id: String::from("artifact_accounting_report"),
+            status: ParameterGolfHomegolfSurfaceStatus::Satisfied,
+            detail: String::from(
+                "HOMEGOLF now emits one counted-byte report bound to the exact scored clustered surface. The current honest answer is a refused over-cap posture rather than a hidden or implied budget pass.",
+            ),
+            evidence_refs: vec![
+                String::from(
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_artifact_accounting.json",
+                ),
+                String::from(
+                    "crates/psionic-train/src/parameter_golf_homegolf_accounting.rs",
+                ),
+                String::from(
+                    "docs/audits/2026-03-27-homegolf-artifact-accounting-audit.md",
+                ),
+            ],
+        },
+        ParameterGolfHomegolfRequiredSurface {
             surface_id: String::from("mixed_device_dense_home_cluster_execution"),
             status: ParameterGolfHomegolfSurfaceStatus::Blocked,
             detail: String::from(
@@ -388,6 +406,11 @@ mod tests {
             .required_surfaces
             .iter()
             .any(|surface| surface.surface_id == "public_comparison_report"
+                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
+        assert!(report
+            .required_surfaces
+            .iter()
+            .any(|surface| surface.surface_id == "artifact_accounting_report"
                 && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
         assert!(report
             .required_surfaces

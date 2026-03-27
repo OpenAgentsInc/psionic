@@ -176,6 +176,35 @@ Current boundary:
 - later HOMEGOLF artifact-accounting work still upgrades that into a fuller
   contest-style counted-artifact comparison
 
+## Artifact Accounting Report
+
+HOMEGOLF now also has one explicit counted-byte surface:
+
+- retained accounting report:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_artifact_accounting.json`
+- generator:
+  `crates/psionic-train/src/parameter_golf_homegolf_accounting.rs`
+- entrypoint:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_artifact_accounting.rs`
+- checker:
+  `scripts/check-parameter-golf-homegolf-artifact-accounting.sh`
+
+What this keeps explicit:
+
+- counted code bytes
+- scored model-artifact bytes
+- total counted bytes
+- exact delta versus the `16,000,000`-byte cap
+- explicit pass/refusal status
+
+Current truth:
+
+- the current HOMEGOLF accounting answer is a refusal, not a pass
+- Psionic's current counted code plus the current exact-family scored bundle is
+  far over the contest budget
+- that over-cap posture is now frozen in one machine-readable report instead of
+  being left as an implied later concern
+
 ## Comparison Policy
 
 Allowed wording:

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.homegolf_artifact_accounting.v1",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "source_track_contract_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+  "source_clustered_run_surface_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+  "source_counted_code_bytes_ref": "fixtures/parameter_golf/reports/parameter_golf_research_harness_report.json",
+  "merged_bundle_descriptor_digest": "8a111f908acf02174554a75e83e13092852ee7caa534f65c43be897bd4c606ee",
+  "merged_bundle_tokenizer_digest": "49b44264442058c20b2b95a947f3aac60e8729fd57d63db8b8754de8edb98a6d",
+  "counted_code_bytes": 7188700,
+  "scored_model_artifact_bytes": 68248296,
+  "total_counted_bytes": 75436996,
+  "artifact_cap_bytes": 16000000,
+  "cap_delta_bytes": 59436996,
+  "budget_status": "refused_exceeds_artifact_cap",
+  "claim_boundary": "This is the first explicit HOMEGOLF artifact-accounting answer, not a claim that the current clustered HOMEGOLF surface is contest-ready. The counted code bytes come from Psionic's current shipped record-compatible research/runtime posture, and the scored model bytes come from the exact-family HOMEGOLF clustered surface. That combination is intentionally honest about today's over-cap state so later HOMEGOLF work can improve it instead of hiding the byte budget failure.",
+  "summary": "HOMEGOLF now emits one explicit counted-byte report bound to the exact scored clustered surface. The current outcome is a refused over-cap posture: the exact-family scored bundle bytes plus Psionic's current counted code bytes exceed the 16,000,000-byte contest budget by a wide margin.",
+  "report_digest": "e6d59c02b24f724ece1ae557b95320d6dee0a304f2aa3c238c5d6b60af925230"
+}
