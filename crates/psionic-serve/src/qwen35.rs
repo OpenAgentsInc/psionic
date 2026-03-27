@@ -344,21 +344,51 @@ impl CudaGgufQwen35TextGenerationService {
         let mut state = self
             .model
             .initial_state(&mut self.backend, cache_capacity_tokens)?;
-        let mut last_logits = Vec::new();
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
+        let fast_greedy = qwen35_fast_greedy_path(&request.options);
+        let mut last_logits = Vec::new();
+        let mut pending_greedy_token = None;
 
-        for token in prompt_tokens.as_slice() {
+        if fast_greedy {
+            let (last_prompt_token, prompt_prefix) = prompt_tokens
+                .as_slice()
+                .split_last()
+                .expect("validated non-empty prompt token list");
+            for token in prompt_prefix {
+                let step = self.model.forward_token(
+                    &mut self.backend,
+                    &mut self.step_plan,
+                    &mut state,
+                    *token,
+                    CudaStepOutputMode::NoOutput,
+                )?;
+                kernel_count = kernel_count.saturating_add(step.kernel_count);
+                bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+            }
             let step = self.model.forward_token(
                 &mut self.backend,
                 &mut self.step_plan,
                 &mut state,
-                *token,
-                CudaStepOutputMode::FullLogits,
+                *last_prompt_token,
+                CudaStepOutputMode::ArgmaxOnly,
             )?;
-            last_logits = step.logits;
+            pending_greedy_token = step.selected_token;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+        } else {
+            for token in prompt_tokens.as_slice() {
+                let step = self.model.forward_token(
+                    &mut self.backend,
+                    &mut self.step_plan,
+                    &mut state,
+                    *token,
+                    CudaStepOutputMode::FullLogits,
+                )?;
+                last_logits = step.logits;
+                kernel_count = kernel_count.saturating_add(step.kernel_count);
+                bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+            }
         }
 
         let prompt_eval_duration_ns = prompt_eval_start
@@ -368,7 +398,6 @@ impl CudaGgufQwen35TextGenerationService {
             .unwrap_or(u64::MAX);
         let mut sampler = crate::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
-        let fast_greedy = qwen35_fast_greedy_path(&request.options);
         let mut generated_tokens = Vec::new();
         let mut generated_text_terminated = None;
         let first_token_started = Instant::now();
@@ -386,10 +415,10 @@ impl CudaGgufQwen35TextGenerationService {
             }
 
             let next_token = if fast_greedy {
-                let step = if generated_tokens.is_empty() {
+                let step = if let Some(selected) = pending_greedy_token.take() {
                     Qwen35ForwardStep {
-                        selected_token: Some(select_argmax(last_logits.as_slice())?),
-                        logits: last_logits.clone(),
+                        selected_token: Some(selected),
+                        logits: Vec::new(),
                         kernel_count: 0,
                         bytes_moved: 0,
                     }
@@ -844,47 +873,36 @@ impl CudaQwen35Model {
             }
         }
 
-        let hidden_size = self.descriptor.config.hidden_size;
-        let hidden = plan
-            .current_hidden_buffer
-            .read_f32_at_offset(0, hidden_size)
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        bytes_moved = bytes_moved.saturating_add(
-            hidden_size
-                .saturating_mul(std::mem::size_of::<f32>())
-                .try_into()
-                .unwrap_or(u64::MAX),
-        );
-        let final_hidden = rms_norm(
-            hidden.as_slice(),
-            self.output_norm.as_slice(),
-            self.family_metadata.rms_norm_epsilon,
-        );
-        kernel_count = kernel_count.saturating_add(1);
-
+        let current_hidden_buffer = plan.current_hidden_buffer.clone();
+        let output_norm_device = self.output_norm_device.clone();
         let (logits, selected_token, output_stats) = match output_mode {
+            CudaStepOutputMode::NoOutput => (Vec::new(), None, zero_cuda_matvec_stats()),
             CudaStepOutputMode::FullLogits => {
                 let (logits, stats) = plan
-                    .run_output_logits(
+                    .run_output_logits_from_device(
                         backend,
+                        &current_hidden_buffer,
+                        &output_norm_device,
+                        self.family_metadata.rms_norm_epsilon,
                         &self.output.storage,
                         self.output.host.mode,
                         self.output.host.rows,
                         self.output.host.columns,
-                        final_hidden.as_slice(),
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 (logits, None, stats)
             }
             CudaStepOutputMode::ArgmaxOnly => {
                 let (selected, stats) = plan
-                    .run_output_argmax(
+                    .run_output_argmax_from_device(
                         backend,
+                        &current_hidden_buffer,
+                        &output_norm_device,
+                        self.family_metadata.rms_norm_epsilon,
                         &self.output.storage,
                         self.output.host.mode,
                         self.output.host.rows,
                         self.output.host.columns,
-                        final_hidden.as_slice(),
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 (Vec::new(), Some(selected), stats)
@@ -1215,18 +1233,38 @@ impl Qwen35Layer {
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
             let cache_key_host = if state.len > 0 {
-                state
-                    .key_cache
-                    .read_f32_at_offset(0, state.len.saturating_mul(state.width))
-                    .map_err(ReferenceTextGenerationError::Runtime)?
+                f16_bytes_to_f32_vec(
+                    state
+                        .key_cache
+                        .read_bytes_at_offset(
+                            0,
+                            state
+                                .len
+                                .saturating_mul(state.width)
+                                .saturating_mul(state.element_bytes),
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?
+                        .as_slice(),
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?
             } else {
                 Vec::new()
             };
             let cache_value_host = if state.len > 0 {
-                state
-                    .value_cache
-                    .read_f32_at_offset(0, state.len.saturating_mul(state.width))
-                    .map_err(ReferenceTextGenerationError::Runtime)?
+                f16_bytes_to_f32_vec(
+                    state
+                        .value_cache
+                        .read_bytes_at_offset(
+                            0,
+                            state
+                                .len
+                                .saturating_mul(state.width)
+                                .saturating_mul(state.element_bytes),
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?
+                        .as_slice(),
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?
             } else {
                 Vec::new()
             };
@@ -1275,7 +1313,7 @@ impl Qwen35Layer {
             let mut attention = backend
                 .begin_submission()
                 .map_err(ReferenceTextGenerationError::Runtime)?;
-            attention.attention_decode_rope_cache(
+            attention.attention_decode_rope_cache_f16_kv(
                 &plan.qkv_norm_buffer,
                 0,
                 query_width,
@@ -1475,7 +1513,7 @@ impl Qwen35Layer {
             query_bytes.saturating_add(kv_bytes),
             kv_bytes,
         )?;
-        submission.attention_decode_rope_cache(
+        submission.attention_decode_rope_cache_f16_kv(
             &plan.qkv_norm_buffer,
             0,
             query_width,
@@ -2087,14 +2125,18 @@ impl Qwen35FullAttentionLayer {
         backend: &mut CudaBackend,
         cache_capacity_tokens: usize,
     ) -> Result<Qwen35FullAttentionState, ReferenceTextGenerationError> {
+        let cache_bytes = cache_capacity_tokens
+            .saturating_mul(self.kv_width)
+            .saturating_mul(std::mem::size_of::<u16>());
         Ok(Qwen35FullAttentionState {
             key_cache: backend
-                .f32_buffer(cache_capacity_tokens.saturating_mul(self.kv_width))
+                .byte_buffer(&vec![0_u8; cache_bytes])
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             value_cache: backend
-                .f32_buffer(cache_capacity_tokens.saturating_mul(self.kv_width))
+                .byte_buffer(&vec![0_u8; cache_bytes])
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             width: self.kv_width,
+            element_bytes: std::mem::size_of::<u16>(),
             len: 0,
             capacity_tokens: cache_capacity_tokens,
         })
@@ -2145,6 +2187,7 @@ struct Qwen35FullAttentionState {
     key_cache: CudaBuffer,
     value_cache: CudaBuffer,
     width: usize,
+    element_bytes: usize,
     len: usize,
     capacity_tokens: usize,
 }
@@ -2162,9 +2205,10 @@ impl Qwen35FullAttentionState {
             .max(self.capacity_tokens.saturating_mul(2))
             .checked_next_power_of_two()
             .unwrap_or(required_tokens);
-        let token_bytes = self.width.saturating_mul(std::mem::size_of::<f32>());
-        let new_key_cache = backend.f32_buffer(new_capacity.saturating_mul(self.width))?;
-        let new_value_cache = backend.f32_buffer(new_capacity.saturating_mul(self.width))?;
+        let token_bytes = self.width.saturating_mul(self.element_bytes);
+        let new_cache_bytes = new_capacity.saturating_mul(token_bytes);
+        let new_key_cache = backend.byte_buffer(&vec![0_u8; new_cache_bytes])?;
+        let new_value_cache = backend.byte_buffer(&vec![0_u8; new_cache_bytes])?;
         if self.len > 0 {
             let copy_bytes = self.len.saturating_mul(token_bytes);
             let mut submission = backend.begin_submission()?;
@@ -2199,6 +2243,7 @@ enum Qwen35LayerState {
 
 #[derive(Clone, Copy, Debug)]
 enum CudaStepOutputMode {
+    NoOutput,
     FullLogits,
     ArgmaxOnly,
 }
@@ -3246,6 +3291,16 @@ fn model_load_runtime_error(error: ModelLoadError) -> crate::RuntimeError {
     crate::RuntimeError::Backend(error.to_string())
 }
 
+fn zero_cuda_matvec_stats() -> CudaQuantizedMatvecStats {
+    CudaQuantizedMatvecStats {
+        host_to_device_bytes: 0,
+        device_to_host_bytes: 0,
+        submission_count: 0,
+        sync_count: 0,
+        kernel_launches: 0,
+    }
+}
+
 fn cuda_stats_bytes(stats: CudaQuantizedMatvecStats) -> u64 {
     stats
         .host_to_device_bytes
@@ -3275,6 +3330,45 @@ fn qwen35_rope_runtime_parameters(
         .unwrap_or([0.0, rotary_dim as f32 - 1.0]);
     let theta_scale = metadata.rope_theta.powf(-2.0 / rotary_dim as f32);
     (freq_scale, ext_factor, corr_dims, theta_scale)
+}
+
+fn f16_bytes_to_f32_vec(bytes: &[u8]) -> Result<Vec<f32>, crate::RuntimeError> {
+    if bytes.len() % std::mem::size_of::<u16>() != 0 {
+        return Err(crate::RuntimeError::Backend(format!(
+            "f16 byte buffer length must be divisible by 2, actual {}",
+            bytes.len()
+        )));
+    }
+    let mut values = Vec::with_capacity(bytes.len() / std::mem::size_of::<u16>());
+    for chunk in bytes.chunks_exact(std::mem::size_of::<u16>()) {
+        values.push(f16_bits_to_f32(u16::from_le_bytes([chunk[0], chunk[1]])));
+    }
+    Ok(values)
+}
+
+fn f16_bits_to_f32(bits: u16) -> f32 {
+    let sign = (u32::from(bits & 0x8000)) << 16;
+    let exponent = (bits >> 10) & 0x1f;
+    let mantissa = bits & 0x03ff;
+    let value = if exponent == 0 {
+        if mantissa == 0 {
+            sign
+        } else {
+            let mut normalized = u32::from(mantissa);
+            let mut shift = 0_u32;
+            while (normalized & 0x0400) == 0 {
+                normalized <<= 1;
+                shift = shift.saturating_add(1);
+            }
+            normalized &= 0x03ff;
+            sign | ((113_u32.saturating_sub(shift)) << 23) | (normalized << 13)
+        }
+    } else if exponent == 0x1f {
+        sign | 0x7f80_0000 | (u32::from(mantissa) << 13)
+    } else {
+        sign | ((u32::from(exponent) + 112) << 23) | (u32::from(mantissa) << 13)
+    };
+    f32::from_bits(value)
 }
 
 fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {

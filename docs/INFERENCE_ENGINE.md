@@ -44,16 +44,16 @@ than just run tensor math.
   calling.
 - The first `qwen35` lane must still fail closed for system-message image and
   video parts to stay aligned with the real template semantics.
-- On March 26, 2026, after fixing the qwen35 full-attention gate scratch path
-  and keeping the gated-attention vector device-resident, the local
-  `qwen3.5:0.8b` benchmark on this host measured about `365 tok/s` decode on
-  Psionic versus about `318 tok/s` decode on local Ollama for the same
-  one-sentence prompt and `128` token cap.
-- The qwen35 lane is now throughput-competitive on this host, but it is not
-  architecture-closed yet. The remaining optimization headroom is inside the
-  native runtime itself: the final output projection still falls back to host
-  logits selection, and the decode plan still uses more synchronized
-  submissions than it should.
+- On March 26, 2026, after fixing the qwen35 full-attention gate scratch path,
+  restoring the dense `f16` KV cache kernel, and skipping output-head work for
+  greedy prompt-prefix replay, the local `qwen3.5:0.8b` benchmark on this host
+  measured about `366 tok/s` decode on Psionic versus about `326 tok/s` decode
+  on local Ollama for the same one-sentence prompt and `128` token cap.
+- The qwen35 lane is now ahead on decode throughput for this host and prompt,
+  but it is still not architecture-closed. Greedy prompt replay is faster than
+  the earlier pilot, but end-to-end prompt-plus-decode throughput still trails
+  Ollama because token embedding gather and the remaining prefix path are still
+  less device-native than they should be.
 
 ## Embeddings Requirements
 

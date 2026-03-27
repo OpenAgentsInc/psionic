@@ -116,18 +116,26 @@ The pilot is intentionally bounded:
 Measured on this host on March 26, 2026 with the downloaded
 `qwen3.5:0.8b-q8_0.gguf`, the same one-sentence prompt, and a `128` token cap:
 
-- Psionic native CUDA qwen35 decode throughput: about `365.15 tok/s`
-- local Ollama `qwen3.5:0.8b` decode throughput: about `317.99 tok/s`
+- Psionic native CUDA qwen35 decode throughput: about `366.06 tok/s`
+- local Ollama `qwen3.5:0.8b` decode throughput: about `326.37 tok/s`
 
 This pilot therefore proves native CUDA execution correctness, honest
 publication, and a first throughput win over the local Ollama baseline on this
 host.
 
+The same March 26, 2026 benchmark also shows the current boundary clearly:
+
+- Psionic greedy prompt replay for this prompt now spends about `50-52 ms` on
+  the `22` prompt tokens after adding a no-output prefix path
+- local Ollama still leads on end-to-end prompt-plus-decode throughput on the
+  same prompt at about `532.58 tok/s`
+
 ## Current Bottlenecks
 
 The remaining optimization headroom is inside Psionic's native qwen35 runtime:
 
-- the final RMSNorm and output projection still read hidden state back to host
+- token embedding gather still enters the decode path through a less
+  device-native route than Ollama
 - the runtime still executes more synchronized CUDA submissions than it should
 - the lane still refuses KV-session reuse, prefix caching, and adapter serving
 - the lane has not yet proven a wider batch, longer context, or concurrent
