@@ -862,6 +862,7 @@ impl ParameterGolfReferenceTrainingConfig {
         config.checkpoint_family = String::from("train.parameter_golf.promoted_general_xtrain");
         config.step_duration_ms = 75;
         config.max_steps = 8;
+        config.finite_difference_epsilon = 0.005;
         config.geometry = ParameterGolfBatchGeometry {
             world_size: 1,
             train_batch_tokens: 16,
@@ -869,6 +870,9 @@ impl ParameterGolfReferenceTrainingConfig {
             train_sequence_length: 4,
             grad_accum_steps: 1,
         };
+        config.hyperparameters.tied_embed_lr = 0.2;
+        config.hyperparameters.matrix_lr = 0.08;
+        config.hyperparameters.scalar_lr = 0.08;
         config.inference_attention_window_tokens = Some(config.geometry.train_sequence_length);
         config.selected_coordinates = promoted_xtrain_coordinate_budget();
         config
@@ -5292,6 +5296,10 @@ mod tests {
         assert_eq!(xtrain.promoted_profile, proof.promoted_profile);
         assert!(xtrain.max_steps > proof.max_steps);
         assert!(xtrain.geometry.grad_accum_steps < proof.geometry.grad_accum_steps);
+        assert!(xtrain.finite_difference_epsilon < proof.finite_difference_epsilon);
+        assert!(xtrain.hyperparameters.tied_embed_lr > proof.hyperparameters.tied_embed_lr);
+        assert!(xtrain.hyperparameters.matrix_lr > proof.hyperparameters.matrix_lr);
+        assert!(xtrain.hyperparameters.scalar_lr > proof.hyperparameters.scalar_lr);
         assert!(xtrain.selected_coordinates.len() > proof.selected_coordinates.len());
         assert!(
             xtrain
