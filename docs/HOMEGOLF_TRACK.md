@@ -143,6 +143,39 @@ What it does not prove:
 - that the current exact dense HOMEGOLF trainer already has live MLX plus home
   CUDA execution parity
 
+## Public Comparison Report
+
+HOMEGOLF now also has one frozen public comparison surface:
+
+- retained comparison report:
+  `fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json`
+- generator:
+  `crates/psionic-train/src/parameter_golf_homegolf_comparison.rs`
+- entrypoint:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_public_comparison.rs`
+- checker:
+  `scripts/check-parameter-golf-homegolf-public-comparison.sh`
+
+What this keeps explicit:
+
+- delta from the public naive baseline
+- delta from the current public best leaderboard row
+- exact `val_bpb` delta
+- exact surfaced artifact-byte delta
+- unchanged `600s` wallclock-cap posture
+- required language:
+  - `public-baseline comparable`
+  - `not public-leaderboard equivalent`
+
+Current boundary:
+
+- the public references are frozen from the reviewed Parameter Golf repo
+  snapshot
+- the HOMEGOLF side still compares using the current clustered score surface's
+  scored artifact bytes
+- later HOMEGOLF artifact-accounting work still upgrades that into a fuller
+  contest-style counted-artifact comparison
+
 ## Comparison Policy
 
 Allowed wording:

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "report_id": "parameter_golf.homegolf_public_comparison.v1",
+  "source_clustered_run_surface_ref": "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+  "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+  "comparison_classes": [
+    "public_baseline_comparable",
+    "not_public_leaderboard_equivalent"
+  ],
+  "homegolf_final_validation_bits_per_byte": 9.93265382277841,
+  "homegolf_scored_artifact_bytes": 68248296,
+  "homegolf_wallclock_cap_seconds": 600,
+  "homegolf_observed_cluster_wallclock_ms": 61228,
+  "public_naive_baseline": {
+    "label": "public_naive_baseline",
+    "val_bpb": 1.2243657,
+    "artifact_bytes": 15863489,
+    "wallclock_cap_seconds": 600,
+    "hardware_posture": "8xH100 SXM",
+    "source_ref": "competition/repos/parameter-golf/records/track_10min_16mb/2026-03-17_NaiveBaseline/submission.json"
+  },
+  "current_public_leaderboard_best": {
+    "label": "current_public_leaderboard_best",
+    "val_bpb": 1.1194,
+    "artifact_bytes": 15990006,
+    "wallclock_cap_seconds": 600,
+    "hardware_posture": "8xH100 SXM",
+    "source_ref": "competition/repos/parameter-golf/records/track_10min_16mb/2026-03-23_LeakyReLU_LegalTTT_ParallelMuon/{submission.json,README.md}"
+  },
+  "delta_vs_public_naive_baseline": {
+    "delta_val_bpb": 8.70828812277841,
+    "delta_artifact_bytes": 52384807,
+    "delta_wallclock_cap_seconds": 0
+  },
+  "delta_vs_current_public_leaderboard_best": {
+    "delta_val_bpb": 8.813253822778409,
+    "delta_artifact_bytes": 52258290,
+    "delta_wallclock_cap_seconds": 0
+  },
+  "claim_boundary": "This report makes HOMEGOLF publicly comparable, not public-leaderboard equivalent. The public reference values are frozen from the current Parameter Golf repo snapshot reviewed on 2026-03-27, while the HOMEGOLF side still uses the current clustered composed surface whose scored bytes are the exact-family bundle bytes rather than a later full contest-style counted-artifact receipt. That later accounting surface remains separate work.",
+  "summary": "HOMEGOLF now emits one deterministic comparison report against the public naive baseline and the current public best leaderboard row. It keeps exact deltas in val_bpb, scored artifact bytes, and wallclock-cap posture while explicitly refusing leaderboard-equivalent language for the mixed-home-cluster track.",
+  "report_digest": "fc473bdabb5dae2624d262d22a9732a9e49b6721e71fc255087f43a15a599838"
+}

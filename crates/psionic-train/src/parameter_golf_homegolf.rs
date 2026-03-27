@@ -210,6 +210,24 @@ pub fn build_parameter_golf_homegolf_track_contract_report(
             ],
         },
         ParameterGolfHomegolfRequiredSurface {
+            surface_id: String::from("public_comparison_report"),
+            status: ParameterGolfHomegolfSurfaceStatus::Satisfied,
+            detail: String::from(
+                "HOMEGOLF now emits one deterministic public comparison report against the public naive baseline and the current public best leaderboard row from the reviewed Parameter Golf repo snapshot, while refusing leaderboard-equivalent language for the mixed-home-cluster track.",
+            ),
+            evidence_refs: vec![
+                String::from(
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
+                ),
+                String::from(
+                    "crates/psionic-train/src/parameter_golf_homegolf_comparison.rs",
+                ),
+                String::from(
+                    "docs/audits/2026-03-27-homegolf-public-comparison-audit.md",
+                ),
+            ],
+        },
+        ParameterGolfHomegolfRequiredSurface {
             surface_id: String::from("mixed_device_dense_home_cluster_execution"),
             status: ParameterGolfHomegolfSurfaceStatus::Blocked,
             detail: String::from(
@@ -365,6 +383,11 @@ mod tests {
             .required_surfaces
             .iter()
             .any(|surface| surface.surface_id == "clustered_homegolf_score_surface"
+                && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
+        assert!(report
+            .required_surfaces
+            .iter()
+            .any(|surface| surface.surface_id == "public_comparison_report"
                 && surface.status == ParameterGolfHomegolfSurfaceStatus::Satisfied));
         assert!(report
             .required_surfaces
