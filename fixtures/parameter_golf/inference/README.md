@@ -9,3 +9,7 @@ Claim boundary:
 
 Operator note:
 - `cargo run -p psionic-train --example parameter_golf_promoted_prompt -- <bundle_dir>` now fails closed if any case drifts from the checked-in expected output
+- `cargo run -p psionic-serve --example parameter_golf_promoted_operator -- inspect <bundle_dir>` reports the current manifest and artifact inventory
+- `cargo run -p psionic-serve --example parameter_golf_promoted_operator -- validate <bundle_dir> --assume bundle` emits the typed inference-promotion receipt and exits non-zero if the bundle is refused
+- `cargo run -p psionic-serve --example parameter_golf_promoted_operator -- prompt <bundle_dir> --prompt "abcd"` runs local prompt inference only after the promotion receipt is green
+- `cargo run -p psionic-serve --example parameter_golf_promoted_operator -- warm <bundle_dir>` loads the same promoted bundle through `psionic-serve`, creates one session, and runs one tiny warm/smoke generation
