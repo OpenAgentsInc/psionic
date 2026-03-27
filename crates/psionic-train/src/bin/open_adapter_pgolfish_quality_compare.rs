@@ -28,6 +28,11 @@ const ADMITTED_HOME_SUMMARY_PATH: &str =
 struct Args {
     output_root: PathBuf,
     evaluator_backend_label: String,
+    m5_report_path: PathBuf,
+    m5_bundle_path: PathBuf,
+    cuda_report_path: PathBuf,
+    cuda_bundle_path: PathBuf,
+    admitted_home_summary_path: PathBuf,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -168,14 +173,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         ArtifactInput {
             artifact_id: String::from("same_node_m5_mlx"),
             artifact_kind: String::from("same_node_retained_bundle"),
-            report_path: PathBuf::from(M5_REPORT_PATH),
-            bundle_path: PathBuf::from(M5_BUNDLE_PATH),
+            report_path: args.m5_report_path.clone(),
+            bundle_path: args.m5_bundle_path.clone(),
         },
         ArtifactInput {
             artifact_id: String::from("same_node_rtx4080_cuda"),
             artifact_kind: String::from("same_node_retained_bundle"),
-            report_path: PathBuf::from(CUDA_REPORT_PATH),
-            bundle_path: PathBuf::from(CUDA_BUNDLE_PATH),
+            report_path: args.cuda_report_path.clone(),
+            bundle_path: args.cuda_bundle_path.clone(),
         },
     ];
 
@@ -186,7 +191,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect::<Result<Vec<_>, _>>()?;
     let admitted_home_run_context =
-        admitted_home_run_context(Path::new(ADMITTED_HOME_SUMMARY_PATH))?;
+        admitted_home_run_context(args.admitted_home_summary_path.as_path())?;
 
     let best_heldout = evaluated_artifacts
         .iter()
@@ -233,7 +238,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ],
             explicit_non_pgolf_boundaries: vec![
                 String::from("this lane evaluates open-adapter retained bundles, not full Parameter Golf challenge submission artifacts"),
-                String::from("the admitted mixed-device swarm row is summary-backed training quality only because that run has not yet emitted a promoted PGOLF runtime bundle"),
+                String::from("the admitted mixed-device swarm row is summary-backed training quality only because that run still has not emitted the same inferable promoted or near-equivalent runtime bundle path as the same-node M5 artifact"),
                 String::from("no claim is made that the current held-out synthetic supervision set is a public contest dataset or exact PGOLF leaderboard protocol"),
             ],
         },
@@ -259,6 +264,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     let mut output_root = PathBuf::from(DEFAULT_OUTPUT_ROOT);
     let mut evaluator_backend_label = default_evaluator_backend_label();
+    let mut m5_report_path = PathBuf::from(M5_REPORT_PATH);
+    let mut m5_bundle_path = PathBuf::from(M5_BUNDLE_PATH);
+    let mut cuda_report_path = PathBuf::from(CUDA_REPORT_PATH);
+    let mut cuda_bundle_path = PathBuf::from(CUDA_BUNDLE_PATH);
+    let mut admitted_home_summary_path = PathBuf::from(ADMITTED_HOME_SUMMARY_PATH);
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -272,9 +282,31 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
                     .next()
                     .ok_or("missing value after --evaluator-backend-label")?;
             }
+            "--m5-report" => {
+                m5_report_path =
+                    PathBuf::from(args.next().ok_or("missing value after --m5-report")?);
+            }
+            "--m5-bundle" => {
+                m5_bundle_path =
+                    PathBuf::from(args.next().ok_or("missing value after --m5-bundle")?);
+            }
+            "--cuda-report" => {
+                cuda_report_path =
+                    PathBuf::from(args.next().ok_or("missing value after --cuda-report")?);
+            }
+            "--cuda-bundle" => {
+                cuda_bundle_path =
+                    PathBuf::from(args.next().ok_or("missing value after --cuda-bundle")?);
+            }
+            "--admitted-home-summary" => {
+                admitted_home_summary_path = PathBuf::from(
+                    args.next()
+                        .ok_or("missing value after --admitted-home-summary")?,
+                );
+            }
             "--help" | "-h" => {
                 println!(
-                    "Usage: open_adapter_pgolfish_quality_compare [--output-root <path>] [--evaluator-backend-label <label>]"
+                    "Usage: open_adapter_pgolfish_quality_compare [--output-root <path>] [--evaluator-backend-label <label>] [--m5-report <path>] [--m5-bundle <path>] [--cuda-report <path>] [--cuda-bundle <path>] [--admitted-home-summary <path>]"
                 );
                 std::process::exit(0);
             }
@@ -285,6 +317,11 @@ fn parse_args() -> Result<Args, Box<dyn std::error::Error>> {
     Ok(Args {
         output_root,
         evaluator_backend_label,
+        m5_report_path,
+        m5_bundle_path,
+        cuda_report_path,
+        cuda_bundle_path,
+        admitted_home_summary_path,
     })
 }
 
@@ -414,7 +451,7 @@ fn admitted_home_run_context(
             })
             .collect(),
         boundary_note: String::from(
-            "The admitted mixed-device Tailnet run is included here as retained training-summary context only. It is not yet a promoted PGOLF runtime bundle, so this row stays out of the held-out bundle-eval winner table until TAILRUN-6 lands.",
+            "The admitted mixed-device Tailnet run is included here as retained training-summary context only. It still does not have the same inferable promoted or near-equivalent runtime bundle path as the same-node M5 artifact, so this row stays out of the held-out bundle-eval winner table.",
         ),
     })
 }

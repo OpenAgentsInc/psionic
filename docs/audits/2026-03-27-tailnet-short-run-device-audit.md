@@ -245,6 +245,7 @@ Canonical retained admitted-device matrix artifacts now live at:
 This audit is now paired with:
 
 - `docs/audits/2026-03-27-tailrun-pgolfish-quality-comparison-audit.md`
+- `docs/audits/2026-03-27-tailrun-daily-operator-loop-and-scoreboard-audit.md`
 
 That follow-up matters because the current same-node throughput advantage does
 **not** yet turn into a held-out quality advantage on the shared PGOLF-ish
@@ -260,6 +261,8 @@ So the honest current state is:
 - one same-node M5 artifact now has a retained near-equivalent infer/serve
   bridge:
   `docs/audits/2026-03-27-tailrun-open-adapter-near-equivalent-infer-serve-audit.md`
+- the daily operator loop and scoreboard are now frozen at:
+  `scripts/run-tailrun-daily-loop.sh`
 - the admitted mixed-device run is still summary-backed quality only until that
   same promotion/export bridge exists for the shared run artifact
 - `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json`

@@ -1,0 +1,112 @@
+{
+  "schema_version": "psionic.open_adapter_pgolfish_quality_compare.v1",
+  "evaluator_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "output_root": "/Users/christopherdavid/work/psionic/fixtures/apple_adapter/daily/tailrun-daily-scoreboard-validation-20260327/quality",
+  "profile": {
+    "hidden_size": 512,
+    "vocab_size": 1024,
+    "lora_rank": 32,
+    "batch_size": 16,
+    "heldout_sample_count": 64,
+    "heldout_split": "holdout",
+    "mostly_under_pgolf_constraints": [
+      "bounded 10-minute training reports are compared against one fixed synthetic SP1024-like held-out profile",
+      "the same hidden width, vocab width, LoRA rank, and tokenizer digest used in the admitted short-run benchmark are reused for evaluation",
+      "quality is reported as held-out cross-entropy loss and bits-per-token instead of raw throughput alone"
+    ],
+    "explicit_non_pgolf_boundaries": [
+      "this lane evaluates open-adapter retained bundles, not full Parameter Golf challenge submission artifacts",
+      "the admitted mixed-device swarm row is summary-backed training quality only because that run still has not emitted the same inferable promoted or near-equivalent runtime bundle path as the same-node M5 artifact",
+      "no claim is made that the current held-out synthetic supervision set is a public contest dataset or exact PGOLF leaderboard protocol"
+    ]
+  },
+  "evaluated_artifacts": [
+    {
+      "artifact_id": "same_node_m5_mlx",
+      "artifact_kind": "same_node_retained_bundle",
+      "source_report_path": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+      "bundle_path": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+      "training_host": "ChristohersMBP2.lan",
+      "training_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "training_steps_per_second": 162.53061053630358,
+      "training_source_tokens_per_second": 4649675.706222572,
+      "training_initial_mean_loss": 6.932116,
+      "training_final_mean_loss": 0.0,
+      "heldout_mean_loss": 15.942383766174316,
+      "heldout_bits_per_token": 22.999997999408404,
+      "heldout_batch_count": 4,
+      "heldout_sample_count": 64,
+      "state_dict_digest": "8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8"
+    },
+    {
+      "artifact_id": "same_node_rtx4080_cuda",
+      "artifact_kind": "same_node_retained_bundle",
+      "source_report_path": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json",
+      "bundle_path": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors",
+      "training_host": "archlinux",
+      "training_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "training_steps_per_second": 82.40252049829174,
+      "training_source_tokens_per_second": 2357371.30641513,
+      "training_initial_mean_loss": 6.932116,
+      "training_final_mean_loss": 0.0,
+      "heldout_mean_loss": 15.942383766174316,
+      "heldout_bits_per_token": 22.999997999408404,
+      "heldout_batch_count": 4,
+      "heldout_sample_count": 64,
+      "state_dict_digest": "ad0d0904c70293c5134b9719951a8b421acc1a56f79af967b3033962e4a3dccf"
+    }
+  ],
+  "admitted_home_run_context": {
+    "source_summary_path": "/Users/christopherdavid/work/psionic/fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json",
+    "run_id": "tailrun-home-admitted-20260327e",
+    "result_classification": "bounded_success",
+    "admitted_device_set": [
+      "local_m5_mlx",
+      "archlinux_rtx4080_cuda"
+    ],
+    "accepted_contributions": 2,
+    "replay_checked_contributions": 2,
+    "publish_disposition": "refused",
+    "promotion_disposition": "held",
+    "aggregate_training_final_mean_loss": 5.364421e-7,
+    "aggregate_estimated_steps_per_second": 3050.8474576271187,
+    "per_device_contributions": [
+      {
+        "node_id": "swarm-mac-a",
+        "runtime_role": "coordinator",
+        "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+        "estimated_steps_per_second": 101.69491525423727,
+        "final_mean_loss": 5.364421e-7,
+        "contribution_share": 0.5
+      },
+      {
+        "node_id": "swarm-linux-4080-a",
+        "runtime_role": "contributor",
+        "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+        "estimated_steps_per_second": 6000.0,
+        "final_mean_loss": 5.364421e-7,
+        "contribution_share": 0.5
+      }
+    ],
+    "boundary_note": "The admitted mixed-device Tailnet run is included here as retained training-summary context only. It still does not have the same inferable promoted or near-equivalent runtime bundle path as the same-node M5 artifact, so this row stays out of the held-out bundle-eval winner table."
+  },
+  "comparison": {
+    "best_heldout_artifact_id": "same_node_m5_mlx",
+    "best_heldout_mean_loss": 15.942383766174316,
+    "fastest_same_node_training_artifact_id": "same_node_m5_mlx",
+    "fastest_same_node_steps_per_second": 162.53061053630358,
+    "same_node_quality_gaps_vs_best": [
+      {
+        "artifact_id": "same_node_m5_mlx",
+        "heldout_mean_loss_gap": 0.0,
+        "heldout_bits_per_token_gap": 0.0
+      },
+      {
+        "artifact_id": "same_node_rtx4080_cuda",
+        "heldout_mean_loss_gap": 0.0,
+        "heldout_bits_per_token_gap": 0.0
+      }
+    ]
+  },
+  "claim_boundary": "This report honestly compares retained same-node home-device artifacts on one shared held-out PGOLF-ish profile and then places the admitted mixed-device Tailnet run beside them using its retained training summary only. It does not claim exact Parameter Golf parity, a promoted inference bundle for the mixed-device run, or open-internet decentralized training."
+}
