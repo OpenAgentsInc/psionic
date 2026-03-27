@@ -1056,6 +1056,38 @@ __global__ void split_interleaved_query_gate_f32_kernel(
     gate_output[index] = input[source_base + head_dim + dim_index];
 }
 
+__global__ void split_interleaved_query_gate_rms_norm_f32_kernel(
+    const float *input,
+    int head_count,
+    int head_dim,
+    const float *weight,
+    float epsilon,
+    float *query_output,
+    float *gate_output
+) {
+    const int head_index = static_cast<int>(blockIdx.x);
+    if (head_index >= head_count) {
+        return;
+    }
+    const int source_base = head_index * head_dim * 2;
+    const int output_base = head_index * head_dim;
+    __shared__ float scratch[kBlockSize];
+
+    float mean_square_partial = 0.0f;
+    for (int dim_index = threadIdx.x; dim_index < head_dim; dim_index += blockDim.x) {
+        const float query_value = input[source_base + dim_index];
+        mean_square_partial += query_value * query_value;
+    }
+    const float mean_square_sum = reduce_block_sum(mean_square_partial, scratch);
+    const float inv_rms = rsqrtf(mean_square_sum / static_cast<float>(head_dim) + epsilon);
+
+    for (int dim_index = threadIdx.x; dim_index < head_dim; dim_index += blockDim.x) {
+        const float query_value = input[source_base + dim_index];
+        query_output[output_base + dim_index] = query_value * weight[dim_index] * inv_rms;
+        gate_output[output_base + dim_index] = input[source_base + head_dim + dim_index];
+    }
+}
+
 __global__ void depthwise_causal_conv1d_step_f32_kernel(
     const float *input,
     float *state,
@@ -6112,6 +6144,28 @@ extern "C" int psionic_cuda_split_interleaved_query_gate_f32(
         static_cast<const float *>(input),
         head_count,
         head_dim,
+        static_cast<float *>(query_output),
+        static_cast<float *>(gate_output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_split_interleaved_query_gate_rms_norm_f32(
+    const void *input,
+    int head_count,
+    int head_dim,
+    const void *weight,
+    float epsilon,
+    void *query_output,
+    void *gate_output,
+    void *stream
+) {
+    split_interleaved_query_gate_rms_norm_f32_kernel<<<head_count, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const float *>(input),
+        head_count,
+        head_dim,
+        static_cast<const float *>(weight),
+        epsilon,
         static_cast<float *>(query_output),
         static_cast<float *>(gate_output)
     );

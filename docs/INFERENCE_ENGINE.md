@@ -46,9 +46,10 @@ than just run tensor math.
   video parts to stay aligned with the real template semantics.
 - On March 27, 2026, after moving qwen35 hybrid-layer SSM `decay` and `beta`
   derivation onto CUDA, normalizing q/k regions directly into the packed
-  decode buffers, and replaying greedy argmax decode through a captured CUDA
-  graph, the local `qwen3.5:0.8b` benchmark on this host measured about
-  `487 tok/s` decode on Psionic versus about `326 tok/s` decode on local
+  decode buffers, replaying greedy argmax decode through a captured CUDA
+  graph, and fusing the qwen35 full-attention query/gate split with per-head
+  query RMSNorm, the local `qwen3.5:0.8b` benchmark on this host measured
+  about `492 tok/s` decode on Psionic versus about `326 tok/s` decode on local
   Ollama for the same one-sentence prompt and `128` token cap.
 - The qwen35 lane is now ahead on decode throughput for this host and prompt,
   but it is still not architecture-closed. Greedy prompt replay is materially

@@ -118,8 +118,12 @@ Measured on this host on March 27, 2026 with the downloaded
 
 - Psionic native CUDA qwen35 decode throughput: about `486.78 tok/s`
 - local Ollama `qwen3.5:0.8b` decode throughput: about `326.14 tok/s`
+Measured again on the same host and prompt after the next decode-kernel pass:
 
-This improvement now comes from two architectural changes inside the native
+- Psionic native CUDA qwen35 decode throughput: about `492.31 tok/s`
+- local Ollama `qwen3.5:0.8b` decode throughput: about `326.14 tok/s`
+
+This improvement now comes from three architectural changes inside the native
 Psionic runtime:
 
 - qwen35 derives hybrid-layer SSM `decay` and `beta` on CUDA and normalizes
@@ -128,6 +132,8 @@ Psionic runtime:
 - greedy argmax decode now replays the fused qwen35 CUDA submission through a
   captured CUDA graph, and the slower token-embedding mirror experiment is no
   longer on the default path
+- full-attention decode now fuses the qwen35 query/gate split with per-head
+  query RMSNorm into one CUDA kernel before the attention decode kernel
 
 This pilot therefore proves native CUDA execution correctness, honest
 publication, and a wider throughput win over the local Ollama baseline on this

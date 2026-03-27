@@ -1672,21 +1672,14 @@ impl Qwen35Layer {
             None,
             &plan.matvec_output_buffer,
         )?;
-        submission.split_interleaved_query_gate_f32(
+        submission.split_interleaved_query_gate_rms_norm_f32(
             &plan.matvec_output_buffer,
             head_count,
             head_dim,
-            &plan.q_buffer,
-            &plan.gate_buffer,
-        )?;
-        submission.rms_norm_region(
-            &plan.q_buffer,
-            0,
             &full_attention.query_norm_device,
-            &plan.qkv_norm_buffer,
-            0,
-            query_width,
             epsilon,
+            &plan.qkv_norm_buffer,
+            &plan.gate_buffer,
         )?;
         submission.rms_norm_region(
             &plan.matvec_output_buffer,
@@ -2510,21 +2503,14 @@ impl Qwen35Layer {
             None,
             &plan.matvec_output_buffer,
         )?;
-        submission.split_interleaved_query_gate_f32(
+        submission.split_interleaved_query_gate_rms_norm_f32(
             &plan.matvec_output_buffer,
             head_count,
             head_dim,
-            &plan.q_buffer,
-            &plan.gate_buffer,
-        )?;
-        submission.rms_norm_region(
-            &plan.q_buffer,
-            0,
             &full_attention.query_norm_device,
-            &plan.qkv_norm_buffer,
-            0,
-            query_width,
             epsilon,
+            &plan.qkv_norm_buffer,
+            &plan.gate_buffer,
         )?;
         submission.rms_norm_region(
             &plan.matvec_output_buffer,
