@@ -18,6 +18,7 @@ use psionic_models::{
     ParameterGolfBankedWeights, ParameterGolfExecutionError, ParameterGolfModelDescriptor,
     ParameterGolfModelError, ParameterGolfParameterVector, ParameterGolfPromotedProfileContract,
     ParameterGolfPromotedProfileKind, ParameterGolfReferenceModel,
+    PARAMETER_GOLF_BASELINE_VOCAB_SIZE,
 };
 use psionic_runtime::TrainingCheckpointReference;
 use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
@@ -553,6 +554,205 @@ pub struct ParameterGolfTrainableCoordinate {
     pub flat_index: usize,
 }
 
+/// Explicit tokenizer identity for one promoted PGOLF training profile.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfPromotedTokenizerIdentity {
+    /// Repo-owned bounded local-reference SentencePiece surface.
+    RepoLocalReferenceSentencePiece,
+    /// Exact public challenge SP1024 SentencePiece surface.
+    ChallengeSp1024SentencePiece,
+}
+
+/// Explicit dataset identity for one promoted PGOLF training profile.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfPromotedDatasetIdentity {
+    /// Repo-owned bounded local-reference token stream.
+    RepoLocalReferenceFixture,
+    /// Exact public FineWeb challenge lane.
+    ChallengeFinewebSp1024,
+}
+
+/// Explicit evaluation identity for one promoted PGOLF training profile.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfPromotedEvaluationIdentity {
+    /// Bounded local-reference validation on the repo-owned fixture.
+    LocalReferenceValidation,
+    /// Challenge-style bits-per-byte evaluation on the public challenge lane.
+    ChallengeBitsPerByte,
+}
+
+/// Explicit evaluation policy for one promoted PGOLF training profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfPromotedEvaluationPolicy {
+    /// Stable evaluation identity.
+    pub evaluation_identity: ParameterGolfPromotedEvaluationIdentity,
+    /// Whether legal score-first TTT is required.
+    pub legal_score_first_ttt_required: bool,
+    /// Whether contest bits-per-byte accounting is required.
+    pub contest_bits_per_byte_accounting_required: bool,
+}
+
+/// Explicit artifact policy for one promoted PGOLF training profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfPromotedArtifactPolicy {
+    /// Whether the exact public compressed artifact cap is required.
+    pub exact_compressed_artifact_cap_required: bool,
+    /// Required compressed artifact cap in bytes when challenge posture is
+    /// requested.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compressed_artifact_cap_bytes: Option<u64>,
+}
+
+/// Explicit promoted training profile for one PGOLF-shaped small-decoder lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfPromotedTrainingProfile {
+    /// Stable promoted profile id.
+    pub profile_id: String,
+    /// Stable promoted profile kind.
+    pub kind: ParameterGolfPromotedProfileKind,
+    /// Stable tokenizer identity.
+    pub tokenizer_identity: ParameterGolfPromotedTokenizerIdentity,
+    /// Stable dataset identity.
+    pub dataset_identity: ParameterGolfPromotedDatasetIdentity,
+    /// Stable evaluation policy.
+    pub evaluation_policy: ParameterGolfPromotedEvaluationPolicy,
+    /// Stable artifact policy.
+    pub artifact_policy: ParameterGolfPromotedArtifactPolicy,
+}
+
+impl Default for ParameterGolfPromotedTrainingProfile {
+    fn default() -> Self {
+        Self::general_psion_small_decoder()
+    }
+}
+
+impl ParameterGolfPromotedTrainingProfile {
+    /// Returns the general Psion small-decoder training profile.
+    #[must_use]
+    pub fn general_psion_small_decoder() -> Self {
+        Self {
+            profile_id: String::from(
+                ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder.profile_id(),
+            ),
+            kind: ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder,
+            tokenizer_identity:
+                ParameterGolfPromotedTokenizerIdentity::RepoLocalReferenceSentencePiece,
+            dataset_identity: ParameterGolfPromotedDatasetIdentity::RepoLocalReferenceFixture,
+            evaluation_policy: ParameterGolfPromotedEvaluationPolicy {
+                evaluation_identity:
+                    ParameterGolfPromotedEvaluationIdentity::LocalReferenceValidation,
+                legal_score_first_ttt_required: false,
+                contest_bits_per_byte_accounting_required: false,
+            },
+            artifact_policy: ParameterGolfPromotedArtifactPolicy {
+                exact_compressed_artifact_cap_required: false,
+                compressed_artifact_cap_bytes: None,
+            },
+        }
+    }
+
+    /// Returns the strict PGOLF challenge overlay training profile.
+    #[must_use]
+    pub fn strict_pgolf_challenge() -> Self {
+        Self {
+            profile_id: String::from(
+                ParameterGolfPromotedProfileKind::StrictPgolfChallenge.profile_id(),
+            ),
+            kind: ParameterGolfPromotedProfileKind::StrictPgolfChallenge,
+            tokenizer_identity:
+                ParameterGolfPromotedTokenizerIdentity::ChallengeSp1024SentencePiece,
+            dataset_identity: ParameterGolfPromotedDatasetIdentity::ChallengeFinewebSp1024,
+            evaluation_policy: ParameterGolfPromotedEvaluationPolicy {
+                evaluation_identity: ParameterGolfPromotedEvaluationIdentity::ChallengeBitsPerByte,
+                legal_score_first_ttt_required: true,
+                contest_bits_per_byte_accounting_required: true,
+            },
+            artifact_policy: ParameterGolfPromotedArtifactPolicy {
+                exact_compressed_artifact_cap_required: true,
+                compressed_artifact_cap_bytes: Some(16_000_000),
+            },
+        }
+    }
+
+    fn validate_contract_alignment(&self) -> Result<(), ParameterGolfReferenceTrainingError> {
+        let expected_profile_id = self.kind.profile_id();
+        if self.profile_id != expected_profile_id {
+            return Err(ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted training profile",
+                message: format!(
+                    "profile id `{}` drifted from frozen kind `{expected_profile_id}`",
+                    self.profile_id
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    fn validate_local_reference_lane(
+        &self,
+        fixture: &ParameterGolfLocalReferenceFixture,
+    ) -> Result<(), ParameterGolfReferenceTrainingError> {
+        self.validate_contract_alignment()?;
+        if fixture.tokenizer_vocab_size != PARAMETER_GOLF_BASELINE_VOCAB_SIZE {
+            return Err(ParameterGolfReferenceTrainingError::PromotedProfileRefusal {
+                profile_id: self.profile_id.clone(),
+                detail: format!(
+                    "local-reference fixture vocab size {} drifted from promoted baseline vocab size {}",
+                    fixture.tokenizer_vocab_size, PARAMETER_GOLF_BASELINE_VOCAB_SIZE
+                ),
+            });
+        }
+        let mut missing = Vec::new();
+        if self.tokenizer_identity
+            != ParameterGolfPromotedTokenizerIdentity::RepoLocalReferenceSentencePiece
+        {
+            missing.push(String::from(
+                "strict challenge tokenizer identity requires the exact public challenge SP1024 tokenizer, but the current lane is the repo-owned local-reference SentencePiece surface",
+            ));
+        }
+        if self.dataset_identity != ParameterGolfPromotedDatasetIdentity::RepoLocalReferenceFixture
+        {
+            missing.push(String::from(
+                "strict challenge dataset identity requires the public FineWeb SP1024 lane, but the current lane is the repo-owned local-reference fixture",
+            ));
+        }
+        if self.evaluation_policy.legal_score_first_ttt_required {
+            missing.push(String::from(
+                "strict challenge evaluation requires legal score-first TTT, but the local-reference lane does not execute that overlay",
+            ));
+        }
+        if self
+            .evaluation_policy
+            .contest_bits_per_byte_accounting_required
+        {
+            missing.push(String::from(
+                "strict challenge evaluation requires contest bits-per-byte accounting, but the local-reference lane only claims bounded local-reference validation",
+            ));
+        }
+        if self.artifact_policy.exact_compressed_artifact_cap_required {
+            missing.push(format!(
+                "strict challenge artifact posture requires an exact compressed artifact cap of {} bytes, but the local-reference lane does not enforce exported-folder submission accounting",
+                self.artifact_policy
+                    .compressed_artifact_cap_bytes
+                    .unwrap_or(16_000_000)
+            ));
+        }
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(
+                ParameterGolfReferenceTrainingError::PromotedProfileRefusal {
+                    profile_id: self.profile_id.clone(),
+                    detail: missing.join("; "),
+                },
+            )
+        }
+    }
+}
+
 /// Config for the bounded Parameter Golf local-reference trainer.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfReferenceTrainingConfig {
@@ -572,6 +772,9 @@ pub struct ParameterGolfReferenceTrainingConfig {
     pub hyperparameters: ParameterGolfTrainingHyperparameters,
     /// Finite-difference epsilon used for selected coordinates.
     pub finite_difference_epsilon: f32,
+    /// Explicit promoted profile and policy surface for this run.
+    #[serde(default)]
+    pub promoted_profile: ParameterGolfPromotedTrainingProfile,
     /// Selected trainable coordinates.
     pub selected_coordinates: Vec<ParameterGolfTrainableCoordinate>,
 }
@@ -591,6 +794,7 @@ impl ParameterGolfReferenceTrainingConfig {
             geometry,
             hyperparameters: ParameterGolfTrainingHyperparameters::baseline_defaults(),
             finite_difference_epsilon: 0.01,
+            promoted_profile: ParameterGolfPromotedTrainingProfile::general_psion_small_decoder(),
             selected_coordinates: vec![
                 ParameterGolfTrainableCoordinate {
                     parameter_id: String::from("tok_emb.weight"),
@@ -615,6 +819,18 @@ impl ParameterGolfReferenceTrainingConfig {
         let mut config = Self::local_reference();
         config.run_id = String::from("parameter-golf-promoted-general-proof-run");
         config.checkpoint_family = String::from("train.parameter_golf.promoted_general");
+        config
+    }
+
+    /// Returns the strict PGOLF challenge overlay config. The bounded
+    /// local-reference lane is expected to refuse this profile explicitly until
+    /// the exact challenge prerequisites are present.
+    #[must_use]
+    pub fn strict_pgolf_challenge() -> Self {
+        let mut config = Self::local_reference();
+        config.run_id = String::from("parameter-golf-strict-pgolf-challenge");
+        config.checkpoint_family = String::from("train.parameter_golf.strict_pgolf_challenge");
+        config.promoted_profile = ParameterGolfPromotedTrainingProfile::strict_pgolf_challenge();
         config
     }
 
@@ -643,6 +859,7 @@ impl ParameterGolfReferenceTrainingConfig {
                 message: String::from("selected_coordinates must not be empty"),
             });
         }
+        self.promoted_profile.validate_contract_alignment()?;
         self.geometry.validate()?;
         Ok(())
     }
@@ -727,6 +944,9 @@ pub struct ParameterGolfCheckpointManifest {
     pub checkpoint_family: String,
     /// Stable run identifier.
     pub run_id: String,
+    /// Explicit promoted profile and policy surface.
+    #[serde(default)]
+    pub promoted_profile: ParameterGolfPromotedTrainingProfile,
     /// Logical checkpoint step.
     pub step: u64,
     /// Logical training start time.
@@ -1062,6 +1282,8 @@ pub enum ParameterGolfReferenceTrainingError {
         completed_steps: u64,
         max_steps: u64,
     },
+    #[error("parameter golf promoted profile `{profile_id}` refused this lane: {detail}")]
+    PromotedProfileRefusal { profile_id: String, detail: String },
     #[error("parameter golf artifact is missing tensor `{parameter_id}`")]
     MissingArtifactTensor { parameter_id: String },
     #[error(
@@ -1266,6 +1488,9 @@ impl ParameterGolfReferenceTrainingRunner {
     ) -> Result<Self, ParameterGolfReferenceTrainingError> {
         config.validate()?;
         fixture.validate()?;
+        config
+            .promoted_profile
+            .validate_local_reference_lane(fixture)?;
 
         let initial_model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
         if fixture.tokenizer_vocab_size != initial_model.descriptor().config.vocab_size {
@@ -1676,9 +1901,7 @@ pub fn run_parameter_golf_promoted_reference_run(
     fixture: &ParameterGolfLocalReferenceFixture,
     config: &ParameterGolfReferenceTrainingConfig,
 ) -> Result<ParameterGolfPromotedReferenceRun, ParameterGolfReferenceTrainingError> {
-    let profile_contract = parameter_golf_promoted_profile_contract(
-        ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder,
-    );
+    let profile_contract = parameter_golf_promoted_profile_contract(config.promoted_profile.kind);
     let training_outcome = train_parameter_golf_local_reference(fixture, config)?;
     validate_promoted_reference_descriptor(
         &profile_contract,
@@ -1711,7 +1934,14 @@ pub fn run_parameter_golf_promoted_reference_run(
     let summary = ParameterGolfPromotedReferenceRunSummary {
         schema_version: String::from("psionic.parameter_golf_promoted_reference_run.v1"),
         profile_id: profile_contract.profile_id.clone(),
-        profile_kind: String::from("general_psion_small_decoder"),
+        profile_kind: match config.promoted_profile.kind {
+            ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder => {
+                String::from("general_psion_small_decoder")
+            }
+            ParameterGolfPromotedProfileKind::StrictPgolfChallenge => {
+                String::from("strict_pgolf_challenge")
+            }
+        },
         run_id: config.run_id.clone(),
         checkpoint_family: config.checkpoint_family.clone(),
         descriptor_digest: model_descriptor.stable_digest(),
@@ -2254,6 +2484,7 @@ pub fn restore_parameter_golf_local_reference_checkpoint(
         geometry: manifest.geometry.clone(),
         hyperparameters: manifest.hyperparameters.clone(),
         finite_difference_epsilon: manifest.finite_difference_epsilon,
+        promoted_profile: manifest.promoted_profile.clone(),
         selected_coordinates: manifest
             .trainable_tensors
             .iter()
@@ -2947,6 +3178,7 @@ fn export_checkpoint(
         checkpoint_ref: checkpoint_ref.clone(),
         checkpoint_family: config.checkpoint_family.clone(),
         run_id: config.run_id.clone(),
+        promoted_profile: config.promoted_profile.clone(),
         step,
         started_at_ms: config.started_at_ms,
         step_duration_ms: config.step_duration_ms,
@@ -3716,7 +3948,7 @@ mod tests {
         train_parameter_golf_local_reference_with_metric_sink,
         write_parameter_golf_promoted_reference_run, ParameterGolfFinalArtifactConfig,
         ParameterGolfLocalReferenceFixture, ParameterGolfReferenceTrainingConfig,
-        ParameterGolfReferenceTrainingRunner,
+        ParameterGolfReferenceTrainingError, ParameterGolfReferenceTrainingRunner,
     };
     use psionic_models::{ParameterGolfPromotedProfileKind, ParameterGolfReferenceModel};
 
@@ -4023,6 +4255,13 @@ mod tests {
                 .manifest
                 .stable_digest()
         );
+        assert_eq!(
+            run.training_outcome
+                .final_checkpoint
+                .manifest
+                .promoted_profile,
+            config.promoted_profile
+        );
 
         let explicit_report = promoted_checkpoint_surface_report(
             &run.profile_contract,
@@ -4045,6 +4284,47 @@ mod tests {
             .path()
             .join("parameter_golf_promoted_resume_proof.json")
             .exists());
+        Ok(())
+    }
+
+    #[test]
+    fn strict_pgolf_challenge_profile_refuses_local_reference_lane() -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::strict_pgolf_challenge();
+        let error = ParameterGolfReferenceTrainingRunner::new(&fixture, &config).unwrap_err();
+
+        match error {
+            ParameterGolfReferenceTrainingError::PromotedProfileRefusal { profile_id, detail } => {
+                assert_eq!(
+                    profile_id,
+                    ParameterGolfPromotedProfileKind::StrictPgolfChallenge.profile_id()
+                );
+                assert!(detail.contains("challenge SP1024 tokenizer"));
+                assert!(detail.contains("FineWeb SP1024 lane"));
+                assert!(detail.contains("score-first TTT"));
+                assert!(detail.contains("bits-per-byte accounting"));
+                assert!(detail.contains("compressed artifact cap"));
+            }
+            other => panic!("expected promoted profile refusal, got {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn restored_checkpoint_preserves_promoted_profile_policy() -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::promoted_general_small_decoder();
+        let run = run_parameter_golf_promoted_reference_run(&fixture, &config)?;
+        let restored = restore_parameter_golf_local_reference_checkpoint(
+            &fixture,
+            &run.training_outcome.final_checkpoint,
+        )?;
+
+        assert_eq!(restored.config.promoted_profile, config.promoted_profile);
+        assert_eq!(
+            restored.latest_checkpoint.manifest.promoted_profile,
+            config.promoted_profile
+        );
         Ok(())
     }
 

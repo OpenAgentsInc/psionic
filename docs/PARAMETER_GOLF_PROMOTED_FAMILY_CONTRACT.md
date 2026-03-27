@@ -115,6 +115,18 @@ That proof path binds the general promoted profile to the existing full
 checkpoint tensor surface exactly matches the promoted descriptor, and proves
 restore-plus-resume parity from the emitted checkpoint lineage.
 
+The profile split is also carried directly through the training config and
+checkpoint manifest:
+
+- `ParameterGolfReferenceTrainingConfig.promoted_profile`
+- `ParameterGolfCheckpointManifest.promoted_profile`
+
+The bounded local-reference trainer only admits the general Psion profile. If
+the strict challenge overlay is requested before the exact public challenge
+tokenizer, FineWeb lane, legal score-first TTT path, contest BPB accounting,
+and exported artifact-cap accounting exist, the lane now refuses explicitly
+instead of silently pretending those prerequisites are satisfied.
+
 For train-to-infer work, this promoted PGOLF path is now the primary first-model
 target. The older `PsionCompactDecoderReferencePilotModel` remains the bounded
 smoke-test lane for receipt and pipeline closure only.

@@ -579,6 +579,19 @@ Goal:
 
 That requires the broader roadmap below.
 
+Status update after the promoted PGOLF-family work already landed:
+
+- the first promoted inferable family target is now explicitly the
+  `parameter_golf_decoder` core, not the old toy pilot
+- the family split is now machine-readable as:
+  - one general Psion small-decoder profile
+  - one strict PGOLF challenge overlay profile
+- the strict challenge overlay now refuses the bounded local-reference lane
+  explicitly until the exact challenge prerequisites exist, rather than
+  inheriting them implicitly or pretending they are already true
+- promoted checkpoint manifests now carry the chosen profile policy surface so
+  later bundle/load/serve work can enforce it without guessing
+
 ## Roadmap: Everything Needed To Make Trained Psion Models Inferable
 
 ### PINF-1: Freeze One Inferable Psion Artifact Bundle Contract
