@@ -238,6 +238,27 @@ Canonical retained admitted-device matrix artifacts now live at:
 
 - `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json`
 - `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json`
+- `fixtures/apple_adapter/runs/tailrun_pgolfish_quality_compare_20260327/quality_report.json`
+
+## PGOLF-ish Quality Follow-Up
+
+This audit is now paired with:
+
+- `docs/audits/2026-03-27-tailrun-pgolfish-quality-comparison-audit.md`
+
+That follow-up matters because the current same-node throughput advantage does
+**not** yet turn into a held-out quality advantage on the shared PGOLF-ish
+comparison profile:
+
+- M5 same-node held-out mean loss: `15.942383766174316`
+- RTX 4080 same-node held-out mean loss: `15.942383766174316`
+
+So the honest current state is:
+
+- throughput comparison is real and retained
+- same-node held-out quality is currently tied
+- the admitted mixed-device run is still summary-backed quality only until the
+  next promotion/export issue lands
 - `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json`
 
 The exact retained command was:

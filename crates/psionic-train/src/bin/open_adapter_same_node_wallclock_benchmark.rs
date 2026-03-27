@@ -4,14 +4,11 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use psionic_data::{TokenizerDigest, TokenizerFamily};
 use psionic_train::{
-    OpenAdapterExecutionConfig, OpenAdapterSftRunOutcome, OpenAdapterTrainingExecutionBackend,
-    OpenAdapterHiddenStateSample,
+    first_swarm_open_adapter_sft_request, open_adapter_pgolfish_config,
+    open_adapter_pgolfish_samples, run_open_adapter_sft_export, OpenAdapterExecutionConfig,
+    OpenAdapterPgolfishSampleSplit, OpenAdapterSftRunOutcome, OpenAdapterTrainingExecutionBackend,
     PortableModelBundle, PortableTokenizerAssetFormat, PortableTokenizerBinding,
-    TrainingLoopBudget,
-    first_swarm_open_adapter_sft_request, first_swarm_open_adapter_training_config,
-    run_open_adapter_sft_export,
     OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
 };
 use serde::Serialize;
@@ -22,11 +19,6 @@ const DEFAULT_CALIBRATION_STEPS: u64 = 12;
 const REQUEST_STEP_DURATION_MS: u64 = 25;
 const TARGET_UTILIZATION_BPS: u64 = 9_500;
 const ELAPSED_CHECK_INTERVAL_STEPS: u64 = 1_024;
-const BENCHMARK_HIDDEN_SIZE: usize = 512;
-const BENCHMARK_VOCAB_SIZE: usize = 1_024;
-const BENCHMARK_LORA_RANK: usize = 32;
-const BENCHMARK_BATCH_SIZE: usize = 16;
-const BENCHMARK_SAMPLE_COUNT: usize = 128;
 
 #[derive(Clone, Debug, Serialize)]
 struct BenchmarkReport {
@@ -98,7 +90,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let calibration_config = benchmark_config(
         &args.backend_label,
-        format!("same-node-wallclock-calibration-{}", short_backend_label(args.backend_label.as_str())),
+        format!(
+            "same-node-wallclock-calibration-{}",
+            short_backend_label(args.backend_label.as_str())
+        ),
         format!(
             "benchmark.open_adapter.same_node.{}.calibration",
             short_backend_label(args.backend_label.as_str())
@@ -110,14 +105,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         OpenAdapterTrainingExecutionBackend::new(calibration_config.clone(), calibration_samples)?;
     let calibration_outcome = timed_run(&calibration_backend, REQUEST_STEP_DURATION_MS)?;
     let calibration_elapsed_ms = calibration_outcome.observed_wallclock_ms;
-    let estimated_step_ms = ((calibration_elapsed_ms
-        + args.calibration_steps.saturating_sub(1))
+    let estimated_step_ms = ((calibration_elapsed_ms + args.calibration_steps.saturating_sub(1))
         / args.calibration_steps)
         .max(1);
 
     let retained_config = benchmark_config(
         &args.backend_label,
-        format!("same-node-wallclock-retained-{}", short_backend_label(args.backend_label.as_str())),
+        format!(
+            "same-node-wallclock-retained-{}",
+            short_backend_label(args.backend_label.as_str())
+        ),
         format!(
             "benchmark.open_adapter.same_node.{}.retained",
             short_backend_label(args.backend_label.as_str())
@@ -282,21 +279,12 @@ fn benchmark_config(
     checkpoint_family: String,
     max_steps: u64,
 ) -> Result<OpenAdapterExecutionConfig, Box<dyn std::error::Error>> {
-    let mut config =
-        first_swarm_open_adapter_training_config(run_id, checkpoint_family, backend_label);
-    config.budget = TrainingLoopBudget::new(max_steps, 1, 1)?;
-    config.batch_size = BENCHMARK_BATCH_SIZE;
-    config.model.hidden_size = BENCHMARK_HIDDEN_SIZE;
-    config.model.vocab_size = BENCHMARK_VOCAB_SIZE;
-    config.model.target.lora_rank = BENCHMARK_LORA_RANK;
-    config.model.target.lora_alpha = BENCHMARK_LORA_RANK as f32;
-    config.model.tokenizer = TokenizerDigest::new(
-        TokenizerFamily::SentencePiece,
-        "psionic.synthetic.pgolfish.sp1024.v1",
-        BENCHMARK_VOCAB_SIZE as u32,
-    )
-    .with_template_digest("psionic.synthetic.pgolfish.prompt_template.v1");
-    Ok(config)
+    Ok(open_adapter_pgolfish_config(
+        backend_label,
+        run_id,
+        checkpoint_family,
+        max_steps,
+    )?)
 }
 
 fn timed_run(
@@ -352,7 +340,8 @@ fn run_until_target_wallclock(
         run.apply_step(step_input)?;
         completed_steps = completed_steps.saturating_add(1);
 
-        if completed_steps % ELAPSED_CHECK_INTERVAL_STEPS == 0 && started.elapsed() >= target_duration
+        if completed_steps % ELAPSED_CHECK_INTERVAL_STEPS == 0
+            && started.elapsed() >= target_duration
         {
             break;
         }
@@ -446,42 +435,11 @@ fn now_ms() -> u64 {
 
 fn benchmark_samples(
     sample_prefix: &str,
-) -> Result<Vec<OpenAdapterHiddenStateSample>, Box<dyn std::error::Error>> {
-    let mut samples = Vec::with_capacity(BENCHMARK_SAMPLE_COUNT);
-    for sample_index in 0..BENCHMARK_SAMPLE_COUNT {
-        let target_token_id = ((sample_index * 37) % BENCHMARK_VOCAB_SIZE) as u32;
-        let mut hidden_state = Vec::with_capacity(BENCHMARK_HIDDEN_SIZE);
-        for dim in 0..BENCHMARK_HIDDEN_SIZE {
-            hidden_state.push(synthetic_hidden_value(
-                sample_index,
-                dim,
-                target_token_id as usize,
-            ));
-        }
-        samples.push(OpenAdapterHiddenStateSample::new(
-            format!("{sample_prefix}-{sample_index:04}"),
-            hidden_state,
-            target_token_id,
-            192 + (sample_index % 64) as u32,
-        )?);
-    }
-    Ok(samples)
-}
-
-fn synthetic_hidden_value(sample_index: usize, dim: usize, target_token_id: usize) -> f32 {
-    let seed = ((sample_index as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15))
-        ^ ((dim as u64 + 1).wrapping_mul(0xBF58_476D_1CE4_E5B9))
-        ^ ((target_token_id as u64 + 1).wrapping_mul(0x94D0_49BB_1331_11EB));
-    let hashed = seed ^ (seed >> 30);
-    let base = ((hashed & 0xffff) as f32 / 32768.0) - 1.0;
-    let bucket = if dim % 64 == target_token_id % 64 {
-        0.75
-    } else if dim % 17 == sample_index % 17 {
-        0.25
-    } else {
-        0.0
-    };
-    (base * 0.35) + bucket
+) -> Result<Vec<psionic_train::OpenAdapterHiddenStateSample>, Box<dyn std::error::Error>> {
+    Ok(open_adapter_pgolfish_samples(
+        sample_prefix,
+        OpenAdapterPgolfishSampleSplit::Training,
+    )?)
 }
 
 struct TimedOutcome {
