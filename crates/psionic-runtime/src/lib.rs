@@ -5477,6 +5477,40 @@ impl TokenSampler {
     pub fn select_next_token(&mut self, logits: &[f32], history: &[u32]) -> Option<u32> {
         let mut adjusted_logits = logits.to_vec();
         apply_sampling_penalties(&mut adjusted_logits, history, &self.policy);
+        if !adjusted_logits.iter().any(|value| value.is_finite()) {
+            return None;
+        }
+        if self.policy.strategy == SamplingStrategy::Greedy
+            || self.policy.effective_temperature() <= 1e-6
+        {
+            return select_argmax_token(&adjusted_logits);
+        }
+        let token = sample_token_index(&mut self.rng, &adjusted_logits, &self.policy);
+        if token.is_some() {
+            if let Some(generator_state) = self.generator_state.as_mut() {
+                generator_state.draws = generator_state.draws.saturating_add(1);
+            }
+        }
+        token
+    }
+
+    /// Selects the next token while refusing one explicit set of token ids.
+    pub fn select_next_token_with_disallowed(
+        &mut self,
+        logits: &[f32],
+        history: &[u32],
+        disallowed_token_ids: &[u32],
+    ) -> Option<u32> {
+        let mut adjusted_logits = logits.to_vec();
+        apply_sampling_penalties(&mut adjusted_logits, history, &self.policy);
+        for &token_id in disallowed_token_ids {
+            if let Some(logit) = adjusted_logits.get_mut(token_id as usize) {
+                *logit = f32::NEG_INFINITY;
+            }
+        }
+        if !adjusted_logits.iter().any(|value| value.is_finite()) {
+            return None;
+        }
         if self.policy.strategy == SamplingStrategy::Greedy
             || self.policy.effective_temperature() <= 1e-6
         {
@@ -11673,6 +11707,28 @@ mod tests {
 
         assert_eq!(logits[0], 0.0);
         assert_eq!(logits[1], 10.0 - (DEFAULT_PENALTY_LOOKBACK as f32));
+    }
+
+    #[test]
+    fn token_sampler_can_refuse_disallowed_ids() {
+        let policy = SamplingPolicy {
+            strategy: SamplingStrategy::Greedy,
+            temperature: None,
+            top_k: None,
+            top_p: None,
+            repeat_penalty: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            seed: None,
+        };
+        let logits = vec![1.0, 10.0, 9.0];
+        let mut sampler = TokenSampler::new(&policy);
+
+        let selected = sampler
+            .select_next_token_with_disallowed(&logits, &[], &[1])
+            .expect("disallowed token should be skipped");
+
+        assert_eq!(selected, 2);
     }
 
     #[test]

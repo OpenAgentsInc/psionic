@@ -6323,12 +6323,18 @@ impl<'a> PromotedParameterGolfGenerationStream<'a> {
                 .values()
                 .get(last_row_start..last_row_start.saturating_add(width))
                 .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
-            let next_token = match self.sampler.select_next_token_from_history(
-                self.loaded_model.runtime_bundle().tokenizer(),
-                last_logits,
-                self.history.as_slice(),
-                self.generated_tokens.as_slice(),
-            )? {
+            let next_token = match self
+                .sampler
+                .select_next_token_from_history_with_disallowed(
+                    self.loaded_model.runtime_bundle().tokenizer(),
+                    last_logits,
+                    self.history.as_slice(),
+                    self.generated_tokens.as_slice(),
+                    self.loaded_model
+                        .runtime_bundle()
+                        .tokenizer()
+                        .generation_disallowed_token_ids(),
+                )? {
                 GenerationSelection::Token(token) => token,
                 GenerationSelection::Terminate => {
                     return Ok(Some(self.emit_terminal_or_chunk(
@@ -6776,10 +6782,27 @@ impl GenerationSampler {
         history: &[u32],
         generated_tokens: &[TokenId],
     ) -> Result<GenerationSelection, ReferenceTextGenerationError> {
+        self.select_next_token_from_history_with_disallowed(
+            tokenizer,
+            logits,
+            history,
+            generated_tokens,
+            &[],
+        )
+    }
+
+    fn select_next_token_from_history_with_disallowed(
+        &mut self,
+        tokenizer: &dyn TokenizerBoundary,
+        logits: &[f32],
+        history: &[u32],
+        generated_tokens: &[TokenId],
+        disallowed_token_ids: &[u32],
+    ) -> Result<GenerationSelection, ReferenceTextGenerationError> {
         let Some(matcher) = self.structured_output.as_ref() else {
             return self
                 .sampler
-                .select_next_token(logits, history)
+                .select_next_token_with_disallowed(logits, history, disallowed_token_ids)
                 .map(TokenId)
                 .map_or(
                     Err(ReferenceTextGenerationError::MissingOutput("next_token")),
@@ -6797,6 +6820,11 @@ impl GenerationSampler {
         }
 
         let mut masked_logits = logits.to_vec();
+        for &token_id in disallowed_token_ids {
+            if let Some(logit) = masked_logits.get_mut(token_id as usize) {
+                *logit = f32::NEG_INFINITY;
+            }
+        }
         for _ in 0..masked_logits.len() {
             let Some(candidate) = self.sampler.select_next_token(&masked_logits, history) else {
                 return Err(ReferenceTextGenerationError::StructuredOutputExhausted);

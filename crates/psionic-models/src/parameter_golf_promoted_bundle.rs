@@ -638,6 +638,7 @@ pub struct ParameterGolfPromotedRuntimeTokenizer {
     vocabulary: TokenVocabulary,
     lookup: BTreeMap<String, TokenId>,
     eos_token_ids: Vec<TokenId>,
+    generation_disallowed_token_ids: Vec<u32>,
 }
 
 impl ParameterGolfPromotedRuntimeTokenizer {
@@ -694,11 +695,29 @@ impl ParameterGolfPromotedRuntimeTokenizer {
             .copied()
             .map(TokenId)
             .collect::<Vec<_>>();
+        let generation_disallowed_token_ids = asset
+            .pieces
+            .iter()
+            .filter_map(|piece| match piece.kind {
+                ParameterGolfPromotedTokenizerTokenKind::Normal
+                | ParameterGolfPromotedTokenizerTokenKind::Byte => None,
+                ParameterGolfPromotedTokenizerTokenKind::Control => {
+                    if asset.eos_token_ids.contains(&piece.token_id) {
+                        None
+                    } else {
+                        Some(piece.token_id)
+                    }
+                }
+                ParameterGolfPromotedTokenizerTokenKind::Unknown
+                | ParameterGolfPromotedTokenizerTokenKind::Unused => Some(piece.token_id),
+            })
+            .collect::<Vec<_>>();
         Ok(Self {
             asset,
             vocabulary,
             lookup,
             eos_token_ids,
+            generation_disallowed_token_ids,
         })
     }
 
@@ -706,6 +725,12 @@ impl ParameterGolfPromotedRuntimeTokenizer {
     #[must_use]
     pub fn asset(&self) -> &ParameterGolfPromotedTokenizerAsset {
         &self.asset
+    }
+
+    /// Returns token ids that inference should refuse by default.
+    #[must_use]
+    pub fn generation_disallowed_token_ids(&self) -> &[u32] {
+        self.generation_disallowed_token_ids.as_slice()
     }
 
     /// Encodes text with explicit BOS/EOS injection.
@@ -1030,6 +1055,7 @@ impl ParameterGolfPromotedRuntimeBundle {
         let mut bounded_history = Vec::with_capacity(bounded_history_capacity);
         let mut generated_tokens = Vec::with_capacity(options.max_new_tokens);
         let mut sampler = TokenSampler::new(&options.sampling_policy);
+        let generation_disallowed_token_ids = self.tokenizer.generation_disallowed_token_ids();
         let termination = loop {
             if generated_tokens.len() >= options.max_new_tokens {
                 break ParameterGolfPromotedGenerationTermination::MaxNewTokens;
@@ -1061,7 +1087,11 @@ impl ParameterGolfPromotedRuntimeBundle {
                 .get(last_row_start..last_row_start.saturating_add(width))
                 .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
             let next_token = sampler
-                .select_next_token(last_logits, history.as_slice())
+                .select_next_token_with_disallowed(
+                    last_logits,
+                    history.as_slice(),
+                    generation_disallowed_token_ids,
+                )
                 .ok_or(ParameterGolfPromotedGenerationError::MissingLogits)?;
             let next_token = TokenId(next_token);
             history.push(next_token.as_u32());
@@ -1647,4 +1677,66 @@ fn is_runtime_special_token(
     Some(token.as_u32()) == asset.pad_token_id
         || Some(token.as_u32()) == asset.bos_token_id
         || eos_token_ids.contains(&token)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn promoted_runtime_tokenizer_refuses_unknown_non_eos_control_and_unused_ids()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut asset = ParameterGolfPromotedTokenizerAsset {
+            schema_version: String::from(PARAMETER_GOLF_PROMOTED_TOKENIZER_ASSET_SCHEMA_VERSION),
+            profile_id: String::from("pgolf.test"),
+            tokenizer_id: String::from("pgolf.test.tokenizer"),
+            tokenizer_version: String::from("v1"),
+            family: ParameterGolfPromotedTokenizerFamily::SentencePiece,
+            asset_format: ParameterGolfPromotedTokenizerAssetFormat::SentencePiecePieceTableJson,
+            vocab_size: 5,
+            add_bos: false,
+            add_eos: false,
+            bos_token_id: Some(1),
+            eos_token_ids: vec![2],
+            pad_token_id: None,
+            unknown_token_id: Some(0),
+            pieces: vec![
+                ParameterGolfPromotedTokenizerToken {
+                    token_id: 0,
+                    piece: String::from("<unk>"),
+                    kind: ParameterGolfPromotedTokenizerTokenKind::Unknown,
+                },
+                ParameterGolfPromotedTokenizerToken {
+                    token_id: 1,
+                    piece: String::from("<s>"),
+                    kind: ParameterGolfPromotedTokenizerTokenKind::Control,
+                },
+                ParameterGolfPromotedTokenizerToken {
+                    token_id: 2,
+                    piece: String::from("</s>"),
+                    kind: ParameterGolfPromotedTokenizerTokenKind::Control,
+                },
+                ParameterGolfPromotedTokenizerToken {
+                    token_id: 3,
+                    piece: String::from("a"),
+                    kind: ParameterGolfPromotedTokenizerTokenKind::Normal,
+                },
+                ParameterGolfPromotedTokenizerToken {
+                    token_id: 4,
+                    piece: String::from("<reserved_0004>"),
+                    kind: ParameterGolfPromotedTokenizerTokenKind::Unused,
+                },
+            ],
+            tokenizer_digest: String::new(),
+            asset_digest: String::new(),
+            detail: String::from("test tokenizer asset"),
+        };
+        asset.tokenizer_digest = asset.tokenizer_contract_digest();
+        asset.asset_digest = asset.stable_digest();
+
+        let tokenizer = ParameterGolfPromotedRuntimeTokenizer::from_asset(asset)?;
+
+        assert_eq!(tokenizer.generation_disallowed_token_ids(), &[0, 1, 4]);
+        Ok(())
+    }
 }
