@@ -22,13 +22,13 @@ than just run tensor math.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
-- `qwen35` is `implemented_early` through a dedicated CPU `llama.cpp` proxy
-  runtime with prompt-projected image and video inputs.
+- `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
+  runtime with prompt-projected image and video inputs at the HTTP layer.
 - The `qwen35` lane must publish:
-  - `backend = cpu`
-  - `execution_mode = proxy`
-  - `execution_engine = llama.cpp`
-  - `residency_mode = llama_cpp_proxy`
+  - `backend = cuda`
+  - `execution_mode = native`
+  - `execution_engine = psionic`
+  - `residency_mode = cuda_accelerated`
   - single-request execution posture
   - no scheduler policy claim
 - The `qwen35` lane must also publish:
@@ -44,6 +44,13 @@ than just run tensor math.
   calling.
 - The first `qwen35` lane must still fail closed for system-message image and
   video parts to stay aligned with the real template semantics.
+- The current `qwen35` CUDA lane is functional but not throughput-closed. On
+  March 26, 2026, the local `qwen3.5:0.8b` benchmark on this host measured
+  about `85 tok/s` decode on Psionic versus about `321 tok/s` decode on local
+  Ollama for the same one-sentence prompt and `128` token cap.
+- The remaining qwen35 gap is not admission or prompt rendering. The remaining
+  gap is the native runtime itself: hybrid SSM math, full-attention cache
+  handling, and buffer reuse are still partially host-driven.
 
 ## Embeddings Requirements
 

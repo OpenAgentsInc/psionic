@@ -56,15 +56,15 @@ use tokio_stream::iter;
 
 use crate::{
     CpuGgufTextGenerationService, CpuModelEmbeddingsService, CudaGgufGptOssTextGenerationService,
-    CudaGptOssTextGenerationError, DecodeStrategy, DecoderModelDescriptor, EmbeddingMetrics,
-    EmbeddingNormalization, EmbeddingProvenance, EmbeddingRequest, EmbeddingResponse,
-    EmbeddingsExecutor, GenerationMetrics, GenerationOptions, GenerationRequest,
-    GgufDecoderAdapterLoader, GptOssPerformanceMetrics, MetalGgufGptOssTextGenerationService,
-    MetalGptOssTextGenerationError, ModelEmbeddingsError, PromptRenderError,
-    ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor, TokenSequence,
-    continuous_batch_text_generation_execution_profile, default_embeddings_execution_profile,
-    default_generation_scheduler_policy, default_text_generation_execution_profile,
-    tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
+    CudaGgufQwen35TextGenerationService, CudaGptOssTextGenerationError, DecodeStrategy,
+    DecoderModelDescriptor, EmbeddingMetrics, EmbeddingNormalization, EmbeddingProvenance,
+    EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor, GenerationMetrics,
+    GenerationOptions, GenerationRequest, GgufDecoderAdapterLoader, GptOssPerformanceMetrics,
+    MetalGgufGptOssTextGenerationService, MetalGptOssTextGenerationError, ModelEmbeddingsError,
+    PromptRenderError, ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor,
+    TokenSequence, continuous_batch_text_generation_execution_profile,
+    default_embeddings_execution_profile, default_generation_scheduler_policy,
+    default_text_generation_execution_profile, tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
 mod tassadar_post_article_router_plugin_tool_loop_pilot;
@@ -128,6 +128,20 @@ impl LocalServingTruth {
             memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
         }
     }
+
+    const fn cuda_native() -> Self {
+        Self {
+            residency_mode: "cuda_accelerated",
+            hybrid_offload: "unsupported",
+            hybrid_offload_layers: None,
+            fallback_policy: "refuse",
+            performance_class: "nvidia_native",
+            load_status: LOCAL_SERVER_LOAD_STATUS,
+            warm_control: LOCAL_SERVER_WARM_CONTROL,
+            unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
+            memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -154,6 +168,15 @@ impl OpenAiCompatServingTruth {
             execution_mode_label: "proxy",
             execution_engine_label: "llama.cpp",
             local_serving_truth: LocalServingTruth::cpu_proxy(),
+        }
+    }
+
+    const fn cuda_native() -> Self {
+        Self {
+            backend_label: "cuda",
+            execution_mode_label: "native",
+            execution_engine_label: "psionic",
+            local_serving_truth: LocalServingTruth::cuda_native(),
         }
     }
 }
@@ -754,6 +777,7 @@ impl GptOssCudaOpenAiCompatServer {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OpenAiCompatBackend {
     Cpu,
+    Cuda,
 }
 
 #[derive(Clone, Debug)]
@@ -812,7 +836,8 @@ struct OpenAiCompatState {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OpenAiCompatRuntimeKind {
-    GgufDecoder,
+    GgufDecoderCpu,
+    GgufDecoderCudaQwen35,
     SafetensorsEmbeddings,
 }
 
@@ -929,7 +954,7 @@ impl OpenAiCompatLoadedModel {
         match self.decoder() {
             Some(model) if matches!(model.family, GgufDecoderFamily::Qwen35) => {
                 unsupported_structured_output_capabilities(
-                    "structured outputs are unavailable on the qwen35 llama.cpp text-only proxy runtime",
+                    qwen35_structured_output_unavailable_detail(self.execution_engine_label()),
                 )
             }
             Some(_) => local_structured_output_capabilities(),
@@ -1008,6 +1033,21 @@ impl OpenAiCompatLoadedModel {
     }
 }
 
+fn qwen35_structured_output_unavailable_detail(
+    execution_engine_label: &str,
+) -> &'static str {
+    if execution_engine_label == "psionic" {
+        "structured outputs are unavailable on the native qwen35 text-only runtime"
+    } else {
+        "structured outputs are unavailable on the qwen35 llama.cpp text-only proxy runtime"
+    }
+}
+
+enum OpenAiCompatGenerationService {
+    Cpu(CpuGgufTextGenerationService),
+    Qwen35Cuda(CudaGgufQwen35TextGenerationService),
+}
+
 #[derive(Clone)]
 struct OpenAiCompatWorker {
     sender: mpsc::UnboundedSender<OpenAiCompatWorkerCommand>,
@@ -1043,11 +1083,6 @@ impl OpenAiCompatServer {
                 "generic OpenAI server requires at least one `--model` path",
             )));
         }
-        if !matches!(config.backend, OpenAiCompatBackend::Cpu) {
-            return Err(OpenAiCompatServerError::Config(String::from(
-                "generic OpenAI server currently supports only the cpu backend",
-            )));
-        }
 
         let include_psionic_fields = env::var("PSIONIC_OPENAI_INCLUDE_DEBUG_FIELDS")
             .ok()
@@ -1060,8 +1095,15 @@ impl OpenAiCompatServer {
         let mut load_plans = Vec::new();
 
         for model_path in &config.model_paths {
-            let decoder_attempt = load_generic_decoder_model(model_path, config.reasoning_budget);
-            let embeddings_attempt = load_generic_embeddings_model(model_path);
+            let decoder_attempt =
+                load_generic_decoder_model(model_path, config.reasoning_budget, config.backend);
+            let embeddings_attempt = if matches!(config.backend, OpenAiCompatBackend::Cpu) {
+                load_generic_embeddings_model(model_path)
+            } else {
+                Err(String::from(
+                    "generic OpenAI cuda backend does not support embeddings artifacts",
+                ))
+            };
             let (loaded_model, accepted_names, load_plan) = match (
                 decoder_attempt,
                 embeddings_attempt,
@@ -1175,18 +1217,37 @@ impl OpenAiCompatWorker {
         let (sender, mut receiver) = mpsc::unbounded_channel();
         let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
         std::thread::Builder::new()
-            .name(String::from("psionic-openai-cpu-worker"))
+            .name(String::from("psionic-openai-worker"))
             .spawn(move || {
                 let mut generation_services = BTreeMap::new();
                 let mut embeddings_services = BTreeMap::new();
                 for load_plan in &load_plans {
                     match load_plan.runtime_kind {
-                        OpenAiCompatRuntimeKind::GgufDecoder => {
+                        OpenAiCompatRuntimeKind::GgufDecoderCpu => {
                             match CpuGgufTextGenerationService::from_gguf_path(&load_plan.path) {
                                 Ok(service) => {
                                     let model_key =
                                         service.model_descriptor().model.model_id.clone();
-                                    generation_services.insert(model_key, service);
+                                    generation_services
+                                        .insert(model_key, OpenAiCompatGenerationService::Cpu(service));
+                                }
+                                Err(error) => {
+                                    let _ = ready_tx.send(Err::<(), String>(error.to_string()));
+                                    return;
+                                }
+                            }
+                        }
+                        OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35 => {
+                            match CudaGgufQwen35TextGenerationService::from_gguf_path(
+                                &load_plan.path,
+                            ) {
+                                Ok(service) => {
+                                    let model_key =
+                                        service.model_descriptor().model.model_id.clone();
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Qwen35Cuda(service),
+                                    );
                                 }
                                 Err(error) => {
                                     let _ = ready_tx.send(Err::<(), String>(error.to_string()));
@@ -1291,7 +1352,14 @@ impl OpenAiCompatWorker {
                         .iter()
                         .map(|(request, _)| request.clone())
                         .collect::<Vec<_>>();
-                    let results = service.generate_continuous_batch(requests);
+                    let results = match service {
+                        OpenAiCompatGenerationService::Cpu(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
+                        OpenAiCompatGenerationService::Qwen35Cuda(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
+                    };
                     for ((_, reply), result) in selected.into_iter().zip(results.responses) {
                         let _ = reply.send(result);
                     }
@@ -4560,6 +4628,7 @@ fn prompt_options_for_family(
 fn load_generic_decoder_model(
     model_path: &Path,
     reasoning_budget: u8,
+    backend: OpenAiCompatBackend,
 ) -> Result<
     (
         OpenAiCompatLoadedModel,
@@ -4575,11 +4644,24 @@ fn load_generic_decoder_model(
         .map_err(|error| error.to_string())?;
     let descriptor = adapter.descriptor().clone();
     let family = adapter.family_metadata().family;
+    let runtime_kind = match (backend, family) {
+        (OpenAiCompatBackend::Cpu, _) => OpenAiCompatRuntimeKind::GgufDecoderCpu,
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35) => {
+            OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35
+        }
+        (OpenAiCompatBackend::Cuda, _) => {
+            return Err(format!(
+                "generic OpenAI cuda backend currently supports only qwen35 GGUF decoders; `{}` resolved to `{}`",
+                model_path.display(),
+                decoder_family_label(family),
+            ));
+        }
+    };
     let loaded_model = OpenAiCompatLoadedModel {
         model_key: descriptor.model.model_id.clone(),
         canonical_name: default_model_name(model_path, descriptor.model.model_id.as_str()),
         supported_endpoints: vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses],
-        serving_truth: generic_decoder_serving_truth(family),
+        serving_truth: generic_decoder_serving_truth(family, backend),
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
             family,
@@ -4589,8 +4671,8 @@ fn load_generic_decoder_model(
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
                 .then(|| adapter.prompt_renderer()),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
-            execution_profile: generic_decoder_execution_profile(family),
-            scheduler_policy: generic_decoder_scheduler_policy(family),
+            execution_profile: generic_decoder_execution_profile(family, backend),
+            scheduler_policy: generic_decoder_scheduler_policy(family, backend),
         }),
     };
     Ok((
@@ -4598,7 +4680,7 @@ fn load_generic_decoder_model(
         accepted_model_names(model_path, descriptor.model.model_id.as_str()),
         OpenAiCompatModelLoadPlan {
             path: model_path.to_path_buf(),
-            runtime_kind: OpenAiCompatRuntimeKind::GgufDecoder,
+            runtime_kind,
         },
     ))
 }
@@ -4636,15 +4718,23 @@ fn load_generic_embeddings_model(
     ))
 }
 
-fn generic_decoder_serving_truth(family: GgufDecoderFamily) -> OpenAiCompatServingTruth {
-    if matches!(family, GgufDecoderFamily::Qwen35) {
+fn generic_decoder_serving_truth(
+    family: GgufDecoderFamily,
+    backend: OpenAiCompatBackend,
+) -> OpenAiCompatServingTruth {
+    if matches!((backend, family), (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)) {
+        OpenAiCompatServingTruth::cuda_native()
+    } else if matches!(family, GgufDecoderFamily::Qwen35) {
         OpenAiCompatServingTruth::cpu_llama_cpp_proxy()
     } else {
         OpenAiCompatServingTruth::cpu_native()
     }
 }
 
-fn generic_decoder_execution_profile(family: GgufDecoderFamily) -> ExecutionCapabilityProfile {
+fn generic_decoder_execution_profile(
+    family: GgufDecoderFamily,
+    _backend: OpenAiCompatBackend,
+) -> ExecutionCapabilityProfile {
     if matches!(family, GgufDecoderFamily::Qwen35) {
         default_text_generation_execution_profile()
     } else {
@@ -4654,8 +4744,10 @@ fn generic_decoder_execution_profile(family: GgufDecoderFamily) -> ExecutionCapa
 
 fn generic_decoder_scheduler_policy(
     family: GgufDecoderFamily,
+    backend: OpenAiCompatBackend,
 ) -> Option<GenerationSchedulerPolicy> {
-    (!matches!(family, GgufDecoderFamily::Qwen35)).then(default_generation_scheduler_policy)
+    (matches!(backend, OpenAiCompatBackend::Cpu) && !matches!(family, GgufDecoderFamily::Qwen35))
+        .then(default_generation_scheduler_policy)
 }
 
 fn render_prompt_for_model(

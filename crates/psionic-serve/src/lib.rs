@@ -25,6 +25,7 @@ mod psion_capability_matrix;
 mod psion_capability_withdrawal;
 mod psion_served_evidence;
 mod psion_served_output_claim_posture;
+mod qwen35;
 mod tassadar;
 mod tassadar_article_cross_machine_reproducibility_publication;
 mod tassadar_article_route_minimality_publication_verdict;
@@ -65,6 +66,7 @@ pub use psion_capability_matrix::*;
 pub use psion_capability_withdrawal::*;
 pub use psion_served_evidence::*;
 pub use psion_served_output_claim_posture::*;
+pub use qwen35::*;
 pub use psionic_adapters::*;
 use psionic_backend_cpu::CpuBackend;
 use psionic_backend_cuda::{

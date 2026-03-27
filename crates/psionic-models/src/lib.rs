@@ -5032,33 +5032,12 @@ fn build_gguf_decoder_descriptor(
         metadata,
         format!("{architecture}.attention.head_count").as_str(),
     )?;
+    let head_dim = decoder_head_dim(family_metadata, hidden_size, head_count)?;
     let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
     let kv_head_count = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
-        let per_layer = read_optional_gguf_usize_array(metadata, kv_head_count_key.as_str())?;
-        per_layer
-            .iter()
-            .copied()
-            .find(|value| *value > 0)
-            .or_else(|| {
-                read_optional_gguf_usize(metadata, kv_head_count_key.as_str())
-                    .ok()
-                    .flatten()
-            })
-            .unwrap_or(head_count)
+        qwen35_kv_head_count(content, metadata, architecture, head_count, head_dim)?
     } else {
         read_optional_gguf_usize(metadata, kv_head_count_key.as_str())?.unwrap_or(head_count)
-    };
-    let head_dim = if let Some(key_length) = family_metadata.attention_key_length {
-        key_length
-    } else if head_count == 0 || hidden_size % head_count != 0 {
-        return Err(ModelLoadError::InvalidGgufMetadata {
-            key: format!("{architecture}.attention.head_count"),
-            message: format!(
-                "hidden size {hidden_size} is not divisible by attention head count {head_count}"
-            ),
-        });
-    } else {
-        hidden_size / head_count
     };
     let value_length = family_metadata.attention_value_length.unwrap_or(head_dim);
     if value_length != head_dim {
@@ -5227,15 +5206,21 @@ fn build_gguf_decoder_tensor_layout(
                 .attention
                 .head_count
                 .saturating_mul(config.block.attention.head_dim);
-            let kv_width = config.kv_width();
             let ssm_inner_size = qwen35_ssm_inner_size.expect("qwen35 ssm inner size");
             let ssm_group_count = qwen35_ssm_group_count.expect("qwen35 ssm group count");
             let ssm_state_size = qwen35_ssm_state_size.expect("qwen35 ssm state size");
             let ssm_conv_kernel = qwen35_ssm_conv_kernel.expect("qwen35 ssm conv kernel");
+            let ssm_time_step_rank = read_required_gguf_usize(
+                metadata,
+                format!("{architecture}.ssm.time_step_rank").as_str(),
+            )?;
             if let Some(qkv_weight) = content.tensor_info(&format!("{prefix}.attn_qkv.weight")) {
                 let (qkv_rows, qkv_columns) = tensor_matrix_shape(qkv_weight)?;
-                let expected_qkv_rows =
-                    query_width.saturating_add(ssm_inner_size.saturating_mul(2));
+                let expected_qkv_rows = ssm_inner_size.saturating_add(
+                    ssm_group_count
+                        .saturating_mul(ssm_state_size)
+                        .saturating_mul(2),
+                );
                 if qkv_rows != expected_qkv_rows || qkv_columns != config.hidden_size {
                     return Err(artifact_format_error(
                         "gguf",
@@ -5299,11 +5284,11 @@ fn build_gguf_decoder_tensor_layout(
 
                 let ssm_beta = required_tensor_info(content, &format!("{prefix}.ssm_beta.weight"))?;
                 let (ssm_beta_rows, ssm_beta_columns) = tensor_matrix_shape(ssm_beta)?;
-                if ssm_beta_rows != ssm_group_count || ssm_beta_columns != config.hidden_size {
+                if ssm_beta_rows != ssm_time_step_rank || ssm_beta_columns != config.hidden_size {
                     return Err(artifact_format_error(
                         "gguf",
                         format!(
-                            "{} shape [{ssm_beta_rows}, {ssm_beta_columns}] does not match expected [{ssm_group_count}, {}]",
+                            "{} shape [{ssm_beta_rows}, {ssm_beta_columns}] does not match expected [{ssm_time_step_rank}, {}]",
                             ssm_beta.name, config.hidden_size
                         ),
                     ));
@@ -5422,17 +5407,23 @@ fn build_gguf_decoder_tensor_layout(
 
             let query_weight = required_tensor_info(content, &format!("{prefix}.attn_q.weight"))?;
             let (query_rows, query_columns) = tensor_matrix_shape(query_weight)?;
-            if query_rows != query_width || query_columns != config.hidden_size {
+            let expected_query_rows = query_width.saturating_mul(2);
+            if query_rows != expected_query_rows || query_columns != config.hidden_size {
                 return Err(artifact_format_error(
                     "gguf",
                     format!(
-                        "{} shape [{query_rows}, {query_columns}] does not match expected [{query_width}, {}]",
+                        "{} shape [{query_rows}, {query_columns}] does not match expected [{expected_query_rows}, {}]",
                         query_weight.name, config.hidden_size
                     ),
                 ));
             }
             let key_weight = required_tensor_info(content, &format!("{prefix}.attn_k.weight"))?;
             let (key_rows, key_columns) = tensor_matrix_shape(key_weight)?;
+            let kv_width = qwen35_full_attention_kv_width(
+                key_rows,
+                config.block.attention.head_dim,
+                key_weight.name.as_str(),
+            )?;
             if key_rows != kv_width || key_columns != config.hidden_size {
                 return Err(artifact_format_error(
                     "gguf",
@@ -7307,6 +7298,69 @@ fn read_optional_gguf_string_array(
     )
 }
 
+fn decoder_head_dim(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    hidden_size: usize,
+    head_count: usize,
+) -> Result<usize, ModelLoadError> {
+    if let Some(key_length) = family_metadata.attention_key_length {
+        return Ok(key_length);
+    }
+    if head_count == 0 || hidden_size % head_count != 0 {
+        return Err(ModelLoadError::InvalidGgufMetadata {
+            key: format!("{}.attention.head_count", family_metadata.architecture),
+            message: format!(
+                "hidden size {hidden_size} is not divisible by attention head count {head_count}"
+            ),
+        });
+    }
+    Ok(hidden_size / head_count)
+}
+
+fn qwen35_kv_head_count(
+    content: &GgufContent,
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+    architecture: &str,
+    head_count: usize,
+    head_dim: usize,
+) -> Result<usize, ModelLoadError> {
+    let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
+    let per_layer = read_optional_gguf_usize_array(metadata, kv_head_count_key.as_str())?;
+    if let Some(kv_head_count) = per_layer.iter().copied().find(|value| *value > 0) {
+        return Ok(kv_head_count);
+    }
+    if let Some(kv_head_count) = read_optional_gguf_usize(metadata, kv_head_count_key.as_str())? {
+        if kv_head_count > 0 {
+            return Ok(kv_head_count);
+        }
+    }
+    for layer_index in 0..read_required_gguf_usize(metadata, format!("{architecture}.block_count").as_str())? {
+        let tensor_name = format!("blk.{layer_index}.attn_k.weight");
+        if let Some(key_weight) = content.tensor_info(&tensor_name) {
+            let (key_rows, _) = tensor_matrix_shape(key_weight)?;
+            return qwen35_full_attention_kv_width(key_rows, head_dim, tensor_name.as_str())
+                .map(|kv_width| kv_width / head_dim);
+        }
+    }
+    Ok(head_count)
+}
+
+fn qwen35_full_attention_kv_width(
+    key_rows: usize,
+    head_dim: usize,
+    tensor_name: &str,
+) -> Result<usize, ModelLoadError> {
+    if head_dim == 0 || key_rows % head_dim != 0 {
+        return Err(artifact_format_error(
+            "gguf",
+            format!(
+                "{tensor_name} row count {key_rows} is not divisible by qwen35 head dim {head_dim}"
+            ),
+        ));
+    }
+    Ok(key_rows)
+}
+
 fn collect_decoder_family_facts(
     metadata: &BTreeMap<String, GgufMetadataValue>,
     family: &GgufDecoderFamily,
@@ -7316,11 +7370,16 @@ fn collect_decoder_family_facts(
         GgufDecoderFamily::Qwen35 => vec![
             format!("{architecture}.attention.head_count_kv"),
             format!("{architecture}.full_attention_interval"),
+            format!("{architecture}.mrope_sections"),
+            format!("{architecture}.rope.dimension_sections"),
+            format!("{architecture}.rope.mrope_interleaved"),
+            format!("{architecture}.rope.mrope_section"),
             format!("{architecture}.ssm.conv_kernel"),
             format!("{architecture}.ssm.group_count"),
             format!("{architecture}.ssm.inner_size"),
             format!("{architecture}.ssm.state_size"),
             format!("{architecture}.ssm.time_step_rank"),
+            format!("{architecture}.ssm.v_head_reordered"),
             format!("{architecture}.vision.block_count"),
             format!("{architecture}.vision.embedding_length"),
             format!("{architecture}.vision_start_token_id"),
@@ -10720,6 +10779,34 @@ mod tests {
                 GgufMetadataValue::F32(10_000_000.0),
             ),
             (
+                String::from("qwen35.mrope_sections"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(2),
+                ]),
+            ),
+            (
+                String::from("qwen35.rope.dimension_sections"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(2),
+                ]),
+            ),
+            (
+                String::from("qwen35.rope.mrope_section"),
+                GgufMetadataValue::Array(vec![
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(1),
+                    GgufMetadataValue::U32(2),
+                ]),
+            ),
+            (
+                String::from("qwen35.rope.mrope_interleaved"),
+                GgufMetadataValue::Bool(true),
+            ),
+            (
                 String::from("qwen35.full_attention_interval"),
                 GgufMetadataValue::U32(4),
             ),
@@ -10742,6 +10829,10 @@ mod tests {
             (
                 String::from("qwen35.ssm.time_step_rank"),
                 GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("qwen35.ssm.v_head_reordered"),
+                GgufMetadataValue::Bool(true),
             ),
             (
                 String::from("qwen35.vision.block_count"),
@@ -11321,7 +11412,7 @@ mod tests {
             } else {
                 tensors.push(dense_f32_tensor(
                     &format!("{prefix}.attn_q.weight"),
-                    vec![8, 8],
+                    vec![16, 8],
                 ));
                 tensors.push(dense_f32_tensor(
                     &format!("{prefix}.attn_k.weight"),

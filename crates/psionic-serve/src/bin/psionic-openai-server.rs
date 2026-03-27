@@ -90,13 +90,16 @@ where
             }
             "--backend" => {
                 let value = next_value(&mut args, argument.as_str())?;
-                if value != "cpu" {
-                    return Err(format!(
-                        "invalid --backend value `{value}` (expected cpu)\n\n{}",
-                        usage()
-                    ));
-                }
-                backend = OpenAiCompatBackend::Cpu;
+                backend = match value.as_str() {
+                    "cpu" => OpenAiCompatBackend::Cpu,
+                    "cuda" => OpenAiCompatBackend::Cuda,
+                    _ => {
+                        return Err(format!(
+                            "invalid --backend value `{value}` (expected cpu or cuda)\n\n{}",
+                            usage()
+                        ));
+                    }
+                };
             }
             "--reasoning-budget" => {
                 reasoning_budget = next_value(&mut args, argument.as_str())?
@@ -133,13 +136,14 @@ fn next_value(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<Str
 
 fn usage() -> String {
     String::from(
-        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu] [--host <ip>] [--port <port>] [--reasoning-budget <n>]",
+        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda] [--host <ip>] [--port <port>] [--reasoning-budget <n>]",
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::parse_args_from;
+    use psionic_serve::OpenAiCompatBackend;
 
     #[test]
     fn parse_args_accepts_multiple_models() {
@@ -152,10 +156,18 @@ mod tests {
     }
 
     #[test]
-    fn parse_args_rejects_non_cpu_backend() {
-        let error = parse_args_from(["-m", "/tmp/model.gguf", "--backend", "cuda"])
-            .expect_err("generic server should reject non-cpu backend");
+    fn parse_args_accepts_cuda_backend() {
+        let config = parse_args_from(["-m", "/tmp/model.gguf", "--backend", "cuda"])
+            .expect("cuda backend should parse");
 
-        assert!(error.contains("expected cpu"));
+        assert!(matches!(config.backend, OpenAiCompatBackend::Cuda));
+    }
+
+    #[test]
+    fn parse_args_rejects_unknown_backend() {
+        let error = parse_args_from(["-m", "/tmp/model.gguf", "--backend", "metal"])
+            .expect_err("generic server should reject unknown backend");
+
+        assert!(error.contains("expected cpu or cuda"));
     }
 }
