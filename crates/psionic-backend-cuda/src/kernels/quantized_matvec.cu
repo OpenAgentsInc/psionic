@@ -1033,6 +1033,25 @@ __global__ void sigmoid_mul_f32_kernel(
     }
 }
 
+__global__ void split_interleaved_query_gate_f32_kernel(
+    const float *input,
+    int head_count,
+    int head_dim,
+    float *query_output,
+    float *gate_output
+) {
+    const int index = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const int element_count = head_count * head_dim;
+    if (index >= element_count) {
+        return;
+    }
+    const int head_index = index / head_dim;
+    const int dim_index = index % head_dim;
+    const int source_base = head_index * head_dim * 2;
+    query_output[index] = input[source_base + dim_index];
+    gate_output[index] = input[source_base + head_dim + dim_index];
+}
+
 __global__ void depthwise_causal_conv1d_step_f32_kernel(
     const float *input,
     float *state,
@@ -5993,6 +6012,26 @@ extern "C" int psionic_cuda_sigmoid_mul_f32(
         gate_offset,
         element_count,
         static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_split_interleaved_query_gate_f32(
+    const void *input,
+    int head_count,
+    int head_dim,
+    void *query_output,
+    void *gate_output,
+    void *stream
+) {
+    const int element_count = head_count * head_dim;
+    const int blocks = (element_count + kBlockSize - 1) / kBlockSize;
+    split_interleaved_query_gate_f32_kernel<<<blocks, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const float *>(input),
+        head_count,
+        head_dim,
+        static_cast<float *>(query_output),
+        static_cast<float *>(gate_output)
     );
     return static_cast<int>(cudaGetLastError());
 }

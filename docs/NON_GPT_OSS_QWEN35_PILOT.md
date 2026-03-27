@@ -104,7 +104,6 @@ The pilot is green only if all of the following remain true:
 
 The pilot is intentionally bounded:
 
-- it is not throughput-closed against Ollama or llama.cpp-class runtimes
 - it is still an early native Psionic CUDA execution slice
 - it does not claim native multimodal inference
 - it does not claim a native image or video encoder
@@ -117,23 +116,22 @@ The pilot is intentionally bounded:
 Measured on this host on March 26, 2026 with the downloaded
 `qwen3.5:0.8b-q8_0.gguf`, the same one-sentence prompt, and a `128` token cap:
 
-- Psionic native CUDA qwen35 decode throughput: about `268.19 tok/s`
-- local Ollama `qwen3.5:0.8b` decode throughput: about `327.57 tok/s`
+- Psionic native CUDA qwen35 decode throughput: about `365.15 tok/s`
+- local Ollama `qwen3.5:0.8b` decode throughput: about `317.99 tok/s`
 
-This pilot therefore proves native CUDA execution correctness and honest
-publication. It does not prove competitive throughput yet.
+This pilot therefore proves native CUDA execution correctness, honest
+publication, and a first throughput win over the local Ollama baseline on this
+host.
 
 ## Current Bottlenecks
 
-The remaining performance gap is inside Psionic's native qwen35 runtime:
+The remaining optimization headroom is inside Psionic's native qwen35 runtime:
 
-- the hybrid SSM lane still round-trips `alpha` and `beta` scalar updates
-  through the host
-- full-attention decode still uses host-owned KV history and host-side softmax
 - the final RMSNorm and output projection still read hidden state back to host
-- the runtime still executes one synchronized CUDA submission per projection
-  instead of a deeper device-resident decode plan
+- the runtime still executes more synchronized CUDA submissions than it should
 - the lane still refuses KV-session reuse, prefix caching, and adapter serving
+- the lane has not yet proven a wider batch, longer context, or concurrent
+  throughput lead over Ollama-class runtimes
 
 ## Claim Rule
 
@@ -148,4 +146,4 @@ It is not sufficient to claim:
 - video understanding
 - tool-loop support
 - structured-output support
-- throughput parity with Ollama
+- broad throughput leadership across prompts, lengths, or concurrency

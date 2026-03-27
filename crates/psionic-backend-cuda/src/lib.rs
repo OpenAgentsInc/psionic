@@ -1748,6 +1748,27 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Splits qwen35-style per-head query/gate interleaving into two
+    /// contiguous output vectors.
+    pub fn split_interleaved_query_gate_f32(
+        &mut self,
+        input: &CudaBuffer,
+        head_count: usize,
+        head_dim: usize,
+        query_output: &CudaBuffer,
+        gate_output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_split_interleaved_query_gate_f32(
+            &input.platform,
+            head_count,
+            head_dim,
+            &query_output.platform,
+            &gate_output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Executes one qwen35-style depthwise causal conv1d decode step.
     pub fn depthwise_causal_conv1d_step_f32(
         &mut self,
@@ -8826,6 +8847,14 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_split_interleaved_query_gate_f32(
+            input: *const c_void,
+            head_count: c_int,
+            head_dim: c_int,
+            query_output: *mut c_void,
+            gate_output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_depthwise_causal_conv1d_step_f32(
             input: *const c_void,
             state: *mut c_void,
@@ -11225,19 +11254,13 @@ mod platform {
             output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             let values_offset = c_int::try_from(values_offset).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda sigmoid_mul values offset exceeds c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda sigmoid_mul values offset exceeds c_int"))
             })?;
             let gate_offset = c_int::try_from(gate_offset).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda sigmoid_mul gate offset exceeds c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda sigmoid_mul gate offset exceeds c_int"))
             })?;
             let element_count = c_int::try_from(element_count).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda sigmoid_mul element count exceeds c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda sigmoid_mul element count exceeds c_int"))
             })?;
             self.runtime.set_device()?;
             self.runtime.check(
@@ -11256,6 +11279,40 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_split_interleaved_query_gate_f32(
+            &mut self,
+            input: &PlatformBuffer,
+            head_count: usize,
+            head_dim: usize,
+            query_output: &PlatformBuffer,
+            gate_output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 query/gate split head count exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda qwen35 query/gate split head dim exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_split_interleaved_query_gate_f32(
+                        input.inner.device_ptr.cast(),
+                        head_count,
+                        head_dim,
+                        query_output.inner.device_ptr.cast(),
+                        gate_output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_split_interleaved_query_gate_f32",
+            )
+        }
+
         pub(super) fn encode_depthwise_causal_conv1d_step_f32(
             &mut self,
             input: &PlatformBuffer,
@@ -11266,9 +11323,7 @@ mod platform {
             output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             let channels = c_int::try_from(channels).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda depthwise conv channels exceed c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda depthwise conv channels exceed c_int"))
             })?;
             let kernel_size = c_int::try_from(kernel_size).map_err(|_| {
                 RuntimeError::Backend(String::from(
@@ -11309,17 +11364,13 @@ mod platform {
             output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             let query_offset = c_int::try_from(query_offset).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda gated_delta query offset exceeds c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda gated_delta query offset exceeds c_int"))
             })?;
             let key_offset = c_int::try_from(key_offset).map_err(|_| {
                 RuntimeError::Backend(String::from("cuda gated_delta key offset exceeds c_int"))
             })?;
             let value_offset = c_int::try_from(value_offset).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "cuda gated_delta value offset exceeds c_int",
-                ))
+                RuntimeError::Backend(String::from("cuda gated_delta value offset exceeds c_int"))
             })?;
             let key_head_count = c_int::try_from(key_head_count).map_err(|_| {
                 RuntimeError::Backend(String::from(
@@ -14497,6 +14548,19 @@ mod platform {
             _gate_offset: usize,
             _element_count: usize,
             _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_split_interleaved_query_gate_f32(
+            &mut self,
+            _input: &PlatformBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _query_output: &PlatformBuffer,
+            _gate_output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda quantized text-generation kernels require Linux CUDA support",

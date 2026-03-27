@@ -44,14 +44,16 @@ than just run tensor math.
   calling.
 - The first `qwen35` lane must still fail closed for system-message image and
   video parts to stay aligned with the real template semantics.
-- The current `qwen35` CUDA lane is functional but not throughput-closed. On
-  March 26, 2026, the local `qwen3.5:0.8b` benchmark on this host measured
-  about `268 tok/s` decode on Psionic versus about `328 tok/s` decode on local
-  Ollama for the same one-sentence prompt and `128` token cap.
-- The remaining qwen35 gap is not admission or prompt rendering. The remaining
-  gap is the native runtime itself: full-attention cache handling, final
-  output projection, and part of the recurrent scalar update path are still
-  partially host-driven.
+- On March 26, 2026, after fixing the qwen35 full-attention gate scratch path
+  and keeping the gated-attention vector device-resident, the local
+  `qwen3.5:0.8b` benchmark on this host measured about `365 tok/s` decode on
+  Psionic versus about `318 tok/s` decode on local Ollama for the same
+  one-sentence prompt and `128` token cap.
+- The qwen35 lane is now throughput-competitive on this host, but it is not
+  architecture-closed yet. The remaining optimization headroom is inside the
+  native runtime itself: the final output projection still falls back to host
+  logits selection, and the decode plan still uses more synchronized
+  submissions than it should.
 
 ## Embeddings Requirements
 

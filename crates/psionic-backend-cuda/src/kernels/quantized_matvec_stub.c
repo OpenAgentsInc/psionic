@@ -118,6 +118,23 @@ int psionic_cuda_q8_0_matvec_q8_1_argmax(
     return 1;
 }
 
+int psionic_cuda_split_interleaved_query_gate_f32(
+    const void *input,
+    int head_count,
+    int head_dim,
+    void *query_output,
+    void *gate_output,
+    void *stream
+) {
+    (void)input;
+    (void)head_count;
+    (void)head_dim;
+    (void)query_output;
+    (void)gate_output;
+    (void)stream;
+    return 1;
+}
+
 int psionic_cuda_mxfp4_matvec_q8_1_argmax(
     const void *weights,
     int rows,
