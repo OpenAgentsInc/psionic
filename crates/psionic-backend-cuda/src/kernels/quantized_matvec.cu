@@ -5765,15 +5765,21 @@ extern "C" int psionic_cuda_q8_0_matvec_q8_1(
     void *output,
     void *stream
 ) {
-    launch_quantized_matvec_q8_1_regular(
-        static_cast<const uint8_t *>(weights),
+    const int block_count = cols / kQ81ElementsPerBlock;
+    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);
+    quantized_matvec_q8_1_mmvq_kernel<Q80Q81Dot, kQ80Q81MmvqVdr, kQ80Qi><<<
         rows,
-        cols,
+        block_dims,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const uint8_t *>(weights),
         row_stride,
+        rows,
+        block_count,
         static_cast<const Q81Block *>(input_q8_1),
         static_cast<const float *>(bias),
         static_cast<float *>(output),
-        static_cast<cudaStream_t>(stream),
         Q80Q81Dot{}
     );
     return static_cast<int>(cudaGetLastError());
