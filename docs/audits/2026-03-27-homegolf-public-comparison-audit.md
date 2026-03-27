@@ -46,31 +46,31 @@ The HOMEGOLF side comes from:
 
 The current retained HOMEGOLF values are:
 
-- `final_validation_bits_per_byte=9.93265382277841`
-- `homegolf_scored_artifact_bytes=68248296`
+- `final_validation_bits_per_byte=6.306931747817168`
+- `homegolf_scored_artifact_bytes=4732744`
 - `homegolf_wallclock_cap_seconds=600`
-- `homegolf_observed_cluster_wallclock_ms=61228`
+- `homegolf_observed_cluster_wallclock_ms=3611`
 
 ## Retained Deltas
 
 Against the public naive baseline:
 
-- `delta_val_bpb=8.70828812277841`
-- `delta_artifact_bytes=52384807`
+- `delta_val_bpb=5.082566047817168`
+- `delta_artifact_bytes=-11130745`
 - `delta_wallclock_cap_seconds=0`
 
 Against the current public leaderboard best:
 
-- `delta_val_bpb=8.81325382277841`
-- `delta_artifact_bytes=52258290`
+- `delta_val_bpb=5.187531747817168`
+- `delta_artifact_bytes=-11257262`
 - `delta_wallclock_cap_seconds=0`
 
 ## What This Proves
 
 The repo can now truthfully say:
 
-- HOMEGOLF emits one explicit comparison artifact beside the retained clustered
-  score surface
+- HOMEGOLF emits one explicit comparison artifact beside the retained live dense
+  mixed-device score surface
 - the comparison artifact records exact deltas against the public naive
   baseline and the current public best leaderboard row
 - the allowed comparison language is now frozen inside one machine-readable
@@ -83,14 +83,10 @@ The repo can now truthfully say:
 This report still does **not** prove:
 
 - public leaderboard equivalence for HOMEGOLF
-- full contest-style counted-artifact parity on the HOMEGOLF side
 - that the HOMEGOLF result is already a valid public submission candidate
 
-The current HOMEGOLF bytes in this comparison are the retained scored bundle
-bytes from the clustered surface, not yet the later full counted-artifact
-receipt that includes the HOMEGOLF-specific export/accounting posture.
-
-That remaining accounting closure belongs to the next HOMEGOLF issue.
+The quality gap is still very large even though the byte posture is now much
+better.
 
 ## Verification
 

@@ -7,10 +7,10 @@
     "public_baseline_comparable",
     "not_public_leaderboard_equivalent"
   ],
-  "homegolf_final_validation_bits_per_byte": 9.93265382277841,
-  "homegolf_scored_artifact_bytes": 68248296,
+  "homegolf_final_validation_bits_per_byte": 6.306931747817168,
+  "homegolf_scored_artifact_bytes": 4732744,
   "homegolf_wallclock_cap_seconds": 600,
-  "homegolf_observed_cluster_wallclock_ms": 61228,
+  "homegolf_observed_cluster_wallclock_ms": 3611,
   "public_naive_baseline": {
     "label": "public_naive_baseline",
     "val_bpb": 1.2243657,
@@ -28,16 +28,16 @@
     "source_ref": "competition/repos/parameter-golf/records/track_10min_16mb/2026-03-23_LeakyReLU_LegalTTT_ParallelMuon/{submission.json,README.md}"
   },
   "delta_vs_public_naive_baseline": {
-    "delta_val_bpb": 8.70828812277841,
-    "delta_artifact_bytes": 52384807,
+    "delta_val_bpb": 5.082566047817168,
+    "delta_artifact_bytes": -11130745,
     "delta_wallclock_cap_seconds": 0
   },
   "delta_vs_current_public_leaderboard_best": {
-    "delta_val_bpb": 8.813253822778409,
-    "delta_artifact_bytes": 52258290,
+    "delta_val_bpb": 5.187531747817168,
+    "delta_artifact_bytes": -11257262,
     "delta_wallclock_cap_seconds": 0
   },
-  "claim_boundary": "This report makes HOMEGOLF publicly comparable, not public-leaderboard equivalent. The public reference values are frozen from the current Parameter Golf repo snapshot reviewed on 2026-03-27, while the HOMEGOLF side still uses the current clustered composed surface whose scored bytes are the exact-family bundle bytes rather than a later full contest-style counted-artifact receipt. That later accounting surface remains separate work.",
-  "summary": "HOMEGOLF now emits one deterministic comparison report against the public naive baseline and the current public best leaderboard row. It keeps exact deltas in val_bpb, scored artifact bytes, and wallclock-cap posture while explicitly refusing leaderboard-equivalent language for the mixed-home-cluster track.",
-  "report_digest": "fc473bdabb5dae2624d262d22a9732a9e49b6721e71fc255087f43a15a599838"
+  "claim_boundary": "This report makes HOMEGOLF publicly comparable, not public-leaderboard equivalent. The public reference values are frozen from the current Parameter Golf repo snapshot reviewed on 2026-03-27, while the HOMEGOLF side now uses the retained live dense mixed-device surface and its exact dense challenge export bytes rather than the older open-adapter composed surrogate. The current lane is still far from leaderboard quality, and the mixed-device runtime still does not imply official 8xH100 hardware equivalence.",
+  "summary": "HOMEGOLF now emits one deterministic comparison report against the public naive baseline and the current public best leaderboard row from the upgraded live dense mixed-device surface. It keeps exact deltas in val_bpb, scored artifact bytes, and wallclock-cap posture while explicitly refusing leaderboard-equivalent language for the custom-hardware track.",
+  "report_digest": "e287820dde281015d7870e03929f59f5818cea0cbff9af8b48dc64229d47dafb"
 }

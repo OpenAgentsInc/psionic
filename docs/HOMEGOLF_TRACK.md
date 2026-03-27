@@ -154,9 +154,9 @@ After `HOMEGOLF-8`, this is no longer the canonical runnable contest-lane
 surface. It remains the secondary exact-family train-to-infer proof, while the
 strict challenge runnable lane is the canonical HOMEGOLF command surface.
 
-## First Clustered HOMEGOLF Surface
+## Live Dense HOMEGOLF Surface
 
-HOMEGOLF now also has a first honest clustered score surface:
+HOMEGOLF now also has a first upgraded live dense mixed-device score surface:
 
 - retained clustered surface report:
   `fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json`
@@ -164,26 +164,33 @@ HOMEGOLF now also has a first honest clustered score surface:
   `crates/psionic-train/src/parameter_golf_homegolf_clustered.rs`
 - entrypoint:
   `crates/psionic-train/src/bin/parameter_golf_homegolf_clustered_run_surface.rs`
+- audit:
+  `docs/audits/2026-03-27-homegolf-live-dense-run-surface.md`
 - checker:
   `scripts/check-parameter-golf-homegolf-clustered-run-surface.sh`
 
 What this proves:
 
-- one real two-device home-Tailnet admitted run stayed inside the `600s` budget
-- the current admitted device inventory and per-device contribution receipts are
-  frozen in one HOMEGOLF report
-- that same report binds the current exact-family HOMEGOLF train-to-infer bundle
-  proof and final `val_bpb`
-- operators can now compare real clustered home-device work against exact-family
-  score progress without pretending the dense exact-baseline trainer already ran
-  live across the admitted home cluster
+- one real same-job dense mixed-device runtime surface now exists inside the
+  HOMEGOLF track
+- the retained dense participants are:
+  - one local Apple Silicon MLX rank
+  - one optional-H100 CUDA submesh
+- the retained dense surface keeps explicit per-device contribution receipts and
+  dense wallclock facts inside one HOMEGOLF report
+- that same report now binds the exact dense challenge export bytes and final
+  roundtrip `val_bpb`
+- the retained surface keeps:
+  - `observed_cluster_wallclock_ms=3611`
+  - `final_validation_bits_per_byte=6.306931747817168`
+  - `model_artifact_bytes=4732744`
 
 What it does not prove:
 
-- that one exact dense mixed-device home-cluster run directly produced the
-  scored bundle
-- that the current exact dense HOMEGOLF trainer already has live MLX plus home
-  CUDA execution parity
+- admitted home-RTX dense closure on the local home cluster
+- one single retained run id that already binds the mixed-device dense runtime
+  receipts and the final scored export bytes in one artifact family
+- official public-leaderboard equivalence
 
 ## Public Comparison Report
 
@@ -213,10 +220,10 @@ Current boundary:
 
 - the public references are frozen from the reviewed Parameter Golf repo
   snapshot
-- the HOMEGOLF side still compares using the current clustered score surface's
-  scored artifact bytes
-- later HOMEGOLF artifact-accounting work still upgrades that into a fuller
-  contest-style counted-artifact comparison
+- the HOMEGOLF side now compares using the live dense mixed-device surface and
+  its retained exact dense challenge export bytes
+- the result is materially stronger than the older open-adapter composition,
+  but still not near the public leaderboard on score
 
 ## Artifact Accounting Report
 
@@ -241,11 +248,14 @@ What this keeps explicit:
 
 Current truth:
 
-- the current HOMEGOLF accounting answer is a refusal, not a pass
-- Psionic's current counted code plus the current exact-family scored bundle is
-  far over the contest budget
-- that over-cap posture is now frozen in one machine-readable report instead of
-  being left as an implied later concern
+- the current HOMEGOLF accounting answer is now a pass, not a refusal
+- Psionic's current counted code plus the retained compressed dense export stays
+  inside the contest budget
+- the retained counted values are:
+  - `counted_code_bytes=7188700`
+  - `scored_model_artifact_bytes=4732744`
+  - `total_counted_bytes=11921444`
+  - `cap_delta_bytes=-4078556`
 
 ## Mixed Hardware Manifest Example
 

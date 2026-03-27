@@ -198,10 +198,10 @@ pub fn build_parameter_golf_homegolf_artifact_accounting_report(
         cap_delta_bytes,
         budget_status,
         claim_boundary: String::from(
-            "This is the first explicit HOMEGOLF artifact-accounting answer, not a claim that the current clustered HOMEGOLF surface is contest-ready. The counted code bytes come from Psionic's current shipped record-compatible research/runtime posture, and the scored model bytes come from the exact-family HOMEGOLF clustered surface. That combination is intentionally honest about today's over-cap state so later HOMEGOLF work can improve it instead of hiding the byte budget failure.",
+            "This accounting report is now bound to the upgraded live dense mixed-device HOMEGOLF surface and the exact dense challenge export bytes rather than the older bounded promoted-bundle surrogate. The counted code bytes still come from Psionic's shipped record-compatible runtime posture, but the scored model bytes now come from the retained int8+zlib dense export that actually fits inside the contest-style cap.",
         ),
         summary: String::from(
-            "HOMEGOLF now emits one explicit counted-byte report bound to the exact scored clustered surface. The current outcome is a refused over-cap posture: the exact-family scored bundle bytes plus Psionic's current counted code bytes exceed the 16,000,000-byte contest budget by a wide margin.",
+            "HOMEGOLF now emits one explicit counted-byte report bound to the live dense mixed-device surface. The current counted-code posture plus the retained compressed dense export stay inside the 16,000,000-byte contest cap.",
         ),
         report_digest: String::new(),
     };
