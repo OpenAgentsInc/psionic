@@ -14,6 +14,15 @@ is the canonical CPU-reference lane. It remains valuable for bounded receipts,
 checkpoint, replay, and promotion truth, but it is not a valid Google GPU
 training proof target by itself.
 
+It is also no longer the primary first-model train-to-infer target. The
+promoted PGOLF-shaped first-model proof path now lives separately at:
+
+- `crates/psionic-train/examples/parameter_golf_promoted_reference_run.rs`
+
+That promoted path is the honest closure target for the first serious
+train/checkpoint/restore/resume artifact family; this Psion pilot remains the
+bounded smoke-test and receipt lane.
+
 The canonical bounded accelerator-backed single-node trainer now exists
 separately at:
 

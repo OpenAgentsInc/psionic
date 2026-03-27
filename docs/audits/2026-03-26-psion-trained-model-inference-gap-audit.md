@@ -526,6 +526,18 @@ The frozen contract surface for that recommendation now lives in:
 - `crates/psionic-train/src/model_io.rs`
 - `crates/psionic-train/src/parameter_golf_reference.rs`
 
+The first canonical promoted proof-training path now also exists at:
+
+- `run_parameter_golf_promoted_reference_run(...)`
+- `write_parameter_golf_promoted_reference_run(...)`
+- `crates/psionic-train/examples/parameter_golf_promoted_reference_run.rs`
+
+That matters because the repo now has one explicit first-model proof lane that
+uses the full `parameter_golf_decoder` baseline instead of the toy
+`PsionCompactDecoderReferencePilotModel`, verifies exact checkpoint-surface
+parity against the promoted descriptor, and proves restore-plus-resume parity
+from the emitted checkpoint lineage.
+
 ## Two Honest Targets
 
 There are two different projects that could both be described as "make Psion

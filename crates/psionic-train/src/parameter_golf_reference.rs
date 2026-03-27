@@ -15,8 +15,8 @@ use psionic_eval::{
     ParameterGolfValidationEvalReport,
 };
 use psionic_models::{
-    ParameterGolfBankedWeights, ParameterGolfExecutionError, ParameterGolfModelError,
-    ParameterGolfParameterVector, ParameterGolfPromotedProfileContract,
+    ParameterGolfBankedWeights, ParameterGolfExecutionError, ParameterGolfModelDescriptor,
+    ParameterGolfModelError, ParameterGolfParameterVector, ParameterGolfPromotedProfileContract,
     ParameterGolfPromotedProfileKind, ParameterGolfReferenceModel,
 };
 use psionic_runtime::TrainingCheckpointReference;
@@ -608,6 +608,16 @@ impl ParameterGolfReferenceTrainingConfig {
         }
     }
 
+    /// Returns the canonical promoted first-model proof config for the general
+    /// Psion PGOLF-shaped small-decoder profile.
+    #[must_use]
+    pub fn promoted_general_small_decoder() -> Self {
+        let mut config = Self::local_reference();
+        config.run_id = String::from("parameter-golf-promoted-general-proof-run");
+        config.checkpoint_family = String::from("train.parameter_golf.promoted_general");
+        config
+    }
+
     fn validate(&self) -> Result<(), ParameterGolfReferenceTrainingError> {
         if self.run_id.trim().is_empty() {
             return Err(ParameterGolfReferenceTrainingError::MissingRunId);
@@ -846,6 +856,160 @@ pub struct ParameterGolfReferenceTrainingOutcome {
     pub checkpoint_writeback_receipts: Vec<AsyncCheckpointWritebackReceipt>,
     /// Final summary.
     pub summary: ParameterGolfReferenceTrainingSummary,
+}
+
+/// One expected or observed tensor entry in the promoted checkpoint surface.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfCheckpointSurfaceTensorEntry {
+    /// Stable tensor name.
+    pub name: String,
+    /// Stable tensor shape.
+    pub shape: Vec<usize>,
+}
+
+/// One tensor shape mismatch between the promoted descriptor and the emitted
+/// checkpoint artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfCheckpointSurfaceShapeMismatch {
+    /// Stable tensor name.
+    pub name: String,
+    /// Expected logical shape from the promoted descriptor.
+    pub expected: Vec<usize>,
+    /// Actual logical shape from the emitted checkpoint.
+    pub actual: Vec<usize>,
+}
+
+/// Machine-readable report proving whether the emitted checkpoint tensor surface
+/// matches the promoted PGOLF descriptor exactly.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfPromotedCheckpointSurfaceReport {
+    /// Stable promoted profile id.
+    pub profile_id: String,
+    /// Stable descriptor digest for the promoted decoder.
+    pub descriptor_digest: String,
+    /// Stable checkpoint artifact digest.
+    pub checkpoint_artifact_digest: String,
+    /// Ordered expected tensors from the promoted descriptor.
+    pub expected_tensors: Vec<ParameterGolfCheckpointSurfaceTensorEntry>,
+    /// Ordered actual tensors from the emitted checkpoint artifact.
+    pub actual_tensors: Vec<ParameterGolfCheckpointSurfaceTensorEntry>,
+    /// Tensor names declared by the descriptor but missing from the artifact.
+    pub missing_tensors: Vec<String>,
+    /// Tensor names present in the artifact but not declared by the descriptor.
+    pub unexpected_tensors: Vec<String>,
+    /// Tensor names whose shapes drifted.
+    pub shape_mismatches: Vec<ParameterGolfCheckpointSurfaceShapeMismatch>,
+    /// Whether tensor-name coverage matches exactly.
+    pub exact_name_match: bool,
+    /// Whether tensor shapes match exactly.
+    pub exact_shape_match: bool,
+    /// Whether the full tensor surface matches exactly.
+    pub exact_match: bool,
+    /// Human-readable explanation of the report.
+    pub detail: String,
+    /// Stable digest over the report payload.
+    pub report_digest: String,
+}
+
+impl ParameterGolfPromotedCheckpointSurfaceReport {
+    /// Returns a stable digest over the report payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(
+            b"psionic_parameter_golf_promoted_checkpoint_surface_report|",
+            self,
+        )
+    }
+}
+
+/// Machine-readable proof that the promoted checkpoint can be restored and
+/// resumed to the same final state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterGolfPromotedResumeProof {
+    /// Stable promoted profile id.
+    pub profile_id: String,
+    /// Checkpoint ref used as the restore source.
+    pub restore_source_checkpoint_ref: String,
+    /// Stable manifest digest for the restore source checkpoint.
+    pub restore_source_manifest_digest: String,
+    /// Final checkpoint ref emitted by the continuous source run.
+    pub continuous_final_checkpoint_ref: String,
+    /// Final checkpoint manifest digest emitted by the continuous source run.
+    pub continuous_final_manifest_digest: String,
+    /// Final checkpoint ref emitted by the restored-and-resumed run.
+    pub resumed_final_checkpoint_ref: String,
+    /// Final checkpoint manifest digest emitted by the restored-and-resumed run.
+    pub resumed_final_manifest_digest: String,
+    /// One-based number of steps replayed after restore.
+    pub replayed_steps: u64,
+    /// Whether restore/resume reached exact final parity.
+    pub exact_final_parity: bool,
+    /// Human-readable explanation of the proof.
+    pub detail: String,
+    /// Stable digest over the proof payload.
+    pub proof_digest: String,
+}
+
+impl ParameterGolfPromotedResumeProof {
+    /// Returns a stable digest over the proof payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(b"psionic_parameter_golf_promoted_resume_proof|", self)
+    }
+}
+
+/// Final machine-readable summary for the promoted first-model PGOLF proof run.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ParameterGolfPromotedReferenceRunSummary {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable promoted profile id.
+    pub profile_id: String,
+    /// Stable promoted profile kind label.
+    pub profile_kind: String,
+    /// Stable promoted run id.
+    pub run_id: String,
+    /// Stable checkpoint family.
+    pub checkpoint_family: String,
+    /// Stable descriptor digest.
+    pub descriptor_digest: String,
+    /// Stable training fixture digest.
+    pub training_dataset_digest: String,
+    /// Stable validation fixture digest.
+    pub validation_dataset_digest: String,
+    /// Initial checkpoint ref.
+    pub initial_checkpoint_ref: String,
+    /// Final checkpoint ref.
+    pub final_checkpoint_ref: String,
+    /// Final checkpoint manifest digest.
+    pub final_checkpoint_manifest_digest: String,
+    /// Stable checkpoint surface report digest.
+    pub checkpoint_surface_report_digest: String,
+    /// Stable resume proof digest.
+    pub resume_proof_digest: String,
+    /// Bounded training summary.
+    pub training_summary: ParameterGolfReferenceTrainingSummary,
+    /// Human-readable explanation of the run boundary.
+    pub detail: String,
+}
+
+/// Full promoted PGOLF-shaped first-model proof run.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParameterGolfPromotedReferenceRun {
+    /// Frozen promoted profile contract used by the run.
+    pub profile_contract: ParameterGolfPromotedProfileContract,
+    /// Concrete training config used by the run.
+    pub training_config: ParameterGolfReferenceTrainingConfig,
+    /// Stable trained-model descriptor.
+    pub model_descriptor: ParameterGolfModelDescriptor,
+    /// Full bounded training outcome.
+    pub training_outcome: ParameterGolfReferenceTrainingOutcome,
+    /// Exact checkpoint-surface verification report.
+    pub checkpoint_surface_report: ParameterGolfPromotedCheckpointSurfaceReport,
+    /// Restore/resume parity proof.
+    pub resume_proof: ParameterGolfPromotedResumeProof,
+    /// Final summary for operator-facing proof-run output.
+    pub summary: ParameterGolfPromotedReferenceRunSummary,
 }
 
 /// Failure for the bounded Parameter Golf local-reference trainer.
@@ -1504,6 +1668,366 @@ pub fn train_parameter_golf_local_reference_with_async_checkpoint_writeback(
     outcome.checkpoint_writeback_receipts =
         merge_checkpoint_writeback_receipts(receipts, shutdown_receipts);
     Ok(outcome)
+}
+
+/// Runs the promoted PGOLF-shaped first-model proof lane and verifies that the
+/// emitted checkpoint matches the promoted descriptor exactly.
+pub fn run_parameter_golf_promoted_reference_run(
+    fixture: &ParameterGolfLocalReferenceFixture,
+    config: &ParameterGolfReferenceTrainingConfig,
+) -> Result<ParameterGolfPromotedReferenceRun, ParameterGolfReferenceTrainingError> {
+    let profile_contract = parameter_golf_promoted_profile_contract(
+        ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder,
+    );
+    let training_outcome = train_parameter_golf_local_reference(fixture, config)?;
+    validate_promoted_reference_descriptor(
+        &profile_contract,
+        training_outcome.initial_model.descriptor(),
+    )?;
+    validate_promoted_reference_descriptor(
+        &profile_contract,
+        training_outcome.trained_model.descriptor(),
+    )?;
+
+    let model_descriptor = training_outcome.trained_model.descriptor().clone();
+    let checkpoint_surface_report = promoted_checkpoint_surface_report(
+        &profile_contract,
+        &model_descriptor,
+        &training_outcome.final_checkpoint.weights_artifact,
+    )?;
+    if !checkpoint_surface_report.exact_match {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted checkpoint surface",
+            message: format!(
+                "emitted checkpoint drifted from promoted descriptor: missing={:?} unexpected={:?} shape_mismatches={:?}",
+                checkpoint_surface_report.missing_tensors,
+                checkpoint_surface_report.unexpected_tensors,
+                checkpoint_surface_report.shape_mismatches
+            ),
+        });
+    }
+
+    let resume_proof = promoted_resume_proof(fixture, &profile_contract, &training_outcome)?;
+    let summary = ParameterGolfPromotedReferenceRunSummary {
+        schema_version: String::from("psionic.parameter_golf_promoted_reference_run.v1"),
+        profile_id: profile_contract.profile_id.clone(),
+        profile_kind: String::from("general_psion_small_decoder"),
+        run_id: config.run_id.clone(),
+        checkpoint_family: config.checkpoint_family.clone(),
+        descriptor_digest: model_descriptor.stable_digest(),
+        training_dataset_digest: fixture.training_digest(),
+        validation_dataset_digest: fixture.validation_digest(),
+        initial_checkpoint_ref: training_outcome.initial_checkpoint.manifest.checkpoint_ref.clone(),
+        final_checkpoint_ref: training_outcome.final_checkpoint.manifest.checkpoint_ref.clone(),
+        final_checkpoint_manifest_digest: training_outcome
+            .final_checkpoint
+            .manifest
+            .stable_digest(),
+        checkpoint_surface_report_digest: checkpoint_surface_report.report_digest.clone(),
+        resume_proof_digest: resume_proof.proof_digest.clone(),
+        training_summary: training_outcome.summary.clone(),
+        detail: String::from(
+            "Promoted PGOLF first-model proof run trained the full parameter_golf_decoder baseline, verified that the emitted checkpoint surface exactly matched the promoted descriptor, and proved restore-plus-resume parity from the emitted checkpoint lineage.",
+        ),
+    };
+    Ok(ParameterGolfPromotedReferenceRun {
+        profile_contract,
+        training_config: config.clone(),
+        model_descriptor,
+        training_outcome,
+        checkpoint_surface_report,
+        resume_proof,
+        summary,
+    })
+}
+
+/// Writes one promoted PGOLF first-model proof run into a self-contained output
+/// directory.
+pub fn write_parameter_golf_promoted_reference_run(
+    run: &ParameterGolfPromotedReferenceRun,
+    output_dir: &Path,
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    std::fs::create_dir_all(output_dir)?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_promoted_profile_contract.json")
+            .as_path(),
+        &run.profile_contract,
+        "parameter golf promoted profile contract export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_promoted_training_config.json")
+            .as_path(),
+        &run.training_config,
+        "parameter golf promoted training config export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_promoted_model_descriptor.json")
+            .as_path(),
+        &run.model_descriptor,
+        "parameter golf promoted model descriptor export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_promoted_checkpoint_surface_report.json")
+            .as_path(),
+        &run.checkpoint_surface_report,
+        "parameter golf promoted checkpoint surface report export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_promoted_resume_proof.json")
+            .as_path(),
+        &run.resume_proof,
+        "parameter golf promoted resume proof export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_promoted_summary.json")
+            .as_path(),
+        &run.summary,
+        "parameter golf promoted summary export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_initial_checkpoint_manifest.json")
+            .as_path(),
+        &run.training_outcome.initial_checkpoint.manifest,
+        "parameter golf initial checkpoint manifest export",
+    )?;
+    write_json_file(
+        output_dir
+            .join("parameter_golf_final_checkpoint_manifest.json")
+            .as_path(),
+        &run.training_outcome.final_checkpoint.manifest,
+        "parameter golf final checkpoint manifest export",
+    )?;
+    std::fs::write(
+        output_dir.join("parameter_golf_initial_checkpoint.safetensors"),
+        run.training_outcome
+            .initial_checkpoint
+            .weights_artifact
+            .bytes
+            .as_slice(),
+    )?;
+    std::fs::write(
+        output_dir.join("parameter_golf_final_checkpoint.safetensors"),
+        run.training_outcome
+            .final_checkpoint
+            .weights_artifact
+            .bytes
+            .as_slice(),
+    )?;
+    std::fs::write(
+        output_dir.join("parameter_golf_final_model_int8_zlib.st"),
+        run.training_outcome
+            .int8_zlib_model_artifact
+            .bytes
+            .as_slice(),
+    )?;
+    Ok(())
+}
+
+fn write_json_file<T: Serialize>(
+    path: &Path,
+    value: &T,
+    context: &'static str,
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    let bytes = serde_json::to_vec_pretty(value).map_err(|error| {
+        ParameterGolfReferenceTrainingError::Serialization {
+            context,
+            message: error.to_string(),
+        }
+    })?;
+    std::fs::write(path, bytes)?;
+    Ok(())
+}
+
+fn validate_promoted_reference_descriptor(
+    profile_contract: &ParameterGolfPromotedProfileContract,
+    descriptor: &ParameterGolfModelDescriptor,
+) -> Result<(), ParameterGolfReferenceTrainingError> {
+    if descriptor.model.model_id != profile_contract.baseline_model_id {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted reference descriptor",
+            message: format!(
+                "baseline model id drifted: descriptor `{}` vs promoted `{}`",
+                descriptor.model.model_id, profile_contract.baseline_model_id
+            ),
+        });
+    }
+    if descriptor.model.revision != profile_contract.baseline_revision {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted reference descriptor",
+            message: format!(
+                "baseline revision drifted: descriptor `{}` vs promoted `{}`",
+                descriptor.model.revision, profile_contract.baseline_revision
+            ),
+        });
+    }
+    if descriptor.config != profile_contract.baseline_config {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted reference descriptor",
+            message: String::from("baseline config drifted from the promoted family contract"),
+        });
+    }
+    Ok(())
+}
+
+fn promoted_checkpoint_surface_report(
+    profile_contract: &ParameterGolfPromotedProfileContract,
+    descriptor: &ParameterGolfModelDescriptor,
+    checkpoint_artifact: &ParameterGolfTrainingArtifact,
+) -> Result<ParameterGolfPromotedCheckpointSurfaceReport, ParameterGolfReferenceTrainingError> {
+    let safetensors =
+        SafeTensors::deserialize(checkpoint_artifact.bytes.as_slice()).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted checkpoint surface",
+                message: error.to_string(),
+            }
+        })?;
+    let mut expected_tensors = descriptor
+        .weights
+        .tensors
+        .iter()
+        .map(|tensor| ParameterGolfCheckpointSurfaceTensorEntry {
+            name: tensor.name.clone(),
+            shape: tensor.shape.dims().to_vec(),
+        })
+        .collect::<Vec<_>>();
+    expected_tensors.sort_by(|left, right| left.name.cmp(&right.name));
+
+    let mut actual_tensors = Vec::new();
+    for name in safetensors.names() {
+        let tensor = safetensors.tensor(name).map_err(|error| {
+            ParameterGolfReferenceTrainingError::Serialization {
+                context: "parameter golf promoted checkpoint surface",
+                message: error.to_string(),
+            }
+        })?;
+        actual_tensors.push(ParameterGolfCheckpointSurfaceTensorEntry {
+            name: String::from(name),
+            shape: tensor.shape().to_vec(),
+        });
+    }
+    actual_tensors.sort_by(|left, right| left.name.cmp(&right.name));
+
+    let expected_by_name = expected_tensors
+        .iter()
+        .map(|tensor| (tensor.name.as_str(), tensor.shape.as_slice()))
+        .collect::<BTreeMap<_, _>>();
+    let actual_by_name = actual_tensors
+        .iter()
+        .map(|tensor| (tensor.name.as_str(), tensor.shape.as_slice()))
+        .collect::<BTreeMap<_, _>>();
+
+    let missing_tensors = expected_by_name
+        .keys()
+        .filter(|name| !actual_by_name.contains_key(**name))
+        .map(|name| String::from(*name))
+        .collect::<Vec<_>>();
+    let unexpected_tensors = actual_by_name
+        .keys()
+        .filter(|name| !expected_by_name.contains_key(**name))
+        .map(|name| String::from(*name))
+        .collect::<Vec<_>>();
+    let shape_mismatches = expected_tensors
+        .iter()
+        .filter_map(|expected| {
+            let actual_shape = actual_by_name.get(expected.name.as_str())?;
+            if *actual_shape == expected.shape.as_slice() {
+                None
+            } else {
+                Some(ParameterGolfCheckpointSurfaceShapeMismatch {
+                    name: expected.name.clone(),
+                    expected: expected.shape.clone(),
+                    actual: (*actual_shape).to_vec(),
+                })
+            }
+        })
+        .collect::<Vec<_>>();
+    let exact_name_match = missing_tensors.is_empty() && unexpected_tensors.is_empty();
+    let exact_shape_match = shape_mismatches.is_empty();
+    let exact_match = exact_name_match && exact_shape_match;
+    let detail = if exact_match {
+        String::from(
+            "Emitted checkpoint tensor names and shapes exactly match the promoted PGOLF descriptor layout.",
+        )
+    } else {
+        String::from(
+            "Emitted checkpoint tensor surface drifted from the promoted PGOLF descriptor and is not claimable for first-model inference.",
+        )
+    };
+    let mut report = ParameterGolfPromotedCheckpointSurfaceReport {
+        profile_id: profile_contract.profile_id.clone(),
+        descriptor_digest: descriptor.stable_digest(),
+        checkpoint_artifact_digest: checkpoint_artifact.artifact_digest.clone(),
+        expected_tensors,
+        actual_tensors,
+        missing_tensors,
+        unexpected_tensors,
+        shape_mismatches,
+        exact_name_match,
+        exact_shape_match,
+        exact_match,
+        detail,
+        report_digest: String::new(),
+    };
+    report.report_digest = report.stable_digest();
+    Ok(report)
+}
+
+fn promoted_resume_proof(
+    fixture: &ParameterGolfLocalReferenceFixture,
+    profile_contract: &ParameterGolfPromotedProfileContract,
+    outcome: &ParameterGolfReferenceTrainingOutcome,
+) -> Result<ParameterGolfPromotedResumeProof, ParameterGolfReferenceTrainingError> {
+    let mut restored =
+        restore_parameter_golf_local_reference_checkpoint(fixture, &outcome.initial_checkpoint)?;
+    while !restored.is_complete() {
+        restored.step()?;
+    }
+    let resumed_outcome = restored.into_outcome()?;
+    let continuous_final_manifest_digest = outcome.final_checkpoint.manifest.stable_digest();
+    let resumed_final_manifest_digest = resumed_outcome.final_checkpoint.manifest.stable_digest();
+    let exact_final_parity = resumed_outcome.trained_model == outcome.trained_model
+        && resumed_outcome.final_validation_eval == outcome.final_validation_eval
+        && resumed_final_manifest_digest == continuous_final_manifest_digest;
+    if !exact_final_parity {
+        return Err(ParameterGolfReferenceTrainingError::Serialization {
+            context: "parameter golf promoted resume proof",
+            message: String::from(
+                "restored-and-resumed proof run diverged from the continuous source run",
+            ),
+        });
+    }
+    let replayed_steps = outcome.step_metrics.len().saturating_sub(
+        outcome
+            .initial_checkpoint
+            .manifest
+            .step
+            .try_into()
+            .unwrap_or(usize::MAX),
+    ) as u64;
+    let mut proof = ParameterGolfPromotedResumeProof {
+        profile_id: profile_contract.profile_id.clone(),
+        restore_source_checkpoint_ref: outcome.initial_checkpoint.manifest.checkpoint_ref.clone(),
+        restore_source_manifest_digest: outcome.initial_checkpoint.manifest.stable_digest(),
+        continuous_final_checkpoint_ref: outcome.final_checkpoint.manifest.checkpoint_ref.clone(),
+        continuous_final_manifest_digest,
+        resumed_final_checkpoint_ref: resumed_outcome.final_checkpoint.manifest.checkpoint_ref,
+        resumed_final_manifest_digest,
+        replayed_steps,
+        exact_final_parity,
+        detail: String::from(
+            "Restoring the emitted promoted checkpoint and replaying the remaining bounded steps produced the same final checkpoint and validation state as the continuous source run.",
+        ),
+        proof_digest: String::new(),
+    };
+    proof.proof_digest = proof.stable_digest();
+    Ok(proof)
 }
 
 fn submit_checkpoint_async_writeback(
@@ -3180,19 +3704,21 @@ mod tests {
         checkpoint_async_writeback_payload,
         export_parameter_golf_banked_full_precision_model_bytes,
         export_parameter_golf_full_precision_model_bytes,
-        export_parameter_golf_quantized_model_artifact,
+        export_parameter_golf_quantized_model_artifact, promoted_checkpoint_surface_report,
         read_parameter_golf_checkpoint_from_directory,
         restore_parameter_golf_banked_weights_from_safetensors,
         restore_parameter_golf_local_reference_checkpoint,
         restore_parameter_golf_model_from_int8_zlib,
         restore_parameter_golf_model_from_quantized_artifact,
-        restore_parameter_golf_model_from_safetensors, train_parameter_golf_local_reference,
+        restore_parameter_golf_model_from_safetensors, run_parameter_golf_promoted_reference_run,
+        train_parameter_golf_local_reference,
         train_parameter_golf_local_reference_with_async_checkpoint_writeback,
-        train_parameter_golf_local_reference_with_metric_sink, ParameterGolfFinalArtifactConfig,
+        train_parameter_golf_local_reference_with_metric_sink,
+        write_parameter_golf_promoted_reference_run, ParameterGolfFinalArtifactConfig,
         ParameterGolfLocalReferenceFixture, ParameterGolfReferenceTrainingConfig,
         ParameterGolfReferenceTrainingRunner,
     };
-    use psionic_models::ParameterGolfReferenceModel;
+    use psionic_models::{ParameterGolfPromotedProfileKind, ParameterGolfReferenceModel};
 
     #[derive(Clone, Default)]
     struct SharedWriter(Arc<Mutex<Vec<u8>>>);
@@ -3474,6 +4000,51 @@ mod tests {
                 && matches!(event.value, LocalTrainMetricValue::F32(_))));
         assert!(progress.contents().contains("mean_microbatch_loss"));
         assert!(structured.contents().starts_with("metric_event {"));
+        Ok(())
+    }
+
+    #[test]
+    fn promoted_parameter_golf_reference_run_proves_full_checkpoint_surface_and_resume(
+    ) -> Result<(), Box<dyn Error>> {
+        let fixture = ParameterGolfLocalReferenceFixture::reference()?;
+        let config = ParameterGolfReferenceTrainingConfig::promoted_general_small_decoder();
+        let run = run_parameter_golf_promoted_reference_run(&fixture, &config)?;
+
+        assert_eq!(
+            run.profile_contract.kind,
+            ParameterGolfPromotedProfileKind::GeneralPsionSmallDecoder
+        );
+        assert!(run.checkpoint_surface_report.exact_match);
+        assert!(run.resume_proof.exact_final_parity);
+        assert_eq!(
+            run.summary.final_checkpoint_manifest_digest,
+            run.training_outcome
+                .final_checkpoint
+                .manifest
+                .stable_digest()
+        );
+
+        let explicit_report = promoted_checkpoint_surface_report(
+            &run.profile_contract,
+            &run.model_descriptor,
+            &run.training_outcome.final_checkpoint.weights_artifact,
+        )?;
+        assert_eq!(explicit_report, run.checkpoint_surface_report);
+
+        let output_dir = tempdir()?;
+        write_parameter_golf_promoted_reference_run(&run, output_dir.path())?;
+        assert!(output_dir
+            .path()
+            .join("parameter_golf_promoted_summary.json")
+            .exists());
+        assert!(output_dir
+            .path()
+            .join("parameter_golf_final_checkpoint.safetensors")
+            .exists());
+        assert!(output_dir
+            .path()
+            .join("parameter_golf_promoted_resume_proof.json")
+            .exists());
         Ok(())
     }
 

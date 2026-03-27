@@ -104,11 +104,26 @@ The promoted-family split is now carried in:
 - `parameter_golf_strict_challenge_profile_contract()` in
   `crates/psionic-train/src/parameter_golf_reference.rs`
 
+The first canonical promoted training proof path now also exists at:
+
+- `run_parameter_golf_promoted_reference_run(...)` in
+  `crates/psionic-train/src/parameter_golf_reference.rs`
+- `crates/psionic-train/examples/parameter_golf_promoted_reference_run.rs`
+
+That proof path binds the general promoted profile to the existing full
+`parameter_golf_decoder` local-reference trainer, verifies that the emitted
+checkpoint tensor surface exactly matches the promoted descriptor, and proves
+restore-plus-resume parity from the emitted checkpoint lineage.
+
+For train-to-infer work, this promoted PGOLF path is now the primary first-model
+target. The older `PsionCompactDecoderReferencePilotModel` remains the bounded
+smoke-test lane for receipt and pipeline closure only.
+
 ## Scope Boundary
 
 This contract freeze does not itself:
 
-- emit the promoted bundle
+- emit the later self-contained promoted bundle
 - load the bundle for inference
 - run local generation
 - wire `psionic-serve`
