@@ -656,6 +656,57 @@ __global__ void quantized_matvec_q8_1_mmvq_kernel(
     }
 }
 
+template <typename DotFn, int Vdr, int Qi, int RowsPerBlock, int WarpsPerRow>
+__launch_bounds__(RowsPerBlock * WarpsPerRow * kWarpSize, 1)
+__global__ void quantized_matvec_q8_1_grouped_mmvq_kernel(
+    const uint8_t *weights,
+    int row_stride,
+    int rows,
+    int block_count,
+    const Q81Block *input,
+    const float *bias,
+    float *output,
+    DotFn dot_fn
+) {
+    const int warp_index = static_cast<int>(threadIdx.y);
+    const int row_in_block = warp_index / WarpsPerRow;
+    const int warp_in_row = warp_index % WarpsPerRow;
+    const int row = static_cast<int>(blockIdx.x) * RowsPerBlock + row_in_block;
+    if (row >= rows) {
+        return;
+    }
+
+    constexpr int blocks_per_iter = Vdr * WarpsPerRow * kWarpSize / Qi;
+    const int tid = kWarpSize * warp_in_row + static_cast<int>(threadIdx.x);
+    const uint8_t *row_weights = weights + static_cast<size_t>(row) * static_cast<size_t>(row_stride);
+
+    float sum = 0.0f;
+    for (int block_index = tid / (Qi / Vdr); block_index < block_count; block_index += blocks_per_iter) {
+        const int quant_index = Vdr * (tid % (Qi / Vdr));
+        sum += dot_fn(row_weights, input, block_index, block_index, quant_index);
+    }
+
+    __shared__ float partials[RowsPerBlock][WarpsPerRow - 1 > 0 ? WarpsPerRow - 1 : 1][kWarpSize];
+    if (warp_in_row > 0) {
+        partials[row_in_block][warp_in_row - 1][threadIdx.x] = sum;
+    }
+    __syncthreads();
+
+    if (warp_in_row > 0) {
+        return;
+    }
+
+#pragma unroll
+    for (int other_warp = 0; other_warp < WarpsPerRow - 1; ++other_warp) {
+        sum += partials[row_in_block][other_warp][threadIdx.x];
+    }
+
+    sum = warp_reduce_sum(sum);
+    if (threadIdx.x == 0) {
+        output[row] = sum + (bias != nullptr ? bias[row] : 0.0f);
+    }
+}
+
 __device__ __forceinline__ unsigned long long pack_argmax_pair(float value, int index) {
     return (static_cast<unsigned long long>(static_cast<uint32_t>(index)) << 32) |
         static_cast<unsigned long long>(__float_as_uint(value));
@@ -5766,9 +5817,16 @@ extern "C" int psionic_cuda_q8_0_matvec_q8_1(
     void *stream
 ) {
     const int block_count = cols / kQ81ElementsPerBlock;
-    const dim3 block_dims(kWarpSize, kMmvqWarps, 1);
-    quantized_matvec_q8_1_mmvq_kernel<Q80Q81Dot, kQ80Q81MmvqVdr, kQ80Qi><<<
-        rows,
+    constexpr int rows_per_block = 1;
+    constexpr int warps_per_row = 2;
+    const dim3 block_dims(kWarpSize, rows_per_block * warps_per_row, 1);
+    quantized_matvec_q8_1_grouped_mmvq_kernel<
+        Q80Q81Dot,
+        kQ80Q81MmvqVdr,
+        kQ80Qi,
+        rows_per_block,
+        warps_per_row><<<
+        (rows + rows_per_block - 1) / rows_per_block,
         block_dims,
         0,
         static_cast<cudaStream_t>(stream)

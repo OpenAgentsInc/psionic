@@ -57,8 +57,9 @@ than just run tensor math.
   qwen35 hybrid depthwise conv1d plus immediate SiLU activation into one CUDA
   kernel, and then switching the q8_1 output-head argmax path onto the MMVQ
   kernel, and then switching the dense GGML `Q8_0` to `Q8_1` matvec fast path
-  from the shared-input launcher onto the MMVQ kernel, the local
-  `qwen3.5:0.8b` benchmark on this host measured about `520 tok/s` decode on
+  from the shared-input launcher onto the MMVQ kernel, and then retuning that
+  q8.0 MMVQ launch from four warps per row down to two, the local
+  `qwen3.5:0.8b` benchmark on this host measured about `525 tok/s` decode on
   Psionic versus
   about `329 tok/s` decode on local Ollama for the same one-sentence prompt
   and `128` token cap.
