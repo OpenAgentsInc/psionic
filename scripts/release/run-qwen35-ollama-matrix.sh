@@ -97,9 +97,10 @@ stop_loaded_ollama_models() {
   if [[ -z "$loaded_models" ]]; then
     return
   fi
-  while IFS= read -r model; do
-    [[ -n "$model" ]] || continue
-    ollama stop "$model" >/dev/null 2>&1 || true
+  local loaded_model
+  while IFS= read -r loaded_model; do
+    [[ -n "$loaded_model" ]] || continue
+    ollama stop "$loaded_model" >/dev/null 2>&1 || true
   done <<< "$loaded_models"
 }
 
