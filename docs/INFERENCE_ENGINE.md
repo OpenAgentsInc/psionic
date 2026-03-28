@@ -104,7 +104,8 @@ than just run tensor math.
   contract:
   - `/v1/chat/completions`
   - modes `none`, `auto`, `required`, and named tool choice
-  - machine-readable `message.tool_calls`
+  - request-level `parallel_tool_calls`
+  - ordered machine-readable `message.tool_calls`
   - JSON-schema-subset argument validation
   - proxy `qwen35` still fails closed for tool calling
 - The first `qwen35` lane must still fail closed for system-message image and

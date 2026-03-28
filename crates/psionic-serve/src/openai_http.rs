@@ -287,6 +287,14 @@ struct ToolCallingContract {
     tools: BTreeMap<String, ToolDefinitionRequest>,
     mode: ToolChoiceMode,
     named_tool: Option<String>,
+    parallel_tool_calls: bool,
+}
+
+impl ToolCallingContract {
+    fn allows_parallel_tool_calls(&self) -> bool {
+        self.parallel_tool_calls
+            && matches!(self.mode, ToolChoiceMode::Auto | ToolChoiceMode::Required)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -2097,6 +2105,8 @@ struct ChatCompletionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tool_choice: Option<ToolChoiceRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    parallel_tool_calls: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     response_format: Option<ChatCompletionResponseFormatRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_grammar: Option<PsionicGrammarRequest>,
@@ -2131,6 +2141,7 @@ impl Default for ChatCompletionRequest {
             stream: false,
             tools: Vec::new(),
             tool_choice: None,
+            parallel_tool_calls: None,
             response_format: None,
             psionic_grammar: None,
             psionic_structured_output: None,
@@ -2379,6 +2390,8 @@ struct ResponsesRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tool_choice: Option<ToolChoiceRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    parallel_tool_calls: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_response_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_structured_output: Option<StructuredOutputRequest>,
@@ -2415,6 +2428,7 @@ impl Default for ResponsesRequest {
             stream: false,
             tools: Vec::new(),
             tool_choice: None,
+            parallel_tool_calls: None,
             previous_response_id: None,
             psionic_structured_output: None,
             psionic_reasoning: None,
@@ -2650,6 +2664,7 @@ fn tool_contract_from_chat_request(
     validate_tool_contract(
         request.tools.as_slice(),
         request.tool_choice.as_ref(),
+        request.parallel_tool_calls,
         structured_output_requested,
     )
 }
@@ -2661,6 +2676,7 @@ fn tool_contract_from_responses_request(
     validate_tool_contract(
         request.tools.as_slice(),
         request.tool_choice.as_ref(),
+        request.parallel_tool_calls,
         structured_output_requested,
     )
 }
@@ -2668,12 +2684,18 @@ fn tool_contract_from_responses_request(
 fn validate_tool_contract(
     tools: &[ToolDefinitionEnvelope],
     tool_choice: Option<&ToolChoiceRequest>,
+    parallel_tool_calls: Option<bool>,
     structured_output_requested: bool,
 ) -> Result<Option<ToolCallingContract>, OpenAiCompatHttpError> {
     if tools.is_empty() {
         if tool_choice.is_some() {
             return Err(OpenAiCompatHttpError::BadRequest(String::from(
                 "`tool_choice` requires at least one declared tool",
+            )));
+        }
+        if parallel_tool_calls.is_some() {
+            return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                "`parallel_tool_calls` requires at least one declared tool",
             )));
         }
         return Ok(None);
@@ -2743,6 +2765,7 @@ fn validate_tool_contract(
         tools: tool_map,
         mode,
         named_tool,
+        parallel_tool_calls: parallel_tool_calls.unwrap_or(true),
     }))
 }
 
@@ -2798,13 +2821,19 @@ fn tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
             "Tool use is disabled for this request. Answer normally.",
         )),
         ToolChoiceMode::Auto => lines.push(String::from(
-            "Use `{ \"kind\": \"message\", \"content\": \"...\" }` for a normal answer, or `{ \"kind\": \"tool:<name>\", ...tool arguments... }` to call exactly one tool.",
+            if contract.allows_parallel_tool_calls() {
+                "Use `{ \"kind\": \"message\", \"content\": \"...\" }` for a normal answer, or `{ \"kind\": \"tool_calls\", \"tool_calls\": [{ \"name\": \"<tool>\", \"arguments\": { ... } }] }` to call one or more tools in order."
+            } else {
+                "Use `{ \"kind\": \"message\", \"content\": \"...\" }` for a normal answer, or `{ \"kind\": \"tool_calls\", \"tool_calls\": [{ \"name\": \"<tool>\", \"arguments\": { ... } }] }` to call exactly one tool."
+            },
         )),
-        ToolChoiceMode::Required => lines.push(String::from(
-            "You must call exactly one tool using `{ \"kind\": \"tool:<name>\", ...tool arguments... }`.",
-        )),
+        ToolChoiceMode::Required => lines.push(String::from(if contract.allows_parallel_tool_calls() {
+            "You must call one or more tools using `{ \"kind\": \"tool_calls\", \"tool_calls\": [{ \"name\": \"<tool>\", \"arguments\": { ... } }] }`."
+        } else {
+            "You must call exactly one tool using `{ \"kind\": \"tool_calls\", \"tool_calls\": [{ \"name\": \"<tool>\", \"arguments\": { ... } }] }`."
+        })),
         ToolChoiceMode::Named => lines.push(format!(
-            "You must call exactly one tool using `{{ \"kind\": \"tool:{}\", ...tool arguments... }}`.",
+            "You must call exactly one tool using `{{ \"kind\": \"tool_calls\", \"tool_calls\": [{{ \"name\": \"{}\", \"arguments\": {{ ... }} }}] }}`.",
             contract.named_tool.as_deref().unwrap_or_default()
         )),
     }
@@ -2860,8 +2889,23 @@ fn structured_output_from_tool_contract(
             }),
         });
     }
+    variants.push(StructuredTaggedVariant {
+        tag: String::from("tool_calls"),
+        schema: tool_calls_batch_schema(contract)?,
+    });
 
-    match contract.mode {
+    validate_structured_output_request(StructuredOutputRequest::TaggedStructure {
+        name: Some(String::from("psionic_tool_call")),
+        discriminator: String::from("kind"),
+        variants,
+    })
+    .map(Some)
+}
+
+fn tool_calls_batch_schema(
+    contract: &ToolCallingContract,
+) -> Result<serde_json::Value, OpenAiCompatHttpError> {
+    let items_schema = match contract.mode {
         ToolChoiceMode::Named => {
             let name = contract.named_tool.as_ref().ok_or_else(|| {
                 OpenAiCompatHttpError::Internal(String::from(
@@ -2873,32 +2917,64 @@ fn structured_output_from_tool_contract(
                     "named tool `{name}` is missing from the validated tool map"
                 ))
             })?;
-            variants.push(StructuredTaggedVariant {
-                tag: tool_variant_tag(name),
-                schema: normalized_tool_parameters_schema(tool)?,
-            });
+            tool_call_item_schema(tool)?
         }
-        ToolChoiceMode::Auto | ToolChoiceMode::Required => {
-            for (name, tool) in &contract.tools {
-                variants.push(StructuredTaggedVariant {
-                    tag: tool_variant_tag(name),
-                    schema: normalized_tool_parameters_schema(tool)?,
-                });
-            }
+        ToolChoiceMode::Auto | ToolChoiceMode::Required => serde_json::json!({
+            "oneOf": contract
+                .tools
+                .values()
+                .map(tool_call_item_schema)
+                .collect::<Result<Vec<_>, OpenAiCompatHttpError>>()?
+        }),
+        ToolChoiceMode::None => {
+            return Err(OpenAiCompatHttpError::Internal(String::from(
+                "tool batch schema requested while tool calling is disabled",
+            )));
         }
-        ToolChoiceMode::None => {}
+    };
+
+    let mut tool_calls = serde_json::Map::new();
+    tool_calls.insert(
+        String::from("type"),
+        serde_json::Value::String(String::from("array")),
+    );
+    tool_calls.insert(String::from("minItems"), serde_json::json!(1));
+    tool_calls.insert(String::from("items"), items_schema);
+    if !contract.allows_parallel_tool_calls() {
+        tool_calls.insert(String::from("maxItems"), serde_json::json!(1));
     }
 
-    validate_structured_output_request(StructuredOutputRequest::TaggedStructure {
-        name: Some(String::from("psionic_tool_call")),
-        discriminator: String::from("kind"),
-        variants,
-    })
-    .map(Some)
+    Ok(serde_json::Value::Object(serde_json::Map::from_iter([
+        (
+            String::from("type"),
+            serde_json::Value::String(String::from("object")),
+        ),
+        (
+            String::from("properties"),
+            serde_json::json!({
+                "tool_calls": serde_json::Value::Object(tool_calls)
+            }),
+        ),
+        (String::from("required"), serde_json::json!(["tool_calls"])),
+        (
+            String::from("additionalProperties"),
+            serde_json::Value::Bool(false),
+        ),
+    ])))
 }
 
-fn tool_variant_tag(name: &str) -> String {
-    format!("tool:{name}")
+fn tool_call_item_schema(
+    tool: &ToolDefinitionRequest,
+) -> Result<serde_json::Value, OpenAiCompatHttpError> {
+    Ok(serde_json::json!({
+        "type": "object",
+        "properties": {
+            "name": { "const": tool.name.clone() },
+            "arguments": normalized_tool_parameters_schema(tool)?
+        },
+        "required": ["name", "arguments"],
+        "additionalProperties": false
+    }))
 }
 
 fn tool_call_outcome_from_response(
@@ -2942,6 +3018,66 @@ fn tool_call_outcome_from_response(
         return Ok(Some(ToolCallOutcome {
             content: Some(content),
             tool_calls: Vec::new(),
+        }));
+    }
+
+    if tag == "tool_calls" {
+        let tool_calls = value
+            .get("tool_calls")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| {
+                OpenAiCompatHttpError::BadRequest(String::from(
+                    "tool batch envelope is missing an array `tool_calls` field",
+                ))
+            })?;
+        if tool_calls.is_empty() {
+            return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                "tool batch envelope must contain at least one tool call",
+            )));
+        }
+        if !contract.allows_parallel_tool_calls() && tool_calls.len() != 1 {
+            return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                "tool batch envelope returned more than one tool call while `parallel_tool_calls` is disabled",
+            )));
+        }
+        let resolved = tool_calls
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let item = item.as_object().ok_or_else(|| {
+                    OpenAiCompatHttpError::BadRequest(String::from(
+                        "tool batch entries must be JSON objects",
+                    ))
+                })?;
+                let tool_name = item
+                    .get("name")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        OpenAiCompatHttpError::BadRequest(String::from(
+                            "tool batch entries must include string `name`",
+                        ))
+                    })?;
+                let arguments = item.get("arguments").cloned().ok_or_else(|| {
+                    OpenAiCompatHttpError::BadRequest(String::from(
+                        "tool batch entries must include `arguments`",
+                    ))
+                })?;
+                let tool = contract.tools.get(tool_name).ok_or_else(|| {
+                    OpenAiCompatHttpError::BadRequest(format!(
+                        "model selected undeclared tool `{tool_name}`"
+                    ))
+                })?;
+                validate_tool_arguments(tool, &arguments)?;
+                Ok(ResolvedToolCall {
+                    id: format!("{request_id}-tool-{index}"),
+                    name: tool_name.to_string(),
+                    arguments,
+                })
+            })
+            .collect::<Result<Vec<_>, OpenAiCompatHttpError>>()?;
+        return Ok(Some(ToolCallOutcome {
+            content: None,
+            tool_calls: resolved,
         }));
     }
 
@@ -7078,7 +7214,7 @@ mod tests {
                     "<think>",
                     "</think>",
                     "hello",
-                    "{\"kind\":\"tool:get_weather\",\"latitude\":48.8566,\"longitude\":2.3522}",
+                    "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":48.8566,\"longitude\":2.3522}}]}",
                     "world",
                 ],
             )
@@ -7102,6 +7238,7 @@ mod tests {
                 stream: false,
                 tools: vec![weather_tool_definition()],
                 tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
                 response_format: None,
                 psionic_grammar: None,
                 psionic_structured_output: None,
@@ -7151,7 +7288,7 @@ mod tests {
                     "<think>",
                     "</think>",
                     "hello",
-                    "{\"kind\":\"tool:get_weather\",\"latitude\":48.8566,\"longitude\":2.3522}",
+                    "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":48.8566,\"longitude\":2.3522}}]}",
                     "world",
                 ],
             )
@@ -7180,6 +7317,7 @@ mod tests {
                         name: String::from("get_weather"),
                     },
                 })),
+                parallel_tool_calls: Some(true),
                 response_format: None,
                 psionic_grammar: None,
                 psionic_structured_output: None,
@@ -7196,6 +7334,10 @@ mod tests {
         assert_eq!(
             payload["psionic_tool_calls"][0]["name"],
             serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            payload["psionic_tool_calls"].as_array().map(Vec::len),
+            Some(1)
         );
         Ok(())
     }
@@ -7222,7 +7364,7 @@ mod tests {
                     "<think>",
                     "</think>",
                     "hello",
-                    "{\"kind\":\"tool:get_weather\",\"latitude\":\"oops\",\"longitude\":2.3522}",
+                    "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":\"oops\",\"longitude\":2.3522}}]}",
                     "world",
                 ],
             )
@@ -7247,6 +7389,7 @@ mod tests {
                     stream: false,
                     tools: vec![weather_tool_definition()],
                     tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                    parallel_tool_calls: Some(false),
                     response_format: None,
                     psionic_grammar: None,
                     psionic_structured_output: None,
@@ -8647,6 +8790,73 @@ mod tests {
     }
 
     #[test]
+    fn generic_server_parallel_tool_calls_surface_ordered_batch()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let path = temp.path().join("tiny-tool-batch-llama.gguf");
+        write_test_gguf(
+            &path,
+            multi_tool_call_llama_metadata("tiny tool batch llama").as_slice(),
+            dense_decoder_tensors_with_vocab(false, 6, 3, 4).as_slice(),
+        )?;
+
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
+        let response =
+            tokio::runtime::Runtime::new()?.block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-tool-batch-llama")),
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: vec![weather_tool_definition(), time_tool_definition()],
+                    tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                    parallel_tool_calls: Some(true),
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))?;
+        let payload = tokio::runtime::Runtime::new()?.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["finish_reason"],
+            serde_json::json!("tool_calls")
+        );
+        assert_eq!(
+            payload["choices"][0]["message"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            payload["choices"][0]["message"]["tool_calls"][1]["function"]["name"],
+            serde_json::json!("get_time")
+        );
+        assert!(
+            payload["choices"][0]["message"]["tool_calls"][0]["id"]
+                .as_str()
+                .is_some_and(|id| id.ends_with("-tool-0"))
+        );
+        assert!(
+            payload["choices"][0]["message"]["tool_calls"][1]["id"]
+                .as_str()
+                .is_some_and(|id| id.ends_with("-tool-1"))
+        );
+        assert_eq!(
+            payload["psionic_tool_calls"][0]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            payload["psionic_tool_calls"][1]["name"],
+            serde_json::json!("get_time")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn generic_responses_named_tool_choice_surfaces_tool_call()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
@@ -8676,6 +8886,7 @@ mod tests {
                         name: String::from("get_weather"),
                     },
                 })),
+                parallel_tool_calls: Some(true),
                 previous_response_id: None,
                 psionic_structured_output: None,
                 psionic_reasoning: None,
@@ -8694,6 +8905,10 @@ mod tests {
         assert_eq!(
             payload["psionic_tool_calls"][0]["name"],
             serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            payload["psionic_tool_calls"].as_array().map(Vec::len),
+            Some(1)
         );
         Ok(())
     }
@@ -8721,6 +8936,7 @@ mod tests {
                 stream: false,
                 tools: vec![weather_tool_definition()],
                 tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
                 response_format: None,
                 psionic_grammar: None,
                 psionic_structured_output: None,
@@ -8729,14 +8945,13 @@ mod tests {
                 ..Default::default()
             }),
         ));
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let payload = tokio::runtime::Runtime::new()?.block_on(response_json(response))?;
         assert!(
             payload["error"]["message"]
                 .as_str()
                 .unwrap_or_default()
-                .len()
-                > 8,
+                .contains("structured output fallback could not find a valid continuation"),
             "validation failures should surface through parser-backed refusal"
         );
         Ok(())
@@ -8766,6 +8981,7 @@ mod tests {
                     stream: true,
                     tools: vec![weather_tool_definition()],
                     tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                    parallel_tool_calls: Some(false),
                     response_format: None,
                     psionic_grammar: None,
                     psionic_structured_output: None,
@@ -8908,6 +9124,166 @@ mod tests {
                 .author_name
                 .as_deref(),
             Some("get_weather")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_router_tool_loop_boundary_replays_parallel_tool_results_in_order()
+    -> Result<(), Box<dyn std::error::Error>> {
+        struct ScriptedServeToolLoopRunner {
+            turns: Vec<(Option<String>, Vec<ResolvedToolCall>)>,
+        }
+
+        impl ToolLoopModelRunner for ScriptedServeToolLoopRunner {
+            fn run_turn(
+                &mut self,
+                request: psionic_router::ToolLoopTurnRequest,
+            ) -> Result<ToolLoopModelTurn, ToolLoopError> {
+                let (content, tool_calls) =
+                    self.turns.get(request.step_index).cloned().ok_or_else(|| {
+                        ToolLoopError::Execution(String::from("missing scripted turn"))
+                    })?;
+                Ok(ToolLoopModelTurn {
+                    assistant_message: assistant_prompt_message_for_tool_loop(content),
+                    tool_calls: tool_calls
+                        .into_iter()
+                        .map(tool_loop_tool_call_from_resolved)
+                        .collect(),
+                })
+            }
+        }
+
+        struct ScriptedToolExecutor {
+            descriptor: ToolProviderDescriptor,
+            observed_tool_call_ids: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+            result_text: &'static str,
+        }
+
+        impl ToolLoopToolExecutor for ScriptedToolExecutor {
+            fn descriptor(&self) -> &ToolProviderDescriptor {
+                &self.descriptor
+            }
+
+            fn execute(
+                &self,
+                request: ToolExecutionRequest,
+            ) -> Result<ToolLoopToolResult, ToolLoopError> {
+                self.observed_tool_call_ids
+                    .lock()
+                    .expect("tool call id mutex")
+                    .push(request.tool_call.id.clone());
+                Ok(ToolLoopToolResult {
+                    tool_call_id: request.tool_call.id,
+                    tool_name: request.tool_call.name.clone(),
+                    provider: self.descriptor.clone(),
+                    visibility: self.descriptor.result_visibility,
+                    message: tool_result_prompt_message(
+                        request.tool_call.name.as_str(),
+                        self.result_text,
+                    ),
+                    structured: None,
+                })
+            }
+        }
+
+        let observed_tool_call_ids = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut gateway = ToolGateway::new();
+        gateway.register(
+            "get_weather",
+            ScriptedToolExecutor {
+                descriptor: ToolProviderDescriptor::mcp("weather-provider", "weather", "sse")
+                    .with_history_visibility(ToolHistoryVisibility::PromptHistory)
+                    .with_result_visibility(ToolResultVisibility::InjectIntoModel),
+                observed_tool_call_ids: std::sync::Arc::clone(&observed_tool_call_ids),
+                result_text: "72f and sunny",
+            },
+        );
+        gateway.register(
+            "get_time",
+            ScriptedToolExecutor {
+                descriptor: ToolProviderDescriptor::mcp("clock-provider", "clock", "sse")
+                    .with_history_visibility(ToolHistoryVisibility::PromptHistory)
+                    .with_result_visibility(ToolResultVisibility::InjectIntoModel),
+                observed_tool_call_ids: std::sync::Arc::clone(&observed_tool_call_ids),
+                result_text: "13:00 UTC",
+            },
+        );
+
+        let temp = tempfile::tempdir()?;
+        let path = temp.path().join("tiny-tool-loop-batch-llama.gguf");
+        write_test_gguf(
+            &path,
+            dense_llama_metadata("tiny tool loop batch llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&path))?;
+        let controller = ToolLoopController::new(&server.state.router, &gateway);
+        let mut runner = ScriptedServeToolLoopRunner {
+            turns: vec![
+                (
+                    Some(String::from("Calling weather and time tools")),
+                    vec![
+                        ResolvedToolCall {
+                            id: String::from("tool-0"),
+                            name: String::from("get_weather"),
+                            arguments: serde_json::json!({"city": "Paris"}),
+                        },
+                        ResolvedToolCall {
+                            id: String::from("tool-1"),
+                            name: String::from("get_time"),
+                            arguments: serde_json::json!({"timezone": "UTC"}),
+                        },
+                    ],
+                ),
+                (
+                    Some(String::from("Paris is sunny and it is 13:00 UTC.")),
+                    Vec::new(),
+                ),
+            ],
+        };
+        let outcome = controller.run(
+            ToolLoopRequest::new(
+                RoutingRequest::new(RoutingEndpoint::Responses).require_tool_calling(),
+                vec![PromptMessage::new(
+                    PromptMessageRole::User,
+                    "What is the weather in Paris and the current UTC time?",
+                )],
+            ),
+            &mut runner,
+        )?;
+
+        assert_eq!(outcome.steps.len(), 2);
+        assert_eq!(
+            outcome
+                .final_message
+                .as_ref()
+                .map(|message| message.content.as_str()),
+            Some("Paris is sunny and it is 13:00 UTC.")
+        );
+        assert_eq!(outcome.steps[0].tool_results.len(), 2);
+        assert_eq!(
+            outcome.steps[0]
+                .tool_results
+                .iter()
+                .map(|result| result.tool_call_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["tool-0", "tool-1"]
+        );
+        assert_eq!(
+            outcome.steps[0]
+                .tool_results
+                .iter()
+                .map(|result| result.tool_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["get_weather", "get_time"]
+        );
+        assert_eq!(
+            observed_tool_call_ids
+                .lock()
+                .expect("tool call ids should be readable")
+                .as_slice(),
+            ["tool-0", "tool-1"]
         );
         Ok(())
     }
@@ -9685,7 +10061,7 @@ mod tests {
             "<s>",
             "</s>",
             "hello",
-            "{\"kind\":\"tool:get_weather\",\"latitude\":48.8566,\"longitude\":2.3522}",
+            "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":48.8566,\"longitude\":2.3522}}]}",
             "world",
         ]));
         metadata
@@ -9699,7 +10075,21 @@ mod tests {
             "<s>",
             "</s>",
             "hello",
-            "{\"kind\":\"tool:get_weather\",\"latitude\":\"oops\",\"longitude\":2.3522}",
+            "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":\"oops\",\"longitude\":2.3522}}]}",
+            "world",
+        ]));
+        metadata
+    }
+
+    fn multi_tool_call_llama_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = dense_family_header("llama", name);
+        set_context_length(&mut metadata, "llama", 256);
+        metadata.extend(sentencepiece_tokenizer_metadata_entries_with_tokens(vec![
+            "<unk>",
+            "<s>",
+            "</s>",
+            "hello",
+            "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":48.8566,\"longitude\":2.3522}},{\"name\":\"get_time\",\"arguments\":{\"timezone\":\"UTC\"}}]}",
             "world",
         ]));
         metadata
@@ -9718,6 +10108,24 @@ mod tests {
                         "longitude": { "type": "number" }
                     },
                     "required": ["latitude", "longitude"],
+                    "additionalProperties": false
+                })),
+            },
+        }
+    }
+
+    fn time_tool_definition() -> ToolDefinitionEnvelope {
+        ToolDefinitionEnvelope {
+            kind: String::from("function"),
+            function: ToolDefinitionRequest {
+                name: String::from("get_time"),
+                description: Some(String::from("Get the current time for one timezone.")),
+                parameters: Some(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "timezone": { "type": "string", "minLength": 1 }
+                    },
+                    "required": ["timezone"],
                     "additionalProperties": false
                 })),
             },
