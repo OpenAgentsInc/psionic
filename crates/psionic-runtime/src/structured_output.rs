@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use regex_syntax::{
     hir::{Class as RegexClass, Hir as RegexHir, HirKind as RegexHirKind, Look as RegexLook},
@@ -1135,8 +1135,8 @@ impl MatchResult {
 struct MatchContext<'a> {
     grammar: &'a Grammar,
     input: &'a [char],
-    memo: BTreeMap<(String, usize), MatchResult>,
-    visiting: HashSet<(String, usize)>,
+    memo: HashMap<(&'a str, usize), MatchResult>,
+    visiting: HashSet<(&'a str, usize)>,
 }
 
 impl<'a> MatchContext<'a> {
@@ -1144,13 +1144,13 @@ impl<'a> MatchContext<'a> {
         Self {
             grammar,
             input,
-            memo: BTreeMap::new(),
+            memo: HashMap::new(),
             visiting: HashSet::new(),
         }
     }
 
-    fn match_rule(&mut self, rule: &str, position: usize) -> MatchResult {
-        let key = (rule.to_string(), position);
+    fn match_rule(&mut self, rule: &'a str, position: usize) -> MatchResult {
+        let key = (rule, position);
         if let Some(result) = self.memo.get(&key) {
             return result.clone();
         }
@@ -1169,7 +1169,7 @@ impl<'a> MatchContext<'a> {
         result
     }
 
-    fn match_expression(&mut self, expression: &Expression, position: usize) -> MatchResult {
+    fn match_expression(&mut self, expression: &'a Expression, position: usize) -> MatchResult {
         let mut complete_positions = BTreeSet::new();
         let mut needs_more = false;
         for alternative in &expression.alternatives {
@@ -1183,7 +1183,7 @@ impl<'a> MatchContext<'a> {
         }
     }
 
-    fn match_sequence(&mut self, sequence: &Sequence, position: usize) -> MatchResult {
+    fn match_sequence(&mut self, sequence: &'a Sequence, position: usize) -> MatchResult {
         let mut active_positions = BTreeSet::from([position]);
         let mut needs_more = false;
         for term in &sequence.terms {
@@ -1209,7 +1209,7 @@ impl<'a> MatchContext<'a> {
         }
     }
 
-    fn match_term(&mut self, term: &Term, position: usize) -> MatchResult {
+    fn match_term(&mut self, term: &'a Term, position: usize) -> MatchResult {
         let mut states = BTreeSet::from([position]);
         let mut complete_positions = BTreeSet::new();
         let mut needs_more = false;
@@ -1247,7 +1247,7 @@ impl<'a> MatchContext<'a> {
         }
     }
 
-    fn match_symbol(&mut self, symbol: &Symbol, position: usize) -> MatchResult {
+    fn match_symbol(&mut self, symbol: &'a Symbol, position: usize) -> MatchResult {
         match symbol {
             Symbol::Literal(literal) => match_literal(literal, self.input, position),
             Symbol::CharacterClass(character_class) => {

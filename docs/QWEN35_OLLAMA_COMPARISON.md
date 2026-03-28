@@ -218,11 +218,12 @@ Psionic-only measured means:
   `--json-schema-file`, and the native qwen35 structured path is now replay-safe
   and can stay off dense raw-logit replay on the bounded greedy schema lane.
 - Structured-output throughput is still outside the canonical matrix. After the
-  leading-char token-cache bucketing pass and a clean isolated rebuild on March
-  28, 2026, the local `qwen3.5:0.8b` summary-schema spot check measured native
-  Psionic at about `76 tok/s` on the first bounded sparse-gather run and about
-  `159 tok/s` mean across a warmed three-repeat pass, versus local Ollama at
-  about `331 tok/s`. Psionic published
+  leading-char token-cache bucketing pass, the matcher memo-path allocation
+  cut, and a clean isolated rebuild on March 28, 2026, the local
+  `qwen3.5:0.8b` summary-schema spot check measured native Psionic at about
+  `78 tok/s` on the first bounded sparse-gather run and about `162 tok/s` mean
+  across a warmed three-repeat pass, versus local Ollama at about `331 tok/s`.
+  Psionic published
   `qwen35_output_modes=[top_k_candidates:128,sparse_logits:2,sparse_logits:3,sparse_logits:10]`,
   `qwen35_readback_bytes=5700`, and `qwen35_raw_logits=false` on the sparse
   run. The later warmed repeats stayed on `qwen35_output_modes=[top_k_candidates:128]`

@@ -88,10 +88,11 @@ than just run tensor math.
   `--json-schema-file`.
 - Structured-output throughput is still not part of the canonical
   Psionic-versus-Ollama matrix. On March 28, 2026, after adding leading-char
-  token-id buckets to the structured-output append cache and rebuilding from a
+  token-id buckets to the structured-output append cache, removing per-rule
+  name allocation from the recursive matcher memo path, and rebuilding from a
   clean isolated target, a fresh local `qwen3.5:0.8b` summary-schema spot
-  check measured native Psionic at about `76 tok/s` on the first bounded
-  sparse-gather run and about `159 tok/s` mean across a warmed three-repeat
+  check measured native Psionic at about `78 tok/s` on the first bounded
+  sparse-gather run and about `162 tok/s` mean across a warmed three-repeat
   pass, versus local Ollama at about `331 tok/s`. Psionic published
   `qwen35_output_modes=[top_k_candidates:128,sparse_logits:2,sparse_logits:3,sparse_logits:10]`,
   `qwen35_readback_bytes=5700`, and `qwen35_raw_logits=false` on the sparse
