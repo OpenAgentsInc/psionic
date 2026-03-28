@@ -11,7 +11,7 @@ Tracked issues:
 Published benchmark checkpoints:
 
 - greedy matrix checkpoint: `c5bc0ba2`
-- sampled matrix checkpoint: `043eda03`
+- sampled matrix checkpoint: `213f3995`
 
 Shared benchmark rules:
 
@@ -73,15 +73,17 @@ Psionic output-mode evidence on this contract:
 
 - `qwen35_output_modes=[top_k_candidates:40]`
 - `qwen35_raw_logits=false`
+- Psionic sampled rows rerun after a clean `CARGO_INCREMENTAL=0` rebuild of
+  `qwen35_cuda_bench`
 
 ## Sampled Matrix
 
 | Model | Artifact path | Artifact digest | Psionic decode tok/s | Ollama decode tok/s | Status | Notes |
 | --- | --- | --- | ---: | ---: | --- | --- |
-| `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `499.43` | `330.83` | `implemented_early`, ahead | Native CUDA sampled decode stays on the bounded `top_k_candidates` lane instead of dense vocab-logit readback |
-| `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `244.42` | `202.41` | `implemented_early`, ahead | One Psionic repeat stopped at `112` tokens before the cap and still stayed ahead on decode throughput |
-| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `172.46` | `139.79` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row stays ahead on the same bounded sampled lane |
-| `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `105.65` | `93.08` | `implemented_early`, ahead | The row still needs the same operational rule as greedy benchmarking: unload Ollama before the Psionic measurement |
+| `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `497.09` | `330.83` | `implemented_early`, ahead | Native CUDA sampled decode stays on the bounded `top_k_candidates` lane instead of dense vocab-logit readback |
+| `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `244.07` | `202.41` | `implemented_early`, ahead | One Psionic repeat stopped at `112` tokens before the cap and still stayed ahead on decode throughput |
+| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `172.89` | `139.79` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row stays ahead on the same bounded sampled lane |
+| `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `105.90` | `93.08` | `implemented_early`, ahead | The row still needs the same operational rule as greedy benchmarking: unload Ollama before the Psionic measurement |
 
 ## Current Notes
 

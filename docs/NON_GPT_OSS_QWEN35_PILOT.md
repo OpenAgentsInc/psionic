@@ -276,12 +276,13 @@ sampled benchmark contract from `docs/QWEN35_OLLAMA_COMPARISON.md`:
   - `qwen35_output_modes=[top_k_candidates:40]`
   - `qwen35_raw_logits=false`
 
-Measured on the same host with `3` repeats per backend:
+Measured on the same host with `3` repeats per backend after a clean
+`CARGO_INCREMENTAL=0` rebuild of `qwen35_cuda_bench` on the Psionic side:
 
-- `qwen3.5:0.8b`: Psionic about `499.43 tok/s`, Ollama about `330.83 tok/s`
-- `qwen3.5:2b`: Psionic about `244.42 tok/s`, Ollama about `202.41 tok/s`
-- `qwen3.5:4b`: Psionic about `172.46 tok/s`, Ollama about `139.79 tok/s`
-- `qwen3.5:9b`: Psionic about `105.65 tok/s`, Ollama about `93.08 tok/s`
+- `qwen3.5:0.8b`: Psionic about `497.09 tok/s`, Ollama about `330.83 tok/s`
+- `qwen3.5:2b`: Psionic about `244.07 tok/s`, Ollama about `202.41 tok/s`
+- `qwen3.5:4b`: Psionic about `172.89 tok/s`, Ollama about `139.79 tok/s`
+- `qwen3.5:9b`: Psionic about `105.90 tok/s`, Ollama about `93.08 tok/s`
 
 The sampled lane stays bounded and honest. qwen35 only uses the fast
 `TopKCandidates { top_k }` output path when the request remains exact for a
