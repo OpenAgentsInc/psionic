@@ -421,7 +421,7 @@ impl ParameterGolfBatchGeometry {
         self.local_validation_batch_tokens() / self.train_sequence_length
     }
 
-    fn validate(&self) -> Result<(), ParameterGolfReferenceTrainingError> {
+    pub(crate) fn validate(&self) -> Result<(), ParameterGolfReferenceTrainingError> {
         if self.world_size != 1 {
             return Err(ParameterGolfReferenceTrainingError::InvalidBatchGeometry {
                 message: format!(

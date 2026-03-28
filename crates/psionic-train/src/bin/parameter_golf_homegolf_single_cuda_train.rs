@@ -73,11 +73,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         config.final_validation_mode = final_validation_mode;
     }
     if let Some(validation_eval_mode) = validation_eval_mode {
+        let previous_default_validation_batch_sequences =
+            parameter_golf_default_validation_batch_sequences(
+                &config.geometry,
+                &config.validation_eval_mode,
+            );
+        let preserved_validation_batch_sequences = config.validation_batch_sequences;
         config.validation_eval_mode = validation_eval_mode;
-        config.validation_batch_sequences = parameter_golf_default_validation_batch_sequences(
-            &config.geometry,
-            &config.validation_eval_mode,
-        );
+        if preserved_validation_batch_sequences == previous_default_validation_batch_sequences {
+            config.validation_batch_sequences = parameter_golf_default_validation_batch_sequences(
+                &config.geometry,
+                &config.validation_eval_mode,
+            );
+        }
     }
     if let Some(score_first_ttt) = score_first_ttt {
         config.score_first_ttt = Some(score_first_ttt);

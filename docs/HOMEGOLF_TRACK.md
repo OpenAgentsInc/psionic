@@ -121,6 +121,35 @@ What it does not prove:
 - that the live dense strict HOMEGOLF run has already been retained
 - that the mixed-device home cluster already produces the scored bundle
 
+## Current Local-CUDA Strict Score Finding
+
+HOMEGOLF now also has one observed local-CUDA strict score iteration on the
+current home `RTX 4080` lane:
+
+- latest audit:
+  `docs/audits/2026-03-28-homegolf-local-cuda-strict-score-iteration-audit.md`
+
+What this observed run changed:
+
+- the exact strict HOMEGOLF scorer no longer only refuses or OOMs on the local
+  `16GB` consumer CUDA lane
+- one divisor-safe local fit profile now reaches a finite strict score with:
+  - `grad_accum_steps=64`
+  - `validation_batch_sequences=8`
+  - `sliding_window:64`
+  - `legal_score_first_ttt:batch_sequences=4`
+- the observed one-step strict result reached:
+  - `train_time_ms=321606`
+  - `final_validation_elapsed_ms=187517`
+  - `final_validation_mean_loss=11.74549673`
+  - `final_validation_bits_per_byte=6.80014851`
+
+What this does not yet prove:
+
+- one fully retained report/artifact pair from that exact local-CUDA strict run
+- exact prompt-generation proof on the scored local-CUDA artifact itself
+- one public-leaderboard-equivalent result
+
 ## Train-To-Infer Closure
 
 HOMEGOLF now also has one retained train-to-infer closure proof for the exact

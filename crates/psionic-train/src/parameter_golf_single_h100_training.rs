@@ -402,6 +402,11 @@ impl ParameterGolfSingleH100TrainingConfig {
                 }
             }
         }
+        self.geometry.validate().map_err(|error| {
+            ParameterGolfSingleH100TrainingError::InvalidConfig {
+                message: format!("invalid batch geometry for single-device trainer: {error}"),
+            }
+        })?;
         self.model_config.validate().map_err(|error| {
             ParameterGolfSingleH100TrainingError::InvalidConfig {
                 message: format!("model_config is invalid for the trainer lane: {error}"),
@@ -1324,12 +1329,6 @@ impl ParameterGolfSingleH100TrainingReport {
     }
 }
 
-#[derive(Debug)]
-struct ParameterGolfPersistedArtifactOutput {
-    path: PathBuf,
-    bytes: Vec<u8>,
-}
-
 /// Config for a bounded same-node validation-runtime comparison.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfSingleH100ValidationRuntimeComparisonConfig {
@@ -1842,31 +1841,42 @@ pub fn write_parameter_golf_single_h100_training_report(
     output_path: &Path,
     config: &ParameterGolfSingleH100TrainingConfig,
 ) -> Result<ParameterGolfSingleH100TrainingReport, ParameterGolfSingleH100TrainingError> {
-    let (mut report, persisted_artifact, mut live_visualization_writer) =
+    emit_progress_line(format!(
+        "training_report_closeout_start report_path={}",
+        output_path.display()
+    ));
+    let (report, persisted_artifact_path, mut live_visualization_writer) =
         build_parameter_golf_single_h100_training_report_inner(config, Some(output_path))?;
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    if let Some(persisted_artifact) = persisted_artifact {
-        if let Some(parent) = persisted_artifact.path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&persisted_artifact.path, persisted_artifact.bytes)?;
-        report.compressed_model_artifact_path = Some(persisted_artifact.path.display().to_string());
-        report.report_digest = stable_digest(
-            b"psionic_parameter_golf_single_h100_training_report|",
-            &report_without_digest(&report),
-        );
+    if let Some(persisted_artifact_path) = persisted_artifact_path.as_ref() {
+        emit_progress_line(format!(
+            "training_report_closeout_artifact_ready path={}",
+            persisted_artifact_path.display()
+        ));
     }
+    emit_progress_line(String::from("training_report_json_encode_start"));
     let encoded = serde_json::to_vec_pretty(&report).map_err(|error| {
         ParameterGolfSingleH100TrainingError::Serialization {
             message: error.to_string(),
         }
     })?;
+    emit_progress_line(format!(
+        "training_report_json_encode_complete bytes={}",
+        encoded.len()
+    ));
     fs::write(output_path, encoded)?;
+    emit_progress_line(format!(
+        "training_report_json_write_complete report_path={}",
+        output_path.display()
+    ));
     if let Some(writer) = live_visualization_writer.as_mut() {
+        emit_progress_line(String::from("training_report_visualization_finish_start"));
         writer.finish_with_report(&report)?;
+        emit_progress_line(String::from("training_report_visualization_finish_complete"));
     }
+    emit_progress_line(String::from("training_report_closeout_complete"));
     Ok(report)
 }
 
@@ -2063,7 +2073,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
 ) -> Result<
     (
         ParameterGolfSingleH100TrainingReport,
-        Option<ParameterGolfPersistedArtifactOutput>,
+        Option<PathBuf>,
         Option<crate::ParameterGolfSingleH100LiveVisualizationWriter>,
     ),
     ParameterGolfSingleH100TrainingError,
@@ -2658,6 +2668,31 @@ fn build_parameter_golf_single_h100_training_report_inner(
         &config.run_id,
         step,
     )?;
+    emit_progress_line(format!(
+        "final_artifact_export_complete bytes={} artifact_ref={} artifact_digest={}",
+        compressed_model_artifact.bytes.len(),
+        compressed_model_artifact.artifact_ref,
+        compressed_model_artifact.artifact_digest,
+    ));
+    let persisted_artifact_path = if let Some(output_path) = output_path {
+        let artifact_path = persisted_artifact_output_path(output_path);
+        if let Some(parent) = artifact_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        emit_progress_line(format!(
+            "final_artifact_persist_start path={} bytes={}",
+            artifact_path.display(),
+            compressed_model_artifact.bytes.len(),
+        ));
+        fs::write(&artifact_path, compressed_model_artifact.bytes.as_slice())?;
+        emit_progress_line(format!(
+            "final_artifact_persist_complete path={}",
+            artifact_path.display()
+        ));
+        Some(artifact_path)
+    } else {
+        None
+    };
     let mut final_validation = pre_export_final_validation.clone();
     let mut final_validation_observed_ms = pre_export_final_validation_observed_ms;
     let mut final_roundtrip_receipt = None;
@@ -2870,8 +2905,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         compressed_model_bytes: Some(compressed_model_artifact.bytes.len() as u64),
         compressed_model_artifact_ref: Some(compressed_model_artifact.artifact_ref.clone()),
         compressed_model_artifact_digest: Some(compressed_model_artifact.artifact_digest.clone()),
-        compressed_model_artifact_path: output_path
-            .map(persisted_artifact_output_path)
+        compressed_model_artifact_path: persisted_artifact_path
+            .as_ref()
             .map(|path| path.display().to_string()),
         step_metrics,
         aggregate_phase_timings: Some(aggregate_phase_timings),
@@ -2885,16 +2920,29 @@ fn build_parameter_golf_single_h100_training_report_inner(
         summary,
         report_digest: String::new(),
     };
+    let report_digest_started = Instant::now();
+    emit_progress_line(format!(
+        "training_report_digest_start final_validation_bpb={} report_path={}",
+        report
+            .final_validation
+            .as_ref()
+            .map_or_else(|| String::from("none"), |summary| format!("{:.8}", summary.bits_per_byte)),
+        output_path
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| String::from("<memory_only>")),
+    ));
     report.report_digest = stable_digest(
         b"psionic_parameter_golf_single_h100_training_report|",
         &report_without_digest(&report),
     );
+    emit_progress_line(format!(
+        "training_report_digest_complete elapsed_ms={} report_digest={}",
+        duration_ms(report_digest_started),
+        report.report_digest,
+    ));
     Ok((
         report,
-        output_path.map(|path| ParameterGolfPersistedArtifactOutput {
-            path: persisted_artifact_output_path(path),
-            bytes: compressed_model_artifact.bytes,
-        }),
+        persisted_artifact_path,
         live_visualization_writer,
     ))
 }
@@ -8111,6 +8159,23 @@ mod tests {
             config.final_artifact_config,
             ParameterGolfFinalArtifactConfig::competitive_defaults()
         );
+    }
+
+    #[test]
+    fn homegolf_local_cuda_rejects_non_sequence_exact_grad_accum() {
+        let mut config = ParameterGolfSingleH100TrainingConfig::challenge_homegolf_local_cuda_defaults(
+            PathBuf::from("."),
+            PathBuf::from("tokenizer.model"),
+        );
+        config.geometry.grad_accum_steps = 24;
+        let error = config
+            .validate()
+            .expect_err("non-sequence-exact grad_accum should refuse");
+        assert!(matches!(
+            error,
+            ParameterGolfSingleH100TrainingError::InvalidConfig { message }
+                if message.contains("invalid batch geometry")
+        ));
     }
 
     #[test]
