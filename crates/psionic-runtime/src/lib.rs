@@ -5524,7 +5524,6 @@ pub struct TokenSampler {
     rng: StdRng,
     mirostat_state: Option<MirostatState>,
     candidate_tokens: Vec<SampleToken>,
-    candidate_probabilities: Vec<f32>,
 }
 
 impl TokenSampler {
@@ -5547,7 +5546,6 @@ impl TokenSampler {
             rng,
             mirostat_state,
             candidate_tokens: Vec::new(),
-            candidate_probabilities: Vec::new(),
         }
     }
 
@@ -5573,7 +5571,6 @@ impl TokenSampler {
             rng,
             mirostat_state,
             candidate_tokens: Vec::new(),
-            candidate_probabilities: Vec::new(),
         })
     }
 
@@ -5770,32 +5767,6 @@ impl TokenSampler {
         if candidate_ids.len() != candidate_logits.len() {
             return None;
         }
-        if sampling_is_argmax_only(&self.policy) {
-            return candidate_ids
-                .iter()
-                .copied()
-                .zip(candidate_logits.iter().copied())
-                .find_map(|(id, logit)| logit.is_finite().then_some(id));
-        }
-        if can_fast_path_presorted_candidate_sampling(
-            &self.policy,
-            candidate_ids,
-            candidate_logits,
-        ) {
-            let selected = sample_presorted_candidate_slice_fast(
-                &mut self.rng,
-                &mut self.candidate_probabilities,
-                candidate_ids,
-                candidate_logits,
-                &self.policy,
-            );
-            if selected.is_some() {
-                if let Some(generator_state) = self.generator_state.as_mut() {
-                    generator_state.draws = generator_state.draws.saturating_add(1);
-                }
-            }
-            return selected;
-        }
         self.candidate_tokens.clear();
         self.candidate_tokens.reserve(candidate_ids.len());
         for (&id, &logit) in candidate_ids.iter().zip(candidate_logits.iter()) {
@@ -5810,6 +5781,9 @@ impl TokenSampler {
         }
         if self.candidate_tokens.is_empty() {
             return None;
+        }
+        if sampling_is_argmax_only(&self.policy) {
+            return self.candidate_tokens.first().map(|token| token.id);
         }
         let full_vocab_size = full_vocab_size.max(self.candidate_tokens.len());
         let top_k_already_applied = matches!(
@@ -6184,117 +6158,6 @@ fn typical_p(tokens: &mut Vec<SampleToken>, typical_p: Option<f32>) {
 fn sampling_is_argmax_only(policy: &SamplingPolicy) -> bool {
     policy.strategy == SamplingStrategy::Greedy
         || (policy.effective_temperature() <= 1e-6 && policy.effective_mirostat().is_none())
-}
-
-fn can_fast_path_presorted_candidate_sampling(
-    policy: &SamplingPolicy,
-    candidate_ids: &[u32],
-    candidate_logits: &[f32],
-) -> bool {
-    if candidate_ids.is_empty()
-        || candidate_ids.len() != candidate_logits.len()
-        || policy.strategy != SamplingStrategy::Sample
-        || policy.effective_mirostat().is_some()
-        || policy.effective_typical_p().is_some()
-        || policy.effective_temperature() <= 1e-6
-    {
-        return false;
-    }
-    let Some(top_k) = policy.effective_top_k() else {
-        return false;
-    };
-    let Some(top_p) = policy.effective_top_p() else {
-        return false;
-    };
-    if top_k == 0 || candidate_ids.len() > top_k || !(0.0 < top_p && top_p < 1.0) {
-        return false;
-    }
-    candidate_logits.iter().all(|logit| logit.is_finite())
-}
-
-fn truncate_presorted_top_p_prefix(
-    probabilities: &mut [f32],
-    logits: &[f32],
-    top_p: f32,
-) -> Option<usize> {
-    let max_logit = *logits.first()?;
-    let mut total = 0.0_f32;
-    for (slot, &logit) in probabilities.iter_mut().zip(logits.iter()) {
-        let weight = (logit - max_logit).exp();
-        *slot = weight;
-        total += weight;
-    }
-    if !total.is_finite() || total <= 0.0 {
-        return None;
-    }
-    let mut cumulative = 0.0_f32;
-    for (index, weight) in probabilities.iter().copied().enumerate() {
-        cumulative += weight / total;
-        if cumulative >= top_p {
-            return Some(index + 1);
-        }
-    }
-    Some(probabilities.len().max(1))
-}
-
-fn truncate_presorted_min_p_prefix(logits: &[f32], min_p: Option<f32>) -> usize {
-    let Some(min_p) = min_p else {
-        return logits.len();
-    };
-    if logits.is_empty() || min_p <= 0.0 || min_p > 1.0 {
-        return logits.len();
-    }
-    let threshold = logits[0] + min_p.ln();
-    logits
-        .iter()
-        .position(|&logit| !logit.is_finite() || logit < threshold)
-        .unwrap_or(logits.len())
-        .max(1)
-}
-
-fn sample_presorted_candidate_slice_fast(
-    rng: &mut StdRng,
-    probability_scratch: &mut Vec<f32>,
-    candidate_ids: &[u32],
-    candidate_logits: &[f32],
-    policy: &SamplingPolicy,
-) -> Option<u32> {
-    let top_p = policy.effective_top_p()?;
-    if !(0.0 < top_p && top_p < 1.0) {
-        return None;
-    }
-    probability_scratch.resize(candidate_logits.len(), 0.0);
-    let raw_keep = truncate_presorted_top_p_prefix(
-        &mut probability_scratch[..candidate_logits.len()],
-        candidate_logits,
-        top_p,
-    )?;
-    let min_p_keep =
-        truncate_presorted_min_p_prefix(&candidate_logits[..raw_keep], policy.effective_min_p());
-    let keep = raw_keep.min(min_p_keep).max(1);
-    let kept_logits = &candidate_logits[..keep];
-    let kept_ids = &candidate_ids[..keep];
-    let kept_probabilities = &mut probability_scratch[..keep];
-    let temperature = policy.effective_temperature();
-    let max_logit = kept_logits[0] / temperature;
-    let mut total = 0.0_f32;
-    for (slot, &logit) in kept_probabilities.iter_mut().zip(kept_logits.iter()) {
-        let weight = (logit / temperature - max_logit).exp();
-        *slot = weight;
-        total += weight;
-    }
-    if !total.is_finite() || total <= 0.0 {
-        return None;
-    }
-
-    let mut target = rng.random::<f32>() * total;
-    for (&token_id, &weight) in kept_ids.iter().zip(kept_probabilities.iter()) {
-        target -= weight;
-        if target <= 0.0 {
-            return Some(token_id);
-        }
-    }
-    kept_ids.last().copied()
 }
 
 fn sample_token_from_tokens(

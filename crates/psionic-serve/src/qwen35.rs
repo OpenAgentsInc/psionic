@@ -973,6 +973,14 @@ fn qwen35_partitioned_top_k_block_override() -> Option<usize> {
         .filter(|value| *value > 0)
 }
 
+fn qwen35_partitioned_top_k_threshold() -> usize {
+    std::env::var("PSIONIC_QWEN35_PARTITIONED_TOP_K_THRESHOLD")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(QWEN35_CUDA_PARTITIONED_TOP_K_THRESHOLD)
+}
+
 fn qwen35_partitioned_top_k_block_count(top_k: usize, override_blocks: Option<usize>) -> usize {
     if let Some(blocks) = override_blocks {
         return blocks;
@@ -6797,6 +6805,7 @@ struct Qwen35CudaStepPlan {
     top_k_indices_host_buffer: CudaHostBuffer,
     top_k_values_host_buffer: CudaHostBuffer,
     partitioned_top_k_block_override: Option<usize>,
+    partitioned_top_k_threshold: usize,
     no_output_graph_exec: Option<CudaGraphExec>,
     no_output_graph_cache_identity: Option<Vec<(usize, usize)>>,
     decode_graph_exec: Option<CudaGraphExec>,
@@ -6817,6 +6826,7 @@ impl Qwen35CudaStepPlan {
         max_penalty_token_count: usize,
     ) -> Result<Self, ReferenceTextGenerationError> {
         let partitioned_top_k_block_override = qwen35_partitioned_top_k_block_override();
+        let partitioned_top_k_threshold = qwen35_partitioned_top_k_threshold();
         let q8_1_bytes = ggml_q8_1_storage_bytes(1, max_input_columns)
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let activated_q8_1_bytes = ggml_q8_1_storage_bytes(1, max_output_rows)
@@ -6938,6 +6948,7 @@ impl Qwen35CudaStepPlan {
                 .host_buffer(QWEN35_CUDA_MAX_TOP_K * std::mem::size_of::<f32>())
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             partitioned_top_k_block_override,
+            partitioned_top_k_threshold,
             no_output_graph_exec: None,
             no_output_graph_cache_identity: None,
             decode_graph_exec: None,
@@ -6955,7 +6966,7 @@ impl Qwen35CudaStepPlan {
         logit_count: usize,
         top_k: usize,
     ) -> Result<(), crate::RuntimeError> {
-        if top_k >= QWEN35_CUDA_PARTITIONED_TOP_K_THRESHOLD {
+        if top_k >= self.partitioned_top_k_threshold {
             let partitioned_top_k_blocks = qwen35_partitioned_top_k_block_count(
                 top_k,
                 self.partitioned_top_k_block_override,
