@@ -163,6 +163,7 @@ coordinator_log_path="${bundle_dir}/logs/coordinator.log"
 
 remote_contributor_report_path="${remote_bundle_dir}/contributor_runtime_report.json"
 remote_target_dir='$HOME/code/psionic/target/first-swarm-tailnet'
+remote_tmp_dir='$HOME/code/psionic-tailrun/tmp'
 
 echo "Staging ${git_ref} to ${remote_host}:${remote_worktree_dir}"
 git -C "${repo_root}" archive "${git_ref}" -- \
@@ -218,7 +219,7 @@ jq -n \
 
 echo "Starting remote contributor on ${remote_host} (${remote_tailnet_ip}:${contributor_port})"
 ssh "${remote_host}" \
-  "bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; mkdir -p \"${remote_target_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --bin first_swarm_trusted_lan_live_runtime -- --role contributor --run-id ${run_id} --topology-contract ${remote_worktree_dir}/${topology_contract_rel} --workflow-plan ${remote_worktree_dir}/${workflow_plan_rel} --local-endpoint ${remote_tailnet_ip}:${contributor_port} --peer-endpoint ${local_tailnet_ip}:${coordinator_port} --output ${remote_contributor_report_path}'" \
+  "bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --bin first_swarm_trusted_lan_live_runtime -- --role contributor --run-id ${run_id} --topology-contract ${remote_worktree_dir}/${topology_contract_rel} --workflow-plan ${remote_worktree_dir}/${workflow_plan_rel} --local-endpoint ${remote_tailnet_ip}:${contributor_port} --peer-endpoint ${local_tailnet_ip}:${coordinator_port} --output ${remote_contributor_report_path}'" \
   >"${contributor_log_path}" 2>&1 &
 contributor_ssh_pid=$!
 
