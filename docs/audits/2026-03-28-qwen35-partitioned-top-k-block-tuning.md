@@ -73,7 +73,7 @@ This tuning pass:
 - sized the partitioned top-k scratch buffers from the effective block count
   instead of the old fixed constant
 
-The landed code change is:
+The first landed code change was:
 
 - commit `e34c0b05` `Tune qwen35 partitioned top-k block count`
 
@@ -151,6 +151,75 @@ Those rows still remain:
   - `qwen35_output_modes=[top_k_candidates:100]`
   - `qwen35_raw_logits=false`
 
+## Adaptive Follow-On For Wider `top_k`
+
+The fixed `24`-block default was clearly right for the canonical
+`sampled_topk40` contract, but a follow-on sweep showed the wider
+`sampled_topk100` contract still wanted a larger block count.
+
+Idle RTX 4080 `sampled_topk100` sweep:
+
+| Blocks | `0.8b` | `2b` | `4b` | `9b` |
+| --- | ---: | ---: | ---: | ---: |
+| `16` | `473.13` | `245.94` | `176.22` | `108.60` |
+| `24` | `493.70` | `248.26` | `177.45` | `109.11` |
+| `32` | `498.93` | `250.04` | `178.03` | `109.32` |
+| `40` | `501.72` | `250.84` | `178.46` | `109.49` |
+| `48` | `501.85` | `250.07` | `178.29` | `109.44` |
+| `64` | `501.85` | `250.77` | `178.33` | `109.42` |
+
+That suggested a simple adaptive rule:
+
+- keep the clean `top_k = 40` contract on the `24`-block profile
+- widen the block count for larger bounded candidate sets
+
+The second landed code change was:
+
+- commit `d90cd0e5` `Adapt qwen35 partitioned top-k block counts`
+
+That commit keeps the small sampled lane at `24` blocks and switches the wider
+bounded lane to a larger block count for `top_k >= 96`.
+
+## Commit-Pinned Adaptive Rerun
+
+After landing `d90cd0e5`, the sampled matrix was rerun again on the same idle
+RTX 4080 host:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_210428_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_210428_archlinux-/one_page_summary.md`
+
+### `sampled_topk40` deltas vs `20260328_200654`
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `506.49` | `505.33` | `-0.23%` | `336.81` |
+| `qwen3.5:2b` | `252.83` | `252.94` | `+0.04%` | `206.31` |
+| `qwen3.5:4b` | `179.55` | `179.42` | `-0.08%` | `143.99` |
+| `qwen3.5:9b` | `110.13` | `110.12` | `-0.00%` | `83.81` |
+
+Interpretation:
+
+- this is effectively flat
+- the adaptive policy did not give back the `top_k = 40` win
+- the clean sampled lane stayed on the same bounded-candidate profile
+
+### `sampled_topk100` deltas vs `20260328_200654`
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `492.81` | `501.50` | `+1.76%` | `327.19` |
+| `qwen3.5:2b` | `247.57` | `250.76` | `+1.29%` | `205.42` |
+| `qwen3.5:4b` | `177.28` | `178.31` | `+0.58%` | `143.72` |
+| `qwen3.5:9b` | `109.02` | `109.42` | `+0.36%` | `97.78` |
+
+Interpretation:
+
+- this is a smaller gain than the earlier `8 -> 24` jump, but it is still
+  real and repeatable
+- the gain is concentrated in the wider bounded lane, which is exactly what
+  the sweep predicted
+- the row-strength classifications stay unchanged
+
 ## What This Tells Us
 
 The bounded sampled lane still had kernel-launch shape headroom even after the
@@ -169,8 +238,7 @@ This is a real throughput gain, not just a measurement artifact.
 ## Next Steps
 
 - tune the partitioned block count against the wider `top_k = 100` contract
-  explicitly instead of assuming the `top_k = 40` optimum is globally optimal
-- consider making the partitioned block count adaptive to `top_k` or model
-  family once the wider sweep data exists
+  beyond the current `24` versus `40` split and decide whether a richer
+  adaptive rule is worth the added complexity
 - keep benchmarking from the same remote staging worktree so future qwen35
   tuning passes do not pay path-sensitive rebuild cost again

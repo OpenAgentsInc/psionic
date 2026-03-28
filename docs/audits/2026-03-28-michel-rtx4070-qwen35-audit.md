@@ -33,6 +33,13 @@ the row-strength classifications: `sampled_topk40` moved to `506.49`, `252.83`,
 `179.55`, `110.13 tok/s`, and `sampled_topk100` moved to `492.81`, `247.57`,
 `177.28`, `109.02 tok/s`.
 
+Later again, current `main` made that block-count policy adaptive by requested
+`top_k` and published another sampled follow-on at
+`fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_210428_archlinux-.json`.
+That kept the clean `sampled_topk40` rows effectively flat while nudging the
+wide `sampled_topk100` rows up again to `501.50`, `250.76`, `178.31`,
+`109.42 tok/s`.
+
 Tracked issue:
 
 - `#650` Follow up Michel's RTX 4070 qwen35 run: benchmark-quality closure and
@@ -102,8 +109,9 @@ The current canonical clean-host record is split by contract:
   `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_190650_archlinux-.json`
   remains the full greedy-plus-sampled checkpoint
 - the later March 28 sampled follow-on at
-  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_200654_archlinux-.json`
-  is the latest sampled-only checkpoint after partitioned block-count tuning
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_210428_archlinux-.json`
+  is the latest sampled-only checkpoint after the later adaptive block-count
+  follow-on
 
 This audit therefore treats Michel's run as a constrained-host follow-on, not
 as a correction to `#606`, `#631`, or `#632`.

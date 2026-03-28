@@ -160,6 +160,13 @@ than just run tensor math.
   and raised `sampled_topk100` throughput from `446.26`, `236.17`, `171.24`,
   `106.62 tok/s` to `492.81`, `247.57`, `177.28`, `109.02 tok/s`, while the
   row-strength classifications stayed unchanged.
+- Later again on March 28, 2026, current `main` made the partitioned block
+  count adaptive by requested `top_k` instead of using the same fixed value
+  for every bounded sampled row. The commit-pinned rerun at
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_210428_archlinux-.json`
+  kept `sampled_topk40` effectively flat at `505.33`, `252.94`, `179.42`,
+  `110.12 tok/s` while raising `sampled_topk100` again to `501.50`,
+  `250.76`, `178.31`, `109.42 tok/s`.
 - The fresh clean-host March 28, 2026 rerun on the same RTX 4080 changes the
   canonical interpretation:
   - raw greedy `tok/s` is higher on Psionic across all four models, and
