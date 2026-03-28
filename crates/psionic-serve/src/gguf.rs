@@ -2210,6 +2210,7 @@ fn build_qwen35_proxy_generation_response(
         kv_residency: None,
         kv_cache_encoding: None,
         prefix_tokens_reused: None,
+        termination_detail: None,
         gpt_oss_perf: None,
         qwen35_cuda_decode: None,
     };

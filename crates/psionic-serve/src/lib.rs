@@ -1532,6 +1532,9 @@ pub struct GenerationMetrics {
     /// Number of prompt-prefix tokens reused from the shared prefix cache.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix_tokens_reused: Option<usize>,
+    /// Explicit termination detail when the runtime can distinguish EOS from a stop-sequence hit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub termination_detail: Option<GenerationTerminationDetail>,
     /// Native qwen35 CUDA decode-output evidence for the realized request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub qwen35_cuda_decode: Option<Qwen35CudaDecodeOutputMetrics>,
@@ -1575,6 +1578,94 @@ pub struct GptOssStageTimingMetrics {
     pub stop_check_ns: u64,
     /// Host-side sampling / token-selection time in nanoseconds.
     pub sampling_ns: u64,
+}
+
+/// Narrow termination cause when the runtime can distinguish more than the terminal reason alone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenerationTerminationCause {
+    /// The model emitted an EOS token.
+    EndOfSequenceToken,
+    /// The generated text matched a configured stop sequence.
+    StopSequence,
+    /// The request hit the configured output token cap.
+    MaxOutputTokens,
+    /// The request hit the context limit.
+    ContextLimit,
+    /// The caller explicitly cancelled the request.
+    Cancelled,
+    /// The caller disconnected after streaming started.
+    Disconnected,
+    /// The runtime failed after generation started.
+    Error,
+}
+
+/// Additional termination detail when the runtime can identify the exact stop cause.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenerationTerminationDetail {
+    /// Narrow classified termination cause.
+    pub cause: GenerationTerminationCause,
+    /// Matched stop sequence when that caused termination.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched_stop_sequence: Option<String>,
+}
+
+impl GenerationTerminationDetail {
+    #[must_use]
+    pub const fn end_of_sequence_token() -> Self {
+        Self {
+            cause: GenerationTerminationCause::EndOfSequenceToken,
+            matched_stop_sequence: None,
+        }
+    }
+
+    #[must_use]
+    pub fn stop_sequence(matched_stop_sequence: impl Into<String>) -> Self {
+        Self {
+            cause: GenerationTerminationCause::StopSequence,
+            matched_stop_sequence: Some(matched_stop_sequence.into()),
+        }
+    }
+
+    #[must_use]
+    pub const fn max_output_tokens() -> Self {
+        Self {
+            cause: GenerationTerminationCause::MaxOutputTokens,
+            matched_stop_sequence: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn context_limit() -> Self {
+        Self {
+            cause: GenerationTerminationCause::ContextLimit,
+            matched_stop_sequence: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn cancelled() -> Self {
+        Self {
+            cause: GenerationTerminationCause::Cancelled,
+            matched_stop_sequence: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn disconnected() -> Self {
+        Self {
+            cause: GenerationTerminationCause::Disconnected,
+            matched_stop_sequence: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn error() -> Self {
+        Self {
+            cause: GenerationTerminationCause::Error,
+            matched_stop_sequence: None,
+        }
+    }
 }
 
 impl GptOssStageTimingMetrics {
@@ -2195,6 +2286,7 @@ impl GenerationMetrics {
             kv_residency: None,
             kv_cache_encoding: None,
             prefix_tokens_reused: None,
+            termination_detail: None,
             gpt_oss_perf: None,
             qwen35_cuda_decode: None,
         }
@@ -2215,6 +2307,7 @@ impl GenerationMetrics {
             && self.kv_residency.is_none()
             && self.kv_cache_encoding.is_none()
             && self.prefix_tokens_reused.is_none()
+            && self.termination_detail.is_none()
             && self.gpt_oss_perf.is_none()
     }
 }
@@ -6184,6 +6277,7 @@ impl<'a> PromotedParameterGolfGenerationStream<'a> {
                 kv_cache_encoding_policy.clone(),
             )),
             prefix_tokens_reused: Some(0),
+            termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -7820,6 +7914,7 @@ where
                 kv_cache_encoding_policy.clone(),
             )),
             prefix_tokens_reused: Some(self.prefix_tokens_reused),
+            termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: self.gpt_oss_perf.filter(|perf| !perf.is_zero()),
         };
@@ -8745,6 +8840,7 @@ where
                 kv_cache_encoding_policy.clone(),
             )),
             prefix_tokens_reused: Some(self.prefix_tokens_reused),
+            termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -9420,6 +9516,7 @@ where
                 kv_cache_encoding_policy.clone(),
             )),
             prefix_tokens_reused: Some(prefix_tokens_reused),
+            termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
         };
@@ -9493,24 +9590,42 @@ where
     result
 }
 
-fn truncate_generated_text(
+struct TruncatedGeneratedText {
+    truncated: String,
+    matched_stop_sequence: String,
+}
+
+fn truncate_generated_text_with_match(
     tokenizer: &dyn TokenizerBoundary,
     generated_tokens: &mut Vec<TokenId>,
     stop_sequences: &[String],
-) -> Option<String> {
+) -> Option<TruncatedGeneratedText> {
     if stop_sequences.is_empty() {
         return None;
     }
 
     let text = tokenizer.decode(generated_tokens);
-    let stop_index = stop_sequences
+    let stop_hit = stop_sequences
         .iter()
         .filter(|stop| !stop.is_empty())
-        .filter_map(|stop| text.find(stop))
-        .min()?;
+        .filter_map(|stop| text.find(stop).map(|index| (index, stop.as_str())))
+        .min_by_key(|(index, _)| *index)?;
+    let (stop_index, matched_stop_sequence) = stop_hit;
     let truncated = text[..stop_index].trim_end().to_string();
     *generated_tokens = tokenizer.encode(truncated.as_str()).as_slice().to_vec();
-    Some(truncated)
+    Some(TruncatedGeneratedText {
+        truncated,
+        matched_stop_sequence: matched_stop_sequence.to_string(),
+    })
+}
+
+fn truncate_generated_text(
+    tokenizer: &dyn TokenizerBoundary,
+    generated_tokens: &mut Vec<TokenId>,
+    stop_sequences: &[String],
+) -> Option<String> {
+    truncate_generated_text_with_match(tokenizer, generated_tokens, stop_sequences)
+        .map(|result| result.truncated)
 }
 
 fn text_prefix_without_trailing_chars(text: &str, trailing_chars: usize) -> &str {

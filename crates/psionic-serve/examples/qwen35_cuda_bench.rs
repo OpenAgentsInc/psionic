@@ -5,12 +5,14 @@ use std::{
 };
 
 use psionic_models::{
-    GgufDecoderAdapterLoader, PromptMessage, PromptMessageRole, PromptRenderOptions,
+    GgufDecoderAdapterLoader, GgufRuntimeTokenizer, PromptMessage, PromptMessageRole,
+    PromptRenderOptions, TokenId, TokenizerBoundary,
 };
-use psionic_runtime::{StructuredOutputRequest, StructuredOutputValue, DEFAULT_PENALTY_LOOKBACK};
+use psionic_runtime::{DEFAULT_PENALTY_LOOKBACK, StructuredOutputRequest, StructuredOutputValue};
 use psionic_serve::{
-    CudaGgufQwen35TextGenerationService, GenerationOptions, GenerationRequest,
-    Qwen35CudaDecodeOutputMetrics, TextGenerationExecutor,
+    CudaGgufQwen35TextGenerationService, GenerationOptions, GenerationRequest, GenerationResponse,
+    GenerationTerminationCause, Qwen35CudaDecodeOutputMetrics, TerminationReason,
+    TextGenerationExecutor,
 };
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -129,10 +131,12 @@ struct BenchRunReport {
     qwen35_output_modes: Vec<String>,
     qwen35_readback_bytes: u64,
     qwen35_raw_logits: bool,
+    termination: BenchTerminationReport,
     structured_output_mode: String,
     structured_output_parser: String,
     structured_output_kind: String,
     structured_output_value: Option<Value>,
+    output_token_ids: Vec<u32>,
     output_text: String,
 }
 
@@ -156,6 +160,13 @@ struct BenchQwen35OutputMetricsReport {
     output_modes: Vec<String>,
     readback_bytes: u64,
     raw_logits: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct BenchTerminationReport {
+    observed: String,
+    classification: String,
+    matched_stop_sequence: Option<String>,
 }
 
 impl Default for BenchConfig {
@@ -556,7 +567,7 @@ impl BenchConfig {
 }
 
 fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
-    let rendered = render_prompt(&config.model_path, &config.prompt)?;
+    let bench_model = load_bench_model(&config.model_path, &config.prompt)?;
     let mut service = CudaGgufQwen35TextGenerationService::from_gguf_path(&config.model_path)
         .map_err(|error| format!("failed to load qwen35 cuda service: {error}"))?;
     let descriptor = service.model_descriptor().clone();
@@ -565,11 +576,11 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         String::from("warmup"),
         descriptor.clone(),
         None,
-        rendered.text.clone(),
+        bench_model.rendered.text.clone(),
         build_generation_options(
             config,
             min_warmup_tokens(config.max_output_tokens),
-            &rendered.stop_sequences,
+            &bench_model.rendered.stop_sequences,
         ),
     );
     let _ = service
@@ -582,8 +593,12 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             format!("bench-{run_index}"),
             descriptor.clone(),
             None,
-            rendered.text.clone(),
-            build_generation_options(config, config.max_output_tokens, &rendered.stop_sequences),
+            bench_model.rendered.text.clone(),
+            build_generation_options(
+                config,
+                config.max_output_tokens,
+                &bench_model.rendered.stop_sequences,
+            ),
         );
         let response = service
             .generate(&request)
@@ -602,10 +617,17 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             response.provenance.as_ref(),
             response.output.structured.as_ref(),
         );
+        let termination = psionic_termination_report(
+            &response,
+            &bench_model.tokenizer,
+            &bench_model.rendered.stop_sequences,
+        );
+        let output_token_ids = token_ids(response.output.tokens.as_slice());
         let prompt_s = nanos_to_seconds(prompt_ns);
         let decode_s = nanos_to_seconds(decode_ns);
         let total_s = nanos_to_seconds(total_ns);
-        let output_text = response.output.text.replace('\n', "\\n");
+        let output_text = response.output.text;
+        let printable_output_text = output_text.replace('\n', "\\n");
         runs.push(BenchRunReport {
             run_index: run_index + 1,
             decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
@@ -618,14 +640,16 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_output_modes: output_metrics.output_modes.clone(),
             qwen35_readback_bytes: output_metrics.readback_bytes,
             qwen35_raw_logits: output_metrics.raw_logits,
+            termination: termination.clone(),
             structured_output_mode: structured_output.mode.clone(),
             structured_output_parser: structured_output.parser.clone(),
             structured_output_kind: structured_output.kind.clone(),
             structured_output_value: structured_output.value.clone(),
+            output_token_ids,
             output_text: output_text.clone(),
         });
         println!(
-            "backend=psionic run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} decode_tok_s={:.2} {} {} output={}",
+            "backend=psionic run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} {} {} output={}",
             run_index + 1,
             bench_decode_mode_label(config.decode_mode),
             response.metrics.prompt_eval_count.unwrap_or(0),
@@ -634,13 +658,19 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             decode_s,
             total_s,
             decode_tok_s,
+            termination.observed,
+            termination.classification,
+            termination
+                .matched_stop_sequence
+                .as_deref()
+                .unwrap_or("none"),
             format_qwen35_output_metrics(&output_metrics),
             format_structured_output_report(&structured_output),
-            output_text,
+            printable_output_text,
         );
     }
 
-    let report = build_bench_report(config, &rendered, runs);
+    let report = build_bench_report(config, &bench_model.rendered, runs);
     println!(
         "backend=psionic mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -650,7 +680,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
 }
 
 fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
-    let rendered = render_prompt(&config.model_path, &config.prompt)?;
+    let bench_model = load_bench_model(&config.model_path, &config.prompt)?;
     let client = Client::builder()
         .build()
         .map_err(|error| format!("failed to build Ollama HTTP client: {error}"))?;
@@ -663,7 +693,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
         &client,
         &config.ollama_base_url,
         ollama_model,
-        &rendered,
+        &bench_model.rendered,
         config,
         min_warmup_tokens(config.max_output_tokens),
     )?;
@@ -674,7 +704,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             &client,
             &config.ollama_base_url,
             ollama_model,
-            &rendered,
+            &bench_model.rendered,
             config,
             config.max_output_tokens,
         )?;
@@ -686,7 +716,19 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
         let prompt_s = nanos_to_seconds(prompt_ns);
         let decode_s = nanos_to_seconds(decode_ns);
         let total_s = nanos_to_seconds(total_ns);
-        let output_text = response.response.replace('\n', "\\n");
+        let termination = ollama_termination_report(
+            &response,
+            &bench_model.rendered.stop_sequences,
+            config.max_output_tokens,
+        );
+        let output_token_ids = token_ids(
+            bench_model
+                .tokenizer
+                .encode(response.response.as_str())
+                .as_slice(),
+        );
+        let output_text = response.response;
+        let printable_output_text = output_text.replace('\n', "\\n");
         runs.push(BenchRunReport {
             run_index: run_index + 1,
             decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
@@ -699,14 +741,16 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_output_modes: Vec::new(),
             qwen35_readback_bytes: 0,
             qwen35_raw_logits: false,
+            termination: termination.clone(),
             structured_output_mode: String::from("none"),
             structured_output_parser: String::from("none"),
             structured_output_kind: String::from("none"),
             structured_output_value: None,
+            output_token_ids,
             output_text: output_text.clone(),
         });
         println!(
-            "backend=ollama run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} decode_tok_s={:.2} output={}",
+            "backend=ollama run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} output={}",
             run_index + 1,
             bench_decode_mode_label(config.decode_mode),
             response.prompt_eval_count.unwrap_or(0),
@@ -715,11 +759,17 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             decode_s,
             total_s,
             decode_tok_s,
-            output_text,
+            termination.observed,
+            termination.classification,
+            termination
+                .matched_stop_sequence
+                .as_deref()
+                .unwrap_or("none"),
+            printable_output_text,
         );
     }
 
-    let report = build_bench_report(config, &rendered, runs);
+    let report = build_bench_report(config, &bench_model.rendered, runs);
     println!(
         "backend=ollama mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -764,10 +814,12 @@ fn build_generation_options(
     options
 }
 
-fn render_prompt(model_path: &Path, prompt: &str) -> Result<RenderedPrompt, String> {
+fn load_bench_model(model_path: &Path, prompt: &str) -> Result<BenchModelContext, String> {
     let adapter = GgufDecoderAdapterLoader
         .load_path(model_path)
         .map_err(|error| format!("failed to load GGUF metadata: {error}"))?;
+    let tokenizer = GgufRuntimeTokenizer::from_gguf(adapter.tokenizer())
+        .map_err(|error| format!("failed to build GGUF runtime tokenizer: {error}"))?;
     let renderer = adapter.prompt_renderer();
     let rendered = renderer
         .render_with_options(
@@ -780,9 +832,12 @@ fn render_prompt(model_path: &Path, prompt: &str) -> Result<RenderedPrompt, Stri
             &PromptRenderOptions::default(),
         )
         .map_err(|error| format!("failed to render qwen35 prompt: {error}"))?;
-    Ok(RenderedPrompt {
-        text: rendered.text,
-        stop_sequences: rendered.stop_sequences,
+    Ok(BenchModelContext {
+        rendered: RenderedPrompt {
+            text: rendered.text,
+            stop_sequences: rendered.stop_sequences,
+        },
+        tokenizer,
     })
 }
 
@@ -855,10 +910,7 @@ fn format_structured_output_report(report: &BenchStructuredOutputRuntimeReport) 
         .unwrap_or_else(|| String::from("none"));
     format!(
         "structured_output_mode={} structured_output_parser={} structured_output_kind={} structured_output_value={}",
-        report.mode,
-        report.parser,
-        report.kind,
-        value
+        report.mode, report.parser, report.kind, value
     )
 }
 
@@ -972,7 +1024,7 @@ fn build_bench_report(
     let mean_total_s = runs.iter().map(|run| run.total_s).sum::<f64>() / repeats;
     let mean_decode_tok_s = runs.iter().map(|run| run.decode_tok_s).sum::<f64>() / repeats;
     BenchReport {
-        schema_version: 1,
+        schema_version: 2,
         report_kind: String::from("qwen35_cuda_bench"),
         generated_at_unix_s: current_unix_timestamp_seconds(),
         backend: String::from(bench_backend_label(config.backend)),
@@ -1062,9 +1114,19 @@ struct RenderedPrompt {
     stop_sequences: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
+struct BenchModelContext {
+    rendered: RenderedPrompt,
+    tokenizer: GgufRuntimeTokenizer,
+}
+
 #[derive(Deserialize)]
 struct OllamaGenerateResponse {
     response: String,
+    #[serde(default)]
+    done_reason: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
     #[serde(default)]
     total_duration: Option<u64>,
     #[serde(default)]
@@ -1075,6 +1137,107 @@ struct OllamaGenerateResponse {
     eval_count: Option<usize>,
     #[serde(default)]
     eval_duration: Option<u64>,
+}
+
+fn token_ids(tokens: &[TokenId]) -> Vec<u32> {
+    tokens.iter().copied().map(TokenId::as_u32).collect()
+}
+
+fn psionic_termination_report(
+    response: &GenerationResponse,
+    tokenizer: &GgufRuntimeTokenizer,
+    stop_sequences: &[String],
+) -> BenchTerminationReport {
+    let observed = termination_reason_label(response.termination).to_string();
+    if let Some(detail) = response.metrics.termination_detail.as_ref() {
+        return BenchTerminationReport {
+            observed,
+            classification: termination_cause_label(detail.cause).to_string(),
+            matched_stop_sequence: detail.matched_stop_sequence.clone(),
+        };
+    }
+    let classification = match response.termination {
+        TerminationReason::EndOfSequence => response
+            .output
+            .tokens
+            .as_slice()
+            .last()
+            .copied()
+            .filter(|token| tokenizer.is_end_of_sequence(*token))
+            .map(|_| String::from("eos_token"))
+            .unwrap_or_else(|| {
+                if stop_sequences.is_empty() {
+                    String::from("end_of_sequence")
+                } else {
+                    String::from("stop_sequence")
+                }
+            }),
+        TerminationReason::MaxOutputTokens => String::from("max_output_tokens"),
+        TerminationReason::ContextLimit => String::from("context_limit"),
+        TerminationReason::Cancelled => String::from("cancelled"),
+        TerminationReason::Disconnected => String::from("disconnected"),
+        TerminationReason::Error => String::from("error"),
+    };
+    BenchTerminationReport {
+        observed,
+        classification,
+        matched_stop_sequence: None,
+    }
+}
+
+fn ollama_termination_report(
+    response: &OllamaGenerateResponse,
+    stop_sequences: &[String],
+    max_output_tokens: usize,
+) -> BenchTerminationReport {
+    let observed = response
+        .done_reason
+        .clone()
+        .or_else(|| response.error.as_ref().map(|_| String::from("error")))
+        .unwrap_or_else(|| String::from("unknown"));
+    let classification = if response.error.is_some() {
+        String::from("error")
+    } else {
+        match response.done_reason.as_deref() {
+            Some("length") => String::from("max_output_tokens"),
+            Some("stop") if stop_sequences.is_empty() => String::from("eos_token"),
+            Some("stop") => String::from("ambiguous_stop_or_eos"),
+            Some("unload") => String::from("unknown"),
+            Some(other) => other.replace('-', "_"),
+            None if response.eval_count.unwrap_or(0) >= max_output_tokens => {
+                String::from("max_output_tokens")
+            }
+            None => String::from("unknown"),
+        }
+    };
+    BenchTerminationReport {
+        observed,
+        classification,
+        matched_stop_sequence: None,
+    }
+}
+
+fn termination_reason_label(reason: TerminationReason) -> &'static str {
+    match reason {
+        TerminationReason::EndOfSequence => "end_of_sequence",
+        TerminationReason::MaxOutputTokens => "max_output_tokens",
+        TerminationReason::ContextLimit => "context_limit",
+        TerminationReason::Cancelled => "cancelled",
+        TerminationReason::Disconnected => "disconnected",
+        TerminationReason::Error => "error",
+    }
+}
+
+fn termination_cause_label(cause: GenerationTerminationCause) -> &'static str {
+    match cause {
+        GenerationTerminationCause::EndOfSequenceToken => "eos_token",
+        GenerationTerminationCause::StopSequence => "stop_sequence",
+        GenerationTerminationCause::MaxOutputTokens => "max_output_tokens",
+        GenerationTerminationCause::ContextLimit => "context_limit",
+        GenerationTerminationCause::Cancelled => "cancelled",
+        GenerationTerminationCause::Disconnected => "disconnected",
+        GenerationTerminationCause::Error => "error",
+    }
 }
 
 fn ollama_generate(

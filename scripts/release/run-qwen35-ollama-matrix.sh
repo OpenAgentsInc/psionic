@@ -22,15 +22,99 @@ sanitize_id() {
   printf '%s' "$value"
 }
 
+require_command() {
+  local name="$1"
+  if ! command -v "$name" >/dev/null 2>&1; then
+    echo "missing required command: $name" >&2
+    exit 1
+  fi
+}
+
 extract_number_field() {
   local field="$1"
   local path="$2"
-  rg -m1 -o "\"${field}\": [0-9]+(\\.[0-9]+)?" "$path" | awk '{print $2}'
+  jq -r ".${field}" "$path"
 }
 
 extract_output_tokens_csv() {
   local path="$1"
-  rg -o '"output_tokens": [0-9]+' "$path" | awk '{print $2}' | paste -sd, -
+  jq -r '[.runs[].output_tokens | tostring] | join(",")' "$path"
+}
+
+extract_termination_csv() {
+  local path="$1"
+  jq -r '[.runs[].termination.classification] | join(",")' "$path"
+}
+
+build_row_comparison() {
+  local psionic_path="$1"
+  local ollama_path="$2"
+  jq -n --slurpfile ps "$psionic_path" --slurpfile ol "$ollama_path" '
+    def min_len($a; $b): [($a | length), ($b | length)] | min;
+    def first_divergence($a; $b):
+      ([range(0; min_len($a; $b)) | select($a[.] != $b[.])] | first)
+      // (if ($a | length) != ($b | length) then min_len($a; $b) else null end);
+    def divergence_token($tokens; $index):
+      if $index == null then null else ($tokens[$index] // null) end;
+    def termination_signature($run):
+      {
+        observed: ($run.termination.observed // "unknown"),
+        classification: ($run.termination.classification // "unknown"),
+        matched_stop_sequence: $run.termination.matched_stop_sequence
+      };
+    def run_comparison($p; $o):
+      (first_divergence(($p.output_token_ids // []); ($o.output_token_ids // []))) as $d
+      | {
+          run_index: $p.run_index,
+          native_output_tokens_match: (($p.output_tokens // null) == ($o.output_tokens // null)),
+          comparable_output_tokens_match: ((($p.output_token_ids // []) | length) == (($o.output_token_ids // []) | length)),
+          exact_output_token_ids_match: (
+            $d == null
+            and ((($p.output_token_ids // []) | length) == (($o.output_token_ids // []) | length))
+          ),
+          shared_output_token_prefix: (
+            if $d == null
+            then min_len(($p.output_token_ids // []); ($o.output_token_ids // []))
+            else $d
+            end
+          ),
+          first_divergence_output_token_index: (if $d == null then null else ($d + 1) end),
+          psionic_divergence_token_id: divergence_token(($p.output_token_ids // []); $d),
+          ollama_divergence_token_id: divergence_token(($o.output_token_ids // []); $d),
+          psionic_termination: termination_signature($p),
+          ollama_termination: termination_signature($o),
+          termination_classification_match: (
+            ($p.termination.classification // "unknown") == ($o.termination.classification // "unknown")
+          ),
+          throughput_strength: (
+            if $d == null
+              and (($p.termination.classification // "unknown") == ($o.termination.classification // "unknown"))
+            then "strong"
+            elif (($p.output_tokens // null) == ($o.output_tokens // null))
+            then "weak_length_matched_only"
+            else "mismatched"
+            end
+          )
+        };
+    ($ps[0]) as $psionic
+    | ($ol[0]) as $ollama
+    | ([range(0; [($psionic.runs | length), ($ollama.runs | length)] | min) | run_comparison($psionic.runs[.]; $ollama.runs[.])]) as $runs
+    | {
+        run_count: ($runs | length),
+        exact_match_runs: ($runs | map(select(.exact_output_token_ids_match)) | length),
+        native_output_token_match_runs: ($runs | map(select(.native_output_tokens_match)) | length),
+        row_strength: (
+          if ($runs | length) == 0
+          then "unknown"
+          elif ($runs | all(.throughput_strength == "strong"))
+          then "strong"
+          elif ($runs | all(.throughput_strength != "mismatched"))
+          then "weak_length_matched_only"
+          else "mismatched"
+          end
+        ),
+        runs: $runs
+      }'
 }
 
 require_model_path() {
@@ -43,6 +127,7 @@ require_model_path() {
 }
 
 export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
+require_command jq
 
 host_label="${PSIONIC_QWEN35_MATRIX_HOST_LABEL:-$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9._-' '-')}"
 repeats="${PSIONIC_QWEN35_MATRIX_REPEATS:-3}"
@@ -120,8 +205,8 @@ fi
   printf 'CARGO_INCREMENTAL: `%s`\n\n' "$CARGO_INCREMENTAL"
   printf 'Change rationale: `%s`\n\n' "$change_rationale"
   printf 'Ollama comparison rationale: `%s`\n\n' "$ollama_change_rationale"
-  printf '| Contract | Model | Psionic tok/s | Ollama tok/s | Ratio | Psionic output tokens | Ollama output tokens | Comparable |\n'
-  printf '| --- | --- | ---: | ---: | ---: | --- | --- | --- |\n'
+  printf '| Contract | Model | Psionic tok/s | Ollama tok/s | Ratio | Psionic output tokens | Ollama output tokens | Psionic termination | Ollama termination | First divergence | Strength |\n'
+  printf '| --- | --- | ---: | ---: | ---: | --- | --- | --- | --- | --- | --- |\n'
 } > "$summary_path"
 
 manifest_tmp="${matrix_path}.tmp"
@@ -222,13 +307,15 @@ for contract in "${contracts[@]}"; do
     ollama_mean="$(extract_number_field mean_decode_tok_s "$ollama_report")"
     psionic_tokens="$(extract_output_tokens_csv "$psionic_report")"
     ollama_tokens="$(extract_output_tokens_csv "$ollama_report")"
-    comparable="no"
-    if [[ "$psionic_tokens" == "$ollama_tokens" ]]; then
-      comparable="yes"
-    fi
+    psionic_termination="$(extract_termination_csv "$psionic_report")"
+    ollama_termination="$(extract_termination_csv "$ollama_report")"
+    row_comparison="$(build_row_comparison "$psionic_report" "$ollama_report")"
+    row_strength="$(printf '%s' "$row_comparison" | jq -r '.row_strength')"
+    first_divergence="$(printf '%s' "$row_comparison" | jq -r '[.runs[].first_divergence_output_token_index // "none"] | map(tostring) | join(",")')"
+    native_output_tokens_match="$(printf '%s' "$row_comparison" | jq -r 'if (.runs | length) == 0 then false else (.runs | all(.native_output_tokens_match)) end')"
     ratio="$(awk -v ps="$psionic_mean" -v ol="$ollama_mean" 'BEGIN { if (ol == 0) { print "0.00" } else { printf "%.2f", ps / ol } }')"
 
-    printf '| `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` |\n' \
+    printf '| `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` | `%s` |\n' \
       "$contract" \
       "$model" \
       "$psionic_mean" \
@@ -236,7 +323,10 @@ for contract in "${contracts[@]}"; do
       "$ratio" \
       "$psionic_tokens" \
       "$ollama_tokens" \
-      "$comparable" >> "$summary_path"
+      "$psionic_termination" \
+      "$ollama_termination" \
+      "$first_divergence" \
+      "$row_strength" >> "$summary_path"
 
     printf '%s' "$row_sep" >> "$manifest_tmp"
     row_sep=$',\n'
@@ -248,7 +338,9 @@ for contract in "${contracts[@]}"; do
       printf '      "ollama_model": "%s",\n' "$(json_escape "$ollama_model")"
       printf '      "psionic_report_path": "%s",\n' "$(json_escape "$psionic_rel")"
       printf '      "ollama_report_path": "%s",\n' "$(json_escape "$ollama_rel")"
-      printf '      "output_tokens_match": %s,\n' "$([[ "$comparable" == "yes" ]] && printf true || printf false)"
+      printf '      "native_output_tokens_match": %s,\n' "$([[ "$native_output_tokens_match" == "true" ]] && printf true || printf false)"
+      printf '      "row_strength": "%s",\n' "$(json_escape "$row_strength")"
+      printf '      "comparison": %s,\n' "$row_comparison"
       printf '      "psionic_report": '
       cat "$psionic_report"
       printf ',\n'

@@ -22,10 +22,11 @@ use crate::{
     ContinuousBatchGenerationResult, GenerationEventStream, GenerationInput, GenerationMetrics,
     GenerationOptions, GenerationProvenance, GenerationRequest, GenerationResponse,
     GenerationStreamChunk, GenerationStreamEvent, GenerationStreamStatus, GenerationStreamTerminal,
-    GenerationStreamingPolicy, LoadedModelView, LoadedModelsObservation, LocalRuntimeDiagnostic,
-    ManagedTextGenerationRuntime, Qwen35CudaDecodeOutputMetrics, Qwen35CudaDecodeOutputMode,
-    ReferenceTextGenerationError, StreamingTextGenerationExecutor, TerminationReason,
-    TextGenerationExecutor, current_time_millis, default_generation_streaming_policy,
+    GenerationStreamingPolicy, GenerationTerminationDetail, LoadedModelView,
+    LoadedModelsObservation, LocalRuntimeDiagnostic, ManagedTextGenerationRuntime,
+    Qwen35CudaDecodeOutputMetrics, Qwen35CudaDecodeOutputMode, ReferenceTextGenerationError,
+    StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor,
+    current_time_millis, default_generation_streaming_policy,
 };
 
 pub struct CudaGgufQwen35TextGenerationService {
@@ -418,14 +419,20 @@ impl CudaGgufQwen35TextGenerationService {
         let mut first_token_emitted_at = None;
         let mut last_token_emitted_at = None;
 
-        let termination = loop {
+        let (termination, termination_detail) = loop {
             if generated_tokens.len() >= request.options.max_output_tokens {
-                break TerminationReason::MaxOutputTokens;
+                break (
+                    TerminationReason::MaxOutputTokens,
+                    Some(GenerationTerminationDetail::max_output_tokens()),
+                );
             }
             if prompt_tokens.len().saturating_add(generated_tokens.len())
                 >= self.model.descriptor.config.max_context
             {
-                break TerminationReason::ContextLimit;
+                break (
+                    TerminationReason::ContextLimit,
+                    Some(GenerationTerminationDetail::context_limit()),
+                );
             }
 
             let next_token = if matches!(output_mode, CudaStepOutputMode::ArgmaxOnly) {
@@ -473,7 +480,10 @@ impl CudaGgufQwen35TextGenerationService {
                     match structured_candidate_selection {
                         Some(crate::GenerationSelection::Token(token)) => token,
                         Some(crate::GenerationSelection::Terminate) => {
-                            break TerminationReason::EndOfSequence;
+                            break (
+                                TerminationReason::EndOfSequence,
+                                Some(GenerationTerminationDetail::end_of_sequence_token()),
+                            );
                         }
                         None => {
                             let allowed_token_ids = sampler
@@ -516,7 +526,10 @@ impl CudaGgufQwen35TextGenerationService {
                             )? {
                                 crate::GenerationSelection::Token(token) => token,
                                 crate::GenerationSelection::Terminate => {
-                                    break TerminationReason::EndOfSequence;
+                                    break (
+                                        TerminationReason::EndOfSequence,
+                                        Some(GenerationTerminationDetail::end_of_sequence_token()),
+                                    );
                                 }
                             }
                         }
@@ -574,7 +587,10 @@ impl CudaGgufQwen35TextGenerationService {
                     match structured_candidate_selection {
                         Some(crate::GenerationSelection::Token(token)) => token,
                         Some(crate::GenerationSelection::Terminate) => {
-                            break TerminationReason::EndOfSequence;
+                            break (
+                                TerminationReason::EndOfSequence,
+                                Some(GenerationTerminationDetail::end_of_sequence_token()),
+                            );
                         }
                         None if request.options.structured_output.is_some() => {
                             let allowed_token_ids = sampler
@@ -617,7 +633,10 @@ impl CudaGgufQwen35TextGenerationService {
                             )? {
                                 crate::GenerationSelection::Token(token) => token,
                                 crate::GenerationSelection::Terminate => {
-                                    break TerminationReason::EndOfSequence;
+                                    break (
+                                        TerminationReason::EndOfSequence,
+                                        Some(GenerationTerminationDetail::end_of_sequence_token()),
+                                    );
                                 }
                             }
                         }
@@ -628,7 +647,10 @@ impl CudaGgufQwen35TextGenerationService {
                         )? {
                             crate::GenerationSelection::Token(token) => token,
                             crate::GenerationSelection::Terminate => {
-                                break TerminationReason::EndOfSequence;
+                                break (
+                                    TerminationReason::EndOfSequence,
+                                    Some(GenerationTerminationDetail::end_of_sequence_token()),
+                                );
                             }
                         },
                     }
@@ -662,13 +684,19 @@ impl CudaGgufQwen35TextGenerationService {
                 )? {
                     crate::GenerationSelection::Token(token) => token,
                     crate::GenerationSelection::Terminate => {
-                        break TerminationReason::EndOfSequence;
+                        break (
+                            TerminationReason::EndOfSequence,
+                            Some(GenerationTerminationDetail::end_of_sequence_token()),
+                        );
                     }
                 }
             };
 
             if self.model.tokenizer.is_end_of_sequence(next_token) {
-                break TerminationReason::EndOfSequence;
+                break (
+                    TerminationReason::EndOfSequence,
+                    Some(GenerationTerminationDetail::end_of_sequence_token()),
+                );
             }
 
             if first_token_emitted_at.is_none() {
@@ -676,15 +704,18 @@ impl CudaGgufQwen35TextGenerationService {
             }
             last_token_emitted_at = Some(first_token_started.elapsed());
             generated_tokens.push(next_token);
-            if crate::truncate_generated_text(
+            if let Some(stop_hit) = crate::truncate_generated_text_with_match(
                 &self.model.tokenizer,
                 &mut generated_tokens,
                 &request.options.stop_sequences,
-            )
-            .is_some()
-            {
+            ) {
                 generated_text_terminated = Some(TerminationReason::EndOfSequence);
-                break TerminationReason::EndOfSequence;
+                break (
+                    TerminationReason::EndOfSequence,
+                    Some(GenerationTerminationDetail::stop_sequence(
+                        stop_hit.matched_stop_sequence,
+                    )),
+                );
             }
         };
 
@@ -715,6 +746,7 @@ impl CudaGgufQwen35TextGenerationService {
             kv_residency: None,
             kv_cache_encoding: None,
             prefix_tokens_reused: Some(0),
+            termination_detail,
             qwen35_cuda_decode: (!decode_output_metrics.is_zero()).then_some(decode_output_metrics),
             gpt_oss_perf: None,
         };

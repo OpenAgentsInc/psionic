@@ -2209,6 +2209,7 @@ fn run_cuda_generation_request(
             kv_residency: kv_residency.clone(),
             kv_cache_encoding: Some(kv_cache_encoding.accounting.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
+            termination_detail: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
             qwen35_cuda_decode: None,
         };
@@ -2701,6 +2702,7 @@ fn run_cuda_hybrid_generation_request(
             kv_residency: kv_residency.clone(),
             kv_cache_encoding: Some(kv_cache_encoding.accounting.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
+            termination_detail: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
             qwen35_cuda_decode: None,
         };
@@ -3417,6 +3419,7 @@ fn run_metal_generation_request(
             kv_residency: kv_residency.clone(),
             kv_cache_encoding: Some(kv_cache_encoding.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
+            termination_detail: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
             qwen35_cuda_decode: None,
         };

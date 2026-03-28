@@ -11,10 +11,11 @@ Tracked issues:
 
 Published benchmark checkpoints:
 
-- greedy matrix checkpoint: historical `c5bc0ba2`, rerun pending under the
-  corrected explicit Ollama greedy contract
-- sampled matrix checkpoint: `March 27, 2026 rerun after sampler-surface refresh`
-- large-`top_k` sampled matrix checkpoint: `March 28, 2026 clean-host partitioned top-k rerun`
+- current canonical checkpoint: `March 28, 2026 clean RTX 4080 rerun with
+  explicit Ollama greedy settings and per-run divergence evidence`
+- historical greedy checkpoint: `c5bc0ba2`, preserved for provenance only
+- historical sampled checkpoints: `March 27-28, 2026` reruns before
+  termination and divergence evidence landed in the repo-owned collector
 
 Shared benchmark rules:
 
@@ -47,6 +48,7 @@ Those artifacts preserve the per-run fields that matter for honest comparison:
 
 - `prompt_tokens`
 - `output_tokens`
+- `output_token_ids`
 - `prompt_s`
 - `decode_s`
 - `total_s`
@@ -54,6 +56,8 @@ Those artifacts preserve the per-run fields that matter for honest comparison:
 - `qwen35_output_modes`
 - `qwen35_readback_bytes`
 - `qwen35_raw_logits`
+- termination classification and matched stop-sequence evidence
+- first-divergence index and row-strength classification in the matrix summary
 - rendered prompt and stop sequences
 - effective sampled contract values
 - host label, GPU memory, power-limit metadata, Psionic commit, and Ollama
@@ -61,6 +65,35 @@ Those artifacts preserve the per-run fields that matter for honest comparison:
 
 Constrained-host follow-up reruns should use that path instead of publishing a
 reduced matrix that keeps only token count and mean throughput.
+
+## Current Clean RTX 4080 Matrix
+
+Current canonical evidence lives in:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_174935_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_174935_archlinux-/one_page_summary.md`
+
+Interpretation rules:
+
+- `strong` means exact comparable token-id match plus termination-class match
+- `weak_length_matched_only` means both sides produced the same native output
+  token count but diverged in comparable generated token IDs
+- `mismatched` means the row is not a clean throughput comparison row
+
+| Contract | Model | Psionic tok/s | Ollama tok/s | Strength | Notes |
+| --- | --- | ---: | ---: | --- | --- |
+| `greedy` | `qwen3.5:0.8b` | `529.77` | `336.27` | `mismatched` | Raw throughput favors Psionic, but generated lengths differ (`26,25,25` vs `28,28,28`) and first divergence starts at token `1,3,3` |
+| `greedy` | `qwen3.5:2b` | `259.95` | `205.15` | `mismatched` | Raw throughput favors Psionic, but first divergence starts at token `2,2,2` and output lengths differ (`25,21,24` vs `34,34,34`) |
+| `greedy` | `qwen3.5:4b` | `173.57` | `146.23` | `mismatched` | One Psionic repeat hit `max_output_tokens` with malformed continuation (`128,29,30` vs `35,35,35`); this is a real runtime instability, not just a reporting gap |
+| `greedy` | `qwen3.5:9b` | `107.40` | `97.32` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`10,28,24` vs `42,42,42`) and first divergence starts at token `1,5,6` |
+| `sampled_topk40` | `qwen3.5:0.8b` | `270.07` | `336.91` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
+| `sampled_topk40` | `qwen3.5:2b` | `175.24` | `206.78` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
+| `sampled_topk40` | `qwen3.5:4b` | `136.85` | `144.01` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
+| `sampled_topk40` | `qwen3.5:9b` | `92.61` | `96.32` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `1,3,3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
+| `sampled_topk100` | `qwen3.5:0.8b` | `446.49` | `326.43` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`12,32,26` vs `20,20,20`) and first divergence starts at token `1,3,4` |
+| `sampled_topk100` | `qwen3.5:2b` | `235.28` | `204.70` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`26,25,33` vs `38,38,38`) and first divergence starts at token `1,4,4` |
+| `sampled_topk100` | `qwen3.5:4b` | `170.96` | `144.39` | `mismatched` | One Psionic repeat hit `max_output_tokens` with malformed continuation (`128,25,34` vs `37,37,37`); the wider bounded lane does not explain the row cleanly |
+| `sampled_topk100` | `qwen3.5:9b` | `106.37` | `97.44` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`24,40,30` vs `37,37,37`) and first divergence starts at token `1,5,5` |
 
 ## Greedy Contract
 
@@ -93,16 +126,19 @@ Historical note:
 - the old harness omitted these explicit Ollama greedy settings and therefore
   let Ollama use its default sampler surface instead of a forced greedy path
 - the repo now forces the explicit no-sampling, no-penalty Ollama contract
-  above, and the greedy matrix must be rerun under that contract before greedy
-  throughput claims are treated as canonical again
+  above, and the clean March 28 rerun supersedes the earlier greedy summary
+  with committed per-run termination and divergence evidence
 
 ## Greedy Matrix
 
-Greedy rerun pending under the corrected explicit Ollama greedy contract above.
+Use the clean RTX 4080 matrix above as the current canonical greedy evidence.
 
-Historical checkpoint values from `c5bc0ba2` are intentionally not reproduced
-here as canonical matrix truth because the older harness did not force Ollama
-onto a real greedy path.
+Current status:
+
+- raw greedy `tok/s` is higher on Psionic across all four models
+- every greedy row is still `mismatched`
+- greedy first-token parity remains unresolved and requires runtime work, not
+  more summary-only reporting
 
 ## Sampled Contract
 
@@ -136,12 +172,16 @@ Psionic output-mode evidence on this contract:
 
 ## Sampled Matrix
 
-| Model | Artifact path | Artifact digest | Psionic decode tok/s | Ollama decode tok/s | Status | Notes |
-| --- | --- | --- | ---: | ---: | --- | --- |
-| `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `496.28` | `329.38` | `implemented_early`, ahead | Native CUDA sampled decode still stays on the bounded `top_k_candidates` lane instead of dense vocab-logit readback |
-| `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `243.81` | `202.58` | `implemented_early`, ahead | Fresh March 28 rerun after the sampled request-surface refresh |
-| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `173.44` | `139.90` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row stays ahead on the same bounded sampled lane |
-| `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `105.25` | `92.90` | `implemented_early`, ahead | The row still needs the same operational rule as greedy benchmarking: unload Ollama before the Psionic measurement |
+Use the clean RTX 4080 matrix above as the current canonical sampled
+`top_k = 40` evidence.
+
+Current status:
+
+- all four rows are `weak_length_matched_only`, not `strong`
+- Psionic stays on the bounded sampled lane:
+  - `qwen35_output_modes=[top_k_candidates:40]`
+  - `qwen35_raw_logits=false`
+- Psionic trails Ollama on all four clean `top_k = 40` rows on this host
 
 ## Large-`top_k` Sampled Contract
 
@@ -175,12 +215,17 @@ Psionic output-mode evidence on this contract:
 
 ## Large-`top_k` Sampled Matrix
 
-| Model | Artifact path | Artifact digest | Psionic decode tok/s | Ollama decode tok/s | Status | Notes |
-| --- | --- | --- | ---: | ---: | --- | --- |
-| `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `416.06` | `320.24` | `implemented_early`, ahead | Large-candidate sampled decode now stays on the bounded candidate lane instead of falling off the older radix-sort path |
-| `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `224.83` | `204.06` | `implemented_early`, ahead | The follow-on win comes from partitioning the one-row vocab scan across multiple CUDA blocks and merging back exactly |
-| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `163.12` | `124.38` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row also stays ahead under the larger bounded-candidate contract |
-| `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `101.18` | `93.13` | `implemented_early`, ahead | The `9b` row still requires serialized Ollama residency, but the wider candidate set stays on the native bounded lane and remains ahead |
+Use the clean RTX 4080 matrix above as the current canonical sampled
+`top_k = 100` evidence.
+
+Current status:
+
+- all four rows are `mismatched`
+- Psionic stays on the wider bounded sampled lane:
+  - `qwen35_output_modes=[top_k_candidates:100]`
+  - `qwen35_raw_logits=false`
+- the `4b` row now has a repeated cap-hit failure signature on Psionic that
+  needs direct runtime investigation
 
 ## Penalty-Active Psionic Follow-On
 
@@ -228,12 +273,17 @@ Psionic-only measured means:
 
 ## Current Notes
 
-- The `0.8b`, `2b`, `4b`, and `9b` rows are ahead on decode throughput on this
-  host under the original sampled contract and the clean-host large-`top_k`
-  sampled contract above.
-- The greedy contract is currently bounded to "rerun pending under the
-  corrected explicit Ollama greedy settings" rather than a live canonical
-  throughput claim.
+- The fresh clean-host matrix changes the current canonical claim surface on
+  this checkout:
+  - greedy raw `tok/s` is higher on Psionic across all four models, but every
+    greedy row is still `mismatched`
+  - clean sampled `top_k = 40` rows are the highest-signal constrained
+    contract; Psionic stays on bounded candidates there and still trails Ollama
+    on all four rows
+  - sampled `top_k = 100` rows remain `mismatched`
+- The `qwen3.5:4b` clean-host rerun now shows a repeated Psionic cap-hit
+  instability on both greedy and `top_k = 100` sampled rows. That is a runtime
+  defect, not a benchmark-summary artifact.
 - The sampled CUDA lane is bounded, not vague. It uses
   `TopKCandidates { top_k }` only when the request stays inside the exact
   envelope:

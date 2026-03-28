@@ -91,8 +91,8 @@ than just run tensor math.
   matrix now lives at `scripts/release/run-qwen35-ollama-matrix.sh`. It writes
   a combined manifest plus row reports that preserve output-token arrays,
   prompt/decode timing, qwen35 output modes, readback bytes, raw-logit
-  materialization, host power-limit metadata, Psionic commit, and Ollama
-  version.
+  materialization, termination classification, first-divergence evidence, host
+  power-limit metadata, Psionic commit, and Ollama version.
 - Structured-output throughput is still not part of the canonical
   Psionic-versus-Ollama matrix. On March 28, 2026, after adding leading-char
   token-id buckets to the structured-output append cache, removing per-rule
@@ -127,20 +127,14 @@ than just run tensor math.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
-  a forced greedy contract. The repo now forces explicit Ollama greedy options
-  for those rows and will republish the greedy matrix after rerunning it under
-  that corrected contract.
+  a forced greedy contract.
 - On March 28, 2026, after adding a native one-row CUDA top-k candidate output
   path and routing qwen35 sampled decode through `TopKCandidates { top_k }`
   instead of unconditional dense-vocab readback, and after refreshing the
   local sampler surface to honor `min_p`, `typical_p`, `mirostat`,
-  `mirostat_tau`, `mirostat_eta`, and request-level `repeat_last_n`,
-  the same host measured native qwen35 sampled decode ahead of local Ollama on
-  all four rows under the explicit sampled contract in
-  `docs/QWEN35_OLLAMA_COMPARISON.md`: about `496 tok/s` versus `329 tok/s` on
-  `qwen3.5:0.8b`, about `244 tok/s` versus `203 tok/s` on `qwen3.5:2b`, about
-  `173 tok/s` versus `140 tok/s` on `qwen3.5:4b`, and about `105 tok/s`
-  versus `93 tok/s` on `qwen3.5:9b`.
+  `mirostat_tau`, `mirostat_eta`, and request-level `repeat_last_n`, the same
+  host now has a clean committed rerun with explicit divergence evidence in
+  `docs/QWEN35_OLLAMA_COMPARISON.md`.
 - The same March 28, 2026 refresh widened the Psionic-side sampler and request
   surface to include `typical_p`, `mirostat`, `mirostat_tau`,
   `mirostat_eta`, and request-level `repeat_last_n`, but those controls are
@@ -150,11 +144,18 @@ than just run tensor math.
 - On March 28, 2026, after widening the shared-memory CUDA top-k fast path to
   the full bounded qwen35 envelope and then replacing the older one-row
   radix-sort route with a partitioned multi-block one-row candidate path, the
-  same host also measured the larger bounded-candidate `top_k = 100` contract
-  ahead on all four rows in `docs/QWEN35_OLLAMA_COMPARISON.md`: about
-  `416 tok/s` versus `320 tok/s` on `qwen3.5:0.8b`, about `225 tok/s` versus
-  `204 tok/s` on `qwen3.5:2b`, about `163 tok/s` versus `124 tok/s` on
-  `qwen3.5:4b`, and about `101 tok/s` versus `93 tok/s` on `qwen3.5:9b`.
+  same host now publishes the larger bounded-candidate `top_k = 100` contract
+  with row-strength classification instead of summary-only throughput claims.
+- The fresh clean-host March 28, 2026 rerun on the same RTX 4080 changes the
+  canonical interpretation:
+  - raw greedy `tok/s` is higher on Psionic across all four models, but every
+    greedy row is still `mismatched`
+  - clean sampled `top_k = 40` rows stay on the bounded candidate lane and are
+    length-matched, but Psionic still trails Ollama on all four rows and token
+    divergence starts within the first few generated tokens
+  - sampled `top_k = 100` rows remain `mismatched`
+  - the `qwen3.5:4b` row shows a repeated Psionic cap-hit instability on both
+    greedy and `top_k = 100` sampled runs
 - On March 28, 2026, the same bounded qwen35 CUDA sampled lane was widened
   again to apply repeat, presence, and frequency penalties on device before
   exact top-k selection instead of forcing explicit dense `raw_logits`
@@ -174,11 +175,11 @@ than just run tensor math.
   benchmark requirement is operational: unload Ollama's resident GPU caches
   before measuring Psionic, because Ollama keeps prior model weights live in
   VRAM.
-- The qwen35 lane is now ahead on decode throughput for this host and prompt,
-  but it is still not architecture-closed. Greedy prompt replay is materially
-  faster than the earlier pilot, but the remaining headroom is still in the
-  host-seeded hidden copy, output-head launch overhead, and a more integrated
-  full-attention decode path.
+- The qwen35 lane is materially faster than the earlier pilot on this host,
+  but the current canonical matrix is mixed rather than "ahead everywhere":
+  greedy raw `tok/s` is higher but mismatched, clean sampled `top_k = 40`
+  rows are behind Ollama, and the remaining headroom is still in greedy
+  parity, sampled decode overhead, and the unstable `4b` runtime path.
 - The multi-row local comparison matrix for `0.8b`, `2b`, `4b`, and `9b` lives
   in `docs/QWEN35_OLLAMA_COMPARISON.md`.
 
