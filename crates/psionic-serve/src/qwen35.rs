@@ -6395,20 +6395,34 @@ impl Qwen35HybridLayer {
         &self,
         backend: &mut CudaBackend,
     ) -> Result<Qwen35HybridState, ReferenceTextGenerationError> {
+        let conv_state = backend
+            .f32_buffer(
+                self.qkv_gate_alpha_beta.rows_per_projection[0]
+                    .saturating_mul(self.conv_kernel.saturating_sub(1)),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let delta_state = backend
+            .f32_buffer(
+                self.time_step_rank
+                    .saturating_mul(self.state_size)
+                    .saturating_mul(self.state_size),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let mut submission = backend
+            .begin_submission()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        submission
+            .fill_buffer(&conv_state, 0)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        submission
+            .fill_buffer(&delta_state, 0)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        submission
+            .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
         Ok(Qwen35HybridState {
-            conv_state: backend
-                .f32_buffer(
-                    self.qkv_gate_alpha_beta.rows_per_projection[0]
-                        .saturating_mul(self.conv_kernel.saturating_sub(1)),
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            delta_state: backend
-                .f32_buffer(
-                    self.time_step_rank
-                        .saturating_mul(self.state_size)
-                        .saturating_mul(self.state_size),
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?,
+            conv_state,
+            delta_state,
         })
     }
 
