@@ -2976,6 +2976,7 @@ impl GgufPromptTemplateRenderer {
         messages: &[PromptMessage],
         add_generation_prompt: bool,
     ) -> Result<String, PromptRenderError> {
+        let messages = normalize_qwen35_messages(messages)?;
         if messages.is_empty() {
             return Err(PromptRenderError::InvalidConversation {
                 message: String::from("qwen35 prompt rendering requires at least one message"),
@@ -3030,11 +3031,28 @@ impl GgufPromptTemplateRenderer {
                     rendered.push_str(final_content.trim_start_matches('\n'));
                     rendered.push_str("<|im_end|>\n");
                 }
-                PromptMessageRole::Developer | PromptMessageRole::Tool => {
+                PromptMessageRole::Tool => {
+                    if !matches!(
+                        messages.get(index.wrapping_sub(1)).map(|value| value.role),
+                        Some(PromptMessageRole::Tool)
+                    ) {
+                        rendered.push_str("<|im_start|>user");
+                    }
+                    rendered.push('\n');
+                    rendered.push_str("<tool_response>\n");
+                    rendered.push_str(message.content.trim());
+                    rendered.push_str("\n</tool_response>");
+                    if !matches!(
+                        messages.get(index + 1).map(|value| value.role),
+                        Some(PromptMessageRole::Tool)
+                    ) {
+                        rendered.push_str("<|im_end|>\n");
+                    }
+                }
+                PromptMessageRole::Developer => {
                     return Err(PromptRenderError::InvalidConversation {
-                        message: format!(
-                            "qwen35 text-only rendering does not support `{}` messages",
-                            message.role.as_str()
+                        message: String::from(
+                            "qwen35 developer messages must be normalized before rendering",
                         ),
                     });
                 }
@@ -3158,6 +3176,42 @@ fn strip_qwen35_think_block(content: &str) -> String {
         || content.to_string(),
         |(_, final_content)| final_content.to_string(),
     )
+}
+
+fn normalize_qwen35_messages(
+    messages: &[PromptMessage],
+) -> Result<Vec<PromptMessage>, PromptRenderError> {
+    let mut normalized = Vec::new();
+    let mut leading_instructions = Vec::new();
+    let mut saw_non_instruction = false;
+    for message in messages {
+        match message.role {
+            PromptMessageRole::System | PromptMessageRole::Developer if !saw_non_instruction => {
+                let trimmed = message.content.trim();
+                if !trimmed.is_empty() {
+                    leading_instructions.push(trimmed.to_string());
+                }
+            }
+            PromptMessageRole::System | PromptMessageRole::Developer => {
+                return Err(PromptRenderError::InvalidConversation {
+                    message: String::from(
+                        "qwen35 system/developer messages must precede user/assistant/tool turns",
+                    ),
+                });
+            }
+            _ => {
+                saw_non_instruction = true;
+                normalized.push(message.clone());
+            }
+        }
+    }
+    if !leading_instructions.is_empty() {
+        normalized.insert(
+            0,
+            PromptMessage::new(PromptMessageRole::System, leading_instructions.join("\n\n")),
+        );
+    }
+    Ok(normalized)
 }
 
 /// First-launch GGUF decoder family classification used by Psionic.
@@ -9050,6 +9104,54 @@ mod tests {
                 "<|im_start|>user\nExplain the runtime.<|im_end|>\n",
                 "<|im_start|>assistant\nIt runs on CPU.<|im_end|>\n",
                 "<|im_start|>user\nAnswer in one sentence.<|im_end|>\n",
+                "<|im_start|>assistant\n<think>\n\n</think>\n\n",
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_prompt_template_renderer_merges_qwen35_instruction_roles_and_tool_results()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let renderer = GgufPromptTemplateRenderer::new(
+            qwen35_prompt_tokenizer_metadata(),
+            super::GgufChatTemplateMetadata::new(
+                Some(String::from(qwen35_chat_template())),
+                BTreeMap::new(),
+            ),
+        );
+        let messages = vec![
+            PromptMessage::new(PromptMessageRole::Developer, "Tool contract guidance."),
+            PromptMessage::new(PromptMessageRole::System, "System guidance."),
+            PromptMessage::new(PromptMessageRole::User, "What's the weather?"),
+            PromptMessage::new(
+                PromptMessageRole::Assistant,
+                "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}]}",
+            ),
+            PromptMessage::new(PromptMessageRole::Tool, "{\"forecast\":\"sunny\"}")
+                .with_author_name("get_weather"),
+            PromptMessage::new(PromptMessageRole::User, "And tomorrow?"),
+        ];
+
+        let rendered = renderer.render(None, messages.as_slice(), true)?;
+
+        assert_eq!(rendered.family, GgufPromptTemplateFamily::Qwen35);
+        assert_eq!(
+            rendered.text,
+            concat!(
+                "<|im_start|>system\n",
+                "Tool contract guidance.\n\nSystem guidance.<|im_end|>\n",
+                "<|im_start|>user\n",
+                "What's the weather?<|im_end|>\n",
+                "<|im_start|>assistant\n",
+                "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}]}",
+                "<|im_end|>\n",
+                "<|im_start|>user\n",
+                "<tool_response>\n",
+                "{\"forecast\":\"sunny\"}\n",
+                "</tool_response><|im_end|>\n",
+                "<|im_start|>user\n",
+                "And tomorrow?<|im_end|>\n",
                 "<|im_start|>assistant\n<think>\n\n</think>\n\n",
             )
         );

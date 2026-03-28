@@ -330,7 +330,7 @@ impl ResolvedToolCall {
         let raw_arguments = self.raw_arguments()?;
         Ok(ChatCompletionToolCall {
             id: self.id,
-            kind: "function",
+            kind: String::from("function"),
             function: ChatCompletionToolCallFunction {
                 name: self.name,
                 arguments: raw_arguments,
@@ -2209,6 +2209,10 @@ struct ChatCompletionMessage {
     content: ChatCompletionMessageContent,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<ChatCompletionToolCall>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
 }
 
 impl ChatCompletionMessage {
@@ -2217,6 +2221,8 @@ impl ChatCompletionMessage {
             role: role.into(),
             content: ChatCompletionMessageContent::Text(content.into()),
             name: None,
+            tool_calls: None,
+            tool_call_id: None,
         }
     }
 
@@ -2230,6 +2236,8 @@ impl ChatCompletionMessage {
             role: role.into(),
             content: ChatCompletionMessageContent::Text(content.into()),
             name: Some(name.into()),
+            tool_calls: None,
+            tool_call_id: None,
         }
     }
 
@@ -2239,6 +2247,8 @@ impl ChatCompletionMessage {
             role: role.into(),
             content: ChatCompletionMessageContent::Parts(content),
             name: None,
+            tool_calls: None,
+            tool_call_id: None,
         }
     }
 }
@@ -2837,6 +2847,11 @@ fn tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
             contract.named_tool.as_deref().unwrap_or_default()
         )),
     }
+    if contract.allows_parallel_tool_calls()
+        && let Some(example) = parallel_tool_call_example(contract)
+    {
+        lines.push(example);
+    }
     lines.push(String::from("Declared tools:"));
     for tool in contract.tools.values() {
         let schema =
@@ -2851,6 +2866,22 @@ fn tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
         ));
     }
     PromptMessage::new(PromptMessageRole::Developer, lines.join("\n"))
+}
+
+fn parallel_tool_call_example(contract: &ToolCallingContract) -> Option<String> {
+    let tool_names = contract
+        .tools
+        .values()
+        .take(2)
+        .map(|tool| tool.name.as_str())
+        .collect::<Vec<_>>();
+    if tool_names.len() < 2 {
+        return None;
+    }
+    Some(format!(
+        "If multiple tools are needed in the same turn, emit them in one `tool_calls` array like `{{ \"kind\": \"tool_calls\", \"tool_calls\": [{{ \"name\": \"{}\", \"arguments\": {{ ... }} }}, {{ \"name\": \"{}\", \"arguments\": {{ ... }} }}] }}`.",
+        tool_names[0], tool_names[1]
+    ))
 }
 
 fn apply_tool_contract_to_prompt_messages(
@@ -4252,15 +4283,15 @@ struct ChatCompletionResponseMessage {
     tool_calls: Option<Vec<ChatCompletionToolCall>>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct ChatCompletionToolCall {
     id: String,
     #[serde(rename = "type")]
-    kind: &'static str,
+    kind: String,
     function: ChatCompletionToolCallFunction,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct ChatCompletionToolCallFunction {
     name: String,
     arguments: String,
@@ -4429,7 +4460,7 @@ fn completion_stream_tool_calls(
         .map(|(index, tool_call)| ChatCompletionChunkToolCall {
             index,
             id: Some(tool_call.id),
-            kind: Some(tool_call.kind),
+            kind: Some("function"),
             function: Some(ChatCompletionChunkToolCallFunctionDelta {
                 name: Some(tool_call.function.name),
                 arguments: Some(tool_call.function.arguments),
@@ -5534,6 +5565,7 @@ fn chat_messages_to_prompt_messages_generic(
         )));
     }
     let mut prompt_messages = Vec::new();
+    let mut tool_names_by_id = std::collections::HashMap::new();
     for message in messages {
         let role = match message.role.as_str() {
             "system" => PromptMessageRole::System,
@@ -5547,6 +5579,19 @@ fn chat_messages_to_prompt_messages_generic(
                 )));
             }
         };
+        if role == PromptMessageRole::Assistant
+            && let Some(tool_calls) = message.tool_calls.as_ref()
+            && !tool_calls.is_empty()
+        {
+            for tool_call in tool_calls {
+                tool_names_by_id.insert(tool_call.id.clone(), tool_call.function.name.clone());
+            }
+            prompt_messages.push(PromptMessage::new(
+                PromptMessageRole::Assistant,
+                assistant_tool_call_envelope_json(tool_calls)?,
+            ));
+            continue;
+        }
         let mut prompt = PromptMessage::new(
             role,
             chat_message_content_to_text(
@@ -5557,16 +5602,52 @@ fn chat_messages_to_prompt_messages_generic(
             )?,
         );
         if role == PromptMessageRole::Tool {
-            let Some(name) = message.name.as_ref() else {
+            let tool_name = message.name.clone().or_else(|| {
+                message
+                    .tool_call_id
+                    .as_ref()
+                    .and_then(|tool_call_id| tool_names_by_id.get(tool_call_id).cloned())
+            });
+            let Some(name) = tool_name else {
                 return Err(OpenAiCompatHttpError::BadRequest(String::from(
-                    "tool messages require a `name` field",
+                    "tool messages require a `name` field or a `tool_call_id` that matches an earlier assistant tool call",
                 )));
             };
-            prompt = prompt.with_author_name(name.clone());
+            prompt = prompt.with_author_name(name);
         }
         prompt_messages.push(prompt);
     }
     Ok(prompt_messages)
+}
+
+fn assistant_tool_call_envelope_json(
+    tool_calls: &[ChatCompletionToolCall],
+) -> Result<String, OpenAiCompatHttpError> {
+    let tool_calls = tool_calls
+        .iter()
+        .map(|tool_call| {
+            let arguments = serde_json::from_str::<serde_json::Value>(&tool_call.function.arguments)
+                .map_err(|error| {
+                    OpenAiCompatHttpError::BadRequest(format!(
+                        "assistant tool call `{}` arguments are not valid JSON: {error}",
+                        tool_call.function.name
+                    ))
+                })?;
+            Ok(serde_json::json!({
+                "name": tool_call.function.name,
+                "arguments": arguments,
+            }))
+        })
+        .collect::<Result<Vec<_>, OpenAiCompatHttpError>>()?;
+    serde_json::to_string(&serde_json::json!({
+        "kind": "tool_calls",
+        "tool_calls": tool_calls,
+    }))
+    .map_err(|error| {
+        OpenAiCompatHttpError::Internal(format!(
+            "failed to serialize assistant tool-call envelope: {error}"
+        ))
+    })
 }
 
 fn chat_message_content_to_text(
@@ -5713,7 +5794,8 @@ mod tests {
     use super::{
         CPU_SERVER_FALLBACK_POLICY, CPU_SERVER_HYBRID_OFFLOAD_MODE, CPU_SERVER_RESIDENCY_MODE,
         ChatCompletionContentPart, ChatCompletionJsonSchemaRequest, ChatCompletionMessage,
-        ChatCompletionRequest, ChatCompletionResponseFormatRequest, EmbeddingsInput,
+        ChatCompletionMessageContent, ChatCompletionRequest, ChatCompletionResponseFormatRequest,
+        ChatCompletionToolCall, ChatCompletionToolCallFunction, EmbeddingsInput,
         EmbeddingsRequest, GptOssMetalExecutionMode, GptOssOpenAiCompatBackend,
         GptOssOpenAiCompatConfig, HARMONY_CALL_STOP, HARMONY_RETURN_STOP, LOCAL_SERVER_LOAD_STATUS,
         LOCAL_SERVER_MEMORY_PRESSURE_REPORTING, LOCAL_SERVER_UNLOAD_CONTROL,
@@ -5723,8 +5805,9 @@ mod tests {
         PsionicResponseStateRequest, ResolvedReasoningRequest, ResolvedToolCall,
         ResponseContinuationMode, ResponsesInput, ResponsesRequest, RoutingEndpoint,
         RoutingRequest, StopSequences, ToolChoiceRequest, ToolDefinitionEnvelope,
-        ToolDefinitionRequest, assistant_prompt_message_for_tool_loop,
-        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
+        ToolDefinitionRequest, apply_tool_contract_to_prompt_messages,
+        assistant_prompt_message_for_tool_loop, chat_messages_to_prompt_messages,
+        chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
         completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
         generation_options_from_chat_request_for_family, generation_options_from_responses_request,
         generic_embeddings, generic_health, generic_list_models, gpt_oss_local_serving_truth,
@@ -5732,7 +5815,8 @@ mod tests {
         insert_local_serving_truth_headers, prompt_request_cache_key, render_prompt_for_model,
         resolve_execution_summary, resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
-        surfaced_reasoning_response, tool_loop_tool_call_from_resolved, tool_result_prompt_message,
+        surfaced_reasoning_response, tool_contract_from_chat_request,
+        tool_loop_tool_call_from_resolved, tool_result_prompt_message,
     };
     use crate::{
         DecodeStrategy, GenerationMetrics, GenerationOutput, GenerationRequest, GenerationResponse,
@@ -5746,11 +5830,12 @@ mod tests {
         response::{IntoResponse, Response},
     };
     use psionic_models::{
-        ByteProjectionEmbedder, GgufDecoderFamily, GgufMetadataValue, GgufTensorType,
-        GptOssHarmonyParseOptions, GptOssHarmonyRenderContext, PromptChannelConfig, PromptMessage,
-        PromptMessageRole, PromptReasoningEffort, PromptRenderOptions,
-        Qwen35MultimodalProjectionConfig, ReasoningParser, TokenId, TokenSequence,
-        parse_gpt_oss_harmony_text, render_gpt_oss_harmony_prompt,
+        ByteProjectionEmbedder, GgufContent, GgufDecoderFamily, GgufMetadataValue,
+        GgufPromptTemplateRenderer, GgufTensorType, GptOssHarmonyParseOptions,
+        GptOssHarmonyRenderContext, PromptChannelConfig, PromptMessage, PromptMessageRole,
+        PromptReasoningEffort, PromptRenderOptions, Qwen35MultimodalProjectionConfig,
+        ReasoningParser, TokenId, TokenSequence, parse_gpt_oss_harmony_text,
+        render_gpt_oss_harmony_prompt,
     };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
@@ -5793,6 +5878,52 @@ mod tests {
         assert_eq!(prompt[0].content, "first instruction");
         assert_eq!(prompt[1].role, PromptMessageRole::User);
         assert_eq!(prompt[1].content, "hello");
+    }
+
+    #[test]
+    fn generic_chat_qwen35_tool_result_replay_infers_name_from_prior_tool_call() {
+        let prompt = chat_messages_to_prompt_messages_generic(
+            &[
+                ChatCompletionMessage::text("user", "use the tool"),
+                ChatCompletionMessage {
+                    role: String::from("assistant"),
+                    content: ChatCompletionMessageContent::Text(String::new()),
+                    name: None,
+                    tool_calls: Some(vec![ChatCompletionToolCall {
+                        id: String::from("call-1"),
+                        kind: String::from("function"),
+                        function: ChatCompletionToolCallFunction {
+                            name: String::from("get_weather"),
+                            arguments: String::from("{\"city\":\"Paris\"}"),
+                        },
+                    }]),
+                    tool_call_id: None,
+                },
+                ChatCompletionMessage {
+                    role: String::from("tool"),
+                    content: ChatCompletionMessageContent::Text(String::from(
+                        "{\"condition\":\"sunny\"}",
+                    )),
+                    name: None,
+                    tool_calls: None,
+                    tool_call_id: Some(String::from("call-1")),
+                },
+            ],
+            GgufDecoderFamily::Qwen35,
+            None,
+        )
+        .expect("prompt messages");
+
+        assert_eq!(prompt.len(), 3);
+        assert_eq!(prompt[0].role, PromptMessageRole::User);
+        assert_eq!(prompt[1].role, PromptMessageRole::Assistant);
+        assert_eq!(
+            prompt[1].content,
+            "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}]}"
+        );
+        assert_eq!(prompt[2].role, PromptMessageRole::Tool);
+        assert_eq!(prompt[2].author_name.as_deref(), Some("get_weather"));
+        assert_eq!(prompt[2].content, "{\"condition\":\"sunny\"}");
     }
 
     #[test]
@@ -7241,6 +7372,117 @@ mod tests {
         );
         assert!(payload["choices"][0]["message"]["tool_calls"].is_null());
         assert!(payload["psionic_tool_calls"].is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_native_qwen35_tool_contract_merges_with_system_instruction()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35-render-tool-contract.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_native_full_attention_decoder_metadata(
+                "tiny native qwen35 render tool contract",
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors().as_slice(),
+        )?;
+
+        let request = ChatCompletionRequest {
+            model: Some(String::from("tiny-qwen35-render-tool-contract")),
+            messages: vec![
+                ChatCompletionMessage::text("system", "You are Hermes."),
+                ChatCompletionMessage::text("user", "hello"),
+            ],
+            temperature: Some(0.0),
+            max_tokens: Some(1),
+            stop: None,
+            stream: false,
+            tools: vec![weather_tool_definition()],
+            tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+            parallel_tool_calls: Some(false),
+            response_format: None,
+            psionic_grammar: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_prefix_cache: None,
+            ..Default::default()
+        };
+        let prompt_messages = apply_tool_contract_to_prompt_messages(
+            chat_messages_to_prompt_messages_for_family(
+                &request.messages,
+                GgufDecoderFamily::Qwen35,
+            )?,
+            tool_contract_from_chat_request(&request, false)?.as_ref(),
+        );
+        let content = GgufContent::read_path(&qwen35_path)?;
+        let renderer = GgufPromptTemplateRenderer::new(
+            content.load_tokenizer()?,
+            content.load_chat_templates()?,
+        );
+        let rendered = renderer.render(None, prompt_messages.as_slice(), true)?;
+
+        assert!(rendered.text.starts_with("<|im_start|>system\n"));
+        assert!(rendered.text.contains("When tools are enabled"));
+        assert!(rendered.text.contains("You are Hermes."));
+        assert!(!rendered.text.contains("developer\n"));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_native_qwen35_parallel_tool_contract_includes_batched_example()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp
+            .path()
+            .join("tiny-qwen35-render-parallel-tool-contract.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_native_full_attention_decoder_metadata(
+                "tiny native qwen35 render parallel tool contract",
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors().as_slice(),
+        )?;
+
+        let request = ChatCompletionRequest {
+            model: Some(String::from("tiny-qwen35-render-parallel-tool-contract")),
+            messages: vec![
+                ChatCompletionMessage::text("system", "You are Hermes."),
+                ChatCompletionMessage::text("user", "call both tools"),
+            ],
+            temperature: Some(0.0),
+            max_tokens: Some(1),
+            stop: None,
+            stream: false,
+            tools: vec![weather_tool_definition(), time_tool_definition()],
+            tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+            parallel_tool_calls: Some(true),
+            response_format: None,
+            psionic_grammar: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_prefix_cache: None,
+            ..Default::default()
+        };
+        let prompt_messages = apply_tool_contract_to_prompt_messages(
+            chat_messages_to_prompt_messages_for_family(
+                &request.messages,
+                GgufDecoderFamily::Qwen35,
+            )?,
+            tool_contract_from_chat_request(&request, false)?.as_ref(),
+        );
+        let content = GgufContent::read_path(&qwen35_path)?;
+        let renderer = GgufPromptTemplateRenderer::new(
+            content.load_tokenizer()?,
+            content.load_chat_templates()?,
+        );
+        let rendered = renderer.render(None, prompt_messages.as_slice(), true)?;
+
+        assert!(rendered.text.contains("If multiple tools are needed in the same turn"));
+        assert!(rendered.text.contains("\"name\": \"get_time\""));
+        assert!(rendered.text.contains("\"name\": \"get_weather\""));
         Ok(())
     }
 
