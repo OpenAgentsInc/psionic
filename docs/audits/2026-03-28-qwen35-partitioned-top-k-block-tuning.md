@@ -452,6 +452,64 @@ This answers the crossover question cleanly:
 - future qwen35 sampled tuning should stay inside the partitioned lane rather
   than toggling back to the non-partitioned selector
 
+## Later Follow-On: Fused Remap Removal Also Stayed Flat And Was Reverted
+
+The next partitioned-lane follow-on removed the third kernel in the
+partitioned one-row top-k path by carrying original indices through the merge
+stage instead of remapping them afterward.
+
+That code landed briefly as:
+
+- commit `351423c3` `Fuse qwen35 partitioned top-k remap into merge`
+
+The clean narrowed rerun on the idle RTX 4080 host was:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_224016_archlinux-fusedmerge.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_224016_archlinux-fusedmerge/one_page_summary.md`
+
+Scope:
+
+- models `qwen3.5:0.8b`, `qwen3.5:2b`, `qwen3.5:4b`, `qwen3.5:9b`
+- contracts `sampled_topk40` and `sampled_topk100`
+- `repeats = 3`
+- idle RTX 4080 host with the row-by-row isolation runner
+
+The CUDA submission report did improve on paper because the partitioned top-k
+path encoded `2` operations instead of `3`, but the end-to-end sampled rows did
+not move in a defensible way.
+
+Relative to the same `20260328_210428` sampled baseline:
+
+### `sampled_topk40` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta |
+| --- | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `505.33` | `505.77` | `+0.09%` |
+| `qwen3.5:2b` | `252.94` | `253.11` | `+0.07%` |
+| `qwen3.5:4b` | `179.42` | `179.63` | `+0.12%` |
+| `qwen3.5:9b` | `110.12` | `110.16` | `+0.03%` |
+
+### `sampled_topk100` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta |
+| --- | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `501.50` | `502.08` | `+0.12%` |
+| `qwen3.5:2b` | `250.76` | `250.23` | `-0.21%` |
+| `qwen3.5:4b` | `178.31` | `178.38` | `+0.04%` |
+| `qwen3.5:9b` | `109.42` | `109.47` | `+0.04%` |
+
+Interpretation:
+
+- this is still noise-level movement, not a meaningful qwen35 throughput gain
+- reducing the partitioned top-k kernel count alone was not the active
+  bottleneck in the sampled decode path
+- one row regressed slightly, so there is no reason to keep the extra kernel
+  rewrite on `main`
+
+That experiment was reverted immediately as:
+
+- commit `b8bfc453` `Revert "Fuse qwen35 partitioned top-k remap into merge"`
+
 ## Updated Next Steps
 
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
@@ -460,6 +518,9 @@ This answers the crossover question cleanly:
   noise-level deltas
 - stop spending time on non-partitioned `top_k = 40` crossover tuning on this
   host; that path is decisively slower
+- stop spending time on partitioned micro-cleanups that only reduce kernel
+  count without changing end-to-end memory traffic or synchronization
 - focus the next optimization pass inside the partitioned bounded-candidate
-  lane itself: kernel shape, memory traffic, or combined device-to-host output
-  staging
+  lane where it can plausibly reduce actual sampled-step cost: memory traffic,
+  device-to-host staging, or broader step fusion around the bounded-candidate
+  output path

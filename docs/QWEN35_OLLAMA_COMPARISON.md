@@ -120,6 +120,12 @@ Current canonical evidence lives in:
   row-by-row isolation fix:
   - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_212810_archlinux-.json`
   - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_212810_archlinux-/one_page_summary.md`
+- non-canonical diagnostic rerun after fusing the partitioned top-k remap into
+  the merge kernel; this was later reverted because the end-to-end sampled
+  deltas stayed inside noise and `sampled_topk100 qwen3.5:2b` regressed
+  slightly:
+  - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_224016_archlinux-fusedmerge.json`
+  - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_224016_archlinux-fusedmerge/one_page_summary.md`
 
 Why `20260328_212810` is diagnostic only:
 
