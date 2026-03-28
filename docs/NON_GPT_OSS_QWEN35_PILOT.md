@@ -286,9 +286,10 @@ Measured on the same host with `3` repeats per backend after a clean
 
 The sampled lane stays bounded and honest. qwen35 only uses the fast
 `TopKCandidates { top_k }` output path when the request remains exact for a
-candidate-only decode surface. Requests with penalties, structured-output
-masking, or unsupported sampling shapes still fall back to explicit dense
-raw-logit readback.
+candidate-only decode surface. Repeat, presence, and frequency penalties now
+stay on that bounded lane too. Structured-output masking and unsupported
+sampling shapes still fall back to explicit dense raw-logit readback, and
+`mirostat` still stays exact through the same fallback path.
 
 The same clean host now also has a larger bounded-candidate follow-on contract
 after replacing the older one-row radix-sort path with a partitioned
@@ -316,6 +317,29 @@ residency between rows:
 - `qwen3.5:4b`: Psionic about `163.12 tok/s`, Ollama about `124.38 tok/s`
 - `qwen3.5:9b`: Psionic about `101.18 tok/s`, Ollama about `93.13 tok/s`
 
+The same local runtime now also keeps repeat, presence, and frequency penalties
+on the bounded qwen35 CUDA candidate lane instead of forcing dense-vocab
+readback. On the short prompt `Explain what Psionic is in one sentence.` with
+the same `128` token cap and these settings:
+
+- `temperature = 0.8`
+- `top_k = 40`
+- `top_p = 0.9`
+- `min_p = 0.05`
+- `repeat_penalty = 1.1`
+- `repeat_last_n = 64`
+- `presence_penalty = 0.2`
+- `frequency_penalty = 0.1`
+- `seed = 42`
+
+Psionic now publishes `qwen35_output_modes=[top_k_candidates:40]` with
+`qwen35_raw_logits=false` on all four local rows and measures about:
+
+- `qwen3.5:0.8b`: `89.29 tok/s`
+- `qwen3.5:2b`: `120.71 tok/s`
+- `qwen3.5:4b`: `56.47 tok/s`
+- `qwen3.5:9b`: `43.27 tok/s`
+
 The local sampler surface now also honors `min_p` and request-level
 `repeat_last_n` in addition to `temperature`, `top_k`, `top_p`, `min_p`,
 `typical_p`, `repeat_penalty`, `presence_penalty`, `frequency_penalty`,
@@ -334,8 +358,10 @@ Psionic applies it after exact top-k candidate selection on both the dense and
 bounded sampling paths.
 
 `typical_p` remains compatible with the same bounded lane for the same reason,
-and `mirostat` is now implemented on the local sampler, benchmark harness, and
-generic qwen35 request surface too.
+and repeat, presence, and frequency penalties now stay on that same bounded
+lane too. `mirostat` is implemented on the local sampler, benchmark harness,
+and generic qwen35 request surface too, but it still routes through explicit
+`raw_logits` fallback on qwen35 CUDA.
 
 Those controls are not part of the canonical Psionic-versus-Ollama matrix on
 this checkout, because the local Ollama `qwen3.5` runner routes through

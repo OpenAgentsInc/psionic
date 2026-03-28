@@ -44,8 +44,8 @@ than just run tensor math.
   when the request stays inside the exact candidate-only envelope:
   - sampled decode or non-zero effective temperature
   - effective `top_k` available and `<= 128`
-  - repeat, presence, and frequency penalties inactive
   - structured-output masking inactive
+  - `mirostat` inactive
 - The runtime sampling surface now also honors `min_p`, `typical_p`,
   `mirostat`, `mirostat_tau`, `mirostat_eta`, and request-level
   `repeat_last_n` in addition to the existing sampled controls.
@@ -130,6 +130,17 @@ than just run tensor math.
   `416 tok/s` versus `320 tok/s` on `qwen3.5:0.8b`, about `225 tok/s` versus
   `204 tok/s` on `qwen3.5:2b`, about `163 tok/s` versus `124 tok/s` on
   `qwen3.5:4b`, and about `101 tok/s` versus `93 tok/s` on `qwen3.5:9b`.
+- On March 28, 2026, the same bounded qwen35 CUDA sampled lane was widened
+  again to apply repeat, presence, and frequency penalties on device before
+  exact top-k selection instead of forcing explicit dense `raw_logits`
+  readback. On the local short-prompt smoke contract with `temperature = 0.8`,
+  `top_k = 40`, `top_p = 0.9`, `min_p = 0.05`, `repeat_penalty = 1.1`,
+  `repeat_last_n = 64`, `presence_penalty = 0.2`,
+  `frequency_penalty = 0.1`, and `seed = 42`, the qwen35 lane stayed on
+  `qwen35_output_modes=[top_k_candidates:40]` with `qwen35_raw_logits=false`
+  across all four local rows and measured about `89 tok/s` on `qwen3.5:0.8b`,
+  about `121 tok/s` on `qwen3.5:2b`, about `56 tok/s` on `qwen3.5:4b`, and
+  about `43 tok/s` on `qwen3.5:9b`.
 - The 4B row only became correct and faster after fixing the fused decode
   output head for mixed `Q4_K` and `Q6_K` weights. Greedy `ArgmaxOnly` decode
   now routes `Q6_K` output weights through `Q8_1` projection plus `argmax_f32`

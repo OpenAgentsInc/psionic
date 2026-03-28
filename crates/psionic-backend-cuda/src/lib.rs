@@ -622,6 +622,36 @@ impl CudaBuffer {
         )
     }
 
+    /// Writes contiguous `i32` values into a region of an `i32` buffer.
+    pub fn write_i32_at_offset(
+        &mut self,
+        element_offset: usize,
+        values: &[i32],
+    ) -> Result<(), RuntimeError> {
+        if self.spec.dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(format!(
+                "write_i32_at_offset requires I32 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        let expected_end = element_offset.saturating_add(values.len());
+        if expected_end > self.spec.storage_size() {
+            return Err(RuntimeError::Backend(format!(
+                "cuda buffer i32 region write exceeds allocation: end={} allocation={}",
+                expected_end,
+                self.spec.storage_size()
+            )));
+        }
+        let mut bytes = Vec::with_capacity(values.len().saturating_mul(size_of::<i32>()));
+        for value in values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+        self.write_bytes_at_offset(
+            element_offset.saturating_mul(size_of::<i32>()),
+            bytes.as_slice(),
+        )
+    }
+
     /// Writes contiguous `f32` values into a `bf16` buffer with explicit
     /// round-to-bf16 conversion on the host staging path.
     pub fn write_bf16_from_f32(&mut self, values: &[f32]) -> Result<(), RuntimeError> {
@@ -1563,6 +1593,32 @@ impl CudaSubmission {
             &selected_values.platform,
         )?;
         self.encoded_operations += 3;
+        Ok(())
+    }
+
+    /// Applies repeat, presence, and frequency penalties to sparse token ids on one `f32` logits row.
+    pub fn apply_sampling_penalties_f32_sparse(
+        &mut self,
+        logits: &CudaBuffer,
+        vocab_size: usize,
+        token_ids: &CudaBuffer,
+        token_counts: &CudaBuffer,
+        active_token_count: usize,
+        repeat_penalty: f32,
+        presence_penalty: f32,
+        frequency_penalty: f32,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_apply_sampling_penalties_f32_sparse(
+            &logits.platform,
+            vocab_size,
+            &token_ids.platform,
+            &token_counts.platform,
+            active_token_count,
+            repeat_penalty,
+            presence_penalty,
+            frequency_penalty,
+        )?;
+        self.encoded_operations += 1;
         Ok(())
     }
 
@@ -9273,6 +9329,17 @@ mod platform {
             selected_values: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_apply_sampling_penalties_f32_sparse(
+            logits: *mut c_void,
+            vocab_size: c_int,
+            token_ids: *const c_void,
+            token_counts: *const c_void,
+            active_token_count: c_int,
+            repeat_penalty: f32,
+            presence_penalty: f32,
+            frequency_penalty: f32,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_top_k_f32_one_row_radix_sort_temp_storage_bytes(
             cols: c_int,
             temp_storage_bytes: *mut usize,
@@ -11388,6 +11455,44 @@ mod platform {
                     )
                 },
                 "psionic_cuda_top_k_f32_one_row_partitioned",
+            )
+        }
+
+        pub(super) fn encode_apply_sampling_penalties_f32_sparse(
+            &mut self,
+            logits: &PlatformBuffer,
+            vocab_size: usize,
+            token_ids: &PlatformBuffer,
+            token_counts: &PlatformBuffer,
+            active_token_count: usize,
+            repeat_penalty: f32,
+            presence_penalty: f32,
+            frequency_penalty: f32,
+        ) -> Result<(), RuntimeError> {
+            let vocab_size = c_int::try_from(vocab_size).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda penalty vocab size exceeds c_int"))
+            })?;
+            let active_token_count = c_int::try_from(active_token_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda penalty active token count exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_apply_sampling_penalties_f32_sparse(
+                        logits.inner.device_ptr.cast(),
+                        vocab_size,
+                        token_ids.inner.device_ptr.cast(),
+                        token_counts.inner.device_ptr.cast(),
+                        active_token_count,
+                        repeat_penalty,
+                        presence_penalty,
+                        frequency_penalty,
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_apply_sampling_penalties_f32_sparse",
             )
         }
 
@@ -15524,6 +15629,22 @@ mod platform {
             _partial_values: &PlatformBuffer,
             _selected_indices: &PlatformBuffer,
             _selected_values: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_apply_sampling_penalties_f32_sparse(
+            &mut self,
+            _logits: &PlatformBuffer,
+            _vocab_size: usize,
+            _token_ids: &PlatformBuffer,
+            _token_counts: &PlatformBuffer,
+            _active_token_count: usize,
+            _repeat_penalty: f32,
+            _presence_penalty: f32,
+            _frequency_penalty: f32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda quantized text-generation kernels require Linux CUDA support",
@@ -20310,6 +20431,60 @@ mod tests {
             .map(|(_, value)| *value)
             .collect::<Vec<_>>();
         assert_close(&selected_values.read_f32()?, &expected_values, 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_applies_sampling_penalties_to_sparse_logits_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let logits = backend.input_buffer(Shape::new(vec![4]), vec![1.0_f32, 3.0, 2.5, -0.5])?;
+        let token_ids = backend.input_i32_buffer(Shape::new(vec![2]), vec![1_i32, 3])?;
+        let token_counts = backend.input_i32_buffer(Shape::new(vec![2]), vec![2_i32, 1])?;
+        let mut submission = backend.begin_submission()?;
+        submission.apply_sampling_penalties_f32_sparse(
+            &logits,
+            4,
+            &token_ids,
+            &token_counts,
+            2,
+            2.0,
+            0.5,
+            0.5,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 1);
+
+        let mut expected = vec![1.0_f32, 3.0, 2.5, -0.5];
+        psionic_runtime::apply_sampling_penalties(
+            expected.as_mut_slice(),
+            &[1_u32, 1, 3],
+            &psionic_runtime::SamplingPolicy {
+                strategy: psionic_runtime::SamplingStrategy::Greedy,
+                temperature: None,
+                top_k: None,
+                top_p: None,
+                min_p: None,
+                typical_p: None,
+                mirostat: None,
+                mirostat_tau: None,
+                mirostat_eta: None,
+                repeat_penalty: Some(2.0),
+                repeat_last_n: Some(3),
+                presence_penalty: Some(0.5),
+                frequency_penalty: Some(0.5),
+                seed: None,
+            },
+        );
+        assert_close(&logits.read_f32()?, &expected, 1e-6);
         Ok(())
     }
 

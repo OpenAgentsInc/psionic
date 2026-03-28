@@ -12422,6 +12422,91 @@ mod tests {
     }
 
     #[test]
+    fn bounded_candidate_sampling_matches_dense_sampling_with_penalties_when_candidate_set_is_exact(
+    ) {
+        let options = GenerationOptions {
+            max_output_tokens: 4,
+            context_overflow_policy: ContextOverflowPolicy::Refuse,
+            decode_strategy: super::DecodeStrategy::Sample,
+            temperature: Some(0.8),
+            top_k: Some(3),
+            top_p: Some(0.9),
+            min_p: Some(0.05),
+            typical_p: None,
+            mirostat: None,
+            mirostat_tau: None,
+            mirostat_eta: None,
+            repeat_penalty: Some(1.1),
+            repeat_last_n: Some(3),
+            presence_penalty: Some(0.2),
+            frequency_penalty: Some(0.1),
+            seed: Some(23),
+            stop_sequences: Vec::new(),
+            structured_output: None,
+        };
+        let history = vec![1_u32, 1, 3];
+        let logits = vec![3.0_f32, 2.9, 2.8, -1.0, -2.0];
+        let mut penalized_logits = logits.clone();
+        psionic_runtime::apply_sampling_penalties(
+            penalized_logits.as_mut_slice(),
+            history.as_slice(),
+            &options.sampling_policy(),
+        );
+        let mut ranked = penalized_logits
+            .iter()
+            .copied()
+            .enumerate()
+            .collect::<Vec<_>>();
+        ranked.sort_by(|(left_index, left_logit), (right_index, right_logit)| {
+            right_logit
+                .total_cmp(left_logit)
+                .then_with(|| left_index.cmp(right_index))
+        });
+        ranked.truncate(options.top_k.expect("top_k set"));
+        let candidate_ids = ranked
+            .iter()
+            .map(|(index, _)| u32::try_from(*index).expect("candidate id fits in u32"))
+            .collect::<Vec<_>>();
+        let candidate_logits = ranked
+            .iter()
+            .map(|(_, logit)| *logit)
+            .collect::<Vec<_>>();
+
+        let tokenizer = FixtureWordTokenizer::new();
+        let mut dense = super::GenerationSampler::new(&options).expect("dense sampler");
+        let mut bounded = super::GenerationSampler::new(&options).expect("bounded sampler");
+
+        let dense_draws = (0..8)
+            .map(|_| {
+                match dense
+                    .select_next_token_from_history(&tokenizer, &logits, &history, &[])
+                    .expect("dense sample")
+                {
+                    super::GenerationSelection::Token(token) => token,
+                    super::GenerationSelection::Terminate => panic!("unexpected terminate"),
+                }
+            })
+            .collect::<Vec<_>>();
+        let bounded_draws = (0..8)
+            .map(|_| {
+                match bounded
+                    .select_next_token_from_candidates(
+                        candidate_ids.as_slice(),
+                        candidate_logits.as_slice(),
+                        logits.len(),
+                    )
+                    .expect("bounded sample")
+                {
+                    super::GenerationSelection::Token(token) => token,
+                    super::GenerationSelection::Terminate => panic!("unexpected terminate"),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(dense_draws, bounded_draws);
+    }
+
+    #[test]
     fn penalties_shift_token_selection() -> Result<(), Box<dyn std::error::Error>> {
         let options = GenerationOptions {
             max_output_tokens: 4,

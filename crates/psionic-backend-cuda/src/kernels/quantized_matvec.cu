@@ -1780,6 +1780,48 @@ __global__ void remap_top_k_indices_kernel(
     selected_indices[index] = source_indices[partial_index];
 }
 
+__global__ void apply_sampling_penalties_f32_sparse_kernel(
+    float *logits,
+    int vocab_size,
+    const int32_t *token_ids,
+    const int32_t *token_counts,
+    int active_token_count,
+    float repeat_penalty,
+    float presence_penalty,
+    float frequency_penalty
+) {
+    const int index = static_cast<int>(blockIdx.x) * blockDim.x + static_cast<int>(threadIdx.x);
+    if (index >= active_token_count) {
+        return;
+    }
+
+    const int token_id = token_ids[index];
+    if (token_id < 0 || token_id >= vocab_size) {
+        return;
+    }
+
+    const int count = token_counts[index];
+    if (count <= 0) {
+        return;
+    }
+
+    float logit = logits[token_id];
+    if (fabsf(repeat_penalty - 1.0f) > FLT_EPSILON) {
+        if (logit < 0.0f) {
+            logit *= repeat_penalty;
+        } else {
+            logit /= repeat_penalty;
+        }
+    }
+    if (fabsf(frequency_penalty) > FLT_EPSILON) {
+        logit -= frequency_penalty * static_cast<float>(count);
+    }
+    if (fabsf(presence_penalty) > FLT_EPSILON) {
+        logit -= presence_penalty;
+    }
+    logits[token_id] = logit;
+}
+
 __global__ void copy_top_k_pairs_kernel(
     const int32_t *sorted_indices,
     const float *sorted_values,
@@ -7359,6 +7401,39 @@ extern "C" int psionic_cuda_top_k_f32_one_row_partitioned(
         static_cast<const int32_t *>(partial_indices),
         static_cast<int32_t *>(selected_indices),
         top_k
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_apply_sampling_penalties_f32_sparse(
+    void *logits,
+    int vocab_size,
+    const void *token_ids,
+    const void *token_counts,
+    int active_token_count,
+    float repeat_penalty,
+    float presence_penalty,
+    float frequency_penalty,
+    void *stream
+) {
+    if (logits == nullptr || token_ids == nullptr || token_counts == nullptr || vocab_size <= 0 ||
+        active_token_count < 0) {
+        return static_cast<int>(cudaErrorInvalidValue);
+    }
+    if (active_token_count == 0) {
+        return 0;
+    }
+
+    const int blocks = (active_token_count + kBlockSize - 1) / kBlockSize;
+    apply_sampling_penalties_f32_sparse_kernel<<<blocks, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<float *>(logits),
+        vocab_size,
+        static_cast<const int32_t *>(token_ids),
+        static_cast<const int32_t *>(token_counts),
+        active_token_count,
+        repeat_penalty,
+        presence_penalty,
+        frequency_penalty
     );
     return static_cast<int>(cudaGetLastError());
 }

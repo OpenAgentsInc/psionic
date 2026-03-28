@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc, time::Instant};
+use std::{collections::BTreeMap, path::Path, sync::Arc, time::Instant};
 
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len};
 use psionic_backend_cuda::{
@@ -14,6 +14,7 @@ use psionic_models::{
 };
 use psionic_runtime::{
     BackendHealthTracker, DeviceDiscovery, LoadedModelResidency, LocalRuntimeObservability,
+    SamplingPolicy,
 };
 use sha2::{Digest, Sha256};
 
@@ -368,6 +369,8 @@ impl CudaGgufQwen35TextGenerationService {
                     &mut state,
                     *token,
                     CudaStepOutputMode::NoOutput,
+                    &request.options,
+                    &[],
                 )?;
                 kernel_count = kernel_count.saturating_add(step.kernel_count);
                 bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
@@ -378,6 +381,8 @@ impl CudaGgufQwen35TextGenerationService {
                 &mut state,
                 *last_prompt_token,
                 output_mode,
+                &request.options,
+                &[],
             )?;
             pending_greedy_token = step.selected_token;
             last_candidates = step.candidates;
@@ -395,6 +400,8 @@ impl CudaGgufQwen35TextGenerationService {
                     &mut state,
                     *token,
                     CudaStepOutputMode::FullLogits,
+                    &request.options,
+                    &[],
                 )?;
                 last_logits = step.logits;
                 kernel_count = kernel_count.saturating_add(step.kernel_count);
@@ -448,6 +455,8 @@ impl CudaGgufQwen35TextGenerationService {
                             .last()
                             .expect("generated token should exist"),
                         CudaStepOutputMode::ArgmaxOnly,
+                        &request.options,
+                        generated_tokens.as_slice(),
                     )?
                 };
                 kernel_count = kernel_count.saturating_add(step.kernel_count);
@@ -471,6 +480,8 @@ impl CudaGgufQwen35TextGenerationService {
                             .last()
                             .expect("generated token should exist"),
                         CudaStepOutputMode::TopKCandidates(top_k),
+                        &request.options,
+                        generated_tokens.as_slice(),
                     )?;
                     last_candidates = step.candidates;
                     kernel_count = kernel_count.saturating_add(step.kernel_count);
@@ -505,6 +516,8 @@ impl CudaGgufQwen35TextGenerationService {
                             .last()
                             .expect("generated token should exist"),
                         CudaStepOutputMode::FullLogits,
+                        &request.options,
+                        generated_tokens.as_slice(),
                     )?;
                     last_logits = step.logits;
                     kernel_count = kernel_count.saturating_add(step.kernel_count);
@@ -654,7 +667,6 @@ fn qwen35_cuda_output_mode(options: &GenerationOptions) -> CudaStepOutputMode {
     }
     if options.structured_output.is_none()
         && matches!(options.decode_strategy, crate::DecodeStrategy::Sample)
-        && !qwen35_sampling_penalties_active(options)
         && policy.effective_temperature() > 1e-6
         && mirostat.is_none()
         && policy.effective_temperature() > 1e-6
@@ -672,6 +684,26 @@ fn qwen35_sampling_penalties_active(options: &GenerationOptions) -> bool {
     (policy.effective_repeat_penalty() - 1.0).abs() > f32::EPSILON
         || policy.effective_presence_penalty().abs() > f32::EPSILON
         || policy.effective_frequency_penalty().abs() > f32::EPSILON
+}
+
+fn qwen35_sampling_penalty_counts(
+    history: &[TokenId],
+    vocab_size: usize,
+    policy: &SamplingPolicy,
+) -> BTreeMap<u32, usize> {
+    let start = match policy.effective_repeat_last_n(history.len()) {
+        Some(lookback) => history.len().saturating_sub(lookback),
+        None => history.len(),
+    };
+    let mut counts = BTreeMap::new();
+    for &token in &history[start..] {
+        let token_id = token.as_u32();
+        if token_id as usize >= vocab_size {
+            continue;
+        }
+        *counts.entry(token_id).or_insert(0) += 1;
+    }
+    counts
 }
 
 fn qwen35_decode_output_metrics(
@@ -1034,6 +1066,7 @@ impl CudaQwen35Model {
             self.max_projection_input_columns(),
             self.max_projection_output_rows(),
             self.descriptor.config.vocab_size,
+            self.descriptor.config.max_context,
         )
     }
 
@@ -1107,6 +1140,8 @@ impl CudaQwen35Model {
         state: &mut Qwen35State,
         token: TokenId,
         output_mode: CudaStepOutputMode,
+        request_options: &GenerationOptions,
+        generated_history: &[TokenId],
     ) -> Result<Qwen35ForwardStep, ReferenceTextGenerationError> {
         if token.as_u32() as usize >= self.descriptor.config.vocab_size {
             return Err(ReferenceTextGenerationError::InvalidToken {
@@ -1115,8 +1150,17 @@ impl CudaQwen35Model {
             });
         }
         if std::env::var_os("PSIONIC_QWEN35_DEBUG_ATTENTION").is_none() {
-            return self.forward_token_fused(backend, plan, state, token, output_mode);
+            return self.forward_token_fused(
+                backend,
+                plan,
+                state,
+                token,
+                output_mode,
+                request_options,
+                generated_history,
+            );
         }
+        let sampling_policy = request_options.sampling_policy();
         let mut bytes_moved = 0u64;
         let mut kernel_count = 0usize;
         let position = state.position;
@@ -1258,6 +1302,8 @@ impl CudaQwen35Model {
                         self.output.host.rows,
                         self.output.host.columns,
                         top_k,
+                        generated_history,
+                        &sampling_policy,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 let readback_bytes = stats.device_to_host_bytes;
@@ -1294,10 +1340,13 @@ impl CudaQwen35Model {
         state: &mut Qwen35State,
         token: TokenId,
         output_mode: CudaStepOutputMode,
+        request_options: &GenerationOptions,
+        generated_history: &[TokenId],
     ) -> Result<Qwen35ForwardStep, ReferenceTextGenerationError> {
         let mut bytes_moved = 0u64;
         let mut kernel_count = 0usize;
         let position = state.position;
+        let sampling_policy = request_options.sampling_policy();
         if self.token_embedding_f16.is_none() {
             let hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
             plan.current_hidden_buffer
@@ -2692,6 +2741,8 @@ impl CudaQwen35Model {
                                 self.output.host.rows,
                                 self.output.host.columns,
                                 top_k,
+                                generated_history,
+                                &sampling_policy,
                             )
                             .map_err(ReferenceTextGenerationError::Runtime)?;
                         let readback_bytes = stats.device_to_host_bytes;
@@ -6375,6 +6426,10 @@ struct Qwen35CudaStepPlan {
     top_k_values_buffer: CudaBuffer,
     top_k_partial_indices_buffer: CudaBuffer,
     top_k_partial_values_buffer: CudaBuffer,
+    penalty_token_ids_buffer: CudaBuffer,
+    penalty_token_counts_buffer: CudaBuffer,
+    penalty_token_ids_scratch: Vec<i32>,
+    penalty_token_counts_scratch: Vec<i32>,
     next_token_host_buffer: CudaHostBuffer,
     next_token_buffer: CudaBuffer,
     argmax_state_host_buffer: CudaHostBuffer,
@@ -6398,6 +6453,7 @@ impl Qwen35CudaStepPlan {
         max_input_columns: usize,
         max_output_rows: usize,
         vocab_size: usize,
+        max_penalty_token_count: usize,
     ) -> Result<Self, ReferenceTextGenerationError> {
         let q8_1_bytes = ggml_q8_1_storage_bytes(1, max_input_columns)
             .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -6405,6 +6461,7 @@ impl Qwen35CudaStepPlan {
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let top_k_partial_len =
             QWEN35_CUDA_MAX_TOP_K.saturating_mul(QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS);
+        let max_penalty_token_count = max_penalty_token_count.max(1);
         Ok(Self {
             matvec_input_buffer: backend
                 .f32_buffer(max_input_columns)
@@ -6481,6 +6538,14 @@ impl Qwen35CudaStepPlan {
             top_k_partial_values_buffer: backend
                 .f32_buffer(top_k_partial_len)
                 .map_err(ReferenceTextGenerationError::Runtime)?,
+            penalty_token_ids_buffer: backend
+                .i32_buffer(max_penalty_token_count)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            penalty_token_counts_buffer: backend
+                .i32_buffer(max_penalty_token_count)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            penalty_token_ids_scratch: vec![0_i32; max_penalty_token_count],
+            penalty_token_counts_scratch: vec![0_i32; max_penalty_token_count],
             next_token_host_buffer: backend
                 .host_buffer(std::mem::size_of::<i32>())
                 .map_err(ReferenceTextGenerationError::Runtime)?,
@@ -6536,6 +6601,73 @@ impl Qwen35CudaStepPlan {
             &self.top_k_indices_buffer,
             &self.top_k_values_buffer,
         )
+    }
+
+    fn encode_sampling_penalties_from_history(
+        &mut self,
+        submission: &mut CudaSubmission,
+        vocab_size: usize,
+        history: &[TokenId],
+        policy: &SamplingPolicy,
+    ) -> Result<u64, crate::RuntimeError> {
+        let repeat_penalty = policy.effective_repeat_penalty();
+        let presence_penalty = policy.effective_presence_penalty();
+        let frequency_penalty = policy.effective_frequency_penalty();
+        if (repeat_penalty - 1.0).abs() <= f32::EPSILON
+            && presence_penalty.abs() <= f32::EPSILON
+            && frequency_penalty.abs() <= f32::EPSILON
+        {
+            return Ok(0);
+        }
+
+        let counts = qwen35_sampling_penalty_counts(history, vocab_size, policy);
+        let active_token_count = counts.len();
+        if active_token_count == 0 {
+            return Ok(0);
+        }
+        if active_token_count > self.penalty_token_ids_scratch.len() {
+            return Err(crate::RuntimeError::Backend(format!(
+                "qwen35 cuda penalty history exceeds scratch capacity: active={} capacity={}",
+                active_token_count,
+                self.penalty_token_ids_scratch.len()
+            )));
+        }
+        for (slot, (token_id, count)) in counts.into_iter().enumerate() {
+            self.penalty_token_ids_scratch[slot] = i32::try_from(token_id).map_err(|_| {
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 cuda penalty token id exceeds i32: {}",
+                    token_id
+                ))
+            })?;
+            self.penalty_token_counts_scratch[slot] = i32::try_from(count).map_err(|_| {
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 cuda penalty token count exceeds i32: {}",
+                    count
+                ))
+            })?;
+        }
+        self.penalty_token_ids_buffer.write_i32_at_offset(
+            0,
+            &self.penalty_token_ids_scratch[..active_token_count],
+        )?;
+        self.penalty_token_counts_buffer.write_i32_at_offset(
+            0,
+            &self.penalty_token_counts_scratch[..active_token_count],
+        )?;
+        submission.apply_sampling_penalties_f32_sparse(
+            &self.logits_buffer,
+            vocab_size,
+            &self.penalty_token_ids_buffer,
+            &self.penalty_token_counts_buffer,
+            active_token_count,
+            repeat_penalty,
+            presence_penalty,
+            frequency_penalty,
+        )?;
+        Ok(active_token_count
+            .saturating_mul(std::mem::size_of::<i32>() * 2)
+            .try_into()
+            .unwrap_or(u64::MAX))
     }
 
     fn run_projection_matvec(
@@ -6752,6 +6884,8 @@ impl Qwen35CudaStepPlan {
         rows: usize,
         cols: usize,
         top_k: usize,
+        history: &[TokenId],
+        policy: &SamplingPolicy,
     ) -> Result<(CudaTopKResult, CudaQuantizedMatvecStats), crate::RuntimeError> {
         if top_k == 0 || top_k > QWEN35_CUDA_MAX_TOP_K {
             return Err(crate::RuntimeError::Backend(format!(
@@ -6801,6 +6935,8 @@ impl Qwen35CudaStepPlan {
                 &self.logits_buffer,
             )?;
         }
+        let host_to_device_bytes =
+            self.encode_sampling_penalties_from_history(&mut submission, rows, history, policy)?;
         self.encode_top_k_from_logits(&mut submission, rows, top_k)?;
         submission
             .copy_device_to_host(&self.top_k_indices_buffer, &self.top_k_indices_host_buffer)?;
@@ -6816,7 +6952,7 @@ impl Qwen35CudaStepPlan {
         Ok((
             result,
             CudaQuantizedMatvecStats {
-                host_to_device_bytes: 0,
+                host_to_device_bytes,
                 device_to_host_bytes: top_k
                     .saturating_mul(std::mem::size_of::<u32>() + std::mem::size_of::<f32>())
                     .try_into()

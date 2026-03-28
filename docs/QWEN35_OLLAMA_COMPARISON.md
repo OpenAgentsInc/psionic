@@ -129,6 +129,50 @@ Psionic output-mode evidence on this contract:
 | `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `163.12` | `124.38` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row also stays ahead under the larger bounded-candidate contract |
 | `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `101.18` | `93.13` | `implemented_early`, ahead | The `9b` row still requires serialized Ollama residency, but the wider candidate set stays on the native bounded lane and remains ahead |
 
+## Penalty-Active Psionic Follow-On
+
+This is not a canonical Psionic-versus-Ollama matrix on this checkout, because
+the local Ollama `qwen3.5` runner does not wire repeat, presence, and
+frequency penalties through the same active sampler path. It is still a useful
+runtime checkpoint for Psionic itself because these requests used to force
+explicit dense `raw_logits` readback on qwen35 CUDA.
+
+Prompt:
+
+```text
+Explain what Psionic is in one sentence.
+```
+
+Token cap:
+
+- `128`
+
+Sampled settings:
+
+- `temperature = 0.8`
+- `top_k = 40`
+- `top_p = 0.9`
+- `min_p = 0.05`
+- `repeat_penalty = 1.1`
+- `repeat_last_n = 64`
+- `presence_penalty = 0.2`
+- `frequency_penalty = 0.1`
+- `seed = 42`
+
+Psionic output-mode evidence on this contract:
+
+- `qwen35_output_modes=[top_k_candidates:40]`
+- `qwen35_raw_logits=false`
+
+Psionic-only measured means:
+
+| Model | Psionic decode tok/s | Notes |
+| --- | ---: | --- |
+| `qwen3.5:0.8b` | `89.29` | Same exact penalty-active request now stays on bounded candidates instead of dense readback |
+| `qwen3.5:2b` | `120.71` | Clear throughput win over the earlier raw-logits penalty fallback on this host |
+| `qwen3.5:4b` | `56.47` | The row stays on bounded candidates, but the short prompt remains noisier under penalties |
+| `qwen3.5:9b` | `43.27` | The row also stays on bounded candidates without materializing dense logits on the host |
+
 ## Current Notes
 
 - The `0.8b`, `2b`, `4b`, and `9b` rows are ahead on decode throughput on this
@@ -139,8 +183,8 @@ Psionic output-mode evidence on this contract:
   envelope:
   - sampled decode or non-zero effective temperature
   - effective `top_k` available and `<= 128`
-  - repeat, presence, and frequency penalties inactive
   - structured-output masking inactive
+  - `mirostat` inactive
 - The runtime sampling surface now honors `min_p` and request-level
   `repeat_last_n` in addition to `temperature`, `top_k`, `top_p`, `min_p`,
   `typical_p`, `repeat_penalty`, `presence_penalty`, `frequency_penalty`,
@@ -155,11 +199,11 @@ Psionic output-mode evidence on this contract:
 - `min_p` remains compatible with the bounded qwen35 CUDA sampled lane because
   Psionic applies it after exact top-k candidate selection on both the dense
   and bounded sampling paths.
-- `typical_p`, penalty controls, `repeat_last_n`, and `mirostat` are supported
-  on the Psionic runtime and request surfaces, but they are not part of the
-  canonical Psionic-versus-Ollama matrix on this checkout because the local
-  Ollama `qwen3.5` runner does not wire those controls through the same active
-  sampler path.
+- `typical_p`, repeat/presence/frequency penalties, `repeat_last_n`, and
+  `mirostat` are supported on the Psionic runtime and request surfaces, but
+  they are not part of the canonical Psionic-versus-Ollama matrix on this
+  checkout because the local Ollama `qwen3.5` runner does not wire those
+  controls through the same active sampler path.
 - `mirostat` therefore remains a Psionic-side capability note, not a canonical
   beat-Ollama throughput claim.
 - Requests outside that envelope still fall back to explicit raw-logit readback
