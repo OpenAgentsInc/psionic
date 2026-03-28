@@ -3,50 +3,59 @@ use std::{
     fs,
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    path::Path,
+    path::{Path, PathBuf},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use ed25519_dalek::SigningKey;
+use psionic_adapters::{
+    AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterTargetFamily,
+    LmHeadLoraAdapterArtifact,
+};
 use psionic_cluster::{
     AdmissionToken, ClusterBackendReadinessStatus, ClusterId, ClusterMembershipRecord,
     ClusterMembershipStatus, ClusterNamespace, ClusterNodeIdentity, ClusterNodeTelemetry,
     ClusterSnapshot, ClusterStabilityPosture, ClusterState, NodeEpoch, NodeId, NodeRole,
 };
+use psionic_core::QuantizationMode;
 use psionic_datastream::{DatastreamEncoding, DatastreamManifest, DatastreamSubjectKind};
 use psionic_environments::EnvironmentPackageKey;
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    AdapterArtifactRetentionPolicy, AdapterArtifactStorageError, AdapterArtifactStorageState,
-    AdapterAssignmentAckReceipt, AdapterAssignmentClaim, AdapterClusterCoordinationError,
-    AdapterClusterMembershipReceipt, AdapterClusterWindowPlanReceipt,
-    AdapterContributionArtifactDisposition, AdapterContributionExecutionSummary,
-    AdapterContributionProgress, AdapterContributionSecurityController,
-    AdapterContributionSecurityError, AdapterContributionSecurityPolicy,
-    AdapterContributionSubmissionReceipt, AdapterContributionUploadLocator,
-    AdapterContributionValidationBundle, AdapterContributionValidatorPolicy,
-    AdapterContributionValidatorState, AdapterPolicyAggregator, AdapterPolicyPromotionReceipt,
-    AdapterTrainingClusterCoordinator, AdapterValidationError, AdapterWindowContractError,
-    AdapterWindowScoreSummary, AdapterWorkerHeartbeatReceipt, AdapterWorkerIdentity,
-    AdapterWorkerProtocolError, AdapterWorkerProtocolPolicy, AdapterWorkerProtocolState,
-    AdapterWorkerTrustClass, CheckpointRecoveryError,
-    FirstSwarmOpenAdapterAggregationCompatibility, FirstSwarmOpenAdapterContributorReceipt,
-    FirstSwarmOpenAdapterReceiptError, OPEN_ADAPTER_CUDA_BACKEND_LABEL,
-    OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL, OpenAdapterExecutionConfig, OpenAdapterHiddenStateSample,
-    OpenAdapterPrecisionPolicy, OpenAdapterSftError, OpenAdapterTrainingExecutionBackend,
-    OpenAdapterTrainingExecutionError, TrainingCoreError, TrainingRunGraphError, TrainingRunState,
     build_first_swarm_open_adapter_contributor_receipt,
     compare_first_swarm_open_adapter_contributor_receipts, first_swarm_open_adapter_samples,
     first_swarm_open_adapter_sft_request, first_swarm_open_adapter_training_config,
-    first_swarm_run_contract, run_open_adapter_sft_export,
+    first_swarm_run_contract, run_open_adapter_sft_export, AdapterArtifactRetentionPolicy,
+    AdapterArtifactStorageError, AdapterArtifactStorageState, AdapterAssignmentAckReceipt,
+    AdapterAssignmentClaim, AdapterClusterCoordinationError, AdapterClusterMembershipReceipt,
+    AdapterClusterWindowPlanReceipt, AdapterContributionArtifactDisposition,
+    AdapterContributionExecutionSummary, AdapterContributionProgress,
+    AdapterContributionSecurityController, AdapterContributionSecurityError,
+    AdapterContributionSecurityPolicy, AdapterContributionSubmissionReceipt,
+    AdapterContributionUploadLocator, AdapterContributionValidationBundle,
+    AdapterContributionValidatorPolicy, AdapterContributionValidatorState, AdapterPolicyAggregator,
+    AdapterPolicyPromotionReceipt, AdapterTrainingClusterCoordinator, AdapterValidationError,
+    AdapterWindowContractError, AdapterWindowScoreSummary, AdapterWorkerHeartbeatReceipt,
+    AdapterWorkerIdentity, AdapterWorkerProtocolError, AdapterWorkerProtocolPolicy,
+    AdapterWorkerProtocolState, AdapterWorkerTrustClass, CheckpointRecoveryError,
+    FirstSwarmOpenAdapterAggregationCompatibility, FirstSwarmOpenAdapterContributorReceipt,
+    FirstSwarmOpenAdapterReceiptError, FixedBudgetTrainingRun, OpenAdapterExecutionConfig,
+    OpenAdapterHiddenStateSample, OpenAdapterPrecisionPolicy, OpenAdapterSftError,
+    OpenAdapterTrainingExecutionBackend, OpenAdapterTrainingExecutionError, PortableModelBundle,
+    PortableTokenizerAssetFormat, PortableTokenizerBinding, TrainingCoreError, TrainingLoopBudget,
+    TrainingParameterGroupState, TrainingRunGraphError, TrainingRunState, TrainingTensorBuffer,
+    OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
 };
 
 const FIRST_SWARM_TRUSTED_LAN_RUNTIME_REPORT_SCHEMA_VERSION: &str =
     "swarm.first_trusted_lan_runtime_report.v1";
+const FIRST_SWARM_TRUSTED_LAN_MERGED_ARTIFACT_REPORT_SCHEMA_VERSION: &str =
+    "swarm.first_trusted_lan_merged_artifact_report.v1";
 const FIRST_SWARM_TRUSTED_LAN_ENVIRONMENT_REF: &str = "env.swarm.local_open_adapter";
 const FIRST_SWARM_TRUSTED_LAN_ENVIRONMENT_VERSION: &str = "2026.03.24";
 const FIRST_SWARM_TRUSTED_LAN_POLICY_FAMILY: &str = "swarm.local.open_adapter.policy";
@@ -90,6 +99,43 @@ pub struct FirstSwarmTrustedLanLocalContribution {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FirstSwarmTrustedLanRetainedArtifacts {
+    pub artifact_root: String,
+    pub local_contributor_adapter_path: String,
+    pub remote_contributor_adapter_path: String,
+    pub merged_adapter_path: String,
+    pub merged_portable_bundle_path: String,
+    pub merged_report_path: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FirstSwarmTrustedLanMergedArtifactReport {
+    pub schema_version: String,
+    pub run_id: String,
+    pub aggregation_policy_id: String,
+    pub merge_strategy: String,
+    pub contributor_weight_bps: BTreeMap<String, u32>,
+    pub local_contributor_receipt_digest: String,
+    pub remote_contributor_receipt_digest: String,
+    pub local_adapter_artifact_digest: String,
+    pub remote_adapter_artifact_digest: String,
+    pub merged_adapter_artifact_digest: String,
+    pub merged_adapter_identity_digest: String,
+    pub merged_portable_bundle_artifact_digest: String,
+    pub merged_portable_bundle_state_dict_digest: String,
+    pub merged_lora_rank: usize,
+    pub merged_lora_alpha: f32,
+    pub evaluation_backend_label: String,
+    pub canonical_profile_mean_loss: f64,
+    pub canonical_profile_bits_per_token: f64,
+    pub canonical_profile_batch_count: usize,
+    pub canonical_profile_sample_count: usize,
+    pub deterministic_probe_top_token_id: usize,
+    pub claim_boundary: String,
+    pub report_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FirstSwarmTrustedLanRuntimeReport {
     pub schema_version: String,
     pub run_id: String,
@@ -123,6 +169,8 @@ pub struct FirstSwarmTrustedLanRuntimeReport {
     pub replay_receipt_digests: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_contribution: Option<FirstSwarmTrustedLanLocalContribution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retained_artifacts: Option<FirstSwarmTrustedLanRetainedArtifacts>,
     pub protocol_detail: String,
     pub claim_boundary: String,
     pub started_at_ms: u64,
@@ -254,6 +302,16 @@ struct LocalContributionRun {
     payload: Vec<u8>,
 }
 
+#[derive(Clone, Debug)]
+struct DecodedLoraAdapter {
+    rank: usize,
+    alpha: f32,
+    hidden_size: usize,
+    vocab_size: usize,
+    lora_a: Vec<f32>,
+    lora_b: Vec<f32>,
+}
+
 #[derive(Debug, Error)]
 pub enum FirstSwarmTrustedLanRuntimeError {
     #[error("failed to read `{path}`: {error}")]
@@ -290,6 +348,8 @@ pub enum FirstSwarmTrustedLanRuntimeError {
     #[error(transparent)]
     OpenAdapterSft(#[from] OpenAdapterSftError),
     #[error(transparent)]
+    ModelIo(#[from] crate::ModelIoError),
+    #[error(transparent)]
     OpenAdapterFixture(#[from] FirstSwarmOpenAdapterReceiptError),
     #[error(transparent)]
     TrainingCore(#[from] TrainingCoreError),
@@ -325,7 +385,13 @@ pub fn run_first_swarm_trusted_lan_runtime(
         peer_endpoint,
     )?;
     let mut report = match role {
-        FirstSwarmTrustedLanRuntimeRole::Coordinator => run_coordinator(context, started_at_ms)?,
+        FirstSwarmTrustedLanRuntimeRole::Coordinator => run_coordinator(
+            context,
+            started_at_ms,
+            output_path
+                .parent()
+                .map(|parent| parent.join("retained_artifacts")),
+        )?,
         FirstSwarmTrustedLanRuntimeRole::Contributor => run_contributor(context, started_at_ms)?,
     };
     report.finished_at_ms = now_ms();
@@ -339,6 +405,7 @@ pub fn run_first_swarm_trusted_lan_runtime(
 fn run_coordinator(
     context: ExecutionContext,
     started_at_ms: u64,
+    artifact_root: Option<PathBuf>,
 ) -> Result<FirstSwarmTrustedLanRuntimeReport, FirstSwarmTrustedLanRuntimeError> {
     let mut plan = build_coordinator_plan(&context, started_at_ms)?;
     let local_claim_id = plan.local_claim.claim_id.clone();
@@ -640,6 +707,19 @@ fn run_coordinator(
         scored_at_ms + 50,
         scored_at_ms + 60,
     )?;
+    let retained_artifacts = if let Some(artifact_root) = artifact_root {
+        Some(retain_coordinator_artifacts(
+            artifact_root.as_path(),
+            context.run_id.as_str(),
+            &context.local_node,
+            &local_run,
+            &context.peer_node,
+            &remote_contributor_receipt,
+            remote_payload.as_slice(),
+        )?)
+    } else {
+        None
+    };
 
     Ok(FirstSwarmTrustedLanRuntimeReport {
         schema_version: String::from(FIRST_SWARM_TRUSTED_LAN_RUNTIME_REPORT_SCHEMA_VERSION),
@@ -664,6 +744,7 @@ fn run_coordinator(
         aggregation_compatibility: Some(compatibility),
         replay_receipt_digests,
         local_contribution: Some(local_run.contribution),
+        retained_artifacts,
         protocol_detail: String::from(
             "The Mac coordinator ran one MLX open-adapter contribution locally, admitted one Linux CUDA contributor over the trusted-LAN cluster port, compared the retained contributor receipts across both backends, and sealed validator, replay, and aggregation truth through the generic adapter-cluster state machines.",
         ),
@@ -818,6 +899,7 @@ fn run_contributor(
         aggregation_compatibility: None,
         replay_receipt_digests: Vec::new(),
         local_contribution: Some(local_run.contribution),
+        retained_artifacts: None,
         protocol_detail: String::from(
             "The Linux contributor dialed the configured Mac coordinator endpoint over the trusted LAN, accepted one bounded open-adapter assignment, emitted worker heartbeats, and returned one CUDA contributor receipt plus adapter payload.",
         ),
@@ -1133,6 +1215,454 @@ fn run_local_contribution(
             execution_summary,
         },
         payload: outcome.adapter_bytes,
+    })
+}
+
+fn retain_coordinator_artifacts(
+    artifact_root: &Path,
+    run_id: &str,
+    local_node: &ExecutionNode,
+    local_run: &LocalContributionRun,
+    remote_node: &ExecutionNode,
+    remote_receipt: &FirstSwarmOpenAdapterContributorReceipt,
+    remote_payload: &[u8],
+) -> Result<FirstSwarmTrustedLanRetainedArtifacts, FirstSwarmTrustedLanRuntimeError> {
+    fs::create_dir_all(artifact_root).map_err(|error| {
+        FirstSwarmTrustedLanRuntimeError::CreateDir {
+            path: artifact_root.display().to_string(),
+            error,
+        }
+    })?;
+
+    let local_contributor_adapter_path =
+        artifact_root.join(format!("{}_adapter.safetensors", local_node.node_id));
+    let remote_contributor_adapter_path =
+        artifact_root.join(format!("{}_adapter.safetensors", remote_node.node_id));
+    let merged_adapter_path = artifact_root.join("merged_mean_delta_adapter.safetensors");
+    let merged_portable_bundle_path = artifact_root.join("merged_portable_bundle.safetensors");
+    let merged_report_path = artifact_root.join("merged_artifact_report.json");
+
+    write_bytes(
+        local_contributor_adapter_path.as_path(),
+        local_run.payload.as_slice(),
+    )?;
+    write_bytes(remote_contributor_adapter_path.as_path(), remote_payload)?;
+
+    build_and_write_merged_artifacts(
+        run_id,
+        local_node,
+        &local_run.contribution.contributor_receipt,
+        local_run.payload.as_slice(),
+        remote_node,
+        remote_receipt,
+        remote_payload,
+        merged_adapter_path.as_path(),
+        merged_portable_bundle_path.as_path(),
+        merged_report_path.as_path(),
+    )?;
+    Ok(FirstSwarmTrustedLanRetainedArtifacts {
+        artifact_root: artifact_root.display().to_string(),
+        local_contributor_adapter_path: local_contributor_adapter_path.display().to_string(),
+        remote_contributor_adapter_path: remote_contributor_adapter_path.display().to_string(),
+        merged_adapter_path: merged_adapter_path.display().to_string(),
+        merged_portable_bundle_path: merged_portable_bundle_path.display().to_string(),
+        merged_report_path: merged_report_path.display().to_string(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_and_write_merged_artifacts(
+    run_id: &str,
+    local_node: &ExecutionNode,
+    local_receipt: &FirstSwarmOpenAdapterContributorReceipt,
+    local_payload: &[u8],
+    remote_node: &ExecutionNode,
+    remote_receipt: &FirstSwarmOpenAdapterContributorReceipt,
+    remote_payload: &[u8],
+    merged_adapter_path: &Path,
+    merged_portable_bundle_path: &Path,
+    merged_report_path: &Path,
+) -> Result<FirstSwarmTrustedLanMergedArtifactReport, FirstSwarmTrustedLanRuntimeError> {
+    let local_adapter = decode_lora_adapter(local_payload, local_receipt.manifest.lora_alpha)?;
+    let remote_adapter = decode_lora_adapter(remote_payload, remote_receipt.manifest.lora_alpha)?;
+    if local_adapter.hidden_size != remote_adapter.hidden_size
+        || local_adapter.vocab_size != remote_adapter.vocab_size
+    {
+        return Err(FirstSwarmTrustedLanRuntimeError::InvalidInput {
+            detail: String::from(
+                "first swarm merged artifact export requires matching hidden and vocabulary shapes",
+            ),
+        });
+    }
+
+    let local_weight = 0.5_f32;
+    let remote_weight = 0.5_f32;
+    let local_scale = (local_weight * (local_adapter.alpha / local_adapter.rank as f32)).sqrt();
+    let remote_scale = (remote_weight * (remote_adapter.alpha / remote_adapter.rank as f32)).sqrt();
+    let merged_rank = local_adapter.rank + remote_adapter.rank;
+    let merged_alpha = merged_rank as f32;
+
+    let mut merged_lora_a =
+        Vec::with_capacity(merged_rank.saturating_mul(local_adapter.hidden_size));
+    merged_lora_a.extend(local_adapter.lora_a.iter().map(|value| value * local_scale));
+    merged_lora_a.extend(
+        remote_adapter
+            .lora_a
+            .iter()
+            .map(|value| value * remote_scale),
+    );
+
+    let mut merged_lora_b =
+        Vec::with_capacity(local_adapter.vocab_size.saturating_mul(merged_rank));
+    for vocab_index in 0..local_adapter.vocab_size {
+        let local_row_start = vocab_index * local_adapter.rank;
+        let remote_row_start = vocab_index * remote_adapter.rank;
+        merged_lora_b.extend(
+            local_adapter.lora_b[local_row_start..local_row_start + local_adapter.rank]
+                .iter()
+                .map(|value| value * local_scale),
+        );
+        merged_lora_b.extend(
+            remote_adapter.lora_b[remote_row_start..remote_row_start + remote_adapter.rank]
+                .iter()
+                .map(|value| value * remote_scale),
+        );
+    }
+
+    let merged_adapter_bytes = serialize_lora_adapter(
+        merged_rank,
+        local_adapter.hidden_size,
+        local_adapter.vocab_size,
+        merged_lora_a.as_slice(),
+        merged_lora_b.as_slice(),
+    )?;
+    let merged_adapter_artifact_digest =
+        hex::encode(Sha256::digest(merged_adapter_bytes.as_slice()));
+    write_bytes(merged_adapter_path, merged_adapter_bytes.as_slice())?;
+
+    let merged_identity = merged_adapter_identity(
+        run_id,
+        local_receipt,
+        merged_adapter_artifact_digest.as_str(),
+        merged_rank,
+    );
+    let merged_artifact = LmHeadLoraAdapterArtifact::from_safetensors_bytes(
+        merged_adapter_bytes.as_slice(),
+        merged_identity.clone(),
+        merged_alpha,
+    )
+    .map_err(|error| FirstSwarmTrustedLanRuntimeError::Protocol {
+        detail: format!("failed to decode exact mean-delta merged adapter artifact: {error}"),
+    })?;
+    let deterministic_probe_top_token_id =
+        deterministic_probe_top_token_id(&merged_artifact, local_adapter.vocab_size)?;
+
+    let mut config = first_swarm_open_adapter_training_config(
+        format!("{run_id}-merged"),
+        format!("{FIRST_SWARM_TRUSTED_LAN_POLICY_FAMILY}:{run_id}:merged"),
+        local_node.backend_label.clone(),
+    );
+    config.model.target.lora_rank = merged_rank;
+    config.model.target.lora_alpha = merged_alpha;
+    let evaluation_samples = first_swarm_samples_for_backend(local_node.backend_label.as_str())?;
+    let backend = OpenAdapterTrainingExecutionBackend::new(config.clone(), evaluation_samples)?;
+    let training_groups =
+        merged_training_groups(&backend, merged_lora_a.as_slice(), merged_lora_b.as_slice())?;
+    let tokenizer = PortableTokenizerBinding::new(
+        config.model.tokenizer.clone(),
+        PortableTokenizerAssetFormat::PsionicDigest,
+        format!(
+            "{}@{}",
+            config.model.base_model_id, config.model.base_model_revision
+        ),
+    );
+    let portable_bundle = PortableModelBundle::from_training_groups(
+        config.admissible_model_family.adapter_family(),
+        config.model.base_model_revision.clone(),
+        config.checkpoint_family.clone(),
+        Some(format!("checkpoint://{}/merged", config.run_id)),
+        training_groups.as_slice(),
+        tokenizer,
+        config.model.tokenizer.template_digest.clone(),
+    )?;
+    let (portable_bundle_bytes, portable_bundle_receipt) = portable_bundle.export_safetensors()?;
+    write_bytes(
+        merged_portable_bundle_path,
+        portable_bundle_bytes.as_slice(),
+    )?;
+    let (
+        canonical_profile_mean_loss,
+        canonical_profile_batch_count,
+        canonical_profile_sample_count,
+    ) = evaluate_training_groups(&backend, training_groups)?;
+
+    let mut contributor_weight_bps = BTreeMap::new();
+    contributor_weight_bps.insert(local_node.node_id.clone(), 5_000);
+    contributor_weight_bps.insert(remote_node.node_id.clone(), 5_000);
+    let mut report = FirstSwarmTrustedLanMergedArtifactReport {
+        schema_version: String::from(FIRST_SWARM_TRUSTED_LAN_MERGED_ARTIFACT_REPORT_SCHEMA_VERSION),
+        run_id: String::from(run_id),
+        aggregation_policy_id: String::from("aggregation.open_adapter.mean_delta"),
+        merge_strategy: String::from("exact_mean_delta_rank_stacking"),
+        contributor_weight_bps,
+        local_contributor_receipt_digest: local_receipt.receipt_digest.clone(),
+        remote_contributor_receipt_digest: remote_receipt.receipt_digest.clone(),
+        local_adapter_artifact_digest: local_receipt.adapter_artifact_digest.clone(),
+        remote_adapter_artifact_digest: remote_receipt.adapter_artifact_digest.clone(),
+        merged_adapter_artifact_digest,
+        merged_adapter_identity_digest: merged_identity.stable_digest(),
+        merged_portable_bundle_artifact_digest: portable_bundle_receipt.artifact_digest.clone(),
+        merged_portable_bundle_state_dict_digest: portable_bundle_receipt
+            .state_dict_digest
+            .clone(),
+        merged_lora_rank: merged_rank,
+        merged_lora_alpha: merged_alpha,
+        evaluation_backend_label: local_node.backend_label.clone(),
+        canonical_profile_mean_loss,
+        canonical_profile_bits_per_token: canonical_profile_mean_loss / std::f64::consts::LN_2,
+        canonical_profile_batch_count,
+        canonical_profile_sample_count,
+        deterministic_probe_top_token_id,
+        claim_boundary: String::from(
+            "This report records one exact mean-delta merged open-adapter artifact derived from the two admitted trusted-LAN contributor payloads. It proves that the retained mixed-device run now emits an inferable merged adapter and portable bundle, but it does not claim exact HOMEGOLF or public Parameter Golf score parity.",
+        ),
+        report_digest: String::new(),
+    };
+    report.report_digest = stable_digest(
+        b"psionic_first_swarm_trusted_lan_merged_artifact_report|",
+        &report,
+    );
+    write_json(merged_report_path, &report)?;
+    Ok(report)
+}
+
+fn merged_training_groups(
+    backend: &OpenAdapterTrainingExecutionBackend,
+    merged_lora_a: &[f32],
+    merged_lora_b: &[f32],
+) -> Result<Vec<TrainingParameterGroupState>, FirstSwarmTrustedLanRuntimeError> {
+    let mut groups = backend.initial_training_groups()?;
+    if groups.len() != 2 {
+        return Err(FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!(
+                "expected two open-adapter training groups, found {}",
+                groups.len()
+            ),
+        });
+    }
+    groups[0].parameter = TrainingTensorBuffer::from_f32(
+        groups[0].group_id.clone(),
+        groups[0].parameter.spec.clone(),
+        merged_lora_a.to_vec(),
+    )?;
+    groups[1].parameter = TrainingTensorBuffer::from_f32(
+        groups[1].group_id.clone(),
+        groups[1].parameter.spec.clone(),
+        merged_lora_b.to_vec(),
+    )?;
+    Ok(groups)
+}
+
+fn evaluate_training_groups(
+    backend: &OpenAdapterTrainingExecutionBackend,
+    training_groups: Vec<TrainingParameterGroupState>,
+) -> Result<(f64, usize, usize), FirstSwarmTrustedLanRuntimeError> {
+    let run = FixedBudgetTrainingRun::new(
+        backend.config().run_id.clone(),
+        backend.config().checkpoint_family.clone(),
+        TrainingLoopBudget::new(1, 1, 1)?,
+        training_groups,
+    )?;
+    let mut weighted_loss = 0.0_f64;
+    let mut sample_count = 0_u64;
+    for batch_index in 0..backend.batches().len() {
+        let record = backend.produce_gradient_batch(&run, batch_index)?;
+        weighted_loss += record.mean_loss as f64 * f64::from(record.training_batch.sample_count);
+        sample_count += u64::from(record.training_batch.sample_count);
+    }
+    Ok((
+        weighted_loss / sample_count.max(1) as f64,
+        backend.batches().len(),
+        sample_count as usize,
+    ))
+}
+
+fn deterministic_probe_top_token_id(
+    artifact: &LmHeadLoraAdapterArtifact,
+    vocab_size: usize,
+) -> Result<usize, FirstSwarmTrustedLanRuntimeError> {
+    let mut logits = vec![0.0_f32; vocab_size];
+    artifact
+        .apply_to_logits(&[1.0, 0.0, 0.0, 0.0], logits.as_mut_slice())
+        .map_err(|error| FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("failed to compute merged deterministic probe logits: {error}"),
+        })?;
+    Ok(logits
+        .iter()
+        .enumerate()
+        .max_by(|left, right| left.1.partial_cmp(right.1).expect("finite logits"))
+        .map(|(index, _)| index)
+        .unwrap_or_default())
+}
+
+fn merged_adapter_identity(
+    run_id: &str,
+    receipt: &FirstSwarmOpenAdapterContributorReceipt,
+    artifact_digest: &str,
+    merged_rank: usize,
+) -> AdapterArtifactIdentity {
+    AdapterArtifactIdentity::new(
+        format!("first-swarm-merged-{run_id}"),
+        String::from("mean-delta-rank-stacked"),
+        AdapterArtifactKind::Lora,
+        AdapterArtifactFormat::Safetensors,
+        receipt.manifest.base_model_id.clone(),
+        receipt.manifest.base_model_revision.clone(),
+        receipt.manifest.base_served_artifact_digest.clone(),
+        String::from(artifact_digest),
+        QuantizationMode::None,
+        AdapterTargetFamily::DecoderComposite,
+        u64::try_from(
+            merged_rank.saturating_mul(receipt.manifest.hidden_size + receipt.manifest.vocab_size),
+        )
+        .unwrap_or(u64::MAX),
+    )
+    .with_provenance_digest(receipt.execution_provenance_digest.clone())
+    .with_governance_digest(receipt.manifest.receipt_contract_digest.clone())
+}
+
+fn decode_lora_adapter(
+    payload: &[u8],
+    alpha: f32,
+) -> Result<DecodedLoraAdapter, FirstSwarmTrustedLanRuntimeError> {
+    let tensors = SafeTensors::deserialize(payload).map_err(|error| {
+        FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("failed to decode contributor safetensors payload: {error}"),
+        }
+    })?;
+    let (lora_a_shape, lora_a) =
+        decode_lora_tensor(&tensors, &["lm_head.lora_A.weight", "output.lora_A.weight"])?;
+    let (lora_b_shape, lora_b) =
+        decode_lora_tensor(&tensors, &["lm_head.lora_B.weight", "output.lora_B.weight"])?;
+    let [rank, hidden_size] = lora_a_shape.as_slice() else {
+        return Err(FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("unexpected LoRA A shape {lora_a_shape:?}"),
+        });
+    };
+    let [vocab_size, lora_b_rank] = lora_b_shape.as_slice() else {
+        return Err(FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("unexpected LoRA B shape {lora_b_shape:?}"),
+        });
+    };
+    if rank != lora_b_rank {
+        return Err(FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("LoRA rank mismatch between A ({rank}) and B ({lora_b_rank}) tensors"),
+        });
+    }
+    Ok(DecodedLoraAdapter {
+        rank: *rank,
+        alpha,
+        hidden_size: *hidden_size,
+        vocab_size: *vocab_size,
+        lora_a,
+        lora_b,
+    })
+}
+
+fn decode_lora_tensor(
+    tensors: &SafeTensors<'_>,
+    names: &[&str],
+) -> Result<(Vec<usize>, Vec<f32>), FirstSwarmTrustedLanRuntimeError> {
+    let tensor = names
+        .iter()
+        .find_map(|name| {
+            tensors
+                .tensor(name)
+                .ok()
+                .map(|tensor| ((*name).to_string(), tensor))
+        })
+        .ok_or_else(|| FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("missing expected LoRA tensor from payload: {:?}", names),
+        })?;
+    let (tensor_name, tensor_view) = tensor;
+    if tensor_view.dtype() != SafeTensorsDType::F32 {
+        return Err(FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!(
+                "tensor `{tensor_name}` used unsupported dtype {:?}",
+                tensor_view.dtype()
+            ),
+        });
+    }
+    let data = tensor_view.data();
+    if data.len() % 4 != 0 {
+        return Err(FirstSwarmTrustedLanRuntimeError::Protocol {
+            detail: format!("tensor `{tensor_name}` did not carry a valid f32 byte length"),
+        });
+    }
+    let values = data
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect::<Vec<_>>();
+    Ok((tensor_view.shape().to_vec(), values))
+}
+
+fn serialize_lora_adapter(
+    rank: usize,
+    hidden_size: usize,
+    vocab_size: usize,
+    lora_a: &[f32],
+    lora_b: &[f32],
+) -> Result<Vec<u8>, FirstSwarmTrustedLanRuntimeError> {
+    let raw_a = encode_f32_bytes(lora_a);
+    let raw_b = encode_f32_bytes(lora_b);
+    let view_a = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![rank, hidden_size],
+        raw_a.as_slice(),
+    )
+    .map_err(|error| FirstSwarmTrustedLanRuntimeError::Protocol {
+        detail: format!("failed to build merged LoRA A tensor view: {error}"),
+    })?;
+    let view_b = TensorView::new(
+        SafeTensorsDType::F32,
+        vec![vocab_size, rank],
+        raw_b.as_slice(),
+    )
+    .map_err(|error| FirstSwarmTrustedLanRuntimeError::Protocol {
+        detail: format!("failed to build merged LoRA B tensor view: {error}"),
+    })?;
+    serialize(
+        [
+            ("lm_head.lora_A.weight", view_a),
+            ("lm_head.lora_B.weight", view_b),
+        ],
+        None,
+    )
+    .map_err(|error| FirstSwarmTrustedLanRuntimeError::Protocol {
+        detail: format!("failed to serialize merged LoRA adapter artifact: {error}"),
+    })
+}
+
+fn encode_f32_bytes(values: &[f32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(values.len().saturating_mul(4));
+    for value in values {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    bytes
+}
+
+fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), FirstSwarmTrustedLanRuntimeError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            FirstSwarmTrustedLanRuntimeError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            }
+        })?;
+    }
+    fs::write(path, bytes).map_err(|error| FirstSwarmTrustedLanRuntimeError::Write {
+        path: path.display().to_string(),
+        error,
     })
 }
 
@@ -1463,6 +1993,13 @@ fn write_runtime_report(
     output_path: &Path,
     report: &FirstSwarmTrustedLanRuntimeReport,
 ) -> Result<(), FirstSwarmTrustedLanRuntimeError> {
+    write_json(output_path, report)
+}
+
+fn write_json(
+    output_path: &Path,
+    value: &impl Serialize,
+) -> Result<(), FirstSwarmTrustedLanRuntimeError> {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             FirstSwarmTrustedLanRuntimeError::CreateDir {
@@ -1471,7 +2008,7 @@ fn write_runtime_report(
             }
         })?;
     }
-    let encoded = serde_json::to_string_pretty(report)?;
+    let encoded = serde_json::to_string_pretty(value)?;
     fs::write(output_path, format!("{encoded}\n")).map_err(|error| {
         FirstSwarmTrustedLanRuntimeError::Write {
             path: output_path.display().to_string(),
@@ -1570,5 +2107,35 @@ mod tests {
         assert!(coordinator_report.promotion_receipt.is_some());
         assert!(coordinator_report.aggregation_compatibility.is_some());
         assert_eq!(coordinator_report.replay_receipt_digests.len(), 2);
+        let retained_artifacts = coordinator_report
+            .retained_artifacts
+            .as_ref()
+            .expect("coordinator should retain merged artifacts");
+        assert!(Path::new(&retained_artifacts.local_contributor_adapter_path).exists());
+        assert!(Path::new(&retained_artifacts.remote_contributor_adapter_path).exists());
+        assert!(Path::new(&retained_artifacts.merged_adapter_path).exists());
+        assert!(Path::new(&retained_artifacts.merged_portable_bundle_path).exists());
+        assert!(Path::new(&retained_artifacts.merged_report_path).exists());
+        let merged_report: FirstSwarmTrustedLanMergedArtifactReport = serde_json::from_slice(
+            &fs::read(&retained_artifacts.merged_report_path)
+                .expect("merged report should be readable"),
+        )
+        .expect("merged report should decode");
+        assert_eq!(
+            merged_report.schema_version,
+            FIRST_SWARM_TRUSTED_LAN_MERGED_ARTIFACT_REPORT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            merged_report.merge_strategy,
+            "exact_mean_delta_rank_stacking"
+        );
+        assert_eq!(merged_report.merged_lora_rank, 4);
+        let bundle = PortableModelBundle::import_safetensors(
+            fs::read(&retained_artifacts.merged_portable_bundle_path)
+                .expect("merged portable bundle should be readable")
+                .as_slice(),
+        )
+        .expect("merged portable bundle should import");
+        assert_eq!(bundle.to_training_groups().expect("groups").len(), 2);
     }
 }

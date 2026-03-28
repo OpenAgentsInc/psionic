@@ -39,6 +39,8 @@ from pathlib import Path
 
 bundle_path = Path(sys.argv[1])
 bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+artifacts = bundle.get("artifacts", {})
+merged = bundle.get("merged_artifact", {})
 
 def fail(message: str) -> None:
     print(message, file=sys.stderr)
@@ -64,6 +66,24 @@ if len(bundle.get("replay_receipt_digests", [])) != 2:
     fail("first swarm real-run check: expected exactly two replay receipt digests")
 if "mixed-hardware open-adapter run" not in bundle["claim_boundary"]:
     fail("first swarm real-run check: claim boundary drifted")
+for required_path in [
+    "local_contributor_adapter_path",
+    "remote_contributor_adapter_path",
+    "merged_adapter_path",
+    "merged_portable_bundle_path",
+    "merged_report_path",
+]:
+    value = artifacts.get(required_path)
+    if not value:
+        fail(f"first swarm real-run check: missing artifact path `{required_path}`")
+    if not Path(value).exists():
+        fail(f"first swarm real-run check: artifact path `{required_path}` does not exist")
+if merged.get("merge_strategy") != "exact_mean_delta_rank_stacking":
+    fail("first swarm real-run check: merged artifact strategy drifted")
+if int(merged.get("merged_lora_rank", 0)) != 4:
+    fail("first swarm real-run check: merged_lora_rank must stay 4 for the retained two-contributor run")
+if not merged.get("merged_portable_bundle_state_dict_digest"):
+    fail("first swarm real-run check: merged portable bundle state dict digest is missing")
 
 summary = {
     "verdict": "verified",
@@ -72,6 +92,8 @@ summary = {
     "promotion_disposition": bundle["promotion_disposition"],
     "merge_disposition": bundle["merge_disposition"],
     "publish_disposition": bundle["publish_disposition"],
+    "merge_strategy": merged.get("merge_strategy"),
+    "merged_lora_rank": merged.get("merged_lora_rank"),
 }
 print(json.dumps(summary, indent=2))
 PY

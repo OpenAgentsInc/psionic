@@ -25,8 +25,8 @@ Options:
   --run-id <id>                 Stable run identifier. Default: tailrun-home-admitted-<utc>
   --bundle-dir <path>           Local output directory. Default: fixtures/swarm/runs/<run_id>
   --remote-host <host>          Remote Linux contributor SSH target. Default: archlinux
-  --remote-worktree-dir <path>  Remote staged repo root. Default: /tmp/psionic-first-swarm-tailnet-<run_id>
-  --remote-bundle-dir <path>    Remote runtime output root. Default: /tmp/swarm-runs/<run_id>/linux
+  --remote-worktree-dir <path>  Remote staged repo root. Default: $HOME/code/psionic-tailrun/<run_id>/repo
+  --remote-bundle-dir <path>    Remote runtime output root. Default: $HOME/code/psionic-tailrun/<run_id>/linux
   --git-ref <ref>               Local git ref to archive for the remote run. Default: local HEAD
   --local-tailnet-ip <ip>       Explicit local Tailnet IPv4. Default: detect with tailscale ip -4
   --remote-tailnet-ip <ip>      Explicit remote Tailnet IPv4. Default: detect over SSH
@@ -118,11 +118,11 @@ if [[ -z "${git_ref}" ]]; then
 fi
 
 if [[ -z "${remote_worktree_dir}" ]]; then
-  remote_worktree_dir="/tmp/psionic-first-swarm-tailnet-${run_id}"
+  remote_worktree_dir="\$HOME/code/psionic-tailrun/${run_id}/repo"
 fi
 
 if [[ -z "${remote_bundle_dir}" ]]; then
-  remote_bundle_dir="/tmp/swarm-runs/${run_id}/linux"
+  remote_bundle_dir="\$HOME/code/psionic-tailrun/${run_id}/linux"
 fi
 
 detect_local_tailnet_ip() {
@@ -162,8 +162,7 @@ contributor_log_path="${bundle_dir}/logs/contributor.log"
 coordinator_log_path="${bundle_dir}/logs/coordinator.log"
 
 remote_contributor_report_path="${remote_bundle_dir}/contributor_runtime_report.json"
-remote_cargo_home="/tmp/psionic-tailrun-cargo-home"
-remote_target_dir="/tmp/psionic-tailrun-target/first-swarm-tailnet"
+remote_target_dir='$HOME/code/psionic/target/first-swarm-tailnet'
 
 echo "Staging ${git_ref} to ${remote_host}:${remote_worktree_dir}"
 git -C "${repo_root}" archive "${git_ref}" -- \
@@ -219,7 +218,7 @@ jq -n \
 
 echo "Starting remote contributor on ${remote_host} (${remote_tailnet_ip}:${contributor_port})"
 ssh "${remote_host}" \
-  "bash -ic 'export CARGO_HOME=${remote_cargo_home}; export CARGO_TARGET_DIR=${remote_target_dir}; mkdir -p \"${remote_cargo_home}\" \"$(dirname "${remote_target_dir}")\"; if [[ -d ~/.cargo/registry ]]; then ln -sfn ~/.cargo/registry \"${remote_cargo_home}\"/registry; fi; if [[ -d ~/.cargo/git ]]; then ln -sfn ~/.cargo/git \"${remote_cargo_home}\"/git; fi; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --bin first_swarm_trusted_lan_live_runtime -- --role contributor --run-id ${run_id} --topology-contract ${remote_worktree_dir}/${topology_contract_rel} --workflow-plan ${remote_worktree_dir}/${workflow_plan_rel} --local-endpoint ${remote_tailnet_ip}:${contributor_port} --peer-endpoint ${local_tailnet_ip}:${coordinator_port} --output ${remote_contributor_report_path}'" \
+  "bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; mkdir -p \"${remote_target_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --bin first_swarm_trusted_lan_live_runtime -- --role contributor --run-id ${run_id} --topology-contract ${remote_worktree_dir}/${topology_contract_rel} --workflow-plan ${remote_worktree_dir}/${workflow_plan_rel} --local-endpoint ${remote_tailnet_ip}:${contributor_port} --peer-endpoint ${local_tailnet_ip}:${coordinator_port} --output ${remote_contributor_report_path}'" \
   >"${contributor_log_path}" 2>&1 &
 contributor_ssh_pid=$!
 
@@ -308,6 +307,7 @@ coordinator = load(coordinator_path)
 contributor = load(contributor_path)
 topology = load(topology_path)
 workflow = load(workflow_path)
+retained_artifacts = coordinator.get("retained_artifacts")
 
 if coordinator["runtime_role"] != "coordinator":
     raise SystemExit("coordinator runtime report does not carry runtime_role=coordinator")
@@ -325,6 +325,15 @@ if coordinator.get("promotion_receipt") is None:
     raise SystemExit("coordinator runtime report is missing promotion_receipt")
 if coordinator.get("aggregation_compatibility") is None:
     raise SystemExit("coordinator runtime report is missing aggregation_compatibility")
+if retained_artifacts is None:
+    raise SystemExit("coordinator runtime report is missing retained_artifacts")
+
+merged_report_path = retained_artifacts["merged_report_path"]
+merged_report = load(merged_report_path)
+if merged_report["schema_version"] != "swarm.first_trusted_lan_merged_artifact_report.v1":
+    raise SystemExit("merged artifact report schema drifted")
+if merged_report["merge_strategy"] != "exact_mean_delta_rank_stacking":
+    raise SystemExit("merged artifact report merge_strategy drifted")
 
 summary = coordinator["validator_summary"]
 promotion = coordinator["promotion_receipt"]
@@ -373,8 +382,23 @@ bundle = {
         "workflow_plan_path": os.path.abspath(workflow_path),
         "coordinator_report_path": os.path.abspath(coordinator_path),
         "contributor_report_path": os.path.abspath(contributor_path),
+        "local_contributor_adapter_path": os.path.abspath(retained_artifacts["local_contributor_adapter_path"]),
+        "remote_contributor_adapter_path": os.path.abspath(retained_artifacts["remote_contributor_adapter_path"]),
+        "merged_adapter_path": os.path.abspath(retained_artifacts["merged_adapter_path"]),
+        "merged_portable_bundle_path": os.path.abspath(retained_artifacts["merged_portable_bundle_path"]),
+        "merged_report_path": os.path.abspath(merged_report_path),
     },
-    "claim_boundary": "This bundle proves one real admitted-device Tailnet mixed-hardware open-adapter run across a local M5 MLX coordinator and a Linux RTX 4080 contributor, with explicit contributor receipts, submission receipts, validator summary, replay receipts, and aggregation outcome. It does not claim M2 participation, full-model mixed-backend dense training, or automatic published-model promotion.",
+    "merged_artifact": {
+        "merge_strategy": merged_report["merge_strategy"],
+        "merged_lora_rank": int(merged_report["merged_lora_rank"]),
+        "merged_lora_alpha": float(merged_report["merged_lora_alpha"]),
+        "merged_portable_bundle_state_dict_digest": merged_report["merged_portable_bundle_state_dict_digest"],
+        "merged_portable_bundle_artifact_digest": merged_report["merged_portable_bundle_artifact_digest"],
+        "canonical_profile_mean_loss": float(merged_report["canonical_profile_mean_loss"]),
+        "canonical_profile_bits_per_token": float(merged_report["canonical_profile_bits_per_token"]),
+        "deterministic_probe_top_token_id": int(merged_report["deterministic_probe_top_token_id"]),
+    },
+    "claim_boundary": "This bundle proves one real admitted-device Tailnet mixed-hardware open-adapter run across a local M5 MLX coordinator and a Linux RTX 4080 contributor, with explicit contributor receipts, submission receipts, validator summary, replay receipts, aggregation outcome, and one inferable exact mean-delta merged adapter plus portable bundle. It does not claim M2 participation, exact HOMEGOLF or Parameter Golf score parity, full-model mixed-backend dense training, or automatic published-model promotion.",
 }
 encoded = json.dumps(bundle, indent=2)
 bundle["bundle_sha256"] = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -408,8 +432,16 @@ tailrun_summary = {
         "bundle_path": os.path.abspath(bundle_path),
         "coordinator_report_path": os.path.abspath(coordinator_path),
         "contributor_report_path": os.path.abspath(contributor_path),
+        "merged_portable_bundle_path": os.path.abspath(retained_artifacts["merged_portable_bundle_path"]),
+        "merged_report_path": os.path.abspath(merged_report_path),
     },
-    "claim_boundary": "This summary records per-device contribution accounting for one admitted-device home-Tailnet run. It does not claim M2 participation, open internet swarm membership, or full dense training parity.",
+    "merged_artifact": {
+        "merge_strategy": merged_report["merge_strategy"],
+        "merged_lora_rank": int(merged_report["merged_lora_rank"]),
+        "canonical_profile_mean_loss": float(merged_report["canonical_profile_mean_loss"]),
+        "deterministic_probe_top_token_id": int(merged_report["deterministic_probe_top_token_id"]),
+    },
+    "claim_boundary": "This summary records per-device contribution accounting for one admitted-device home-Tailnet run plus one retained inferable exact mean-delta merged adapter and portable bundle. It does not claim M2 participation, open internet swarm membership, full dense training parity, or public Parameter Golf score equivalence.",
 }
 encoded = json.dumps(tailrun_summary, indent=2)
 tailrun_summary["summary_sha256"] = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
