@@ -1652,6 +1652,134 @@ __global__ void top_k_f32_kernel(
     }
 }
 
+__global__ void top_k_f32_one_row_partial_kernel(
+    const float *input,
+    int32_t *partial_indices,
+    float *partial_values,
+    int column_count,
+    int top_k
+) {
+    top_k = min(top_k, min(column_count, kLogitsMaxSelected));
+    if (top_k <= 0) {
+        return;
+    }
+
+    const int block_count = max(gridDim.x, 1);
+    const float *row_input = input;
+    __shared__ float row_top_values[kLogitsMaxSelected];
+    __shared__ int row_top_indices[kLogitsMaxSelected];
+
+    using TopKBlockRadixSort =
+        cub::BlockRadixSort<float, kLogitsTopKBlockSize, kLogitsTopKItemsPerThread, int>;
+    __shared__ typename TopKBlockRadixSort::TempStorage sort_storage;
+    __shared__ float tile_top_values[kLogitsFastSharedTopK];
+    __shared__ int tile_top_indices[kLogitsFastSharedTopK];
+    __shared__ float merged_top_values[kLogitsMaxSelected];
+    __shared__ int merged_top_indices[kLogitsMaxSelected];
+
+    if (threadIdx.x == 0) {
+        for (int slot = 0; slot < top_k; ++slot) {
+            row_top_values[slot] = -INFINITY;
+            row_top_indices[slot] = -1;
+        }
+    }
+    __syncthreads();
+
+    for (int tile_base = static_cast<int>(blockIdx.x) * kLogitsTopKTileSize;
+         tile_base < column_count;
+         tile_base += block_count * kLogitsTopKTileSize) {
+        float thread_keys[kLogitsTopKItemsPerThread];
+        int thread_values[kLogitsTopKItemsPerThread];
+#pragma unroll
+        for (int item = 0; item < kLogitsTopKItemsPerThread; ++item) {
+            const int column =
+                tile_base + static_cast<int>(threadIdx.x) * kLogitsTopKItemsPerThread + item;
+            if (column < column_count) {
+                thread_keys[item] = row_input[column];
+                thread_values[item] = column;
+            } else {
+                thread_keys[item] = -INFINITY;
+                thread_values[item] = column_count;
+            }
+        }
+
+        TopKBlockRadixSort(sort_storage).SortDescending(thread_keys, thread_values);
+        __syncthreads();
+
+#pragma unroll
+        for (int item = 0; item < kLogitsTopKItemsPerThread; ++item) {
+            const int rank = static_cast<int>(threadIdx.x) * kLogitsTopKItemsPerThread + item;
+            if (rank < top_k) {
+                tile_top_values[rank] = thread_keys[item];
+                tile_top_indices[rank] = thread_values[item];
+            }
+        }
+        __syncthreads();
+
+        if (threadIdx.x == 0) {
+            int row_slot = 0;
+            int tile_slot = 0;
+            for (int merged_slot = 0; merged_slot < top_k; ++merged_slot) {
+                float row_value = -INFINITY;
+                int row_index = -1;
+                if (row_slot < top_k) {
+                    row_value = row_top_values[row_slot];
+                    row_index = row_top_indices[row_slot];
+                }
+
+                float tile_value = -INFINITY;
+                int tile_index = -1;
+                if (tile_slot < top_k) {
+                    const int candidate_index = tile_top_indices[tile_slot];
+                    if (candidate_index >= 0 && candidate_index < column_count) {
+                        tile_value = tile_top_values[tile_slot];
+                        tile_index = candidate_index;
+                    }
+                }
+
+                if (top_k_candidate_better(tile_value, tile_index, row_value, row_index)) {
+                    merged_top_values[merged_slot] = tile_value;
+                    merged_top_indices[merged_slot] = tile_index;
+                    ++tile_slot;
+                } else {
+                    merged_top_values[merged_slot] = row_value;
+                    merged_top_indices[merged_slot] = row_index;
+                    ++row_slot;
+                }
+            }
+
+            for (int slot = 0; slot < top_k; ++slot) {
+                row_top_values[slot] = merged_top_values[slot];
+                row_top_indices[slot] = merged_top_indices[slot];
+            }
+        }
+        __syncthreads();
+    }
+
+    const size_t block_offset = static_cast<size_t>(blockIdx.x) * static_cast<size_t>(top_k);
+    for (int slot = static_cast<int>(threadIdx.x); slot < top_k; slot += blockDim.x) {
+        partial_indices[block_offset + static_cast<size_t>(slot)] = row_top_indices[slot];
+        partial_values[block_offset + static_cast<size_t>(slot)] = row_top_values[slot];
+    }
+}
+
+__global__ void remap_top_k_indices_kernel(
+    const int32_t *source_indices,
+    int32_t *selected_indices,
+    int top_k
+) {
+    const int index = static_cast<int>(blockIdx.x) * blockDim.x + static_cast<int>(threadIdx.x);
+    if (index >= top_k) {
+        return;
+    }
+    const int32_t partial_index = selected_indices[index];
+    if (partial_index < 0) {
+        selected_indices[index] = -1;
+        return;
+    }
+    selected_indices[index] = source_indices[partial_index];
+}
+
 __global__ void copy_top_k_pairs_kernel(
     const int32_t *sorted_indices,
     const float *sorted_values,
@@ -7158,6 +7286,78 @@ extern "C" int psionic_cuda_top_k_f32(
         static_cast<float *>(selected_values),
         rows,
         cols,
+        top_k
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_top_k_f32_one_row_partitioned(
+    const void *input,
+    int cols,
+    int top_k,
+    int partial_block_count,
+    void *partial_indices,
+    void *partial_values,
+    void *selected_indices,
+    void *selected_values,
+    void *stream
+) {
+    if (input == nullptr || partial_indices == nullptr || partial_values == nullptr ||
+        selected_indices == nullptr || selected_values == nullptr || cols <= 0 || top_k <= 0 ||
+        partial_block_count <= 0) {
+        return static_cast<int>(cudaErrorInvalidValue);
+    }
+
+    top_k = min(top_k, min(cols, kLogitsMaxSelected));
+    if (top_k <= 0) {
+        return 0;
+    }
+
+    const int tile_count = max(1, (cols + kLogitsTopKTileSize - 1) / kLogitsTopKTileSize);
+    partial_block_count = min(partial_block_count, tile_count);
+
+    const cudaStream_t cuda_stream = static_cast<cudaStream_t>(stream);
+    if (partial_block_count <= 1 || cols <= kLogitsTopKTileSize) {
+        top_k_f32_kernel<<<1, kLogitsTopKBlockSize, 0, cuda_stream>>>(
+            static_cast<const float *>(input),
+            static_cast<int32_t *>(selected_indices),
+            static_cast<float *>(selected_values),
+            1,
+            cols,
+            top_k
+        );
+        return static_cast<int>(cudaGetLastError());
+    }
+
+    top_k_f32_one_row_partial_kernel<<<partial_block_count, kLogitsTopKBlockSize, 0, cuda_stream>>>(
+        static_cast<const float *>(input),
+        static_cast<int32_t *>(partial_indices),
+        static_cast<float *>(partial_values),
+        cols,
+        top_k
+    );
+    cudaError_t status = cudaGetLastError();
+    if (status != cudaSuccess) {
+        return static_cast<int>(status);
+    }
+
+    top_k_f32_kernel<<<1, kLogitsTopKBlockSize, 0, cuda_stream>>>(
+        static_cast<const float *>(partial_values),
+        static_cast<int32_t *>(selected_indices),
+        static_cast<float *>(selected_values),
+        1,
+        partial_block_count * top_k,
+        top_k
+    );
+    status = cudaGetLastError();
+    if (status != cudaSuccess) {
+        return static_cast<int>(status);
+    }
+
+    const int remap_blocks = (top_k + kBlockSize - 1) / kBlockSize;
+    remap_top_k_indices_kernel<<<remap_blocks, kBlockSize, 0, cuda_stream>>>(
+        static_cast<const int32_t *>(partial_indices),
+        static_cast<int32_t *>(selected_indices),
         top_k
     );
     return static_cast<int>(cudaGetLastError());

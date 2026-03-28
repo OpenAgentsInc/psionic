@@ -1540,6 +1540,32 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Selects the bounded top-k values from one contiguous `f32` row using multiple CUDA blocks.
+    pub fn top_k_f32_one_row_partitioned(
+        &mut self,
+        input: &CudaBuffer,
+        column_count: usize,
+        top_k: usize,
+        partial_block_count: usize,
+        partial_indices: &CudaBuffer,
+        partial_values: &CudaBuffer,
+        selected_indices: &CudaBuffer,
+        selected_values: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_top_k_f32_one_row_partitioned(
+            &input.platform,
+            column_count,
+            top_k,
+            partial_block_count,
+            &partial_indices.platform,
+            &partial_values.platform,
+            &selected_indices.platform,
+            &selected_values.platform,
+        )?;
+        self.encoded_operations += 3;
+        Ok(())
+    }
+
     /// Selects the bounded top-k values from one contiguous `f32` row using device radix sort.
     pub fn top_k_f32_one_row_radix_sort(
         &mut self,
@@ -9236,6 +9262,17 @@ mod platform {
             selected_values: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_top_k_f32_one_row_partitioned(
+            input: *const c_void,
+            cols: c_int,
+            top_k: c_int,
+            partial_block_count: c_int,
+            partial_indices: *mut c_void,
+            partial_values: *mut c_void,
+            selected_indices: *mut c_void,
+            selected_values: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_top_k_f32_one_row_radix_sort_temp_storage_bytes(
             cols: c_int,
             temp_storage_bytes: *mut usize,
@@ -11310,6 +11347,47 @@ mod platform {
                     )
                 },
                 "psionic_cuda_top_k_f32",
+            )
+        }
+
+        pub(super) fn encode_top_k_f32_one_row_partitioned(
+            &mut self,
+            input: &PlatformBuffer,
+            cols: usize,
+            top_k: usize,
+            partial_block_count: usize,
+            partial_indices: &PlatformBuffer,
+            partial_values: &PlatformBuffer,
+            selected_indices: &PlatformBuffer,
+            selected_values: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let cols = c_int::try_from(cols).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda top_k cols exceed c_int"))
+            })?;
+            let top_k = c_int::try_from(top_k).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda top_k selection width exceeds c_int"))
+            })?;
+            let partial_block_count = c_int::try_from(partial_block_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda partitioned top_k block count exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_top_k_f32_one_row_partitioned(
+                        input.inner.device_ptr.cast(),
+                        cols,
+                        top_k,
+                        partial_block_count,
+                        partial_indices.inner.device_ptr.cast(),
+                        partial_values.inner.device_ptr.cast(),
+                        selected_indices.inner.device_ptr.cast(),
+                        selected_values.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_top_k_f32_one_row_partitioned",
             )
         }
 
@@ -15428,6 +15506,22 @@ mod platform {
             _rows: usize,
             _cols: usize,
             _top_k: usize,
+            _selected_indices: &PlatformBuffer,
+            _selected_values: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_top_k_f32_one_row_partitioned(
+            &mut self,
+            _input: &PlatformBuffer,
+            _cols: usize,
+            _top_k: usize,
+            _partial_block_count: usize,
+            _partial_indices: &PlatformBuffer,
+            _partial_values: &PlatformBuffer,
             _selected_indices: &PlatformBuffer,
             _selected_values: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
@@ -20118,6 +20212,76 @@ mod tests {
         submission.top_k_f32(&input, 1, values.len(), top_k, &selected_indices, &selected_values)?;
         let report = submission.commit(CudaCommandWait::Completed)?;
         assert_eq!(report.encoded_operations, 1);
+
+        let mut expected = values
+            .iter()
+            .copied()
+            .enumerate()
+            .collect::<Vec<_>>();
+        expected.sort_by(|(left_index, left_value), (right_index, right_value)| {
+            right_value
+                .total_cmp(left_value)
+                .then_with(|| left_index.cmp(right_index))
+        });
+        expected.truncate(top_k);
+
+        let selected_indices = selected_indices
+            .read_bytes()?
+            .chunks_exact(std::mem::size_of::<i32>())
+            .map(|chunk| i32::from_ne_bytes(chunk.try_into().expect("top_k i32 bytes")))
+            .collect::<Vec<_>>();
+        let expected_indices = expected
+            .iter()
+            .map(|(index, _)| i32::try_from(*index).expect("expected index fits in i32"))
+            .collect::<Vec<_>>();
+        assert_eq!(selected_indices, expected_indices);
+        let expected_values = expected
+            .iter()
+            .map(|(_, value)| *value)
+            .collect::<Vec<_>>();
+        assert_close(&selected_values.read_f32()?, &expected_values, 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_executes_partitioned_top_k_for_wide_one_row_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let values = (0..4097)
+            .map(|index| {
+                let bucket = ((index * 73) % 4097) as f32;
+                bucket - ((index % 11) as f32 * 0.01)
+            })
+            .collect::<Vec<_>>();
+        let input = backend.input_buffer(Shape::new(vec![values.len()]), values.clone())?;
+        let top_k = 100usize;
+        let partial_block_count = 8usize;
+        let partial_len = top_k * partial_block_count;
+        let partial_indices = backend.i32_buffer(partial_len)?;
+        let partial_values = backend.f32_buffer(partial_len)?;
+        let selected_indices = backend.i32_buffer(top_k)?;
+        let selected_values = backend.f32_buffer(top_k)?;
+        let mut submission = backend.begin_submission()?;
+        submission.top_k_f32_one_row_partitioned(
+            &input,
+            values.len(),
+            top_k,
+            partial_block_count,
+            &partial_indices,
+            &partial_values,
+            &selected_indices,
+            &selected_values,
+        )?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 3);
 
         let mut expected = values
             .iter()

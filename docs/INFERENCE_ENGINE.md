@@ -122,6 +122,14 @@ than just run tensor math.
   not part of the canonical Psionic-versus-Ollama matrix on this checkout
   because the local `ollamarunner` qwen3.5 path does not wire them through the
   same active sampler path.
+- On March 28, 2026, after widening the shared-memory CUDA top-k fast path to
+  the full bounded qwen35 envelope and then replacing the older one-row
+  radix-sort route with a partitioned multi-block one-row candidate path, the
+  same host also measured the larger bounded-candidate `top_k = 100` contract
+  ahead on all four rows in `docs/QWEN35_OLLAMA_COMPARISON.md`: about
+  `416 tok/s` versus `320 tok/s` on `qwen3.5:0.8b`, about `225 tok/s` versus
+  `204 tok/s` on `qwen3.5:2b`, about `163 tok/s` versus `124 tok/s` on
+  `qwen3.5:4b`, and about `101 tok/s` versus `93 tok/s` on `qwen3.5:9b`.
 - The 4B row only became correct and faster after fixing the fused decode
   output head for mixed `Q4_K` and `Q6_K` weights. Greedy `ArgmaxOnly` decode
   now routes `Q6_K` output weights through `Q8_1` projection plus `argmax_f32`

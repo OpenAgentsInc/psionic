@@ -13,6 +13,7 @@ Published benchmark checkpoints:
 
 - greedy matrix checkpoint: `c5bc0ba2`
 - sampled matrix checkpoint: `March 27, 2026 rerun after sampler-surface refresh`
+- large-`top_k` sampled matrix checkpoint: `March 28, 2026 clean-host partitioned top-k rerun`
 
 Shared benchmark rules:
 
@@ -89,10 +90,50 @@ Psionic output-mode evidence on this contract:
 | `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `173.44` | `139.90` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row stays ahead on the same bounded sampled lane |
 | `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `105.25` | `92.90` | `implemented_early`, ahead | The row still needs the same operational rule as greedy benchmarking: unload Ollama before the Psionic measurement |
 
+## Large-`top_k` Sampled Contract
+
+Prompt:
+
+```text
+Explain what Psionic is in one sentence.
+```
+
+Token cap:
+
+- `128`
+
+Sampled settings:
+
+- `temperature = 0.8`
+- `top_k = 100`
+- `top_p = 0.9`
+- `min_p = 0.05`
+- `seed = 42`
+- `think = false` on Ollama
+
+Psionic output-mode evidence on this contract:
+
+- `qwen35_output_modes=[top_k_candidates:100]`
+- `qwen35_raw_logits=false`
+- clean-host rerun after the one-row partitioned CUDA top-k path replaced the
+  slower radix-sort route for larger bounded candidate sets
+- serialized Ollama residency between rows to keep the `4b` and `9b`
+  measurements honest on this 16 GB RTX 4080
+
+## Large-`top_k` Sampled Matrix
+
+| Model | Artifact path | Artifact digest | Psionic decode tok/s | Ollama decode tok/s | Status | Notes |
+| --- | --- | --- | ---: | ---: | --- | --- |
+| `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `416.06` | `320.24` | `implemented_early`, ahead | Large-candidate sampled decode now stays on the bounded candidate lane instead of falling off the older radix-sort path |
+| `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `224.83` | `204.06` | `implemented_early`, ahead | The follow-on win comes from partitioning the one-row vocab scan across multiple CUDA blocks and merging back exactly |
+| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `163.12` | `124.38` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row also stays ahead under the larger bounded-candidate contract |
+| `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `101.18` | `93.13` | `implemented_early`, ahead | The `9b` row still requires serialized Ollama residency, but the wider candidate set stays on the native bounded lane and remains ahead |
+
 ## Current Notes
 
 - The `0.8b`, `2b`, `4b`, and `9b` rows are ahead on decode throughput on this
-  host under both the greedy and sampled contracts above.
+  host under the greedy contract, the original sampled contract, and the
+  clean-host large-`top_k` sampled contract above.
 - The sampled CUDA lane is bounded, not vague. It uses
   `TopKCandidates { top_k }` only when the request stays inside the exact
   envelope:

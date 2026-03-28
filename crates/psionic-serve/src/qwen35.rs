@@ -633,6 +633,8 @@ impl CudaGgufQwen35TextGenerationService {
 }
 
 const QWEN35_CUDA_MAX_TOP_K: usize = 128;
+const QWEN35_CUDA_PARTITIONED_TOP_K_THRESHOLD: usize = 40;
+const QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS: usize = 8;
 fn qwen35_fast_greedy_path_enabled() -> bool {
     std::env::var_os("PSIONIC_QWEN35_DISABLE_FAST_GREEDY").is_none()
 }
@@ -6371,6 +6373,8 @@ struct Qwen35CudaStepPlan {
     logits_host_buffer: CudaHostBuffer,
     top_k_indices_buffer: CudaBuffer,
     top_k_values_buffer: CudaBuffer,
+    top_k_partial_indices_buffer: CudaBuffer,
+    top_k_partial_values_buffer: CudaBuffer,
     next_token_host_buffer: CudaHostBuffer,
     next_token_buffer: CudaBuffer,
     argmax_state_host_buffer: CudaHostBuffer,
@@ -6399,6 +6403,8 @@ impl Qwen35CudaStepPlan {
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let activated_q8_1_bytes = ggml_q8_1_storage_bytes(1, max_output_rows)
             .map_err(ReferenceTextGenerationError::Runtime)?;
+        let top_k_partial_len =
+            QWEN35_CUDA_MAX_TOP_K.saturating_mul(QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS);
         Ok(Self {
             matvec_input_buffer: backend
                 .f32_buffer(max_input_columns)
@@ -6469,6 +6475,12 @@ impl Qwen35CudaStepPlan {
             top_k_values_buffer: backend
                 .f32_buffer(QWEN35_CUDA_MAX_TOP_K)
                 .map_err(ReferenceTextGenerationError::Runtime)?,
+            top_k_partial_indices_buffer: backend
+                .i32_buffer(top_k_partial_len)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            top_k_partial_values_buffer: backend
+                .f32_buffer(top_k_partial_len)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
             next_token_host_buffer: backend
                 .host_buffer(std::mem::size_of::<i32>())
                 .map_err(ReferenceTextGenerationError::Runtime)?,
@@ -6504,6 +6516,18 @@ impl Qwen35CudaStepPlan {
         logit_count: usize,
         top_k: usize,
     ) -> Result<(), crate::RuntimeError> {
+        if top_k > QWEN35_CUDA_PARTITIONED_TOP_K_THRESHOLD {
+            return submission.top_k_f32_one_row_partitioned(
+                &self.logits_buffer,
+                logit_count,
+                top_k,
+                QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS,
+                &self.top_k_partial_indices_buffer,
+                &self.top_k_partial_values_buffer,
+                &self.top_k_indices_buffer,
+                &self.top_k_values_buffer,
+            );
+        }
         submission.top_k_f32(
             &self.logits_buffer,
             1,

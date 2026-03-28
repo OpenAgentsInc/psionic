@@ -290,6 +290,32 @@ candidate-only decode surface. Requests with penalties, structured-output
 masking, or unsupported sampling shapes still fall back to explicit dense
 raw-logit readback.
 
+The same clean host now also has a larger bounded-candidate follow-on contract
+after replacing the older one-row radix-sort path with a partitioned
+multi-block CUDA top-k path for single-row decode:
+
+- prompt:
+  `Explain what Psionic is in one sentence.`
+- token cap: `128`
+- sampled settings:
+  - `temperature = 0.8`
+  - `top_k = 100`
+  - `top_p = 0.9`
+  - `min_p = 0.05`
+  - `seed = 42`
+  - `think = false` on Ollama
+- Psionic output-mode evidence on every row:
+  - `qwen35_output_modes=[top_k_candidates:100]`
+  - `qwen35_raw_logits=false`
+
+Measured on the same host with `3` repeats per backend and serialized Ollama
+residency between rows:
+
+- `qwen3.5:0.8b`: Psionic about `416.06 tok/s`, Ollama about `320.24 tok/s`
+- `qwen3.5:2b`: Psionic about `224.83 tok/s`, Ollama about `204.06 tok/s`
+- `qwen3.5:4b`: Psionic about `163.12 tok/s`, Ollama about `124.38 tok/s`
+- `qwen3.5:9b`: Psionic about `101.18 tok/s`, Ollama about `93.13 tok/s`
+
 The local sampler surface now also honors `min_p` and request-level
 `repeat_last_n` in addition to `temperature`, `top_k`, `top_p`, `min_p`,
 `typical_p`, `repeat_penalty`, `presence_penalty`, `frequency_penalty`,
