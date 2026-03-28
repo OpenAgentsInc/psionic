@@ -164,8 +164,15 @@ impl SharedValidatorPromotionContract {
     }
 }
 
+static SHARED_VALIDATOR_PROMOTION_CONTRACT_CACHE: std::sync::OnceLock<
+    SharedValidatorPromotionContract,
+> = std::sync::OnceLock::new();
+
 pub fn canonical_shared_validator_promotion_contract(
 ) -> Result<SharedValidatorPromotionContract, SharedValidatorPromotionContractError> {
+    if let Some(contract) = SHARED_VALIDATOR_PROMOTION_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest().map_err(|error| {
         SharedValidatorPromotionContractError::InvalidContract {
             detail: format!("failed to load root training-program manifest: {error}"),
@@ -241,6 +248,7 @@ pub fn canonical_shared_validator_promotion_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = SHARED_VALIDATOR_PROMOTION_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

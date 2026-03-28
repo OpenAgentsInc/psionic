@@ -1,12 +1,12 @@
 {
   "schema_version": "psionic.public_miner_protocol_contract.v1",
   "contract_id": "psionic.public_miner_protocol_contract.v1",
-  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
-  "public_work_assignment_contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601",
-  "public_dataset_authority_contract_digest": "cf87c412eecde92e38d382fc2ec2fae3c6bb17a1b4b9963e91e0f67ed77ffd60",
-  "live_checkpoint_catchup_contract_digest": "3589f9e87675511227b73ec95e226ab99354f09cba35cc9c0d72c1608d9a10d8",
-  "quantized_outer_sync_contract_digest": "1b67541b4b4c9b316a8ba78625c4e745c9c3da0f447eacf8585b9e2cafbd5fc2",
-  "content_addressed_artifact_exchange_contract_digest": "1d2153ccb088b9bac59de0e9a0f7534251b42799590bd97e7a5604c3b22f45ef",
+  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
+  "public_work_assignment_contract_digest": "60c63cc182d0386bb269156d68fbaa4c24820d91d13a8ef84e2520cfed4e3752",
+  "public_dataset_authority_contract_digest": "2828910f275dd1e4c44795bde39d1285ca8b1285ccff7828adf79e0796747c23",
+  "live_checkpoint_catchup_contract_digest": "5014483a73eb91d426b5a7d78c478d1af548976ac05a2dfed08ba4ae79f7b7a5",
+  "quantized_outer_sync_contract_digest": "b8e07d3262aea45a95ac2dd6a024f5716ede09534a0ac0e4cec4058fabebf920",
+  "content_addressed_artifact_exchange_contract_digest": "45bd5e0e439cb03ed32d3fb6b125d4a61ec8bab2080493ef926453f9c960b7bd",
   "execution_class_binding": {
     "execution_class_id": "psionic.execution_class.public_miner.v1",
     "admitted_role_class": "public_miner",
@@ -132,5 +132,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first public miner execution protocol: execution-class binding, retry posture, assignment intake, local-step receipts, delta publication, checkpoint synchronization, and one stale-standby refusal. It does not yet claim validator verdict truth, checkpoint-promotion consensus, or reward accounting.",
-  "contract_digest": "cd5d4fe71a5cd7ceaa43389127266ea38847a33631f8b7071eb44e77650fad65"
+  "contract_digest": "b20fb20345bd3b2c6b39c6909ef9f1eab61d2c91b7748bde12561c7c52e5999b"
 }

@@ -409,8 +409,15 @@ impl PublicDatasetAuthorityContract {
     }
 }
 
+static PUBLIC_DATASET_AUTHORITY_CONTRACT_CACHE: std::sync::OnceLock<
+    PublicDatasetAuthorityContract,
+> = std::sync::OnceLock::new();
+
 pub fn canonical_public_dataset_authority_contract(
 ) -> Result<PublicDatasetAuthorityContract, PublicDatasetAuthorityContractError> {
+    if let Some(contract) = PUBLIC_DATASET_AUTHORITY_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let public_work = canonical_public_work_assignment_contract()?;
     let tokenizer_bundle = canonical_psion_tokenizer_artifact_bundle()?;
@@ -555,6 +562,7 @@ pub fn canonical_public_dataset_authority_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = PUBLIC_DATASET_AUTHORITY_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

@@ -1,10 +1,10 @@
 {
   "schema_version": "psionic.settlement_publication_contract.v1",
   "contract_id": "psionic.settlement_publication_contract.v1",
-  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
-  "signed_node_identity_contract_set_digest": "e2423cfcb3e960bbf5790da0f0723f87bacc58003e1ad173d73b9ec63c41ffcc",
-  "reward_ledger_contract_digest": "42d7dc87c9dc416023ee2a96f838946533fb366780ec7449a1f9feed8002f103",
-  "validator_challenge_scoring_contract_digest": "99ad085b9a12258380dc4fb948c51c0cd86644a91afd6f5137d8a76a13830b25",
+  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
+  "signed_node_identity_contract_set_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e",
+  "reward_ledger_contract_digest": "6f252e036aea94f1944533a8e7716cf27c7ef749f2f5282d74be01f0b77be8ed",
+  "validator_challenge_scoring_contract_digest": "7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0",
   "validator_weight_publications": [
     {
       "publication_id": "validator_weight.google.window1231",
@@ -80,5 +80,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first settlement publication surface: validator weight publication, a signed-ledger settlement record, payout-ready exports, and one explicit chain-adapter refusal. It does not yet claim public explorer packaging or open-operator onboarding.",
-  "contract_digest": "ca13e653115f6001022f0573d7d8f09da1b8f778fe811301c9c712f26072ed65"
+  "contract_digest": "9c45bf611d920137f3fad39b49c3b62c92ccf4b4afea08b07d8efe484fa6554f"
 }

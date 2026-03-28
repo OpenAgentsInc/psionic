@@ -386,8 +386,15 @@ impl TrainingExecutionEvidenceBundle {
 }
 
 /// Returns the canonical provider-neutral training execution evidence bundle.
+static TRAINING_EXECUTION_EVIDENCE_BUNDLE_CACHE: std::sync::OnceLock<
+    TrainingExecutionEvidenceBundle,
+> = std::sync::OnceLock::new();
+
 pub fn canonical_training_execution_evidence_bundle(
 ) -> Result<TrainingExecutionEvidenceBundle, TrainingExecutionEvidenceBundleError> {
+    if let Some(bundle) = TRAINING_EXECUTION_EVIDENCE_BUNDLE_CACHE.get() {
+        return Ok(bundle.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let source_contracts = canonical_cross_provider_compute_source_contracts()?;
     let mut bundle = TrainingExecutionEvidenceBundle {
@@ -800,6 +807,7 @@ pub fn canonical_training_execution_evidence_bundle(
     };
     bundle.bundle_digest = bundle.stable_digest();
     bundle.validate(&manifest, &source_contracts)?;
+    let _ = TRAINING_EXECUTION_EVIDENCE_BUNDLE_CACHE.set(bundle.clone());
     Ok(bundle)
 }
 

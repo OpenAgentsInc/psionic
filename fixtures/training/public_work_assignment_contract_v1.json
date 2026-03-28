@@ -4,9 +4,9 @@
   "network_id": "psionic.decentralized_training.testnet.v1",
   "governance_revision_id": "psionic.decentralized_training_governance.v1",
   "current_epoch_id": "network_epoch_00000123",
-  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
-  "public_network_registry_contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4",
-  "elastic_device_mesh_contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc",
+  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
+  "public_network_registry_contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515",
+  "elastic_device_mesh_contract_digest": "cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6",
   "windows": [
     {
       "window_id": "window.public.1230",
@@ -217,5 +217,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first deterministic public-work surface: public window clocks, miner and validator assignments, assignment receipts, and one late-window refusal. It does not yet claim page-proofed data authority, content-addressed artifact exchange, or the full public miner execution protocol.",
-  "contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601"
+  "contract_digest": "60c63cc182d0386bb269156d68fbaa4c24820d91d13a8ef84e2520cfed4e3752"
 }

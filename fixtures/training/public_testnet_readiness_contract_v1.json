@@ -1,9 +1,9 @@
 {
   "schema_version": "psionic.public_testnet_readiness_contract.v1",
   "contract_id": "psionic.public_testnet_readiness_contract.v1",
-  "fraud_quarantine_slashing_contract_digest": "a700e0a8d16213fb91848ffa3eabff857c88fafdf73098420d2ba26a530f1dda",
-  "operator_bootstrap_package_contract_digest": "5d0f0ecf67d414dc39cf5324a70684fa43e5291639e5c2536fff75ae376de5ce",
-  "public_run_explorer_contract_digest": "6ef8e0ebf8a3475fb5ff8514dc44ca158419cb9db6c563b0b28163745c656828",
+  "fraud_quarantine_slashing_contract_digest": "0af11dde321433b27ad765916858b48ce74e0f7c6f019bc81704243aa1e2e20f",
+  "operator_bootstrap_package_contract_digest": "483f656d08732e582494b7a2e9fdde007e45de8700a178a1430ac5074a4d5bc4",
+  "public_run_explorer_contract_digest": "f56844ceae1915e3f96192893efd451e69dbf388e166092e31ac101c5164f4cd",
   "candidates": [
     {
       "candidate_id": "candidate.public_miner.google",
@@ -166,5 +166,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first staged public-testnet gate: candidates, compliance receipts, reward-eligible versus canary decisions, and explicit blocked admission on fraud policy. It does not yet claim curated or open public training runs.",
-  "contract_digest": "bf39625ba7482a9698c8c873be7c41c39c763d6a85d4c9956e421fa83d41c041"
+  "contract_digest": "5d396f669aa79a157ff9c4e69b984978a6edfc7cd7b1adddfa799bee6f3e6549"
 }

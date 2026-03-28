@@ -325,8 +325,14 @@ impl HybridPretrainingPlan {
 }
 
 /// Returns the canonical hybrid pretraining plan for the first mixed execution-class wave.
+static HYBRID_PRETRAINING_PLAN_CACHE: std::sync::OnceLock<HybridPretrainingPlan> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_hybrid_pretraining_plan(
 ) -> Result<HybridPretrainingPlan, HybridPretrainingPlanError> {
+    if let Some(plan) = HYBRID_PRETRAINING_PLAN_CACHE.get() {
+        return Ok(plan.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let sources = canonical_cross_provider_compute_source_contracts()?;
     let data_feed_report = builtin_topology_revisable_distributed_data_feed_semantics_report();
@@ -476,6 +482,7 @@ pub fn canonical_hybrid_pretraining_plan(
     };
     plan.plan_digest = plan.stable_digest();
     plan.validate(&manifest, sources.as_slice())?;
+    let _ = HYBRID_PRETRAINING_PLAN_CACHE.set(plan.clone());
     Ok(plan)
 }
 

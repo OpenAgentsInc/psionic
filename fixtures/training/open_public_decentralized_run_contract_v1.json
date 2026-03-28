@@ -1,9 +1,9 @@
 {
   "schema_version": "psionic.open_public_decentralized_run_contract.v1",
   "contract_id": "psionic.open_public_decentralized_run_contract.v1",
-  "public_testnet_readiness_contract_digest": "bf39625ba7482a9698c8c873be7c41c39c763d6a85d4c9956e421fa83d41c041",
-  "curated_decentralized_run_contract_digest": "17310438fe3baacd455d34490558b33440ebf53927602fa02d7341e81d9af9f2",
-  "public_run_explorer_contract_digest": "6ef8e0ebf8a3475fb5ff8514dc44ca158419cb9db6c563b0b28163745c656828",
+  "public_testnet_readiness_contract_digest": "5d396f669aa79a157ff9c4e69b984978a6edfc7cd7b1adddfa799bee6f3e6549",
+  "curated_decentralized_run_contract_digest": "bfe055ed5b6931f559640a0d9c865dae90a3ac631b21822e746e9a2c63f675dc",
+  "public_run_explorer_contract_digest": "f56844ceae1915e3f96192893efd451e69dbf388e166092e31ac101c5164f4cd",
   "participants": [
     {
       "participant_id": "participant.google.public_miner",
@@ -80,5 +80,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first open public miner-validator participation window: outside canary candidates, public score visibility, and one retained blocked-fraud example. It does not yet claim canary payouts.",
-  "contract_digest": "6aa7955fa12c5ee2865dadbf48c31940bd7ccbaa946b96fc7b39a11955be9775"
+  "contract_digest": "4bfad52c448fbf70b65bffadfcdc8f32d42ecd33b96641d44c7ff6c1985974e4"
 }

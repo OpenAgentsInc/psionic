@@ -2,6 +2,7 @@ use std::{
     collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use psionic_environments::EnvironmentPackageKey;
@@ -443,8 +444,15 @@ impl CrossProviderTrainingProgramManifest {
 }
 
 /// Returns the canonical cross-provider training-program manifest.
+static CROSS_PROVIDER_TRAINING_PROGRAM_MANIFEST_CACHE: OnceLock<
+    CrossProviderTrainingProgramManifest,
+> = OnceLock::new();
+
 pub fn cross_provider_training_program_manifest(
 ) -> Result<CrossProviderTrainingProgramManifest, CrossProviderTrainingProgramManifestError> {
+    if let Some(manifest) = CROSS_PROVIDER_TRAINING_PROGRAM_MANIFEST_CACHE.get() {
+        return Ok(manifest.clone());
+    }
     let stage_config_sha = artifact_sha256(PSION_PRETRAIN_STAGE_CONFIG_FIXTURE_PATH)?;
     let baseline_artifacts = vec![
         baseline_artifact(
@@ -545,6 +553,7 @@ pub fn cross_provider_training_program_manifest(
     };
     manifest.program_manifest_digest = manifest.stable_digest();
     manifest.validate()?;
+    let _ = CROSS_PROVIDER_TRAINING_PROGRAM_MANIFEST_CACHE.set(manifest.clone());
     Ok(manifest)
 }
 

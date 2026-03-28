@@ -1,10 +1,10 @@
 {
   "schema_version": "psionic.fraud_quarantine_slashing_contract.v1",
   "contract_id": "psionic.fraud_quarantine_slashing_contract.v1",
-  "signed_node_identity_contract_set_digest": "e2423cfcb3e960bbf5790da0f0723f87bacc58003e1ad173d73b9ec63c41ffcc",
-  "public_dataset_authority_contract_digest": "cf87c412eecde92e38d382fc2ec2fae3c6bb17a1b4b9963e91e0f67ed77ffd60",
-  "validator_challenge_scoring_contract_digest": "99ad085b9a12258380dc4fb948c51c0cd86644a91afd6f5137d8a76a13830b25",
-  "multi_validator_consensus_contract_digest": "ce2a463d0703a5cf5dc3d30efc9b9f8981c17e60bfa8a0d9b2f716912af0470f",
+  "signed_node_identity_contract_set_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e",
+  "public_dataset_authority_contract_digest": "2828910f275dd1e4c44795bde39d1285ca8b1285ccff7828adf79e0796747c23",
+  "validator_challenge_scoring_contract_digest": "7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0",
+  "multi_validator_consensus_contract_digest": "53f1584e194bfbafe11633198d549364a2ce948c10f5a61436e5f65c431283d7",
   "fraud_signals": [
     {
       "signal_id": "signal.sybil.local_rtx4080.wallet_watch",
@@ -96,5 +96,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first decentralized fraud-defense surface: sybil-watch signals, duplicate-work evidence, observation versus blocking quarantines, one slashing decision, and one explicit appeal window. It does not yet claim automatic fraud-proof generation or fully open permissionless admission.",
-  "contract_digest": "a700e0a8d16213fb91848ffa3eabff857c88fafdf73098420d2ba26a530f1dda"
+  "contract_digest": "0af11dde321433b27ad765916858b48ce74e0f7c6f019bc81704243aa1e2e20f"
 }

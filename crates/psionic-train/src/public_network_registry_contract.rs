@@ -803,8 +803,14 @@ impl PublicNetworkRegistryContract {
     }
 }
 
+static PUBLIC_NETWORK_REGISTRY_CONTRACT_CACHE: std::sync::OnceLock<PublicNetworkRegistryContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_public_network_registry_contract(
 ) -> Result<PublicNetworkRegistryContract, PublicNetworkRegistryContractError> {
+    if let Some(contract) = PUBLIC_NETWORK_REGISTRY_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let network = canonical_decentralized_network_contract()?;
     let identity_contract = canonical_signed_node_identity_contract_set()?;
@@ -1096,6 +1102,7 @@ pub fn canonical_public_network_registry_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = PUBLIC_NETWORK_REGISTRY_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

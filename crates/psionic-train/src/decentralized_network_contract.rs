@@ -492,8 +492,14 @@ impl DecentralizedNetworkContract {
 }
 
 /// Returns the canonical decentralized network contract.
+static DECENTRALIZED_NETWORK_CONTRACT_CACHE: std::sync::OnceLock<DecentralizedNetworkContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_decentralized_network_contract(
 ) -> Result<DecentralizedNetworkContract, DecentralizedNetworkContractError> {
+    if let Some(contract) = DECENTRALIZED_NETWORK_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let run_graph = canonical_cross_provider_program_run_graph()?;
     let validator_contract = canonical_shared_validator_promotion_contract()?;
@@ -613,6 +619,7 @@ pub fn canonical_decentralized_network_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = DECENTRALIZED_NETWORK_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

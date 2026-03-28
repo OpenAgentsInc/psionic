@@ -485,8 +485,14 @@ impl PublicWorkAssignmentContract {
     }
 }
 
+static PUBLIC_WORK_ASSIGNMENT_CONTRACT_CACHE: std::sync::OnceLock<PublicWorkAssignmentContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_public_work_assignment_contract(
 ) -> Result<PublicWorkAssignmentContract, PublicWorkAssignmentContractError> {
+    if let Some(contract) = PUBLIC_WORK_ASSIGNMENT_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let network = canonical_decentralized_network_contract()?;
     let registry = canonical_public_network_registry_contract()?;
     let mesh = canonical_elastic_device_mesh_contract()?;
@@ -668,6 +674,7 @@ pub fn canonical_public_work_assignment_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = PUBLIC_WORK_ASSIGNMENT_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

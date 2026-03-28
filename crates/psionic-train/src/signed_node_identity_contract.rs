@@ -679,8 +679,14 @@ impl SignedNodeIdentityContractSet {
     }
 }
 
+static SIGNED_NODE_IDENTITY_CONTRACT_SET_CACHE: std::sync::OnceLock<SignedNodeIdentityContractSet> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_signed_node_identity_contract_set(
 ) -> Result<SignedNodeIdentityContractSet, SignedNodeIdentityContractSetError> {
+    if let Some(contract) = SIGNED_NODE_IDENTITY_CONTRACT_SET_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let network = canonical_decentralized_network_contract()?;
     let sources = canonical_cross_provider_compute_source_contracts()?;
@@ -880,6 +886,7 @@ pub fn canonical_signed_node_identity_contract_set(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = SIGNED_NODE_IDENTITY_CONTRACT_SET_CACHE.set(contract.clone());
     Ok(contract)
 }
 

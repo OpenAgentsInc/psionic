@@ -2,8 +2,8 @@
   "schema_version": "psionic.public_dataset_authority_contract.v1",
   "contract_id": "psionic.public_dataset_authority_contract.v1",
   "dataset_family_id": "psion.curated_pretrain.dataset_family.v1",
-  "program_manifest_digest": "be2b5f782849e58af8a469cf7aeb8b53289e1655f1f533cb0f5d790ae26fa198",
-  "public_work_assignment_contract_digest": "c3432d6ae531283e0da93ccb1ced6729ab4fc5d6014bb5be8e091e2f7184e601",
+  "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
+  "public_work_assignment_contract_digest": "60c63cc182d0386bb269156d68fbaa4c24820d91d13a8ef84e2520cfed4e3752",
   "tokenized_corpus_dataset_id": "psion_corpus_tokenized",
   "tokenized_corpus_dataset_version": "v1",
   "tokenizer_bundle_schema_version": "psion.tokenizer_artifact_bundle.v1",
@@ -227,5 +227,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first public data-truth surface above deterministic public work: page definitions, page proofs, tokenizer and packing digests, replay identity, admitted miner data receipts, and one refused duplicate claim. It does not yet claim content-addressed artifact exchange or the full public miner execution protocol.",
-  "contract_digest": "cf87c412eecde92e38d382fc2ec2fae3c6bb17a1b4b9963e91e0f67ed77ffd60"
+  "contract_digest": "2828910f275dd1e4c44795bde39d1285ca8b1285ccff7828adf79e0796747c23"
 }

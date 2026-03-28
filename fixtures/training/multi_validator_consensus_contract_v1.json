@@ -1,10 +1,10 @@
 {
   "schema_version": "psionic.multi_validator_consensus_contract.v1",
   "contract_id": "psionic.multi_validator_consensus_contract.v1",
-  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
-  "validator_challenge_scoring_contract_digest": "99ad085b9a12258380dc4fb948c51c0cd86644a91afd6f5137d8a76a13830b25",
+  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
+  "validator_challenge_scoring_contract_digest": "7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0",
   "shared_validator_promotion_contract_digest": "fce26138afb1719033aabd39e44e751efbc68c08e14a3c27a5bfdb4e8e70aa86",
-  "content_addressed_artifact_exchange_contract_digest": "1d2153ccb088b9bac59de0e9a0f7534251b42799590bd97e7a5604c3b22f45ef",
+  "content_addressed_artifact_exchange_contract_digest": "45bd5e0e439cb03ed32d3fb6b125d4a61ec8bab2080493ef926453f9c960b7bd",
   "consensus_policy": {
     "minimum_validator_quorum": 2,
     "require_unanimous_acceptance_for_promotion": true,
@@ -65,5 +65,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first multi-validator checkpoint-promotion surface: quorum policy, weighted validator votes, held-no-promotion decisions, and explicit disagreement receipts. It does not yet claim fraud penalties, slashing, or reward accounting.",
-  "contract_digest": "ce2a463d0703a5cf5dc3d30efc9b9f8981c17e60bfa8a0d9b2f716912af0470f"
+  "contract_digest": "53f1584e194bfbafe11633198d549364a2ce948c10f5a61436e5f65c431283d7"
 }

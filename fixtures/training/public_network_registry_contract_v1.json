@@ -6,8 +6,8 @@
   "current_epoch_id": "network_epoch_00000123",
   "program_manifest_id": "psionic-cross-provider-pretraining-program-v1",
   "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
-  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
-  "signed_node_identity_contract_digest": "e2423cfcb3e960bbf5790da0f0723f87bacc58003e1ad173d73b9ec63c41ffcc",
+  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
+  "signed_node_identity_contract_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e",
   "compatibility_policy": {
     "required_release_id": "psionic.decentralized_training_identity_release.v1",
     "required_environment_ref": "psion.pretrain.reference_runtime",
@@ -240,14 +240,14 @@
       "current_epoch_id": "network_epoch_00000123",
       "filter": {
         "requested_role_class": "public_miner",
+        "requested_execution_class": "validated_contributor_window",
         "admitted_trust_tiers": [
           "private_cloud_operator_managed",
           "local_operator_managed"
         ],
         "require_online": true,
         "require_relay_advertisement": false,
-        "detail": "Discover contributor-window-capable public miner nodes for the current epoch while excluding dense-rank-only or validator-only participants.",
-        "requested_execution_class": "validated_contributor_window"
+        "detail": "Discover contributor-window-capable public miner nodes for the current epoch while excluding dense-rank-only or validator-only participants."
       },
       "matched_registry_record_ids": [
         "google_l4_validator_node.registry",
@@ -258,7 +258,7 @@
         {
           "registry_record_id": "runpod_8xh100_dense_node.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `runpod_8xh100_dense_node.registry` does not admit role `public_miner`."
+          "detail": "Registry record `runpod_8xh100_dense_node.registry` does not admit role `PublicMiner`."
         }
       ],
       "detail": "Registry discovery for the current public_miner role resolves the Google validator node plus the two local contributor-window nodes, and it explicitly refuses RunPod because the role and execution binding do not match yet."
@@ -268,14 +268,14 @@
       "current_epoch_id": "network_epoch_00000123",
       "filter": {
         "requested_role_class": "public_validator",
+        "requested_execution_class": "validator",
         "admitted_trust_tiers": [
           "private_cloud_operator_managed",
           "local_operator_managed"
         ],
         "require_online": true,
         "require_relay_advertisement": false,
-        "detail": "Discover validator-capable nodes for the current epoch with role, execution-class, and compatibility policy checks kept explicit.",
-        "requested_execution_class": "validator"
+        "detail": "Discover validator-capable nodes for the current epoch with role, execution-class, and compatibility policy checks kept explicit."
       },
       "matched_registry_record_ids": [
         "google_l4_validator_node.registry",
@@ -285,12 +285,12 @@
         {
           "registry_record_id": "runpod_8xh100_dense_node.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `runpod_8xh100_dense_node.registry` does not admit role `public_validator`."
+          "detail": "Registry record `runpod_8xh100_dense_node.registry` does not admit role `PublicValidator`."
         },
         {
           "registry_record_id": "local_rtx4080_workstation.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `local_rtx4080_workstation.registry` does not admit role `public_validator`."
+          "detail": "Registry record `local_rtx4080_workstation.registry` does not admit role `PublicValidator`."
         }
       ],
       "detail": "Registry discovery for the current validator quorum resolves the Google and Apple MLX nodes and refuses the remaining nodes through typed role or execution-class mismatch."
@@ -300,14 +300,14 @@
       "current_epoch_id": "network_epoch_00000123",
       "filter": {
         "requested_role_class": "checkpoint_authority",
+        "requested_execution_class": "checkpoint_writer",
         "admitted_trust_tiers": [
           "private_cloud_operator_managed",
           "rented_provider_operator_managed"
         ],
         "require_online": true,
         "require_relay_advertisement": false,
-        "detail": "Discover checkpoint-authority nodes that can publish promoted checkpoint state for the current public epoch.",
-        "requested_execution_class": "checkpoint_writer"
+        "detail": "Discover checkpoint-authority nodes that can publish promoted checkpoint state for the current public epoch."
       },
       "matched_registry_record_ids": [
         "google_l4_validator_node.registry",
@@ -317,12 +317,12 @@
         {
           "registry_record_id": "local_rtx4080_workstation.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `local_rtx4080_workstation.registry` does not admit role `checkpoint_authority`."
+          "detail": "Registry record `local_rtx4080_workstation.registry` does not admit role `CheckpointAuthority`."
         },
         {
           "registry_record_id": "local_mlx_mac_workstation.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `local_mlx_mac_workstation.registry` does not admit role `checkpoint_authority`."
+          "detail": "Registry record `local_mlx_mac_workstation.registry` does not admit role `CheckpointAuthority`."
         }
       ],
       "detail": "Registry discovery for checkpoint authority resolves the Google and RunPod nodes only, which matches the current role and execution-class bindings frozen by the network contract and signed identities."
@@ -348,17 +348,17 @@
         {
           "registry_record_id": "runpod_8xh100_dense_node.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `runpod_8xh100_dense_node.registry` does not admit role `relay`."
+          "detail": "Registry record `runpod_8xh100_dense_node.registry` does not admit role `Relay`."
         },
         {
           "registry_record_id": "local_rtx4080_workstation.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `local_rtx4080_workstation.registry` does not admit role `relay`."
+          "detail": "Registry record `local_rtx4080_workstation.registry` does not admit role `Relay`."
         },
         {
           "registry_record_id": "local_mlx_mac_workstation.registry",
           "refusal_kind": "role_class_not_admitted",
-          "detail": "Registry record `local_mlx_mac_workstation.registry` does not admit role `relay`."
+          "detail": "Registry record `local_mlx_mac_workstation.registry` does not admit role `Relay`."
         }
       ],
       "detail": "Registry discovery for relay support resolves the Google node only, which keeps relay posture explicit instead of burying it in endpoint prose or private host notes."
@@ -429,5 +429,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract closes one permissioned-testnet registry, discovery, and matchmaking surface above the signed node identity layer. It proves that nodes, roles, execution classes, trust tiers, relay posture, compatibility policy, and selected session offers can be discovered from one machine-legible contract instead of operator-only host lists. It does not claim permissionless gossip, public internet admission, or live elastic runtime yet.",
-  "contract_digest": "ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4"
+  "contract_digest": "f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515"
 }

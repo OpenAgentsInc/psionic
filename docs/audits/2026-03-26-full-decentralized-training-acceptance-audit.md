@@ -39,11 +39,23 @@ open public participation, and one incentivized rewarded closeout.
   its exact network incentives. It instead proves a signed-ledger settlement
   route with explicit optional chain refusal.
 
+## Fresh Validation State
+
+On 2026-03-27 the full decentralized checker sweep was rerun successfully on
+current `main`, from `check-decentralized-network-contract.sh` through
+`check-incentivized-decentralized-run-contract.sh`.
+
+The stale failure story from the first draft of this acceptance audit is no
+longer current. `psionic-backend-cuda` no longer stops the lane on a missing
+`PlatformSubmission::allocate`, `elastic_device_mesh_contract.rs` now keeps
+relay leases above the stale-peer timeout, `live_checkpoint_catchup_contract.rs`
+now binds completed restore assignments against the serving record's
+`source_id`, and the pure canonical builders used by later decentralized
+generators are memoized so the fresh checker path no longer degenerates into
+recursive recomputation.
+
 ## Remaining Honest Limits
 
-- the current cargo-backed generators and tests are still blocked by the
-  unrelated `psionic-backend-cuda` compile failure on
-  `PlatformSubmission::allocate` in `crates/psionic-backend-cuda/src/lib.rs:876`
 - the first incentivized run still pays the current reward-eligible set rather
   than the outside canary participants
 - optional chain publication remains refused rather than shipped

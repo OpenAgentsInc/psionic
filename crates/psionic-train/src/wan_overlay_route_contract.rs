@@ -452,8 +452,14 @@ impl WanOverlayRouteContract {
     }
 }
 
+static WAN_OVERLAY_ROUTE_CONTRACT_CACHE: std::sync::OnceLock<WanOverlayRouteContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_wan_overlay_route_contract(
 ) -> Result<WanOverlayRouteContract, WanOverlayRouteContractError> {
+    if let Some(contract) = WAN_OVERLAY_ROUTE_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let network = canonical_decentralized_network_contract()?;
     let registry = canonical_public_network_registry_contract()?;
     let mesh = canonical_elastic_device_mesh_contract()?;
@@ -612,6 +618,7 @@ pub fn canonical_wan_overlay_route_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = WAN_OVERLAY_ROUTE_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

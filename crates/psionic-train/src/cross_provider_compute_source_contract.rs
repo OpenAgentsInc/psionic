@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use psionic_environments::EnvironmentPackageKey;
@@ -564,8 +565,15 @@ impl CrossProviderLaunchInput {
 }
 
 /// Returns the four canonical compute-source contracts for the first cross-provider examples.
+static CROSS_PROVIDER_COMPUTE_SOURCE_CONTRACTS_CACHE: OnceLock<
+    Vec<CrossProviderComputeSourceContract>,
+> = OnceLock::new();
+
 pub fn canonical_cross_provider_compute_source_contracts(
 ) -> Result<Vec<CrossProviderComputeSourceContract>, CrossProviderComputeSourceContractError> {
+    if let Some(contracts) = CROSS_PROVIDER_COMPUTE_SOURCE_CONTRACTS_CACHE.get() {
+        return Ok(contracts.clone());
+    }
     let manifest = canonical_program_manifest()?;
     let contracts = vec![
         google_l4_validator_compute_source_contract()?,
@@ -576,6 +584,7 @@ pub fn canonical_cross_provider_compute_source_contracts(
     for contract in &contracts {
         contract.validate(&manifest)?;
     }
+    let _ = CROSS_PROVIDER_COMPUTE_SOURCE_CONTRACTS_CACHE.set(contracts.clone());
     Ok(contracts)
 }
 

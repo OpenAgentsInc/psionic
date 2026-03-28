@@ -1,10 +1,10 @@
 {
   "schema_version": "psionic.curated_decentralized_run_contract.v1",
   "contract_id": "psionic.curated_decentralized_run_contract.v1",
-  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
-  "public_testnet_readiness_contract_digest": "bf39625ba7482a9698c8c873be7c41c39c763d6a85d4c9956e421fa83d41c041",
-  "public_run_explorer_contract_digest": "6ef8e0ebf8a3475fb5ff8514dc44ca158419cb9db6c563b0b28163745c656828",
-  "settlement_publication_contract_digest": "ca13e653115f6001022f0573d7d8f09da1b8f778fe811301c9c712f26072ed65",
+  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
+  "public_testnet_readiness_contract_digest": "5d396f669aa79a157ff9c4e69b984978a6edfc7cd7b1adddfa799bee6f3e6549",
+  "public_run_explorer_contract_digest": "f56844ceae1915e3f96192893efd451e69dbf388e166092e31ac101c5164f4cd",
+  "settlement_publication_contract_digest": "9c45bf611d920137f3fad39b49c3b62c92ccf4b4afea08b07d8efe484fa6554f",
   "participants": [
     {
       "participant_id": "participant.google.public_miner",
@@ -64,5 +64,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first curated internet-scale decentralized run: permissioned participants, one retained evidence bundle, and one after-action audit. It does not yet claim outside-operator admission or canary payouts.",
-  "contract_digest": "17310438fe3baacd455d34490558b33440ebf53927602fa02d7341e81d9af9f2"
+  "contract_digest": "bfe055ed5b6931f559640a0d9c865dae90a3ac631b21822e746e9a2c63f675dc"
 }

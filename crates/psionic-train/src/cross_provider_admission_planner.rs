@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{collections::BTreeSet, fs, path::Path, sync::OnceLock};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -224,8 +224,13 @@ impl CrossProviderAdmissionPlan {
 }
 
 /// Returns the canonical cross-provider admission plan.
+static CROSS_PROVIDER_ADMISSION_PLAN_CACHE: OnceLock<CrossProviderAdmissionPlan> = OnceLock::new();
+
 pub fn canonical_cross_provider_admission_plan(
 ) -> Result<CrossProviderAdmissionPlan, CrossProviderAdmissionPlannerError> {
+    if let Some(plan) = CROSS_PROVIDER_ADMISSION_PLAN_CACHE.get() {
+        return Ok(plan.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let binder = canonical_cross_provider_runtime_binder()?;
     let sources = canonical_cross_provider_compute_source_contracts()?;
@@ -291,6 +296,7 @@ pub fn canonical_cross_provider_admission_plan(
     };
     plan.plan_digest = plan.stable_digest();
     plan.validate()?;
+    let _ = CROSS_PROVIDER_ADMISSION_PLAN_CACHE.set(plan.clone());
     Ok(plan)
 }
 

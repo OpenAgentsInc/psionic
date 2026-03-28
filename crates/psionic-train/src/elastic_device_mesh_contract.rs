@@ -13,8 +13,7 @@ use crate::{
     canonical_dense_topology_revision_contract, canonical_public_network_registry_contract,
     DecentralizedNetworkContractError, DecentralizedNetworkRoleClass,
     DenseRankRecoveryContractError, DenseTopologyRevisionContractError,
-    PublicNetworkRegistryContractError, PublicNetworkSessionKind,
-    PUBLIC_NETWORK_REGISTRY_CURRENT_EPOCH_ID,
+    PublicNetworkRegistryContractError, PUBLIC_NETWORK_REGISTRY_CURRENT_EPOCH_ID,
 };
 
 pub const ELASTIC_DEVICE_MESH_CONTRACT_SCHEMA_VERSION: &str =
@@ -602,12 +601,20 @@ impl ElasticDeviceMeshContract {
     }
 }
 
+static ELASTIC_DEVICE_MESH_CONTRACT_CACHE: std::sync::OnceLock<ElasticDeviceMeshContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_elastic_device_mesh_contract(
 ) -> Result<ElasticDeviceMeshContract, ElasticDeviceMeshContractError> {
+    if let Some(contract) = ELASTIC_DEVICE_MESH_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let network = canonical_decentralized_network_contract()?;
     let registry = canonical_public_network_registry_contract()?;
     let topology = canonical_dense_topology_revision_contract()?;
     let recovery = canonical_dense_rank_recovery_contract()?;
+    let relay_lease_duration_seconds = network.epoch_cadence.stale_peer_timeout_seconds
+        + network.epoch_cadence.heartbeat_interval_seconds;
 
     let role_lease_policies = vec![
         role_policy(
@@ -628,11 +635,11 @@ pub fn canonical_elastic_device_mesh_contract(
         ),
         role_policy(
             DecentralizedNetworkRoleClass::Relay,
-            10,
+            relay_lease_duration_seconds,
             2,
             2,
             4,
-            "Relay leases stay especially short because route support must fail over quickly when the single current relay disappears.",
+            "Relay leases stay just above the stale-peer cutoff so route support can fail over quickly without drifting below the network's own liveness boundary.",
         ),
         role_policy(
             DecentralizedNetworkRoleClass::CheckpointAuthority,
@@ -894,6 +901,7 @@ pub fn canonical_elastic_device_mesh_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = ELASTIC_DEVICE_MESH_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

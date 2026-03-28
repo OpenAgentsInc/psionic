@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
+    sync::OnceLock,
 };
 
 use serde::{Deserialize, Serialize};
@@ -391,8 +392,14 @@ impl CrossProviderRuntimeBinderContract {
 }
 
 /// Returns the canonical provider-neutral runtime binder contract.
+static CROSS_PROVIDER_RUNTIME_BINDER_CACHE: OnceLock<CrossProviderRuntimeBinderContract> =
+    OnceLock::new();
+
 pub fn canonical_cross_provider_runtime_binder(
 ) -> Result<CrossProviderRuntimeBinderContract, CrossProviderRuntimeBinderError> {
+    if let Some(contract) = CROSS_PROVIDER_RUNTIME_BINDER_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let sources = canonical_cross_provider_compute_source_contracts()?;
     let launches = canonical_cross_provider_launch_contracts()?;
@@ -443,6 +450,7 @@ pub fn canonical_cross_provider_runtime_binder(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate(&manifest, &sources, &launches)?;
+    let _ = CROSS_PROVIDER_RUNTIME_BINDER_CACHE.set(contract.clone());
     Ok(contract)
 }
 

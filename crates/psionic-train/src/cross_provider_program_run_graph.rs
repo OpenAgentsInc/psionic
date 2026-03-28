@@ -3,6 +3,7 @@ use std::{
     fs,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::Path,
+    sync::OnceLock,
 };
 
 use psionic_cluster::{
@@ -472,8 +473,14 @@ impl CrossProviderProgramRunGraph {
 }
 
 /// Returns the canonical whole-program cross-provider run graph.
+static CROSS_PROVIDER_PROGRAM_RUN_GRAPH_CACHE: OnceLock<CrossProviderProgramRunGraph> =
+    OnceLock::new();
+
 pub fn canonical_cross_provider_program_run_graph(
 ) -> Result<CrossProviderProgramRunGraph, CrossProviderProgramRunGraphError> {
+    if let Some(graph) = CROSS_PROVIDER_PROGRAM_RUN_GRAPH_CACHE.get() {
+        return Ok(graph.clone());
+    }
     let manifest = cross_provider_training_program_manifest()?;
     let admission_plan = canonical_cross_provider_admission_plan()?;
     let hybrid_plan = canonical_hybrid_pretraining_plan()?;
@@ -570,6 +577,7 @@ pub fn canonical_cross_provider_program_run_graph(
     };
     graph.contract_digest = graph.stable_digest();
     graph.validate()?;
+    let _ = CROSS_PROVIDER_PROGRAM_RUN_GRAPH_CACHE.set(graph.clone());
     Ok(graph)
 }
 

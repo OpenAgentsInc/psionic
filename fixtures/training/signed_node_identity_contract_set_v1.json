@@ -7,7 +7,7 @@
   "program_manifest_digest": "5c7cd52ecf5345551e165eeb1e25440153bf64f38e69aaf1d33a13c7056ca479",
   "environment_ref": "psion.pretrain.reference_runtime",
   "environment_version": "v1",
-  "decentralized_network_contract_digest": "37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda",
+  "decentralized_network_contract_digest": "604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20",
   "revocation_authority": {
     "policy_id": "psionic.decentralized_training_identity_revocation.v1",
     "revocation_feed_template": "runs/${RUN_ID}/decentralized/revocations/network_epoch_${NETWORK_EPOCH}.json",
@@ -353,5 +353,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract set closes one signed public-node identity layer above the canonical compute-source contracts and the decentralized network contract. It binds wallet, software build digest, capability digests, benchmark evidence, admitted roles, admitted execution classes, typed refusals, and revocation posture into one machine-legible surface. It does not claim hardware-backed attestation, on-chain wallet verification, permissionless registration, or automatic slashing.",
-  "contract_digest": "e2423cfcb3e960bbf5790da0f0723f87bacc58003e1ad173d73b9ec63c41ffcc"
+  "contract_digest": "bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e"
 }

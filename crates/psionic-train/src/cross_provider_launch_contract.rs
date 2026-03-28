@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use serde::{Deserialize, Serialize};
@@ -368,8 +369,14 @@ impl CrossProviderLaunchContract {
 }
 
 /// Returns the canonical provider-neutral launch contracts.
+static CROSS_PROVIDER_LAUNCH_CONTRACTS_CACHE: OnceLock<Vec<CrossProviderLaunchContract>> =
+    OnceLock::new();
+
 pub fn canonical_cross_provider_launch_contracts(
 ) -> Result<Vec<CrossProviderLaunchContract>, CrossProviderLaunchContractError> {
+    if let Some(contracts) = CROSS_PROVIDER_LAUNCH_CONTRACTS_CACHE.get() {
+        return Ok(contracts.clone());
+    }
     let contracts = vec![
         google_single_node_accelerated_launch_contract()?,
         google_two_node_swarm_launch_contract()?,
@@ -379,6 +386,7 @@ pub fn canonical_cross_provider_launch_contracts(
     for contract in &contracts {
         contract.validate()?;
     }
+    let _ = CROSS_PROVIDER_LAUNCH_CONTRACTS_CACHE.set(contracts.clone());
     Ok(contracts)
 }
 

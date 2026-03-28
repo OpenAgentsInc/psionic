@@ -12,7 +12,7 @@ use crate::{
     canonical_live_checkpoint_catchup_contract, canonical_public_network_registry_contract,
     canonical_public_work_assignment_contract, canonical_quantized_outer_sync_contract,
     canonical_remote_train_artifact_backend_contract_set, canonical_wan_overlay_route_contract,
-    CatchupDisposition, DecentralizedNetworkRoleClass, LiveCheckpointCatchupContractError,
+    DecentralizedNetworkRoleClass, LiveCheckpointCatchupContractError,
     PublicNetworkRegistryContractError, PublicWorkAssignmentContractError,
     QuantizedOuterSyncContractError, RemoteTrainArtifactBackendContractError, TrainArtifactClass,
     WanOverlayRouteContractError,
@@ -675,9 +675,16 @@ impl ContentAddressedArtifactExchangeContract {
     }
 }
 
+static CONTENT_ADDRESSED_ARTIFACT_EXCHANGE_CONTRACT_CACHE: std::sync::OnceLock<
+    ContentAddressedArtifactExchangeContract,
+> = std::sync::OnceLock::new();
+
 pub fn canonical_content_addressed_artifact_exchange_contract(
 ) -> Result<ContentAddressedArtifactExchangeContract, ContentAddressedArtifactExchangeContractError>
 {
+    if let Some(contract) = CONTENT_ADDRESSED_ARTIFACT_EXCHANGE_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let registry = canonical_public_network_registry_contract()?;
     let public_work = canonical_public_work_assignment_contract()?;
     let wan = canonical_wan_overlay_route_contract()?;
@@ -913,6 +920,7 @@ pub fn canonical_content_addressed_artifact_exchange_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = CONTENT_ADDRESSED_ARTIFACT_EXCHANGE_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

@@ -2,10 +2,10 @@
   "schema_version": "psionic.internet_fault_harness_contract.v1",
   "contract_id": "psionic.internet_fault_harness_contract.v1",
   "current_epoch_id": "network_epoch_00000123",
-  "elastic_device_mesh_contract_digest": "c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc",
-  "wan_overlay_route_contract_digest": "3f8ac57a330f37acfed56c582353643cd09072f6b1792472917165db979922e4",
-  "live_checkpoint_catchup_contract_digest": "3589f9e87675511227b73ec95e226ab99354f09cba35cc9c0d72c1608d9a10d8",
-  "quantized_outer_sync_contract_digest": "1b67541b4b4c9b316a8ba78625c4e745c9c3da0f447eacf8585b9e2cafbd5fc2",
+  "elastic_device_mesh_contract_digest": "cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6",
+  "wan_overlay_route_contract_digest": "3fe65cbb07b327819e98126ac2e6f6960d07b7ddb70606f4c3c788455d5ac6f1",
+  "live_checkpoint_catchup_contract_digest": "5014483a73eb91d426b5a7d78c478d1af548976ac05a2dfed08ba4ae79f7b7a5",
+  "quantized_outer_sync_contract_digest": "b8e07d3262aea45a95ac2dd6a024f5716ede09534a0ac0e4cec4058fabebf920",
   "fault_profiles": [
     {
       "profile_id": "profile.packet_loss_public_miner_failover",
@@ -207,5 +207,5 @@
     "train_system_doc_path": "docs/TRAIN_SYSTEM.md"
   },
   "claim_boundary": "This contract freezes the first public-internet realism harness above route, catch-up, and outer-sync truth: fault profiles, throughput baselines, soak suites, repeated passed runs, and one explicit held validator-loss case. It does not yet claim incentive settlement or global public-network promotion beyond the retained evidence set.",
-  "contract_digest": "56f2e8a50e2623e97e3f33c650f6013409a24f9e6487158a568ec3d1e61957b1"
+  "contract_digest": "51d0228883e17c0ba5bab4c6c2ba7fe5df333aa37ef45202702a2b251b268f09"
 }

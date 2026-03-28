@@ -221,8 +221,15 @@ impl ContributorProgramLineageContract {
     }
 }
 
+static CONTRIBUTOR_PROGRAM_LINEAGE_CONTRACT_CACHE: std::sync::OnceLock<
+    ContributorProgramLineageContract,
+> = std::sync::OnceLock::new();
+
 pub fn canonical_contributor_program_lineage_contract(
 ) -> Result<ContributorProgramLineageContract, ContributorProgramLineageError> {
+    if let Some(contract) = CONTRIBUTOR_PROGRAM_LINEAGE_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let manifest = cross_provider_training_program_manifest().map_err(|error| {
         ContributorProgramLineageError::InvalidContract {
             detail: format!("failed to load root training-program manifest: {error}"),
@@ -294,6 +301,7 @@ pub fn canonical_contributor_program_lineage_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = CONTRIBUTOR_PROGRAM_LINEAGE_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

@@ -165,6 +165,11 @@ impl LiveCheckpointCatchupContract {
             .iter()
             .map(|record| record.registry_record_id.as_str())
             .collect::<BTreeSet<_>>();
+        let record_by_id = registry
+            .registry_records
+            .iter()
+            .map(|record| (record.registry_record_id.as_str(), record))
+            .collect::<BTreeMap<_, _>>();
         let active_role_pairs = mesh
             .member_leases
             .iter()
@@ -427,6 +432,17 @@ impl LiveCheckpointCatchupContract {
                         receipt.receipt_id, receipt.selected_advertisement_id
                     ),
                 })?;
+            let advertisement_record = record_by_id.get(
+                advertisement.serving_registry_record_id.as_str(),
+            )
+            .ok_or_else(|| LiveCheckpointCatchupContractError::InvalidContract {
+                detail: format!(
+                    "catchup receipt `{}` advertisement `{}` references unknown serving record `{}`",
+                    receipt.receipt_id,
+                    receipt.selected_advertisement_id,
+                    advertisement.serving_registry_record_id
+                ),
+            })?;
             let route = route_by_id
                 .get(receipt.selected_route_id.as_str())
                 .ok_or_else(|| LiveCheckpointCatchupContractError::InvalidContract {
@@ -486,8 +502,7 @@ impl LiveCheckpointCatchupContract {
                             && receipt.served_optimizer_bytes > 0)
                         || !advertisement.serves_optimizer_state
                         || receipt.joining_step_lag > window.maximum_step_lag
-                        || restore_assignment.restore_source_id
-                            != advertisement.serving_registry_record_id
+                        || restore_assignment.restore_source_id != advertisement_record.source_id
                     {
                         return Err(LiveCheckpointCatchupContractError::InvalidContract {
                             detail: format!(
@@ -533,8 +548,14 @@ impl LiveCheckpointCatchupContract {
     }
 }
 
+static LIVE_CHECKPOINT_CATCHUP_CONTRACT_CACHE: std::sync::OnceLock<LiveCheckpointCatchupContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_live_checkpoint_catchup_contract(
 ) -> Result<LiveCheckpointCatchupContract, LiveCheckpointCatchupContractError> {
+    if let Some(contract) = LIVE_CHECKPOINT_CATCHUP_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let checkpoint_contract = canonical_sharded_distributed_checkpoint_contract()?;
     let dense_recovery = canonical_dense_rank_recovery_contract()?;
     let mesh = canonical_elastic_device_mesh_contract()?;
@@ -690,6 +711,7 @@ pub fn canonical_live_checkpoint_catchup_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = LIVE_CHECKPOINT_CATCHUP_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

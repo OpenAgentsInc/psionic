@@ -504,8 +504,14 @@ impl QuantizedOuterSyncContract {
     }
 }
 
+static QUANTIZED_OUTER_SYNC_CONTRACT_CACHE: std::sync::OnceLock<QuantizedOuterSyncContract> =
+    std::sync::OnceLock::new();
+
 pub fn canonical_quantized_outer_sync_contract(
 ) -> Result<QuantizedOuterSyncContract, QuantizedOuterSyncContractError> {
+    if let Some(contract) = QUANTIZED_OUTER_SYNC_CONTRACT_CACHE.get() {
+        return Ok(contract.clone());
+    }
     let mesh = canonical_elastic_device_mesh_contract()?;
     let wan = canonical_wan_overlay_route_contract()?;
     let catchup = canonical_live_checkpoint_catchup_contract()?;
@@ -656,6 +662,7 @@ pub fn canonical_quantized_outer_sync_contract(
     };
     contract.contract_digest = contract.stable_digest();
     contract.validate()?;
+    let _ = QUANTIZED_OUTER_SYNC_CONTRACT_CACHE.set(contract.clone());
     Ok(contract)
 }
 

@@ -40,19 +40,34 @@ surface. It now covers:
 - one curated run, one open public run, one incentivized run, and one final
   acceptance audit
 
-The system is not yet fully cargo-green in this checkout. The shared blocker is
-the pre-existing compile failure in
-`crates/psionic-backend-cuda/src/lib.rs:876`, where
-`PlatformSubmission::allocate` is missing. That blocker currently prevents the
-repo's cargo-backed contract checkers from completing end to end.
+The system is cargo-green again on current `main` for the decentralized XTRAIN
+checker lane.
+
+The stale blocker recorded in the first draft of this audit is no longer the
+current truth. `psionic-backend-cuda` no longer stops the workspace on a
+missing `PlatformSubmission::allocate`, and a fresh 2026-03-27 repair pass
+fixed the actual contract-path failures that had accumulated above that old
+workspace issue:
+
+- relay lease duration in
+  `crates/psionic-train/src/elastic_device_mesh_contract.rs` had drifted down
+  to the decentralized stale-peer timeout instead of staying above it
+- live catch-up validation in
+  `crates/psionic-train/src/live_checkpoint_catchup_contract.rs` compared a
+  restore assignment `source_id` against a registry-record id
+- later decentralized generators were still paying pathological recursive
+  recomputation across pure canonical builders instead of reusing already-built
+  contract truth inside one process
 
 So the honest current state is:
 
 - the XTRAIN system is implemented as a coherent contract stack
 - its fixtures, references, and retained evidence are present and internally
   cross-linked
-- its cargo-backed regeneration path is still blocked by unrelated workspace
-  breakage
+- its cargo-backed decentralized checker and regeneration path is fresh again
+  on current `main`
+- the remaining limitations are about public runtime proof scope and real
+  outside execution, not the old unrelated CUDA workspace breakage
 
 ## Scope Covered By This Audit
 
@@ -237,53 +252,49 @@ A repo-local inventory pass over the XTRAIN decentralized lane found:
 - zero missing `docs/TRAIN_SYSTEM.md` or self-referenced fixture paths
 
 I also re-checked the digest linkage across the final decentralized chain. The
-current fixtures still bind in the intended order:
+current fixtures now bind in the intended order:
 
-- network digest `37205ba6736d97b64f7156dde917b02d4bd4eeaa5bcfcfd96544c3bcdf338bda`
-- identity set digest `e2423cfcb3e960bbf5790da0f0723f87bacc58003e1ad173d73b9ec63c41ffcc`
-- registry digest `ebb5ca08893fe16f1a72c67f2fd99aefe44a95af7670bb31e875b2d77b88b7f4`
-- mesh digest `c28470e11457d28464a6e5ae42543996b7048ec13e228b64e6394e233d1965fc`
-- overlay digest `3f8ac57a330f37acfed56c582353643cd09072f6b1792472917165db979922e4`
-- catch-up digest `3589f9e87675511227b73ec95e226ab99354f09cba35cc9c0d72c1608d9a10d8`
-- artifact exchange digest `1d2153ccb088b9bac59de0e9a0f7534251b42799590bd97e7a5604c3b22f45ef`
-- miner protocol digest `cd5d4fe71a5cd7ceaa43389127266ea38847a33631f8b7071eb44e77650fad65`
-- validator scoring digest `99ad085b9a12258380dc4fb948c51c0cd86644a91afd6f5137d8a76a13830b25`
-- consensus digest `ce2a463d0703a5cf5dc3d30efc9b9f8981c17e60bfa8a0d9b2f716912af0470f`
-- fraud digest `a700e0a8d16213fb91848ffa3eabff857c88fafdf73098420d2ba26a530f1dda`
-- reward ledger digest `42d7dc87c9dc416023ee2a96f838946533fb366780ec7449a1f9feed8002f103`
-- settlement digest `ca13e653115f6001022f0573d7d8f09da1b8f778fe811301c9c712f26072ed65`
-- operator package digest `5d0f0ecf67d414dc39cf5324a70684fa43e5291639e5c2536fff75ae376de5ce`
-- explorer digest `6ef8e0ebf8a3475fb5ff8514dc44ca158419cb9db6c563b0b28163745c656828`
-- testnet readiness digest `bf39625ba7482a9698c8c873be7c41c39c763d6a85d4c9956e421fa83d41c041`
-- curated run digest `17310438fe3baacd455d34490558b33440ebf53927602fa02d7341e81d9af9f2`
-- open public run digest `6aa7955fa12c5ee2865dadbf48c31940bd7ccbaa946b96fc7b39a11955be9775`
-- incentivized run digest `1b4379c607674ef2198424370c3ad8a2940d1a9d2aea752b54219a3fff5e4e90`
+- network digest `604f679b257e271416a2591aa78872b2aa6ae3842ea6ca721d0af601bb2e1f20`
+- identity set digest `bfeb12fb77be78eed0584a57788b240fd28d0348ef7352d91fd3eff4b7b1f10e`
+- registry digest `f5031ce4f88f8438f7d031640ab6721b96b4844e99976c2d7f0bfb0208068515`
+- mesh digest `cd1579369c86fb174d17e7da5c0edec823d2d287fb0ca18ebb843fdc21cbf1e6`
+- overlay digest `3fe65cbb07b327819e98126ac2e6f6960d07b7ddb70606f4c3c788455d5ac6f1`
+- catch-up digest `5014483a73eb91d426b5a7d78c478d1af548976ac05a2dfed08ba4ae79f7b7a5`
+- artifact exchange digest `45bd5e0e439cb03ed32d3fb6b125d4a61ec8bab2080493ef926453f9c960b7bd`
+- miner protocol digest `b20fb20345bd3b2c6b39c6909ef9f1eab61d2c91b7748bde12561c7c52e5999b`
+- validator scoring digest `7304a4946946d75d74ee0c533678765e41672cc85339a720c10a83a855addcd0`
+- consensus digest `53f1584e194bfbafe11633198d549364a2ce948c10f5a61436e5f65c431283d7`
+- fraud digest `0af11dde321433b27ad765916858b48ce74e0f7c6f019bc81704243aa1e2e20f`
+- reward ledger digest `6f252e036aea94f1944533a8e7716cf27c7ef749f2f5282d74be01f0b77be8ed`
+- settlement digest `9c45bf611d920137f3fad39b49c3b62c92ccf4b4afea08b07d8efe484fa6554f`
+- operator package digest `483f656d08732e582494b7a2e9fdde007e45de8700a178a1430ac5074a4d5bc4`
+- explorer digest `f56844ceae1915e3f96192893efd451e69dbf388e166092e31ac101c5164f4cd`
+- testnet readiness digest `5d396f669aa79a157ff9c4e69b984978a6edfc7cd7b1adddfa799bee6f3e6549`
+- curated run digest `bfe055ed5b6931f559640a0d9c865dae90a3ac631b21822e746e9a2c63f675dc`
+- open public run digest `4bfad52c448fbf70b65bffadfcdc8f32d42ecd33b96641d44c7ff6c1985974e4`
+- incentivized run digest `fd23a04384808bb4e32c21c9ee9a79bfc81ce2fee3f9c1e9e5718280ebb0fbc6`
 
-### Cargo-Backed Validation Attempt
+### Cargo-Backed Checker Sweep
 
-I attempted to rerun the shipped checker path with:
+On 2026-03-27 I reran the shipped decentralized checker chain from
+`scripts/check-decentralized-network-contract.sh` through
+`scripts/check-incentivized-decentralized-run-contract.sh`.
 
-```bash
-./scripts/check-decentralized-network-contract.sh
-```
+That full cargo-backed sweep now passes on current `main`.
 
-That checker still fails before reaching its fixture comparison phase because
-the workspace compile currently stops at:
+The freshness repair depended on three concrete changes:
 
-```text
-error[E0599]: no method named `allocate` found for struct `PlatformSubmission`
---> crates/psionic-backend-cuda/src/lib.rs:876:37
-```
-
-The follow-on error is:
-
-```text
-error: could not compile `psionic-backend-cuda` (lib) due to 1 previous error
-```
-
-Because the decentralized checker path and the rest of the XTRAIN checkers all
-depend on the same cargo workspace build, this blocker currently prevents
-full cargo-backed revalidation of the XTRAIN generators in this checkout.
+- fixing the relay lease policy in
+  `crates/psionic-train/src/elastic_device_mesh_contract.rs` so it stays above
+  the network stale-peer timeout instead of drifting down to equality
+- fixing the completed catch-up binding in
+  `crates/psionic-train/src/live_checkpoint_catchup_contract.rs` so restore
+  assignments compare against the serving record's `source_id` instead of its
+  registry-record id
+- memoizing pure canonical builders across the cross-provider and decentralized
+  contract stack so the later miner, validator, consensus, reward, and public
+  run generators no longer degrade into recursive recomputation inside one
+  process
 
 ## How To Operate The XTRAIN System Today
 
