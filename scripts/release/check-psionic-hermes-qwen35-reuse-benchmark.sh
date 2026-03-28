@@ -29,6 +29,7 @@ report_path="${PSIONIC_HERMES_REUSE_REPORT_PATH:-$repo_root/fixtures/qwen35/herm
 log_path="${PSIONIC_HERMES_SERVER_LOG_PATH:-$repo_root/target/hermes/hermes_qwen35_reuse_server.log}"
 tmpdir="${TMPDIR:-$repo_root/target/hermes/tmp}"
 iterations="${PSIONIC_HERMES_REUSE_ITERATIONS:-3}"
+psionic_revision="${PSIONIC_HERMES_PSIONIC_REVISION:-}"
 
 mkdir -p "$(dirname "$report_path")" "$(dirname "$log_path")" "$tmpdir"
 
@@ -68,5 +69,6 @@ python3 "$repo_root/scripts/release/hermes_qwen35_reuse_benchmark.py" \
   --model "$model_name" \
   --model-path "$model_path" \
   --psionic-root "$repo_root" \
+  ${psionic_revision:+--psionic-revision "$psionic_revision"} \
   --report-path "$report_path" \
   --iterations "$iterations"
