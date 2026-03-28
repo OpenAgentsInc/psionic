@@ -7328,6 +7328,32 @@ impl GenerationSampler {
             )
     }
 
+    fn select_next_token_from_presorted_candidates(
+        &mut self,
+        candidate_ids: &[u32],
+        candidate_logits: &[f32],
+        full_vocab_size: usize,
+    ) -> Result<GenerationSelection, ReferenceTextGenerationError> {
+        if self.structured_output.is_some() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                RuntimeError::UnsupportedStep(String::from(
+                    "bounded candidate sampling is unavailable while structured-output masking is active",
+                )),
+            ));
+        }
+        self.sampler
+            .select_next_token_from_presorted_candidates(
+                candidate_ids,
+                candidate_logits,
+                full_vocab_size,
+            )
+            .map(TokenId)
+            .map_or(
+                Err(ReferenceTextGenerationError::MissingOutput("next_token")),
+                |token| Ok(GenerationSelection::Token(token)),
+            )
+    }
+
     pub(crate) fn structured_output_allowed_token_ids_for_generated_tokens(
         &mut self,
         tokenizer: &dyn TokenizerBoundary,

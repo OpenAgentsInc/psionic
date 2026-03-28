@@ -5746,6 +5746,58 @@ impl TokenSampler {
             &mut self.mirostat_state,
             full_vocab_size,
             top_k_already_applied,
+            false,
+        );
+        if selected.is_some() {
+            if let Some(generator_state) = self.generator_state.as_mut() {
+                generator_state.draws = generator_state.draws.saturating_add(1);
+            }
+        }
+        selected
+    }
+
+    /// Selects the next token from one preselected candidate set that is
+    /// already sorted by descending logit.
+    pub fn select_next_token_from_presorted_candidates(
+        &mut self,
+        candidate_ids: &[u32],
+        candidate_logits: &[f32],
+        full_vocab_size: usize,
+    ) -> Option<u32> {
+        if candidate_ids.len() != candidate_logits.len() {
+            return None;
+        }
+        self.candidate_tokens.clear();
+        self.candidate_tokens.reserve(candidate_ids.len());
+        for (&id, &logit) in candidate_ids.iter().zip(candidate_logits.iter()) {
+            if !logit.is_finite() {
+                continue;
+            }
+            self.candidate_tokens.push(SampleToken {
+                id,
+                logit,
+                probability: 0.0,
+            });
+        }
+        if self.candidate_tokens.is_empty() {
+            return None;
+        }
+        if sampling_is_argmax_only(&self.policy) {
+            return self.candidate_tokens.first().map(|token| token.id);
+        }
+        let full_vocab_size = full_vocab_size.max(self.candidate_tokens.len());
+        let top_k_already_applied = matches!(
+            self.policy.effective_top_k(),
+            Some(top_k) if top_k > 0 && self.candidate_tokens.len() <= top_k
+        );
+        let selected = sample_token_from_tokens(
+            &mut self.rng,
+            &mut self.candidate_tokens,
+            &self.policy,
+            &mut self.mirostat_state,
+            full_vocab_size,
+            top_k_already_applied,
+            true,
         );
         if selected.is_some() {
             if let Some(generator_state) = self.generator_state.as_mut() {
@@ -5943,7 +5995,15 @@ fn sample_token_index(
             probability: 0.0,
         })
         .collect::<Vec<_>>();
-    sample_token_from_tokens(rng, &mut tokens, policy, mirostat_state, logits.len(), false)
+    sample_token_from_tokens(
+        rng,
+        &mut tokens,
+        policy,
+        mirostat_state,
+        logits.len(),
+        false,
+        false,
+    )
 }
 
 fn top_k(tokens: &mut Vec<SampleToken>, top_k: Option<usize>) {
@@ -5999,7 +6059,7 @@ fn softmax(tokens: &mut [SampleToken]) -> f32 {
     sum
 }
 
-fn top_p(tokens: &mut Vec<SampleToken>, top_p: Option<f32>) {
+fn top_p(tokens: &mut Vec<SampleToken>, top_p: Option<f32>, presorted_descending: bool) {
     let Some(top_p) = top_p else {
         return;
     };
@@ -6009,7 +6069,9 @@ fn top_p(tokens: &mut Vec<SampleToken>, top_p: Option<f32>) {
     if !softmax(tokens).is_finite() {
         return;
     }
-    tokens.sort_by(|left, right| right.probability.total_cmp(&left.probability));
+    if !presorted_descending {
+        tokens.sort_by(|left, right| right.probability.total_cmp(&left.probability));
+    }
 
     let mut cumulative = 0.0;
     let mut keep = tokens.len();
@@ -6023,19 +6085,23 @@ fn top_p(tokens: &mut Vec<SampleToken>, top_p: Option<f32>) {
     tokens.truncate(keep.max(1));
 }
 
-fn min_p(tokens: &mut Vec<SampleToken>, min_p: Option<f32>) {
+fn min_p(tokens: &mut Vec<SampleToken>, min_p: Option<f32>, presorted_descending: bool) {
     let Some(min_p) = min_p else {
         return;
     };
     if min_p <= 0.0 || min_p > 1.0 {
         return;
     }
-    let Some(max_token) = tokens
-        .iter()
-        .copied()
-        .filter(|token| token.logit.is_finite())
-        .max_by(|left, right| left.logit.total_cmp(&right.logit))
-    else {
+    let max_token = if presorted_descending {
+        tokens.iter().copied().find(|token| token.logit.is_finite())
+    } else {
+        tokens
+            .iter()
+            .copied()
+            .filter(|token| token.logit.is_finite())
+            .max_by(|left, right| left.logit.total_cmp(&right.logit))
+    };
+    let Some(max_token) = max_token else {
         return;
     };
     if !max_token.logit.is_finite() {
@@ -6101,6 +6167,7 @@ fn sample_token_from_tokens(
     mirostat_state: &mut Option<MirostatState>,
     vocab_size: usize,
     top_k_already_applied: bool,
+    presorted_descending: bool,
 ) -> Option<u32> {
     if tokens.is_empty() {
         return None;
@@ -6109,12 +6176,22 @@ fn sample_token_from_tokens(
         return sample_token_mirostat(rng, tokens, policy, mirostat_state, vocab_size, mode);
     }
 
+    let mut tokens_sorted_descending = presorted_descending;
     if !top_k_already_applied {
         top_k(tokens, policy.effective_top_k());
+        tokens_sorted_descending = true;
     }
-    typical_p(tokens, policy.effective_typical_p());
-    top_p(tokens, policy.effective_top_p());
-    min_p(tokens, policy.effective_min_p());
+    let effective_typical_p = policy.effective_typical_p();
+    if effective_typical_p.is_some() {
+        typical_p(tokens, effective_typical_p);
+        tokens_sorted_descending = false;
+    }
+    let effective_top_p = policy.effective_top_p();
+    if effective_top_p.is_some() {
+        top_p(tokens, effective_top_p, tokens_sorted_descending);
+        tokens_sorted_descending = true;
+    }
+    min_p(tokens, policy.effective_min_p(), tokens_sorted_descending);
 
     if tokens.is_empty() {
         return None;
@@ -12401,6 +12478,55 @@ mod tests {
         assert!(draws.iter().all(|&token| token == 0 || token == 1));
         assert!(draws.iter().any(|&token| token == 0));
         assert!(draws.iter().any(|&token| token == 1));
+    }
+
+    #[test]
+    fn presorted_candidate_sampling_matches_generic_candidate_sampling() {
+        let policy = SamplingPolicy {
+            strategy: SamplingStrategy::Sample,
+            temperature: Some(0.8),
+            top_k: Some(4),
+            top_p: Some(0.9),
+            min_p: Some(0.05),
+            typical_p: None,
+            mirostat: None,
+            mirostat_tau: None,
+            mirostat_eta: None,
+            repeat_penalty: None,
+            repeat_last_n: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            seed: Some(41),
+        };
+        let candidate_ids = vec![7_u32, 3, 19, 2];
+        let candidate_logits = vec![3.5_f32, 3.0, 2.5, 2.0];
+        let mut generic = TokenSampler::new(&policy);
+        let mut presorted = TokenSampler::new(&policy);
+
+        let generic_draws = (0..16)
+            .map(|_| {
+                generic
+                    .select_next_token_from_candidates(
+                        candidate_ids.as_slice(),
+                        candidate_logits.as_slice(),
+                        32,
+                    )
+                    .expect("generic candidate sampling should produce a token")
+            })
+            .collect::<Vec<_>>();
+        let presorted_draws = (0..16)
+            .map(|_| {
+                presorted
+                    .select_next_token_from_presorted_candidates(
+                        candidate_ids.as_slice(),
+                        candidate_logits.as_slice(),
+                        32,
+                    )
+                    .expect("presorted candidate sampling should produce a token")
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(generic_draws, presorted_draws);
     }
 
     #[test]

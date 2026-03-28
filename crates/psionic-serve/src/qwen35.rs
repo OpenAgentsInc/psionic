@@ -640,7 +640,7 @@ impl CudaGgufQwen35TextGenerationService {
                                 }
                             }
                         }
-                        None => match sampler.select_next_token_from_candidates(
+                        None => match sampler.select_next_token_from_presorted_candidates(
                             candidates.indices.as_slice(),
                             candidates.values.as_slice(),
                             self.model.descriptor.config.vocab_size,
