@@ -1068,6 +1068,69 @@ This is an actual loop improvement over the prior single-follow-on posture:
 - detached scoring remains attached to each queued run, so the GPU chain does
   not wait behind inline full validation after `20260328f`
 
+## EMA Export Queue Extension
+
+The chained LR sweep still only exercised raw-surface exports.
+
+That meant the queued local loop could compare learning-rate variants, but it
+could not test whether a smoothed final export surface improves the same
+two-step honest `600s` posture.
+
+The repo-owned runner now exposes one explicit EMA export control:
+
+- env:
+  `PSIONIC_PARAMETER_GOLF_EMA_DECAY=<f32>`
+- runner flags:
+  - `--ema-decay <f32>`
+  - `--final-model-surface <surface>`
+
+That landed at `psionic` commit `5f6b2f10`.
+
+This does not invent a new trainer lane.
+
+It simply makes one existing substrate surface operator-reachable in the
+HOMEGOLF loop:
+
+- explicit EMA state
+- explicit final exported surface selection
+
+At `2026-03-28 06:44:43 CDT`, the next queued EMA-backed local run was staged
+on `archlinux` behind the existing raw-surface chain:
+
+- queued run id:
+  `homegolf-baseline-g64-stepcap2-clip1-lr050-ema997-artifactonly-600s-20260328i`
+- queue pid:
+  `781762`
+- queue log:
+  `/home/christopherdavid/scratch/psionic_homegolf_runs/queue_homegolf_20260328i_repo.log`
+
+Queued posture:
+
+- `challenge_max_steps=2`
+- `grad_clip_norm=1.0`
+- `learning_rate_scale=0.50`
+- `ema_decay=0.997`
+- `final_model_surface=ema`
+- `final_validation_mode=artifact_only`
+- `validation_eval_mode=non_overlapping`
+- prompt closeout attached
+- detached score closeout attached
+
+Retained waiting evidence:
+
+- `queue_waiting_for_pid_file timestamp=2026-03-28T06:44:43-05:00 path=/home/christopherdavid/scratch/psionic_homegolf_runs/homegolf-baseline-g64-stepcap2-clip1-lr035-artifactonly-600s-20260328h/train.pid`
+
+So the current live queue chain is now:
+
+- `20260328f` raw, `lr=0.75`
+- `20260328g` raw, `lr=0.50`
+- `20260328h` raw, `lr=0.35`
+- `20260328i` ema, `lr=0.50`, `ema_decay=0.997`
+
+This is the first queued pass that can compare one smoothed final export
+surface against the raw-surface local chain without another operator
+intervention.
+
 ## Current Honest Boundary
 
 HOMEGOLF is frozen as a contract now, but one important surface is still
@@ -1091,6 +1154,8 @@ One more current truth is explicit after `20260328d`:
   inline full validation
 - the next two LR variants after that are also already staged through the
   repo-owned future-run queue and will launch automatically
+- one EMA-backed export variant is now also staged behind that raw-surface
+  chain
 - the retained actual public PGOLF score is still `6.306931747817168`
 - the active local clipped run is still closing its full roundtrip validation,
   so it does not yet have a completed new score receipt
