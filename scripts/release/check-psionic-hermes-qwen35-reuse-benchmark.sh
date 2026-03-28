@@ -5,8 +5,13 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 
 server_bin="${PSIONIC_HERMES_SERVER_BIN:-$repo_root/target/debug/psionic-openai-server}"
-if [[ ! -x "$server_bin" ]]; then
+if [[ "${PSIONIC_HERMES_SKIP_BUILD:-0}" != "1" ]]; then
   cargo build -q -p psionic-serve --bin psionic-openai-server
+fi
+if [[ ! -x "$server_bin" ]]; then
+  echo "missing psionic-openai-server binary after build: $server_bin" >&2
+  echo "set PSIONIC_HERMES_SERVER_BIN and CARGO_TARGET_DIR together if the binary lives outside the repo target dir" >&2
+  exit 1
 fi
 
 model_path="${PSIONIC_HERMES_QWEN35_MODEL_PATH:-/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf}"
