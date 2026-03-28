@@ -113,6 +113,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let raw = max_challenge_steps.to_string_lossy();
         config.max_steps = raw.parse::<u64>()?;
     }
+    if let Some(grad_clip_norm) =
+        env::var_os("PSIONIC_PARAMETER_GOLF_HOMEGOLF_GRAD_CLIP_NORM")
+    {
+        let raw = grad_clip_norm.to_string_lossy();
+        config.hyperparameters.grad_clip_norm = raw.parse::<f32>()?;
+    }
     if truthy_env("PSIONIC_PARAMETER_GOLF_DISABLE_SCORE_FIRST_TTT") {
         config.score_first_ttt = None;
     }

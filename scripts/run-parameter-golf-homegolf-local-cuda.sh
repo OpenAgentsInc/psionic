@@ -13,6 +13,7 @@ cargo_target_dir="${repo_root}/target"
 binary_path=""
 max_steps=""
 challenge_max_steps=""
+grad_clip_norm=""
 final_validation_mode="roundtrip_only"
 validation_eval_mode="non_overlapping"
 background="0"
@@ -40,6 +41,7 @@ Options:
   --binary-path <path>                  Use an existing trainer binary instead of cargo.
   --max-steps <n>                       Optional bounded max-steps override.
   --challenge-max-steps <n>             Honest challenge max-steps cap that preserves the local 600s contract.
+  --grad-clip-norm <f32>                Optional training grad-clip norm override for the HOMEGOLF lane.
   --final-validation-mode <mode>        Final validation mode. Default: roundtrip_only
   --validation-eval-mode <mode>         Validation eval mode. Default: non_overlapping
   --trainer-arg <arg>                   Extra trailing trainer arg. Repeatable.
@@ -92,6 +94,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --challenge-max-steps)
       challenge_max_steps="$2"
+      shift 2
+      ;;
+    --grad-clip-norm)
+      grad_clip_norm="$2"
       shift 2
       ;;
     --final-validation-mode)
@@ -259,6 +265,9 @@ fi
 if [[ -n "${challenge_max_steps}" ]]; then
   printf 'CHALLENGE_MAX_STEPS=%q\n' "${challenge_max_steps}" >> "${launch_env_path}"
 fi
+if [[ -n "${grad_clip_norm}" ]]; then
+  printf 'GRAD_CLIP_NORM=%q\n' "${grad_clip_norm}" >> "${launch_env_path}"
+fi
 if [[ -n "${binary_path}" ]]; then
   printf 'BINARY_PATH=%q\n' "${binary_path}" >> "${launch_env_path}"
 fi
@@ -283,6 +292,9 @@ run_trainer() {
   )
   if [[ -n "${challenge_max_steps}" ]]; then
     run_env+=("PSIONIC_PARAMETER_GOLF_HOMEGOLF_MAX_CHALLENGE_STEPS=${challenge_max_steps}")
+  fi
+  if [[ -n "${grad_clip_norm}" ]]; then
+    run_env+=("PSIONIC_PARAMETER_GOLF_HOMEGOLF_GRAD_CLIP_NORM=${grad_clip_norm}")
   fi
   env "${run_env[@]}" \
     "${trainer_command[@]}"
