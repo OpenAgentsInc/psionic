@@ -31,6 +31,7 @@ Example:
     -- \
     --run-id next_run \
     --challenge-max-steps 2 \
+    --grad-accum-steps 64 \
     --grad-clip-norm 1.0 \
     --learning-rate-scale 0.75 \
     --final-validation-mode artifact_only \
