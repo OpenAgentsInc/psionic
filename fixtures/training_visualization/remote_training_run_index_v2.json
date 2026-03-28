@@ -1,0 +1,102 @@
+{
+  "schema_version": "psionic.remote_training_run_index.v2",
+  "index_id": "remote-training-run-index-sample-v2",
+  "generated_at_ms": 1742846405000,
+  "entries": [
+    {
+      "provider": "google_cloud",
+      "profile_id": "google_a2_ultragpu_1g",
+      "lane_id": "psion.google_single_node.accelerated",
+      "run_id": "psion-google-summary-only-sample",
+      "repo_revision": "main@5e6f5f0f",
+      "track_semantics": {
+        "track_family": "psion",
+        "track_id": "psion.reference_pilot.single_node.v1",
+        "execution_class": "single_node",
+        "comparability_class": "not_comparable",
+        "proof_posture": "summary_only",
+        "public_equivalence_class": "not_applicable",
+        "semantic_summary": "Google single-node Psion keeps provider-neutral run identity and summary truth without inventing a score law or loss curve."
+      },
+      "result_classification": "completed_success",
+      "series_status": "unavailable",
+      "series_unavailable_reason": "no canonical optimizer-step loss or math series was retained for this completed Google lane",
+      "last_heartbeat_at_ms": 1742760920000,
+      "bundle_artifact_uri": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
+      "bundle_digest": "41aacce46ad898cab5fff7fbeb4b6e0a6e14759909e93f730b0d5ca9bd195666",
+      "semantic_summary": "Google single-node Psion keeps provider-neutral run identity and summary truth without inventing a score law or loss curve."
+    },
+    {
+      "provider": "google_cloud",
+      "profile_id": "g2_l4_single_node_accelerated",
+      "lane_id": "psion_accelerated_reference_pilot",
+      "run_id": "psion-google-live-sample",
+      "repo_revision": "main@979af617",
+      "track_semantics": {
+        "track_family": "psion",
+        "track_id": "psion.reference_pilot.accelerated_single_node.v1",
+        "execution_class": "single_node",
+        "comparability_class": "same_track_comparable",
+        "proof_posture": "runtime_measured",
+        "public_equivalence_class": "not_applicable",
+        "semantic_summary": "Accelerated Google Psion retains measured live runtime telemetry every second without claiming PGOLF-style score comparability."
+      },
+      "result_classification": "active",
+      "series_status": "available",
+      "last_heartbeat_at_ms": 1742846404900,
+      "bundle_artifact_uri": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+      "bundle_digest": "de1cff6baf2fe74480fc4caf910528fa5127391621c04f504dfb6826745a7695",
+      "semantic_summary": "Accelerated Google Psion retains measured live runtime telemetry every second without claiming PGOLF-style score comparability."
+    },
+    {
+      "provider": "run_pod",
+      "profile_id": "runpod_h100_single_gpu",
+      "lane_id": "parameter_golf.runpod_single_h100",
+      "run_id": "parameter-golf-runpod-single-h100-live-sample",
+      "repo_revision": "main@5e6f5f0f",
+      "track_semantics": {
+        "track_family": "parameter_golf",
+        "track_id": "non-record-unlimited-compute-16mb",
+        "execution_class": "single_node",
+        "comparability_class": "same_track_comparable",
+        "proof_posture": "runtime_measured",
+        "public_equivalence_class": "not_applicable",
+        "score_law_ref": "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
+        "artifact_cap_bytes": 16000000,
+        "semantic_summary": "Single-node PGOLF retains live optimizer telemetry under the non-record unlimited-compute 16MB submission track."
+      },
+      "result_classification": "active",
+      "series_status": "available",
+      "last_heartbeat_at_ms": 1742846402000,
+      "bundle_artifact_uri": "fixtures/training_visualization/parameter_golf_live_remote_training_visualization_bundle_v2.json",
+      "bundle_digest": "b7f4a4b797f7faa383ffc25fb522e244e9f3c7d9cc224b0927aa8a8e962691fc",
+      "semantic_summary": "Single-node PGOLF retains live optimizer telemetry under the non-record unlimited-compute 16MB submission track."
+    },
+    {
+      "provider": "run_pod",
+      "profile_id": "runpod_8xh100_parameter_golf",
+      "lane_id": "parameter_golf_distributed_8xh100",
+      "run_id": "parameter-golf-runpod-8xh100-sample",
+      "repo_revision": "main@5e6f5f0f",
+      "track_semantics": {
+        "track_family": "parameter_golf",
+        "track_id": "non-record-unlimited-compute-16mb",
+        "execution_class": "dense_distributed",
+        "comparability_class": "same_track_comparable",
+        "proof_posture": "runtime_measured",
+        "public_equivalence_class": "not_applicable",
+        "score_law_ref": "docs/PARAMETER_GOLF_NON_RECORD_SUBMISSION.md",
+        "artifact_cap_bytes": 16000000,
+        "semantic_summary": "Distributed PGOLF retains the same non-record track semantics while widening execution class to dense distributed runtime telemetry."
+      },
+      "result_classification": "active",
+      "series_status": "available",
+      "last_heartbeat_at_ms": 1742846512000,
+      "bundle_artifact_uri": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+      "bundle_digest": "7569345ac27d8da9627618d2a6d2d9d4ea2e4863890de46f72975c743c0d3d79",
+      "semantic_summary": "Distributed PGOLF retains the same non-record track semantics while widening execution class to dense distributed runtime telemetry."
+    }
+  ],
+  "detail": "The v2 run index keeps the shipped v1 discovery substrate readable while adding explicit track family, execution class, proof posture, comparability, and score-law semantics.",
+  "index_digest": "78bdf816a20a4904964073a9b5014374701e4755e639ac11a7ec8ba903db5bbf"
+}

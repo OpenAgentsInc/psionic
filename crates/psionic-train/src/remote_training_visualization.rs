@@ -529,7 +529,7 @@ impl RemoteTrainingVisualizationBundle {
 }
 
 impl RemoteTrainingRefreshContract {
-    fn validate(
+    pub(crate) fn validate(
         &self,
         result_classification: RemoteTrainingResultClassification,
     ) -> Result<(), RemoteTrainingVisualizationError> {
@@ -579,7 +579,7 @@ impl RemoteTrainingRefreshContract {
 }
 
 impl RemoteTrainingTimelineEntry {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         ensure_nonempty(
             self.phase.as_str(),
             "remote_training_visualization_bundle.timeline.phase",
@@ -597,7 +597,7 @@ impl RemoteTrainingTimelineEntry {
 }
 
 impl RemoteTrainingHeartbeatSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         ensure_nonempty(
             self.phase.as_str(),
             "remote_training_visualization_bundle.heartbeat_series.phase",
@@ -630,7 +630,7 @@ impl RemoteTrainingHeartbeatSample {
 }
 
 impl RemoteTrainingLossSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         if self.train_loss.is_none() && self.ema_loss.is_none() && self.validation_loss.is_none() {
             return Err(RemoteTrainingVisualizationError::MissingField {
                 field: String::from(
@@ -655,7 +655,7 @@ impl RemoteTrainingLossSample {
 }
 
 impl RemoteTrainingMathSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         validate_optional_metric(
             self.learning_rate,
             "remote_training_visualization_bundle.math_series.learning_rate",
@@ -695,7 +695,7 @@ impl RemoteTrainingMathSample {
 }
 
 impl RemoteTrainingRuntimeSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         validate_optional_duration(
             self.data_wait_ms,
             "remote_training_visualization_bundle.runtime_series.data_wait_ms",
@@ -725,7 +725,7 @@ impl RemoteTrainingRuntimeSample {
 }
 
 impl RemoteTrainingGpuSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         ensure_nonempty(
             self.device_id.as_str(),
             "remote_training_visualization_bundle.gpu_series.device_id",
@@ -755,7 +755,7 @@ impl RemoteTrainingGpuSample {
 }
 
 impl RemoteTrainingDistributedSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         if self.participating_rank_count == 0 {
             return Err(RemoteTrainingVisualizationError::InvalidValue {
                 field: String::from(
@@ -777,7 +777,7 @@ impl RemoteTrainingDistributedSample {
 }
 
 impl RemoteTrainingEventSample {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         ensure_nonempty(
             self.event_kind.as_str(),
             "remote_training_visualization_bundle.event_series.event_kind",
@@ -791,7 +791,7 @@ impl RemoteTrainingEventSample {
 }
 
 impl RemoteTrainingSourceArtifact {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         ensure_nonempty(
             self.artifact_role.as_str(),
             "remote_training_visualization_bundle.source_artifacts.artifact_role",
@@ -817,7 +817,7 @@ impl RemoteTrainingSourceArtifact {
 }
 
 impl RemoteTrainingVisualizationSummary {
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         if self.total_steps_completed > 0 && self.latest_global_step.is_none() {
             return Err(RemoteTrainingVisualizationError::MissingField {
                 field: String::from(

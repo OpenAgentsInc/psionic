@@ -1,9 +1,14 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use psionic_train::{
-    sample_google_live_visualization_bundle, sample_google_summary_only_visualization_bundle,
+    sample_google_live_visualization_bundle, sample_google_live_visualization_bundle_v2,
+    sample_google_summary_only_visualization_bundle,
+    sample_google_summary_only_visualization_bundle_v2,
     sample_parameter_golf_distributed_live_visualization_bundle,
-    sample_parameter_golf_live_visualization_bundle, sample_remote_training_run_index,
+    sample_parameter_golf_distributed_live_visualization_bundle_v2,
+    sample_parameter_golf_live_visualization_bundle,
+    sample_parameter_golf_live_visualization_bundle_v2, sample_remote_training_run_index,
+    sample_remote_training_run_index_v2,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -16,6 +21,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let parameter_golf_live = sample_parameter_golf_live_visualization_bundle()?;
     let parameter_golf_distributed = sample_parameter_golf_distributed_live_visualization_bundle()?;
     let run_index = sample_remote_training_run_index()?;
+    let google_summary_only_v2 = sample_google_summary_only_visualization_bundle_v2()?;
+    let google_live_v2 = sample_google_live_visualization_bundle_v2()?;
+    let parameter_golf_live_v2 = sample_parameter_golf_live_visualization_bundle_v2()?;
+    let parameter_golf_distributed_v2 =
+        sample_parameter_golf_distributed_live_visualization_bundle_v2()?;
+    let run_index_v2 = sample_remote_training_run_index_v2()?;
 
     fs::write(
         fixtures_dir.join("psion_google_summary_only_remote_training_visualization_bundle_v1.json"),
@@ -40,6 +51,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::write(
         fixtures_dir.join("remote_training_run_index_v1.json"),
         format!("{}\n", serde_json::to_string_pretty(&run_index)?),
+    )?;
+    fs::write(
+        fixtures_dir.join("psion_google_summary_only_remote_training_visualization_bundle_v2.json"),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&google_summary_only_v2)?
+        ),
+    )?;
+    fs::write(
+        fixtures_dir.join("psion_google_live_remote_training_visualization_bundle_v2.json"),
+        format!("{}\n", serde_json::to_string_pretty(&google_live_v2)?),
+    )?;
+    fs::write(
+        fixtures_dir.join("parameter_golf_live_remote_training_visualization_bundle_v2.json"),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&parameter_golf_live_v2)?
+        ),
+    )?;
+    fs::write(
+        fixtures_dir
+            .join("parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json"),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&parameter_golf_distributed_v2)?
+        ),
+    )?;
+    fs::write(
+        fixtures_dir.join("remote_training_run_index_v2.json"),
+        format!("{}\n", serde_json::to_string_pretty(&run_index_v2)?),
     )?;
     Ok(())
 }

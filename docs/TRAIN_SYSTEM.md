@@ -52,11 +52,16 @@ The train system assumes the execution substrate defined in
 transport behavior.
 
 The remote-training viewer contract now also has a canonical typed artifact
-family. Psionic owns the provider-neutral live bundle and run-index truth in
-`crates/psionic-train/src/remote_training_visualization.rs` plus the canonical
-fixtures under `fixtures/training_visualization/`. Autopilot consumes that
-truth through its own cache, projection, and pane code instead of moving
-renderer semantics into this repo.
+family. Psionic owns the shipped provider-neutral `v1` live bundle and run-index
+truth in `crates/psionic-train/src/remote_training_visualization.rs`, the
+track-aware `v2` follow-on in
+`crates/psionic-train/src/remote_training_visualization_v2.rs`, and the
+canonical fixtures under `fixtures/training_visualization/`. Autopilot
+consumes that truth through its own cache, projection, and pane code instead
+of moving renderer semantics into this repo. `v1` remains the shipped live
+substrate. `v2` adds track family, execution class, comparability, proof
+posture, public-equivalence, score-law, and cap semantics needed for
+`HOMEGOLF` and bounded `XTRAIN`.
 
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the

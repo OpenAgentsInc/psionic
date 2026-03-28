@@ -32,7 +32,9 @@ The provider-neutral app-facing remote-training contract is separate from the
 stage-level observability receipts:
 
 - `crates/psionic-train/src/remote_training_visualization.rs` owns the typed
-  live bundle and run-index contract.
+  shipped `v1` live bundle and run-index contract.
+- `crates/psionic-train/src/remote_training_visualization_v2.rs` owns the
+  track-aware `v2` follow-on contract.
 - `crates/psionic-train/examples/remote_training_visualization_fixtures.rs`
   regenerates the canonical visualization fixtures.
 - `fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json`
@@ -43,6 +45,9 @@ stage-level observability receipts:
   is the canonical distributed always-live example.
 - `fixtures/training_visualization/remote_training_run_index_v1.json` is the
   canonical run-index example.
+- `fixtures/training_visualization/remote_training_run_index_v2.json` is the
+  canonical track-aware run-index example used during the `v1` -> `v2`
+  migration window.
 
 ## What The Receipt Freezes
 

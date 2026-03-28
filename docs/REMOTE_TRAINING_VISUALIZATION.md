@@ -1,10 +1,11 @@
 # Remote Training Visualization
 
-This document freezes the first provider-neutral app-facing contract for remote
-training runs.
+This document freezes the provider-neutral app-facing contract family for
+remote training runs.
 
-The contract exists so Autopilot can render Google Cloud and RunPod runs from
-one typed artifact family without scraping provider-shaped logs in pane code.
+The contract exists so Autopilot can render Google Cloud, RunPod, PGOLF,
+HOMEGOLF, and bounded XTRAIN runs from typed retained artifacts instead of
+scraping provider-shaped logs in pane code.
 
 Psionic owns the machine-facing truth.
 
@@ -12,8 +13,10 @@ Autopilot owns rendering, refresh loops, and pane behavior.
 
 ## Canonical Artifacts
 
-- `crates/psionic-train/src/remote_training_visualization.rs` owns the typed
-  bundle and run-index contract.
+- `crates/psionic-train/src/remote_training_visualization.rs` owns the shipped
+  `v1` bundle and run-index contract.
+- `crates/psionic-train/src/remote_training_visualization_v2.rs` owns the
+  track-aware `v2` follow-on bundle and run-index contract.
 - `crates/psionic-train/examples/remote_training_visualization_fixtures.rs`
   regenerates the canonical example fixtures.
 - `fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json`
@@ -26,17 +29,59 @@ Autopilot owns rendering, refresh loops, and pane behavior.
   is the canonical RunPod distributed always-live example bundle.
 - `fixtures/training_visualization/remote_training_run_index_v1.json` is the
   canonical run-index example.
+- `fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json`
+  is the canonical summary-only `v2` example bundle.
+- `fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json`
+  is the canonical accelerated Google `v2` example bundle.
+- `fixtures/training_visualization/parameter_golf_live_remote_training_visualization_bundle_v2.json`
+  is the canonical single-node PGOLF `v2` example bundle.
+- `fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json`
+  is the canonical distributed PGOLF `v2` example bundle.
+- `fixtures/training_visualization/remote_training_run_index_v2.json` is the
+  canonical track-aware run-index example.
 
 The stable schema versions are:
 
 - `psionic.remote_training_visualization_bundle.v1`
 - `psionic.remote_training_run_index.v1`
+- `psionic.remote_training_visualization_bundle.v2`
+- `psionic.remote_training_run_index.v2`
+
+## Migration Window
+
+`v1` remains the shipped foundation and stays readable during the migration
+window.
+
+`v2` is the track-aware follow-on. It is not a stealth `v1` field extension.
+
+That split is deliberate:
+
+- `v1` keeps the already-shipped always-live provider-neutral substrate stable
+- `v2` adds the machine-first track semantics needed for `HOMEGOLF`, bounded
+  `XTRAIN`, and later compare mode without forcing the app to guess meaning
+
+The new `v2` contract adds:
+
+- `track_family`
+- `track_id`
+- `execution_class`
+- `comparability_class`
+- `proof_posture`
+- `public_equivalence_class`
+- `score_law_ref`
+- explicit artifact and wallclock caps when the score law carries them
+- machine-stable primary-score identity when a run already has a retained score
+- concise machine-authored semantic summaries
+
+The `v2` bundle stays machine-first. It does not move pane-local labels or
+badge copy into Psionic.
 
 ## What The Bundle Freezes
 
-The first bundle freezes one provider-neutral shape for:
+The bundle family freezes one provider-neutral shape for:
 
 - provider, profile, lane, run, and repo revision identity
+- explicit track semantics once a lane upgrades to `v2`
 - one explicit refresh contract with one-second active-run cadence semantics
 - one explicit `series_status` plus `series_unavailable_reason`
 - timeline rows for lifecycle boundaries
@@ -56,7 +101,7 @@ directly instead of inventing a loss curve.
 
 ## What The Run Index Freezes
 
-The first run index freezes one discovery surface that can enumerate:
+The run-index family freezes one discovery surface that can enumerate:
 
 - summary-only lanes
 - full-series lanes
@@ -66,6 +111,14 @@ The first run index freezes one discovery surface that can enumerate:
 - rehearsal-only runs
 
 That keeps the app out of provider-root walking and ad hoc manifest discovery.
+
+The `v2` run index also carries explicit track semantics per row so consumers
+can tell the difference between:
+
+- PGOLF live training truth
+- HOMEGOLF score-closeout truth
+- bounded XTRAIN train-to-infer truth
+- non-score Psion training truth
 
 ## Live Requirement
 
@@ -87,6 +140,24 @@ The repo now also ships a provider-neutral final evidence bundle family in
 `crates/psionic-train/src/training_execution_evidence_bundle.rs`. Visualization
 refs from this document are one typed section inside that final evidence family,
 not a sidecar proof surface.
+
+## Track-Aware Semantics
+
+`v2` makes one repo-owned distinction explicit:
+
+- `series_status` answers whether live chartable telemetry exists
+- track semantics answer what the run means
+
+That lets one app-facing viewer stay honest across different run families.
+
+Examples:
+
+- a PGOLF live lane can be `available` with measured runtime truth but no final
+  submission score yet
+- a HOMEGOLF lane can carry score-law and cap semantics even when the retained
+  score arrives at closeout rather than during active training
+- a bounded XTRAIN lane can stay explicit about its proof posture instead of
+  being mistaken for a public-leaderboard-equivalent contest run
 
 ## Parameter Golf Single-H100
 
