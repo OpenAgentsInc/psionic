@@ -146,13 +146,18 @@ than just run tensor math.
   radix-sort route with a partitioned multi-block one-row candidate path, the
   same host now publishes the larger bounded-candidate `top_k = 100` contract
   with row-strength classification instead of summary-only throughput claims.
+- Later on March 28, 2026, routing the canonical `top_k = 40` sampled
+  contract through that same partitioned one-row selector at the inclusive
+  threshold removed the prior sampled overhead cliff on the clean RTX 4080
+  host and restored Psionic throughput leadership on all four clean
+  length-matched sampled rows.
 - The fresh clean-host March 28, 2026 rerun on the same RTX 4080 changes the
   canonical interpretation:
   - raw greedy `tok/s` is higher on Psionic across all four models, but every
     greedy row is still `mismatched`
-  - clean sampled `top_k = 40` rows stay on the bounded candidate lane and are
-    length-matched, but Psionic still trails Ollama on all four rows and token
-    divergence starts within the first few generated tokens
+  - clean sampled `top_k = 40` rows stay on the bounded candidate lane, remain
+    length-matched, and now beat Ollama on all four models even though token
+    divergence still starts within the first few generated tokens
   - sampled `top_k = 100` rows remain `mismatched`
   - the `qwen3.5:4b` row shows a repeated Psionic cap-hit instability on both
     greedy and `top_k = 100` sampled runs
@@ -176,10 +181,10 @@ than just run tensor math.
   before measuring Psionic, because Ollama keeps prior model weights live in
   VRAM.
 - The qwen35 lane is materially faster than the earlier pilot on this host,
-  but the current canonical matrix is mixed rather than "ahead everywhere":
-  greedy raw `tok/s` is higher but mismatched, clean sampled `top_k = 40`
-  rows are behind Ollama, and the remaining headroom is still in greedy
-  parity, sampled decode overhead, and the unstable `4b` runtime path.
+  but the current canonical matrix is still mixed rather than "ahead
+  everywhere": greedy raw `tok/s` is higher but mismatched, clean sampled
+  `top_k = 40` rows are now ahead on all four models, and the remaining
+  headroom is still in greedy parity and the unstable `4b` runtime path.
 - The multi-row local comparison matrix for `0.8b`, `2b`, `4b`, and `9b` lives
   in `docs/QWEN35_OLLAMA_COMPARISON.md`.
 

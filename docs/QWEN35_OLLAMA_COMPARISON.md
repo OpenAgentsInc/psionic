@@ -11,8 +11,9 @@ Tracked issues:
 
 Published benchmark checkpoints:
 
-- current canonical checkpoint: `March 28, 2026 clean RTX 4080 rerun with
-  explicit Ollama greedy settings and per-run divergence evidence`
+- current canonical checkpoint: `March 28, 2026 clean RTX 4080 reruns with
+  explicit Ollama greedy settings, per-run divergence evidence, and the
+  inclusive partitioned top-k40 selector`
 - historical greedy checkpoint: `c5bc0ba2`, preserved for provenance only
 - historical sampled checkpoints: `March 27-28, 2026` reruns before
   termination and divergence evidence landed in the repo-owned collector
@@ -26,6 +27,9 @@ Shared benchmark rules:
 - Psionic uses the native CUDA `qwen35` lane
 - Ollama uses the local `ollama serve` instance
 - decode throughput is reported as mean `tok/s`
+- verify `nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory
+  --format=csv,noheader,nounits` returns no resident compute processes before
+  the run; do not publish qwen35 benchmark numbers from a busy GPU
 - benchmark one runtime at a time for `9b` on this 16 GB RTX 4080 because
   Ollama keeps model weights resident in VRAM
 - the local Ollama `qwen3.5` path on this checkout routes through
@@ -43,6 +47,10 @@ The canonical repo-owned rerun path is now:
   `cargo run --release -p psionic-serve --example qwen35_cuda_bench -- ... --json-out report.json`
 - sequential multi-row collection from
   `scripts/release/run-qwen35-ollama-matrix.sh`
+
+The canonical matrix runner now refuses to start if `nvidia-smi` reports any
+resident compute processes unless `PSIONIC_QWEN35_MATRIX_ALLOW_BUSY_GPU=1` is
+set explicitly.
 
 Those artifacts preserve the per-run fields that matter for honest comparison:
 
@@ -70,8 +78,13 @@ reduced matrix that keeps only token count and mean throughput.
 
 Current canonical evidence lives in:
 
-- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_174935_archlinux-.json`
-- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_174935_archlinux-/one_page_summary.md`
+- greedy plus `sampled_topk100`:
+  - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_174935_archlinux-.json`
+  - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_174935_archlinux-/one_page_summary.md`
+- `sampled_topk40` after routing `top_k = 40` through the inclusive
+  partitioned one-row CUDA selector:
+  - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_182857_archlinux-.json`
+  - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_182857_archlinux-/one_page_summary.md`
 
 Interpretation rules:
 
@@ -86,10 +99,10 @@ Interpretation rules:
 | `greedy` | `qwen3.5:2b` | `259.95` | `205.15` | `mismatched` | Raw throughput favors Psionic, but first divergence starts at token `2,2,2` and output lengths differ (`25,21,24` vs `34,34,34`) |
 | `greedy` | `qwen3.5:4b` | `173.57` | `146.23` | `mismatched` | One Psionic repeat hit `max_output_tokens` with malformed continuation (`128,29,30` vs `35,35,35`); this is a real runtime instability, not just a reporting gap |
 | `greedy` | `qwen3.5:9b` | `107.40` | `97.32` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`10,28,24` vs `42,42,42`) and first divergence starts at token `1,5,6` |
-| `sampled_topk40` | `qwen3.5:0.8b` | `270.07` | `336.91` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
-| `sampled_topk40` | `qwen3.5:2b` | `175.24` | `206.78` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
-| `sampled_topk40` | `qwen3.5:4b` | `136.85` | `144.01` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
-| `sampled_topk40` | `qwen3.5:9b` | `92.61` | `96.32` | `weak_length_matched_only` | Both sides hit the `128` token cap, but first comparable token divergence starts at token `1,3,3`; Psionic stayed on `qwen35_output_modes=[top_k_candidates:40]` |
+| `sampled_topk40` | `qwen3.5:0.8b` | `469.06` | `337.20` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `3`, and the inclusive partitioned top-k40 selector removes the prior sampled overhead cliff |
+| `sampled_topk40` | `qwen3.5:2b` | `243.38` | `207.05` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `3`, and Psionic now leads on the clean sampled row |
+| `sampled_topk40` | `qwen3.5:4b` | `174.98` | `143.75` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `3`, and the clean sampled row is now clearly ahead on Psionic |
+| `sampled_topk40` | `qwen3.5:9b` | `108.37` | `96.68` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `1,3,3`, and Psionic now leads without falling back to dense logits |
 | `sampled_topk100` | `qwen3.5:0.8b` | `446.49` | `326.43` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`12,32,26` vs `20,20,20`) and first divergence starts at token `1,3,4` |
 | `sampled_topk100` | `qwen3.5:2b` | `235.28` | `204.70` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`26,25,33` vs `38,38,38`) and first divergence starts at token `1,4,4` |
 | `sampled_topk100` | `qwen3.5:4b` | `170.96` | `144.39` | `mismatched` | One Psionic repeat hit `max_output_tokens` with malformed continuation (`128,25,34` vs `37,37,37`); the wider bounded lane does not explain the row cleanly |
@@ -169,6 +182,8 @@ Psionic output-mode evidence on this contract:
 - `qwen35_raw_logits=false`
 - Psionic sampled rows rerun after a clean `CARGO_INCREMENTAL=0` rebuild of
   `qwen35_cuda_bench`
+- current canonical rerun after routing `top_k = 40` through the inclusive
+  partitioned one-row CUDA selector instead of the slower generic top-k path
 
 ## Sampled Matrix
 
@@ -181,7 +196,7 @@ Current status:
 - Psionic stays on the bounded sampled lane:
   - `qwen35_output_modes=[top_k_candidates:40]`
   - `qwen35_raw_logits=false`
-- Psionic trails Ollama on all four clean `top_k = 40` rows on this host
+- Psionic now leads Ollama on all four clean `top_k = 40` rows on this host
 
 ## Large-`top_k` Sampled Contract
 

@@ -8,6 +8,15 @@ This audit records the current state of the external qwen35 native-CUDA versus
 Ollama run published from `michellacle/psionic_local` on a constrained laptop
 host and binds that result back to Psionic's current public qwen35 record.
 
+Later on March 28, 2026, current `main` routed the canonical
+`sampled_topk40` contract through the inclusive partitioned one-row CUDA
+selector. A fresh clean RTX 4080 rerun at
+`fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_182857_archlinux-.json`
+restored Psionic's lead on all four clean length-matched sampled rows. This
+audit still explains why Michel's originally published laptop artifact was not
+definitive and why constrained-host reruns should happen only on that later
+change or newer.
+
 Tracked issue:
 
 - `#650` Follow up Michel's RTX 4070 qwen35 run: benchmark-quality closure and
@@ -132,6 +141,13 @@ The most severe mismatch is:
 That row is not an honest throughput comparison.
 
 ### 2. The most informative rows are the clean sampled `top_k = 40` rows
+
+Historical note:
+
+- later the same day, current `main` closed this specific clean-host sampled
+  gap by routing `top_k = 40` through the inclusive partitioned selector
+- this section still describes Michel's originally published laptop artifact,
+  not the later corrected RTX 4080 rerun
 
 Only three rows in the published matrix keep the same output-token count on
 both sides:
