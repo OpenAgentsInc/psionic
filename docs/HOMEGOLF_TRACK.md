@@ -188,9 +188,15 @@ What is true now:
 - the local HOMEGOLF CUDA lane now also has one repo-owned scratch-first
   operator wrapper:
   - `scripts/run-parameter-golf-homegolf-local-cuda.sh`
+- HOMEGOLF local score runs now also have one repo-owned post-closeout prompt
+  watcher:
+  - `scripts/wait-parameter-golf-homegolf-prompt-closeout.sh`
 - that wrapper refuses dirty non-`main` launches by default, can fast-forward
   clean `main`, writes reports and logs under
   `~/scratch/psionic_homegolf_runs/<run_id>`, and keeps `TMPDIR` off `/tmp`
+- the prompt watcher waits for the final training report, then emits one bound
+  text-generation proof from that same retained artifact family without another
+  manual operator step
 - that matters because the latest live `archlinux` rerun attempts exposed
   quota-sensitive failures on the older ad-hoc `/tmp` posture even though the
   reachable local CUDA lane itself is still valid for bounded and long-closeout
