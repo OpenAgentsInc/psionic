@@ -1,0 +1,332 @@
+{
+  "report_kind": "psionic_hermes_backend_benchmark_row",
+  "created_at_utc": "2026-03-28T21:45:40.246796+00:00",
+  "backend_label": "ollama",
+  "base_url": "http://127.0.0.1:11434/v1",
+  "model": "qwen3.5:2b",
+  "model_path": "qwen3.5:2b",
+  "psionic_root": "/home/christopherdavid/scratch/psionic-hermes-benchmark-473c0ad5",
+  "psionic_revision": "473c0ad5bd5219cbcb7f76495d8166933242b872",
+  "hermes_root": "/home/christopherdavid/scratch/hermes-agent-proof2",
+  "hermes_revision": "e295a2215acd55f2ee930fc7a4cd2df1c5464234",
+  "python_executable": "/home/christopherdavid/scratch/hermes-min/.venv/bin/python",
+  "python_version": "3.14.3 (main, Feb 13 2026, 15:31:44) [GCC 15.2.1 20260209]",
+  "host": "archlinux",
+  "cases": [
+    {
+      "case_id": "required_tool_turn",
+      "stage": "tool_loop",
+      "pass": true,
+      "summary": "required tool turn emitted one weather tool call",
+      "wallclock_s": 2.9273656900040805,
+      "first_delta_s": 2.8171800010022707,
+      "completion_tok_s": 48.50777628667297,
+      "usage": {
+        "prompt_tokens": 662,
+        "completion_tokens": 142,
+        "total_tokens": 804
+      },
+      "usage_reports": [
+        {
+          "prompt_tokens": 303,
+          "completion_tokens": 85,
+          "total_tokens": 388
+        },
+        {
+          "prompt_tokens": 359,
+          "completion_tokens": 57,
+          "total_tokens": 416
+        }
+      ],
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_required"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_required"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": false,
+      "failed": false,
+      "final_response": "Paris is currently sunny with a temperature of 18\u00b0C (64\u00b0F).",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the weather tool for Paris."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": "The user wants me to use the weather tool for Paris. I have a function called `get_weather_required` that takes a city parameter and returns current Paris weather information. The city parameter should be \"Paris\" based on the enum values provided.\n\nLet me call this function with the appropriate parameters.",
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "call_viaun8m9",
+              "call_id": "call_viaun8m9",
+              "response_item_id": "fc_viaun8m9",
+              "type": "function",
+              "function": {
+                "name": "get_weather_required",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\", \"temperature_c\": 18}",
+          "tool_call_id": "call_viaun8m9"
+        },
+        {
+          "role": "assistant",
+          "content": "Paris is currently sunny with a temperature of 18\u00b0C (64\u00b0F).",
+          "reasoning": "The user asked me to use the weather tool for Paris. I already called the get_weather_required function and got the result. Now I should present this information clearly to the user.",
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "assistant_tool_names": [
+          "get_weather_required"
+        ]
+      }
+    },
+    {
+      "case_id": "auto_plain_text_turn",
+      "stage": "provider_sanity",
+      "pass": true,
+      "summary": "auto mode answered with plain text and no tool call",
+      "wallclock_s": 0.49223175100632943,
+      "first_delta_s": 0.4290090959984809,
+      "completion_tok_s": 113.76754930073561,
+      "usage": {
+        "prompt_tokens": 314,
+        "completion_tokens": 56,
+        "total_tokens": 370
+      },
+      "usage_reports": [
+        {
+          "prompt_tokens": 314,
+          "completion_tokens": 56,
+          "total_tokens": 370
+        }
+      ],
+      "stream_calls": 1,
+      "request_summaries": [
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_auto"
+          ]
+        }
+      ],
+      "api_calls": 1,
+      "completed": true,
+      "failed": false,
+      "final_response": "Hello! How can I help you today?",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello in one short sentence. Do not use tools."
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! How can I help you today?",
+          "reasoning": "The user is asking me to say hello in a short sentence without using any tools. This is a simple greeting request that doesn't require any tool usage. I should respond directly and concisely as Hermes Agent.",
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "final_text": "Hello! How can I help you today?"
+      }
+    },
+    {
+      "case_id": "multi_turn_tool_loop",
+      "stage": "tool_loop",
+      "pass": true,
+      "summary": "multi-turn tool loop replay reached a final answer",
+      "wallclock_s": 1.7262324029870797,
+      "first_delta_s": 1.5786272650002502,
+      "completion_tok_s": 86.31514490295153,
+      "usage": {
+        "prompt_tokens": 684,
+        "completion_tokens": 149,
+        "total_tokens": 833
+      },
+      "usage_reports": [
+        {
+          "prompt_tokens": 314,
+          "completion_tokens": 71,
+          "total_tokens": 385
+        },
+        {
+          "prompt_tokens": 370,
+          "completion_tokens": 78,
+          "total_tokens": 448
+        }
+      ],
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_loop"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_loop"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": true,
+      "failed": false,
+      "final_response": "Here's the current weather in Paris:\n\n- **Condition**: Sunny\n- **Temperature**: 22\u00b0C",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the weather tool for Paris and then summarize the result."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": "The user wants me to use the weather tool for Paris and then summarize the result. I have a weather tool available that can get the current weather for Paris. Let me call this tool with \"Paris\" as the city parameter.",
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "call_nur4fqp0",
+              "call_id": "call_nur4fqp0",
+              "response_item_id": "fc_nur4fqp0",
+              "type": "function",
+              "function": {
+                "name": "get_weather_loop",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\", \"temperature_c\": 22}",
+          "tool_call_id": "call_nur4fqp0"
+        },
+        {
+          "role": "assistant",
+          "content": "Here's the current weather in Paris:\n\n- **Condition**: Sunny\n- **Temperature**: 22\u00b0C",
+          "reasoning": "The user asked me to use the weather tool for Paris and then summarize the result. I already called the get_weather_loop function with city=\"Paris\" and received the result. Now I need to summarize it clearly and concisely as per my instructions.",
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "final_text": "Here's the current weather in Paris:\n\n- **Condition**: Sunny\n- **Temperature**: 22\u00b0C",
+        "saw_tool_result": true
+      }
+    },
+    {
+      "case_id": "streamed_tool_turn",
+      "stage": "tool_loop",
+      "pass": true,
+      "summary": "streaming chat loop preserved a tool-call turn",
+      "wallclock_s": 1.770982089015888,
+      "first_delta_s": 1.5312646810198203,
+      "completion_tok_s": 92.03932722469091,
+      "usage": {
+        "prompt_tokens": 664,
+        "completion_tokens": 163,
+        "total_tokens": 827
+      },
+      "usage_reports": [
+        {
+          "prompt_tokens": 304,
+          "completion_tokens": 80,
+          "total_tokens": 384
+        },
+        {
+          "prompt_tokens": 360,
+          "completion_tokens": 83,
+          "total_tokens": 443
+        }
+      ],
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_stream"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_stream"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": false,
+      "failed": false,
+      "final_response": "Here's the current weather in Paris:\n\n- **Condition**: Sunny\n- **Temperature**: 21\u00b0C (70\u00b0F)\n\nThe weather looks pleasant for a sunny day!",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the weather tool for Paris."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": "The user wants me to use the weather tool for Paris. I have a function called `get_weather_stream` that takes a city parameter and can get current weather for Paris. This is straightforward - I just need to call this function with \"Paris\" as the city parameter.",
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "call_mlo0xyg1",
+              "call_id": "call_mlo0xyg1",
+              "response_item_id": "fc_mlo0xyg1",
+              "type": "function",
+              "function": {
+                "name": "get_weather_stream",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\", \"temperature_c\": 21}",
+          "tool_call_id": "call_mlo0xyg1"
+        },
+        {
+          "role": "assistant",
+          "content": "Here's the current weather in Paris:\n\n- **Condition**: Sunny\n- **Temperature**: 21\u00b0C (70\u00b0F)\n\nThe weather looks pleasant for a sunny day!",
+          "reasoning": "The user asked me to use the weather tool for Paris. I already called the get_weather_stream function with city=\"Paris\" and received the result. Now I should present this information clearly to the user.",
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "assistant_tool_names": [
+          "get_weather_stream"
+        ]
+      }
+    }
+  ],
+  "overall_pass": true,
+  "passing_case_count": 4,
+  "total_case_count": 4,
+  "mean_case_wallclock_s": 1.7292029832533444,
+  "mean_completion_tok_s": 85.15744942876276
+}

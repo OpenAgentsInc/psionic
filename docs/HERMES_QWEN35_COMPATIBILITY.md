@@ -86,6 +86,9 @@ Both retained rows fail:
 
 - `parallel_tool_turn`
 
+The first same-host backend benchmark now lives in
+`docs/HERMES_BACKEND_BENCHMARK.md`.
+
 ## What The Proof Actually Shows
 
 The retained reports prove the following source-level compatibility work is now
@@ -128,5 +131,6 @@ audit posture implied:
 - source and retained receipts now prove `5/6` Hermes compatibility on exact
   pushed Psionic for local qwen35 rows
 - the remaining blocker is sharply bounded to same-turn parallel tool calling
-- this is enough to justify the next benchmark phase against Ollama and
-  `llama.cpp`, but not enough to claim full Hermes compatibility yet
+- the repo now also has one retained Psionic-versus-Ollama Hermes benchmark on
+  the local `2b` row
+- this is still not enough to claim full Hermes compatibility yet

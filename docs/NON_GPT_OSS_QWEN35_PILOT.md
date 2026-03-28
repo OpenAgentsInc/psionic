@@ -20,6 +20,9 @@ The pilot row is the downloaded artifact at:
 The retained Hermes-on-Psionic `chat.completions` proof now lives in
 `docs/HERMES_QWEN35_COMPATIBILITY.md`.
 
+The first same-host Hermes backend benchmark now lives in
+`docs/HERMES_BACKEND_BENCHMARK.md`.
+
 Current honest status:
 
 - exact pushed Psionic revision `ef5e2cdca840db6b2fc0c871649e6cb4b2af6d30`
