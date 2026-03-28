@@ -63,6 +63,9 @@ As of commit `d0bbea32`, the same runner also:
 - stops any models still loaded in Ollama between rows
 - waits for the GPU to become idle before each Psionic row
 - waits for the GPU to become idle again after each Ollama row
+- forces Psionic qwen35 benchmark requests onto
+  `PrefixCacheMode::Bypass` so the matrix measures the raw prompt and decode
+  lane instead of mixing in shared prefix-cache behavior
 
 That change is benchmark-hygiene, not a throughput claim. It closes a real
 measurement hole that showed up during later sampled follow-up runs.

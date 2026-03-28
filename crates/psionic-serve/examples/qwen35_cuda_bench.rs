@@ -8,7 +8,10 @@ use psionic_models::{
     GgufDecoderAdapterLoader, GgufRuntimeTokenizer, PromptMessage, PromptMessageRole,
     PromptRenderOptions, TokenId, TokenizerBoundary,
 };
-use psionic_runtime::{DEFAULT_PENALTY_LOOKBACK, StructuredOutputRequest, StructuredOutputValue};
+use psionic_runtime::{
+    DEFAULT_PENALTY_LOOKBACK, PrefixCacheControl, PrefixCacheMode, StructuredOutputRequest,
+    StructuredOutputValue,
+};
 use psionic_serve::{
     CudaGgufQwen35TextGenerationService, GenerationOptions, GenerationRequest, GenerationResponse,
     GenerationTerminationCause, Qwen35CudaDecodeOutputMetrics, TerminationReason,
@@ -571,6 +574,10 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
     let mut service = CudaGgufQwen35TextGenerationService::from_gguf_path(&config.model_path)
         .map_err(|error| format!("failed to load qwen35 cuda service: {error}"))?;
     let descriptor = service.model_descriptor().clone();
+    let prefix_cache_bypass = PrefixCacheControl {
+        mode: PrefixCacheMode::Bypass,
+        ..PrefixCacheControl::default()
+    };
 
     let warmup = GenerationRequest::new_text(
         String::from("warmup"),
@@ -582,7 +589,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             min_warmup_tokens(config.max_output_tokens),
             &bench_model.rendered.stop_sequences,
         ),
-    );
+    )
+    .with_prefix_cache_control(prefix_cache_bypass.clone());
     let _ = service
         .generate(&warmup)
         .map_err(|error| format!("warmup generation failed: {error}"))?;
@@ -599,7 +607,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
                 config.max_output_tokens,
                 &bench_model.rendered.stop_sequences,
             ),
-        );
+        )
+        .with_prefix_cache_control(prefix_cache_bypass.clone());
         let response = service
             .generate(&request)
             .map_err(|error| format!("benchmark generation failed: {error}"))?;

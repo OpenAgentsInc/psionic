@@ -92,7 +92,10 @@ than just run tensor math.
   a combined manifest plus row reports that preserve output-token arrays,
   prompt/decode timing, qwen35 output modes, readback bytes, raw-logit
   materialization, termination classification, first-divergence evidence, host
-  power-limit metadata, Psionic commit, and Ollama version.
+  power-limit metadata, Psionic commit, and Ollama version. The same harness
+  now forces Psionic benchmark requests onto `PrefixCacheMode::Bypass` so the
+  canonical matrix measures raw qwen35 prompt and decode throughput instead of
+  unrelated shared prefix-cache behavior.
 - Structured-output throughput is still not part of the canonical
   Psionic-versus-Ollama matrix. On March 28, 2026, after adding leading-char
   token-id buckets to the structured-output append cache, removing per-rule

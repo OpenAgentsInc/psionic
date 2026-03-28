@@ -510,10 +510,49 @@ That experiment was reverted immediately as:
 
 - commit `b8bfc453` `Revert "Fuse qwen35 partitioned top-k remap into merge"`
 
+## Later Follow-On: Benchmark Harness Now Bypasses Shared Prefix Cache
+
+After the later Hermes-driven qwen35 prefix-cache changes landed on `main`,
+the canonical sampled `top_k = 40` row on the clean idle RTX 4080 stopped
+being a stable benchmark input.
+
+On current `main`, a narrowed sanity check at commit `88ebe571` reproduced:
+
+- `sampled_topk40`
+- `qwen3.5:0.8b`
+- idle RTX 4080 host
+- failure: `qwen35 cuda top-k returned a negative token index -1`
+
+The same row immediately recovered once the benchmark harness forced Psionic
+requests onto `PrefixCacheMode::Bypass`.
+
+The clean rerun after that harness change was:
+
+- `qwen3.5:0.8b`
+- `sampled_topk40`
+- `128/128` output tokens
+- bounded-candidate output:
+  - `qwen35_output_modes=[top_k_candidates:40]`
+  - `qwen35_raw_logits=false`
+- Psionic `507.12 tok/s`
+- Ollama `330.42 tok/s`
+
+What this means:
+
+- the raw qwen35 sampled lane was still healthy on the clean host
+- the new instability lived in shared prefix-cache participation, not in the
+  bounded sampled selector itself
+- benchmark requests should bypass shared prefix cache so the matrix keeps
+  measuring prompt and decode throughput instead of unrelated cache behavior
+
+This is a benchmark-discipline fix, not a new throughput claim.
+
 ## Updated Next Steps
 
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
   are measured on a genuinely idle GPU
+- keep benchmark requests on `PrefixCacheMode::Bypass` until the later qwen35
+  shared prefix-cache regression is classified and fixed separately
 - stop spending time on host-side sampler cleanups that only move results by
   noise-level deltas
 - stop spending time on non-partitioned `top_k = 40` crossover tuning on this
