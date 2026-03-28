@@ -190,6 +190,7 @@ fn parse_provider(value: &str) -> Result<RemoteTrainingProvider, Box<dyn std::er
     match value {
         "google_cloud" => Ok(RemoteTrainingProvider::GoogleCloud),
         "run_pod" | "runpod" => Ok(RemoteTrainingProvider::RunPod),
+        "local_hybrid" | "localhybrid" => Ok(RemoteTrainingProvider::LocalHybrid),
         other => Err(format!("unsupported provider `{other}`").into()),
     }
 }
@@ -212,6 +213,7 @@ fn provider_label(provider: RemoteTrainingProvider) -> &'static str {
     match provider {
         RemoteTrainingProvider::GoogleCloud => "google",
         RemoteTrainingProvider::RunPod => "runpod",
+        RemoteTrainingProvider::LocalHybrid => "local_hybrid",
     }
 }
 

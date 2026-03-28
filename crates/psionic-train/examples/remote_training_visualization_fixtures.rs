@@ -1,8 +1,8 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use psionic_train::{
-    sample_google_live_visualization_bundle, sample_google_live_visualization_bundle_v2,
-    sample_google_summary_only_visualization_bundle,
+    build_parameter_golf_homegolf_visualization_bundle_v2, sample_google_live_visualization_bundle,
+    sample_google_live_visualization_bundle_v2, sample_google_summary_only_visualization_bundle,
     sample_google_summary_only_visualization_bundle_v2,
     sample_parameter_golf_distributed_live_visualization_bundle,
     sample_parameter_golf_distributed_live_visualization_bundle_v2,
@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let parameter_golf_live_v2 = sample_parameter_golf_live_visualization_bundle_v2()?;
     let parameter_golf_distributed_v2 =
         sample_parameter_golf_distributed_live_visualization_bundle_v2()?;
+    let parameter_golf_homegolf_v2 = build_parameter_golf_homegolf_visualization_bundle_v2()?;
     let run_index_v2 = sample_remote_training_run_index_v2()?;
 
     fs::write(
@@ -76,6 +77,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         format!(
             "{}\n",
             serde_json::to_string_pretty(&parameter_golf_distributed_v2)?
+        ),
+    )?;
+    fs::write(
+        fixtures_dir.join("parameter_golf_homegolf_remote_training_visualization_bundle_v2.json"),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&parameter_golf_homegolf_v2)?
         ),
     )?;
     fs::write(

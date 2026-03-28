@@ -1276,6 +1276,7 @@ fn parse_provider(
     match value {
         "google_cloud" => Ok(RemoteTrainingProvider::GoogleCloud),
         "run_pod" | "runpod" => Ok(RemoteTrainingProvider::RunPod),
+        "local_hybrid" | "localhybrid" => Ok(RemoteTrainingProvider::LocalHybrid),
         other => Err(
             ParameterGolfSingleH100VisualizationError::UnsupportedProvider {
                 value: other.to_string(),
@@ -1329,6 +1330,7 @@ fn provider_label(provider: RemoteTrainingProvider) -> &'static str {
     match provider {
         RemoteTrainingProvider::GoogleCloud => "google",
         RemoteTrainingProvider::RunPod => "runpod",
+        RemoteTrainingProvider::LocalHybrid => "local_hybrid",
     }
 }
 

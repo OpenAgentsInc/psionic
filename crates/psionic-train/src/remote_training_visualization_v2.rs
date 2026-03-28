@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    sample_google_live_visualization_bundle, sample_google_summary_only_visualization_bundle,
+    build_parameter_golf_homegolf_run_index_entry_v2,
+    build_parameter_golf_homegolf_visualization_bundle_v2, sample_google_live_visualization_bundle,
+    sample_google_summary_only_visualization_bundle,
     sample_parameter_golf_distributed_live_visualization_bundle,
     sample_parameter_golf_live_visualization_bundle, RemoteTrainingDistributedSample,
     RemoteTrainingEventSample, RemoteTrainingGpuSample, RemoteTrainingHeartbeatSample,
@@ -79,6 +81,24 @@ pub enum RemoteTrainingScoreDirectionV2 {
     HigherIsBetter,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoteTrainingScoreCloseoutPostureV2 {
+    ScoreUnavailable,
+    ScoreHeldPendingCloseout,
+    ScoreClosedOut,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RemoteTrainingPromotionGatePostureV2 {
+    NotApplicable,
+    Held,
+    Eligible,
+    Promoted,
+    Refused,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RemoteTrainingTrackSemanticsV2 {
     pub track_family: RemoteTrainingTrackFamilyV2,
@@ -107,6 +127,24 @@ pub struct RemoteTrainingPrimaryScoreV2 {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RemoteTrainingScoreDeltaV2 {
+    pub reference_id: String,
+    pub score_metric_id: String,
+    pub reference_score_value: f64,
+    pub delta_value: f64,
+    pub delta_summary: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RemoteTrainingScoreSurfaceV2 {
+    pub score_closeout_posture: RemoteTrainingScoreCloseoutPostureV2,
+    pub promotion_gate_posture: RemoteTrainingPromotionGatePostureV2,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub delta_rows: Vec<RemoteTrainingScoreDeltaV2>,
+    pub semantic_summary: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RemoteTrainingVisualizationBundleV2 {
     pub schema_version: String,
     pub bundle_id: String,
@@ -118,6 +156,8 @@ pub struct RemoteTrainingVisualizationBundleV2 {
     pub track_semantics: RemoteTrainingTrackSemanticsV2,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_score: Option<RemoteTrainingPrimaryScoreV2>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score_surface: Option<RemoteTrainingScoreSurfaceV2>,
     pub result_classification: RemoteTrainingResultClassification,
     pub refresh_contract: RemoteTrainingRefreshContract,
     pub series_status: RemoteTrainingSeriesStatus,
@@ -146,6 +186,8 @@ pub struct RemoteTrainingRunIndexEntryV2 {
     pub track_semantics: RemoteTrainingTrackSemanticsV2,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_score: Option<RemoteTrainingPrimaryScoreV2>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score_surface: Option<RemoteTrainingScoreSurfaceV2>,
     pub result_classification: RemoteTrainingResultClassification,
     pub series_status: RemoteTrainingSeriesStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -228,6 +270,54 @@ impl RemoteTrainingPrimaryScoreV2 {
     }
 }
 
+impl RemoteTrainingScoreDeltaV2 {
+    fn validate(&self, field_prefix: &str) -> Result<(), RemoteTrainingVisualizationError> {
+        ensure_nonempty(
+            self.reference_id.as_str(),
+            format!("{field_prefix}.reference_id").as_str(),
+        )?;
+        ensure_nonempty(
+            self.score_metric_id.as_str(),
+            format!("{field_prefix}.score_metric_id").as_str(),
+        )?;
+        ensure_nonempty(
+            self.delta_summary.as_str(),
+            format!("{field_prefix}.delta_summary").as_str(),
+        )?;
+        validate_metric(
+            self.reference_score_value as f32,
+            format!("{field_prefix}.reference_score_value").as_str(),
+        )?;
+        if !self.delta_value.is_finite() {
+            return Err(RemoteTrainingVisualizationError::InvalidValue {
+                field: format!("{field_prefix}.delta_value"),
+                detail: String::from("delta_value must be finite"),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl RemoteTrainingScoreSurfaceV2 {
+    fn validate(&self, field_prefix: &str) -> Result<(), RemoteTrainingVisualizationError> {
+        ensure_nonempty(
+            self.semantic_summary.as_str(),
+            format!("{field_prefix}.semantic_summary").as_str(),
+        )?;
+        let mut seen_reference_ids = BTreeSet::new();
+        for (index, delta) in self.delta_rows.iter().enumerate() {
+            delta.validate(format!("{field_prefix}.delta_rows[{index}]").as_str())?;
+            if !seen_reference_ids.insert(delta.reference_id.as_str()) {
+                return Err(RemoteTrainingVisualizationError::DuplicateValue {
+                    field: format!("{field_prefix}.delta_rows.reference_id"),
+                    value: delta.reference_id.clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
 impl RemoteTrainingVisualizationBundleV2 {
     pub fn from_v1_bundle(
         bundle: RemoteTrainingVisualizationBundle,
@@ -244,6 +334,7 @@ impl RemoteTrainingVisualizationBundleV2 {
             repo_revision: bundle.repo_revision,
             track_semantics,
             primary_score,
+            score_surface: None,
             result_classification: bundle.result_classification,
             refresh_contract: bundle.refresh_contract,
             series_status: bundle.series_status,
@@ -312,6 +403,25 @@ impl RemoteTrainingVisualizationBundleV2 {
         if let Some(score) = &self.primary_score {
             score.validate("remote_training_visualization_bundle_v2.primary_score")?;
             if self.track_semantics.score_law_ref.is_none() {
+                return Err(RemoteTrainingVisualizationError::MissingField {
+                    field: String::from(
+                        "remote_training_visualization_bundle_v2.track_semantics.score_law_ref",
+                    ),
+                });
+            }
+        }
+        if let Some(score_surface) = &self.score_surface {
+            score_surface.validate("remote_training_visualization_bundle_v2.score_surface")?;
+            if self.primary_score.is_none() {
+                return Err(RemoteTrainingVisualizationError::MissingField {
+                    field: String::from("remote_training_visualization_bundle_v2.primary_score"),
+                });
+            }
+            if matches!(
+                score_surface.score_closeout_posture,
+                RemoteTrainingScoreCloseoutPostureV2::ScoreClosedOut
+            ) && self.track_semantics.score_law_ref.is_none()
+            {
                 return Err(RemoteTrainingVisualizationError::MissingField {
                     field: String::from(
                         "remote_training_visualization_bundle_v2.track_semantics.score_law_ref",
@@ -446,6 +556,7 @@ impl RemoteTrainingRunIndexEntryV2 {
             repo_revision: entry.repo_revision,
             track_semantics,
             primary_score,
+            score_surface: None,
             result_classification: entry.result_classification,
             series_status: entry.series_status,
             series_unavailable_reason: entry.series_unavailable_reason,
@@ -458,7 +569,7 @@ impl RemoteTrainingRunIndexEntryV2 {
         Ok(entry)
     }
 
-    fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
+    pub(crate) fn validate(&self) -> Result<(), RemoteTrainingVisualizationError> {
         ensure_nonempty(
             self.profile_id.as_str(),
             "remote_training_run_index_v2.entries.profile_id",
@@ -500,6 +611,14 @@ impl RemoteTrainingRunIndexEntryV2 {
                     field: String::from(
                         "remote_training_run_index_v2.entries.track_semantics.score_law_ref",
                     ),
+                });
+            }
+        }
+        if let Some(score_surface) = &self.score_surface {
+            score_surface.validate("remote_training_run_index_v2.entries.score_surface")?;
+            if self.primary_score.is_none() {
+                return Err(RemoteTrainingVisualizationError::MissingField {
+                    field: String::from("remote_training_run_index_v2.entries.primary_score"),
                 });
             }
         }
@@ -697,6 +816,8 @@ pub fn sample_remote_training_run_index_v2(
     let pgolf_v2 = sample_parameter_golf_live_visualization_bundle_v2()?;
     let distributed_v1 = sample_parameter_golf_distributed_live_visualization_bundle()?;
     let distributed_v2 = sample_parameter_golf_distributed_live_visualization_bundle_v2()?;
+    let homegolf_v2 = build_parameter_golf_homegolf_visualization_bundle_v2()
+        .map_err(map_homegolf_visualization_error)?;
 
     build_remote_training_run_index_v2(RemoteTrainingRunIndexV2 {
         schema_version: String::new(),
@@ -791,9 +912,11 @@ pub fn sample_remote_training_run_index_v2(
                 distributed_v2.primary_score.clone(),
                 distributed_v2.track_semantics.semantic_summary.clone(),
             )?,
+            build_parameter_golf_homegolf_run_index_entry_v2(&homegolf_v2)
+                .map_err(map_homegolf_visualization_error)?,
         ],
         detail: String::from(
-            "The v2 run index keeps the shipped v1 discovery substrate readable while adding explicit track family, execution class, proof posture, comparability, and score-law semantics.",
+            "The v2 run index keeps the shipped v1 discovery substrate readable while adding explicit track family, execution class, proof posture, comparability, score-law, and HOMEGOLF score-surface semantics.",
         ),
         index_digest: String::new(),
     })
@@ -803,6 +926,15 @@ fn stable_bundle_v2_digest(bundle: &RemoteTrainingVisualizationBundleV2) -> Stri
     let mut canonical = bundle.clone();
     canonical.bundle_digest.clear();
     stable_digest_v2(b"remote_training_visualization_bundle_v2|", &canonical)
+}
+
+fn map_homegolf_visualization_error(
+    error: crate::ParameterGolfHomegolfVisualizationError,
+) -> RemoteTrainingVisualizationError {
+    RemoteTrainingVisualizationError::InvalidValue {
+        field: String::from("remote_training_run_index_v2.homegolf_entry"),
+        detail: error.to_string(),
+    }
 }
 
 fn stable_run_index_v2_digest(index: &RemoteTrainingRunIndexV2) -> String {

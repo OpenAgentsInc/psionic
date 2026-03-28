@@ -48,6 +48,8 @@ stage-level observability receipts:
 - `fixtures/training_visualization/remote_training_run_index_v2.json` is the
   canonical track-aware run-index example used during the `v1` -> `v2`
   migration window.
+- `fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json`
+  is the canonical HOMEGOLF score-closeout example in the shared `v2` family.
 
 ## What The Receipt Freezes
 

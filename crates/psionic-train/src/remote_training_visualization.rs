@@ -18,6 +18,7 @@ pub const REMOTE_TRAINING_TARGET_UI_UPDATE_INTERVAL_MS: u64 = 1_000;
 pub enum RemoteTrainingProvider {
     GoogleCloud,
     RunPod,
+    LocalHybrid,
 }
 
 /// Artifact-emission mode exposed to the app.

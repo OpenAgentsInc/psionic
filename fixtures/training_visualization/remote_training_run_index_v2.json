@@ -95,8 +95,62 @@
       "bundle_artifact_uri": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
       "bundle_digest": "7569345ac27d8da9627618d2a6d2d9d4ea2e4863890de46f72975c743c0d3d79",
       "semantic_summary": "Distributed PGOLF retains the same non-record track semantics while widening execution class to dense distributed runtime telemetry."
+    },
+    {
+      "provider": "local_hybrid",
+      "profile_id": "parameter_golf.homegolf_mixed_cluster",
+      "lane_id": "parameter_golf.homegolf_clustered_score_surface",
+      "run_id": "psion-xprovider-pretrain-mixed-backend-20260325+parameter-golf-single-h100-trainer",
+      "repo_revision": "fixtures@parameter_golf_homegolf_clustered_run_surface.v1",
+      "track_semantics": {
+        "track_family": "homegolf",
+        "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+        "execution_class": "home_cluster_mixed_device",
+        "comparability_class": "public_baseline_comparable",
+        "proof_posture": "score_closeout_measured",
+        "public_equivalence_class": "public_baseline_comparable_only",
+        "score_law_ref": "docs/HOMEGOLF_TRACK.md",
+        "artifact_cap_bytes": 16000000,
+        "wallclock_cap_seconds": 600,
+        "semantic_summary": "HOMEGOLF binds a mixed-device home-cluster score closeout to the strict 10-minute public comparison law while refusing public-leaderboard equivalence."
+      },
+      "primary_score": {
+        "score_metric_id": "parameter_golf.validation_bits_per_byte",
+        "score_direction": "lower_is_better",
+        "score_unit": "bits_per_byte",
+        "score_value": 6.306931747817168,
+        "score_value_observed_at_ms": 1742910000000,
+        "score_summary": "The retained clustered HOMEGOLF surface carries one closed-out contest-style validation score for the mixed-device lane."
+      },
+      "score_surface": {
+        "score_closeout_posture": "score_closed_out",
+        "promotion_gate_posture": "held",
+        "delta_rows": [
+          {
+            "reference_id": "public_naive_baseline",
+            "score_metric_id": "parameter_golf.validation_bits_per_byte",
+            "reference_score_value": 1.2243657,
+            "delta_value": 5.082566047817168,
+            "delta_summary": "The current HOMEGOLF closeout remains above the public naive baseline by the retained delta value."
+          },
+          {
+            "reference_id": "current_public_leaderboard_best",
+            "score_metric_id": "parameter_golf.validation_bits_per_byte",
+            "reference_score_value": 1.1194,
+            "delta_value": 5.187531747817168,
+            "delta_summary": "The current HOMEGOLF closeout remains above the retained public-best row and therefore cannot claim a beat posture."
+          }
+        ],
+        "semantic_summary": "HOMEGOLF now exposes closed-out score state, retained public-comparison deltas, and a held promotion gate in the shared visualization bundle family."
+      },
+      "result_classification": "completed_success",
+      "series_status": "partial",
+      "series_unavailable_reason": "HOMEGOLF retained score-closeout, runtime, and comparison truth but did not retain one canonical optimizer-step loss curve for the mixed-device closeout lane",
+      "bundle_artifact_uri": "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json",
+      "bundle_digest": "18dc0f1d7bd939aecbe4a175d109ef3fbe3b662d8c0f2c0338dd8cc9b7237463",
+      "semantic_summary": "HOMEGOLF mixed-device score closeout now appears in the shared track-aware training run index with retained score deltas and held promotion posture."
     }
   ],
-  "detail": "The v2 run index keeps the shipped v1 discovery substrate readable while adding explicit track family, execution class, proof posture, comparability, and score-law semantics.",
-  "index_digest": "78bdf816a20a4904964073a9b5014374701e4755e639ac11a7ec8ba903db5bbf"
+  "detail": "The v2 run index keeps the shipped v1 discovery substrate readable while adding explicit track family, execution class, proof posture, comparability, score-law, and HOMEGOLF score-surface semantics.",
+  "index_digest": "df64932a78c1f225e840d06790bb5d64564413b1c50dfeb6d39b1afafbf4a080"
 }

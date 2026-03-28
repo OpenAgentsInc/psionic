@@ -61,7 +61,9 @@ consumes that truth through its own cache, projection, and pane code instead
 of moving renderer semantics into this repo. `v1` remains the shipped live
 substrate. `v2` adds track family, execution class, comparability, proof
 posture, public-equivalence, score-law, and cap semantics needed for
-`HOMEGOLF` and bounded `XTRAIN`.
+`HOMEGOLF` and bounded `XTRAIN`. The `HOMEGOLF` lane now also emits
+score-closeout, retained score-delta, and promotion-gate posture through the
+same `v2` artifact family instead of leaving that state in sidecar reports.
 
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the

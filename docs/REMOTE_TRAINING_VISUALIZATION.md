@@ -37,8 +37,10 @@ Autopilot owns rendering, refresh loops, and pane behavior.
   is the canonical single-node PGOLF `v2` example bundle.
 - `fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json`
   is the canonical distributed PGOLF `v2` example bundle.
+- `fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json`
+  is the canonical HOMEGOLF score-closeout `v2` example bundle.
 - `fixtures/training_visualization/remote_training_run_index_v2.json` is the
-  canonical track-aware run-index example.
+  canonical track-aware run-index example and now includes the HOMEGOLF lane.
 
 The stable schema versions are:
 
@@ -71,6 +73,7 @@ The new `v2` contract adds:
 - `score_law_ref`
 - explicit artifact and wallclock caps when the score law carries them
 - machine-stable primary-score identity when a run already has a retained score
+- optional score-closeout and promotion-gate posture plus retained score deltas
 - concise machine-authored semantic summaries
 
 The `v2` bundle stays machine-first. It does not move pane-local labels or
@@ -155,7 +158,9 @@ Examples:
 - a PGOLF live lane can be `available` with measured runtime truth but no final
   submission score yet
 - a HOMEGOLF lane can carry score-law and cap semantics even when the retained
-  score arrives at closeout rather than during active training
+  score arrives at closeout rather than during active training, and it can
+  surface held promotion posture plus retained public-comparison deltas through
+  the shared `score_surface`
 - a bounded XTRAIN lane can stay explicit about its proof posture instead of
   being mistaken for a public-leaderboard-equivalent contest run
 
