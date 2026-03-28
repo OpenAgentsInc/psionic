@@ -40,8 +40,9 @@ use crate::{
     build_parameter_golf_baseline_training_graph_with_matrix_execution_mode,
     build_tokenizer_digest, builtin_parameter_golf_cuda_training_capability_report,
     device_matches_single_h100, export_parameter_golf_quantized_model_artifact,
-    inspect_local_single_h100_machine, materialize_parameter_golf_baseline_training_gradients,
-    parameter_golf_optimizer_plan, parameter_golf_parameter_values_for_bindings,
+    inspect_local_single_h100_machine_with_thresholds,
+    materialize_parameter_golf_baseline_training_gradients, parameter_golf_optimizer_plan,
+    parameter_golf_parameter_values_for_bindings,
     restore_parameter_golf_model_from_quantized_artifact, training_batch_from_window_tokens,
     ParameterGolfBaselineEvalGraph, ParameterGolfBaselineTrainingGraph, ParameterGolfBatchGeometry,
     ParameterGolfBf16MasterWeightStepReceipt, ParameterGolfFinalArtifactConfig,
@@ -100,6 +101,66 @@ fn default_single_h100_model_config() -> ParameterGolfConfig {
     ParameterGolfSingleH100ModelVariant::default().model_config()
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterGolfSingleDeviceMachineProfile {
+    #[default]
+    SingleH100,
+    HomegolfLocalCuda,
+}
+
+impl ParameterGolfSingleDeviceMachineProfile {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SingleH100 => "single_h100",
+            Self::HomegolfLocalCuda => "homegolf_local_cuda",
+        }
+    }
+
+    #[must_use]
+    pub fn machine_thresholds(self) -> ParameterGolfSingleH100ChallengeThresholds {
+        match self {
+            Self::SingleH100 => ParameterGolfSingleH100ChallengeThresholds::challenge_h100(),
+            Self::HomegolfLocalCuda => {
+                ParameterGolfSingleH100ChallengeThresholds::homegolf_local_cuda()
+            }
+        }
+    }
+
+    #[must_use]
+    const fn execution_summary_label(self) -> &'static str {
+        match self {
+            Self::SingleH100 => "single-H100",
+            Self::HomegolfLocalCuda => "HOMEGOLF local-CUDA single-device",
+        }
+    }
+
+    #[must_use]
+    const fn claim_boundary(self) -> &'static str {
+        match self {
+            Self::SingleH100 => {
+                "bounded_single_h100_accelerated_trainer; challenge geometry and optimizer contract are real, but this report does not claim 8xH100, record-track, or challenge-speed closure"
+            }
+            Self::HomegolfLocalCuda => {
+                "homegolf_local_cuda_single_device_accelerated_trainer; challenge geometry, exact FineWeb/SP1024 data, and contest-style final scoring are real, but this report claims one HOMEGOLF local-CUDA 10-minute run rather than public single-H100, 8xH100, or leaderboard-equivalent closure"
+            }
+        }
+    }
+
+    #[must_use]
+    const fn refusal_claim_boundary(self) -> &'static str {
+        match self {
+            Self::SingleH100 => {
+                "single_h100_accelerated_trainer_refusal; dataset and model contracts are bound, but no training artifact is claimed when machine or CUDA blocker admission fails"
+            }
+            Self::HomegolfLocalCuda => {
+                "homegolf_local_cuda_single_device_refusal; dataset and model contracts are bound, but no HOMEGOLF local-CUDA training artifact is claimed when machine or CUDA blocker admission fails"
+            }
+        }
+    }
+}
+
 /// Config for the bounded Rust-owned single-H100 Parameter Golf trainer lane.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParameterGolfSingleH100TrainingConfig {
@@ -116,6 +177,9 @@ pub struct ParameterGolfSingleH100TrainingConfig {
     /// Explicit model family variant surfaced into the exact HOMEGOLF lane.
     #[serde(default)]
     pub model_variant: ParameterGolfSingleH100ModelVariant,
+    /// Explicit machine-admission profile for this single-device trainer run.
+    #[serde(default)]
+    pub machine_profile: ParameterGolfSingleDeviceMachineProfile,
     /// Exact model config for this trainer execution.
     #[serde(default = "default_single_h100_model_config")]
     pub model_config: ParameterGolfConfig,
@@ -178,6 +242,7 @@ impl ParameterGolfSingleH100TrainingConfig {
             ),
             variant: String::from(PARAMETER_GOLF_SINGLE_H100_VARIANT),
             model_variant: ParameterGolfSingleH100ModelVariant::BaselineSp1024_9x512,
+            machine_profile: ParameterGolfSingleDeviceMachineProfile::SingleH100,
             model_config: ParameterGolfConfig::baseline_sp1024_9x512(),
             geometry: ParameterGolfBatchGeometry::challenge_single_device_defaults(),
             max_steps: hyperparameters.iterations,
@@ -243,6 +308,27 @@ impl ParameterGolfSingleH100TrainingConfig {
         });
         config.final_model_surface = ParameterGolfFinalModelSurface::Swa;
         config.final_artifact_config = ParameterGolfFinalArtifactConfig::competitive_defaults();
+        config
+    }
+
+    #[must_use]
+    pub fn challenge_homegolf_local_cuda_defaults(
+        dataset_root: impl Into<PathBuf>,
+        tokenizer_path: impl Into<PathBuf>,
+    ) -> Self {
+        let mut config = Self::challenge_defaults(dataset_root, tokenizer_path);
+        config.machine_profile = ParameterGolfSingleDeviceMachineProfile::HomegolfLocalCuda;
+        config
+    }
+
+    #[must_use]
+    pub fn challenge_competitive_homegolf_v1_local_cuda_defaults(
+        dataset_root: impl Into<PathBuf>,
+        tokenizer_path: impl Into<PathBuf>,
+    ) -> Self {
+        let mut config =
+            Self::challenge_competitive_homegolf_v1_defaults(dataset_root, tokenizer_path);
+        config.machine_profile = ParameterGolfSingleDeviceMachineProfile::HomegolfLocalCuda;
         config
     }
 
@@ -1162,6 +1248,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub baseline_model_revision: String,
     #[serde(default)]
     pub model_variant: ParameterGolfSingleH100ModelVariant,
+    #[serde(default)]
+    pub machine_profile: ParameterGolfSingleDeviceMachineProfile,
     #[serde(default = "default_single_h100_model_config")]
     pub model_config: ParameterGolfConfig,
     pub baseline_model_descriptor_digest: String,
@@ -1184,6 +1272,8 @@ pub struct ParameterGolfSingleH100TrainingReport {
     pub compressed_model_bytes: Option<u64>,
     pub compressed_model_artifact_ref: Option<String>,
     pub compressed_model_artifact_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compressed_model_artifact_path: Option<String>,
     pub step_metrics: Vec<ParameterGolfSingleH100TrainingStepMetrics>,
     pub aggregate_phase_timings: Option<ParameterGolfSingleH100PhaseTimings>,
     pub final_training_cursor: Option<ParameterGolfTokenStreamCursor>,
@@ -1203,6 +1293,12 @@ impl ParameterGolfSingleH100TrainingReport {
     pub fn training_executed(&self) -> bool {
         self.disposition == ParameterGolfSingleH100TrainingDisposition::TrainingExecuted
     }
+}
+
+#[derive(Debug)]
+struct ParameterGolfPersistedArtifactOutput {
+    path: PathBuf,
+    bytes: Vec<u8>,
 }
 
 /// Config for a bounded same-node validation-runtime comparison.
@@ -1717,10 +1813,21 @@ pub fn write_parameter_golf_single_h100_training_report(
     output_path: &Path,
     config: &ParameterGolfSingleH100TrainingConfig,
 ) -> Result<ParameterGolfSingleH100TrainingReport, ParameterGolfSingleH100TrainingError> {
-    let (report, mut live_visualization_writer) =
+    let (mut report, persisted_artifact, mut live_visualization_writer) =
         build_parameter_golf_single_h100_training_report_inner(config, Some(output_path))?;
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
+    }
+    if let Some(persisted_artifact) = persisted_artifact {
+        if let Some(parent) = persisted_artifact.path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&persisted_artifact.path, persisted_artifact.bytes)?;
+        report.compressed_model_artifact_path = Some(persisted_artifact.path.display().to_string());
+        report.report_digest = stable_digest(
+            b"psionic_parameter_golf_single_h100_training_report|",
+            &report_without_digest(&report),
+        );
     }
     let encoded = serde_json::to_vec_pretty(&report).map_err(|error| {
         ParameterGolfSingleH100TrainingError::Serialization {
@@ -1801,7 +1908,9 @@ pub fn build_parameter_golf_single_h100_validation_runtime_comparison_receipt(
     let byte_luts =
         parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(&config.tokenizer_path)?;
     let model = ParameterGolfReferenceModel::baseline_fixture(Default::default())?;
-    let machine_observation = inspect_local_single_h100_machine();
+    let machine_observation = inspect_local_single_h100_machine_with_thresholds(
+        ParameterGolfSingleH100ChallengeThresholds::challenge_h100(),
+    );
     let mut legacy_graph_cache = BTreeMap::new();
     let mut device_resident_graph_cache = BTreeMap::new();
     let mut cuda_backend = CudaBackend::new();
@@ -1895,7 +2004,7 @@ pub fn build_parameter_golf_single_h100_validation_runtime_comparison_receipt(
 pub fn build_parameter_golf_single_h100_training_report(
     config: &ParameterGolfSingleH100TrainingConfig,
 ) -> Result<ParameterGolfSingleH100TrainingReport, ParameterGolfSingleH100TrainingError> {
-    let (report, _) = build_parameter_golf_single_h100_training_report_inner(config, None)?;
+    let (report, _, _) = build_parameter_golf_single_h100_training_report_inner(config, None)?;
     Ok(report)
 }
 
@@ -1925,6 +2034,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
 ) -> Result<
     (
         ParameterGolfSingleH100TrainingReport,
+        Option<ParameterGolfPersistedArtifactOutput>,
         Option<crate::ParameterGolfSingleH100LiveVisualizationWriter>,
     ),
     ParameterGolfSingleH100TrainingError,
@@ -1940,7 +2050,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
         config.tokenizer_path.display().to_string(),
         None,
     )?;
-    let machine_observation = inspect_local_single_h100_machine();
+    let machine_observation = inspect_local_single_h100_machine_with_thresholds(
+        config.machine_profile.machine_thresholds(),
+    );
     let initial_model =
         parameter_golf_single_h100_model_from_config(&config.model_config, config.model_variant)?;
     let runtime_descriptor = initial_model.banked_descriptor()?;
@@ -1967,10 +2079,12 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 ParameterGolfSingleH100TrainingDisposition::RefusedMachineContract,
                 machine_observation.refusal.clone(),
                 started_at_ms,
-                String::from(
-                    "The Rust-owned single-H100 trainer path is now implemented, but this run still refused because the local machine contract does not satisfy the non-MIG H100 requirement.",
+                format!(
+                    "The Rust-owned {} trainer path is now implemented, but this run still refused because the local machine contract does not satisfy the declared CUDA admission thresholds.",
+                    config.machine_profile.execution_summary_label()
                 ),
             ),
+            None,
             None,
         ));
     }
@@ -1992,17 +2106,20 @@ fn build_parameter_golf_single_h100_training_report_inner(
                         PsionicRefusalCode::UnsupportedBackendCapability,
                         PsionicRefusalScope::Runtime,
                         format!(
-                            "single-H100 trainer requires an empty Parameter Golf CUDA blocker list, found {:?}",
+                            "{} trainer requires an empty Parameter Golf CUDA blocker list, found {:?}",
+                            config.machine_profile.execution_summary_label(),
                             capability_report.challenge_kernel_blockers()
                         ),
                     )
                     .with_subject(String::from("parameter_golf_single_h100_cuda_blockers")),
                 ),
                 started_at_ms,
-                String::from(
-                    "The Rust-owned single-H100 trainer path refuses explicitly when the committed Parameter Golf CUDA capability report still carries challenge blockers.",
+                format!(
+                    "The Rust-owned {} trainer path refuses explicitly when the committed Parameter Golf CUDA capability report still carries challenge blockers.",
+                    config.machine_profile.execution_summary_label()
                 ),
             ),
+            None,
             None,
         ));
     }
@@ -2027,8 +2144,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
     };
 
     emit_progress_line(format!(
-        "single_h100_train_start run_id={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} validation_eval_mode={} validation_batch_sequences={} matrix_execution_mode={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
+        "single_device_train_start run_id={} machine_profile={} device={} max_steps={} iterations={} warmup_steps={} grad_accum_steps={} val_loss_every={} train_log_every={} final_validation_mode={} validation_eval_mode={} validation_batch_sequences={} matrix_execution_mode={} local_train_sequences={} local_validation_sequences={} max_wallclock_seconds={}",
         config.run_id,
+        config.machine_profile.as_str(),
         selected_device.device_name.as_deref().unwrap_or("unknown"),
         config.max_steps,
         config.hyperparameters.iterations,
@@ -2048,7 +2166,10 @@ fn build_parameter_golf_single_h100_training_report_inner(
         writer.record_phase(
             "training",
             Some(String::from("warmup")),
-            "The single-H100 trainer started and entered warmup or measured training.",
+            format!(
+                "The {} trainer started and entered warmup or measured training.",
+                config.machine_profile.execution_summary_label()
+            ),
             vec![String::from("dataloader"), String::from("trainer_boot")],
             None,
             None,
@@ -2646,7 +2767,8 @@ fn build_parameter_golf_single_h100_training_report_inner(
         }
     };
     let summary = format!(
-        "The Rust-owned single-H100 trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, validation_eval_mode={}, validation_batch_sequences={}, matrix_execution_mode={}, and final_model_surface={}, {} before stopping via {:?}.",
+        "The Rust-owned {} trainer executed {} optimizer step(s) with challenge single-device geometry on CUDA, used the widened train_gpt.py-style warmup, validation, and wallclock-stop control loop, ran with final_validation_mode={}, validation_eval_mode={}, validation_batch_sequences={}, matrix_execution_mode={}, and final_model_surface={}, {} before stopping via {:?}.",
+        config.machine_profile.execution_summary_label(),
         step,
         config.final_validation_mode.as_str(),
         config.validation_eval_mode.as_str(),
@@ -2699,6 +2821,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         baseline_model_id: String::from(PARAMETER_GOLF_BASELINE_MODEL_ID),
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
         model_variant: config.model_variant,
+        machine_profile: config.machine_profile,
         model_config: config.model_config.clone(),
         baseline_model_descriptor_digest: final_model.descriptor().stable_digest(),
         optimizer_plan_digest,
@@ -2718,6 +2841,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
         compressed_model_bytes: Some(compressed_model_artifact.bytes.len() as u64),
         compressed_model_artifact_ref: Some(compressed_model_artifact.artifact_ref.clone()),
         compressed_model_artifact_digest: Some(compressed_model_artifact.artifact_digest.clone()),
+        compressed_model_artifact_path: output_path
+            .map(persisted_artifact_output_path)
+            .map(|path| path.display().to_string()),
         step_metrics,
         aggregate_phase_timings: Some(aggregate_phase_timings),
         final_training_cursor: Some(cursor),
@@ -2726,9 +2852,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         observed_wallclock_ms,
         disposition: ParameterGolfSingleH100TrainingDisposition::TrainingExecuted,
         refusal: None,
-        claim_boundary: String::from(
-            "bounded_single_h100_accelerated_trainer; challenge geometry and optimizer contract are real, but this report does not claim 8xH100, record-track, or challenge-speed closure",
-        ),
+        claim_boundary: String::from(config.machine_profile.claim_boundary()),
         summary,
         report_digest: String::new(),
     };
@@ -2736,7 +2860,14 @@ fn build_parameter_golf_single_h100_training_report_inner(
         b"psionic_parameter_golf_single_h100_training_report|",
         &report_without_digest(&report),
     );
-    Ok((report, live_visualization_writer))
+    Ok((
+        report,
+        output_path.map(|path| ParameterGolfPersistedArtifactOutput {
+            path: persisted_artifact_output_path(path),
+            bytes: compressed_model_artifact.bytes,
+        }),
+        live_visualization_writer,
+    ))
 }
 
 fn refusal_report(
@@ -2795,6 +2926,7 @@ fn refusal_report(
         matching_h100_device_count: machine_observation.matching_h100_device_count,
         machine_contract_satisfied: machine_observation.machine_contract_satisfied,
         model_variant: config.model_variant,
+        machine_profile: config.machine_profile,
         model_config: config.model_config.clone(),
         baseline_model_id: String::from(PARAMETER_GOLF_BASELINE_MODEL_ID),
         baseline_model_revision: String::from(PARAMETER_GOLF_BASELINE_REVISION),
@@ -2816,6 +2948,7 @@ fn refusal_report(
         compressed_model_bytes: None,
         compressed_model_artifact_ref: None,
         compressed_model_artifact_digest: None,
+        compressed_model_artifact_path: None,
         step_metrics: Vec::new(),
         aggregate_phase_timings: None,
         final_training_cursor: None,
@@ -2824,9 +2957,7 @@ fn refusal_report(
         observed_wallclock_ms: finished_at_ms.saturating_sub(started_at_ms),
         disposition,
         refusal,
-        claim_boundary: String::from(
-            "single_h100_accelerated_trainer_refusal; dataset and model contracts are bound, but no training artifact is claimed when machine or CUDA blocker admission fails",
-        ),
+        claim_boundary: String::from(config.machine_profile.refusal_claim_boundary()),
         summary,
         report_digest: String::new(),
     };
@@ -2835,6 +2966,14 @@ fn refusal_report(
         &report_without_digest(&report),
     );
     report
+}
+
+fn persisted_artifact_output_path(report_path: &Path) -> PathBuf {
+    let stem = report_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("parameter_golf_single_device_training");
+    report_path.with_file_name(format!("{stem}.final_model.st"))
 }
 
 pub(crate) fn seed_parameter_states(

@@ -8,15 +8,16 @@ use std::{
 use psionic_backend_cuda::CudaBackend;
 use psionic_core::{DeviceKind, PsionicRefusal};
 use psionic_data::{
-    DatasetIterationMode, DatasetKey, PARAMETER_GOLF_TRAIN_SPLIT_NAME, ParameterGolfDataError,
-    ParameterGolfTokenStreamContract, ParameterGolfTokenStreamCursor, TokenizerDigest,
-    TokenizerFamily, materialize_parameter_golf_token_window,
-    parameter_golf_dataset_bundle_from_local_dir,
+    materialize_parameter_golf_token_window, parameter_golf_dataset_bundle_from_local_dir,
+    DatasetIterationMode, DatasetKey, ParameterGolfDataError, ParameterGolfTokenStreamContract,
+    ParameterGolfTokenStreamCursor, TokenizerDigest, TokenizerFamily,
+    PARAMETER_GOLF_TRAIN_SPLIT_NAME,
 };
 use psionic_ir::GraphError;
 use psionic_models::{
-    PARAMETER_GOLF_BASELINE_MODEL_ID, PARAMETER_GOLF_BASELINE_REVISION, ParameterGolfConfig,
-    ParameterGolfExecutionError, ParameterGolfModelError, ParameterGolfReferenceModel,
+    ParameterGolfConfig, ParameterGolfExecutionError, ParameterGolfModelError,
+    ParameterGolfReferenceModel, PARAMETER_GOLF_BASELINE_MODEL_ID,
+    PARAMETER_GOLF_BASELINE_REVISION,
 };
 use psionic_runtime::{DeviceDescriptor, HealthStatus, RuntimeHealth};
 use serde::{Deserialize, Serialize};
@@ -25,9 +26,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    builtin_parameter_golf_cuda_training_capability_report, parameter_golf_optimizer_plan,
     ParameterGolfBatchGeometry, ParameterGolfCudaTrainingCapabilityReport, ParameterGolfTrainError,
-    ParameterGolfTrainingHyperparameters, builtin_parameter_golf_cuda_training_capability_report,
-    parameter_golf_optimizer_plan,
+    ParameterGolfTrainingHyperparameters,
 };
 
 /// Stable dataset reference for the public single-H100 Parameter Golf bring-up lane.
@@ -59,6 +60,17 @@ impl ParameterGolfSingleH100ChallengeThresholds {
         Self {
             required_backend: String::from("cuda"),
             required_device_name: String::from("H100"),
+            minimum_matching_device_count: 1,
+            require_non_mig: true,
+        }
+    }
+
+    /// Returns the HOMEGOLF local-CUDA single-device thresholds.
+    #[must_use]
+    pub fn homegolf_local_cuda() -> Self {
+        Self {
+            required_backend: String::from("cuda"),
+            required_device_name: String::new(),
             minimum_matching_device_count: 1,
             require_non_mig: true,
         }
@@ -692,7 +704,14 @@ pub(crate) struct ParameterGolfSingleH100MachineObservation {
 }
 
 pub(crate) fn inspect_local_single_h100_machine() -> ParameterGolfSingleH100MachineObservation {
-    let thresholds = ParameterGolfSingleH100ChallengeThresholds::challenge_h100();
+    inspect_local_single_h100_machine_with_thresholds(
+        ParameterGolfSingleH100ChallengeThresholds::challenge_h100(),
+    )
+}
+
+pub(crate) fn inspect_local_single_h100_machine_with_thresholds(
+    thresholds: ParameterGolfSingleH100ChallengeThresholds,
+) -> ParameterGolfSingleH100MachineObservation {
     let backend = CudaBackend::new();
     match backend.discovery_report() {
         Ok(report) => {
@@ -778,10 +797,11 @@ pub(crate) fn device_matches_single_h100(
     if device.backend != thresholds.required_backend || device.device.kind() != DeviceKind::Cuda {
         return false;
     }
-    let name_matches = device
-        .device_name
-        .as_deref()
-        .is_some_and(|name| name.contains(thresholds.required_device_name.as_str()));
+    let name_matches = thresholds.required_device_name.is_empty()
+        || device
+            .device_name
+            .as_deref()
+            .is_some_and(|name| name.contains(thresholds.required_device_name.as_str()));
     if !name_matches {
         return false;
     }
@@ -850,12 +870,12 @@ mod tests {
     };
 
     use super::{
-        PARAMETER_GOLF_SINGLE_H100_DATASET_REF, PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
-        ParameterGolfSingleH100BringupConfig, ParameterGolfSingleH100BringupDisposition,
-        ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100ExecutionPosture,
         bounded_reference_loss_probe_batch, build_parameter_golf_single_h100_bringup_report,
         device_matches_single_h100, machine_observation_from_inventory,
         training_batch_from_window_tokens, write_parameter_golf_single_h100_bringup_report,
+        ParameterGolfSingleH100BringupConfig, ParameterGolfSingleH100BringupDisposition,
+        ParameterGolfSingleH100ChallengeThresholds, ParameterGolfSingleH100ExecutionPosture,
+        PARAMETER_GOLF_SINGLE_H100_DATASET_REF, PARAMETER_GOLF_SINGLE_H100_DATASET_VERSION,
     };
     use crate::ParameterGolfBatchGeometry;
 
@@ -917,8 +937,8 @@ mod tests {
     }
 
     #[test]
-    fn single_h100_bringup_report_surfaces_dataset_and_current_readiness_posture()
-    -> Result<(), Box<dyn Error>> {
+    fn single_h100_bringup_report_surfaces_dataset_and_current_readiness_posture(
+    ) -> Result<(), Box<dyn Error>> {
         let dataset = sample_dataset_root();
         let tokenizer_path = dataset.path.join("fineweb_1024_bpe.model");
         fs::write(&tokenizer_path, b"sentencepiece-placeholder")?;
@@ -972,13 +992,11 @@ mod tests {
                 ParameterGolfSingleH100BringupDisposition::RefusedMachineContract
             );
             assert!(report.refusal.is_some());
-            assert!(
-                report
-                    .refusal
-                    .as_ref()
-                    .is_some_and(|refusal| refusal.subject.as_deref()
-                        == Some("parameter_golf_single_h100_machine"))
-            );
+            assert!(report
+                .refusal
+                .as_ref()
+                .is_some_and(|refusal| refusal.subject.as_deref()
+                    == Some("parameter_golf_single_h100_machine")));
             assert!(!report.ready_to_attempt());
         }
         assert!(report.observed_wallclock_ms > 0);
@@ -986,12 +1004,10 @@ mod tests {
         assert!(report.final_val_loss.is_none());
         assert!(report.final_val_bpb.is_none());
         assert!(report.compressed_model_bytes.is_none());
-        assert!(
-            report
-                .drift_notes
-                .iter()
-                .any(|note| note.contains("does not yet execute the real baseline training loop"))
-        );
+        assert!(report
+            .drift_notes
+            .iter()
+            .any(|note| note.contains("does not yet execute the real baseline training loop")));
         assert_eq!(report.baseline_model_config.vocab_size, 1024);
         assert_eq!(report.geometry, config.geometry);
         assert_eq!(report.hyperparameters, config.hyperparameters);
@@ -1000,8 +1016,8 @@ mod tests {
     }
 
     #[test]
-    fn single_h100_bringup_report_writer_persists_machine_readable_json()
-    -> Result<(), Box<dyn Error>> {
+    fn single_h100_bringup_report_writer_persists_machine_readable_json(
+    ) -> Result<(), Box<dyn Error>> {
         let dataset = sample_dataset_root();
         let tokenizer_path = dataset.path.join("fineweb_1024_bpe.model");
         fs::write(&tokenizer_path, b"sentencepiece-placeholder")?;

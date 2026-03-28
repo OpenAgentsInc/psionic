@@ -1563,6 +1563,7 @@ mod tests {
             matching_h100_device_count: 1,
             machine_contract_satisfied: true,
             model_variant: crate::ParameterGolfSingleH100ModelVariant::BaselineSp1024_9x512,
+            machine_profile: crate::ParameterGolfSingleDeviceMachineProfile::SingleH100,
             model_config: psionic_models::ParameterGolfConfig::baseline_sp1024_9x512(),
             baseline_model_id: String::from("parameter-golf"),
             baseline_model_revision: String::from("rev"),
@@ -1644,6 +1645,9 @@ mod tests {
             compressed_model_bytes: Some(78_000),
             compressed_model_artifact_ref: Some(String::from("artifact://compressed-model")),
             compressed_model_artifact_digest: Some(String::from("artifact-digest")),
+            compressed_model_artifact_path: Some(String::from(
+                "/tmp/parameter_golf_run.final_model.st",
+            )),
             step_metrics: vec![
                 ParameterGolfSingleH100TrainingStepMetrics {
                     global_step: 1,

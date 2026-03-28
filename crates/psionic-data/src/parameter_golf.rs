@@ -10,7 +10,7 @@ use psionic_datastream::{
     DatastreamEncoding, DatastreamManifest, DatastreamManifestRef, DatastreamSubjectKind,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -625,14 +625,15 @@ impl ParameterGolfSentencePieceByteLuts {
 /// Builds the canonical Parameter Golf SentencePiece byte-accounting LUTs from
 /// one explicit `.vocab` artifact emitted beside the challenge tokenizer
 /// model.
-pub fn parameter_golf_sentencepiece_byte_luts_from_vocab_path(
+pub fn parameter_golf_sentencepiece_entries_from_vocab_path(
     vocab_path: impl AsRef<Path>,
-) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+) -> Result<Vec<ParameterGolfSentencePieceTokenEntry>, ParameterGolfDataError> {
     let vocab_path = vocab_path.as_ref();
-    let vocab_text = fs::read_to_string(vocab_path).map_err(|error| ParameterGolfDataError::Io {
-        path: vocab_path.display().to_string(),
-        detail: error.to_string(),
-    })?;
+    let vocab_text =
+        fs::read_to_string(vocab_path).map_err(|error| ParameterGolfDataError::Io {
+            path: vocab_path.display().to_string(),
+            detail: error.to_string(),
+        })?;
     let mut entries = Vec::new();
     for (line_index, line) in vocab_text.lines().enumerate() {
         let piece = line
@@ -649,14 +650,14 @@ pub fn parameter_golf_sentencepiece_byte_luts_from_vocab_path(
             sentencepiece_token_kind_from_vocab_piece(piece),
         ));
     }
-    ParameterGolfSentencePieceByteLuts::build(entries.len(), entries.as_slice())
+    Ok(entries)
 }
 
-/// Builds the canonical Parameter Golf SentencePiece byte-accounting LUTs from
-/// the sibling `.vocab` artifact beside one tokenizer `.model` path.
-pub fn parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(
+/// Loads the canonical Parameter Golf SentencePiece token entries from the
+/// sibling `.vocab` artifact beside one tokenizer `.model` path.
+pub fn parameter_golf_sentencepiece_entries_from_tokenizer_path(
     tokenizer_path: impl AsRef<Path>,
-) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+) -> Result<Vec<ParameterGolfSentencePieceTokenEntry>, ParameterGolfDataError> {
     let tokenizer_path = tokenizer_path.as_ref();
     let mut vocab_path = tokenizer_path.to_path_buf();
     vocab_path.set_extension("vocab");
@@ -666,7 +667,26 @@ pub fn parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(
             vocab_path: vocab_path.display().to_string(),
         });
     }
-    parameter_golf_sentencepiece_byte_luts_from_vocab_path(vocab_path)
+    parameter_golf_sentencepiece_entries_from_vocab_path(vocab_path)
+}
+
+/// Builds the canonical Parameter Golf SentencePiece byte-accounting LUTs from
+/// one explicit `.vocab` artifact emitted beside the challenge tokenizer
+/// model.
+pub fn parameter_golf_sentencepiece_byte_luts_from_vocab_path(
+    vocab_path: impl AsRef<Path>,
+) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+    let entries = parameter_golf_sentencepiece_entries_from_vocab_path(vocab_path)?;
+    ParameterGolfSentencePieceByteLuts::build(entries.len(), entries.as_slice())
+}
+
+/// Builds the canonical Parameter Golf SentencePiece byte-accounting LUTs from
+/// the sibling `.vocab` artifact beside one tokenizer `.model` path.
+pub fn parameter_golf_sentencepiece_byte_luts_from_tokenizer_path(
+    tokenizer_path: impl AsRef<Path>,
+) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+    let entries = parameter_golf_sentencepiece_entries_from_tokenizer_path(tokenizer_path)?;
+    ParameterGolfSentencePieceByteLuts::build(entries.len(), entries.as_slice())
 }
 
 #[derive(Deserialize)]
@@ -683,8 +703,8 @@ struct BuiltinParameterGolfSentencePieceEntry {
 
 /// Returns the canonical Parameter Golf SentencePiece byte-accounting LUTs from
 /// the frozen oracle parity fixture shipped in this repo.
-pub fn builtin_parameter_golf_sentencepiece_byte_luts()
--> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
+pub fn builtin_parameter_golf_sentencepiece_byte_luts(
+) -> Result<ParameterGolfSentencePieceByteLuts, ParameterGolfDataError> {
     let fixture: BuiltinParameterGolfOracleParityFixture = serde_json::from_str(include_str!(
         "../../../fixtures/parameter_golf/parity/parameter_golf_oracle_parity_fixture.json"
     ))
@@ -1119,7 +1139,9 @@ pub enum ParameterGolfDataError {
         expected: u32,
         actual: u32,
     },
-    #[error("parameter golf requested {requested} train shards but only {available} are available")]
+    #[error(
+        "parameter golf requested {requested} train shards but only {available} are available"
+    )]
     InvalidTrainShardLimit { requested: usize, available: usize },
     #[error("parameter golf token window size must be greater than zero")]
     InvalidTokenWindowSize,
