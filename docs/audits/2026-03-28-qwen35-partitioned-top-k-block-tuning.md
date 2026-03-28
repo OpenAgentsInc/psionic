@@ -324,9 +324,142 @@ Interpretation:
 
 ## Next Steps
 
-- move one layer lower than sampler ordering and reduce the host-side top-k
-  parse/copy overhead in the bounded candidate lane
-- target the extra host copies between CUDA pinned buffers, temporary byte
-  vectors, parsed top-k vectors, and the runtime sampler scratch buffers
+## Later Follow-On: Host-Buffer Cleanup Stayed Flat
+
+The next sampled follow-on tried to remove host-side heap materialization in the
+bounded candidate path.
+
+That code landed briefly as:
+
+- commit `44b88722` `Avoid heap top-k materialization in qwen35`
+
+The clean narrowed rerun on the idle RTX 4080 host was:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_214441_archlinux-.json`
+
+Scope:
+
+- models `qwen3.5:0.8b`, `qwen3.5:2b`, `qwen3.5:4b`
+- contracts `sampled_topk40` and `sampled_topk100`
+- `repeats = 3`
+
+Relative to the prior clean sampled baseline from `20260328_210428`, the
+observed deltas were effectively noise:
+
+### `sampled_topk40` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta |
+| --- | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `505.33` | `506.21` | `+0.17%` |
+| `qwen3.5:2b` | `252.94` | `253.10` | `+0.06%` |
+| `qwen3.5:4b` | `179.42` | `179.59` | `+0.10%` |
+
+### `sampled_topk100` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta |
+| --- | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `501.50` | `501.99` | `+0.10%` |
+| `qwen3.5:2b` | `250.76` | `250.83` | `+0.03%` |
+| `qwen3.5:4b` | `178.31` | `178.49` | `+0.10%` |
+
+This did not justify a new canonical checkpoint.
+
+One useful quality finding still came out of that pass:
+
+- the matrix runner's Ollama cleanup loop was leaking a global `model`
+  variable
+- that bug blanked the `model` field in some narrowed JSON artifacts
+- the runner now scopes that cleanup variable correctly so later matrices keep
+  stable model labels again
+
+## Later Follow-On: Presorted Sampler Fast Path Also Stayed Flat
+
+The next sampled follow-on tried to bypass more runtime sampler work for the
+presorted bounded-candidate path.
+
+That experiment was benchmarked as:
+
+- commit `da70c423` `Fast-path qwen35 presorted candidate sampling`
+
+The clean narrowed rerun on the idle RTX 4080 host was:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_215855_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_215855_archlinux-/one_page_summary.md`
+
+Relative to the same `20260328_210428` sampled baseline:
+
+### `sampled_topk40` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `505.33` | `506.50` | `+0.23%` | `336.85` |
+| `qwen3.5:2b` | `252.94` | `253.06` | `+0.05%` | `206.25` |
+| `qwen3.5:4b` | `179.42` | `179.59` | `+0.10%` | `144.12` |
+
+### `sampled_topk100` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `501.50` | `501.87` | `+0.07%` | `321.42` |
+| `qwen3.5:2b` | `250.76` | `250.04` | `-0.28%` | `205.08` |
+| `qwen3.5:4b` | `178.31` | `178.42` | `+0.06%` | `143.98` |
+
+Interpretation:
+
+- this path is effectively flat
+- the bounded sampled lead over Ollama remains strong
+- the extra runtime complexity did not buy a defensible throughput gain
+
+That experiment should not be treated as the new optimization direction.
+
+## Later Follow-On: Threshold Sweep Confirmed `top_k = 40` Must Stay Partitioned
+
+After the flat host-side passes, the next question was whether the current
+partitioned top-k crossover was wrong and `top_k = 40` should fall back to the
+simple one-row top-k kernel instead.
+
+Current main now exposes a tuning-only override for that crossover:
+
+- commit `b926f2f7` `Make qwen35 top-k threshold tunable`
+- env var `PSIONIC_QWEN35_PARTITIONED_TOP_K_THRESHOLD`
+
+The decisive sweep was:
+
+- idle RTX 4080 host
+- Psionic only
+- sampled `top_k = 40`
+- `repeats = 3`
+- models `0.8b`, `2b`, `4b`, `9b`
+- forced override `PSIONIC_QWEN35_PARTITIONED_TOP_K_THRESHOLD=41`
+
+That override routes `top_k = 40` off the partitioned kernel and back onto the
+simple `top_k_f32` path.
+
+Results:
+
+| Model | Default Threshold `40` | Override Threshold `41` | Delta |
+| --- | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `505.33` | `269.97` | `-46.58%` |
+| `qwen3.5:2b` | `252.94` | `175.85` | `-30.48%` |
+| `qwen3.5:4b` | `179.42` | `137.10` | `-23.59%` |
+| `qwen3.5:9b` | `110.12` | `92.97` | `-15.58%` |
+
+This answers the crossover question cleanly:
+
+- the simple one-row top-k kernel is not a hidden win for the canonical
+  `top_k = 40` contract
+- `top_k = 40` must stay on the partitioned path on this host
+- future qwen35 sampled tuning should stay inside the partitioned lane rather
+  than toggling back to the non-partitioned selector
+
+## Updated Next Steps
+
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
   are measured on a genuinely idle GPU
+- stop spending time on host-side sampler cleanups that only move results by
+  noise-level deltas
+- stop spending time on non-partitioned `top_k = 40` crossover tuning on this
+  host; that path is decisively slower
+- focus the next optimization pass inside the partitioned bounded-candidate
+  lane itself: kernel shape, memory traffic, or combined device-to-host output
+  staging

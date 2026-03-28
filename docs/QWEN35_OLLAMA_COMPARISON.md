@@ -431,3 +431,8 @@ Psionic-only measured means:
   The only extra rule is operational: unload Ollama's resident GPU caches
   before measuring Psionic because Ollama keeps prior model weights live in
   VRAM.
+- The qwen35 sampled lane also exposes tuning-only overrides for follow-on
+  kernel work:
+  `PSIONIC_QWEN35_PARTITIONED_TOP_K_BLOCKS` and
+  `PSIONIC_QWEN35_PARTITIONED_TOP_K_THRESHOLD`.
+  They are diagnostic controls, not canonical benchmark settings.
