@@ -3254,12 +3254,10 @@ async fn handle_chat_completions(
             Some(choice.finish_reason),
             unix_timestamp_secs(),
         );
-        let delta_chunk = serialize_event_data(&completion_delta_chunk(
+        let delta_chunk = serialize_event_data(&completion_delta_chunk_for_choice(
             request_id.as_str(),
             response_model_name.as_str(),
-            choice.content.clone(),
-            choice.reasoning_content.clone(),
-            (!choice.tool_calls.is_empty()).then_some(choice.tool_calls.clone()),
+            &choice,
             unix_timestamp_secs(),
         ))?;
         let terminal_chunk = serialize_event_data(&terminal_chunk)?;
@@ -3479,12 +3477,10 @@ async fn handle_generic_chat_completions(
             Some(choice.finish_reason),
             unix_timestamp_secs(),
         );
-        let delta_chunk = serialize_event_data(&completion_delta_chunk(
+        let delta_chunk = serialize_event_data(&completion_delta_chunk_for_choice(
             request_id.as_str(),
             response_model_name.as_str(),
-            choice.content.clone(),
-            choice.reasoning_content.clone(),
-            (!choice.tool_calls.is_empty()).then_some(choice.tool_calls.clone()),
+            &choice,
             unix_timestamp_secs(),
         ))?;
         let terminal_chunk = serialize_event_data(&terminal_chunk)?;
@@ -4271,6 +4267,25 @@ struct ChatCompletionToolCallFunction {
 }
 
 #[derive(Clone, Debug, Serialize)]
+struct ChatCompletionChunkToolCall {
+    index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    kind: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    function: Option<ChatCompletionChunkToolCallFunctionDelta>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ChatCompletionChunkToolCallFunctionDelta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    arguments: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct ChatCompletionUsage {
     prompt_tokens: usize,
     completion_tokens: usize,
@@ -4329,7 +4344,7 @@ struct ChatCompletionChunkDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    tool_calls: Option<Vec<ChatCompletionToolCall>>,
+    tool_calls: Option<Vec<ChatCompletionChunkToolCall>>,
 }
 
 #[derive(Clone, Debug)]
@@ -4404,12 +4419,31 @@ fn completion_terminal_chunk(
     }
 }
 
+fn completion_stream_tool_calls(
+    tool_calls: &[ChatCompletionToolCall],
+) -> Vec<ChatCompletionChunkToolCall> {
+    tool_calls
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, tool_call)| ChatCompletionChunkToolCall {
+            index,
+            id: Some(tool_call.id),
+            kind: Some(tool_call.kind),
+            function: Some(ChatCompletionChunkToolCallFunctionDelta {
+                name: Some(tool_call.function.name),
+                arguments: Some(tool_call.function.arguments),
+            }),
+        })
+        .collect()
+}
+
 fn completion_delta_chunk(
     request_id: &str,
     model: &str,
     content: Option<String>,
     reasoning_content: Option<String>,
-    tool_calls: Option<Vec<ChatCompletionToolCall>>,
+    tool_calls: Option<Vec<ChatCompletionChunkToolCall>>,
     created: u64,
 ) -> ChatCompletionChunk {
     ChatCompletionChunk {
@@ -4428,6 +4462,23 @@ fn completion_delta_chunk(
             finish_reason: None,
         }],
     }
+}
+
+fn completion_delta_chunk_for_choice(
+    request_id: &str,
+    model: &str,
+    choice: &ParsedCompletionChoice,
+    created: u64,
+) -> ChatCompletionChunk {
+    completion_delta_chunk(
+        request_id,
+        model,
+        choice.content.clone(),
+        choice.reasoning_content.clone(),
+        (!choice.tool_calls.is_empty())
+            .then(|| completion_stream_tool_calls(choice.tool_calls.as_slice())),
+        created,
+    )
 }
 
 fn responses_output_items(
@@ -7410,6 +7461,170 @@ mod tests {
     }
 
     #[test]
+    fn generic_server_native_qwen35_streaming_tool_calls_emit_delta_tool_calls()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35-stream-tool.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_native_full_attention_decoder_metadata_with_tokens(
+                "tiny native qwen35 stream tool",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":48.8566,\"longitude\":2.3522}}]}",
+                    "world",
+                ],
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors_with_vocab(9).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&qwen35_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35-stream-tool")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                stop: None,
+                stream: true,
+                tools: vec![weather_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let body = runtime.block_on(response_text(response))?;
+        let events = sse_json_events(body.as_str())?;
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["index"],
+            serde_json::json!(0)
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"],
+            serde_json::json!("{\"latitude\":48.8566,\"longitude\":2.3522}")
+        );
+        assert_eq!(
+            events[1]["choices"][0]["finish_reason"],
+            serde_json::json!("tool_calls")
+        );
+        assert!(body.contains("[DONE]"));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_native_qwen35_streaming_parallel_tool_calls_preserve_order()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35-stream-tool-batch.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_native_full_attention_decoder_metadata_with_tokens(
+                "tiny native qwen35 stream tool batch",
+                vec![
+                    "<|bos|>",
+                    "<|eos|>",
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<think>",
+                    "</think>",
+                    "hello",
+                    "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"latitude\":48.8566,\"longitude\":2.3522}},{\"name\":\"get_time\",\"arguments\":{\"timezone\":\"UTC\"}}]}",
+                    "world",
+                ],
+            )
+            .as_slice(),
+            qwen35_native_full_attention_decoder_tensors_with_vocab(9).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&qwen35_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35-stream-tool-batch")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                stop: None,
+                stream: true,
+                tools: vec![weather_tool_definition(), time_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(true),
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let body = runtime.block_on(response_text(response))?;
+        let events = sse_json_events(body.as_str())?;
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["index"],
+            serde_json::json!(0)
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][1]["index"],
+            serde_json::json!(1)
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][1]["function"]["name"],
+            serde_json::json!("get_time")
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][1]["function"]["arguments"],
+            serde_json::json!("{\"timezone\":\"UTC\"}")
+        );
+        assert_eq!(
+            events[1]["choices"][0]["finish_reason"],
+            serde_json::json!("tool_calls")
+        );
+        assert!(body.contains("[DONE]"));
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_qwen35_projects_multimodal_inputs_through_real_template_markers()
     -> Result<(), Box<dyn std::error::Error>> {
         let _proxy_lock = qwen35_proxy_test_lock()
@@ -8991,8 +9206,24 @@ mod tests {
                 },
             ))?;
         let body = tokio::runtime::Runtime::new()?.block_on(response_text(response))?;
-        assert!(body.contains("\"tool_calls\""));
-        assert!(body.contains("\"finish_reason\":\"tool_calls\""));
+        let events = sse_json_events(body.as_str())?;
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["index"],
+            serde_json::json!(0)
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["tool_calls"][0]["function"]["arguments"],
+            serde_json::json!("{\"latitude\":48.8566,\"longitude\":2.3522}")
+        );
+        assert_eq!(
+            events[1]["choices"][0]["finish_reason"],
+            serde_json::json!("tool_calls")
+        );
         assert!(body.contains("[DONE]"));
         Ok(())
     }
@@ -9817,6 +10048,14 @@ mod tests {
     async fn response_text(response: Response) -> Result<String, Box<dyn std::error::Error>> {
         let body = to_bytes(response.into_body(), usize::MAX).await?;
         Ok(String::from_utf8(body.to_vec())?)
+    }
+
+    fn sse_json_events(body: &str) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
+        body.lines()
+            .filter_map(|line| line.strip_prefix("data: "))
+            .filter(|line| *line != "[DONE]")
+            .map(|line| Ok(serde_json::from_str(line)?))
+            .collect()
     }
 
     #[test]
