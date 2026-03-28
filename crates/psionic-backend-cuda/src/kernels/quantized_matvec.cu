@@ -6677,7 +6677,7 @@ extern "C" int psionic_cuda_q8_0_matvec_q8_1(
 ) {
     const int block_count = cols / kQ81ElementsPerBlock;
     constexpr int rows_per_block = 1;
-    constexpr int warps_per_row = 4;
+    constexpr int warps_per_row = 2;
     const dim3 block_dims(kWarpSize, rows_per_block * warps_per_row, 1);
     quantized_matvec_q8_1_grouped_mmvq_kernel<
         Q80Q81DotFixedMask,
