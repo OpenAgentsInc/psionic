@@ -918,6 +918,91 @@ one-off scratch shell file outside the repo.
 It now depends on committed repo code that future operators and agents can
 reuse directly.
 
+## Detached Artifact Score Closeout
+
+The next honest bottleneck after `20260328d` was not training-step stability.
+
+It was serialized score closeout:
+
+- step `1/1` now trains in `274570ms`
+- then the same GPU stays occupied for hours in
+  `int8_zlib_roundtrip` validation
+- at `2026-03-28 06:38:27 CDT`, the retained live log had only reached
+  `batch=60/947` with `elapsed_ms=1476055`
+
+That meant the training lane could already export one real promptable artifact,
+but the next training attempt still had to wait behind the current full score
+sweep.
+
+This repo now exposes one explicit detached-closeout posture for local HOMEGOLF:
+
+- trainer validation mode:
+  `final_validation_mode=artifact_only`
+- new detached scorer binary:
+  `crates/psionic-train/src/bin/parameter_golf_homegolf_artifact_score.rs`
+- new detached score watcher:
+  `scripts/wait-parameter-golf-homegolf-artifact-score.sh`
+- new runner control:
+  `scripts/run-parameter-golf-homegolf-local-cuda.sh --attach-detached-score-closeout`
+
+What changed in behavior:
+
+- the trainer can now stop after:
+  - `final_artifact_export_complete`
+  - `final_artifact_persist_complete`
+  - writing `training_report.json` with
+    `final_validation_mode=artifact_only`
+- final score closeout can then run in a separate process against the exported
+  artifact
+- the queued next run no longer needs to wait for the previous run's full
+  validation sweep before it may begin
+
+This is a real improvement over the prior `20260328e` queue posture:
+
+- old queued run:
+  `homegolf-baseline-g64-stepcap2-clip1-lr075-600s-20260328e`
+- old score posture:
+  `final_validation_mode=roundtrip_only`
+- old effect:
+  the next run would still inherit the same multi-hour serialized GPU-bound
+  closeout
+
+The queued follow-on is now replaced on `archlinux` with:
+
+- queued run id:
+  `homegolf-baseline-g64-stepcap2-clip1-lr075-artifactonly-600s-20260328f`
+- queue pid:
+  `778424`
+- queue log:
+  `/home/christopherdavid/scratch/psionic_homegolf_runs/queue_homegolf_20260328f_repo.log`
+- retained queue state:
+  - `queue_wait_root=/home/christopherdavid/scratch/psionic_homegolf_runs/homegolf-baseline-g64-stepcap1-clip1-600s-20260328d`
+  - `queue_wait_pid=768560`
+  - `queue_waiting timestamp=2026-03-28T06:38:05-05:00 pid=768560`
+
+Queued `20260328f` posture:
+
+- `grad_accum_steps=64`
+- `challenge_max_steps=2`
+- `grad_clip_norm=1.0`
+- `learning_rate_scale=0.75`
+- `final_validation_mode=artifact_only`
+- `validation_eval_mode=non_overlapping`
+- `attach_prompt_closeout=true`
+- `attach_detached_score_closeout=true`
+
+The detached scorer was also launched in one real smoke pass on `archlinux`
+against the live exported `20260328d` artifact through a synthetic training
+report rooted in the retained single-H100 schema:
+
+- smoke output target:
+  `/home/christopherdavid/scratch/psionic_homegolf_runs/detached_score_smoke_20260328/artifact_score_report.json`
+
+At `2026-03-28 06:38:27 CDT`, that detached score receipt had not landed yet.
+That is acceptable and honest. The point of this change is not that detached
+scoring is suddenly cheap. The point is that detached scoring is no longer on
+the critical path for the next GPU training run.
+
 ## Current Honest Boundary
 
 HOMEGOLF is frozen as a contract now, but one important surface is still
@@ -936,6 +1021,10 @@ One more current truth is explicit after `20260328d`:
 
 - the local honest capped lane can now complete one optimizer step, export the
   retained artifact, and generate actual text from that artifact
+- the next queued local honest run can now stop at artifact export and hand the
+  final score closeout to a detached watcher instead of holding the GPU behind
+  inline full validation
 - the retained actual public PGOLF score is still `6.306931747817168`
 - the active local clipped run is still closing its full roundtrip validation,
   so it does not yet have a completed new score receipt
+- XTRAIN is unchanged in this iteration
