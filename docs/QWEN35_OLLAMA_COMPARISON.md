@@ -8,6 +8,11 @@ Tracked issues:
 - `#606` Scale native qwen35 CUDA lane to beat Ollama on 2B, 4B, and 9B
 - `#631` Benchmark qwen35 temperature/top-k sampling vs Ollama and keep Psionic ahead
 
+Published benchmark checkpoints:
+
+- greedy matrix checkpoint: `c5bc0ba2`
+- sampled matrix checkpoint: `043eda03`
+
 Shared benchmark rules:
 
 - same host
