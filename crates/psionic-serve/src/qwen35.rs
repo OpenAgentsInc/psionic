@@ -811,7 +811,7 @@ impl CudaGgufQwen35TextGenerationService {
 
 const QWEN35_CUDA_MAX_TOP_K: usize = 128;
 const QWEN35_CUDA_PARTITIONED_TOP_K_THRESHOLD: usize = 40;
-const QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS: usize = 8;
+const QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS: usize = 24;
 fn qwen35_fast_greedy_path_enabled() -> bool {
     std::env::var_os("PSIONIC_QWEN35_DISABLE_FAST_GREEDY").is_none()
 }
@@ -930,6 +930,14 @@ fn can_use_cuda_quantized_matvec(mode: QuantizationMode) -> bool {
 
 fn qwen35_requires_dense_f16_mirror(mode: QuantizationMode) -> bool {
     !can_use_cuda_quantized_matvec(mode)
+}
+
+fn qwen35_partitioned_top_k_block_count() -> usize {
+    std::env::var("PSIONIC_QWEN35_PARTITIONED_TOP_K_BLOCKS")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS)
 }
 
 fn initial_cuda_argmax_pair_bytes() -> [u8; std::mem::size_of::<u64>()] {
@@ -6750,6 +6758,7 @@ struct Qwen35CudaStepPlan {
     argmax_state_buffer: CudaBuffer,
     top_k_indices_host_buffer: CudaHostBuffer,
     top_k_values_host_buffer: CudaHostBuffer,
+    partitioned_top_k_blocks: usize,
     no_output_graph_exec: Option<CudaGraphExec>,
     no_output_graph_cache_identity: Option<Vec<(usize, usize)>>,
     decode_graph_exec: Option<CudaGraphExec>,
@@ -6769,12 +6778,13 @@ impl Qwen35CudaStepPlan {
         vocab_size: usize,
         max_penalty_token_count: usize,
     ) -> Result<Self, ReferenceTextGenerationError> {
+        let partitioned_top_k_blocks = qwen35_partitioned_top_k_block_count();
         let q8_1_bytes = ggml_q8_1_storage_bytes(1, max_input_columns)
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let activated_q8_1_bytes = ggml_q8_1_storage_bytes(1, max_output_rows)
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let top_k_partial_len =
-            QWEN35_CUDA_MAX_TOP_K.saturating_mul(QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS);
+            QWEN35_CUDA_MAX_TOP_K.saturating_mul(partitioned_top_k_blocks);
         let max_penalty_token_count = max_penalty_token_count.max(1);
         Ok(Self {
             matvec_input_buffer: backend
@@ -6885,6 +6895,7 @@ impl Qwen35CudaStepPlan {
             top_k_values_host_buffer: backend
                 .host_buffer(QWEN35_CUDA_MAX_TOP_K * std::mem::size_of::<f32>())
                 .map_err(ReferenceTextGenerationError::Runtime)?,
+            partitioned_top_k_blocks,
             no_output_graph_exec: None,
             no_output_graph_cache_identity: None,
             decode_graph_exec: None,
@@ -6907,7 +6918,7 @@ impl Qwen35CudaStepPlan {
                 &self.logits_buffer,
                 logit_count,
                 top_k,
-                QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS,
+                self.partitioned_top_k_blocks,
                 &self.top_k_partial_indices_buffer,
                 &self.top_k_partial_values_buffer,
                 &self.top_k_indices_buffer,
