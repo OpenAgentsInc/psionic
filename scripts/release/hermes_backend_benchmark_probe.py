@@ -414,7 +414,11 @@ def main() -> int:
     reports.append(
         benchmark_case_result(
             case,
-            passed=case["stream_calls"] >= 1 and tool_turn is not None,
+            passed=(
+                case["stream_calls"] >= 1
+                and tool_turn is not None
+                and not case["result"].get("failed", False)
+            ),
             summary="streaming chat loop preserved a tool-call turn",
             details={
                 "assistant_tool_names": [
