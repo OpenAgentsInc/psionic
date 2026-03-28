@@ -1340,7 +1340,8 @@ fn map_report_result(
             RemoteTrainingResultClassification::CompletedSuccess
         }
         crate::ParameterGolfSingleH100TrainingDisposition::RefusedMachineContract
-        | crate::ParameterGolfSingleH100TrainingDisposition::RefusedCudaBlockers => {
+        | crate::ParameterGolfSingleH100TrainingDisposition::RefusedCudaBlockers
+        | crate::ParameterGolfSingleH100TrainingDisposition::RefusedWallclockProjection => {
             RemoteTrainingResultClassification::Refused
         }
     }

@@ -623,6 +623,7 @@ pub struct ParameterGolfSwaReceipt {
 pub enum ParameterGolfSingleH100TrainingDisposition {
     RefusedMachineContract,
     RefusedCudaBlockers,
+    RefusedWallclockProjection,
     TrainingExecuted,
 }
 
@@ -1832,6 +1833,17 @@ impl ParameterGolfParameterState {
 pub enum ParameterGolfSingleH100TrainingError {
     #[error("parameter golf single-H100 training config is invalid: {message}")]
     InvalidConfig { message: String },
+    #[error(
+        "parameter golf single-H100 training projected optimizer step {global_step} to exceed the remaining wallclock budget after {observed_micro_steps}/{grad_accum_steps} micro-steps: observed_step_wallclock_ms={observed_step_wallclock_ms} projected_full_step_wallclock_ms={projected_full_step_wallclock_ms} remaining_training_wallclock_ms={remaining_training_wallclock_ms}"
+    )]
+    ProjectedWallclockCapExceeded {
+        global_step: u64,
+        observed_micro_steps: usize,
+        grad_accum_steps: usize,
+        observed_step_wallclock_ms: u64,
+        projected_full_step_wallclock_ms: u64,
+        remaining_training_wallclock_ms: u64,
+    },
     #[error("parameter golf single-H100 training expected {expected} at `{path}`")]
     MissingPath { path: String, expected: String },
     #[error("parameter golf single-H100 training serialization failed: {message}")]
@@ -2322,6 +2334,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 learning_rate_multiplier,
                 muon_momentum,
                 effective_learning_rate,
+                None,
                 false,
                 &mut live_visualization_writer,
             )?;
@@ -2534,7 +2547,9 @@ fn build_parameter_golf_single_h100_training_report_inner(
                 .token_learning_rate(current_model.descriptor().config.tie_embeddings)
                 * learning_rate_multiplier,
         );
-        let step_metrics_next = execute_training_step(
+        let remaining_training_wallclock_ms =
+            max_wallclock_ms.map(|wallclock_ms| wallclock_ms.saturating_sub(training_time_ms));
+        let step_metrics_next = match execute_training_step(
             &mut cuda_backend,
             &selected_device.device,
             &bundle,
@@ -2554,9 +2569,84 @@ fn build_parameter_golf_single_h100_training_report_inner(
             learning_rate_multiplier,
             muon_momentum,
             effective_learning_rate,
+            remaining_training_wallclock_ms,
             true,
             &mut live_visualization_writer,
-        )?;
+        ) {
+            Ok(step_metrics) => step_metrics,
+            Err(ParameterGolfSingleH100TrainingError::ProjectedWallclockCapExceeded {
+                global_step,
+                observed_micro_steps,
+                grad_accum_steps,
+                observed_step_wallclock_ms,
+                projected_full_step_wallclock_ms,
+                remaining_training_wallclock_ms,
+            }) => {
+                let detail = format!(
+                    "{} trainer projected optimizer step {} to require about {}ms after {}/{} micro-steps, which exceeds the remaining {}ms wallclock budget on this machine posture.",
+                    config.machine_profile.execution_summary_label(),
+                    global_step,
+                    projected_full_step_wallclock_ms,
+                    observed_micro_steps,
+                    grad_accum_steps,
+                    remaining_training_wallclock_ms,
+                );
+                emit_progress_line(format!(
+                    "wallclock_projection_refusal step={}/{} observed_micro_steps={}/{} observed_step_wallclock_ms={} projected_full_step_wallclock_ms={} remaining_training_wallclock_ms={}",
+                    global_step,
+                    config.max_steps,
+                    observed_micro_steps,
+                    grad_accum_steps,
+                    observed_step_wallclock_ms,
+                    projected_full_step_wallclock_ms,
+                    remaining_training_wallclock_ms,
+                ));
+                if step == 0 {
+                    return Ok((
+                        refusal_report(
+                            config,
+                            tokenizer_digest,
+                            &bundle,
+                            &machine_observation,
+                            &initial_model,
+                            optimizer_plan_digest,
+                            precision_receipt.clone(),
+                            capability_report.report_digest.clone(),
+                            capability_report.challenge_kernel_blockers().to_vec(),
+                            ParameterGolfSingleH100TrainingDisposition::RefusedWallclockProjection,
+                            Some(
+                                PsionicRefusal::new(
+                                    PsionicRefusalCode::UnsupportedBackendCapability,
+                                    PsionicRefusalScope::Runtime,
+                                    detail.clone(),
+                                )
+                                .with_subject(format!(
+                                    "{}.wallclock_projection",
+                                    config.machine_profile.as_str()
+                                )),
+                            ),
+                            started_at_ms,
+                            format!(
+                                "The Rust-owned {} trainer refused before emitting a training artifact because the first measured optimizer step projected beyond the remaining declared wallclock cap on this machine posture.",
+                                config.machine_profile.execution_summary_label()
+                            ),
+                        ),
+                        None,
+                        live_visualization_writer,
+                    ));
+                }
+                emit_progress_line(format!(
+                    "stopping_early: wallclock_projection train_time:{}ms completed_steps={} projected_next_step_ms={} remaining_training_wallclock_ms={}",
+                    training_time_ms,
+                    step,
+                    projected_full_step_wallclock_ms,
+                    remaining_training_wallclock_ms,
+                ));
+                stop_reason = Some(ParameterGolfSingleH100TrainingStopReason::WallclockCapReached);
+                break;
+            }
+            Err(error) => return Err(error),
+        };
         training_time_ms = training_time_ms.saturating_add(step_metrics_next.observed_wallclock_ms);
         aggregate_phase_timings.accumulate(&step_metrics_next.phase_timings);
         if let Some(writer) = live_visualization_writer.as_mut() {
@@ -3824,6 +3914,7 @@ fn execute_training_step(
     learning_rate_multiplier: f32,
     muon_momentum: f32,
     effective_learning_rate: Option<f32>,
+    remaining_training_wallclock_ms: Option<u64>,
     emit_micro_step_logs: bool,
     live_visualization_writer: &mut Option<crate::ParameterGolfSingleH100LiveVisualizationWriter>,
 ) -> Result<ParameterGolfSingleH100TrainingStepMetrics, ParameterGolfSingleH100TrainingError> {
@@ -3946,6 +4037,27 @@ fn execute_training_step(
                 Some((micro_step + 1) as u32),
                 false,
             )?;
+        }
+        if let Some(remaining_training_wallclock_ms) = remaining_training_wallclock_ms {
+            let observed_step_wallclock_ms = duration_ms(step_started);
+            let observed_micro_steps = micro_step + 1;
+            let projected_full_step_wallclock_ms = project_full_step_wallclock_ms(
+                observed_step_wallclock_ms,
+                observed_micro_steps,
+                geometry.grad_accum_steps,
+            );
+            if projected_full_step_wallclock_ms > remaining_training_wallclock_ms {
+                return Err(
+                    ParameterGolfSingleH100TrainingError::ProjectedWallclockCapExceeded {
+                        global_step,
+                        observed_micro_steps,
+                        grad_accum_steps: geometry.grad_accum_steps,
+                        observed_step_wallclock_ms,
+                        projected_full_step_wallclock_ms,
+                        remaining_training_wallclock_ms,
+                    },
+                );
+            }
         }
     }
 
@@ -8527,6 +8639,13 @@ mod tests {
     }
 
     #[test]
+    fn project_full_step_wallclock_ms_rounds_up_from_partial_microstep_progress() {
+        assert_eq!(project_full_step_wallclock_ms(28_500, 1, 64), 1_824_000);
+        assert_eq!(project_full_step_wallclock_ms(350_000, 12, 64), 1_866_667);
+        assert_eq!(project_full_step_wallclock_ms(278_709, 64, 64), 278_709);
+    }
+
+    #[test]
     fn final_model_surface_parse_accepts_supported_labels() {
         assert_eq!(
             ParameterGolfFinalModelSurface::parse("raw").expect("raw should parse"),
@@ -8546,6 +8665,20 @@ mod tests {
 fn unique_tensor_ids(ids: Vec<TensorId>) -> Vec<TensorId> {
     let mut seen = std::collections::BTreeSet::new();
     ids.into_iter().filter(|id| seen.insert(*id)).collect()
+}
+
+fn project_full_step_wallclock_ms(
+    observed_step_wallclock_ms: u64,
+    observed_micro_steps: usize,
+    total_micro_steps: usize,
+) -> u64 {
+    if observed_micro_steps == 0 || total_micro_steps == 0 {
+        return 0;
+    }
+    let numerator = u128::from(observed_step_wallclock_ms)
+        .saturating_mul(total_micro_steps as u128)
+        .saturating_add(observed_micro_steps.saturating_sub(1) as u128);
+    (numerator / observed_micro_steps as u128) as u64
 }
 
 fn duration_ms(started: Instant) -> u64 {
