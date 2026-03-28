@@ -15,6 +15,8 @@ max_steps=""
 challenge_max_steps=""
 grad_clip_norm=""
 learning_rate_scale=""
+ema_decay=""
+final_model_surface=""
 final_validation_mode="roundtrip_only"
 validation_eval_mode="non_overlapping"
 background="0"
@@ -48,6 +50,8 @@ Options:
   --challenge-max-steps <n>             Honest challenge max-steps cap that preserves the local 600s contract.
   --grad-clip-norm <f32>                Optional training grad-clip norm override for the HOMEGOLF lane.
   --learning-rate-scale <f32>           Optional uniform learning-rate scale across HOMEGOLF optimizer groups.
+  --ema-decay <f32>                     Optional EMA decay override for HOMEGOLF final-model export.
+  --final-model-surface <surface>       Optional final export surface. Example: raw, ema, swa
   --final-validation-mode <mode>        Final validation mode. Default: roundtrip_only
   --validation-eval-mode <mode>         Validation eval mode. Default: non_overlapping
   --trainer-arg <arg>                   Extra trailing trainer arg. Repeatable.
@@ -112,6 +116,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --learning-rate-scale)
       learning_rate_scale="$2"
+      shift 2
+      ;;
+    --ema-decay)
+      ema_decay="$2"
+      shift 2
+      ;;
+    --final-model-surface)
+      final_model_surface="$2"
       shift 2
       ;;
     --final-validation-mode)
@@ -309,6 +321,12 @@ fi
 if [[ -n "${learning_rate_scale}" ]]; then
   printf 'LEARNING_RATE_SCALE=%q\n' "${learning_rate_scale}" >> "${launch_env_path}"
 fi
+if [[ -n "${ema_decay}" ]]; then
+  printf 'EMA_DECAY=%q\n' "${ema_decay}" >> "${launch_env_path}"
+fi
+if [[ -n "${final_model_surface}" ]]; then
+  printf 'FINAL_MODEL_SURFACE=%q\n' "${final_model_surface}" >> "${launch_env_path}"
+fi
 if [[ -n "${binary_path}" ]]; then
   printf 'BINARY_PATH=%q\n' "${binary_path}" >> "${launch_env_path}"
 fi
@@ -349,6 +367,12 @@ run_trainer() {
   fi
   if [[ -n "${learning_rate_scale}" ]]; then
     run_env+=("PSIONIC_PARAMETER_GOLF_HOMEGOLF_LR_SCALE=${learning_rate_scale}")
+  fi
+  if [[ -n "${ema_decay}" ]]; then
+    run_env+=("PSIONIC_PARAMETER_GOLF_EMA_DECAY=${ema_decay}")
+  fi
+  if [[ -n "${final_model_surface}" ]]; then
+    run_env+=("PSIONIC_PARAMETER_GOLF_FINAL_MODEL_SURFACE=${final_model_surface}")
   fi
   env "${run_env[@]}" \
     "${trainer_command[@]}"

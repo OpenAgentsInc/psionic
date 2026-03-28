@@ -2,10 +2,11 @@ use std::{env, path::PathBuf};
 
 use psionic_train::{
     parameter_golf_default_validation_batch_sequences,
-    write_parameter_golf_single_h100_training_report, ParameterGolfFinalModelSurface,
-    ParameterGolfMatrixExecutionMode, ParameterGolfScoreFirstTttConfig,
-    ParameterGolfSingleH100ModelVariant, ParameterGolfSingleH100TrainingConfig,
-    ParameterGolfSingleH100ValidationMode, ParameterGolfValidationEvalMode,
+    write_parameter_golf_single_h100_training_report, ParameterGolfEmaConfig,
+    ParameterGolfFinalModelSurface, ParameterGolfMatrixExecutionMode,
+    ParameterGolfScoreFirstTttConfig, ParameterGolfSingleH100ModelVariant,
+    ParameterGolfSingleH100TrainingConfig, ParameterGolfSingleH100ValidationMode,
+    ParameterGolfValidationEvalMode,
 };
 
 fn main() {
@@ -113,15 +114,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let raw = max_challenge_steps.to_string_lossy();
         config.max_steps = raw.parse::<u64>()?;
     }
-    if let Some(grad_clip_norm) =
-        env::var_os("PSIONIC_PARAMETER_GOLF_HOMEGOLF_GRAD_CLIP_NORM")
-    {
+    if let Some(grad_clip_norm) = env::var_os("PSIONIC_PARAMETER_GOLF_HOMEGOLF_GRAD_CLIP_NORM") {
         let raw = grad_clip_norm.to_string_lossy();
         config.hyperparameters.grad_clip_norm = raw.parse::<f32>()?;
     }
-    if let Some(learning_rate_scale) =
-        env::var_os("PSIONIC_PARAMETER_GOLF_HOMEGOLF_LR_SCALE")
-    {
+    if let Some(learning_rate_scale) = env::var_os("PSIONIC_PARAMETER_GOLF_HOMEGOLF_LR_SCALE") {
         let raw = learning_rate_scale.to_string_lossy();
         let scale = raw.parse::<f32>()?;
         config.hyperparameters.embed_lr *= scale;
@@ -129,6 +126,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         config.hyperparameters.tied_embed_lr *= scale;
         config.hyperparameters.matrix_lr *= scale;
         config.hyperparameters.scalar_lr *= scale;
+    }
+    if let Some(ema_decay) = env::var_os("PSIONIC_PARAMETER_GOLF_EMA_DECAY") {
+        let raw = ema_decay.to_string_lossy();
+        config.ema = Some(ParameterGolfEmaConfig {
+            decay: raw.parse::<f32>()?,
+        });
     }
     if truthy_env("PSIONIC_PARAMETER_GOLF_DISABLE_SCORE_FIRST_TTT") {
         config.score_first_ttt = None;
