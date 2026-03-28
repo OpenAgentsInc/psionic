@@ -70,6 +70,11 @@ That split keeps the UI honest:
 - discovery of decentralized explorer snapshots stays separate from discovery
   of bounded training runs
 
+The final provider-neutral evidence bundle now also carries explicit
+surface-to-evidence links for the explorer snapshot and index, so an explorer
+consumer can jump into registry, miner-protocol, consensus, settlement, and
+sibling bounded-XTRAIN proof without ad hoc mapping logic.
+
 ## Canonical First View
 
 The committed canonical snapshot is designed to drive the first required

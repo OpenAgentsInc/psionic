@@ -49,29 +49,29 @@
       "metric_facts": [
         {
           "artifact_role": "live_metric_bundle",
-          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "932acaa04ebe4d9427e70a1b31fb07593b789198c36d92ae30ecf656e63da16a",
+          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "3e6c6e8c621978f81d61f60219373df31fde83cb75e4a47a12ea42ffb0eefdcc",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "The one-second Google live bundle is the authoritative metric surface for the single-node lane."
+          "detail": "The one-second Google live v2 bundle is the authoritative metric surface for the single-node lane."
         }
       ],
       "visualization_refs": [
         {
-          "artifact_role": "visualization_bundle",
-          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "932acaa04ebe4d9427e70a1b31fb07593b789198c36d92ae30ecf656e63da16a",
+          "artifact_role": "visualization_bundle_v2",
+          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "3e6c6e8c621978f81d61f60219373df31fde83cb75e4a47a12ea42ffb0eefdcc",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "The app-facing visualization bundle is carried directly into the final evidence bundle."
+          "detail": "The app-facing track-aware visualization bundle is carried directly into the final evidence bundle."
         },
         {
-          "artifact_role": "run_index",
-          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v1.json",
-          "artifact_digest": "62044e3441c3ad34114bfe40a590175284e7aa70a83ea10b2a6d8dbd42bc3e0c",
+          "artifact_role": "run_index_v2",
+          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v2.json",
+          "artifact_digest": "cef09a0c38786176e0aa72a427207504c46e4d43ea88db904beb757d0cf5496f",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "Run discovery remains explicit through the typed run index."
+          "detail": "Run discovery remains explicit through the track-aware typed run index."
         }
       ],
       "validator_results": [
@@ -100,7 +100,7 @@
         {
           "artifact_role": "launch_contract",
           "artifact_path": "fixtures/training/launch_contracts/runpod_8xh100_v1.json",
-          "artifact_digest": "1eb7a60e6dde7a1e6a02562e0506bfa236e74172705924e14adb62647f5206c1",
+          "artifact_digest": "7a9fcbf651d2f86186733e132b7d910a545005c0baa1d6e7412d29867b84c316",
           "evidence_posture": "measured",
           "authoritative": true,
           "detail": "RunPod dense distributed execution keeps one typed launch contract instead of a lane-specific finalizer JSON family."
@@ -137,29 +137,29 @@
       "metric_facts": [
         {
           "artifact_role": "visualization_metric_bundle",
-          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "ad9533442c1132068f7ee1df391ce4a01186f530061dc0bbf5f590480cef95e0",
+          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "d12e56b8cbc895919561476b6a5c0ae1dc9cf9f26aacd9df85df5db08718a8c2",
           "evidence_posture": "derived",
           "authoritative": true,
-          "detail": "The retained RunPod bundle is still post-run-only and keeps the missing live loss curve explicit."
+          "detail": "The retained RunPod v2 bundle now preserves the distributed mirror while keeping any missing primary series explicit."
         }
       ],
       "visualization_refs": [
         {
-          "artifact_role": "visualization_bundle",
-          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "ad9533442c1132068f7ee1df391ce4a01186f530061dc0bbf5f590480cef95e0",
+          "artifact_role": "visualization_bundle_v2",
+          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "d12e56b8cbc895919561476b6a5c0ae1dc9cf9f26aacd9df85df5db08718a8c2",
           "evidence_posture": "derived",
           "authoritative": true,
-          "detail": "The provider-neutral visualization bundle is preserved even when the lane remains post-run-only."
+          "detail": "The provider-neutral track-aware visualization bundle is preserved through the same always-live mirror and finalizer seal path."
         },
         {
-          "artifact_role": "run_index",
-          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v1.json",
-          "artifact_digest": "62044e3441c3ad34114bfe40a590175284e7aa70a83ea10b2a6d8dbd42bc3e0c",
+          "artifact_role": "run_index_v2",
+          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v2.json",
+          "artifact_digest": "cef09a0c38786176e0aa72a427207504c46e4d43ea88db904beb757d0cf5496f",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "The shared run index still enumerates the distributed lane through the same discovery surface."
+          "detail": "The shared v2 run index still enumerates the distributed lane through the same discovery surface."
         }
       ],
       "validator_results": [
@@ -168,7 +168,7 @@
           "execution_class": "dense_full_model_rank",
           "disposition": "accepted",
           "evidence_posture": "derived",
-          "detail": "The distributed lane sealed checkpoint and visualization proof, but the missing live primary series keeps the outcome degraded instead of promoted."
+          "detail": "The distributed lane sealed checkpoint and visualization proof, but any missing promoted primary series still keeps the outcome degraded instead of promoted."
         }
       ],
       "segment_disposition": "degraded_success",
@@ -188,7 +188,7 @@
         {
           "artifact_role": "swarm_launch_contract",
           "artifact_path": "fixtures/training/launch_contracts/local_first_swarm_v1.json",
-          "artifact_digest": "407dfe718c9593ec561f2d0bff0fee58dfddb99726c910b653466a01385a8687",
+          "artifact_digest": "6666ff2b521c045de4b7b78e136d4de74a3dbcd582b1d76c8060b71993d0a45b",
           "evidence_posture": "measured",
           "authoritative": true,
           "detail": "Contributor-window execution still uses one typed launch contract instead of provider-local orchestration logs."
@@ -287,21 +287,21 @@
       "metric_facts": [
         {
           "artifact_role": "summary_visualization_bundle",
-          "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "edf1db385525976e4987e6006391272528e0b8cb730e4c3cb16b72247bc1dffa",
+          "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "a897459ce3cd25038e1f23d1f324280396fce227297de3304fa690eafa8156eb",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "Validator-only metrics can be summary-only and still remain truthful inside the shared bundle family."
+          "detail": "Validator-only metrics can be summary-only and still remain truthful inside the shared track-aware bundle family."
         }
       ],
       "visualization_refs": [
         {
-          "artifact_role": "summary_visualization_bundle",
-          "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "edf1db385525976e4987e6006391272528e0b8cb730e4c3cb16b72247bc1dffa",
+          "artifact_role": "summary_visualization_bundle_v2",
+          "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "a897459ce3cd25038e1f23d1f324280396fce227297de3304fa690eafa8156eb",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "Validator-only visualization refs stay summary-only instead of forcing fake loss curves."
+          "detail": "Validator-only visualization refs stay summary-only inside the v2 bundle instead of forcing fake loss curves."
         }
       ],
       "validator_results": [
@@ -343,7 +343,7 @@
         {
           "artifact_role": "runpod_launch_contract",
           "artifact_path": "fixtures/training/launch_contracts/runpod_8xh100_v1.json",
-          "artifact_digest": "1eb7a60e6dde7a1e6a02562e0506bfa236e74172705924e14adb62647f5206c1",
+          "artifact_digest": "7a9fcbf651d2f86186733e132b7d910a545005c0baa1d6e7412d29867b84c316",
           "evidence_posture": "measured",
           "authoritative": false,
           "detail": "The hybrid bundle can carry both dense-rank and mirror-side launch facts without lane-specific proof JSON."
@@ -387,30 +387,30 @@
       ],
       "metric_facts": [
         {
-          "artifact_role": "run_index",
-          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v1.json",
-          "artifact_digest": "62044e3441c3ad34114bfe40a590175284e7aa70a83ea10b2a6d8dbd42bc3e0c",
+          "artifact_role": "run_index_v2",
+          "artifact_path": "fixtures/training_visualization/remote_training_run_index_v2.json",
+          "artifact_digest": "cef09a0c38786176e0aa72a427207504c46e4d43ea88db904beb757d0cf5496f",
           "evidence_posture": "measured",
           "authoritative": true,
-          "detail": "Hybrid proof keeps the run index explicit because the app still discovers hybrid lanes through the same typed surface."
+          "detail": "Hybrid proof keeps the v2 run index explicit because the app now discovers track-aware lanes through the same typed surface."
         }
       ],
       "visualization_refs": [
         {
-          "artifact_role": "google_live_visualization",
-          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "932acaa04ebe4d9427e70a1b31fb07593b789198c36d92ae30ecf656e63da16a",
+          "artifact_role": "google_live_visualization_v2",
+          "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "3e6c6e8c621978f81d61f60219373df31fde83cb75e4a47a12ea42ffb0eefdcc",
           "evidence_posture": "measured",
           "authoritative": false,
-          "detail": "Hybrid proof can cite live Google visualization state where available."
+          "detail": "Hybrid proof can cite live Google v2 visualization state where available."
         },
         {
-          "artifact_role": "runpod_distributed_visualization",
-          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
-          "artifact_digest": "ad9533442c1132068f7ee1df391ce4a01186f530061dc0bbf5f590480cef95e0",
+          "artifact_role": "runpod_distributed_visualization_v2",
+          "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+          "artifact_digest": "d12e56b8cbc895919561476b6a5c0ae1dc9cf9f26aacd9df85df5db08718a8c2",
           "evidence_posture": "derived",
           "authoritative": false,
-          "detail": "Hybrid proof can also cite post-run-only distributed visualization state while keeping the degraded posture explicit."
+          "detail": "Hybrid proof can also cite the sealed distributed v2 visualization state while keeping the degraded posture explicit."
         }
       ],
       "validator_results": [
@@ -433,6 +433,181 @@
       "detail": "This segment proves the bundle family can seal a hybrid run that spans dense ranks, contributor windows, validator work, checkpoint writing, and eval work."
     }
   ],
+  "visualization_surface_links": [
+    {
+      "link_id": "surface.psion_google_live_v2",
+      "surface_kind": "run_bundle",
+      "surface_schema_version": "psionic.remote_training_visualization_bundle.v2",
+      "track_family": "psion",
+      "track_id": "psion.training.non_record.v1",
+      "surface_ref": {
+        "artifact_role": "psion_google_live_visualization_v2",
+        "artifact_path": "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+        "artifact_digest": "3e6c6e8c621978f81d61f60219373df31fde83cb75e4a47a12ea42ffb0eefdcc",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The live Google v2 surface now maps directly back to its launch, runtime, checkpoint, and discovery evidence without pane-local lookup rules."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/training/launch_contracts/google_single_node_accelerated_v1.json",
+        "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+        "fixtures/psion/checkpoint_recovery/psion_dense_checkpoint_artifact_v1.json",
+        "fixtures/training_visualization/remote_training_run_index_v2.json"
+      ],
+      "detail": "The live Google v2 surface now maps directly back to its launch, runtime, checkpoint, and discovery evidence without pane-local lookup rules."
+    },
+    {
+      "link_id": "surface.parameter_golf_distributed_v2",
+      "surface_kind": "run_bundle",
+      "surface_schema_version": "psionic.remote_training_visualization_bundle.v2",
+      "track_family": "parameter_golf",
+      "track_id": "parameter_golf.non_record.v1",
+      "surface_ref": {
+        "artifact_role": "parameter_golf_distributed_visualization_v2",
+        "artifact_path": "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+        "artifact_digest": "d12e56b8cbc895919561476b6a5c0ae1dc9cf9f26aacd9df85df5db08718a8c2",
+        "evidence_posture": "derived",
+        "authoritative": true,
+        "detail": "The distributed PGOLF v2 surface points directly at the retained launch, runtime, checkpoint, and discovery evidence set."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/training/launch_contracts/runpod_8xh100_v1.json",
+        "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+        "fixtures/training/sharded_distributed_checkpoint_contract_v1.json",
+        "fixtures/training_visualization/remote_training_run_index_v2.json"
+      ],
+      "detail": "The distributed PGOLF v2 surface points directly at the retained launch, runtime, checkpoint, and discovery evidence set."
+    },
+    {
+      "link_id": "surface.psion_google_summary_v2",
+      "surface_kind": "run_bundle",
+      "surface_schema_version": "psionic.remote_training_visualization_bundle.v2",
+      "track_family": "psion",
+      "track_id": "psion.training.non_record.v1",
+      "surface_ref": {
+        "artifact_role": "psion_google_summary_visualization_v2",
+        "artifact_path": "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
+        "artifact_digest": "a897459ce3cd25038e1f23d1f324280396fce227297de3304fa690eafa8156eb",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The summary-only v2 surface keeps validator-only proof jumpable without forcing the consumer to infer which checkpoint or backend refs matter."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/training/launch_contracts/google_single_node_accelerated_v1.json",
+        "fixtures/training/remote_train_artifact_backend_contract_v1.json",
+        "fixtures/psion/checkpoint_recovery/psion_dense_checkpoint_artifact_v1.json"
+      ],
+      "detail": "The summary-only v2 surface keeps validator-only proof jumpable without forcing the consumer to infer which checkpoint or backend refs matter."
+    },
+    {
+      "link_id": "surface.remote_training_run_index_v2",
+      "surface_kind": "run_index",
+      "surface_schema_version": "psionic.remote_training_run_index.v2",
+      "surface_ref": {
+        "artifact_role": "remote_training_run_index_v2",
+        "artifact_path": "fixtures/training_visualization/remote_training_run_index_v2.json",
+        "artifact_digest": "cef09a0c38786176e0aa72a427207504c46e4d43ea88db904beb757d0cf5496f",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The shared v2 run index now advertises exactly which retained v2 surfaces participate in evidence-backed score or runtime drilldown."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+        "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+        "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json",
+        "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json"
+      ],
+      "detail": "The shared v2 run index now advertises exactly which retained v2 surfaces participate in evidence-backed score or runtime drilldown."
+    },
+    {
+      "link_id": "surface.homegolf_score_closeout_v2",
+      "surface_kind": "run_bundle",
+      "surface_schema_version": "psionic.remote_training_visualization_bundle.v2",
+      "track_family": "homegolf",
+      "track_id": "parameter_golf.home_cluster_compatible_10min.v1",
+      "surface_ref": {
+        "artifact_role": "homegolf_score_surface_v2",
+        "artifact_path": "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json",
+        "artifact_digest": "a6ffbaef33500e27ad0374438d1914a835fa9288c6547e1dc02b6fe6b3d683d5",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The HOMEGOLF v2 score-closeout surface now has one explicit evidence jump set covering track law, clustered score surface, score-relevant runtime, public comparison, and typed discovery."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_score_relevant_runtime.json",
+        "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
+        "fixtures/training_visualization/remote_training_run_index_v2.json"
+      ],
+      "detail": "The HOMEGOLF v2 score-closeout surface now has one explicit evidence jump set covering track law, clustered score surface, score-relevant runtime, public comparison, and typed discovery."
+    },
+    {
+      "link_id": "surface.xtrain_bounded_run_v2",
+      "surface_kind": "run_bundle",
+      "surface_schema_version": "psionic.remote_training_visualization_bundle.v2",
+      "track_family": "xtrain",
+      "track_id": "parameter_golf.promoted_general_xtrain.quick_eval_window1.v1",
+      "surface_ref": {
+        "artifact_role": "bounded_xtrain_visualization_v2",
+        "artifact_path": "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json",
+        "artifact_digest": "cd6d92497bea66181f47690d772468ca73dcf9cf3ab79d6f6e29865f32408275",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The bounded XTRAIN v2 score lane now maps directly back to the retained quick-eval report, track law, audit, and shared v2 discovery surface."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/parameter_golf/reports/parameter_golf_xtrain_quick_eval_report.json",
+        "docs/PARAMETER_GOLF_XTRAIN_TRACK.md",
+        "docs/audits/2026-03-27-xtrain-pgolf-fastfd-window1-quick-eval-audit.md",
+        "fixtures/training_visualization/remote_training_run_index_v2.json"
+      ],
+      "detail": "The bounded XTRAIN v2 score lane now maps directly back to the retained quick-eval report, track law, audit, and shared v2 discovery surface."
+    },
+    {
+      "link_id": "surface.xtrain_explorer_snapshot_v1",
+      "surface_kind": "explorer_snapshot",
+      "surface_schema_version": "psionic.xtrain_explorer_snapshot.v1",
+      "track_family": "xtrain",
+      "surface_ref": {
+        "artifact_role": "xtrain_explorer_snapshot_v1",
+        "artifact_path": "fixtures/training/xtrain_explorer_snapshot_v1.json",
+        "artifact_digest": "214115b3e1d3ccda9343cfd41024a432c1856ad3fbc7a8a53bc7a1e6370f4281",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The decentralized XTRAIN explorer snapshot now exposes an explicit supporting-evidence set spanning registry, miner protocol, consensus, settlement, curated-run, and sibling bounded-score truth."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/training/public_run_explorer_contract_v1.json",
+        "fixtures/training/public_network_registry_contract_v1.json",
+        "fixtures/training/public_miner_protocol_contract_v1.json",
+        "fixtures/training/multi_validator_consensus_contract_v1.json",
+        "fixtures/training/settlement_publication_contract_v1.json",
+        "fixtures/training/curated_decentralized_run_contract_v1.json",
+        "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json"
+      ],
+      "detail": "The decentralized XTRAIN explorer snapshot now exposes an explicit supporting-evidence set spanning registry, miner protocol, consensus, settlement, curated-run, and sibling bounded-score truth."
+    },
+    {
+      "link_id": "surface.xtrain_explorer_index_v1",
+      "surface_kind": "explorer_index",
+      "surface_schema_version": "psionic.xtrain_explorer_index.v1",
+      "track_family": "xtrain",
+      "surface_ref": {
+        "artifact_role": "xtrain_explorer_index_v1",
+        "artifact_path": "fixtures/training/xtrain_explorer_index_v1.json",
+        "artifact_digest": "44500763402456fcc22f33c363d625d31a0b65eb0be8966a1a51e8b015a31758",
+        "evidence_posture": "measured",
+        "authoritative": true,
+        "detail": "The decentralized XTRAIN explorer index now points directly at the retained snapshot and explorer-foundation contract."
+      },
+      "supporting_evidence_paths": [
+        "fixtures/training/xtrain_explorer_snapshot_v1.json",
+        "fixtures/training/public_run_explorer_contract_v1.json"
+      ],
+      "detail": "The decentralized XTRAIN explorer index now points directly at the retained snapshot and explorer-foundation contract."
+    }
+  ],
   "final_artifact_refs": [
     {
       "artifact_role": "remote_artifact_backend_contract",
@@ -449,6 +624,118 @@
       "evidence_posture": "measured",
       "authoritative": true,
       "detail": "The final bundle cites the shared hybrid planner instead of a lane-specific closeout summary."
+    },
+    {
+      "artifact_role": "remote_training_visualization_reference_doc",
+      "artifact_path": "docs/REMOTE_TRAINING_VISUALIZATION.md",
+      "artifact_digest": "d4520449e1a64fa0995592dc3cca5101cfaad816106bbe34df52ea935d9879ab",
+      "evidence_posture": "derived",
+      "authoritative": true,
+      "detail": "The shared run-surface doc records the machine-facing contract law for the track-aware visualization family."
+    },
+    {
+      "artifact_role": "homegolf_track_contract",
+      "artifact_path": "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+      "artifact_digest": "b119493630207b008082cef6c253ff087dfd4ff06073f9e7dd0087a32775ff05",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "HOMEGOLF evidence closure keeps the track contract explicit inside the final bundle."
+    },
+    {
+      "artifact_role": "homegolf_clustered_run_surface",
+      "artifact_path": "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+      "artifact_digest": "bf46d27f97f3ff2ab633e009a9b1fca6d0b7e9b6c63b40bcf2b742289afce9c3",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "HOMEGOLF evidence closure keeps the clustered score surface explicit instead of hiding it behind one summary score row."
+    },
+    {
+      "artifact_role": "homegolf_score_runtime",
+      "artifact_path": "fixtures/parameter_golf/reports/parameter_golf_homegolf_score_relevant_runtime.json",
+      "artifact_digest": "744800439c009f89b847b94c81424797542d7c98c38be984675366f219245856",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "HOMEGOLF evidence closure keeps the score-relevant runtime report explicit for score-surface drilldown."
+    },
+    {
+      "artifact_role": "homegolf_public_comparison",
+      "artifact_path": "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
+      "artifact_digest": "d974832c373f757acfa0297bcce89c451206d5b83e2b3d28f1c82f812b8ba432",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "HOMEGOLF evidence closure keeps the public-comparison report explicit for score delta drilldown."
+    },
+    {
+      "artifact_role": "xtrain_quick_eval_report",
+      "artifact_path": "fixtures/parameter_golf/reports/parameter_golf_xtrain_quick_eval_report.json",
+      "artifact_digest": "53706340d094c766f8c706f3fecee2c4e412ed53e4fb70eb4651081a66488e69",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Bounded XTRAIN evidence closure keeps the retained quick-eval report explicit for score-lane drilldown."
+    },
+    {
+      "artifact_role": "xtrain_track_contract",
+      "artifact_path": "docs/PARAMETER_GOLF_XTRAIN_TRACK.md",
+      "artifact_digest": "e5caadf57689da34cb61df386db882561d4829a32cb86daeae4f75b1aa588fef",
+      "evidence_posture": "derived",
+      "authoritative": true,
+      "detail": "Bounded XTRAIN evidence closure keeps the track law explicit for score interpretation."
+    },
+    {
+      "artifact_role": "xtrain_quick_eval_audit",
+      "artifact_path": "docs/audits/2026-03-27-xtrain-pgolf-fastfd-window1-quick-eval-audit.md",
+      "artifact_digest": "413674c9eae1680ac75a5fd24ba651d1f882dfbc80c837d68be3e6c2fa7d0adf",
+      "evidence_posture": "derived",
+      "authoritative": true,
+      "detail": "Bounded XTRAIN evidence closure keeps the retained audit explicit for operator drilldown."
+    },
+    {
+      "artifact_role": "public_run_explorer_contract",
+      "artifact_path": "fixtures/training/public_run_explorer_contract_v1.json",
+      "artifact_digest": "d60645fc5ed0467cab5ee1cf671af23720b251e267c27327349138f9f81913a0",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Explorer drilldown keeps the pane-foundation public run explorer contract explicit."
+    },
+    {
+      "artifact_role": "public_network_registry_contract",
+      "artifact_path": "fixtures/training/public_network_registry_contract_v1.json",
+      "artifact_digest": "21f173fc609a9d26de82616265fd40a3cf9c6f60bf229bb05380863d7401b6f0",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Explorer drilldown keeps participant identity and role truth explicit through the registry contract."
+    },
+    {
+      "artifact_role": "public_miner_protocol_contract",
+      "artifact_path": "fixtures/training/public_miner_protocol_contract_v1.json",
+      "artifact_digest": "43798c43db37afe0329c1d64d1f72ddfb57dff52518b0b194c81e6c26c37615a",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Explorer drilldown keeps miner session and refusal truth explicit through the public miner protocol contract."
+    },
+    {
+      "artifact_role": "multi_validator_consensus_contract",
+      "artifact_path": "fixtures/training/multi_validator_consensus_contract_v1.json",
+      "artifact_digest": "5ebe6bc5c764febe94025f5f20873c585da875263e67f72e4e53015b71b01526",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Explorer drilldown keeps held-promotion checkpoint truth explicit through multi-validator consensus."
+    },
+    {
+      "artifact_role": "settlement_publication_contract",
+      "artifact_path": "fixtures/training/settlement_publication_contract_v1.json",
+      "artifact_digest": "02c5280139eab1ba7405725f4f2589699e4c14ded0f2229cbd4242a5d7245b3c",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Explorer drilldown keeps signed settlement posture explicit through the settlement publication contract."
+    },
+    {
+      "artifact_role": "curated_decentralized_run_contract",
+      "artifact_path": "fixtures/training/curated_decentralized_run_contract_v1.json",
+      "artifact_digest": "31a8c72630f06c8bc5d1f912b05c79222e0122947b737cbe05bfea27eb7376f5",
+      "evidence_posture": "measured",
+      "authoritative": true,
+      "detail": "Explorer drilldown keeps the retained curated-run closure explicit alongside the explorer snapshot."
     }
   ],
   "after_action_refs": [
@@ -464,8 +751,8 @@
   "final_disposition": {
     "disposition": "degraded_success",
     "promotion_outcome": "held_no_promotion",
-    "detail": "The canonical bundle proves the shared schema can encode successful, degraded, and refused segments together. The current cross-provider program remains degraded overall because dense distributed live telemetry and full hybrid runtime closure are not finished."
+    "detail": "The canonical bundle proves the shared schema can encode successful, degraded, and refused segments together while also linking track-aware score surfaces and decentralized explorer surfaces back into retained evidence. The current cross-provider program remains degraded overall because dense distributed live telemetry and full hybrid runtime closure are not finished."
   },
-  "claim_boundary": "This bundle family proves one provider-neutral final evidence schema can represent single-node dense runs, dense distributed runs, contributor-window runs, validator-only runs, and hybrid runs without lane-specific proof JSON. It does not claim that every segment shown here has already been executed together in one real production run.",
-  "bundle_digest": "4e79457bafaa9f856897b040a46060396fc5e54c4abff0d276681d88d24e86e6"
+  "claim_boundary": "This bundle family proves one provider-neutral final evidence schema can represent single-node dense runs, dense distributed runs, contributor-window runs, validator-only runs, and hybrid runs without lane-specific proof JSON, while also linking track-aware score surfaces and decentralized explorer surfaces back into retained evidence. It does not claim that every segment shown here has already been executed together in one real production run.",
+  "bundle_digest": "c5d961050d93a96e6c66314291227cc100d60731c4d3e8afc6f24cc6ad9d7404"
 }

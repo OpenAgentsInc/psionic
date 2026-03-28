@@ -72,10 +72,31 @@ validator_dispositions = {
 if not {"accepted", "quarantined", "replay_required"}.issubset(validator_dispositions):
     fail("training execution evidence bundle check: validator disposition coverage drifted")
 
+surface_kinds = {link["surface_kind"] for link in fixture["visualization_surface_links"]}
+required_surface_kinds = {
+    "run_bundle",
+    "run_index",
+    "explorer_snapshot",
+    "explorer_index",
+}
+if surface_kinds != required_surface_kinds:
+    fail("training execution evidence bundle check: visualization surface-kind coverage drifted")
+
+surface_paths = {link["surface_ref"]["artifact_path"] for link in fixture["visualization_surface_links"]}
+required_surface_paths = {
+    "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json",
+    "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json",
+    "fixtures/training/xtrain_explorer_snapshot_v1.json",
+    "fixtures/training/xtrain_explorer_index_v1.json",
+}
+if not required_surface_paths.issubset(surface_paths):
+    fail("training execution evidence bundle check: HOMEGOLF/XTRAIN surface coverage drifted")
+
 summary = {
     "verdict": "verified",
     "segment_count": len(fixture["segment_evidence"]),
     "topology_kind_count": len(topology_kinds),
+    "visualization_surface_link_count": len(fixture["visualization_surface_links"]),
     "final_artifact_ref_count": len(fixture["final_artifact_refs"]),
 }
 print(json.dumps(summary, indent=2))

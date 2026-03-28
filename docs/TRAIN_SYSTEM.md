@@ -589,7 +589,10 @@ doc `docs/TRAINING_EXECUTION_EVIDENCE_REFERENCE.md`, and the fixture
 That surface seals launch facts, runtime facts, checkpoints, metrics,
 visualization refs, validator results, and final disposition under one schema
 family across single-node, dense-distributed, contributor-window,
-validator-only, and hybrid runs.
+validator-only, and hybrid runs. It now also carries explicit
+surface-to-evidence links for the track-aware `v2` run bundles and the
+decentralized `XTRAIN Explorer` artifact family, so score or explorer drilldown
+can resolve retained proof mechanically from the evidence bundle itself.
 
 The first local mixed-hardware swarm lane now also has a canonical machine-
 legible contract in `crates/psionic-train/src/swarm_open_adapter.rs` plus the

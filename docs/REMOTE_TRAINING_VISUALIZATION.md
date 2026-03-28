@@ -157,6 +157,11 @@ The repo now also ships a provider-neutral final evidence bundle family in
 refs from this document are one typed section inside that final evidence family,
 not a sidecar proof surface.
 
+The final evidence bundle now also carries explicit
+`visualization_surface_links`, keyed by retained artifact path, so score-band
+or provenance drilldown can resolve supporting evidence without pane-local
+mapping rules.
+
 ## Track-Aware Semantics
 
 `v2` makes one repo-owned distinction explicit:

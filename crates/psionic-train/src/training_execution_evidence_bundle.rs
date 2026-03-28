@@ -12,7 +12,10 @@ use crate::{
     canonical_cross_provider_compute_source_contracts, cross_provider_training_program_manifest,
     CrossProviderComputeSourceContract, CrossProviderComputeSourceContractError,
     CrossProviderExecutionClass, CrossProviderTrainingProgramManifest,
-    CrossProviderTrainingProgramManifestError,
+    CrossProviderTrainingProgramManifestError, RemoteTrainingTrackFamilyV2,
+    REMOTE_TRAINING_HOMEGOLF_TRACK_ID, REMOTE_TRAINING_RUN_INDEX_V2_SCHEMA_VERSION,
+    REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION, XTRAIN_EXPLORER_INDEX_SCHEMA_VERSION,
+    XTRAIN_EXPLORER_SNAPSHOT_SCHEMA_VERSION,
 };
 
 /// Stable schema version for the provider-neutral training execution evidence bundle.
@@ -114,6 +117,39 @@ pub struct TrainingExecutionEvidenceRef {
     pub detail: String,
 }
 
+/// Visualization or explorer surface kind that can jump into retained evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrainingExecutionVisualizationSurfaceKind {
+    RunBundle,
+    RunIndex,
+    ExplorerSnapshot,
+    ExplorerIndex,
+}
+
+/// Explicit mapping from one score or explorer surface into retained evidence refs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrainingExecutionVisualizationSurfaceLink {
+    /// Stable link id.
+    pub link_id: String,
+    /// Whether the surface is a run bundle, run index, explorer snapshot, or explorer index.
+    pub surface_kind: TrainingExecutionVisualizationSurfaceKind,
+    /// Exact schema version for the linked surface artifact.
+    pub surface_schema_version: String,
+    /// Track family when the linked surface is track-aware.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_family: Option<RemoteTrainingTrackFamilyV2>,
+    /// Stable track id when the linked surface represents one score lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_id: Option<String>,
+    /// The retained score or explorer artifact itself.
+    pub surface_ref: TrainingExecutionEvidenceRef,
+    /// Supporting artifact paths already retained in this evidence bundle.
+    pub supporting_evidence_paths: Vec<String>,
+    /// Machine-legible explanation of the jump relationship.
+    pub detail: String,
+}
+
 /// Typed validator outcome over one execution class.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrainingExecutionValidatorResult {
@@ -188,6 +224,8 @@ pub struct TrainingExecutionEvidenceBundle {
     pub validator_promotion_contract_id: String,
     /// Execution segments carried by this bundle family.
     pub segment_evidence: Vec<TrainingExecutionSegmentEvidence>,
+    /// Explicit score-surface or explorer-surface links into retained evidence refs.
+    pub visualization_surface_links: Vec<TrainingExecutionVisualizationSurfaceLink>,
     /// Final artifact refs retained after bundle closure.
     pub final_artifact_refs: Vec<TrainingExecutionEvidenceRef>,
     /// After-action audit or closeout refs.
@@ -253,6 +291,7 @@ impl TrainingExecutionEvidenceBundle {
         let mut segment_ids = BTreeSet::new();
         let mut topology_coverage = BTreeSet::new();
         let mut class_coverage = BTreeSet::new();
+        let mut retained_artifact_paths = BTreeSet::new();
         let mut bundle_checkpoint_facts = 0_usize;
         for segment in &self.segment_evidence {
             if !segment_ids.insert(segment.segment_id.as_str()) {
@@ -309,6 +348,7 @@ impl TrainingExecutionEvidenceBundle {
             ] {
                 for artifact_ref in section {
                     validate_artifact_ref(artifact_ref)?;
+                    retained_artifact_paths.insert(artifact_ref.artifact_path.clone());
                 }
             }
             for validator_result in &segment.validator_results {
@@ -363,11 +403,149 @@ impl TrainingExecutionEvidenceBundle {
                 ),
             });
         }
+        if self.visualization_surface_links.is_empty() {
+            return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                detail: String::from("visualization_surface_links must not be empty"),
+            });
+        }
         for artifact_ref in &self.final_artifact_refs {
             validate_artifact_ref(artifact_ref)?;
+            retained_artifact_paths.insert(artifact_ref.artifact_path.clone());
         }
         for artifact_ref in &self.after_action_refs {
             validate_artifact_ref(artifact_ref)?;
+            retained_artifact_paths.insert(artifact_ref.artifact_path.clone());
+        }
+
+        let mut surface_link_ids = BTreeSet::new();
+        let mut surface_paths = BTreeSet::new();
+        let mut surface_kinds = BTreeSet::new();
+        let mut linked_track_families = BTreeSet::new();
+        for link in &self.visualization_surface_links {
+            if !surface_link_ids.insert(link.link_id.as_str()) {
+                return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                    detail: format!("duplicate visualization surface link `{}`", link.link_id),
+                });
+            }
+            if link.surface_schema_version.trim().is_empty() || link.detail.trim().is_empty() {
+                return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                    detail: format!(
+                        "visualization surface link `{}` must keep schema version and detail explicit",
+                        link.link_id
+                    ),
+                });
+            }
+            validate_artifact_ref(&link.surface_ref)?;
+            if !surface_paths.insert(link.surface_ref.artifact_path.clone()) {
+                return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                    detail: format!(
+                        "visualization surface artifact `{}` was linked more than once",
+                        link.surface_ref.artifact_path
+                    ),
+                });
+            }
+            if link.track_id.is_some() && link.track_family.is_none() {
+                return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                    detail: format!(
+                        "visualization surface link `{}` has track_id without track_family",
+                        link.link_id
+                    ),
+                });
+            }
+            match link.surface_kind {
+                TrainingExecutionVisualizationSurfaceKind::RunBundle => {
+                    if link.surface_schema_version
+                        != REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION
+                    {
+                        return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                            detail: format!(
+                                "run bundle link `{}` lost the canonical v2 bundle binding",
+                                link.link_id
+                            ),
+                        });
+                    }
+                }
+                TrainingExecutionVisualizationSurfaceKind::RunIndex => {
+                    if link.surface_schema_version != REMOTE_TRAINING_RUN_INDEX_V2_SCHEMA_VERSION {
+                        return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                            detail: format!(
+                                "run index link `{}` lost the canonical v2 run-index binding",
+                                link.link_id
+                            ),
+                        });
+                    }
+                }
+                TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot => {
+                    if link.surface_schema_version != XTRAIN_EXPLORER_SNAPSHOT_SCHEMA_VERSION {
+                        return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                            detail: format!(
+                                "explorer snapshot link `{}` lost the canonical schema binding",
+                                link.link_id
+                            ),
+                        });
+                    }
+                }
+                TrainingExecutionVisualizationSurfaceKind::ExplorerIndex => {
+                    if link.surface_schema_version != XTRAIN_EXPLORER_INDEX_SCHEMA_VERSION {
+                        return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                            detail: format!(
+                                "explorer index link `{}` lost the canonical schema binding",
+                                link.link_id
+                            ),
+                        });
+                    }
+                }
+            }
+            if let Some(track_family) = link.track_family {
+                linked_track_families.insert(track_family);
+            }
+            surface_kinds.insert(link.surface_kind);
+        }
+        let valid_support_paths = retained_artifact_paths
+            .iter()
+            .cloned()
+            .chain(surface_paths.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        for link in &self.visualization_surface_links {
+            if link.supporting_evidence_paths.is_empty() {
+                return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                    detail: format!(
+                        "visualization surface link `{}` must point at supporting evidence",
+                        link.link_id
+                    ),
+                });
+            }
+            for supporting_path in &link.supporting_evidence_paths {
+                if !valid_support_paths.contains(supporting_path) {
+                    return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                        detail: format!(
+                            "visualization surface link `{}` references unknown supporting evidence `{}`",
+                            link.link_id, supporting_path
+                        ),
+                    });
+                }
+            }
+        }
+        if !surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunBundle)
+            || !surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunIndex)
+            || !surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot)
+            || !surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerIndex)
+        {
+            return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                detail: String::from(
+                    "visualization surface links must cover run_bundle, run_index, explorer_snapshot, and explorer_index",
+                ),
+            });
+        }
+        if !linked_track_families.contains(&RemoteTrainingTrackFamilyV2::Homegolf)
+            || !linked_track_families.contains(&RemoteTrainingTrackFamilyV2::Xtrain)
+            || !linked_track_families.contains(&RemoteTrainingTrackFamilyV2::Psion)
+        {
+            return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
+                detail: String::from(
+                    "visualization surface links must explicitly cover psion, homegolf, and xtrain track families",
+                ),
+            });
         }
         if self.final_disposition.detail.trim().is_empty() {
             return Err(TrainingExecutionEvidenceBundleError::InvalidBundle {
@@ -436,25 +614,25 @@ pub fn canonical_training_execution_evidence_bundle(
                 )?],
                 metric_facts: vec![repo_artifact_ref(
                     "live_metric_bundle",
-                    "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
+                    "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
                     TrainingExecutionEvidencePosture::Measured,
                     true,
-                    "The one-second Google live bundle is the authoritative metric surface for the single-node lane.",
+                    "The one-second Google live v2 bundle is the authoritative metric surface for the single-node lane.",
                 )?],
                 visualization_refs: vec![
                     repo_artifact_ref(
-                        "visualization_bundle",
-                        "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
+                        "visualization_bundle_v2",
+                        "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
                         TrainingExecutionEvidencePosture::Measured,
                         true,
-                        "The app-facing visualization bundle is carried directly into the final evidence bundle.",
+                        "The app-facing track-aware visualization bundle is carried directly into the final evidence bundle.",
                     )?,
                     repo_artifact_ref(
-                        "run_index",
-                        "fixtures/training_visualization/remote_training_run_index_v1.json",
+                        "run_index_v2",
+                        "fixtures/training_visualization/remote_training_run_index_v2.json",
                         TrainingExecutionEvidencePosture::Measured,
                         true,
-                        "Run discovery remains explicit through the typed run index.",
+                        "Run discovery remains explicit through the track-aware typed run index.",
                     )?,
                 ],
                 validator_results: vec![TrainingExecutionValidatorResult {
@@ -511,25 +689,25 @@ pub fn canonical_training_execution_evidence_bundle(
                 )?],
                 metric_facts: vec![repo_artifact_ref(
                     "visualization_metric_bundle",
-                    "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+                    "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
                     TrainingExecutionEvidencePosture::Derived,
                     true,
-                    "The retained RunPod bundle now preserves the always-live distributed mirror and still keeps any missing primary series explicit.",
+                    "The retained RunPod v2 bundle now preserves the distributed mirror while keeping any missing primary series explicit.",
                 )?],
                 visualization_refs: vec![
                     repo_artifact_ref(
-                        "visualization_bundle",
-                        "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+                        "visualization_bundle_v2",
+                        "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
                         TrainingExecutionEvidencePosture::Derived,
                         true,
-                        "The provider-neutral visualization bundle is preserved through the same always-live mirror and finalizer seal path.",
+                        "The provider-neutral track-aware visualization bundle is preserved through the same always-live mirror and finalizer seal path.",
                     )?,
                     repo_artifact_ref(
-                        "run_index",
-                        "fixtures/training_visualization/remote_training_run_index_v1.json",
+                        "run_index_v2",
+                        "fixtures/training_visualization/remote_training_run_index_v2.json",
                         TrainingExecutionEvidencePosture::Measured,
                         true,
-                        "The shared run index still enumerates the distributed lane through the same discovery surface.",
+                        "The shared v2 run index still enumerates the distributed lane through the same discovery surface.",
                     )?,
                 ],
                 validator_results: vec![TrainingExecutionValidatorResult {
@@ -634,17 +812,17 @@ pub fn canonical_training_execution_evidence_bundle(
                 )?],
                 metric_facts: vec![repo_artifact_ref(
                     "summary_visualization_bundle",
-                    "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json",
+                    "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
                     TrainingExecutionEvidencePosture::Measured,
                     true,
-                    "Validator-only metrics can be summary-only and still remain truthful inside the shared bundle family.",
+                    "Validator-only metrics can be summary-only and still remain truthful inside the shared track-aware bundle family.",
                 )?],
                 visualization_refs: vec![repo_artifact_ref(
-                    "summary_visualization_bundle",
-                    "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v1.json",
+                    "summary_visualization_bundle_v2",
+                    "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
                     TrainingExecutionEvidencePosture::Measured,
                     true,
-                    "Validator-only visualization refs stay summary-only instead of forcing fake loss curves.",
+                    "Validator-only visualization refs stay summary-only inside the v2 bundle instead of forcing fake loss curves.",
                 )?],
                 validator_results: vec![TrainingExecutionValidatorResult {
                     validator_id: String::from("google-validator-1"),
@@ -722,26 +900,26 @@ pub fn canonical_training_execution_evidence_bundle(
                     "Hybrid closure keeps one provider-neutral checkpoint family even when multiple execution classes contribute to the run.",
                 )?],
                 metric_facts: vec![repo_artifact_ref(
-                    "run_index",
-                    "fixtures/training_visualization/remote_training_run_index_v1.json",
+                    "run_index_v2",
+                    "fixtures/training_visualization/remote_training_run_index_v2.json",
                     TrainingExecutionEvidencePosture::Measured,
                     true,
-                    "Hybrid proof keeps the run index explicit because the app still discovers hybrid lanes through the same typed surface.",
+                    "Hybrid proof keeps the v2 run index explicit because the app now discovers track-aware lanes through the same typed surface.",
                 )?],
                 visualization_refs: vec![
                     repo_artifact_ref(
-                        "google_live_visualization",
-                        "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v1.json",
+                        "google_live_visualization_v2",
+                        "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
                         TrainingExecutionEvidencePosture::Measured,
                         false,
-                        "Hybrid proof can cite live Google visualization state where available.",
+                        "Hybrid proof can cite live Google v2 visualization state where available.",
                     )?,
                     repo_artifact_ref(
-                        "runpod_distributed_visualization",
-                        "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v1.json",
+                        "runpod_distributed_visualization_v2",
+                        "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
                         TrainingExecutionEvidencePosture::Derived,
                         false,
-                        "Hybrid proof can also cite the sealed always-live distributed visualization state while keeping the degraded posture explicit.",
+                        "Hybrid proof can also cite the sealed distributed v2 visualization state while keeping the degraded posture explicit.",
                     )?,
                 ],
                 validator_results: vec![
@@ -770,6 +948,155 @@ pub fn canonical_training_execution_evidence_bundle(
                 ),
             },
         ],
+        visualization_surface_links: vec![
+            visualization_surface_link(
+                "surface.psion_google_live_v2",
+                TrainingExecutionVisualizationSurfaceKind::RunBundle,
+                REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::Psion),
+                Some(String::from("psion.training.non_record.v1")),
+                "psion_google_live_visualization_v2",
+                "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/training/launch_contracts/google_single_node_accelerated_v1.json",
+                    "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+                    "fixtures/psion/checkpoint_recovery/psion_dense_checkpoint_artifact_v1.json",
+                    "fixtures/training_visualization/remote_training_run_index_v2.json",
+                ],
+                "The live Google v2 surface now maps directly back to its launch, runtime, checkpoint, and discovery evidence without pane-local lookup rules.",
+            )?,
+            visualization_surface_link(
+                "surface.parameter_golf_distributed_v2",
+                TrainingExecutionVisualizationSurfaceKind::RunBundle,
+                REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::ParameterGolf),
+                Some(String::from("parameter_golf.non_record.v1")),
+                "parameter_golf_distributed_visualization_v2",
+                "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+                TrainingExecutionEvidencePosture::Derived,
+                true,
+                vec![
+                    "fixtures/training/launch_contracts/runpod_8xh100_v1.json",
+                    "fixtures/training/dense_rank_runtime_reference_contract_v1.json",
+                    "fixtures/training/sharded_distributed_checkpoint_contract_v1.json",
+                    "fixtures/training_visualization/remote_training_run_index_v2.json",
+                ],
+                "The distributed PGOLF v2 surface points directly at the retained launch, runtime, checkpoint, and discovery evidence set.",
+            )?,
+            visualization_surface_link(
+                "surface.psion_google_summary_v2",
+                TrainingExecutionVisualizationSurfaceKind::RunBundle,
+                REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::Psion),
+                Some(String::from("psion.training.non_record.v1")),
+                "psion_google_summary_visualization_v2",
+                "fixtures/training_visualization/psion_google_summary_only_remote_training_visualization_bundle_v2.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/training/launch_contracts/google_single_node_accelerated_v1.json",
+                    "fixtures/training/remote_train_artifact_backend_contract_v1.json",
+                    "fixtures/psion/checkpoint_recovery/psion_dense_checkpoint_artifact_v1.json",
+                ],
+                "The summary-only v2 surface keeps validator-only proof jumpable without forcing the consumer to infer which checkpoint or backend refs matter.",
+            )?,
+            visualization_surface_link(
+                "surface.remote_training_run_index_v2",
+                TrainingExecutionVisualizationSurfaceKind::RunIndex,
+                REMOTE_TRAINING_RUN_INDEX_V2_SCHEMA_VERSION,
+                None,
+                None,
+                "remote_training_run_index_v2",
+                "fixtures/training_visualization/remote_training_run_index_v2.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/training_visualization/psion_google_live_remote_training_visualization_bundle_v2.json",
+                    "fixtures/training_visualization/parameter_golf_distributed_8xh100_remote_training_visualization_bundle_v2.json",
+                    "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json",
+                    "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json",
+                ],
+                "The shared v2 run index now advertises exactly which retained v2 surfaces participate in evidence-backed score or runtime drilldown.",
+            )?,
+            visualization_surface_link(
+                "surface.homegolf_score_closeout_v2",
+                TrainingExecutionVisualizationSurfaceKind::RunBundle,
+                REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::Homegolf),
+                Some(String::from(REMOTE_TRAINING_HOMEGOLF_TRACK_ID)),
+                "homegolf_score_surface_v2",
+                "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_score_relevant_runtime.json",
+                    "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
+                    "fixtures/training_visualization/remote_training_run_index_v2.json",
+                ],
+                "The HOMEGOLF v2 score-closeout surface now has one explicit evidence jump set covering track law, clustered score surface, score-relevant runtime, public comparison, and typed discovery.",
+            )?,
+            visualization_surface_link(
+                "surface.xtrain_bounded_run_v2",
+                TrainingExecutionVisualizationSurfaceKind::RunBundle,
+                REMOTE_TRAINING_VISUALIZATION_BUNDLE_V2_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::Xtrain),
+                Some(String::from(
+                    "parameter_golf.promoted_general_xtrain.quick_eval_window1.v1",
+                )),
+                "bounded_xtrain_visualization_v2",
+                "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/parameter_golf/reports/parameter_golf_xtrain_quick_eval_report.json",
+                    "docs/PARAMETER_GOLF_XTRAIN_TRACK.md",
+                    "docs/audits/2026-03-27-xtrain-pgolf-fastfd-window1-quick-eval-audit.md",
+                    "fixtures/training_visualization/remote_training_run_index_v2.json",
+                ],
+                "The bounded XTRAIN v2 score lane now maps directly back to the retained quick-eval report, track law, audit, and shared v2 discovery surface.",
+            )?,
+            visualization_surface_link(
+                "surface.xtrain_explorer_snapshot_v1",
+                TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot,
+                XTRAIN_EXPLORER_SNAPSHOT_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::Xtrain),
+                None,
+                "xtrain_explorer_snapshot_v1",
+                "fixtures/training/xtrain_explorer_snapshot_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/training/public_run_explorer_contract_v1.json",
+                    "fixtures/training/public_network_registry_contract_v1.json",
+                    "fixtures/training/public_miner_protocol_contract_v1.json",
+                    "fixtures/training/multi_validator_consensus_contract_v1.json",
+                    "fixtures/training/settlement_publication_contract_v1.json",
+                    "fixtures/training/curated_decentralized_run_contract_v1.json",
+                    "fixtures/training_visualization/parameter_golf_xtrain_remote_training_visualization_bundle_v2.json",
+                ],
+                "The decentralized XTRAIN explorer snapshot now exposes an explicit supporting-evidence set spanning registry, miner protocol, consensus, settlement, curated-run, and sibling bounded-score truth.",
+            )?,
+            visualization_surface_link(
+                "surface.xtrain_explorer_index_v1",
+                TrainingExecutionVisualizationSurfaceKind::ExplorerIndex,
+                XTRAIN_EXPLORER_INDEX_SCHEMA_VERSION,
+                Some(RemoteTrainingTrackFamilyV2::Xtrain),
+                None,
+                "xtrain_explorer_index_v1",
+                "fixtures/training/xtrain_explorer_index_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                vec![
+                    "fixtures/training/xtrain_explorer_snapshot_v1.json",
+                    "fixtures/training/public_run_explorer_contract_v1.json",
+                ],
+                "The decentralized XTRAIN explorer index now points directly at the retained snapshot and explorer-foundation contract.",
+            )?,
+        ],
         final_artifact_refs: vec![
             repo_artifact_ref(
                 "remote_artifact_backend_contract",
@@ -785,6 +1112,104 @@ pub fn canonical_training_execution_evidence_bundle(
                 true,
                 "The final bundle cites the shared hybrid planner instead of a lane-specific closeout summary.",
             )?,
+            repo_artifact_ref(
+                "remote_training_visualization_reference_doc",
+                "docs/REMOTE_TRAINING_VISUALIZATION.md",
+                TrainingExecutionEvidencePosture::Derived,
+                true,
+                "The shared run-surface doc records the machine-facing contract law for the track-aware visualization family.",
+            )?,
+            repo_artifact_ref(
+                "homegolf_track_contract",
+                "fixtures/parameter_golf/reports/parameter_golf_homegolf_track_contract.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "HOMEGOLF evidence closure keeps the track contract explicit inside the final bundle.",
+            )?,
+            repo_artifact_ref(
+                "homegolf_clustered_run_surface",
+                "fixtures/parameter_golf/reports/parameter_golf_homegolf_clustered_run_surface.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "HOMEGOLF evidence closure keeps the clustered score surface explicit instead of hiding it behind one summary score row.",
+            )?,
+            repo_artifact_ref(
+                "homegolf_score_runtime",
+                "fixtures/parameter_golf/reports/parameter_golf_homegolf_score_relevant_runtime.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "HOMEGOLF evidence closure keeps the score-relevant runtime report explicit for score-surface drilldown.",
+            )?,
+            repo_artifact_ref(
+                "homegolf_public_comparison",
+                "fixtures/parameter_golf/reports/parameter_golf_homegolf_public_comparison.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "HOMEGOLF evidence closure keeps the public-comparison report explicit for score delta drilldown.",
+            )?,
+            repo_artifact_ref(
+                "xtrain_quick_eval_report",
+                "fixtures/parameter_golf/reports/parameter_golf_xtrain_quick_eval_report.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Bounded XTRAIN evidence closure keeps the retained quick-eval report explicit for score-lane drilldown.",
+            )?,
+            repo_artifact_ref(
+                "xtrain_track_contract",
+                "docs/PARAMETER_GOLF_XTRAIN_TRACK.md",
+                TrainingExecutionEvidencePosture::Derived,
+                true,
+                "Bounded XTRAIN evidence closure keeps the track law explicit for score interpretation.",
+            )?,
+            repo_artifact_ref(
+                "xtrain_quick_eval_audit",
+                "docs/audits/2026-03-27-xtrain-pgolf-fastfd-window1-quick-eval-audit.md",
+                TrainingExecutionEvidencePosture::Derived,
+                true,
+                "Bounded XTRAIN evidence closure keeps the retained audit explicit for operator drilldown.",
+            )?,
+            repo_artifact_ref(
+                "public_run_explorer_contract",
+                "fixtures/training/public_run_explorer_contract_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Explorer drilldown keeps the pane-foundation public run explorer contract explicit.",
+            )?,
+            repo_artifact_ref(
+                "public_network_registry_contract",
+                "fixtures/training/public_network_registry_contract_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Explorer drilldown keeps participant identity and role truth explicit through the registry contract.",
+            )?,
+            repo_artifact_ref(
+                "public_miner_protocol_contract",
+                "fixtures/training/public_miner_protocol_contract_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Explorer drilldown keeps miner session and refusal truth explicit through the public miner protocol contract.",
+            )?,
+            repo_artifact_ref(
+                "multi_validator_consensus_contract",
+                "fixtures/training/multi_validator_consensus_contract_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Explorer drilldown keeps held-promotion checkpoint truth explicit through multi-validator consensus.",
+            )?,
+            repo_artifact_ref(
+                "settlement_publication_contract",
+                "fixtures/training/settlement_publication_contract_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Explorer drilldown keeps signed settlement posture explicit through the settlement publication contract.",
+            )?,
+            repo_artifact_ref(
+                "curated_decentralized_run_contract",
+                "fixtures/training/curated_decentralized_run_contract_v1.json",
+                TrainingExecutionEvidencePosture::Measured,
+                true,
+                "Explorer drilldown keeps the retained curated-run closure explicit alongside the explorer snapshot.",
+            )?,
         ],
         after_action_refs: vec![repo_artifact_ref(
             "after_action_audit",
@@ -797,11 +1222,11 @@ pub fn canonical_training_execution_evidence_bundle(
             disposition: TrainingExecutionDisposition::DegradedSuccess,
             promotion_outcome: TrainingExecutionPromotionOutcome::HeldNoPromotion,
             detail: String::from(
-                "The canonical bundle proves the shared schema can encode successful, degraded, and refused segments together. The current cross-provider program remains degraded overall because dense distributed live telemetry and full hybrid runtime closure are not finished.",
+                "The canonical bundle proves the shared schema can encode successful, degraded, and refused segments together while also linking track-aware score surfaces and decentralized explorer surfaces back into retained evidence. The current cross-provider program remains degraded overall because dense distributed live telemetry and full hybrid runtime closure are not finished.",
             ),
         },
         claim_boundary: String::from(
-            "This bundle family proves one provider-neutral final evidence schema can represent single-node dense runs, dense distributed runs, contributor-window runs, validator-only runs, and hybrid runs without lane-specific proof JSON. It does not claim that every segment shown here has already been executed together in one real production run.",
+            "This bundle family proves one provider-neutral final evidence schema can represent single-node dense runs, dense distributed runs, contributor-window runs, validator-only runs, and hybrid runs without lane-specific proof JSON, while also linking track-aware score surfaces and decentralized explorer surfaces back into retained evidence. It does not claim that every segment shown here has already been executed together in one real production run.",
         ),
         bundle_digest: String::new(),
     };
@@ -934,6 +1359,40 @@ fn repo_artifact_ref(
     })
 }
 
+fn visualization_surface_link(
+    link_id: &str,
+    surface_kind: TrainingExecutionVisualizationSurfaceKind,
+    surface_schema_version: &str,
+    track_family: Option<RemoteTrainingTrackFamilyV2>,
+    track_id: Option<String>,
+    artifact_role: &str,
+    artifact_path: &str,
+    evidence_posture: TrainingExecutionEvidencePosture,
+    authoritative: bool,
+    supporting_evidence_paths: Vec<&str>,
+    detail: &str,
+) -> Result<TrainingExecutionVisualizationSurfaceLink, TrainingExecutionEvidenceBundleError> {
+    Ok(TrainingExecutionVisualizationSurfaceLink {
+        link_id: String::from(link_id),
+        surface_kind,
+        surface_schema_version: String::from(surface_schema_version),
+        track_family,
+        track_id,
+        surface_ref: repo_artifact_ref(
+            artifact_role,
+            artifact_path,
+            evidence_posture,
+            authoritative,
+            detail,
+        )?,
+        supporting_evidence_paths: supporting_evidence_paths
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        detail: String::from(detail),
+    })
+}
+
 fn sha256_file(path: &str) -> Result<String, TrainingExecutionEvidenceBundleError> {
     let bytes = fs::read(path).map_err(|error| TrainingExecutionEvidenceBundleError::Read {
         path: String::from(path),
@@ -952,51 +1411,141 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::{
+        collections::BTreeSet,
+        path::{Path, PathBuf},
+        sync::{Mutex, OnceLock},
+    };
 
     use super::{
         canonical_training_execution_evidence_bundle, TrainingExecutionDisposition,
         TrainingExecutionEvidenceBundleError, TrainingExecutionTopologyKind,
+        TrainingExecutionVisualizationSurfaceKind,
     };
+
+    fn workspace_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("psionic workspace root should exist")
+            .to_path_buf()
+    }
+
+    fn cwd_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn with_workspace_root<T>(
+        f: impl FnOnce() -> Result<T, Box<dyn std::error::Error>>,
+    ) -> Result<T, Box<dyn std::error::Error>> {
+        let _guard = cwd_lock().lock().expect("cwd lock should not be poisoned");
+        let original = std::env::current_dir().expect("current dir should resolve");
+        std::env::set_current_dir(workspace_root()).expect("workspace root should be reachable");
+        let result = f();
+        std::env::set_current_dir(original).expect("original cwd should be restorable");
+        result
+    }
 
     #[test]
     fn canonical_bundle_covers_all_topology_kinds() -> Result<(), Box<dyn std::error::Error>> {
-        let bundle = canonical_training_execution_evidence_bundle()?;
-        let topology_kinds = bundle
-            .segment_evidence
-            .iter()
-            .map(|segment| segment.topology_kind)
-            .collect::<BTreeSet<_>>();
-        assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::Hybrid));
-        assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::SingleNode));
+        with_workspace_root(|| {
+            let bundle = canonical_training_execution_evidence_bundle()?;
+            let topology_kinds = bundle
+                .segment_evidence
+                .iter()
+                .map(|segment| segment.topology_kind)
+                .collect::<BTreeSet<_>>();
+            assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::Hybrid));
+            assert!(topology_kinds.contains(&TrainingExecutionTopologyKind::SingleNode));
+            Ok(())
+        })?;
         Ok(())
     }
 
     #[test]
     fn canonical_bundle_rejects_missing_final_artifact_refs(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut bundle = canonical_training_execution_evidence_bundle()?;
-        bundle.final_artifact_refs.clear();
-        let manifest = crate::cross_provider_training_program_manifest()?;
-        let sources = crate::canonical_cross_provider_compute_source_contracts()?;
-        let err = bundle
-            .validate(&manifest, &sources)
-            .expect_err("missing final artifact refs must be rejected");
-        assert!(matches!(
-            err,
-            TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
-        ));
+        with_workspace_root(|| {
+            let mut bundle = canonical_training_execution_evidence_bundle()?;
+            bundle.final_artifact_refs.clear();
+            let manifest = crate::cross_provider_training_program_manifest()?;
+            let sources = crate::canonical_cross_provider_compute_source_contracts()?;
+            let err = bundle
+                .validate(&manifest, &sources)
+                .expect_err("missing final artifact refs must be rejected");
+            assert!(matches!(
+                err,
+                TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
+            ));
+            Ok(())
+        })?;
         Ok(())
     }
 
     #[test]
     fn canonical_bundle_stays_degraded_until_all_segments_are_green(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let bundle = canonical_training_execution_evidence_bundle()?;
-        assert_eq!(
-            bundle.final_disposition.disposition,
-            TrainingExecutionDisposition::DegradedSuccess
-        );
+        with_workspace_root(|| {
+            let bundle = canonical_training_execution_evidence_bundle()?;
+            assert_eq!(
+                bundle.final_disposition.disposition,
+                TrainingExecutionDisposition::DegradedSuccess
+            );
+            Ok(())
+        })?;
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_bundle_links_track_aware_and_explorer_surfaces(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        with_workspace_root(|| {
+            let bundle = canonical_training_execution_evidence_bundle()?;
+            let surface_kinds = bundle
+                .visualization_surface_links
+                .iter()
+                .map(|link| link.surface_kind)
+                .collect::<BTreeSet<_>>();
+            assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunBundle));
+            assert!(surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::RunIndex));
+            assert!(surface_kinds
+                .contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerSnapshot));
+            assert!(
+                surface_kinds.contains(&TrainingExecutionVisualizationSurfaceKind::ExplorerIndex)
+            );
+            assert!(bundle.visualization_surface_links.iter().any(|link| {
+                link.surface_ref.artifact_path
+                    == "fixtures/training_visualization/parameter_golf_homegolf_remote_training_visualization_bundle_v2.json"
+            }));
+            assert!(bundle.visualization_surface_links.iter().any(|link| {
+                link.surface_ref.artifact_path
+                    == "fixtures/training/xtrain_explorer_snapshot_v1.json"
+            }));
+            Ok(())
+        })?;
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_bundle_rejects_unknown_surface_supporting_path(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        with_workspace_root(|| {
+            let mut bundle = canonical_training_execution_evidence_bundle()?;
+            bundle.visualization_surface_links[0]
+                .supporting_evidence_paths
+                .push(String::from("fixtures/training/does_not_exist.json"));
+            let manifest = crate::cross_provider_training_program_manifest()?;
+            let sources = crate::canonical_cross_provider_compute_source_contracts()?;
+            let err = bundle
+                .validate(&manifest, &sources)
+                .expect_err("unknown supporting evidence path must be rejected");
+            assert!(matches!(
+                err,
+                TrainingExecutionEvidenceBundleError::InvalidBundle { .. }
+            ));
+            Ok(())
+        })?;
         Ok(())
     }
 }
