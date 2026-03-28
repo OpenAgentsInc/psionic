@@ -235,10 +235,98 @@ The improvement is real because:
 
 This is a real throughput gain, not just a measurement artifact.
 
+## Later Follow-On: Presorted Candidate Cleanup And Isolation Recheck
+
+After the adaptive block-count tuning landed, the next sampled follow-on
+looked at host-side work in the bounded candidate lane.
+
+Two later commits matter here:
+
+- `9990d5cf` `Skip redundant sort for qwen35 presorted candidates`
+- `d0bbea32` `Tighten qwen35 benchmark GPU isolation`
+
+### Presorted candidate cleanup
+
+The bounded qwen35 sampled lane already receives CUDA top-k candidates sorted
+by descending logit.
+
+The cleanup in `9990d5cf`:
+
+- adds a presorted-candidate sampling entrypoint
+- skips the redundant host-side `top_p` sort for that path
+- preserves the same bounded-candidate output mode
+
+That change is valid, but on the real qwen35 sampled rows it did not produce a
+meaningful throughput gain by itself.
+
+### Why the first follow-on matrix was not trustworthy
+
+The first full follow-on after `9990d5cf` produced:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_212306_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_212306_archlinux-/one_page_summary.md`
+
+That artifact is diagnostic only and should not be treated as canonical
+evidence.
+
+What it exposed:
+
+- startup-only idle-GPU checks were not enough
+- later rows could still run after unrelated CUDA residency reappeared on the
+  host
+- some sampled rows looked contradictory even though token counts and sampled
+  contracts were unchanged
+
+The problem was measurement hygiene, not a newly validated runtime speedup or
+regression.
+
+### Isolation fix
+
+Commit `d0bbea32` tightened the canonical matrix runner so it now:
+
+- re-checks GPU idleness before every backend row
+- stops any models still listed by `ollama ps` between rows
+- waits for the GPU to become idle again after each Ollama row
+
+This change is benchmark hygiene. It does not change qwen35 runtime speed.
+
+### Clean diagnostic rerun
+
+After landing `d0bbea32`, the narrowed rerun on the idle RTX 4080 host was:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_212810_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_212810_archlinux-/one_page_summary.md`
+
+Scope:
+
+- models `qwen3.5:2b` and `qwen3.5:4b`
+- contracts `sampled_topk40` and `sampled_topk100`
+- `repeats = 3`
+
+What the clean rerun showed:
+
+- `sampled_topk40`
+  - `2b` `252.84 tok/s`
+  - `4b` `178.65 tok/s`
+- `sampled_topk100`
+  - `2b` `250.56 tok/s`
+  - `4b` `178.16 tok/s`
+
+Interpretation:
+
+- these numbers return to the previously published stable range
+- the presorted-candidate cleanup is effectively throughput-flat on the real
+  sampled contracts
+- `9990d5cf` is reasonable to keep as bounded-candidate cleanup, but not as a
+  new performance checkpoint
+- `d0bbea32` was the materially important change because it makes later
+  benchmark claims harder to contaminate
+
 ## Next Steps
 
-- tune the partitioned block count against the wider `top_k = 100` contract
-  beyond the current `24` versus `40` split and decide whether a richer
-  adaptive rule is worth the added complexity
-- keep benchmarking from the same remote staging worktree so future qwen35
-  tuning passes do not pay path-sensitive rebuild cost again
+- move one layer lower than sampler ordering and reduce the host-side top-k
+  parse/copy overhead in the bounded candidate lane
+- target the extra host copies between CUDA pinned buffers, temporary byte
+  vectors, parsed top-k vectors, and the runtime sampler scratch buffers
+- keep using the row-by-row isolation runner so future qwen35 tuning passes
+  are measured on a genuinely idle GPU

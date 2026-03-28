@@ -31,6 +31,11 @@ Shared benchmark rules:
 - verify `nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory
   --format=csv,noheader,nounits` returns no resident compute processes before
   the run; do not publish qwen35 benchmark numbers from a busy GPU
+- the canonical matrix runner now re-checks GPU idleness before every backend
+  row and waits for the GPU to drain after each Ollama row
+- the canonical matrix runner now stops any models still listed by `ollama ps`
+  between rows so Ollama does not silently retain VRAM residency across the
+  Psionic-versus-Ollama sequence
 - benchmark one runtime at a time for `9b` on this 16 GB RTX 4080 because
   Ollama keeps model weights resident in VRAM
 - the local Ollama `qwen3.5` path on this checkout routes through
@@ -52,6 +57,15 @@ The canonical repo-owned rerun path is now:
 The canonical matrix runner now refuses to start if `nvidia-smi` reports any
 resident compute processes unless `PSIONIC_QWEN35_MATRIX_ALLOW_BUSY_GPU=1` is
 set explicitly.
+
+As of commit `d0bbea32`, the same runner also:
+
+- stops any models still loaded in Ollama between rows
+- waits for the GPU to become idle before each Psionic row
+- waits for the GPU to become idle again after each Ollama row
+
+That change is benchmark-hygiene, not a throughput claim. It closes a real
+measurement hole that showed up during later sampled follow-up runs.
 
 Those artifacts preserve the per-run fields that matter for honest comparison:
 
@@ -102,6 +116,19 @@ Current canonical evidence lives in:
   state on request init:
   - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_185546_archlinux-.json`
   - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_185546_archlinux-/one_page_summary.md`
+- non-canonical diagnostic rerun after the presorted-candidate cleanup and the
+  row-by-row isolation fix:
+  - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_212810_archlinux-.json`
+  - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_212810_archlinux-/one_page_summary.md`
+
+Why `20260328_212810` is diagnostic only:
+
+- it intentionally narrowed scope to `2b` and `4b`
+- it confirmed the isolation fix restored stable sampled numbers
+- it showed the presorted-candidate cleanup is effectively throughput-flat on
+  the real sampled contracts
+- it is not a new canonical checkpoint because it does not widen Psionic's
+  lead over the existing published sampled record
 
 The mixed canonical table below uses:
 
