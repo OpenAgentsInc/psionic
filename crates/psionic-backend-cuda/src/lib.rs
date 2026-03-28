@@ -1570,6 +1570,26 @@ impl CudaSubmission {
         Ok(())
     }
 
+    /// Gathers one sparse set of `f32` values from a contiguous `f32` input row on CUDA.
+    pub fn gather_f32_by_indices(
+        &mut self,
+        input: &CudaBuffer,
+        input_len: usize,
+        indices: &CudaBuffer,
+        index_count: usize,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        self.platform.encode_gather_f32_by_indices(
+            &input.platform,
+            input_len,
+            &indices.platform,
+            index_count,
+            &output.platform,
+        )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Selects the bounded top-k values from one contiguous `f32` row using multiple CUDA blocks.
     pub fn top_k_f32_one_row_partitioned(
         &mut self,
@@ -3793,7 +3813,15 @@ impl CudaBackend {
 
     /// Allocates an uninitialized dense `i32` buffer on the selected CUDA device.
     pub fn i32_buffer(&mut self, len: usize) -> Result<CudaBuffer, RuntimeError> {
-        self.byte_buffer(&vec![0_u8; len.saturating_mul(size_of::<i32>())])
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Err(RuntimeError::Backend(String::from(
+                "cuda backend unavailable: no selected execution device",
+            )));
+        };
+        self.allocate_buffer(&TensorSpec::new(Shape::new(vec![len]), DType::I32, device))
     }
 
     /// Allocates a page-locked host buffer for stream-owned staging transfers.
@@ -9102,6 +9130,14 @@ mod platform {
         *mut c_void,
         CudaStream,
     ) -> CudaError;
+    type GatherF32ByIndicesKernel = unsafe extern "C" fn(
+        *const c_void,
+        c_int,
+        *const c_void,
+        c_int,
+        *mut c_void,
+        CudaStream,
+    ) -> CudaError;
     type SplitInterleavedQueryGateRmsNormF32Kernel = unsafe extern "C" fn(
         *const c_void,
         c_int,
@@ -9229,6 +9265,14 @@ mod platform {
             rows: c_int,
             cols: c_int,
             decode_params: *const c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
+        fn psionic_cuda_gather_f32_by_indices(
+            input: *const c_void,
+            input_len: c_int,
+            indices: *const c_void,
+            index_count: c_int,
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
@@ -10275,9 +10319,8 @@ mod platform {
             &self,
             column_count: usize,
         ) -> Result<usize, RuntimeError> {
-            let cols = c_int::try_from(column_count).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda top_k cols exceed c_int"))
-            })?;
+            let cols = c_int::try_from(column_count)
+                .map_err(|_| RuntimeError::Backend(String::from("cuda top_k cols exceed c_int")))?;
             self.runtime.set_device()?;
             let mut temp_storage_bytes = 0usize;
             self.runtime.check(
@@ -11215,6 +11258,38 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_gather_f32_by_indices(
+            &mut self,
+            input: &PlatformBuffer,
+            input_len: usize,
+            indices: &PlatformBuffer,
+            index_count: usize,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let input_len = c_int::try_from(input_len).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda sparse gather input length exceeds c_int",
+                ))
+            })?;
+            let index_count = c_int::try_from(index_count).map_err(|_| {
+                RuntimeError::Backend(String::from("cuda sparse gather index count exceeds c_int"))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    (psionic_cuda_gather_f32_by_indices as GatherF32ByIndicesKernel)(
+                        input.inner.device_ptr.cast(),
+                        input_len,
+                        indices.inner.device_ptr.cast(),
+                        index_count,
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_gather_f32_by_indices",
+            )
+        }
+
         pub(super) fn encode_quantized_matvec_q8_1(
             &mut self,
             weights: &PlatformBuffer,
@@ -11391,12 +11466,10 @@ mod platform {
             selected_indices: &PlatformBuffer,
             selected_values: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
-            let rows = c_int::try_from(rows).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda top_k rows exceed c_int"))
-            })?;
-            let cols = c_int::try_from(cols).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda top_k cols exceed c_int"))
-            })?;
+            let rows = c_int::try_from(rows)
+                .map_err(|_| RuntimeError::Backend(String::from("cuda top_k rows exceed c_int")))?;
+            let cols = c_int::try_from(cols)
+                .map_err(|_| RuntimeError::Backend(String::from("cuda top_k cols exceed c_int")))?;
             let top_k = c_int::try_from(top_k).map_err(|_| {
                 RuntimeError::Backend(String::from("cuda top_k selection width exceeds c_int"))
             })?;
@@ -11428,9 +11501,8 @@ mod platform {
             selected_indices: &PlatformBuffer,
             selected_values: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
-            let cols = c_int::try_from(cols).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda top_k cols exceed c_int"))
-            })?;
+            let cols = c_int::try_from(cols)
+                .map_err(|_| RuntimeError::Backend(String::from("cuda top_k cols exceed c_int")))?;
             let top_k = c_int::try_from(top_k).map_err(|_| {
                 RuntimeError::Backend(String::from("cuda top_k selection width exceeds c_int"))
             })?;
@@ -11509,9 +11581,8 @@ mod platform {
             selected_indices: &PlatformBuffer,
             selected_values: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
-            let cols = c_int::try_from(cols).map_err(|_| {
-                RuntimeError::Backend(String::from("cuda top_k cols exceed c_int"))
-            })?;
+            let cols = c_int::try_from(cols)
+                .map_err(|_| RuntimeError::Backend(String::from("cuda top_k cols exceed c_int")))?;
             let top_k = c_int::try_from(top_k).map_err(|_| {
                 RuntimeError::Backend(String::from("cuda top_k selection width exceeds c_int"))
             })?;
@@ -15521,6 +15592,19 @@ mod platform {
             _rows: usize,
             _cols: usize,
             _decode_params: &PlatformBuffer,
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        pub(super) fn encode_gather_f32_by_indices(
+            &mut self,
+            _input: &PlatformBuffer,
+            _input_len: usize,
+            _indices: &PlatformBuffer,
+            _index_count: usize,
             _output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
@@ -20190,6 +20274,42 @@ mod tests {
     }
 
     #[test]
+    fn cuda_backend_gathers_f32_values_by_index_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        let input = backend.input_buffer(
+            Shape::new(vec![6]),
+            vec![1.0_f32, -2.0, 4.25, 3.0, 9.5, 0.0],
+        )?;
+        let indices = backend.input_i32_buffer(Shape::new(vec![4]), vec![4_i32, 2, 5, 1])?;
+        let output = backend.f32_buffer(4)?;
+        let mut submission = backend.begin_submission()?;
+        submission.gather_f32_by_indices(&input, 6, &indices, 4, &output)?;
+        let report = submission.commit(CudaCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 1);
+        assert_close(&output.read_f32()?, &[9.5_f32, 4.25, 0.0, -2.0], 1e-6);
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_backend_i32_buffer_preserves_i32_dtype_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        let mut buffer = backend.i32_buffer(3)?;
+        buffer.write_i32_at_offset(0, &[4_i32, 2, 5])?;
+        assert_eq!(buffer.read_i32()?, vec![4_i32, 2, 5]);
+        Ok(())
+    }
+
+    #[test]
     fn cuda_submission_executes_argmax_when_available() -> Result<(), Box<dyn std::error::Error>> {
         let mut backend = CudaBackend::new();
         let Some(_selected) = backend.selected_device().cloned() else {
@@ -20330,15 +20450,18 @@ mod tests {
         let selected_indices = backend.i32_buffer(top_k)?;
         let selected_values = backend.f32_buffer(top_k)?;
         let mut submission = backend.begin_submission()?;
-        submission.top_k_f32(&input, 1, values.len(), top_k, &selected_indices, &selected_values)?;
+        submission.top_k_f32(
+            &input,
+            1,
+            values.len(),
+            top_k,
+            &selected_indices,
+            &selected_values,
+        )?;
         let report = submission.commit(CudaCommandWait::Completed)?;
         assert_eq!(report.encoded_operations, 1);
 
-        let mut expected = values
-            .iter()
-            .copied()
-            .enumerate()
-            .collect::<Vec<_>>();
+        let mut expected = values.iter().copied().enumerate().collect::<Vec<_>>();
         expected.sort_by(|(left_index, left_value), (right_index, right_value)| {
             right_value
                 .total_cmp(left_value)
@@ -20356,10 +20479,7 @@ mod tests {
             .map(|(index, _)| i32::try_from(*index).expect("expected index fits in i32"))
             .collect::<Vec<_>>();
         assert_eq!(selected_indices, expected_indices);
-        let expected_values = expected
-            .iter()
-            .map(|(_, value)| *value)
-            .collect::<Vec<_>>();
+        let expected_values = expected.iter().map(|(_, value)| *value).collect::<Vec<_>>();
         assert_close(&selected_values.read_f32()?, &expected_values, 1e-6);
         Ok(())
     }
@@ -20404,11 +20524,7 @@ mod tests {
         let report = submission.commit(CudaCommandWait::Completed)?;
         assert_eq!(report.encoded_operations, 3);
 
-        let mut expected = values
-            .iter()
-            .copied()
-            .enumerate()
-            .collect::<Vec<_>>();
+        let mut expected = values.iter().copied().enumerate().collect::<Vec<_>>();
         expected.sort_by(|(left_index, left_value), (right_index, right_value)| {
             right_value
                 .total_cmp(left_value)
@@ -20426,10 +20542,7 @@ mod tests {
             .map(|(index, _)| i32::try_from(*index).expect("expected index fits in i32"))
             .collect::<Vec<_>>();
         assert_eq!(selected_indices, expected_indices);
-        let expected_values = expected
-            .iter()
-            .map(|(_, value)| *value)
-            .collect::<Vec<_>>();
+        let expected_values = expected.iter().map(|(_, value)| *value).collect::<Vec<_>>();
         assert_close(&selected_values.read_f32()?, &expected_values, 1e-6);
         Ok(())
     }
@@ -21461,12 +21574,12 @@ mod tests {
                 } else {
                     0
                 };
-                let query =
-                    &qkv[query_offset + key_head_index * key_dim..query_offset + (key_head_index + 1) * key_dim];
-                let key =
-                    &qkv[key_offset + key_head_index * key_dim..key_offset + (key_head_index + 1) * key_dim];
-                let value = &qkv
-                    [value_offset + value_head_index * value_dim..value_offset + (value_head_index + 1) * value_dim];
+                let query = &qkv[query_offset + key_head_index * key_dim
+                    ..query_offset + (key_head_index + 1) * key_dim];
+                let key = &qkv[key_offset + key_head_index * key_dim
+                    ..key_offset + (key_head_index + 1) * key_dim];
+                let value = &qkv[value_offset + value_head_index * value_dim
+                    ..value_offset + (value_head_index + 1) * value_dim];
                 for value_dim_index in 0..value_dim {
                     let row_offset =
                         (value_head_index * value_dim + value_dim_index).saturating_mul(key_dim);
@@ -21479,8 +21592,7 @@ mod tests {
                         .zip(key.iter())
                         .map(|(left, right)| left * right)
                         .sum::<f32>();
-                    let delta =
-                        (value[value_dim_index] - kv_mem) * beta[value_head_index];
+                    let delta = (value[value_dim_index] - kv_mem) * beta[value_head_index];
                     for (entry, key_value) in state_row.iter_mut().zip(key.iter().copied()) {
                         *entry += key_value * delta;
                     }
@@ -21507,17 +21619,15 @@ mod tests {
         let key_dim = 2usize;
         let value_dim = 2usize;
         let qkv = vec![
-            0.5_f32, -0.25, 0.75, 0.125,   // q
-            -0.2, 0.6, 0.4, -0.3,          // k
+            0.5_f32, -0.25, 0.75, 0.125, // q
+            -0.2, 0.6, 0.4, -0.3, // k
             0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, // v
         ];
         let decay = vec![0.9_f32, 0.8, 0.7, 0.6];
         let beta = vec![0.2_f32, 0.3, 0.4, 0.5];
         let initial_state = vec![
-            0.05_f32, -0.01, 0.02, 0.03,
-            -0.02, 0.04, 0.01, -0.05,
-            0.06, -0.02, -0.03, 0.07,
-            0.01, 0.08, -0.04, 0.02,
+            0.05_f32, -0.01, 0.02, 0.03, -0.02, 0.04, 0.01, -0.05, 0.06, -0.02, -0.03, 0.07, 0.01,
+            0.08, -0.04, 0.02,
         ];
 
         for v_head_reordered in [false, true] {
@@ -21540,10 +21650,11 @@ mod tests {
             );
 
             let qkv_buffer = backend.input_buffer(Shape::new(vec![qkv.len()]), qkv.clone())?;
-            let decay_buffer = backend.input_buffer(Shape::new(vec![decay.len()]), decay.clone())?;
+            let decay_buffer =
+                backend.input_buffer(Shape::new(vec![decay.len()]), decay.clone())?;
             let beta_buffer = backend.input_buffer(Shape::new(vec![beta.len()]), beta.clone())?;
-            let state_buffer =
-                backend.input_buffer(Shape::new(vec![initial_state.len()]), initial_state.clone())?;
+            let state_buffer = backend
+                .input_buffer(Shape::new(vec![initial_state.len()]), initial_state.clone())?;
             let output_buffer = backend.f32_buffer(value_head_count * value_dim)?;
 
             let mut submission = backend.begin_submission()?;

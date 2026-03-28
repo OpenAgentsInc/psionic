@@ -340,7 +340,6 @@ impl CudaGgufQwen35TextGenerationService {
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
         let output_mode = qwen35_cuda_output_mode(&request.options);
-        let mut structured_prompt_replay: Option<(Qwen35State, TokenId)> = None;
         let mut last_logits = Vec::new();
         let mut pending_greedy_token = None;
         let mut last_candidates = None;
@@ -366,11 +365,6 @@ impl CudaGgufQwen35TextGenerationService {
                 )?;
                 kernel_count = kernel_count.saturating_add(step.kernel_count);
                 bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
-            }
-            if request.options.structured_output.is_some()
-                && matches!(output_mode, CudaStepOutputMode::TopKCandidates(_))
-            {
-                structured_prompt_replay = Some((state.clone(), *last_prompt_token));
             }
             let step = self.model.forward_token(
                 &mut self.backend,
@@ -463,23 +457,76 @@ impl CudaGgufQwen35TextGenerationService {
                     &mut decode_output_metrics,
                     step.output_metrics.as_ref(),
                 );
-                step.selected_token.ok_or_else(|| {
+                let selected_token = step.selected_token.ok_or_else(|| {
                     ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
                         String::from("qwen35 argmax decode did not return a selected token"),
                     ))
-                })?
+                })?;
+                if request.options.structured_output.is_some() {
+                    let structured_candidate_selection = sampler
+                        .select_greedy_structured_token_from_candidates(
+                            &self.model.tokenizer,
+                            &[selected_token.as_u32()],
+                            &[0.0_f32],
+                            generated_tokens.as_slice(),
+                        )?;
+                    match structured_candidate_selection {
+                        Some(crate::GenerationSelection::Token(token)) => token,
+                        Some(crate::GenerationSelection::Terminate) => {
+                            break TerminationReason::EndOfSequence;
+                        }
+                        None => {
+                            let allowed_token_ids = sampler
+                                .structured_output_allowed_token_ids_for_generated_tokens(
+                                    &self.model.tokenizer,
+                                    generated_tokens.as_slice(),
+                                )?;
+                            if allowed_token_ids.is_empty() {
+                                return Err(
+                                    ReferenceTextGenerationError::StructuredOutputExhausted,
+                                );
+                            }
+                            let (allowed_logits, stats) = self
+                                .step_plan
+                                .gather_sparse_logits_from_current_output(
+                                    &mut self.backend,
+                                    allowed_token_ids.as_slice(),
+                                    self.model.descriptor.config.vocab_size,
+                                )
+                                .map_err(ReferenceTextGenerationError::Runtime)?;
+                            let sparse_kernel_launches = stats.kernel_launches;
+                            let sparse_readback_bytes = stats.device_to_host_bytes;
+                            let sparse_bytes_moved = cuda_stats_bytes(stats);
+                            kernel_count = kernel_count.saturating_add(sparse_kernel_launches);
+                            bytes_moved = bytes_moved.saturating_add(sparse_bytes_moved);
+                            accumulate_qwen35_decode_output_metrics(
+                                &mut decode_output_metrics,
+                                Some(&qwen35_decode_output_metrics(
+                                    Qwen35CudaDecodeOutputMode::SparseLogits {
+                                        token_count: allowed_token_ids.len(),
+                                    },
+                                    sparse_readback_bytes,
+                                    false,
+                                )),
+                            );
+                            match sampler.select_next_token_from_exact_candidates(
+                                allowed_token_ids.as_slice(),
+                                allowed_logits.as_slice(),
+                                self.model.descriptor.config.vocab_size,
+                            )? {
+                                crate::GenerationSelection::Token(token) => token,
+                                crate::GenerationSelection::Terminate => {
+                                    break TerminationReason::EndOfSequence;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    selected_token
+                }
             } else if let CudaStepOutputMode::TopKCandidates(top_k) = output_mode {
                 {
-                    let mut structured_decode_replay: Option<(Qwen35State, TokenId)> = None;
                     if !generated_tokens.is_empty() {
-                        if request.options.structured_output.is_some() {
-                            structured_decode_replay = Some((
-                                state.clone(),
-                                *generated_tokens
-                                    .last()
-                                    .expect("generated token should exist"),
-                            ));
-                        }
                         let step = self.model.forward_token(
                             &mut self.backend,
                             &mut self.step_plan,
@@ -530,59 +577,43 @@ impl CudaGgufQwen35TextGenerationService {
                             break TerminationReason::EndOfSequence;
                         }
                         None if request.options.structured_output.is_some() => {
-                            let step = if generated_tokens.is_empty() {
-                                let (mut replay_state, replay_token) =
-                                    structured_prompt_replay.clone().ok_or_else(|| {
-                                        ReferenceTextGenerationError::Runtime(
-                                            crate::RuntimeError::Backend(String::from(
-                                                "qwen35 structured prompt replay state is missing",
-                                            )),
-                                        )
-                                    })?;
-                                self.model.forward_token(
-                                    &mut self.backend,
-                                    &mut self.step_plan,
-                                    &mut replay_state,
-                                    replay_token,
-                                    CudaStepOutputMode::FullLogits,
-                                    &request.options,
-                                    &[],
-                                )?
-                            } else {
-                                let (mut replay_state, replay_token) =
-                                    structured_decode_replay.clone().ok_or_else(|| {
-                                        ReferenceTextGenerationError::Runtime(
-                                            crate::RuntimeError::Backend(String::from(
-                                                "qwen35 structured decode replay state is missing",
-                                            )),
-                                        )
-                                    })?;
-                                self.model.forward_token(
-                                    &mut self.backend,
-                                    &mut self.step_plan,
-                                    &mut replay_state,
-                                    replay_token,
-                                    CudaStepOutputMode::FullLogits,
-                                    &request.options,
+                            let allowed_token_ids = sampler
+                                .structured_output_allowed_token_ids_for_generated_tokens(
+                                    &self.model.tokenizer,
                                     generated_tokens.as_slice(),
-                                )?
-                            };
-                            last_logits = step.logits;
-                            kernel_count = kernel_count.saturating_add(step.kernel_count);
-                            bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+                                )?;
+                            if allowed_token_ids.is_empty() {
+                                return Err(
+                                    ReferenceTextGenerationError::StructuredOutputExhausted,
+                                );
+                            }
+                            let (allowed_logits, stats) = self
+                                .step_plan
+                                .gather_sparse_logits_from_current_output(
+                                    &mut self.backend,
+                                    allowed_token_ids.as_slice(),
+                                    self.model.descriptor.config.vocab_size,
+                                )
+                                .map_err(ReferenceTextGenerationError::Runtime)?;
+                            let sparse_kernel_launches = stats.kernel_launches;
+                            let sparse_readback_bytes = stats.device_to_host_bytes;
+                            let sparse_bytes_moved = cuda_stats_bytes(stats);
+                            kernel_count = kernel_count.saturating_add(sparse_kernel_launches);
+                            bytes_moved = bytes_moved.saturating_add(sparse_bytes_moved);
                             accumulate_qwen35_decode_output_metrics(
                                 &mut decode_output_metrics,
-                                step.output_metrics.as_ref(),
+                                Some(&qwen35_decode_output_metrics(
+                                    Qwen35CudaDecodeOutputMode::SparseLogits {
+                                        token_count: allowed_token_ids.len(),
+                                    },
+                                    sparse_readback_bytes,
+                                    false,
+                                )),
                             );
-                            let history = generated_tokens
-                                .iter()
-                                .map(|token| token.as_u32())
-                                .collect::<Vec<_>>();
-                            match sampler.select_next_token_from_history(
-                                &self.model.tokenizer,
-                                &last_logits,
-                                history.as_slice(),
-                                generated_tokens.as_slice(),
+                            match sampler.select_next_token_from_exact_candidates(
+                                allowed_token_ids.as_slice(),
+                                allowed_logits.as_slice(),
+                                self.model.descriptor.config.vocab_size,
                             )? {
                                 crate::GenerationSelection::Token(token) => token,
                                 crate::GenerationSelection::Terminate => {
@@ -964,6 +995,43 @@ fn cuda_top_k_result_from_host_buffers(
         indices,
         values,
     })
+}
+
+fn cuda_top_k_indices_from_host_buffer(
+    indices_host_buffer: &CudaHostBuffer,
+    row_count: usize,
+    top_k: usize,
+) -> Result<Vec<u32>, crate::RuntimeError> {
+    let expected_indices_bytes = row_count
+        .saturating_mul(top_k)
+        .saturating_mul(std::mem::size_of::<i32>());
+    if indices_host_buffer.byte_len() < expected_indices_bytes {
+        return Err(crate::RuntimeError::Backend(format!(
+            "qwen35 cuda top-k index host buffer is too small: need {} bytes, have {}",
+            expected_indices_bytes,
+            indices_host_buffer.byte_len()
+        )));
+    }
+
+    let index_bytes = indices_host_buffer.read_bytes().map_err(|error| {
+        crate::RuntimeError::Backend(format!(
+            "failed to read qwen35 cuda top-k index host buffer: {error}",
+        ))
+    })?;
+    let mut indices = Vec::with_capacity(row_count.saturating_mul(top_k));
+    for chunk in index_bytes[..expected_indices_bytes].chunks_exact(std::mem::size_of::<i32>()) {
+        let index = i32::from_ne_bytes(chunk.try_into().map_err(|_| {
+            crate::RuntimeError::Backend(String::from(
+                "qwen35 cuda top-k returned invalid index bytes",
+            ))
+        })?);
+        indices.push(u32::try_from(index).map_err(|_| {
+            crate::RuntimeError::Backend(format!(
+                "qwen35 cuda top-k returned a negative token index {index}",
+            ))
+        })?);
+    }
+    Ok(indices)
 }
 
 fn cuda_f32_vec_from_host_buffer(
@@ -1384,6 +1452,7 @@ impl CudaQwen35Model {
                         self.output.host.mode,
                         self.output.host.rows,
                         self.output.host.columns,
+                        request_options.structured_output.is_some(),
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 let readback_bytes = stats.device_to_host_bytes;
@@ -1400,8 +1469,34 @@ impl CudaQwen35Model {
                 )
             }
             CudaStepOutputMode::TopKCandidates(top_k) => {
-                let (candidates, stats) = plan
-                    .run_output_top_k_from_device(
+                let (candidates, stats) = if request_options.structured_output.is_some() {
+                    let (indices, stats) = plan
+                        .run_output_top_k_indices_from_device(
+                            backend,
+                            &current_hidden_buffer,
+                            &output_norm_device,
+                            self.family_metadata.rms_norm_epsilon,
+                            self.output.transposed_f16.as_ref(),
+                            &self.output.storage,
+                            self.output.host.mode,
+                            self.output.host.rows,
+                            self.output.host.columns,
+                            top_k,
+                            generated_history,
+                            &sampling_policy,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (
+                        CudaTopKResult {
+                            row_count: 1,
+                            top_k,
+                            values: vec![0.0_f32; indices.len()],
+                            indices,
+                        },
+                        stats,
+                    )
+                } else {
+                    plan.run_output_top_k_from_device(
                         backend,
                         &current_hidden_buffer,
                         &output_norm_device,
@@ -1415,7 +1510,8 @@ impl CudaQwen35Model {
                         generated_history,
                         &sampling_policy,
                     )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    .map_err(ReferenceTextGenerationError::Runtime)?
+                };
                 let readback_bytes = stats.device_to_host_bytes;
                 (
                     Vec::new(),
@@ -2013,7 +2109,14 @@ impl CudaQwen35Model {
                     .try_into()
                     .unwrap_or(u64::MAX);
                 let top_k_bytes = top_k
-                    .saturating_mul(std::mem::size_of::<u32>() + std::mem::size_of::<f32>())
+                    .saturating_mul(
+                        std::mem::size_of::<u32>()
+                            + if request_options.structured_output.is_some() {
+                                0
+                            } else {
+                                std::mem::size_of::<f32>()
+                            },
+                    )
                     .try_into()
                     .unwrap_or(u64::MAX);
                 bytes_moved = bytes_moved
@@ -2303,12 +2406,14 @@ impl CudaQwen35Model {
                             &plan.top_k_indices_host_buffer,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
-                    submission
-                        .copy_device_to_host(
-                            &plan.top_k_values_buffer,
-                            &plan.top_k_values_host_buffer,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    if request_options.structured_output.is_none() {
+                        submission
+                            .copy_device_to_host(
+                                &plan.top_k_values_buffer,
+                                &plan.top_k_values_host_buffer,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
                     let (report, graph_exec) = submission
                         .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -2325,13 +2430,28 @@ impl CudaQwen35Model {
                     }
                 }
                 state.position = state.position.saturating_add(1);
-                let candidates = cuda_top_k_result_from_host_buffers(
-                    &plan.top_k_indices_host_buffer,
-                    &plan.top_k_values_host_buffer,
-                    1,
-                    top_k,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
+                let candidates = if request_options.structured_output.is_some() {
+                    let indices = cuda_top_k_indices_from_host_buffer(
+                        &plan.top_k_indices_host_buffer,
+                        1,
+                        top_k,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    CudaTopKResult {
+                        row_count: 1,
+                        top_k,
+                        values: vec![0.0_f32; indices.len()],
+                        indices,
+                    }
+                } else {
+                    cuda_top_k_result_from_host_buffers(
+                        &plan.top_k_indices_host_buffer,
+                        &plan.top_k_values_host_buffer,
+                        1,
+                        top_k,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?
+                };
                 return Ok(Qwen35ForwardStep {
                     logits: Vec::new(),
                     selected_token: None,
@@ -2823,6 +2943,7 @@ impl CudaQwen35Model {
                                 self.output.host.mode,
                                 self.output.host.rows,
                                 self.output.host.columns,
+                                request_options.structured_output.is_some(),
                             )
                             .map_err(ReferenceTextGenerationError::Runtime)?;
                         let readback_bytes = stats.device_to_host_bytes;
@@ -2839,8 +2960,34 @@ impl CudaQwen35Model {
                         )
                     }
                     CudaStepOutputMode::TopKCandidates(top_k) => {
-                        let (candidates, stats) = plan
-                            .run_output_top_k_from_device(
+                        let (candidates, stats) = if request_options.structured_output.is_some() {
+                            let (indices, stats) = plan
+                                .run_output_top_k_indices_from_device(
+                                    backend,
+                                    &current_hidden_buffer,
+                                    &output_norm_device,
+                                    self.family_metadata.rms_norm_epsilon,
+                                    self.output.transposed_f16.as_ref(),
+                                    &self.output.storage,
+                                    self.output.host.mode,
+                                    self.output.host.rows,
+                                    self.output.host.columns,
+                                    top_k,
+                                    generated_history,
+                                    &sampling_policy,
+                                )
+                                .map_err(ReferenceTextGenerationError::Runtime)?;
+                            (
+                                CudaTopKResult {
+                                    row_count: 1,
+                                    top_k,
+                                    values: vec![0.0_f32; indices.len()],
+                                    indices,
+                                },
+                                stats,
+                            )
+                        } else {
+                            plan.run_output_top_k_from_device(
                                 backend,
                                 &current_hidden_buffer,
                                 &output_norm_device,
@@ -2854,7 +3001,8 @@ impl CudaQwen35Model {
                                 generated_history,
                                 &sampling_policy,
                             )
-                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                            .map_err(ReferenceTextGenerationError::Runtime)?
+                        };
                         let readback_bytes = stats.device_to_host_bytes;
                         (
                             Vec::new(),
@@ -3268,7 +3416,14 @@ impl CudaQwen35Model {
             CudaStepOutputMode::TopKCandidates(top_k) => Some(qwen35_decode_output_metrics(
                 Qwen35CudaDecodeOutputMode::TopKCandidates { top_k },
                 top_k
-                    .saturating_mul(std::mem::size_of::<u32>() + std::mem::size_of::<f32>())
+                    .saturating_mul(
+                        std::mem::size_of::<u32>()
+                            + if request_options.structured_output.is_some() {
+                                0
+                            } else {
+                                std::mem::size_of::<f32>()
+                            },
+                    )
                     .try_into()
                     .unwrap_or(u64::MAX),
                 false,
@@ -6532,6 +6687,8 @@ struct Qwen35CudaStepPlan {
     beta_buffer: CudaBuffer,
     logits_buffer: CudaBuffer,
     logits_host_buffer: CudaHostBuffer,
+    sparse_logits_buffer: CudaBuffer,
+    sparse_logit_indices_buffer: CudaBuffer,
     top_k_indices_buffer: CudaBuffer,
     top_k_values_buffer: CudaBuffer,
     top_k_partial_indices_buffer: CudaBuffer,
@@ -6540,6 +6697,7 @@ struct Qwen35CudaStepPlan {
     penalty_token_counts_buffer: CudaBuffer,
     penalty_token_ids_scratch: Vec<i32>,
     penalty_token_counts_scratch: Vec<i32>,
+    sparse_logit_indices_scratch: Vec<i32>,
     next_token_host_buffer: CudaHostBuffer,
     next_token_buffer: CudaBuffer,
     argmax_state_host_buffer: CudaHostBuffer,
@@ -6636,6 +6794,12 @@ impl Qwen35CudaStepPlan {
             logits_host_buffer: backend
                 .host_buffer(vocab_size * std::mem::size_of::<f32>())
                 .map_err(ReferenceTextGenerationError::Runtime)?,
+            sparse_logits_buffer: backend
+                .f32_buffer(vocab_size)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            sparse_logit_indices_buffer: backend
+                .i32_buffer(vocab_size)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
             top_k_indices_buffer: backend
                 .i32_buffer(QWEN35_CUDA_MAX_TOP_K)
                 .map_err(ReferenceTextGenerationError::Runtime)?,
@@ -6656,6 +6820,7 @@ impl Qwen35CudaStepPlan {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             penalty_token_ids_scratch: vec![0_i32; max_penalty_token_count],
             penalty_token_counts_scratch: vec![0_i32; max_penalty_token_count],
+            sparse_logit_indices_scratch: vec![0_i32; vocab_size],
             next_token_host_buffer: backend
                 .host_buffer(std::mem::size_of::<i32>())
                 .map_err(ReferenceTextGenerationError::Runtime)?,
@@ -6774,6 +6939,70 @@ impl Qwen35CudaStepPlan {
             .saturating_mul(std::mem::size_of::<i32>() * 2)
             .try_into()
             .unwrap_or(u64::MAX))
+    }
+
+    fn gather_sparse_logits_from_current_output(
+        &mut self,
+        backend: &mut CudaBackend,
+        token_ids: &[u32],
+        vocab_size: usize,
+    ) -> Result<(Vec<f32>, CudaQuantizedMatvecStats), crate::RuntimeError> {
+        if token_ids.is_empty() {
+            return Ok((Vec::new(), zero_cuda_matvec_stats()));
+        }
+        if token_ids.len() > self.sparse_logit_indices_scratch.len() {
+            return Err(crate::RuntimeError::Backend(format!(
+                "qwen35 cuda sparse structured gather exceeds scratch capacity: requested={} capacity={}",
+                token_ids.len(),
+                self.sparse_logit_indices_scratch.len()
+            )));
+        }
+        for (slot, &token_id) in token_ids.iter().enumerate() {
+            if token_id as usize >= vocab_size {
+                return Err(crate::RuntimeError::Backend(format!(
+                    "qwen35 cuda sparse structured gather token id exceeds vocab: token_id={} vocab_size={}",
+                    token_id, vocab_size
+                )));
+            }
+            self.sparse_logit_indices_scratch[slot] = i32::try_from(token_id).map_err(|_| {
+                crate::RuntimeError::Backend(format!(
+                    "qwen35 cuda sparse structured gather token id exceeds i32: {}",
+                    token_id
+                ))
+            })?;
+        }
+        self.sparse_logit_indices_buffer
+            .write_i32_at_offset(0, &self.sparse_logit_indices_scratch[..token_ids.len()])?;
+        let mut submission = backend.begin_submission()?;
+        submission.gather_f32_by_indices(
+            &self.logits_buffer,
+            vocab_size,
+            &self.sparse_logit_indices_buffer,
+            token_ids.len(),
+            &self.sparse_logits_buffer,
+        )?;
+        let report = submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
+        let logits = self
+            .sparse_logits_buffer
+            .read_f32_at_offset(0, token_ids.len())?;
+        Ok((
+            logits,
+            CudaQuantizedMatvecStats {
+                host_to_device_bytes: token_ids
+                    .len()
+                    .saturating_mul(std::mem::size_of::<i32>())
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+                device_to_host_bytes: token_ids
+                    .len()
+                    .saturating_mul(std::mem::size_of::<f32>())
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+                submission_count: 1,
+                sync_count: 1,
+                kernel_launches: report.encoded_operations,
+            },
+        ))
     }
 
     fn run_projection_matvec(
@@ -7070,6 +7299,92 @@ impl Qwen35CudaStepPlan {
         ))
     }
 
+    fn run_output_top_k_indices_from_device(
+        &mut self,
+        backend: &mut CudaBackend,
+        input: &CudaBuffer,
+        norm_weight: &CudaBuffer,
+        epsilon: f32,
+        transposed_f16: Option<&CudaBuffer>,
+        weights: &CudaBuffer,
+        mode: QuantizationMode,
+        rows: usize,
+        cols: usize,
+        top_k: usize,
+        history: &[TokenId],
+        policy: &SamplingPolicy,
+    ) -> Result<(Vec<u32>, CudaQuantizedMatvecStats), crate::RuntimeError> {
+        if top_k == 0 || top_k > QWEN35_CUDA_MAX_TOP_K {
+            return Err(crate::RuntimeError::Backend(format!(
+                "qwen35 cuda top-k width must be in 1..={}, actual {}",
+                QWEN35_CUDA_MAX_TOP_K, top_k
+            )));
+        }
+        let mut submission = backend.begin_submission()?;
+        if let Some(transposed_f16) = transposed_f16 {
+            submission.rms_norm(input, norm_weight, &self.matvec_input_buffer, cols, epsilon)?;
+            submission.cast_f32_to_f16(&self.matvec_input_buffer, &self.vector_f16_buffer, cols)?;
+            submission.matmul_f16_to_f32(
+                &self.vector_f16_buffer,
+                transposed_f16,
+                &self.logits_buffer,
+                1,
+                cols,
+                rows,
+            )?;
+        } else if can_use_q8_1_quantized_matvec(mode) {
+            submission.rms_norm_q8_1(
+                input,
+                norm_weight,
+                &self.matvec_input_q8_1_buffer,
+                cols,
+                epsilon,
+            )?;
+            submission.quantized_matvec_q8_1(
+                weights,
+                0,
+                mode,
+                rows,
+                cols,
+                &self.matvec_input_q8_1_buffer,
+                None,
+                &self.logits_buffer,
+            )?;
+        } else {
+            submission.rms_norm(input, norm_weight, &self.matvec_input_buffer, cols, epsilon)?;
+            submission.quantized_matvec(
+                weights,
+                0,
+                mode,
+                rows,
+                cols,
+                &self.matvec_input_buffer,
+                &self.logits_buffer,
+            )?;
+        }
+        let host_to_device_bytes =
+            self.encode_sampling_penalties_from_history(&mut submission, rows, history, policy)?;
+        self.encode_top_k_from_logits(&mut submission, rows, top_k)?;
+        submission
+            .copy_device_to_host(&self.top_k_indices_buffer, &self.top_k_indices_host_buffer)?;
+        let report = submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?;
+        let indices =
+            cuda_top_k_indices_from_host_buffer(&self.top_k_indices_host_buffer, 1, top_k)?;
+        Ok((
+            indices,
+            CudaQuantizedMatvecStats {
+                host_to_device_bytes,
+                device_to_host_bytes: top_k
+                    .saturating_mul(std::mem::size_of::<u32>())
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+                submission_count: 1,
+                sync_count: 1,
+                kernel_launches: report.encoded_operations,
+            },
+        ))
+    }
+
     fn run_output_argmax(
         &mut self,
         backend: &mut CudaBackend,
@@ -7205,6 +7520,7 @@ impl Qwen35CudaStepPlan {
         mode: QuantizationMode,
         rows: usize,
         cols: usize,
+        materialize_logits: bool,
     ) -> Result<(TokenId, CudaQuantizedMatvecStats), crate::RuntimeError> {
         let mut submission = backend.begin_submission()?;
         let (selected, host_to_device_bytes, device_to_host_bytes, kernel_launches) =
@@ -7244,7 +7560,7 @@ impl Qwen35CudaStepPlan {
                     std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX),
                     report.encoded_operations,
                 )
-            } else if can_use_q8_1_argmax(mode) {
+            } else if can_use_q8_1_argmax(mode) && !materialize_logits {
                 self.argmax_state_host_buffer
                     .write_bytes(initial_cuda_argmax_pair_bytes().as_slice())?;
                 submission.rms_norm_q8_1(

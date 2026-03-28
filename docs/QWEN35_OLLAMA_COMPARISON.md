@@ -204,19 +204,25 @@ Psionic-only measured means:
   they are not part of the canonical Psionic-versus-Ollama matrix on this
   checkout because the local Ollama `qwen3.5` runner does not wire those
   controls through the same active sampler path.
-- Native qwen35 structured outputs are also supported now, but only through
-  the explicit dense `raw_logits` fallback path. They are a parity feature,
-  not part of the bounded-candidate throughput matrix. The qwen35 proxy lane
-  still refuses them.
+- Native qwen35 structured outputs are also supported now. Greedy no-penalty
+  structured requests stay on `TopKCandidates { top_k: 128 }` and use exact
+  sparse allowed-logit gather on candidate misses, while structured requests
+  outside that envelope still fall back to explicit dense `raw_logits`
+  readback. Structured outputs are still a parity feature, not part of the
+  bounded-candidate throughput matrix. The qwen35 proxy lane still refuses
+  them.
 - The local `qwen35_cuda_bench` harness now reproduces native-versus-Ollama
   JSON object and JSON schema requests too through `--json-object` and
-  `--json-schema-file`, and the native qwen35 fallback path is now replay-safe
-  instead of double-advancing the decode state on candidate misses.
+  `--json-schema-file`, and the native qwen35 structured path is now replay-safe
+  and can stay off dense raw-logit replay on the bounded greedy schema lane.
 - Structured-output throughput is still outside the canonical matrix. The local
   `qwen3.5:0.8b` summary-schema spot check on March 28, 2026 measured native
-  Psionic at about `64 tok/s` versus local Ollama at about `333 tok/s`, but the
-  two runtimes took different valid schema paths and the early schema prefix
-  still fell outside the bounded top-k candidate set on Psionic.
+  Psionic at about `74 tok/s` versus local Ollama at about `319 tok/s`, with
+  Psionic publishing
+  `qwen35_output_modes=[top_k_candidates:128,sparse_logits:2,sparse_logits:3,sparse_logits:10]`,
+  `qwen35_readback_bytes=5700`, and `qwen35_raw_logits=false`. The two runtimes
+  still took different valid schema paths, so this stays a parity note instead
+  of a canonical throughput row.
 - `mirostat` therefore remains a Psionic-side capability note, not a canonical
   beat-Ollama throughput claim.
 - Requests outside that envelope still fall back to explicit raw-logit readback

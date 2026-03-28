@@ -603,6 +603,9 @@ fn format_qwen35_output_metrics(metrics: Option<&Qwen35CudaDecodeOutputMetrics>)
             psionic_serve::Qwen35CudaDecodeOutputMode::TopKCandidates { top_k } => {
                 format!("top_k_candidates:{top_k}")
             }
+            psionic_serve::Qwen35CudaDecodeOutputMode::SparseLogits { token_count } => {
+                format!("sparse_logits:{token_count}")
+            }
             psionic_serve::Qwen35CudaDecodeOutputMode::RawLogits => String::from("raw_logits"),
         })
         .collect::<Vec<_>>()

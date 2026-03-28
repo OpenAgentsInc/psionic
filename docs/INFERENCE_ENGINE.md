@@ -72,21 +72,28 @@ than just run tensor math.
   through explicit `raw_logits` readback instead of the bounded candidate lane.
 - Outside that envelope the qwen35 lane still falls back to explicit
   `raw_logits` readback instead of silently narrowing behavior.
-- Native qwen35 structured outputs are now supported through the same explicit
-  `raw_logits` fallback path. The bounded `TopKCandidates` fast lane still
-  requires structured-output masking to stay inactive.
+- Native qwen35 structured outputs are now supported on two explicit paths:
+  - greedy, no-penalty, no-`mirostat` structured requests stay on
+    `TopKCandidates { top_k: 128 }` and use exact sparse allowed-logit gather
+    on candidate misses instead of dense vocab replay
+  - structured requests outside that envelope still fall back to explicit
+    `raw_logits` readback instead of silently narrowing behavior
 - The native structured-output path now uses tokenizer-native incremental token
-  append caches and replay-safe fallback, so qwen35 candidate misses no longer
-  double-advance the decode state before falling back to explicit `raw_logits`.
+  append caches and replay-safe sparse fallback, so qwen35 candidate misses no
+  longer double-advance the decode state or require dense vocab replay on the
+  bounded structured lane.
 - The local `qwen35_cuda_bench` harness now reproduces native-versus-Ollama
   JSON object and JSON schema requests too through `--json-object` and
   `--json-schema-file`.
 - Structured-output throughput is still not part of the canonical
-  Psionic-versus-Ollama matrix. On March 28, 2026, the local `qwen3.5:0.8b`
-  summary-schema spot check returned a valid native Psionic payload at about
-  `64 tok/s` versus local Ollama at about `333 tok/s`, but the two runtimes
-  took different valid schema paths and the early qwen35 schema prefix still
-  misses the bounded top-k candidate set.
+  Psionic-versus-Ollama matrix. On March 28, 2026, a fresh local
+  `qwen3.5:0.8b` summary-schema spot check returned a valid native Psionic
+  payload at about `74 tok/s` versus local Ollama at about `319 tok/s`, with
+  Psionic publishing
+  `qwen35_output_modes=[top_k_candidates:128,sparse_logits:2,sparse_logits:3,sparse_logits:10]`,
+  `qwen35_readback_bytes=5700`, and `qwen35_raw_logits=false`. The two runtimes
+  still took different valid schema paths, so this remains a bounded parity
+  note rather than a canonical throughput row.
 - The first `qwen35` lane must still fail closed for tool calling.
 - The first `qwen35` lane must still fail closed for system-message image and
   video parts to stay aligned with the real template semantics.

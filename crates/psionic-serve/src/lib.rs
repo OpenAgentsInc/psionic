@@ -1803,6 +1803,8 @@ pub enum Qwen35CudaDecodeOutputMode {
     ArgmaxOnly,
     /// The step returned a bounded top-k candidate set.
     TopKCandidates { top_k: usize },
+    /// The step returned one sparse allowed-logit subset.
+    SparseLogits { token_count: usize },
     /// The step materialized the dense raw logits vector.
     RawLogits,
 }
@@ -6921,7 +6923,7 @@ impl GenerationSampler {
     fn structured_output_allowed_token_ids(
         &mut self,
         tokenizer: &dyn TokenizerBoundary,
-        logits: &[f32],
+        logits: Option<&[f32]>,
         current_text: &str,
         _current_text_allowed: bool,
         matcher: &StructuredOutputMatcher,
@@ -6960,7 +6962,9 @@ impl GenerationSampler {
                 for &token_id in candidate_ids {
                     let index = token_id as usize;
                     if disallowed_token_ids.contains(&token_id)
-                        || logits.get(index).is_none_or(|value| !value.is_finite())
+                        || logits.is_some_and(|logits| {
+                            logits.get(index).is_none_or(|value| !value.is_finite())
+                        })
                     {
                         continue;
                     }
@@ -6979,8 +6983,10 @@ impl GenerationSampler {
                 }
             }
             None => {
-                for (index, logit) in logits.iter().enumerate() {
-                    if !logit.is_finite() {
+                for index in 0..suffixes.len() {
+                    if logits.is_some_and(|logits| {
+                        logits.get(index).is_none_or(|value| !value.is_finite())
+                    }) {
                         continue;
                     }
                     let token_id = index as u32;
@@ -7093,7 +7099,7 @@ impl GenerationSampler {
         }
         let allowed_token_ids = self.structured_output_allowed_token_ids(
             tokenizer,
-            logits,
+            Some(logits),
             current_text.as_str(),
             current_match.is_allowed(),
             &matcher,
@@ -7153,7 +7159,7 @@ impl GenerationSampler {
         }
         let allowed_token_ids = self.structured_output_allowed_token_ids(
             tokenizer,
-            logits,
+            Some(logits),
             current_text.as_str(),
             current_match.is_allowed(),
             &matcher,
@@ -7182,6 +7188,19 @@ impl GenerationSampler {
                 )),
             ));
         }
+        self.select_next_token_from_exact_candidates(
+            candidate_ids,
+            candidate_logits,
+            full_vocab_size,
+        )
+    }
+
+    pub(crate) fn select_next_token_from_exact_candidates(
+        &mut self,
+        candidate_ids: &[u32],
+        candidate_logits: &[f32],
+        full_vocab_size: usize,
+    ) -> Result<GenerationSelection, ReferenceTextGenerationError> {
         self.sampler
             .select_next_token_from_candidates(candidate_ids, candidate_logits, full_vocab_size)
             .map(TokenId)
@@ -7189,6 +7208,31 @@ impl GenerationSampler {
                 Err(ReferenceTextGenerationError::MissingOutput("next_token")),
                 |token| Ok(GenerationSelection::Token(token)),
             )
+    }
+
+    pub(crate) fn structured_output_allowed_token_ids_for_generated_tokens(
+        &mut self,
+        tokenizer: &dyn TokenizerBoundary,
+        generated_tokens: &[TokenId],
+    ) -> Result<Vec<u32>, ReferenceTextGenerationError> {
+        let Some(matcher) = self.structured_output.clone() else {
+            return Err(ReferenceTextGenerationError::Runtime(
+                RuntimeError::UnsupportedStep(String::from(
+                    "structured-output allowed-token lookup requires an active structured-output matcher",
+                )),
+            ));
+        };
+        let current_text = tokenizer.decode(generated_tokens);
+        let current_match = matcher.classify(current_text.as_str());
+        Ok(self.structured_output_allowed_token_ids(
+            tokenizer,
+            None,
+            current_text.as_str(),
+            current_match.is_allowed(),
+            &matcher,
+            None,
+            &[],
+        ))
     }
 
     fn select_greedy_structured_token_from_candidates(
@@ -7215,18 +7259,10 @@ impl GenerationSampler {
         {
             return Ok(Some(GenerationSelection::Terminate));
         }
-        let mut ranked = candidate_ids
-            .iter()
-            .copied()
-            .zip(candidate_logits.iter().copied())
-            .filter(|(_, logit)| logit.is_finite())
-            .collect::<Vec<_>>();
-        ranked.sort_by(|(left_id, left_logit), (right_id, right_logit)| {
-            right_logit
-                .total_cmp(left_logit)
-                .then_with(|| left_id.cmp(right_id))
-        });
-        for (token_id, _) in ranked {
+        for (&token_id, &logit) in candidate_ids.iter().zip(candidate_logits.iter()) {
+            if !logit.is_finite() {
+                continue;
+            }
             if self.structured_output_allows_token(
                 tokenizer,
                 current_text.as_str(),

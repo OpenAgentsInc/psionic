@@ -625,6 +625,25 @@ __global__ void gather_f16_row_to_f32_kernel(
     output[index] = __half2float(input[static_cast<size_t>(row_index) * static_cast<size_t>(cols) + index]);
 }
 
+__global__ void gather_f32_by_indices_kernel(
+    const float *input,
+    int input_len,
+    const int *indices,
+    int index_count,
+    float *output
+) {
+    const int index = static_cast<int>(blockIdx.x) * blockDim.x + static_cast<int>(threadIdx.x);
+    if (index >= index_count) {
+        return;
+    }
+    const int source_index = indices[index];
+    if (source_index < 0 || source_index >= input_len) {
+        output[index] = -INFINITY;
+        return;
+    }
+    output[index] = input[source_index];
+}
+
 template <bool UseActiveMask>
 struct Q80Q81DotImpl {
     __device__ __forceinline__ float operator()(
@@ -6622,6 +6641,25 @@ extern "C" int psionic_cuda_gather_f16_row_to_f32(
         rows,
         cols,
         static_cast<const int *>(decode_params),
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_gather_f32_by_indices(
+    const void *input,
+    int input_len,
+    const void *indices,
+    int index_count,
+    void *output,
+    void *stream
+) {
+    const int blocks = (index_count + kBlockSize - 1) / kBlockSize;
+    gather_f32_by_indices_kernel<<<blocks, kBlockSize, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<const float *>(input),
+        input_len,
+        static_cast<const int *>(indices),
+        index_count,
         static_cast<float *>(output)
     );
     return static_cast<int>(cudaGetLastError());
