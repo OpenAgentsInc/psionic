@@ -52,10 +52,15 @@ tmpdir="${TMPDIR:-$repo_root/target/hermes/tmp}"
 mkdir -p "$(dirname "$report_path")" "$raw_dir" "$(dirname "$psionic_log_path")" "$tmpdir"
 
 server_pid=""
+llamacpp_pid=""
 cleanup() {
   if [[ -n "$server_pid" ]]; then
     kill "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$llamacpp_pid" ]]; then
+    kill "$llamacpp_pid" 2>/dev/null || true
+    wait "$llamacpp_pid" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -104,6 +109,75 @@ print(f"{time.monotonic():.9f}")
 PY
 )"
 
+enable_llamacpp="${PSIONIC_HERMES_ENABLE_LLAMACPP:-0}"
+llamacpp_root_bin=""
+llamacpp_port=""
+llamacpp_base_url=""
+llamacpp_row_path=""
+llamacpp_ready_start=""
+llamacpp_ready_end=""
+llamacpp_model_alias=""
+if [[ "$enable_llamacpp" == "1" ]]; then
+  case "$(uname -s)" in
+    Darwin)
+      llamacpp_root_bin_default="/Users/christopherdavid/code/llama.cpp/build/bin/llama-server"
+      llamacpp_ngl_default="4"
+      ;;
+    *)
+      llamacpp_root_bin_default="/home/christopherdavid/code/llama.cpp/build/bin/llama-server"
+      llamacpp_ngl_default="999"
+      ;;
+  esac
+  llamacpp_root_bin="${PSIONIC_HERMES_LLAMA_CPP_BIN:-$llamacpp_root_bin_default}"
+  if [[ ! -x "$llamacpp_root_bin" ]]; then
+    echo "missing llama.cpp server binary: $llamacpp_root_bin" >&2
+    exit 1
+  fi
+  llamacpp_model_path="${PSIONIC_HERMES_LLAMA_CPP_MODEL_PATH:-$psionic_model_path}"
+  if [[ ! -f "$llamacpp_model_path" ]]; then
+    echo "missing llama.cpp model artifact: $llamacpp_model_path" >&2
+    exit 1
+  fi
+  llamacpp_port="${PSIONIC_HERMES_LLAMA_CPP_PORT:-8098}"
+  llamacpp_host="${PSIONIC_HERMES_LLAMA_CPP_HOST:-127.0.0.1}"
+  llamacpp_ctx="${PSIONIC_HERMES_LLAMA_CPP_CTX:-4096}"
+  llamacpp_ngl="${PSIONIC_HERMES_LLAMA_CPP_NGL:-$llamacpp_ngl_default}"
+  llamacpp_base_url="http://${llamacpp_host}:${llamacpp_port}/v1"
+  llamacpp_row_path="${raw_dir}/llama_cpp_row.json"
+  llamacpp_model_alias="${PSIONIC_HERMES_LLAMA_CPP_MODEL_ALIAS:-$(basename "$llamacpp_model_path")}"
+  llamacpp_log_path="${PSIONIC_HERMES_LLAMA_CPP_LOG_PATH:-$repo_root/target/hermes/hermes_llamacpp_benchmark_server.log}"
+  mkdir -p "$(dirname "$llamacpp_log_path")"
+  "$llamacpp_root_bin" \
+    -m "$llamacpp_model_path" \
+    --host "$llamacpp_host" \
+    --port "$llamacpp_port" \
+    -c "$llamacpp_ctx" \
+    -ngl "$llamacpp_ngl" \
+    --alias "$llamacpp_model_alias" \
+    >"$llamacpp_log_path" 2>&1 &
+  llamacpp_pid="$!"
+  llamacpp_ready_start="$(python3 - <<'PY'
+import time
+print(f"{time.monotonic():.9f}")
+PY
+)"
+  for _ in $(seq 1 60); do
+    if curl -fsS "http://${llamacpp_host}:${llamacpp_port}/health" >/dev/null 2>&1 || curl -fsS "http://${llamacpp_host}:${llamacpp_port}/v1/models" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+  if ! curl -fsS "http://${llamacpp_host}:${llamacpp_port}/health" >/dev/null 2>&1 && ! curl -fsS "http://${llamacpp_host}:${llamacpp_port}/v1/models" >/dev/null 2>&1; then
+    echo "llama.cpp server failed readiness check on ${llamacpp_host}:${llamacpp_port}" >&2
+    exit 1
+  fi
+  llamacpp_ready_end="$(python3 - <<'PY'
+import time
+print(f"{time.monotonic():.9f}")
+PY
+)"
+fi
+
 psionic_model_name="$(basename "$psionic_model_path")"
 
 OPENAI_API_KEY=dummy \
@@ -128,7 +202,20 @@ OPENAI_BASE_URL="$ollama_base_url" \
   --report-path "$ollama_row_path" \
   --backend-label ollama || true
 
-python3 - "$report_path" "$psionic_row_path" "$ollama_row_path" "$psionic_ready_start" "$psionic_ready_end" "$ollama_ready_start" "$ollama_ready_end" <<'PY'
+if [[ "$enable_llamacpp" == "1" ]]; then
+  OPENAI_API_KEY=dummy \
+  OPENAI_BASE_URL="$llamacpp_base_url" \
+  "$python_bin" "$repo_root/scripts/release/hermes_backend_benchmark_probe.py" \
+    --hermes-root "$hermes_root" \
+    --base-url "$llamacpp_base_url" \
+    --model "$llamacpp_model_alias" \
+    --model-path "$llamacpp_model_path" \
+    --psionic-root "$repo_root" \
+    --report-path "$llamacpp_row_path" \
+    --backend-label llama_cpp || true
+fi
+
+python3 - "$report_path" "$psionic_row_path" "$ollama_row_path" "$psionic_ready_start" "$psionic_ready_end" "$ollama_ready_start" "$ollama_ready_end" "$enable_llamacpp" "$llamacpp_row_path" "$llamacpp_ready_start" "$llamacpp_ready_end" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -141,34 +228,32 @@ psionic_ready_start = float(sys.argv[4])
 psionic_ready_end = float(sys.argv[5])
 ollama_ready_start = float(sys.argv[6])
 ollama_ready_end = float(sys.argv[7])
+enable_llamacpp = sys.argv[8] == "1"
+llamacpp_row_path = Path(sys.argv[9]) if enable_llamacpp else None
+llamacpp_ready_start = float(sys.argv[10]) if enable_llamacpp else None
+llamacpp_ready_end = float(sys.argv[11]) if enable_llamacpp else None
 
 psionic_row = json.loads(psionic_row_path.read_text())
 ollama_row = json.loads(ollama_row_path.read_text())
 
 rows = [psionic_row, ollama_row]
+if enable_llamacpp:
+    rows.append(json.loads(llamacpp_row_path.read_text()))
 by_label = {row["backend_label"]: row for row in rows}
 case_ids = [case["case_id"] for case in psionic_row["cases"]]
 comparison = []
 for case_id in case_ids:
-    psionic_case = next(case for case in psionic_row["cases"] if case["case_id"] == case_id)
-    ollama_case = next(case for case in ollama_row["cases"] if case["case_id"] == case_id)
-    faster_backend = None
-    if psionic_case["wallclock_s"] < ollama_case["wallclock_s"]:
-        faster_backend = "psionic"
-    elif ollama_case["wallclock_s"] < psionic_case["wallclock_s"]:
-        faster_backend = "ollama"
-    comparison.append(
-        {
-            "case_id": case_id,
-            "psionic_pass": psionic_case["pass"],
-            "ollama_pass": ollama_case["pass"],
-            "psionic_wallclock_s": psionic_case["wallclock_s"],
-            "ollama_wallclock_s": ollama_case["wallclock_s"],
-            "psionic_completion_tok_s": psionic_case["completion_tok_s"],
-            "ollama_completion_tok_s": ollama_case["completion_tok_s"],
-            "faster_backend": faster_backend,
+    case_map = {}
+    for row in rows:
+        row_case = next(case for case in row["cases"] if case["case_id"] == case_id)
+        case_map[row["backend_label"]] = {
+            "pass": row_case["pass"],
+            "wallclock_s": row_case["wallclock_s"],
+            "completion_tok_s": row_case["completion_tok_s"],
         }
-    )
+    ranked = sorted(case_map.items(), key=lambda item: item[1]["wallclock_s"])
+    faster_backend = ranked[0][0] if ranked else None
+    comparison.append({"case_id": case_id, "backends": case_map, "faster_backend": faster_backend})
 
 output = {
     "report_kind": "psionic_hermes_backend_benchmark",
@@ -192,6 +277,8 @@ output = {
     "backends": rows,
     "comparison": comparison,
 }
+if enable_llamacpp:
+    output["startup_probe"]["llama_cpp_ready_s"] = llamacpp_ready_end - llamacpp_ready_start
 report_path.write_text(json.dumps(output, indent=2) + "\n")
 print(json.dumps(output, indent=2))
 PY
