@@ -15,6 +15,21 @@ The pilot row is the downloaded artifact at:
 - chat-template digest:
   `273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80`
 
+## Hermes Compatibility
+
+The retained Hermes-on-Psionic `chat.completions` proof now lives in
+`docs/HERMES_QWEN35_COMPATIBILITY.md`.
+
+Current honest status:
+
+- exact pushed Psionic revision `ef5e2cdca840db6b2fc0c871649e6cb4b2af6d30`
+  reaches `5/6` retained Hermes compatibility cases on both local qwen35 `2b`
+  and `9b`
+- the only remaining failed case is `parallel_tool_turn`
+- the retained reports show Hermes sent both tool definitions on the failing
+  turn, so the remaining blocker is current model behavior on same-turn
+  parallel tool use, not missing request-surface plumbing in Psionic
+
 ## Current Lane
 
 Psionic currently supports this row through a bounded native `qwen35` CUDA lane:

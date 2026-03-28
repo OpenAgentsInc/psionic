@@ -1,0 +1,383 @@
+{
+  "report_kind": "psionic_hermes_qwen35_compatibility",
+  "created_at_utc": "2026-03-28T21:34:02.773074+00:00",
+  "backend_label": "psionic",
+  "base_url": "http://127.0.0.1:8095/v1",
+  "model": "qwen3.5-2b-q8_0-registry.gguf",
+  "model_path": "/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf",
+  "psionic_root": "/home/christopherdavid/scratch/psionic-hermes-proof-ef5e2cdc",
+  "psionic_revision": "ef5e2cdca840db6b2fc0c871649e6cb4b2af6d30",
+  "hermes_root": "/home/christopherdavid/scratch/hermes-agent-proof2",
+  "hermes_revision": "e295a2215acd55f2ee930fc7a4cd2df1c5464234",
+  "python_executable": "/home/christopherdavid/scratch/hermes-min/.venv/bin/python",
+  "python_version": "3.14.3 (main, Feb 13 2026, 15:31:44) [GCC 15.2.1 20260209]",
+  "host": "archlinux",
+  "cases": [
+    {
+      "case_id": "required_tool_turn",
+      "pass": true,
+      "summary": "required tool turn emitted one weather tool call",
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_required"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_required"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": false,
+      "failed": false,
+      "final_response": "The weather in Paris is currently sunny with a temperature of 18\u00b0C. The sky is clear, and the temperature is 18\u00b0C. It's a nice day for outdoor activities.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the weather tool for Paris."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": null,
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "psionic-chatcmpl-1-tool-0",
+              "call_id": "psionic-chatcmpl-1-tool-0",
+              "response_item_id": "fc_psionic-chatcmpl-1-tool-0",
+              "type": "function",
+              "function": {
+                "name": "get_weather_required",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\"}",
+          "tool_call_id": "psionic-chatcmpl-1-tool-0"
+        },
+        {
+          "role": "assistant",
+          "content": "The weather in Paris is currently sunny with a temperature of 18\u00b0C. The sky is clear, and the temperature is 18\u00b0C. It's a nice day for outdoor activities.",
+          "reasoning": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "assistant_tool_names": [
+          "get_weather_required"
+        ]
+      }
+    },
+    {
+      "case_id": "auto_plain_text_turn",
+      "pass": true,
+      "summary": "auto mode answered with plain text and no tool call",
+      "stream_calls": 1,
+      "request_summaries": [
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_auto"
+          ]
+        }
+      ],
+      "api_calls": 1,
+      "completed": true,
+      "failed": false,
+      "final_response": "Hello! How can I help you today?",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Say hello in one short sentence. Do not use tools."
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! How can I help you today?",
+          "reasoning": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "final_text": "Hello! How can I help you today?"
+      }
+    },
+    {
+      "case_id": "multi_turn_tool_loop",
+      "pass": true,
+      "summary": "multi-turn tool loop replay reached a final answer",
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_loop"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_loop"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": true,
+      "failed": false,
+      "final_response": "The current weather in Paris is sunny with a temperature of 22\u00b0C. The weather is sunny with a high of 22\u00b0C and a low chance of rain.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the weather tool for Paris and then summarize the result."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": null,
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "psionic-chatcmpl-4-tool-0",
+              "call_id": "psionic-chatcmpl-4-tool-0",
+              "response_item_id": "fc_psionic-chatcmpl-4-tool-0",
+              "type": "function",
+              "function": {
+                "name": "get_weather_loop",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\", \"temperature_c\": 22}",
+          "tool_call_id": "psionic-chatcmpl-4-tool-0"
+        },
+        {
+          "role": "assistant",
+          "content": "The current weather in Paris is sunny with a temperature of 22\u00b0C. The weather is sunny with a high of 22\u00b0C and a low chance of rain.",
+          "reasoning": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "final_text": "The current weather in Paris is sunny with a temperature of 22\u00b0C. The weather is sunny with a high of 22\u00b0C and a low chance of rain.",
+        "saw_tool_result": true
+      }
+    },
+    {
+      "case_id": "parallel_tool_turn",
+      "pass": false,
+      "summary": "parallel tool turn emitted both tool calls in one assistant response",
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_paris_weather",
+            "get_tokyo_weather"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_paris_weather",
+            "get_tokyo_weather"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": false,
+      "failed": false,
+      "final_response": "Paris is currently sunny with a temperature of 22\u00b0C and a clear sky. The temperature is 18\u00b0C with a clear sky and a 10% chance of rain.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use both weather tools now, then summarize both cities in one answer."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": null,
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "psionic-chatcmpl-6-tool-0",
+              "call_id": "psionic-chatcmpl-6-tool-0",
+              "response_item_id": "fc_psionic-chatcmpl-6-tool-0",
+              "type": "function",
+              "function": {
+                "name": "get_paris_weather",
+                "arguments": "{}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\"}",
+          "tool_call_id": "psionic-chatcmpl-6-tool-0"
+        },
+        {
+          "role": "assistant",
+          "content": "Paris is currently sunny with a temperature of 22\u00b0C and a clear sky. The temperature is 18\u00b0C with a clear sky and a 10% chance of rain.",
+          "reasoning": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "assistant_tool_names": [
+          "get_paris_weather"
+        ]
+      }
+    },
+    {
+      "case_id": "invalid_argument_truthful_refusal",
+      "pass": true,
+      "summary": "invalid-argument case surfaced a truthful failure",
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "lookup_atlantis_weather"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "lookup_atlantis_weather"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": true,
+      "failed": false,
+      "final_response": "Atlantis is unsupported. I do not have a weather result.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the Atlantis weather tool and then explain truthfully what happened."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": null,
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "psionic-chatcmpl-8-tool-0",
+              "call_id": "psionic-chatcmpl-8-tool-0",
+              "response_item_id": "fc_psionic-chatcmpl-8-tool-0",
+              "type": "function",
+              "function": {
+                "name": "lookup_atlantis_weather",
+                "arguments": "{\"city\":\"Atlantis\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"error\": \"unsupported city Atlantis\", \"supported_cities\": [\"Paris\"], \"refusal\": \"Atlantis is unsupported. Do not claim a weather result.\"}",
+          "tool_call_id": "psionic-chatcmpl-8-tool-0"
+        },
+        {
+          "role": "assistant",
+          "content": "Atlantis is unsupported. I do not have a weather result.",
+          "reasoning": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "final_text": "Atlantis is unsupported. I do not have a weather result."
+      }
+    },
+    {
+      "case_id": "streamed_tool_turn",
+      "pass": true,
+      "summary": "streaming chat loop preserved a tool-call turn",
+      "stream_calls": 2,
+      "request_summaries": [
+        {
+          "tool_choice": "required",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_stream"
+          ]
+        },
+        {
+          "tool_choice": "auto",
+          "parallel_tool_calls": true,
+          "tool_names": [
+            "get_weather_stream"
+          ]
+        }
+      ],
+      "api_calls": 2,
+      "completed": false,
+      "failed": false,
+      "final_response": "The weather in Paris is currently sunny with a temperature of 22\u00b0C (59\u00b0F), with a 70% chance of sunshine. The sky is partly cloudy, and the temperature is 18\u00b0C. Humidity is 65%, with a chance of light rain in the next few hours. The wind is light, and the humidity is moderate.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Use the weather tool for Paris."
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning": null,
+          "finish_reason": "tool_calls",
+          "tool_calls": [
+            {
+              "id": "psionic-chatcmpl-10-tool-0",
+              "call_id": "psionic-chatcmpl-10-tool-0",
+              "response_item_id": "fc_psionic-chatcmpl-10-tool-0",
+              "type": "function",
+              "function": {
+                "name": "get_weather_stream",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "{\"city\": \"Paris\", \"condition\": \"sunny\"}",
+          "tool_call_id": "psionic-chatcmpl-10-tool-0"
+        },
+        {
+          "role": "assistant",
+          "content": "The weather in Paris is currently sunny with a temperature of 22\u00b0C (59\u00b0F), with a 70% chance of sunshine. The sky is partly cloudy, and the temperature is 18\u00b0C. Humidity is 65%, with a chance of light rain in the next few hours. The wind is light, and the humidity is moderate.",
+          "reasoning": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "details": {
+        "assistant_tool_names": [
+          "get_weather_stream"
+        ]
+      }
+    }
+  ],
+  "overall_pass": false,
+  "passing_case_count": 5,
+  "total_case_count": 6
+}
