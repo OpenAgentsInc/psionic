@@ -3441,7 +3441,7 @@ mod tests {
             } else {
                 tensors.push(dense_f32_tensor(
                     &format!("{prefix}.attn_q.weight"),
-                    vec![8, 8],
+                    vec![16, 8],
                 ));
                 tensors.push(dense_f32_tensor(
                     &format!("{prefix}.attn_k.weight"),

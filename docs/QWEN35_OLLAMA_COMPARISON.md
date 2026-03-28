@@ -99,6 +99,9 @@ Psionic output-mode evidence on this contract:
 - The runtime sampling surface now honors `min_p` and request-level
   `repeat_last_n` in addition to `temperature`, `top_k`, `top_p`,
   `repeat_penalty`, `presence_penalty`, `frequency_penalty`, and `seed`.
+- The generic OpenAI-compatible qwen35 server surface now forwards those same
+  controls on `/v1/chat/completions` and `/v1/responses`, so the benchmark
+  contract does not require a separate sidecar request shape.
 - `repeat_last_n` follows the Ollama-compatible control contract in the local
   sampler and benchmark harness:
   - default `64`

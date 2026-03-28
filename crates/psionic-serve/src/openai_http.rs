@@ -58,13 +58,14 @@ use crate::{
     CpuGgufTextGenerationService, CpuModelEmbeddingsService, CudaGgufGptOssTextGenerationService,
     CudaGgufQwen35TextGenerationService, CudaGptOssTextGenerationError, DecodeStrategy,
     DecoderModelDescriptor, EmbeddingMetrics, EmbeddingNormalization, EmbeddingProvenance,
-    EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor, GenerationMetrics,
-    GenerationOptions, GenerationRequest, GgufDecoderAdapterLoader, GptOssPerformanceMetrics,
+    EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor, GenerationMetrics, GenerationOptions,
+    GenerationRequest, GgufDecoderAdapterLoader, GptOssPerformanceMetrics,
     MetalGgufGptOssTextGenerationService, MetalGptOssTextGenerationError, ModelEmbeddingsError,
     PromptRenderError, ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor,
     TokenSequence, continuous_batch_text_generation_execution_profile,
     default_embeddings_execution_profile, default_generation_scheduler_policy,
-    default_text_generation_execution_profile, tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
+    default_text_generation_execution_profile,
+    tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
 mod tassadar_post_article_router_plugin_tool_loop_pilot;
@@ -1033,9 +1034,7 @@ impl OpenAiCompatLoadedModel {
     }
 }
 
-fn qwen35_structured_output_unavailable_detail(
-    execution_engine_label: &str,
-) -> &'static str {
+fn qwen35_structured_output_unavailable_detail(execution_engine_label: &str) -> &'static str {
     if execution_engine_label == "psionic" {
         "structured outputs are unavailable on the native qwen35 text-only runtime"
     } else {
@@ -1228,8 +1227,10 @@ impl OpenAiCompatWorker {
                                 Ok(service) => {
                                     let model_key =
                                         service.model_descriptor().model.model_id.clone();
-                                    generation_services
-                                        .insert(model_key, OpenAiCompatGenerationService::Cpu(service));
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Cpu(service),
+                                    );
                                 }
                                 Err(error) => {
                                     let _ = ready_tx.send(Err::<(), String>(error.to_string()));
@@ -2052,6 +2053,22 @@ struct ChatCompletionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    top_k: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    top_p: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    min_p: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repeat_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repeat_last_n: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    presence_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    frequency_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    seed: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_tokens: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     stop: Option<StopSequences>,
@@ -2071,6 +2088,34 @@ struct ChatCompletionRequest {
     psionic_reasoning: Option<PsionicReasoningRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_prefix_cache: Option<PrefixCacheControl>,
+}
+
+impl Default for ChatCompletionRequest {
+    fn default() -> Self {
+        Self {
+            model: None,
+            messages: Vec::new(),
+            temperature: None,
+            top_k: None,
+            top_p: None,
+            min_p: None,
+            repeat_penalty: None,
+            repeat_last_n: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            seed: None,
+            max_tokens: None,
+            stop: None,
+            stream: false,
+            tools: Vec::new(),
+            tool_choice: None,
+            response_format: None,
+            psionic_grammar: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_prefix_cache: None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -2278,6 +2323,22 @@ struct ResponsesRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    top_k: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    top_p: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    min_p: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repeat_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    repeat_last_n: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    presence_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    frequency_penalty: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    seed: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_output_tokens: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     stop: Option<StopSequences>,
@@ -2297,6 +2358,36 @@ struct ResponsesRequest {
     psionic_response_state: Option<PsionicResponseStateRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_prefix_cache: Option<PrefixCacheControl>,
+}
+
+impl Default for ResponsesRequest {
+    fn default() -> Self {
+        Self {
+            model: None,
+            instructions: None,
+            conversation: None,
+            input: ResponsesInput::Text(String::new()),
+            temperature: None,
+            top_k: None,
+            top_p: None,
+            min_p: None,
+            repeat_penalty: None,
+            repeat_last_n: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            seed: None,
+            max_output_tokens: None,
+            stop: None,
+            stream: false,
+            tools: Vec::new(),
+            tool_choice: None,
+            previous_response_id: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_response_state: None,
+            psionic_prefix_cache: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -4722,7 +4813,10 @@ fn generic_decoder_serving_truth(
     family: GgufDecoderFamily,
     backend: OpenAiCompatBackend,
 ) -> OpenAiCompatServingTruth {
-    if matches!((backend, family), (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)) {
+    if matches!(
+        (backend, family),
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
+    ) {
         OpenAiCompatServingTruth::cuda_native()
     } else if matches!(family, GgufDecoderFamily::Qwen35) {
         OpenAiCompatServingTruth::cpu_llama_cpp_proxy()
@@ -4899,19 +4993,38 @@ fn generation_options_from_chat_request_for_family(
     default_stop_sequences: &[String],
 ) -> GenerationOptions {
     let max_output_tokens = request.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
-    let temperature = request.temperature.unwrap_or(0.0);
-    let mut options = if temperature <= f32::EPSILON {
+    let mut options = if request_uses_sample_decode(
+        request.temperature,
+        request.top_k,
+        request.top_p,
+        request.min_p,
+    ) {
+        GenerationOptions::sample(max_output_tokens)
+    } else {
         GenerationOptions::greedy(max_output_tokens)
-    } else {
-        let mut options = GenerationOptions::sample(max_output_tokens);
-        options.temperature = Some(temperature);
-        options
     };
-    options.decode_strategy = if temperature <= f32::EPSILON {
-        DecodeStrategy::Greedy
-    } else {
+    options.decode_strategy = if request_uses_sample_decode(
+        request.temperature,
+        request.top_k,
+        request.top_p,
+        request.min_p,
+    ) {
         DecodeStrategy::Sample
+    } else {
+        DecodeStrategy::Greedy
     };
+    apply_sampling_controls(
+        &mut options,
+        request.temperature,
+        request.top_k,
+        request.top_p,
+        request.min_p,
+        request.repeat_penalty,
+        request.repeat_last_n,
+        request.presence_penalty,
+        request.frequency_penalty,
+        request.seed,
+    );
     if let Some(stop) = &request.stop {
         options.stop_sequences.extend(stop.clone().into_vec());
     }
@@ -4932,19 +5045,38 @@ fn generation_options_from_responses_request(
     default_stop_sequences: &[String],
 ) -> GenerationOptions {
     let max_output_tokens = request.max_output_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
-    let temperature = request.temperature.unwrap_or(0.0);
-    let mut options = if temperature <= f32::EPSILON {
+    let mut options = if request_uses_sample_decode(
+        request.temperature,
+        request.top_k,
+        request.top_p,
+        request.min_p,
+    ) {
+        GenerationOptions::sample(max_output_tokens)
+    } else {
         GenerationOptions::greedy(max_output_tokens)
-    } else {
-        let mut options = GenerationOptions::sample(max_output_tokens);
-        options.temperature = Some(temperature);
-        options
     };
-    options.decode_strategy = if temperature <= f32::EPSILON {
-        DecodeStrategy::Greedy
-    } else {
+    options.decode_strategy = if request_uses_sample_decode(
+        request.temperature,
+        request.top_k,
+        request.top_p,
+        request.min_p,
+    ) {
         DecodeStrategy::Sample
+    } else {
+        DecodeStrategy::Greedy
     };
+    apply_sampling_controls(
+        &mut options,
+        request.temperature,
+        request.top_k,
+        request.top_p,
+        request.min_p,
+        request.repeat_penalty,
+        request.repeat_last_n,
+        request.presence_penalty,
+        request.frequency_penalty,
+        request.seed,
+    );
     if let Some(stop) = &request.stop {
         options.stop_sequences.extend(stop.clone().into_vec());
     }
@@ -4957,6 +5089,41 @@ fn generation_options_from_responses_request(
         ensure_harmony_stop_sequences(&mut options.stop_sequences);
     }
     options
+}
+
+fn request_uses_sample_decode(
+    temperature: Option<f32>,
+    top_k: Option<usize>,
+    top_p: Option<f32>,
+    min_p: Option<f32>,
+) -> bool {
+    temperature.is_some_and(|value| value > f32::EPSILON)
+        || top_k.is_some_and(|value| value > 1)
+        || top_p.is_some_and(|value| value.is_finite() && value > 0.0 && value < 1.0)
+        || min_p.is_some_and(|value| value.is_finite() && value > 0.0 && value <= 1.0)
+}
+
+fn apply_sampling_controls(
+    options: &mut GenerationOptions,
+    temperature: Option<f32>,
+    top_k: Option<usize>,
+    top_p: Option<f32>,
+    min_p: Option<f32>,
+    repeat_penalty: Option<f32>,
+    repeat_last_n: Option<i32>,
+    presence_penalty: Option<f32>,
+    frequency_penalty: Option<f32>,
+    seed: Option<u64>,
+) {
+    options.temperature = temperature;
+    options.top_k = top_k;
+    options.top_p = top_p;
+    options.min_p = min_p;
+    options.repeat_penalty = repeat_penalty;
+    options.repeat_last_n = repeat_last_n;
+    options.presence_penalty = presence_penalty;
+    options.frequency_penalty = frequency_penalty;
+    options.seed = seed;
 }
 
 fn response_input_to_prompt_messages_with_options(
@@ -5306,19 +5473,19 @@ mod tests {
         PsionicGrammarRequest, PsionicReasoningMode, PsionicReasoningRequest,
         PsionicResponseStateRequest, ResolvedReasoningRequest, ResolvedToolCall,
         ResponseContinuationMode, ResponsesInput, ResponsesRequest, RoutingEndpoint,
-        RoutingRequest, ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
-        assistant_prompt_message_for_tool_loop, chat_messages_to_prompt_messages,
-        chat_messages_to_prompt_messages_for_family, completion_choice,
-        ensure_harmony_stop_sequences, generation_options_from_chat_request,
-        generation_options_from_chat_request_for_family, generic_embeddings, generic_health,
-        generic_list_models, gpt_oss_local_serving_truth, handle_generic_chat_completions,
-        handle_generic_responses, insert_local_serving_truth_headers, prompt_request_cache_key,
-        render_prompt_for_model, resolve_execution_summary, resolve_generic_model,
-        responses_output_items, surfaced_reasoning_response, tool_loop_tool_call_from_resolved,
-        tool_result_prompt_message,
+        RoutingRequest, StopSequences, ToolChoiceRequest, ToolDefinitionEnvelope,
+        ToolDefinitionRequest, assistant_prompt_message_for_tool_loop,
+        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
+        completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
+        generation_options_from_chat_request_for_family, generation_options_from_responses_request,
+        generic_embeddings, generic_health, generic_list_models, gpt_oss_local_serving_truth,
+        handle_generic_chat_completions, handle_generic_responses,
+        insert_local_serving_truth_headers, prompt_request_cache_key, render_prompt_for_model,
+        resolve_execution_summary, resolve_generic_model, responses_output_items,
+        surfaced_reasoning_response, tool_loop_tool_call_from_resolved, tool_result_prompt_message,
     };
     use crate::{
-        GenerationMetrics, GenerationOutput, GenerationRequest, GenerationResponse,
+        DecodeStrategy, GenerationMetrics, GenerationOutput, GenerationRequest, GenerationResponse,
         GenerationUsage, TerminationReason,
     };
     use axum::{
@@ -5451,6 +5618,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         });
 
         assert!(
@@ -5465,6 +5633,98 @@ mod tests {
                 .iter()
                 .any(|value| value == HARMONY_CALL_STOP)
         );
+    }
+
+    #[test]
+    fn generation_options_from_chat_request_forward_sampling_controls() {
+        let options = generation_options_from_chat_request_for_family(
+            &ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35")),
+                messages: vec![ChatCompletionMessage::text("user", "sample")],
+                temperature: None,
+                top_k: Some(23),
+                top_p: Some(0.85),
+                min_p: Some(0.1),
+                repeat_penalty: Some(1.15),
+                repeat_last_n: Some(32),
+                presence_penalty: Some(0.25),
+                frequency_penalty: Some(0.5),
+                seed: Some(42),
+                max_tokens: Some(17),
+                stop: Some(StopSequences::Many(vec![String::from("done")])),
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+            GgufDecoderFamily::Qwen35,
+            &[],
+        );
+
+        assert_eq!(options.decode_strategy, DecodeStrategy::Sample);
+        assert_eq!(options.max_output_tokens, 17);
+        assert_eq!(options.temperature, None);
+        assert_eq!(options.top_k, Some(23));
+        assert_eq!(options.top_p, Some(0.85));
+        assert_eq!(options.min_p, Some(0.1));
+        assert_eq!(options.repeat_penalty, Some(1.15));
+        assert_eq!(options.repeat_last_n, Some(32));
+        assert_eq!(options.presence_penalty, Some(0.25));
+        assert_eq!(options.frequency_penalty, Some(0.5));
+        assert_eq!(options.seed, Some(42));
+        assert_eq!(options.stop_sequences, vec![String::from("done")]);
+    }
+
+    #[test]
+    fn generation_options_from_responses_request_forward_sampling_controls() {
+        let options = generation_options_from_responses_request(
+            &ResponsesRequest {
+                model: Some(String::from("tiny-qwen35")),
+                instructions: None,
+                conversation: None,
+                input: ResponsesInput::Text(String::from("sample")),
+                temperature: Some(0.65),
+                top_k: Some(19),
+                top_p: Some(0.92),
+                min_p: Some(0.05),
+                repeat_penalty: Some(1.2),
+                repeat_last_n: Some(-1),
+                presence_penalty: Some(0.2),
+                frequency_penalty: Some(0.4),
+                seed: Some(7),
+                max_output_tokens: Some(29),
+                stop: Some(StopSequences::One(String::from("END"))),
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+            GgufDecoderFamily::Qwen35,
+            &[],
+        );
+
+        assert_eq!(options.decode_strategy, DecodeStrategy::Sample);
+        assert_eq!(options.max_output_tokens, 29);
+        assert_eq!(options.temperature, Some(0.65));
+        assert_eq!(options.top_k, Some(19));
+        assert_eq!(options.top_p, Some(0.92));
+        assert_eq!(options.min_p, Some(0.05));
+        assert_eq!(options.repeat_penalty, Some(1.2));
+        assert_eq!(options.repeat_last_n, Some(-1));
+        assert_eq!(options.presence_penalty, Some(0.2));
+        assert_eq!(options.frequency_penalty, Some(0.4));
+        assert_eq!(options.seed, Some(7));
+        assert_eq!(options.stop_sequences, vec![String::from("END")]);
     }
 
     #[test]
@@ -5887,6 +6147,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
         let prompt_messages =
             chat_messages_to_prompt_messages_for_family(&request.messages, qwen_decoder.family)?;
@@ -5984,6 +6245,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))?;
         assert_eq!(
@@ -6165,6 +6427,7 @@ mod tests {
                 psionic_structured_output: None,
                 psionic_reasoning: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         assert_eq!(
@@ -6206,6 +6469,101 @@ mod tests {
                 && body["prompt"]
                     .as_str()
                     .is_some_and(|prompt| prompt.contains("hello"))
+        }));
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen35_proxy_forwards_sampling_controls()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, observed_requests) =
+            runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
+        drop(_proxy_env);
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35")),
+                messages: vec![ChatCompletionMessage::text("user", "sample with controls")],
+                temperature: None,
+                top_k: Some(23),
+                top_p: Some(0.85),
+                min_p: Some(0.1),
+                repeat_penalty: Some(1.15),
+                repeat_last_n: Some(32),
+                presence_penalty: Some(0.25),
+                frequency_penalty: Some(0.5),
+                seed: Some(42),
+                max_tokens: Some(5),
+                stop: Some(StopSequences::One(String::from("done"))),
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+            },
+        ))?;
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("proxy world")
+        );
+
+        let observed_requests = observed_requests
+            .lock()
+            .expect("observed qwen35 proxy requests should be readable");
+        assert!(observed_requests.iter().any(|body| {
+            body.get("n_predict") == Some(&serde_json::json!(5))
+                && body.get("temperature").is_none()
+                && body.get("top_k") == Some(&serde_json::json!(23))
+                && body
+                    .get("top_p")
+                    .and_then(serde_json::Value::as_f64)
+                    .is_some_and(|value| (value - 0.85).abs() < 1e-6)
+                && body
+                    .get("min_p")
+                    .and_then(serde_json::Value::as_f64)
+                    .is_some_and(|value| (value - 0.1).abs() < 1e-6)
+                && body
+                    .get("repeat_penalty")
+                    .and_then(serde_json::Value::as_f64)
+                    .is_some_and(|value| (value - 1.15).abs() < 1e-6)
+                && body.get("repeat_last_n") == Some(&serde_json::json!(32))
+                && body
+                    .get("presence_penalty")
+                    .and_then(serde_json::Value::as_f64)
+                    .is_some_and(|value| (value - 0.25).abs() < 1e-6)
+                && body
+                    .get("frequency_penalty")
+                    .and_then(serde_json::Value::as_f64)
+                    .is_some_and(|value| (value - 0.5).abs() < 1e-6)
+                && body.get("seed") == Some(&serde_json::json!(42))
+                && body
+                    .get("stop")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|values| values.contains(&serde_json::json!("done")))
+                && body["prompt"]
+                    .as_str()
+                    .is_some_and(|prompt| prompt.contains("sample with controls"))
         }));
 
         let _ = shutdown_tx.send(());
@@ -6260,6 +6618,7 @@ mod tests {
                 psionic_structured_output: None,
                 psionic_reasoning: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         assert_eq!(
@@ -6321,6 +6680,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("qwen35 tool calling should fail closed");
@@ -6353,6 +6713,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("qwen35 structured output should fail closed");
@@ -6419,6 +6780,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect("qwen35 multimodal input should project through the prompt surface");
@@ -6463,6 +6825,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("qwen35 system multimodal input should follow template refusal");
@@ -6521,6 +6884,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let payload = runtime.block_on(response_json(response))?;
@@ -6569,6 +6933,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
         let prompt_messages =
             chat_messages_to_prompt_messages_for_family(&request.messages, decoder.family)?;
@@ -6628,6 +6993,7 @@ mod tests {
                         mode: PsionicReasoningMode::Separate,
                     }),
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("llama family should refuse the reasoning parser contract");
@@ -6750,6 +7116,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         assert_eq!(response.status(), StatusCode::OK);
@@ -6801,6 +7168,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let first_payload = runtime.block_on(response_json(first_response))?;
@@ -6847,6 +7215,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let second_payload = runtime.block_on(response_json(second_response))?;
@@ -6913,6 +7282,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let first_payload = runtime.block_on(response_json(first_response))?;
@@ -6947,6 +7317,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let second_payload = runtime.block_on(response_json(second_response))?;
@@ -7004,6 +7375,7 @@ mod tests {
                     psionic_reasoning: None,
                     psionic_response_state: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("unknown response state should be refused");
@@ -7049,6 +7421,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let first_payload = runtime.block_on(response_json(first_response))?;
@@ -7076,6 +7449,7 @@ mod tests {
                     psionic_reasoning: None,
                     psionic_response_state: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("instruction drift should be refused");
@@ -7124,6 +7498,7 @@ mod tests {
                         invalidate_references: false,
                     }),
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("continue_last_assistant should be refused on the current runtime");
@@ -7194,6 +7569,7 @@ mod tests {
                     psionic_reasoning: None,
                     psionic_response_state: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))
             .expect_err("embeddings-only model should refuse responses");
@@ -7239,6 +7615,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
 
         let response = tokio::runtime::Runtime::new()?.block_on(
@@ -7334,6 +7711,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
 
         let response = tokio::runtime::Runtime::new()?.block_on(
@@ -7416,6 +7794,7 @@ mod tests {
             }),
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
 
         let response = tokio::runtime::Runtime::new()?.block_on(
@@ -7480,6 +7859,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         assert_eq!(
@@ -7546,6 +7926,7 @@ mod tests {
             }),
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
 
         let response = tokio::runtime::Runtime::new()?.block_on(
@@ -7612,6 +7993,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))?;
         let payload = tokio::runtime::Runtime::new()?.block_on(response_json(response))?;
@@ -7653,6 +8035,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))?;
         let payload = tokio::runtime::Runtime::new()?.block_on(response_json(response))?;
@@ -7704,6 +8087,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))?;
         let payload = tokio::runtime::Runtime::new()?.block_on(response_json(response))?;
@@ -7761,6 +8145,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let payload = tokio::runtime::Runtime::new()?.block_on(response_json(response))?;
@@ -7805,6 +8190,7 @@ mod tests {
                 psionic_structured_output: None,
                 psionic_reasoning: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             }),
         ));
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -7849,6 +8235,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))?;
         let body = tokio::runtime::Runtime::new()?.block_on(response_text(response))?;
@@ -8100,6 +8487,7 @@ mod tests {
                 mode: PrefixCacheMode::Auto,
                 tenant_id: Some(String::from(tenant_id)),
             }),
+            ..Default::default()
         };
 
         let seeded_summary = runtime.block_on(handle_generic_chat_completions(
@@ -8180,6 +8568,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let first_payload = runtime.block_on(response_json(first_response))?;
@@ -8272,6 +8661,7 @@ mod tests {
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))?;
         let continued_payload = runtime.block_on(response_json(continued_response))?;
@@ -8323,6 +8713,7 @@ mod tests {
                 psionic_structured_output: None,
                 psionic_reasoning: None,
                 psionic_prefix_cache: Some(prefix_cache),
+                ..Default::default()
             };
 
         let seeded = tokio::runtime::Runtime::new()?.block_on(handle_generic_chat_completions(
@@ -8422,6 +8813,7 @@ mod tests {
                     psionic_structured_output: None,
                     psionic_reasoning: None,
                     psionic_prefix_cache: None,
+                    ..Default::default()
                 },
             ))?;
         assert_eq!(
@@ -8484,6 +8876,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_reasoning: None,
             psionic_prefix_cache: None,
+            ..Default::default()
         };
 
         let response = tokio::runtime::Runtime::new()?.block_on(super::generic_chat_completions(
@@ -9169,6 +9562,7 @@ mod tests {
         let mut tensors = vec![
             dense_f32_tensor("token_embd.weight", vec![10, 8]),
             dense_f32_tensor("output_norm.weight", vec![8]),
+            dense_f32_tensor("output.weight", vec![10, 8]),
         ];
 
         for layer_index in 0..4 {
@@ -9228,7 +9622,7 @@ mod tests {
             } else {
                 tensors.push(dense_f32_tensor(
                     &format!("{prefix}.attn_q.weight"),
-                    vec![8, 8],
+                    vec![16, 8],
                 ));
                 tensors.push(dense_f32_tensor(
                     &format!("{prefix}.attn_k.weight"),

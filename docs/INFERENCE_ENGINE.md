@@ -48,6 +48,10 @@ than just run tensor math.
   - structured-output masking inactive
 - The runtime sampling surface now also honors `min_p` and request-level
   `repeat_last_n` in addition to the existing sampled controls.
+- The generic OpenAI-compatible qwen35 request surface now forwards
+  `top_k`, `top_p`, `min_p`, `repeat_penalty`, `repeat_last_n`,
+  `presence_penalty`, `frequency_penalty`, and `seed` on both
+  `/v1/chat/completions` and `/v1/responses`.
 - `repeat_last_n` follows the Ollama-compatible local sampler contract:
   - default `64`
   - `0` disables the penalty lookback window

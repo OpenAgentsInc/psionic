@@ -451,6 +451,7 @@ fn seeded_server_and_response(
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))
         .map_err(|error| {
@@ -491,6 +492,7 @@ fn continuation_row_from_server(
                 psionic_reasoning: None,
                 psionic_response_state: None,
                 psionic_prefix_cache: None,
+                ..Default::default()
             },
         ))
         .map_err(|error| {

@@ -293,6 +293,9 @@ raw-logit readback.
 The local sampler surface now also honors `min_p` and request-level
 `repeat_last_n` in addition to `temperature`, `top_k`, `top_p`,
 `repeat_penalty`, `presence_penalty`, `frequency_penalty`, and `seed`.
+The generic OpenAI-compatible qwen35 server surface now forwards the same
+controls on both `/v1/chat/completions` and `/v1/responses`, and the proxy
+test harness verifies that those fields reach the qwen35 backend request body.
 `repeat_last_n` follows the Ollama-compatible local contract:
 
 - default `64`
