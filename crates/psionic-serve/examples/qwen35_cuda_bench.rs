@@ -483,6 +483,69 @@ impl BenchConfig {
         }
     }
 
+    fn effective_temperature_for_backend(&self, backend: BenchBackend) -> Option<f32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            _ => self.effective_temperature(),
+        }
+    }
+
+    fn effective_top_k_for_backend(&self, backend: BenchBackend) -> Option<usize> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(1),
+            _ => self.effective_top_k(),
+        }
+    }
+
+    fn effective_top_p_for_backend(&self, backend: BenchBackend) -> Option<f32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(1.0),
+            _ => self.effective_top_p(),
+        }
+    }
+
+    fn effective_min_p_for_backend(&self, backend: BenchBackend) -> Option<f32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            _ => self.effective_min_p(),
+        }
+    }
+
+    fn effective_repeat_penalty_for_backend(&self, backend: BenchBackend) -> Option<f32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(1.0),
+            _ => self.effective_repeat_penalty(),
+        }
+    }
+
+    fn effective_repeat_last_n_for_backend(&self, backend: BenchBackend) -> Option<i32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0),
+            _ => self.effective_repeat_last_n(),
+        }
+    }
+
+    fn effective_presence_penalty_for_backend(&self, backend: BenchBackend) -> Option<f32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            _ => self.effective_presence_penalty(),
+        }
+    }
+
+    fn effective_frequency_penalty_for_backend(&self, backend: BenchBackend) -> Option<f32> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(0.0),
+            _ => self.effective_frequency_penalty(),
+        }
+    }
+
+    fn effective_seed_for_backend(&self, backend: BenchBackend) -> Option<u64> {
+        match (backend, self.decode_mode) {
+            (BenchBackend::Ollama, BenchDecodeMode::Greedy) => Some(self.seed.unwrap_or(42)),
+            _ => self.effective_seed(),
+        }
+    }
+
     fn ollama_format_payload(&self) -> Option<Value> {
         match self.structured_output.as_ref() {
             Some(BenchStructuredOutput::JsonObject) => Some(Value::String(String::from("json"))),
@@ -923,19 +986,19 @@ fn build_bench_report(
         decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
         max_output_tokens: config.max_output_tokens,
         repeats: runs.len(),
-        temperature: config.effective_temperature(),
-        top_k: config.effective_top_k(),
-        top_p: config.effective_top_p(),
-        min_p: config.effective_min_p(),
+        temperature: config.effective_temperature_for_backend(config.backend),
+        top_k: config.effective_top_k_for_backend(config.backend),
+        top_p: config.effective_top_p_for_backend(config.backend),
+        min_p: config.effective_min_p_for_backend(config.backend),
         typical_p: config.effective_typical_p(),
         mirostat: config.effective_mirostat(),
         mirostat_tau: config.effective_mirostat_tau(),
         mirostat_eta: config.effective_mirostat_eta(),
-        repeat_penalty: config.effective_repeat_penalty(),
-        repeat_last_n: config.effective_repeat_last_n(),
-        presence_penalty: config.effective_presence_penalty(),
-        frequency_penalty: config.effective_frequency_penalty(),
-        seed: config.effective_seed(),
+        repeat_penalty: config.effective_repeat_penalty_for_backend(config.backend),
+        repeat_last_n: config.effective_repeat_last_n_for_backend(config.backend),
+        presence_penalty: config.effective_presence_penalty_for_backend(config.backend),
+        frequency_penalty: config.effective_frequency_penalty_for_backend(config.backend),
+        seed: config.effective_seed_for_backend(config.backend),
         structured_output: structured_output_config_report(config.structured_output.as_ref()),
         runs,
         mean_output_tokens,
@@ -1025,16 +1088,16 @@ fn ollama_generate(
     let mut options = serde_json::json!({
         "num_predict": max_output_tokens,
     });
-    if let Some(temperature) = config.effective_temperature() {
+    if let Some(temperature) = config.effective_temperature_for_backend(BenchBackend::Ollama) {
         options["temperature"] = serde_json::json!(temperature);
     }
-    if let Some(top_k) = config.effective_top_k() {
+    if let Some(top_k) = config.effective_top_k_for_backend(BenchBackend::Ollama) {
         options["top_k"] = serde_json::json!(top_k);
     }
-    if let Some(top_p) = config.effective_top_p() {
+    if let Some(top_p) = config.effective_top_p_for_backend(BenchBackend::Ollama) {
         options["top_p"] = serde_json::json!(top_p);
     }
-    if let Some(min_p) = config.effective_min_p() {
+    if let Some(min_p) = config.effective_min_p_for_backend(BenchBackend::Ollama) {
         options["min_p"] = serde_json::json!(min_p);
     }
     if let Some(typical_p) = config.effective_typical_p() {
@@ -1049,19 +1112,24 @@ fn ollama_generate(
     if let Some(mirostat_eta) = config.effective_mirostat_eta() {
         options["mirostat_eta"] = serde_json::json!(mirostat_eta);
     }
-    if let Some(repeat_penalty) = config.effective_repeat_penalty() {
+    if let Some(repeat_penalty) = config.effective_repeat_penalty_for_backend(BenchBackend::Ollama)
+    {
         options["repeat_penalty"] = serde_json::json!(repeat_penalty);
     }
-    if let Some(repeat_last_n) = config.effective_repeat_last_n() {
+    if let Some(repeat_last_n) = config.effective_repeat_last_n_for_backend(BenchBackend::Ollama) {
         options["repeat_last_n"] = serde_json::json!(repeat_last_n);
     }
-    if let Some(presence_penalty) = config.effective_presence_penalty() {
+    if let Some(presence_penalty) =
+        config.effective_presence_penalty_for_backend(BenchBackend::Ollama)
+    {
         options["presence_penalty"] = serde_json::json!(presence_penalty);
     }
-    if let Some(frequency_penalty) = config.effective_frequency_penalty() {
+    if let Some(frequency_penalty) =
+        config.effective_frequency_penalty_for_backend(BenchBackend::Ollama)
+    {
         options["frequency_penalty"] = serde_json::json!(frequency_penalty);
     }
-    if let Some(seed) = config.effective_seed() {
+    if let Some(seed) = config.effective_seed_for_backend(BenchBackend::Ollama) {
         options["seed"] = serde_json::json!(seed);
     }
     if !rendered.stop_sequences.is_empty() {
@@ -1073,6 +1141,7 @@ fn ollama_generate(
         "raw": true,
         "stream": false,
         "think": false,
+        "keep_alive": 0,
         "options": options,
     });
     if let Some(format) = config.ollama_format_payload() {

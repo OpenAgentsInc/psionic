@@ -11,7 +11,8 @@ Tracked issues:
 
 Published benchmark checkpoints:
 
-- greedy matrix checkpoint: `c5bc0ba2`
+- greedy matrix checkpoint: historical `c5bc0ba2`, rerun pending under the
+  corrected explicit Ollama greedy contract
 - sampled matrix checkpoint: `March 27, 2026 rerun after sampler-surface refresh`
 - large-`top_k` sampled matrix checkpoint: `March 28, 2026 clean-host partitioned top-k rerun`
 
@@ -73,14 +74,35 @@ Token cap:
 
 - `128`
 
+Ollama greedy settings:
+
+- `temperature = 0.0`
+- `top_k = 1`
+- `top_p = 1.0`
+- `min_p = 0.0`
+- `repeat_penalty = 1.0`
+- `repeat_last_n = 0`
+- `presence_penalty = 0.0`
+- `frequency_penalty = 0.0`
+- `seed = 42`
+- `keep_alive = 0`
+
+Historical note:
+
+- the older March 27 greedy checkpoint is not current canonical evidence
+- the old harness omitted these explicit Ollama greedy settings and therefore
+  let Ollama use its default sampler surface instead of a forced greedy path
+- the repo now forces the explicit no-sampling, no-penalty Ollama contract
+  above, and the greedy matrix must be rerun under that contract before greedy
+  throughput claims are treated as canonical again
+
 ## Greedy Matrix
 
-| Model | Artifact path | Artifact digest | Psionic decode tok/s | Ollama decode tok/s | Status | Notes |
-| --- | --- | --- | ---: | ---: | --- | --- |
-| `qwen3.5:0.8b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-0.8b-q8_0.gguf` | `afb707b6b8fac6e475acc42bc8380fc0b8d2e0e4190be5a969fbf62fcc897db5` | `523.20` | `328.72` | `implemented_early`, ahead | Current pushed checkpoint `c5bc0ba2` |
-| `qwen3.5:2b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf` | `b709d81508a078a686961de6ca07a953b895d9b286c46e17f00fb267f4f2d297` | `244.03` | `205.24` | `implemented_early`, ahead | Fresh March 27 rerun from a no-incremental rebuilt `qwen35_cuda_bench` example and a serialized local Ollama warmup pass |
-| `qwen3.5:4b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-4b-q8_0-registry.gguf` | `81fb60c7daa80fc1123380b98970b320ae233409f0f71a72ed7b9b0d62f40490` | `166.75` | `141.62` | `implemented_early`, ahead | Mixed `Q4_K` and `Q6_K` row. The win required fixing the fused decode output head to use `Q8_1` projection plus `argmax_f32` for `Q6_K` output weights |
-| `qwen3.5:9b` | `/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf` | `dec52a44569a2a25341c4e4d3fee25846eed4f6f0b936278e3a3c900bb99d37c` | `102.68` | `94.62` | `implemented_early`, ahead | The row fits and runs natively on this host once the local Ollama GPU caches are unloaded before the Psionic measurement |
+Greedy rerun pending under the corrected explicit Ollama greedy contract above.
+
+Historical checkpoint values from `c5bc0ba2` are intentionally not reproduced
+here as canonical matrix truth because the older harness did not force Ollama
+onto a real greedy path.
 
 ## Sampled Contract
 
@@ -207,8 +229,11 @@ Psionic-only measured means:
 ## Current Notes
 
 - The `0.8b`, `2b`, `4b`, and `9b` rows are ahead on decode throughput on this
-  host under the greedy contract, the original sampled contract, and the
-  clean-host large-`top_k` sampled contract above.
+  host under the original sampled contract and the clean-host large-`top_k`
+  sampled contract above.
+- The greedy contract is currently bounded to "rerun pending under the
+  corrected explicit Ollama greedy settings" rather than a live canonical
+  throughput claim.
 - The sampled CUDA lane is bounded, not vague. It uses
   `TopKCandidates { top_k }` only when the request stays inside the exact
   envelope:

@@ -227,6 +227,13 @@ instead of recomputing `__activemask()` on every subgroup:
 - Psionic native CUDA qwen35 decode throughput: about `523.20 tok/s`
 - local Ollama `qwen3.5:0.8b` decode throughput: about `328.72 tok/s`
 
+Those historical March 27 benchmark numbers are no longer treated as the
+canonical greedy comparison on this checkout. The older harness omitted
+explicit Ollama greedy settings and therefore let Ollama use its default
+sampler surface instead of a forced greedy contract. The repo now forces
+explicit Ollama greedy options for greedy rows and will republish the greedy
+matrix after rerunning it under that corrected contract.
+
 The current bounded lane now depends on fourteen architectural changes inside the native
 Psionic runtime:
 
@@ -266,13 +273,14 @@ Psionic runtime:
   block before it updates the global argmax state, instead of doing one global
   CAS update per row block
 
-This pilot therefore proves native CUDA execution correctness, honest
-publication, and a wider throughput win over the local Ollama baseline on this
-host.
+This pilot proves native CUDA execution correctness, honest publication, and a
+clear local Psionic-side throughput improvement on this host. The older
+greedy-versus-Ollama comparison values in this document are now historical and
+need a rerun under the corrected explicit Ollama greedy contract before they
+are reused as canonical benchmark evidence.
 
-The same native qwen35 CUDA lane now also beats local Ollama on the harvested
-registry `2b`, `4b`, and `9b` rows on this host under the same one-sentence
-prompt and `128` token-cap contract:
+The earlier harvested registry `2b`, `4b`, and `9b` greedy rows below are in
+the same historical bucket for the same reason:
 
 - `qwen3.5:2b`: Psionic about `244.03 tok/s`, Ollama about `205.24 tok/s`
 - `qwen3.5:4b`: Psionic about `166.75 tok/s`, Ollama about `141.62 tok/s`

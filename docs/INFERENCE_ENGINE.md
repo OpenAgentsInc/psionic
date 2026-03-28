@@ -120,35 +120,16 @@ than just run tensor math.
   - proxy `qwen35` still fails closed for tool calling
 - The first `qwen35` lane must still fail closed for system-message image and
   video parts to stay aligned with the real template semantics.
-- On March 27, 2026, after moving qwen35 hybrid-layer SSM `decay` and `beta`
-  derivation onto CUDA, normalizing q/k regions directly into the packed
-  decode buffers, replaying greedy argmax decode through a captured CUDA
-  graph, and fusing the qwen35 full-attention query/gate split with per-head
-  query RMSNorm, fusing per-head key RMSNorm with value packing, fusing the
-  qwen35 dense and hybrid SiLU activation tails directly into GGML `Q8_1`
-  scratch, and then fusing the full-attention sigmoid gating tail directly
-  into GGML `Q8_1` scratch, and then replaying qwen35 prompt-prefix `NoOutput`
-  submissions through a second captured CUDA graph, and then fusing qwen35
-  hybrid q/k RMSNorm plus v staging into one CUDA kernel, and then fusing
-  qwen35 hybrid depthwise conv1d plus immediate SiLU activation into one CUDA
-  kernel, and then switching the q8_1 output-head argmax path onto the MMVQ
-  kernel, and then switching the dense GGML `Q8_0` to `Q8_1` matvec fast path
-  from the shared-input launcher onto the MMVQ kernel, and then retuning that
-  q8.0 MMVQ launch from four warps per row down to two, and then broadcasting
-  the q8.0 and q8.1 block scales once per four-lane MMVQ subgroup instead of
-  rereading them on every lane, and then grouping the q8.0 output-head MMVQ
-  argmax path into two-row blocks before the global argmax CAS, and then
-  specializing the fully active dense q8.0 MMVQ decode path to use a fixed
-  four-lane subgroup shuffle mask instead of recomputing `__activemask()` on
-  every subgroup, the local `qwen3.5:0.8b` benchmark on this host measured
-  about `523 tok/s` decode on Psionic versus about `329 tok/s` decode on local
-  Ollama for the same one-sentence prompt and `128` token cap.
-- On the same host, prompt, and token cap, the same native qwen35 CUDA lane now
-  also measures about `244 tok/s` on the local `qwen3.5:2b` artifact versus
-  about `205 tok/s` on local Ollama, about `167 tok/s` on the local
-  `qwen3.5:4b` artifact versus about `142 tok/s` on local Ollama, and about
-  `103 tok/s` on the local `qwen3.5:9b` artifact versus about `95 tok/s` on
-  local Ollama.
+- On March 27, 2026, the native qwen35 CUDA lane gained the captured-graph
+  greedy path, fused q/k and activation kernels, and the MMVQ-backed greedy
+  output-head fast path that materially raised local greedy throughput on the
+  Psionic side.
+- The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
+  now historical only. The older harness omitted explicit Ollama greedy
+  settings and therefore let Ollama use its default sampler surface instead of
+  a forced greedy contract. The repo now forces explicit Ollama greedy options
+  for those rows and will republish the greedy matrix after rerunning it under
+  that corrected contract.
 - On March 28, 2026, after adding a native one-row CUDA top-k candidate output
   path and routing qwen35 sampled decode through `TopKCandidates { top_k }`
   instead of unconditional dense-vocab readback, and after refreshing the
