@@ -219,7 +219,7 @@ comparison until one of these becomes true:
 ## Relation To Other Hermes Issues
 
 - direct compatibility proof remains in `docs/HERMES_QWEN35_COMPATIBILITY.md`
-- fast-path-versus-fallback runtime truth belongs to the later qwen35 Hermes
-  performance issue
+- fast-path-versus-fallback runtime truth now lives in
+  `docs/HERMES_QWEN35_FAST_PATH.md`
 - session reuse and prefix-cache reuse belong to the later repeated-session
   latency issue

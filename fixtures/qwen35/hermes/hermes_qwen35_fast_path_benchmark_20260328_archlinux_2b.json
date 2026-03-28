@@ -1,0 +1,970 @@
+{
+  "report_kind": "psionic_hermes_qwen35_fast_path_benchmark",
+  "created_at_utc": "2026-03-28T22:11:02.531551+00:00",
+  "host": "archlinux",
+  "base_url": "http://127.0.0.1:8096/v1",
+  "model": "qwen3.5-2b-q8_0-registry.gguf",
+  "model_path": "/home/christopherdavid/models/qwen3.5/qwen3.5-2b-q8_0-registry.gguf",
+  "psionic_root": "/home/christopherdavid/scratch/psionic-hermes-fastpath-c417d6ae",
+  "psionic_revision": "c417d6aeca6760d143a2efbd9f1c72642bab9c01",
+  "supported_fast_path_envelope": {
+    "api_mode": "chat_completions",
+    "include_debug_fields": true,
+    "tool_selection": "temperature=0, seed=0, tool_choice=required or auto, no structured outputs",
+    "tool_result_continuation": "assistant tool_call replay plus tool result replay on chat.completions",
+    "bounded_decode_modes": [
+      "argmax_only",
+      "top_k_candidates:*",
+      "sparse_logits:*"
+    ],
+    "dense_fallback_mode": "raw_logits",
+    "current_outside_envelope_rows": [
+      "parallel_tool_turn_model_boundary",
+      "mirostat_tool_turn_dense_fallback"
+    ]
+  },
+  "fast_path_health": {
+    "supported_case_count": 3,
+    "supported_cases_all_bounded": true,
+    "dense_fallback_case_count": 1,
+    "outside_envelope_case_count": 2,
+    "current_status": "bounded_fast_path_green"
+  },
+  "cases": [
+    {
+      "case_id": "required_tool_turn_fast_path",
+      "envelope_state": "supported_fast_path",
+      "pass": true,
+      "summary": "required tool turn stayed on the bounded fast path",
+      "requests": [
+        {
+          "request_label": "required_tool_turn",
+          "http_status": 200,
+          "psionic_headers": {
+            "x-psionic-backend": "cuda",
+            "x-psionic-execution-mode": "native",
+            "x-psionic-execution-engine": "psionic",
+            "x-psionic-residency-mode": "cuda_accelerated",
+            "x-psionic-fallback-policy": "refuse",
+            "x-psionic-performance-class": "nvidia_native",
+            "x-psionic-ttft-ns": "89286202",
+            "x-psionic-itl-ns": "4371361"
+          },
+          "decode_metrics": {
+            "present": true,
+            "output_modes": [
+              "top_k_candidates:128"
+            ],
+            "readback_bytes": 12288,
+            "raw_logits_materialized": false,
+            "path_class": "bounded_fast_path"
+          },
+          "tool_call_names": [
+            "get_weather"
+          ],
+          "assistant_text": "",
+          "finish_reason": "tool_calls",
+          "error": null,
+          "payload": {
+            "id": "psionic-chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1774735858,
+            "model": "qwen3.5-2b-q8_0-registry.gguf",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "tool_calls": [
+                    {
+                      "id": "psionic-chatcmpl-1-tool-0",
+                      "type": "function",
+                      "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"city\":\"Paris\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 135,
+              "completion_tokens": 23,
+              "total_tokens": 158
+            },
+            "psionic_metrics": {
+              "total_duration_ns": 617742519,
+              "load_duration_ns": 526575917,
+              "prompt_eval_count": 135,
+              "prompt_eval_duration_ns": 419419191,
+              "context_window": {
+                "budget": {
+                  "max_context_tokens": 262144,
+                  "existing_context_tokens": 0,
+                  "reserved_output_tokens": 128,
+                  "available_prompt_tokens": 262016
+                },
+                "input_prompt_tokens": 135,
+                "retained_prompt_tokens": 135,
+                "truncated_prompt_tokens": 0,
+                "preserved_prefix_tokens": 0
+              },
+              "eval_count": 23,
+              "eval_duration_ns": 189830201,
+              "time_to_first_token_ns": 89286202,
+              "inter_token_latency_ns": 4371361,
+              "prefix_tokens_reused": 0,
+              "termination_detail": {
+                "cause": "end_of_sequence_token"
+              },
+              "qwen35_cuda_decode": {
+                "step_count": 24,
+                "output_modes": [
+                  {
+                    "kind": "top_k_candidates",
+                    "top_k": 128
+                  }
+                ],
+                "readback_bytes": 12288,
+                "raw_logits_materialized": false
+              }
+            },
+            "psionic_output_text": "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}]}",
+            "psionic_output_tokens": [
+              90,
+              1,
+              14868,
+              763,
+              1,
+              13766,
+              44116,
+              2129,
+              13766,
+              44116,
+              64331,
+              591,
+              3147,
+              447,
+              67017,
+              2129,
+              15889,
+              21624,
+              8656,
+              3147,
+              57590,
+              29958,
+              13587
+            ],
+            "psionic_structured_output": {
+              "kind": "tagged_structure",
+              "support_level": "fallback",
+              "mode": "fallback_tagged_structure",
+              "parser": "tagged_json_schema",
+              "schema_name": "psionic_tool_call"
+            },
+            "psionic_structured_value": {
+              "kind": "tagged_structure",
+              "discriminator": "kind",
+              "tag": "tool_calls",
+              "value": {
+                "kind": "tool_calls",
+                "tool_calls": [
+                  {
+                    "name": "get_weather",
+                    "arguments": {
+                      "city": "Paris"
+                    }
+                  }
+                ]
+              }
+            },
+            "psionic_tool_calls": [
+              {
+                "id": "psionic-chatcmpl-1-tool-0",
+                "name": "get_weather",
+                "arguments": {
+                  "city": "Paris"
+                },
+                "raw_arguments": "{\"city\":\"Paris\"}"
+              }
+            ]
+          }
+        }
+      ],
+      "details": {
+        "behavior_ok": true,
+        "expected_tool_call_names": [
+          "get_weather"
+        ]
+      }
+    },
+    {
+      "case_id": "auto_message_fast_path",
+      "envelope_state": "supported_fast_path",
+      "pass": true,
+      "summary": "auto mode answered directly and stayed on the bounded fast path",
+      "requests": [
+        {
+          "request_label": "auto_plain_text_turn",
+          "http_status": 200,
+          "psionic_headers": {
+            "x-psionic-backend": "cuda",
+            "x-psionic-execution-mode": "native",
+            "x-psionic-execution-engine": "psionic",
+            "x-psionic-residency-mode": "cuda_accelerated",
+            "x-psionic-fallback-policy": "refuse",
+            "x-psionic-performance-class": "nvidia_native",
+            "x-psionic-ttft-ns": "90428619",
+            "x-psionic-itl-ns": "4415856"
+          },
+          "decode_metrics": {
+            "present": true,
+            "output_modes": [
+              "top_k_candidates:128"
+            ],
+            "readback_bytes": 9728,
+            "raw_logits_materialized": false,
+            "path_class": "bounded_fast_path"
+          },
+          "tool_call_names": [],
+          "assistant_text": "Hello! How can I assist you today?",
+          "finish_reason": "stop",
+          "error": null,
+          "payload": {
+            "id": "psionic-chatcmpl-2",
+            "object": "chat.completion",
+            "created": 1774735859,
+            "model": "qwen3.5-2b-q8_0-registry.gguf",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "Hello! How can I assist you today?"
+                },
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 171,
+              "completion_tokens": 18,
+              "total_tokens": 189
+            },
+            "psionic_metrics": {
+              "total_duration_ns": 705779391,
+              "load_duration_ns": 526575917,
+              "prompt_eval_count": 171,
+              "prompt_eval_duration_ns": 526046695,
+              "context_window": {
+                "budget": {
+                  "max_context_tokens": 262144,
+                  "existing_context_tokens": 0,
+                  "reserved_output_tokens": 64,
+                  "available_prompt_tokens": 262080
+                },
+                "input_prompt_tokens": 171,
+                "retained_prompt_tokens": 171,
+                "truncated_prompt_tokens": 0,
+                "preserved_prefix_tokens": 0
+              },
+              "eval_count": 18,
+              "eval_duration_ns": 169920900,
+              "time_to_first_token_ns": 90428619,
+              "inter_token_latency_ns": 4415856,
+              "prefix_tokens_reused": 0,
+              "termination_detail": {
+                "cause": "end_of_sequence_token"
+              },
+              "qwen35_cuda_decode": {
+                "step_count": 19,
+                "output_modes": [
+                  {
+                    "kind": "top_k_candidates",
+                    "top_k": 128
+                  }
+                ],
+                "readback_bytes": 9728,
+                "raw_logits_materialized": false
+              }
+            },
+            "psionic_output_text": "{\"kind\":\"message\",\"content\":\"Hello! How can I assist you today?\"}",
+            "psionic_output_tokens": [
+              4754,
+              14868,
+              763,
+              1,
+              1927,
+              2129,
+              1733,
+              3147,
+              9419,
+              0,
+              2500,
+              628,
+              353,
+              7543,
+              488,
+              3242,
+              7285,
+              92
+            ],
+            "psionic_structured_output": {
+              "kind": "tagged_structure",
+              "support_level": "fallback",
+              "mode": "fallback_tagged_structure",
+              "parser": "tagged_json_schema",
+              "schema_name": "psionic_tool_call"
+            },
+            "psionic_structured_value": {
+              "kind": "tagged_structure",
+              "discriminator": "kind",
+              "tag": "message",
+              "value": {
+                "kind": "message",
+                "content": "Hello! How can I assist you today?"
+              }
+            }
+          }
+        }
+      ],
+      "details": {
+        "behavior_ok": true,
+        "expected_tool_call_names": []
+      }
+    },
+    {
+      "case_id": "tool_result_continuation_fast_path",
+      "envelope_state": "supported_fast_path",
+      "pass": true,
+      "summary": "tool-result continuation stayed on the bounded fast path",
+      "requests": [
+        {
+          "request_label": "required_tool_turn",
+          "http_status": 200,
+          "psionic_headers": {
+            "x-psionic-backend": "cuda",
+            "x-psionic-execution-mode": "native",
+            "x-psionic-execution-engine": "psionic",
+            "x-psionic-residency-mode": "cuda_accelerated",
+            "x-psionic-fallback-policy": "refuse",
+            "x-psionic-performance-class": "nvidia_native",
+            "x-psionic-ttft-ns": "89286202",
+            "x-psionic-itl-ns": "4371361"
+          },
+          "decode_metrics": {
+            "present": true,
+            "output_modes": [
+              "top_k_candidates:128"
+            ],
+            "readback_bytes": 12288,
+            "raw_logits_materialized": false,
+            "path_class": "bounded_fast_path"
+          },
+          "tool_call_names": [
+            "get_weather"
+          ],
+          "assistant_text": "",
+          "finish_reason": "tool_calls",
+          "error": null,
+          "payload": {
+            "id": "psionic-chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1774735858,
+            "model": "qwen3.5-2b-q8_0-registry.gguf",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "tool_calls": [
+                    {
+                      "id": "psionic-chatcmpl-1-tool-0",
+                      "type": "function",
+                      "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"city\":\"Paris\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 135,
+              "completion_tokens": 23,
+              "total_tokens": 158
+            },
+            "psionic_metrics": {
+              "total_duration_ns": 617742519,
+              "load_duration_ns": 526575917,
+              "prompt_eval_count": 135,
+              "prompt_eval_duration_ns": 419419191,
+              "context_window": {
+                "budget": {
+                  "max_context_tokens": 262144,
+                  "existing_context_tokens": 0,
+                  "reserved_output_tokens": 128,
+                  "available_prompt_tokens": 262016
+                },
+                "input_prompt_tokens": 135,
+                "retained_prompt_tokens": 135,
+                "truncated_prompt_tokens": 0,
+                "preserved_prefix_tokens": 0
+              },
+              "eval_count": 23,
+              "eval_duration_ns": 189830201,
+              "time_to_first_token_ns": 89286202,
+              "inter_token_latency_ns": 4371361,
+              "prefix_tokens_reused": 0,
+              "termination_detail": {
+                "cause": "end_of_sequence_token"
+              },
+              "qwen35_cuda_decode": {
+                "step_count": 24,
+                "output_modes": [
+                  {
+                    "kind": "top_k_candidates",
+                    "top_k": 128
+                  }
+                ],
+                "readback_bytes": 12288,
+                "raw_logits_materialized": false
+              }
+            },
+            "psionic_output_text": "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}]}",
+            "psionic_output_tokens": [
+              90,
+              1,
+              14868,
+              763,
+              1,
+              13766,
+              44116,
+              2129,
+              13766,
+              44116,
+              64331,
+              591,
+              3147,
+              447,
+              67017,
+              2129,
+              15889,
+              21624,
+              8656,
+              3147,
+              57590,
+              29958,
+              13587
+            ],
+            "psionic_structured_output": {
+              "kind": "tagged_structure",
+              "support_level": "fallback",
+              "mode": "fallback_tagged_structure",
+              "parser": "tagged_json_schema",
+              "schema_name": "psionic_tool_call"
+            },
+            "psionic_structured_value": {
+              "kind": "tagged_structure",
+              "discriminator": "kind",
+              "tag": "tool_calls",
+              "value": {
+                "kind": "tool_calls",
+                "tool_calls": [
+                  {
+                    "name": "get_weather",
+                    "arguments": {
+                      "city": "Paris"
+                    }
+                  }
+                ]
+              }
+            },
+            "psionic_tool_calls": [
+              {
+                "id": "psionic-chatcmpl-1-tool-0",
+                "name": "get_weather",
+                "arguments": {
+                  "city": "Paris"
+                },
+                "raw_arguments": "{\"city\":\"Paris\"}"
+              }
+            ]
+          }
+        },
+        {
+          "request_label": "tool_result_continuation",
+          "http_status": 200,
+          "psionic_headers": {
+            "x-psionic-backend": "cuda",
+            "x-psionic-execution-mode": "native",
+            "x-psionic-execution-engine": "psionic",
+            "x-psionic-residency-mode": "cuda_accelerated",
+            "x-psionic-fallback-policy": "refuse",
+            "x-psionic-performance-class": "nvidia_native",
+            "x-psionic-ttft-ns": "91447346",
+            "x-psionic-itl-ns": "4469775"
+          },
+          "decode_metrics": {
+            "present": true,
+            "output_modes": [
+              "top_k_candidates:128"
+            ],
+            "readback_bytes": 12288,
+            "raw_logits_materialized": false,
+            "path_class": "bounded_fast_path"
+          },
+          "tool_call_names": [],
+          "assistant_text": "The weather in Paris is sunny with a temperature of 18\u00b0C.",
+          "finish_reason": "stop",
+          "error": null,
+          "payload": {
+            "id": "psionic-chatcmpl-3",
+            "object": "chat.completion",
+            "created": 1774735859,
+            "model": "qwen3.5-2b-q8_0-registry.gguf",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "The weather in Paris is sunny with a temperature of 18\u00b0C."
+                },
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 215,
+              "completion_tokens": 23,
+              "total_tokens": 238
+            },
+            "psionic_metrics": {
+              "total_duration_ns": 866418833,
+              "load_duration_ns": 526575917,
+              "prompt_eval_count": 215,
+              "prompt_eval_duration_ns": 663292570,
+              "context_window": {
+                "budget": {
+                  "max_context_tokens": 262144,
+                  "existing_context_tokens": 0,
+                  "reserved_output_tokens": 128,
+                  "available_prompt_tokens": 262016
+                },
+                "input_prompt_tokens": 215,
+                "retained_prompt_tokens": 215,
+                "truncated_prompt_tokens": 0,
+                "preserved_prefix_tokens": 0
+              },
+              "eval_count": 23,
+              "eval_duration_ns": 194258537,
+              "time_to_first_token_ns": 91447346,
+              "inter_token_latency_ns": 4469775,
+              "prefix_tokens_reused": 0,
+              "termination_detail": {
+                "cause": "end_of_sequence_token"
+              },
+              "qwen35_cuda_decode": {
+                "step_count": 24,
+                "output_modes": [
+                  {
+                    "kind": "top_k_candidates",
+                    "top_k": 128
+                  }
+                ],
+                "readback_bytes": 12288,
+                "raw_logits_materialized": false
+              }
+            },
+            "psionic_output_text": "{\"kind\":\"message\",\"content\":\"The weather in Paris is sunny with a temperature of 18\u00b0C.\"}",
+            "psionic_output_tokens": [
+              4754,
+              14868,
+              3147,
+              1927,
+              2129,
+              1733,
+              3147,
+              760,
+              8831,
+              303,
+              11751,
+              369,
+              38383,
+              440,
+              264,
+              9039,
+              314,
+              220,
+              16,
+              23,
+              29922,
+              1149,
+              92
+            ],
+            "psionic_structured_output": {
+              "kind": "tagged_structure",
+              "support_level": "fallback",
+              "mode": "fallback_tagged_structure",
+              "parser": "tagged_json_schema",
+              "schema_name": "psionic_tool_call"
+            },
+            "psionic_structured_value": {
+              "kind": "tagged_structure",
+              "discriminator": "kind",
+              "tag": "message",
+              "value": {
+                "kind": "message",
+                "content": "The weather in Paris is sunny with a temperature of 18\u00b0C."
+              }
+            }
+          }
+        }
+      ],
+      "details": {
+        "behavior_ok": true,
+        "expected_final_text_contains": "paris"
+      }
+    },
+    {
+      "case_id": "parallel_tool_turn_model_boundary",
+      "envelope_state": "outside_supported_envelope",
+      "pass": true,
+      "summary": "same-turn parallel tools are still outside the proven qwen35 fast-path envelope",
+      "requests": [
+        {
+          "request_label": "parallel_tool_turn",
+          "http_status": 200,
+          "psionic_headers": {
+            "x-psionic-backend": "cuda",
+            "x-psionic-execution-mode": "native",
+            "x-psionic-execution-engine": "psionic",
+            "x-psionic-residency-mode": "cuda_accelerated",
+            "x-psionic-fallback-policy": "refuse",
+            "x-psionic-performance-class": "nvidia_native",
+            "x-psionic-ttft-ns": "93431380",
+            "x-psionic-itl-ns": "4457895"
+          },
+          "decode_metrics": {
+            "present": true,
+            "output_modes": [
+              "top_k_candidates:128"
+            ],
+            "readback_bytes": 12288,
+            "raw_logits_materialized": false,
+            "path_class": "bounded_fast_path"
+          },
+          "tool_call_names": [
+            "get_paris_weather"
+          ],
+          "assistant_text": "",
+          "finish_reason": "tool_calls",
+          "error": null,
+          "payload": {
+            "id": "psionic-chatcmpl-4",
+            "object": "chat.completion",
+            "created": 1774735860,
+            "model": "qwen3.5-2b-q8_0-registry.gguf",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "tool_calls": [
+                    {
+                      "id": "psionic-chatcmpl-4-tool-0",
+                      "type": "function",
+                      "function": {
+                        "name": "get_paris_weather",
+                        "arguments": "{}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 237,
+              "completion_tokens": 23,
+              "total_tokens": 260
+            },
+            "psionic_metrics": {
+              "total_duration_ns": 935835312,
+              "load_duration_ns": 526575917,
+              "prompt_eval_count": 237,
+              "prompt_eval_duration_ns": 731094145,
+              "context_window": {
+                "budget": {
+                  "max_context_tokens": 262144,
+                  "existing_context_tokens": 0,
+                  "reserved_output_tokens": 192,
+                  "available_prompt_tokens": 261952
+                },
+                "input_prompt_tokens": 237,
+                "retained_prompt_tokens": 237,
+                "truncated_prompt_tokens": 0,
+                "preserved_prefix_tokens": 0
+              },
+              "eval_count": 23,
+              "eval_duration_ns": 195970649,
+              "time_to_first_token_ns": 93431380,
+              "inter_token_latency_ns": 4457895,
+              "prefix_tokens_reused": 0,
+              "termination_detail": {
+                "cause": "end_of_sequence_token"
+              },
+              "qwen35_cuda_decode": {
+                "step_count": 24,
+                "output_modes": [
+                  {
+                    "kind": "top_k_candidates",
+                    "top_k": 128
+                  }
+                ],
+                "readback_bytes": 12288,
+                "raw_logits_materialized": false
+              }
+            },
+            "psionic_output_text": "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_paris_weather\",\"arguments\":{}}]}",
+            "psionic_output_tokens": [
+              90,
+              1,
+              14868,
+              763,
+              1,
+              13766,
+              44116,
+              2129,
+              13766,
+              44116,
+              64331,
+              591,
+              3147,
+              447,
+              21951,
+              284,
+              67017,
+              2129,
+              15889,
+              763,
+              6061,
+              92,
+              13587
+            ],
+            "psionic_structured_output": {
+              "kind": "tagged_structure",
+              "support_level": "fallback",
+              "mode": "fallback_tagged_structure",
+              "parser": "tagged_json_schema",
+              "schema_name": "psionic_tool_call"
+            },
+            "psionic_structured_value": {
+              "kind": "tagged_structure",
+              "discriminator": "kind",
+              "tag": "tool_calls",
+              "value": {
+                "kind": "tool_calls",
+                "tool_calls": [
+                  {
+                    "name": "get_paris_weather",
+                    "arguments": {}
+                  }
+                ]
+              }
+            },
+            "psionic_tool_calls": [
+              {
+                "id": "psionic-chatcmpl-4-tool-0",
+                "name": "get_paris_weather",
+                "arguments": {},
+                "raw_arguments": "{}"
+              }
+            ]
+          }
+        }
+      ],
+      "details": {
+        "boundary_truthful": true,
+        "expected_tool_call_names": [
+          "get_paris_weather",
+          "get_tokyo_weather"
+        ],
+        "observed_tool_call_names": [
+          "get_paris_weather"
+        ],
+        "degradation_reason": "current qwen35 row still emits fewer than two tools on the same-turn parallel request"
+      }
+    },
+    {
+      "case_id": "mirostat_tool_turn_dense_fallback",
+      "envelope_state": "outside_supported_envelope",
+      "pass": true,
+      "summary": "mirostat tool turn leaves the bounded lane and materializes dense logits",
+      "requests": [
+        {
+          "request_label": "mirostat_required_tool_turn",
+          "http_status": 200,
+          "psionic_headers": {
+            "x-psionic-backend": "cuda",
+            "x-psionic-execution-mode": "native",
+            "x-psionic-execution-engine": "psionic",
+            "x-psionic-residency-mode": "cuda_accelerated",
+            "x-psionic-fallback-policy": "refuse",
+            "x-psionic-performance-class": "nvidia_native",
+            "x-psionic-ttft-ns": "97410974",
+            "x-psionic-itl-ns": "44521726"
+          },
+          "decode_metrics": {
+            "present": true,
+            "output_modes": [
+              "raw_logits"
+            ],
+            "readback_bytes": 156938240,
+            "raw_logits_materialized": true,
+            "path_class": "dense_fallback"
+          },
+          "tool_call_names": [
+            "get_weather"
+          ],
+          "assistant_text": "",
+          "finish_reason": "tool_calls",
+          "error": null,
+          "payload": {
+            "id": "psionic-chatcmpl-5",
+            "object": "chat.completion",
+            "created": 1774735862,
+            "model": "qwen3.5-2b-q8_0-registry.gguf",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "tool_calls": [
+                    {
+                      "id": "psionic-chatcmpl-5-tool-0",
+                      "type": "function",
+                      "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"city\":\"Paris\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 135,
+              "completion_tokens": 23,
+              "total_tokens": 158
+            },
+            "psionic_metrics": {
+              "total_duration_ns": 1649461319,
+              "load_duration_ns": 526575917,
+              "prompt_eval_count": 135,
+              "prompt_eval_duration_ns": 558640401,
+              "context_window": {
+                "budget": {
+                  "max_context_tokens": 262144,
+                  "existing_context_tokens": 0,
+                  "reserved_output_tokens": 128,
+                  "available_prompt_tokens": 262016
+                },
+                "input_prompt_tokens": 135,
+                "retained_prompt_tokens": 135,
+                "truncated_prompt_tokens": 0,
+                "preserved_prefix_tokens": 0
+              },
+              "eval_count": 23,
+              "eval_duration_ns": 1081118314,
+              "time_to_first_token_ns": 97410974,
+              "inter_token_latency_ns": 44521726,
+              "prefix_tokens_reused": 0,
+              "termination_detail": {
+                "cause": "end_of_sequence_token"
+              },
+              "qwen35_cuda_decode": {
+                "step_count": 158,
+                "output_modes": [
+                  {
+                    "kind": "raw_logits"
+                  }
+                ],
+                "readback_bytes": 156938240,
+                "raw_logits_materialized": true
+              }
+            },
+            "psionic_output_text": "{\"kind\":\"tool_calls\",\"tool_calls\":[{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}]}",
+            "psionic_output_tokens": [
+              90,
+              1,
+              14868,
+              763,
+              1,
+              13766,
+              44116,
+              2129,
+              13766,
+              44116,
+              64331,
+              591,
+              3147,
+              447,
+              67017,
+              2129,
+              15889,
+              21624,
+              8656,
+              3147,
+              57590,
+              29958,
+              13587
+            ],
+            "psionic_structured_output": {
+              "kind": "tagged_structure",
+              "support_level": "fallback",
+              "mode": "fallback_tagged_structure",
+              "parser": "tagged_json_schema",
+              "schema_name": "psionic_tool_call"
+            },
+            "psionic_structured_value": {
+              "kind": "tagged_structure",
+              "discriminator": "kind",
+              "tag": "tool_calls",
+              "value": {
+                "kind": "tool_calls",
+                "tool_calls": [
+                  {
+                    "name": "get_weather",
+                    "arguments": {
+                      "city": "Paris"
+                    }
+                  }
+                ]
+              }
+            },
+            "psionic_tool_calls": [
+              {
+                "id": "psionic-chatcmpl-5-tool-0",
+                "name": "get_weather",
+                "arguments": {
+                  "city": "Paris"
+                },
+                "raw_arguments": "{\"city\":\"Paris\"}"
+              }
+            ]
+          }
+        }
+      ],
+      "details": {
+        "boundary_truthful": true,
+        "expected_path_class": "dense_fallback",
+        "observed_path_class": "dense_fallback",
+        "degradation_reason": "mirostat currently routes qwen35 CUDA tool turns through raw-logit fallback"
+      }
+    }
+  ]
+}
