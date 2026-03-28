@@ -78,13 +78,17 @@ reduced matrix that keeps only token count and mean throughput.
 
 Current canonical evidence lives in:
 
-- greedy plus `sampled_topk100`:
+- multi-model baseline:
   - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_174935_archlinux-.json`
   - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_174935_archlinux-/one_page_summary.md`
-- `sampled_topk40` after routing `top_k = 40` through the inclusive
+- `sampled_topk40` follow-on after routing `top_k = 40` through the inclusive
   partitioned one-row CUDA selector:
   - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_182857_archlinux-.json`
   - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_182857_archlinux-/one_page_summary.md`
+- targeted `qwen3.5:4b` post-fix rerun after zeroing per-request hybrid SSM
+  state on request init:
+  - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_185546_archlinux-.json`
+  - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260328_185546_archlinux-/one_page_summary.md`
 
 Interpretation rules:
 
@@ -97,15 +101,15 @@ Interpretation rules:
 | --- | --- | ---: | ---: | --- | --- |
 | `greedy` | `qwen3.5:0.8b` | `529.77` | `336.27` | `mismatched` | Raw throughput favors Psionic, but generated lengths differ (`26,25,25` vs `28,28,28`) and first divergence starts at token `1,3,3` |
 | `greedy` | `qwen3.5:2b` | `259.95` | `205.15` | `mismatched` | Raw throughput favors Psionic, but first divergence starts at token `2,2,2` and output lengths differ (`25,21,24` vs `34,34,34`) |
-| `greedy` | `qwen3.5:4b` | `173.57` | `146.23` | `mismatched` | One Psionic repeat hit `max_output_tokens` with malformed continuation (`128,29,30` vs `35,35,35`); this is a real runtime instability, not just a reporting gap |
+| `greedy` | `qwen3.5:4b` | `174.12` | `144.59` | `mismatched` | The targeted post-fix rerun removed the old cap-hit failure (`51,51,51` vs `35,35,35`), but output lengths still differ and first divergence starts at token `18,18,18` |
 | `greedy` | `qwen3.5:9b` | `107.40` | `97.32` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`10,28,24` vs `42,42,42`) and first divergence starts at token `1,5,6` |
 | `sampled_topk40` | `qwen3.5:0.8b` | `469.06` | `337.20` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `3`, and the inclusive partitioned top-k40 selector removes the prior sampled overhead cliff |
 | `sampled_topk40` | `qwen3.5:2b` | `243.38` | `207.05` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `3`, and Psionic now leads on the clean sampled row |
-| `sampled_topk40` | `qwen3.5:4b` | `174.98` | `143.75` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `3`, and the clean sampled row is now clearly ahead on Psionic |
+| `sampled_topk40` | `qwen3.5:4b` | `175.25` | `143.83` | `weak_length_matched_only` | The targeted post-fix rerun stays length-matched and ahead on Psionic, with first comparable token divergence starting at token `4,4,4` |
 | `sampled_topk40` | `qwen3.5:9b` | `108.37` | `96.68` | `weak_length_matched_only` | Both sides hit the `128` token cap, first comparable token divergence still starts at token `1,3,3`, and Psionic now leads without falling back to dense logits |
 | `sampled_topk100` | `qwen3.5:0.8b` | `446.49` | `326.43` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`12,32,26` vs `20,20,20`) and first divergence starts at token `1,3,4` |
 | `sampled_topk100` | `qwen3.5:2b` | `235.28` | `204.70` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`26,25,33` vs `38,38,38`) and first divergence starts at token `1,4,4` |
-| `sampled_topk100` | `qwen3.5:4b` | `170.96` | `144.39` | `mismatched` | One Psionic repeat hit `max_output_tokens` with malformed continuation (`128,25,34` vs `37,37,37`); the wider bounded lane does not explain the row cleanly |
+| `sampled_topk100` | `qwen3.5:4b` | `171.00` | `145.81` | `mismatched` | The targeted post-fix rerun removed the old cap-hit failure (`41,41,41` vs `37,37,37`), but the row is still mismatched and first divergence starts at token `5,5,5` |
 | `sampled_topk100` | `qwen3.5:9b` | `106.37` | `97.44` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`24,40,30` vs `37,37,37`) and first divergence starts at token `1,5,5` |
 
 ## Greedy Contract
@@ -150,6 +154,8 @@ Current status:
 
 - raw greedy `tok/s` is higher on Psionic across all four models
 - every greedy row is still `mismatched`
+- the `qwen3.5:4b` row no longer shows the earlier warmup-induced cap-hit
+  corruption after zeroing per-request hybrid SSM state on request init
 - greedy first-token parity remains unresolved and requires runtime work, not
   more summary-only reporting
 
@@ -239,8 +245,8 @@ Current status:
 - Psionic stays on the wider bounded sampled lane:
   - `qwen35_output_modes=[top_k_candidates:100]`
   - `qwen35_raw_logits=false`
-- the `4b` row now has a repeated cap-hit failure signature on Psionic that
-  needs direct runtime investigation
+- the targeted `qwen3.5:4b` rerun no longer shows the earlier cap-hit failure,
+  but the row still remains `mismatched`
 
 ## Penalty-Active Psionic Follow-On
 
@@ -293,12 +299,13 @@ Psionic-only measured means:
   - greedy raw `tok/s` is higher on Psionic across all four models, but every
     greedy row is still `mismatched`
   - clean sampled `top_k = 40` rows are the highest-signal constrained
-    contract; Psionic stays on bounded candidates there and still trails Ollama
+    contract; Psionic stays on bounded candidates there and now leads Ollama
     on all four rows
   - sampled `top_k = 100` rows remain `mismatched`
-- The `qwen3.5:4b` clean-host rerun now shows a repeated Psionic cap-hit
-  instability on both greedy and `top_k = 100` sampled rows. That is a runtime
-  defect, not a benchmark-summary artifact.
+- On current `main`, zeroing the per-request hybrid SSM state on request init
+  removes the old `qwen3.5:4b` cap-hit corruption on both greedy and
+  `top_k = 100` sampled reruns. The `4b` row is now stable but still
+  mismatched against Ollama.
 - The sampled CUDA lane is bounded, not vague. It uses
   `TopKCandidates { top_k }` only when the request stays inside the exact
   envelope:

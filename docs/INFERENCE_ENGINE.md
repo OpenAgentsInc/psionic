@@ -159,8 +159,10 @@ than just run tensor math.
     length-matched, and now beat Ollama on all four models even though token
     divergence still starts within the first few generated tokens
   - sampled `top_k = 100` rows remain `mismatched`
-  - the `qwen3.5:4b` row shows a repeated Psionic cap-hit instability on both
-    greedy and `top_k = 100` sampled runs
+- Later on March 28, 2026, zeroing the per-request hybrid SSM state on request
+  init removed the old `qwen3.5:4b` cap-hit corruption on both greedy and
+  `top_k = 100` sampled reruns while preserving the lead over Ollama on that
+  row.
 - On March 28, 2026, the same bounded qwen35 CUDA sampled lane was widened
   again to apply repeat, presence, and frequency penalties on device before
   exact top-k selection instead of forcing explicit dense `raw_logits`
@@ -184,7 +186,8 @@ than just run tensor math.
   but the current canonical matrix is still mixed rather than "ahead
   everywhere": greedy raw `tok/s` is higher but mismatched, clean sampled
   `top_k = 40` rows are now ahead on all four models, and the remaining
-  headroom is still in greedy parity and the unstable `4b` runtime path.
+  headroom is still in greedy parity and the broader exact-match divergence
+  work.
 - The multi-row local comparison matrix for `0.8b`, `2b`, `4b`, and `9b` lives
   in `docs/QWEN35_OLLAMA_COMPARISON.md`.
 
