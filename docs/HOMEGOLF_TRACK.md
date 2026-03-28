@@ -129,6 +129,8 @@ strong.
 
 - latest correction audit:
   `docs/audits/2026-03-28-homegolf-local-cuda-strict-score-iteration-audit.md`
+- latest follow-on integration audit:
+  `docs/audits/2026-03-28-homegolf-local-honest-loop-and-artifact-prompt-audit.md`
 
 What is true now:
 
@@ -137,14 +139,28 @@ What is true now:
     validation-batch fit profile
   - invalid local fit trials like `grad_accum_steps=24` are now refused by the
     shared batch-geometry validator instead of silently dropping train tokens
+- the default local HOMEGOLF CUDA profile now forces `warmup_steps=0` while
+  preserving the public `600` second wallclock cap
 - one bounded local one-step fit posture is real on the `4080`:
   - `max_steps=1`
   - `warmup_steps=0`
   - `grad_accum_steps=64`
-  - `validation_batch_sequences=8`
+  - `validation_batch_sequences=64`
 - that bounded local one-step rerun reached:
-  - `train_time_ms=311252`
-  - `mean_microbatch_loss=8.29200745`
+  - `train_time_ms=278709`
+  - `mean_microbatch_loss=8.29203224`
+- that same rerun exported a real local quantized artifact:
+  - `compressed_model_bytes=4073137`
+  - persisted path:
+    `/tmp/psionic_homegolf_runs/homegolf_baseline_actual_20260328.final_model.st`
+- HOMEGOLF prompt validation is no longer blocked on full report closeout:
+  - `parameter_golf_homegolf_prompt` can now load the persisted artifact
+    directly with explicit `--artifact-path`, `--tokenizer-path`, and
+    `--model-variant`
+- one artifact-only prompt proof from that local export now exists:
+  - prompt `the meaning of life is`
+  - generated text begins:
+    `iiildKild loc loc loc ...`
 
 What is not true:
 
@@ -153,11 +169,12 @@ What is not true:
 - the public `parameter-golf` README still requires scoring on the full
   FineWeb validation split, and the current single-device trainer loads that
   full split
-- the default local HOMEGOLF entrypoint (`warmup_steps=20`) is not `10` minute
-  honest on the `4080`
 - the leaderboard-default `legal_score_first_ttt` overlay expands to
   `chunk_tokens=32768` and `epochs=3`, which is also not `10` minute honest on
   that local lane
+- the current full local roundtrip score path is still not practical on the
+  `4080`; one observed `non_overlapping` validation pass scheduled `947` full
+  batches and needed `25086 ms` for batch `1/947`
 - no new retained local full-validation report/artifact pair was produced on
   the `4080` during this iteration loop
 

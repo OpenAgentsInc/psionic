@@ -6,5 +6,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
 
 export GUARDRAIL_FILE="${repo_root}/fixtures/parameter_golf/google/parameter_golf_google_billing_guardrails_v1.json"
+: "${PROFILE_ID:=a3_h100_single_node_parameter_golf}"
+export PROFILE_ID
 
 exec bash "${script_dir}/psion-google-quota-preflight.sh" "$@"

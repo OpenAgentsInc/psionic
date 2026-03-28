@@ -5,11 +5,27 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 policy_file="${repo_root}/fixtures/parameter_golf/google/parameter_golf_google_input_package_policy_v1.json"
 bringup_report="${repo_root}/fixtures/parameter_golf/reports/parameter_golf_single_h100_bringup.json"
-parameter_golf_root="${HOME}/code/parameter-golf"
 output_dir="${repo_root}/fixtures/parameter_golf/google"
 created_at_utc="2026-03-23T00:00:00Z"
 upload=false
 upload_report=""
+
+default_parameter_golf_root() {
+  local candidates=(
+    "${repo_root}/../competition/repos/parameter-golf"
+    "${HOME}/code/parameter-golf"
+  )
+  local candidate=""
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "${candidate}/.git" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  printf '%s\n' "${candidates[0]}"
+}
+
+parameter_golf_root="$(default_parameter_golf_root)"
 
 usage() {
   cat <<'EOF' >&2
@@ -105,7 +121,7 @@ wait_for_object() {
 }
 
 if [[ ! -d "${parameter_golf_root}/.git" ]]; then
-  echo "error: parameter-golf repo not found at ${parameter_golf_root}" >&2
+  echo "error: parameter-golf repo not found at ${parameter_golf_root}; expected a clone at ${repo_root}/../competition/repos/parameter-golf or ${HOME}/code/parameter-golf" >&2
   exit 1
 fi
 
@@ -259,16 +275,59 @@ jq -n \
 mkdir -p "${archive_root}"
 cp "${contract_file}" "${archive_root}/parameter_golf_google_input_contract_v1.json"
 cp "${manifest_file}" "${archive_root}/psion_google_reference_input_package_manifest.json"
-(
-  cd "${archive_root}"
-  tar \
-    --sort=name \
-    --mtime="${created_at_utc}" \
-    --owner=0 \
-    --group=0 \
-    --numeric-owner \
-    -czf "${archive_path}" .
-)
+python3 - "${archive_root}" "${archive_path}" "${created_at_utc}" <<'PY'
+from __future__ import annotations
+
+import datetime as dt
+import gzip
+import tarfile
+from pathlib import Path
+import sys
+
+archive_root = Path(sys.argv[1])
+archive_path = Path(sys.argv[2])
+created_at = dt.datetime.fromisoformat(sys.argv[3].replace("Z", "+00:00"))
+mtime = int(created_at.timestamp())
+
+with archive_path.open("wb") as handle:
+    gzip_handle = gzip.GzipFile(
+        filename="",
+        mode="wb",
+        fileobj=handle,
+        mtime=0,
+        compresslevel=6,
+    )
+    tar_handle = tarfile.open(fileobj=gzip_handle, mode="w", format=tarfile.GNU_FORMAT)
+
+    directory_info = tarfile.TarInfo("./")
+    directory_info.type = tarfile.DIRTYPE
+    directory_info.mode = 0o755
+    directory_info.uid = 0
+    directory_info.gid = 0
+    directory_info.uname = ""
+    directory_info.gname = ""
+    directory_info.mtime = mtime
+    tar_handle.addfile(directory_info)
+
+    for name in sorted(path.name for path in archive_root.iterdir()):
+        source_path = archive_root / name
+        info = tar_handle.gettarinfo(str(source_path), arcname=f"./{name}")
+        info.uid = 0
+        info.gid = 0
+        info.uname = ""
+        info.gname = ""
+        info.mtime = mtime
+        with source_path.open("rb") as source:
+            tar_handle.addfile(info, source)
+
+    tar_handle.close()
+    gzip_handle.close()
+
+raw = bytearray(archive_path.read_bytes())
+raw[8] = 0
+raw[9] = 3
+archive_path.write_bytes(raw)
+PY
 
 archive_sha256="$(compute_sha256 "${archive_path}")"
 manifest_sha256="$(compute_sha256 "${manifest_file}")"

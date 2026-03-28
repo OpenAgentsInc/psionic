@@ -337,6 +337,7 @@ impl ParameterGolfSingleH100TrainingConfig {
 
     pub fn apply_homegolf_local_cuda_profile(&mut self) {
         self.machine_profile = ParameterGolfSingleDeviceMachineProfile::HomegolfLocalCuda;
+        self.warmup_steps = 0;
         self.geometry.grad_accum_steps = HOMEGOLF_LOCAL_CUDA_GRAD_ACCUM_STEPS;
         self.validation_batch_sequences = HOMEGOLF_LOCAL_CUDA_VALIDATION_BATCH_SEQUENCES;
     }
@@ -1874,7 +1875,9 @@ pub fn write_parameter_golf_single_h100_training_report(
     if let Some(writer) = live_visualization_writer.as_mut() {
         emit_progress_line(String::from("training_report_visualization_finish_start"));
         writer.finish_with_report(&report)?;
-        emit_progress_line(String::from("training_report_visualization_finish_complete"));
+        emit_progress_line(String::from(
+            "training_report_visualization_finish_complete",
+        ));
     }
     emit_progress_line(String::from("training_report_closeout_complete"));
     Ok(report)
@@ -2923,10 +2926,10 @@ fn build_parameter_golf_single_h100_training_report_inner(
     let report_digest_started = Instant::now();
     emit_progress_line(format!(
         "training_report_digest_start final_validation_bpb={} report_path={}",
-        report
-            .final_validation
-            .as_ref()
-            .map_or_else(|| String::from("none"), |summary| format!("{:.8}", summary.bits_per_byte)),
+        report.final_validation.as_ref().map_or_else(
+            || String::from("none"),
+            |summary| format!("{:.8}", summary.bits_per_byte)
+        ),
         output_path
             .map(|path| path.display().to_string())
             .unwrap_or_else(|| String::from("<memory_only>")),
@@ -2940,11 +2943,7 @@ fn build_parameter_golf_single_h100_training_report_inner(
         duration_ms(report_digest_started),
         report.report_digest,
     ));
-    Ok((
-        report,
-        persisted_artifact_path,
-        live_visualization_writer,
-    ))
+    Ok((report, persisted_artifact_path, live_visualization_writer))
 }
 
 fn refusal_report(
@@ -8163,10 +8162,11 @@ mod tests {
 
     #[test]
     fn homegolf_local_cuda_rejects_non_sequence_exact_grad_accum() {
-        let mut config = ParameterGolfSingleH100TrainingConfig::challenge_homegolf_local_cuda_defaults(
-            PathBuf::from("."),
-            PathBuf::from("tokenizer.model"),
-        );
+        let mut config =
+            ParameterGolfSingleH100TrainingConfig::challenge_homegolf_local_cuda_defaults(
+                PathBuf::from("."),
+                PathBuf::from("tokenizer.model"),
+            );
         config.geometry.grad_accum_steps = 24;
         let error = config
             .validate()
@@ -8176,6 +8176,20 @@ mod tests {
             ParameterGolfSingleH100TrainingError::InvalidConfig { message }
                 if message.contains("invalid batch geometry")
         ));
+    }
+
+    #[test]
+    fn homegolf_local_cuda_defaults_drop_warmup_but_keep_wallclock_cap() {
+        let config = ParameterGolfSingleH100TrainingConfig::challenge_homegolf_local_cuda_defaults(
+            PathBuf::from("."),
+            PathBuf::from("tokenizer.model"),
+        );
+        assert_eq!(
+            config.machine_profile,
+            ParameterGolfSingleDeviceMachineProfile::HomegolfLocalCuda
+        );
+        assert_eq!(config.warmup_steps, 0);
+        assert_eq!(config.hyperparameters.max_wallclock_seconds, Some(600.0));
     }
 
     #[test]

@@ -9,5 +9,7 @@ export LAUNCH_FILE="${repo_root}/fixtures/parameter_golf/google/parameter_golf_g
 export OBSERVABILITY_FILE="${repo_root}/fixtures/psion/google/psion_google_host_observability_policy_v1.json"
 export STARTUP_SCRIPT="${script_dir}/psion-google-single-node-startup.sh"
 export QUOTA_PREFLIGHT="${script_dir}/parameter-golf-google-quota-preflight.sh"
+: "${PROFILE_ID:=a3_h100_single_node_parameter_golf}"
+export PROFILE_ID
 
 exec bash "${script_dir}/psion-google-launch-single-node.sh" "$@"

@@ -221,8 +221,11 @@ bash "${repo_root}/scripts/parameter-golf-google-launch-single-node.sh" \
   --manifest-only > "${launch_output_file}"
 
 python3 - "${repo_root}" "${generated_dir}" "${report_path}" "${launch_output_file}" "${preflight_json}" "${descriptor_uri}" <<'PY'
+import hashlib
+import io
 import json
 import sys
+import tarfile
 from pathlib import Path
 
 repo_root = Path(sys.argv[1])
@@ -238,20 +241,95 @@ def fail(message: str) -> None:
     print(message, file=sys.stderr)
     sys.exit(1)
 
-for name in [
-    "parameter_golf_google_input_contract_v1.json",
-    "parameter_golf_google_input_package_manifest_v1.json",
-    "parameter_golf_google_input_package_descriptor_v1.json",
-]:
-    committed = json.loads((committed_dir / name).read_text(encoding="utf-8"))
-    generated = json.loads((generated_dir / name).read_text(encoding="utf-8"))
-    if committed != generated:
-        fail(f"generated {name} does not match committed truth")
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
 
-committed_archive = (committed_dir / "parameter_golf_google_input_package_v1.tar.gz").read_bytes()
-generated_archive = (generated_dir / "parameter_golf_google_input_package_v1.tar.gz").read_bytes()
-if committed_archive != generated_archive:
-    fail("generated input package archive does not match committed truth")
+def stable_contract(document: dict) -> dict:
+    clone = json.loads(json.dumps(document))
+    clone.pop("psionic_git_revision", None)
+    (clone.get("parameter_golf_repo") or {}).pop("git_revision", None)
+    return clone
+
+def stable_manifest(document: dict) -> dict:
+    clone = json.loads(json.dumps(document))
+    clone.pop("git_revision", None)
+    key_digests = clone.get("key_digests") or {}
+    key_digests.pop("input_contract_sha256", None)
+    key_digests.pop("parameter_golf_git_revision", None)
+    for artifact in clone.get("artifacts") or []:
+        if artifact.get("artifact_id") == "parameter_golf_google_input_contract_v1":
+            artifact.pop("sha256", None)
+    return clone
+
+def stable_descriptor(document: dict) -> dict:
+    clone = json.loads(json.dumps(document))
+    clone.pop("git_revision", None)
+    clone.pop("archive_sha256", None)
+    clone.pop("manifest_sha256", None)
+    key_digests = clone.get("key_digests") or {}
+    key_digests.pop("input_contract_sha256", None)
+    key_digests.pop("parameter_golf_git_revision", None)
+    return clone
+
+contract_name = "parameter_golf_google_input_contract_v1.json"
+manifest_name = "parameter_golf_google_input_package_manifest_v1.json"
+descriptor_name = "parameter_golf_google_input_package_descriptor_v1.json"
+archive_name = "parameter_golf_google_input_package_v1.tar.gz"
+
+committed_contract = json.loads((committed_dir / contract_name).read_text(encoding="utf-8"))
+generated_contract = json.loads((generated_dir / contract_name).read_text(encoding="utf-8"))
+if stable_contract(committed_contract) != stable_contract(generated_contract):
+    fail("generated input contract drifted from committed stable truth")
+
+committed_manifest = json.loads((committed_dir / manifest_name).read_text(encoding="utf-8"))
+generated_manifest = json.loads((generated_dir / manifest_name).read_text(encoding="utf-8"))
+if stable_manifest(committed_manifest) != stable_manifest(generated_manifest):
+    fail("generated input package manifest drifted from committed stable truth")
+
+committed_descriptor = json.loads((committed_dir / descriptor_name).read_text(encoding="utf-8"))
+generated_descriptor = json.loads((generated_dir / descriptor_name).read_text(encoding="utf-8"))
+if stable_descriptor(committed_descriptor) != stable_descriptor(generated_descriptor):
+    fail("generated input package descriptor drifted from committed stable truth")
+
+generated_contract_bytes = (generated_dir / contract_name).read_bytes()
+generated_manifest_bytes = (generated_dir / manifest_name).read_bytes()
+generated_archive = (generated_dir / archive_name).read_bytes()
+if generated_descriptor.get("archive_sha256") != sha256_bytes(generated_archive):
+    fail("generated descriptor archive_sha256 does not match the generated archive bytes")
+if generated_descriptor.get("manifest_sha256") != sha256_bytes(generated_manifest_bytes):
+    fail("generated descriptor manifest_sha256 does not match the generated manifest bytes")
+if (generated_manifest.get("key_digests") or {}).get("input_contract_sha256") != sha256_bytes(
+    generated_contract_bytes
+):
+    fail("generated manifest input_contract_sha256 does not match the generated contract bytes")
+
+with tarfile.open(fileobj=io.BytesIO(generated_archive), mode="r:gz") as archive:
+    members = archive.getmembers()
+    normalized_names = []
+    extracted_files = {}
+    for member in members:
+        normalized_name = member.name.rstrip("/")
+        if normalized_name in {".", "./"}:
+            normalized_names.append(".")
+            continue
+        if normalized_name.startswith("./"):
+            normalized_name = normalized_name[2:]
+        normalized_names.append(normalized_name)
+        extracted = archive.extractfile(member)
+        if extracted is not None:
+            extracted_files[normalized_name] = extracted.read()
+
+expected_archive_names = {
+    ".",
+    "parameter_golf_google_input_contract_v1.json",
+    "psion_google_reference_input_package_manifest.json",
+}
+if set(normalized_names) != expected_archive_names:
+    fail(f"generated archive members drifted: observed {sorted(set(normalized_names))}")
+if extracted_files.get("parameter_golf_google_input_contract_v1.json") != generated_contract_bytes:
+    fail("generated archive contract member does not match the generated contract file")
+if extracted_files.get("psion_google_reference_input_package_manifest.json") != generated_manifest_bytes:
+    fail("generated archive manifest member does not match the generated manifest file")
 
 if preflight.get("result") != "ready":
     fail("operator preflight did not report ready")
@@ -311,6 +389,8 @@ report = {
     "training_command": command,
     "pre_training_command": pre_training_command,
     "generated_package_matches_committed_truth": True,
+    "generated_archive_sha256": generated_descriptor["archive_sha256"],
+    "generated_manifest_sha256": generated_descriptor["manifest_sha256"],
 }
 report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 print(json.dumps(report, indent=2))

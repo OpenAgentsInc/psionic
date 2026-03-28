@@ -3,9 +3,26 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
+
+default_parameter_golf_root() {
+    local candidates=(
+        "${repo_root}/../competition/repos/parameter-golf"
+        "${HOME}/code/parameter-golf"
+    )
+    local candidate=""
+    for candidate in "${candidates[@]}"; do
+        if [[ -d "${candidate}/.git" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+    printf '%s\n' "${candidates[0]}"
+}
+
+parameter_golf_root="$(default_parameter_golf_root)"
 input_path="${repo_root}/fixtures/parameter_golf/reports/parameter_golf_single_h100_bringup.json"
-dataset_root="${HOME}/code/parameter-golf/data/datasets/fineweb10B_sp1024"
-tokenizer_path="${HOME}/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model"
+dataset_root="${parameter_golf_root}/data/datasets/fineweb10B_sp1024"
+tokenizer_path="${parameter_golf_root}/data/tokenizers/fineweb_1024_bpe.model"
 report_path=""
 
 usage() {
