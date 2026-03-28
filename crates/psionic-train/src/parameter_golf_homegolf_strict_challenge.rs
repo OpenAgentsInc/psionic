@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use psionic_core::{PsionicRefusal, PsionicRefusalCode, PsionicRefusalScope};
 use serde::{Deserialize, Serialize};
@@ -6,10 +9,10 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ParameterGolfHomegolfTrackContractReport, ParameterGolfPromotedTrainingProfile,
-    ParameterGolfScoreFirstTttConfig, ParameterGolfSingleH100ValidationMode,
-    ParameterGolfValidationEvalMode, build_parameter_golf_homegolf_track_contract_report,
-    parameter_golf_default_validation_batch_sequences,
+    build_parameter_golf_homegolf_track_contract_report,
+    parameter_golf_default_validation_batch_sequences, ParameterGolfHomegolfTrackContractReport,
+    ParameterGolfPromotedTrainingProfile, ParameterGolfScoreFirstTttConfig,
+    ParameterGolfSingleH100ValidationMode, ParameterGolfValidationEvalMode,
 };
 
 pub const PARAMETER_GOLF_HOMEGOLF_STRICT_CHALLENGE_LANE_FIXTURE_PATH: &str =
@@ -25,8 +28,6 @@ const STRICT_DATASET_ROOT_SHELL_PATH: &str =
     "~/code/parameter-golf/data/datasets/fineweb10B_sp1024";
 const STRICT_TOKENIZER_SHELL_PATH: &str =
     "~/code/parameter-golf/data/tokenizers/fineweb_1024_bpe.model";
-const STRICT_DATASET_ROOT_BASENAME: &str = "fineweb10B_sp1024";
-const STRICT_TOKENIZER_FILENAME: &str = "fineweb_1024_bpe.model";
 const TRAINING_REPORT_PLACEHOLDER: &str = "<training_report_path>";
 
 #[derive(Debug, Error)]
@@ -331,10 +332,7 @@ pub fn write_parameter_golf_homegolf_strict_challenge_lane_report(
 fn classify_dataset_root(path: Option<&Path>) -> ParameterGolfHomegolfStrictChallengeInputStatus {
     match path {
         None => ParameterGolfHomegolfStrictChallengeInputStatus::NotSupplied,
-        Some(path)
-            if path.file_name().and_then(|value| value.to_str())
-                != Some(STRICT_DATASET_ROOT_BASENAME) =>
-        {
+        Some(path) if expected_dataset_root_path().as_deref() != Some(path) => {
             ParameterGolfHomegolfStrictChallengeInputStatus::WrongPathIdentity
         }
         Some(path) if !path.is_dir() => {
@@ -347,10 +345,7 @@ fn classify_dataset_root(path: Option<&Path>) -> ParameterGolfHomegolfStrictChal
 fn classify_tokenizer_path(path: Option<&Path>) -> ParameterGolfHomegolfStrictChallengeInputStatus {
     match path {
         None => ParameterGolfHomegolfStrictChallengeInputStatus::NotSupplied,
-        Some(path)
-            if path.file_name().and_then(|value| value.to_str())
-                != Some(STRICT_TOKENIZER_FILENAME) =>
-        {
+        Some(path) if expected_tokenizer_path().as_deref() != Some(path) => {
             ParameterGolfHomegolfStrictChallengeInputStatus::WrongPathIdentity
         }
         Some(path) if !path.is_file() => {
@@ -406,16 +401,31 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+fn strict_shell_path_to_pathbuf(shell_path: &str) -> Option<PathBuf> {
+    shell_path.strip_prefix("~/").map_or_else(
+        || Some(PathBuf::from(shell_path)),
+        |suffix| env::var_os("HOME").map(|home| PathBuf::from(home).join(suffix)),
+    )
+}
+
+fn expected_dataset_root_path() -> Option<PathBuf> {
+    strict_shell_path_to_pathbuf(STRICT_DATASET_ROOT_SHELL_PATH)
+}
+
+fn expected_tokenizer_path() -> Option<PathBuf> {
+    strict_shell_path_to_pathbuf(STRICT_TOKENIZER_SHELL_PATH)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
     use super::{
-        PARAMETER_GOLF_HOMEGOLF_STRICT_CHALLENGE_LANE_FIXTURE_PATH,
+        build_parameter_golf_homegolf_strict_challenge_lane_report, expected_dataset_root_path,
+        expected_tokenizer_path, write_parameter_golf_homegolf_strict_challenge_lane_report,
         ParameterGolfHomegolfStrictChallengeInputStatus,
         ParameterGolfHomegolfStrictChallengeLaneDisposition,
-        build_parameter_golf_homegolf_strict_challenge_lane_report,
-        write_parameter_golf_homegolf_strict_challenge_lane_report,
+        PARAMETER_GOLF_HOMEGOLF_STRICT_CHALLENGE_LANE_FIXTURE_PATH,
     };
 
     #[test]
@@ -435,18 +445,16 @@ mod tests {
             ParameterGolfHomegolfStrictChallengeInputStatus::NotSupplied
         );
         assert!(report.refusal.is_some());
-        assert!(
-            report
-                .refusal
-                .as_ref()
-                .expect("refusal")
-                .detail
-                .contains("local-reference fallback is denied")
-        );
+        assert!(report
+            .refusal
+            .as_ref()
+            .expect("refusal")
+            .detail
+            .contains("local-reference fallback is denied"));
     }
 
     #[test]
-    fn strict_challenge_lane_marks_exact_named_inputs_ready() {
+    fn strict_challenge_lane_rejects_fake_same_basename_inputs() {
         let tempdir = tempfile::tempdir().expect("tempdir");
         let dataset_root = tempdir.path().join("fineweb10B_sp1024");
         let tokenizer_path = tempdir.path().join("fineweb_1024_bpe.model");
@@ -459,7 +467,46 @@ mod tests {
         .expect("build");
         assert_eq!(
             report.disposition,
+            ParameterGolfHomegolfStrictChallengeLaneDisposition::RefusedMissingChallengeInputs
+        );
+        assert_eq!(
+            report.challenge_inputs.dataset_root_status,
+            ParameterGolfHomegolfStrictChallengeInputStatus::WrongPathIdentity
+        );
+        assert_eq!(
+            report.challenge_inputs.tokenizer_path_status,
+            ParameterGolfHomegolfStrictChallengeInputStatus::WrongPathIdentity
+        );
+        assert!(report.refusal.is_some());
+    }
+
+    #[test]
+    fn strict_challenge_lane_marks_real_expected_inputs_ready_when_present() {
+        let Some(dataset_root) = expected_dataset_root_path() else {
+            return;
+        };
+        let Some(tokenizer_path) = expected_tokenizer_path() else {
+            return;
+        };
+        if !dataset_root.is_dir() || !tokenizer_path.is_file() {
+            return;
+        }
+        let report = build_parameter_golf_homegolf_strict_challenge_lane_report(
+            Some(dataset_root.as_path()),
+            Some(tokenizer_path.as_path()),
+        )
+        .expect("build");
+        assert_eq!(
+            report.disposition,
             ParameterGolfHomegolfStrictChallengeLaneDisposition::ReadyToExecute
+        );
+        assert_eq!(
+            report.challenge_inputs.dataset_root_status,
+            ParameterGolfHomegolfStrictChallengeInputStatus::PresentExactNamedPath
+        );
+        assert_eq!(
+            report.challenge_inputs.tokenizer_path_status,
+            ParameterGolfHomegolfStrictChallengeInputStatus::PresentExactNamedPath
         );
         assert!(report.refusal.is_none());
     }

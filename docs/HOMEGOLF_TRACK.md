@@ -97,7 +97,7 @@ HOMEGOLF now has one canonical strict runnable lane surface:
 - lane entrypoint:
   `crates/psionic-train/src/bin/parameter_golf_homegolf_strict_challenge_lane.rs`
 - latest audit:
-  `docs/audits/2026-03-27-homegolf-strict-challenge-lane-audit.md`
+  `docs/audits/2026-03-28-homegolf-strict-challenge-path-identity-audit.md`
 - checker:
   `scripts/check-parameter-golf-homegolf-strict-challenge-lane.sh`
 
@@ -112,6 +112,9 @@ What this proves:
   - legal score-first TTT
   - contest bits-per-byte accounting
   - exact `16,000,000`-byte artifact-cap law
+- fake temp paths with the right final basename no longer produce
+  `ready_to_execute`; the strict lane now requires the real expected
+  `~/code/parameter-golf/...` path identity
 - missing challenge inputs now produce an explicit typed refusal instead of a
   silent local-reference fallback
 
