@@ -151,6 +151,15 @@ than just run tensor math.
   threshold removed the prior sampled overhead cliff on the clean RTX 4080
   host and restored Psionic throughput leadership on all four clean
   length-matched sampled rows.
+- Later the same day, tuning the partitioned one-row top-k block count from
+  `8` to `24` on the same idle RTX 4080 host widened the sampled lead again.
+  The follow-on rerun at
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_200654_archlinux-.json`
+  raised Psionic `sampled_topk40` throughput from `470.49`, `243.56`,
+  `175.06`, `108.36 tok/s` to `506.49`, `252.83`, `179.55`, `110.13 tok/s`,
+  and raised `sampled_topk100` throughput from `446.26`, `236.17`, `171.24`,
+  `106.62 tok/s` to `492.81`, `247.57`, `177.28`, `109.02 tok/s`, while the
+  row-strength classifications stayed unchanged.
 - The fresh clean-host March 28, 2026 rerun on the same RTX 4080 changes the
   canonical interpretation:
   - raw greedy `tok/s` is higher on Psionic across all four models, and

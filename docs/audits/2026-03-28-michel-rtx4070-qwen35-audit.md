@@ -25,6 +25,14 @@ upgrades greedy `qwen3.5:2b` to a `strong` exact-match row, and keeps all
 four clean `sampled_topk40` rows ahead while still classifying them as
 `weak_length_matched_only`.
 
+Later the same day again, current `main` tuned the partitioned one-row CUDA
+top-k block count from `8` to `24` and published a sampled follow-on at
+`fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_200654_archlinux-.json`.
+That rerun widened Psionic's clean-host sampled lead further without changing
+the row-strength classifications: `sampled_topk40` moved to `506.49`, `252.83`,
+`179.55`, `110.13 tok/s`, and `sampled_topk100` moved to `492.81`, `247.57`,
+`177.28`, `109.02 tok/s`.
+
 Tracked issue:
 
 - `#650` Follow up Michel's RTX 4070 qwen35 run: benchmark-quality closure and
@@ -88,9 +96,14 @@ The current repo-local comparison document still records:
 Those results are tied to a different host envelope and a stricter published
 benchmark contract than Michel's laptop artifact.
 
-The current canonical clean-host record is the later March 28 full rerun at
-`fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_190650_archlinux-.json`,
-not only the intermediate `top_k = 40` or targeted `4b` checkpoints.
+The current canonical clean-host record is split by contract:
+
+- the later March 28 full rerun at
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_190650_archlinux-.json`
+  remains the full greedy-plus-sampled checkpoint
+- the later March 28 sampled follow-on at
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260328_200654_archlinux-.json`
+  is the latest sampled-only checkpoint after partitioned block-count tuning
 
 This audit therefore treats Michel's run as a constrained-host follow-on, not
 as a correction to `#606`, `#631`, or `#632`.
