@@ -14,7 +14,8 @@ Published benchmark checkpoints:
 - current canonical checkpoint: `March 28, 2026 clean RTX 4080 reruns with
   explicit Ollama greedy settings, per-run divergence evidence, the inclusive
   partitioned top-k40 selector, the qwen3.5:4b hybrid-state zero-init fix,
-  and later partitioned top-k block-count tuning for sampled rows`
+  and later partitioned top-k tile-width plus small-lane block-count tuning
+  for sampled rows`
 - historical greedy checkpoint: `c5bc0ba2`, preserved for provenance only
 - historical sampled checkpoints: `March 27-28, 2026` reruns before
   termination and divergence evidence landed in the repo-owned collector
@@ -97,8 +98,13 @@ reduced matrix that keeps only token count and mean throughput.
 Current canonical evidence lives in:
 
 - latest sampled follow-on after doubling the partitioned one-row CUDA top-k
+  tile width and then retuning the small-lane `top_k = 40` block count from
+  `24` to `48` on the idle RTX 4080:
+  - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_004540_archlinux-.json`
+  - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260329_004540_archlinux-/one_page_summary.md`
+- earlier sampled follow-on after doubling the partitioned one-row CUDA top-k
   tile width by raising `kLogitsTopKItemsPerThread` from `8` to `16` on the
-  idle RTX 4080:
+  idle RTX 4080 before the later small-lane block-count retune:
   - `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_003921_archlinux-.json`
   - `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260329_003921_archlinux-/one_page_summary.md`
 - latest sampled follow-on after making the partitioned one-row CUDA top-k
@@ -147,7 +153,7 @@ Why `20260328_212810` is diagnostic only:
 The mixed canonical table below uses:
 
 - greedy rows from the full-matrix `20260328_190650` rerun
-- `sampled_topk40` rows from the later sampled-only `20260329_003921`
+- `sampled_topk40` rows from the later sampled-only `20260329_004540`
   follow-on
 - `sampled_topk100` rows from the earlier sampled-only `20260328_210428`
   follow-on
@@ -165,10 +171,10 @@ Interpretation rules:
 | `greedy` | `qwen3.5:2b` | `260.12` | `206.20` | `strong` | The fresh full-matrix rerun now gives an exact comparable token-id match with matching EOS termination across all repeats, even though backend-native token counts still report `33,33,33` vs `34,34,34` |
 | `greedy` | `qwen3.5:4b` | `173.87` | `144.41` | `mismatched` | The fresh full-matrix rerun keeps the post-fix `4b` row stable (`51,51,51` vs `35,35,35`), but output lengths still differ and first divergence starts at token `18,18,18` |
 | `greedy` | `qwen3.5:9b` | `107.74` | `97.43` | `mismatched` | Raw throughput favors Psionic, but output lengths differ (`41,41,41` vs `42,42,42`) and first divergence starts at token `5,5,5` |
-| `sampled_topk40` | `qwen3.5:0.8b` | `511.51` | `337.58` | `weak_length_matched_only` | Both sides still hit the `128` token cap, first comparable token divergence still starts at token `3,3,3`, and doubling the partitioned top-k tile width raises Psionic from `505.33` to `511.51 tok/s` while preserving bounded-candidate output |
-| `sampled_topk40` | `qwen3.5:2b` | `254.07` | `206.38` | `weak_length_matched_only` | Both sides still hit the `128` token cap, first comparable token divergence still starts at token `4,4,4`, and the wider partitioned tile raises Psionic from `252.94` to `254.07 tok/s` without weakening the row classification |
-| `sampled_topk40` | `qwen3.5:4b` | `180.01` | `144.10` | `weak_length_matched_only` | The later sampled rerun keeps the post-fix `4b` row length-matched and ahead on Psionic, with first comparable token divergence still starting at token `4,4,4` and the wider tile raising Psionic from `179.42` to `180.01 tok/s` |
-| `sampled_topk40` | `qwen3.5:9b` | `110.35` | `96.37` | `weak_length_matched_only` | Both sides still hit the `128` token cap, first comparable token divergence still starts at token `3,3,3`, and the wider partitioned tile raises Psionic from `110.12` to `110.35 tok/s` while keeping bounded-candidate output |
+| `sampled_topk40` | `qwen3.5:0.8b` | `519.35` | `337.91` | `weak_length_matched_only` | Both sides still hit the `128` token cap, first comparable token divergence still starts at token `3,3,3`, and retuning the small-lane partitioned block count from `24` to `48` after the wider tile raises Psionic again from `511.51` to `519.35 tok/s` while preserving bounded-candidate output |
+| `sampled_topk40` | `qwen3.5:2b` | `256.03` | `206.37` | `weak_length_matched_only` | Both sides still hit the `128` token cap, first comparable token divergence still starts at token `4,4,4`, and the later `48`-block small-lane profile raises Psionic again from `254.07` to `256.03 tok/s` without weakening the row classification |
+| `sampled_topk40` | `qwen3.5:4b` | `180.99` | `144.43` | `weak_length_matched_only` | The later sampled rerun keeps the post-fix `4b` row length-matched and ahead on Psionic, with first comparable token divergence still starting at token `4,4,4` and the `48`-block profile raising Psionic again from `180.01` to `180.99 tok/s` |
+| `sampled_topk40` | `qwen3.5:9b` | `110.68` | `96.55` | `weak_length_matched_only` | Both sides still hit the `128` token cap, first comparable token divergence still starts at token `3,3,3`, and the later `48`-block small-lane profile raises Psionic again from `110.35` to `110.68 tok/s` while keeping bounded-candidate output |
 | `sampled_topk100` | `qwen3.5:0.8b` | `501.50` | `327.19` | `mismatched` | Raw throughput still favors Psionic, output lengths still differ (`33,33,33` vs `20,20,20`), first divergence still starts at token `4,4,4`, and the adaptive wide-lane policy raises Psionic from `492.81` to `501.50 tok/s` |
 | `sampled_topk100` | `qwen3.5:2b` | `250.76` | `205.42` | `mismatched` | Raw throughput still favors Psionic, output lengths still differ (`27,27,27` vs `38,38,38`), first divergence still starts at token `2,2,2`, and the adaptive policy raises Psionic from `247.57` to `250.76 tok/s` |
 | `sampled_topk100` | `qwen3.5:4b` | `178.31` | `143.72` | `mismatched` | The later sampled rerun keeps the post-fix `4b` row stable (`41,41,41` vs `37,37,37`), the row remains `mismatched`, and the adaptive policy raises Psionic from `177.28` to `178.31 tok/s` |
@@ -252,8 +258,8 @@ Psionic output-mode evidence on this contract:
 - `qwen35_raw_logits=false`
 - Psionic sampled rows rerun after a clean `CARGO_INCREMENTAL=0` rebuild of
   `qwen35_cuda_bench`
-- current canonical rerun after routing `top_k = 40` through the inclusive
-  partitioned one-row CUDA selector instead of the slower generic top-k path
+- current canonical rerun keeps `top_k = 40` on the widened partitioned lane
+  with the later `48`-block small-profile retune
 
 ## Sampled Matrix
 
@@ -266,10 +272,11 @@ Current status:
 - Psionic stays on the bounded sampled lane:
   - `qwen35_output_modes=[top_k_candidates:40]`
   - `qwen35_raw_logits=false`
-- the later adaptive policy keeps `top_k = 40` on the same `24`-block
-  profile and leaves Psionic effectively flat at `505.33`, `252.94`,
-  `179.42`, `110.12 tok/s` after the earlier jump from `470.49`, `243.56`,
-  `175.06`, `108.36 tok/s`
+- the later adaptive policy kept `top_k = 40` on the `24`-block profile and
+  left Psionic effectively flat at `505.33`, `252.94`, `179.42`,
+  `110.12 tok/s`, then the wider partitioned tile plus the later `48`-block
+  small-profile retune moved the same rows again to `519.35`, `256.03`,
+  `180.99`, `110.68 tok/s`
 - Psionic stays ahead of Ollama on all four clean `top_k = 40` rows on this
   host
 

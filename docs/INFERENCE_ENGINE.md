@@ -177,6 +177,15 @@ than just run tensor math.
   raised `sampled_topk40` to `511.51`, `254.07`, `180.01`, `110.35 tok/s`
   against Ollama `337.58`, `206.38`, `144.10`, `96.37 tok/s` while keeping
   the same bounded-candidate output mode and row-strength classifications.
+- Later on March 29, 2026, the wider tile changed the best small-lane
+  partitioned block shape too. Retuning the `top_k = 40` small profile from
+  `24` to `48` on the same idle RTX 4080 host produced another clean sampled
+  gain at
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_004540_archlinux-.json`,
+  raising `sampled_topk40` again to `519.35`, `256.03`, `180.99`,
+  `110.68 tok/s` against Ollama `337.91`, `206.37`, `144.43`, `96.55 tok/s`
+  while keeping the same bounded-candidate output mode and row-strength
+  classifications.
 - The fresh clean-host March 28, 2026 rerun on the same RTX 4080 changes the
   canonical interpretation:
   - raw greedy `tok/s` is higher on Psionic across all four models, and

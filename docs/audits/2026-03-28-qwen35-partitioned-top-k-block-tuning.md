@@ -604,6 +604,68 @@ What this means:
 
 This is a real throughput gain, not a measurement artifact.
 
+## Later Follow-On: Wider Tiles Shifted The Small-Lane Block Optimum Again
+
+After the tile-width increase landed, the next question was whether the old
+small-lane `24`-block profile was still the best shape for the canonical
+`sampled_topk40` contract.
+
+The idle RTX 4080 resweep showed it was not.
+
+The most sensitive row is `qwen3.5:0.8b sampled_topk40`, and after the wider
+tile its observed sweep moved upward:
+
+| Blocks | `0.8b` tok/s |
+| --- | ---: |
+| `24` | `512.02` |
+| `32` | `516.51` |
+| `36` | `516.83` |
+| `40` | `516.69` |
+| `48` | `519.56` |
+| `64` | `519.50` |
+
+That made the new conclusion straightforward:
+
+- the earlier `24`-block default was tuned for the older `8`-item tile width
+- after `kLogitsTopKItemsPerThread: 8 -> 16`, the best small-lane shape moved
+  higher too
+- `48` was the best observed small-lane setting and `64` did not improve it
+
+The follow-on full sampled rerun used the runtime override equivalent to the
+new default:
+
+- `PSIONIC_QWEN35_PARTITIONED_TOP_K_BLOCKS=48`
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_004540_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260329_004540_archlinux-/one_page_summary.md`
+
+Scope:
+
+- models `qwen3.5:0.8b`, `qwen3.5:2b`, `qwen3.5:4b`, `qwen3.5:9b`
+- contract `sampled_topk40`
+- `repeats = 3`
+- idle RTX 4080 host with the row-by-row isolation runner
+
+Relative to the earlier tile-width rerun from `20260329_003921`:
+
+### `sampled_topk40` deltas vs `20260329_003921`
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `511.51` | `519.35` | `+1.53%` | `337.91` |
+| `qwen3.5:2b` | `254.07` | `256.03` | `+0.77%` | `206.37` |
+| `qwen3.5:4b` | `180.01` | `180.99` | `+0.54%` | `144.43` |
+| `qwen3.5:9b` | `110.35` | `110.68` | `+0.30%` | `96.55` |
+
+What this means:
+
+- the tile-width gain exposed more headroom in the same partitioned lane
+- the next profitable move was not a new algorithm, it was retuning the
+  existing small-lane launch shape around the wider tile
+- the row-strength classifications stayed unchanged
+- bounded-candidate output stayed intact:
+  - `qwen35_output_modes=[top_k_candidates:40]`
+  - `qwen35_raw_logits=false`
+
 ## Updated Next Steps
 
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
@@ -618,5 +680,6 @@ This is a real throughput gain, not a measurement artifact.
   count without changing end-to-end memory traffic or synchronization
 - focus the next optimization pass inside the partitioned bounded-candidate
   lane where it can plausibly reduce actual sampled-step cost further:
-  larger wide-lane `top_k = 100` tuning, more kernel-shape exploration, or
-  broader step fusion around the bounded-candidate output path
+  larger wide-lane `top_k = 100` tuning, more kernel-shape exploration inside
+  the partitioned scan itself, or broader step fusion around the
+  bounded-candidate output path
