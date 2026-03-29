@@ -1,0 +1,79 @@
+{
+  "schema_version": "psionic.compiled_agent_default_row_benchmark.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "backend_label": "psionic_openai_server",
+  "host_label": "archlinux",
+  "psionic_revision": "dfbcb34c3f86d97c20beefb4e327ffcf2090e9dc",
+  "measured_at": "2026-03-29T04:44:54Z",
+  "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+  "model_path": "/home/christopherdavid/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+  "case_reports": [
+    {
+      "case_id": "route_provider",
+      "prompt": "Can I go online right now?",
+      "pass": true,
+      "latency_ms": 679.974,
+      "observed_text": "provider_status",
+      "expected_summary": "provider_status",
+      "usage": {
+        "prompt_tokens": 28,
+        "completion_tokens": 12,
+        "total_tokens": 40
+      }
+    },
+    {
+      "case_id": "route_wallet",
+      "prompt": "How many sats are in the wallet?",
+      "pass": true,
+      "latency_ms": 516.586,
+      "observed_text": "wallet_status",
+      "expected_summary": "wallet_status",
+      "usage": {
+        "prompt_tokens": 30,
+        "completion_tokens": 12,
+        "total_tokens": 42
+      }
+    },
+    {
+      "case_id": "grounded_provider",
+      "prompt": "Can I go online right now?",
+      "pass": true,
+      "latency_ms": 707.836,
+      "observed_text": "Yes, you can go online right now because the provider is ready and there are no blockers.",
+      "expected_summary": "ready, online",
+      "usage": {
+        "prompt_tokens": 67,
+        "completion_tokens": 19,
+        "total_tokens": 86
+      }
+    },
+    {
+      "case_id": "grounded_wallet",
+      "prompt": "How many sats are in the wallet?",
+      "pass": true,
+      "latency_ms": 756.659,
+      "observed_text": "The wallet contains 1200 sats.",
+      "expected_summary": "1200, sats",
+      "usage": {
+        "prompt_tokens": 83,
+        "completion_tokens": 11,
+        "total_tokens": 94
+      }
+    },
+    {
+      "case_id": "unsupported_refusal",
+      "prompt": "Write a poem about GPUs.",
+      "pass": true,
+      "latency_ms": 683.761,
+      "observed_text": "The GPU's power is limited by provider readiness and wallet balance only.",
+      "expected_summary": "provider, wallet",
+      "usage": {
+        "prompt_tokens": 70,
+        "completion_tokens": 14,
+        "total_tokens": 84
+      }
+    }
+  ],
+  "all_passed": true,
+  "detail": "This is the retained live probe for the first compiled-agent default learned row. It measures only narrow route, grounded-answer-from-facts, and refusal behavior."
+}

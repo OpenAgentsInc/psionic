@@ -1,0 +1,25 @@
+{
+  "schema_version": "psionic.compiled_agent_default_row.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "backend_label": "psionic_openai_server",
+  "host_label": "archlinux",
+  "accelerator_label": "rtx_4080_16gb",
+  "model_family": "qwen35",
+  "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+  "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+  "admitted_tasks": [
+    "intent_route",
+    "grounded_answer_from_supplied_facts",
+    "unsupported_refusal"
+  ],
+  "refusal_boundary": [
+    "broad autonomous task execution",
+    "silent tool selection without bounded contracts",
+    "unbounded long-context planning"
+  ],
+  "latency_target_p50_ms": 2500,
+  "prompt_token_budget": 512,
+  "completion_token_budget": 96,
+  "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+  "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+}
