@@ -13,6 +13,7 @@ evidence.
 - System architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Detailed workspace map: [docs/WORKSPACE_MAP.md](docs/WORKSPACE_MAP.md)
 - Inference and serving: [docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)
+- Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)
 - Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
@@ -23,6 +24,11 @@ evidence.
   - generic OpenAI-compatible server surfaces
   - hardware validation and backend truth
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
+- Hermes agent backend
+  - use Psionic as a real Hermes backend over the OpenAI-compatible
+    `chat.completions` path
+  - start with [docs/hermes/README.md](docs/hermes/README.md)
+  - supporting docs: [docs/HERMES_QWEN35_COMPATIBILITY.md](docs/HERMES_QWEN35_COMPATIBILITY.md), [docs/HERMES_QWEN35_PARALLEL_ATTRIBUTION.md](docs/HERMES_QWEN35_PARALLEL_ATTRIBUTION.md), [docs/HERMES_BACKEND_BENCHMARK.md](docs/HERMES_BACKEND_BENCHMARK.md)
 - Parameter Golf and distributed training
   - single-H100, distributed `8xH100`, submission, evidence, and score-path work
   - start with [docs/ROADMAP_PARAMETERGOLF.md](docs/ROADMAP_PARAMETERGOLF.md)
