@@ -170,6 +170,13 @@ than just run tensor math.
   kept `sampled_topk40` effectively flat at `505.33`, `252.94`, `179.42`,
   `110.12 tok/s` while raising `sampled_topk100` again to `501.50`,
   `250.76`, `178.31`, `109.42 tok/s`.
+- On March 29, 2026, doubling the partitioned top-k tile width by raising
+  `kLogitsTopKItemsPerThread` from `8` to `16` produced another clean sampled
+  gain on the same idle RTX 4080 host. The rerun at
+  `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_003921_archlinux-.json`
+  raised `sampled_topk40` to `511.51`, `254.07`, `180.01`, `110.35 tok/s`
+  against Ollama `337.58`, `206.38`, `144.10`, `96.37 tok/s` while keeping
+  the same bounded-candidate output mode and row-strength classifications.
 - The fresh clean-host March 28, 2026 rerun on the same RTX 4080 changes the
   canonical interpretation:
   - raw greedy `tok/s` is higher on Psionic across all four models, and

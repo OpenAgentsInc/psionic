@@ -547,6 +547,63 @@ What this means:
 
 This is a benchmark-discipline fix, not a new throughput claim.
 
+## Later Follow-On: Wider Top-K Tiles Produced Another Real Sampled Gain
+
+After the prefix-cache benchmark bypass restored a stable clean-host sampled
+input again, the next partitioned-lane follow-on revisited kernel shape
+instead of host-side cleanup.
+
+The narrowed direct pilot on the idle RTX 4080 first checked whether reducing
+the partitioned finalize kernel count mattered. It did not:
+
+- current `main` `qwen3.5:0.8b sampled_topk40` pilot: `506.96 tok/s`
+- fused-remap pilot on the same row: `505.40 tok/s`
+
+That confirmed the active bottleneck was still inside the partitioned scan
+itself.
+
+The landed follow-on instead doubled the per-thread tile width inside the
+partitioned selector:
+
+- `kLogitsTopKItemsPerThread: 8 -> 16`
+- tile width: `1024 -> 2048` logits per block pass
+
+The clean full sampled rerun on the idle RTX 4080 host was:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_003921_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260329_003921_archlinux-/one_page_summary.md`
+
+Scope:
+
+- models `qwen3.5:0.8b`, `qwen3.5:2b`, `qwen3.5:4b`, `qwen3.5:9b`
+- contract `sampled_topk40`
+- `repeats = 3`
+- idle RTX 4080 host with the row-by-row isolation runner
+
+Relative to the same `20260328_210428` sampled baseline:
+
+### `sampled_topk40` deltas vs `20260328_210428`
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `505.33` | `511.51` | `+1.22%` | `337.58` |
+| `qwen3.5:2b` | `252.94` | `254.07` | `+0.45%` | `206.38` |
+| `qwen3.5:4b` | `179.42` | `180.01` | `+0.33%` | `144.10` |
+| `qwen3.5:9b` | `110.12` | `110.35` | `+0.21%` | `96.37` |
+
+What this means:
+
+- the partitioned sampled lane still had real headroom in the scan kernel
+  itself
+- widening the tile to `2048` logits per block pass reduced sampled-step cost
+  enough to show up end-to-end on the clean host
+- the row-strength classifications stayed unchanged
+- bounded-candidate output stayed intact:
+  - `qwen35_output_modes=[top_k_candidates:40]`
+  - `qwen35_raw_logits=false`
+
+This is a real throughput gain, not a measurement artifact.
+
 ## Updated Next Steps
 
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
@@ -560,6 +617,6 @@ This is a benchmark-discipline fix, not a new throughput claim.
 - stop spending time on partitioned micro-cleanups that only reduce kernel
   count without changing end-to-end memory traffic or synchronization
 - focus the next optimization pass inside the partitioned bounded-candidate
-  lane where it can plausibly reduce actual sampled-step cost: memory traffic,
-  device-to-host staging, or broader step fusion around the bounded-candidate
-  output path
+  lane where it can plausibly reduce actual sampled-step cost further:
+  larger wide-lane `top_k = 100` tuning, more kernel-shape exploration, or
+  broader step fusion around the bounded-candidate output path
