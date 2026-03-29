@@ -34,6 +34,7 @@ Grounded-answer candidate:
 - `fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
+- `fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json`
 
 ## Current Truth
 
@@ -42,6 +43,8 @@ Grounded-answer candidate:
 - grounded-answer candidate keeps the module eval surface non-regressing
 - grounded-answer candidate improves replay fidelity on the wallet answer by
   including recent earnings from the receipt-backed facts
+- promoted and candidate module authority is now exported through a retained
+  runtime-consumable artifact contract instead of only being implied by docs
 
 ## Scope Boundary
 
@@ -50,8 +53,10 @@ promotion in `openagents`.
 
 - `psionic` now trains and retains a route-model artifact from the replay bundle
 - validator-gated XTRAIN evaluates that artifact as the route candidate
+- `psionic` now also publishes a retained promoted-artifact contract for runtime
+  consumers
 - runtime adoption into the compiled-agent authority lane remains a separate
-  promotion step
+  `openagents` promotion step
 
 ## Entry Point
 

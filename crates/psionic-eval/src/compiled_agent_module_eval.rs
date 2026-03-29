@@ -609,7 +609,7 @@ fn evaluate_case(
             }
         }
         CompiledAgentModuleKind::ToolPolicy => {
-            let observed = select_tools(
+            let observed = evaluate_compiled_agent_tool_policy(
                 case.route_input
                     .expect("tool-policy cases need a route input"),
                 &compiled_agent_supported_tools(),
@@ -631,7 +631,7 @@ fn evaluate_case(
             }
         }
         CompiledAgentModuleKind::ToolArguments => {
-            let observed = emit_tool_calls(&case.selected_tools);
+            let observed = evaluate_compiled_agent_tool_arguments(&case.selected_tools);
             let pass = observed == case.expected_calls;
             CompiledAgentModuleEvalCaseReport {
                 case_id: case.case_id.clone(),
@@ -668,7 +668,7 @@ fn evaluate_case(
             }
         }
         CompiledAgentModuleKind::Verify => {
-            let observed = verify_case(
+            let observed = evaluate_compiled_agent_verify(
                 case.route_input.expect("verify cases need a route input"),
                 &case.selected_tools,
                 case.tool_results.as_slice(),
@@ -716,7 +716,8 @@ pub fn evaluate_compiled_agent_route(
     }
 }
 
-fn select_tools(
+#[must_use]
+pub fn evaluate_compiled_agent_tool_policy(
     route: CompiledAgentRoute,
     available_tools: &[crate::CompiledAgentToolSpec],
 ) -> Vec<crate::CompiledAgentToolSpec> {
@@ -735,7 +736,10 @@ fn select_tools(
     }
 }
 
-fn emit_tool_calls(selected_tools: &[String]) -> Vec<CompiledAgentToolCall> {
+#[must_use]
+pub fn evaluate_compiled_agent_tool_arguments(
+    selected_tools: &[String],
+) -> Vec<CompiledAgentToolCall> {
     selected_tools
         .iter()
         .map(|tool_name| CompiledAgentToolCall {
@@ -813,7 +817,8 @@ pub fn evaluate_compiled_agent_grounded_answer(
     }
 }
 
-fn verify_case(
+#[must_use]
+pub fn evaluate_compiled_agent_verify(
     route: CompiledAgentRoute,
     selected_tools: &[String],
     tool_results: &[CompiledAgentToolResult],

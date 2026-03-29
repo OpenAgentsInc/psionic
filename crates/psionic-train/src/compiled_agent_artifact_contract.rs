@@ -1,0 +1,547 @@
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
+
+use psionic_eval::{
+    build_compiled_agent_module_eval_report, compiled_agent_baseline_revision_set,
+    canonical_compiled_agent_default_row_contract, CompiledAgentDefaultLearnedRowContract,
+    CompiledAgentModuleEvalReport, CompiledAgentModuleKind, CompiledAgentModuleRevisionSet,
+    CompiledAgentRouteModelArtifact,
+};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use thiserror::Error;
+
+use crate::{
+    canonical_compiled_agent_route_model_artifact, canonical_compiled_agent_xtrain_cycle_receipt,
+    compiled_agent_grounded_candidate_revision, repo_relative_path, CompiledAgentXtrainError,
+};
+
+pub const COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_FIXTURE_PATH: &str =
+    "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json";
+
+const COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_SCHEMA_VERSION: &str =
+    "psionic.compiled_agent.promoted_artifact_contract.v1";
+const COMPILED_AGENT_COMPATIBILITY_VERSION: &str = "openagents.compiled_agent.first_graph.v1";
+const PROMOTED_AT_UTC: &str = "2026-03-29T00:00:00Z";
+const ROUTE_MODEL_FIXTURE_REF: &str = "fixtures/compiled_agent/compiled_agent_route_model_v1.json";
+const ROUTE_CANDIDATE_REPORT_REF: &str =
+    "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json";
+const GROUNDED_CANDIDATE_REPORT_REF: &str =
+    "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json";
+const BASELINE_REPORT_REF: &str = "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json";
+const XTRAIN_CYCLE_RECEIPT_REF: &str =
+    "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json";
+
+#[derive(Debug, Error)]
+pub enum CompiledAgentArtifactContractError {
+    #[error("failed to create `{path}`: {error}")]
+    CreateDir { path: String, error: std::io::Error },
+    #[error("failed to read `{path}`: {error}")]
+    Read { path: String, error: std::io::Error },
+    #[error("failed to write `{path}`: {error}")]
+    Write { path: String, error: std::io::Error },
+    #[error("fixture `{path}` drifted from the canonical generator output")]
+    FixtureDrift { path: String },
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Xtrain(#[from] CompiledAgentXtrainError),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompiledAgentArtifactLifecycleState {
+    Promoted,
+    Candidate,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "payload_kind", rename_all = "snake_case")]
+pub enum CompiledAgentArtifactPayload {
+    RevisionSet {
+        revision: CompiledAgentModuleRevisionSet,
+    },
+    RouteModel {
+        artifact: CompiledAgentRouteModelArtifact,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CompiledAgentArtifactValidatorLineage {
+    pub validator_report_ref: String,
+    pub validator_report_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xtrain_cycle_receipt_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub xtrain_cycle_receipt_digest: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompiledAgentArtifactContractEntry {
+    pub module: CompiledAgentModuleKind,
+    pub module_name: String,
+    pub signature_name: String,
+    pub implementation_family: String,
+    pub implementation_label: String,
+    pub version: String,
+    pub lifecycle_state: CompiledAgentArtifactLifecycleState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub candidate_label: Option<String>,
+    pub compatibility_version: String,
+    pub confidence_floor: f32,
+    pub artifact_id: String,
+    pub artifact_digest: String,
+    pub row_id: String,
+    pub default_row: CompiledAgentDefaultLearnedRowContract,
+    pub validator_lineage: CompiledAgentArtifactValidatorLineage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predecessor_artifact_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_artifact_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub promoted_at_utc: Option<String>,
+    pub payload: CompiledAgentArtifactPayload,
+    pub detail: String,
+}
+
+impl CompiledAgentArtifactContractEntry {
+    #[must_use]
+    pub fn manifest_id(&self) -> String {
+        format!(
+            "{}:{}:{}:{}",
+            self.module_name, self.implementation_family, self.implementation_label, self.version
+        )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompiledAgentPromotedArtifactContract {
+    pub schema_version: String,
+    pub ledger_id: String,
+    pub row_id: String,
+    pub promoted_entry_count: u32,
+    pub candidate_entry_count: u32,
+    pub entries_by_module: BTreeMap<String, u32>,
+    pub artifacts: Vec<CompiledAgentArtifactContractEntry>,
+    pub summary: String,
+    pub contract_digest: String,
+}
+
+impl CompiledAgentPromotedArtifactContract {
+    #[must_use]
+    pub fn promoted_entry(
+        &self,
+        module: CompiledAgentModuleKind,
+    ) -> Option<&CompiledAgentArtifactContractEntry> {
+        self.artifacts.iter().find(|entry| {
+            entry.module == module
+                && entry.lifecycle_state == CompiledAgentArtifactLifecycleState::Promoted
+        })
+    }
+
+    #[must_use]
+    pub fn candidate_entry(
+        &self,
+        module: CompiledAgentModuleKind,
+        candidate_label: &str,
+    ) -> Option<&CompiledAgentArtifactContractEntry> {
+        self.artifacts.iter().find(|entry| {
+            entry.module == module
+                && entry.lifecycle_state == CompiledAgentArtifactLifecycleState::Candidate
+                && entry.candidate_label.as_deref() == Some(candidate_label)
+        })
+    }
+}
+
+#[must_use]
+pub fn compiled_agent_promoted_artifact_contract_fixture_path() -> PathBuf {
+    repo_relative_path(COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_FIXTURE_PATH)
+}
+
+pub fn canonical_compiled_agent_promoted_artifact_contract(
+) -> Result<CompiledAgentPromotedArtifactContract, CompiledAgentArtifactContractError> {
+    let default_row = canonical_compiled_agent_default_row_contract();
+    let route_model = canonical_compiled_agent_route_model_artifact()?;
+    let baseline_revision = compiled_agent_baseline_revision_set();
+    let grounded_candidate_revision = compiled_agent_grounded_candidate_revision();
+    let baseline_report = build_compiled_agent_module_eval_report(&baseline_revision);
+    let route_candidate_report =
+        build_compiled_agent_module_eval_report(&route_candidate_route_revision(route_model.clone()));
+    let grounded_candidate_report =
+        build_compiled_agent_module_eval_report(&grounded_candidate_revision);
+    let xtrain_cycle = canonical_compiled_agent_xtrain_cycle_receipt()?;
+
+    let baseline_lineage = validator_lineage(
+        BASELINE_REPORT_REF,
+        &baseline_report,
+        Some(XTRAIN_CYCLE_RECEIPT_REF),
+        Some(&xtrain_cycle.receipt_digest),
+    );
+    let route_lineage = validator_lineage(
+        ROUTE_CANDIDATE_REPORT_REF,
+        &route_candidate_report,
+        Some(XTRAIN_CYCLE_RECEIPT_REF),
+        Some(&xtrain_cycle.receipt_digest),
+    );
+    let grounded_lineage = validator_lineage(
+        GROUNDED_CANDIDATE_REPORT_REF,
+        &grounded_candidate_report,
+        Some(XTRAIN_CYCLE_RECEIPT_REF),
+        Some(&xtrain_cycle.receipt_digest),
+    );
+
+    let route_fallback_artifact_id = String::from("compiled_agent.baseline.rule_v1.route");
+    let promoted_route = CompiledAgentArtifactContractEntry {
+        module: CompiledAgentModuleKind::Route,
+        module_name: String::from("intent_route"),
+        signature_name: String::from("intent_route"),
+        implementation_family: String::from("psionic_route_model"),
+        implementation_label: route_model.artifact_id.clone(),
+        version: String::from("2026-03-29"),
+        lifecycle_state: CompiledAgentArtifactLifecycleState::Promoted,
+        candidate_label: None,
+        compatibility_version: String::from(COMPILED_AGENT_COMPATIBILITY_VERSION),
+        confidence_floor: 0.8,
+        artifact_id: route_model.artifact_id.clone(),
+        artifact_digest: route_model.artifact_digest.clone(),
+        row_id: default_row.row_id.clone(),
+        default_row: default_row.clone(),
+        validator_lineage: route_lineage,
+        predecessor_artifact_id: Some(route_fallback_artifact_id.clone()),
+        rollback_artifact_id: Some(route_fallback_artifact_id.clone()),
+        promoted_at_utc: Some(String::from(PROMOTED_AT_UTC)),
+        payload: CompiledAgentArtifactPayload::RouteModel {
+            artifact: route_model.clone(),
+        },
+        detail: format!(
+            "Promoted route artifact sourced from {} and validator-scored through the first bounded compiled-agent XTRAIN cycle.",
+            ROUTE_MODEL_FIXTURE_REF
+        ),
+    };
+
+    let rollback_route = revision_entry(
+        CompiledAgentModuleKind::Route,
+        "intent_route",
+        "intent_route",
+        "psionic_rule_revision",
+        "last_known_good",
+        "2026-03-28",
+        CompiledAgentArtifactLifecycleState::Candidate,
+        Some("last_known_good"),
+        0.8,
+        route_fallback_artifact_id,
+        &baseline_revision,
+        &default_row,
+        baseline_lineage.clone(),
+        None,
+        None,
+        "Rollback route artifact that preserves the last-known-good baseline revision for clean candidate-authority rollback.",
+    );
+
+    let promoted_tool_policy = revision_entry(
+        CompiledAgentModuleKind::ToolPolicy,
+        "tool_policy",
+        "tool_policy",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        CompiledAgentArtifactLifecycleState::Promoted,
+        None,
+        0.8,
+        "compiled_agent.baseline.rule_v1.tool_policy".to_string(),
+        &baseline_revision,
+        &default_row,
+        baseline_lineage.clone(),
+        None,
+        Some(String::from(PROMOTED_AT_UTC)),
+        "Promoted tool-policy artifact remains the baseline bounded rule revision.",
+    );
+
+    let promoted_tool_arguments = revision_entry(
+        CompiledAgentModuleKind::ToolArguments,
+        "tool_arguments",
+        "tool_arguments",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        CompiledAgentArtifactLifecycleState::Promoted,
+        None,
+        0.8,
+        "compiled_agent.baseline.rule_v1.tool_arguments".to_string(),
+        &baseline_revision,
+        &default_row,
+        baseline_lineage.clone(),
+        None,
+        Some(String::from(PROMOTED_AT_UTC)),
+        "Promoted tool-argument artifact remains the baseline bounded rule revision.",
+    );
+
+    let promoted_grounded_answer = revision_entry(
+        CompiledAgentModuleKind::GroundedAnswer,
+        "grounded_answer",
+        "grounded_answer",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        CompiledAgentArtifactLifecycleState::Promoted,
+        None,
+        0.82,
+        "compiled_agent.baseline.rule_v1.grounded_answer".to_string(),
+        &baseline_revision,
+        &default_row,
+        baseline_lineage.clone(),
+        None,
+        Some(String::from(PROMOTED_AT_UTC)),
+        "Promoted grounded-answer artifact remains the baseline rule revision until a learned grounded artifact is retained and promoted.",
+    );
+
+    let candidate_grounded_answer = revision_entry(
+        CompiledAgentModuleKind::GroundedAnswer,
+        "grounded_answer",
+        "grounded_answer",
+        "psionic_rule_revision",
+        "psionic_candidate",
+        "2026-03-29",
+        CompiledAgentArtifactLifecycleState::Candidate,
+        Some("psionic_candidate"),
+        0.82,
+        grounded_candidate_revision.revision_id.clone(),
+        &grounded_candidate_revision,
+        &default_row,
+        grounded_lineage.clone(),
+        Some(String::from("compiled_agent.baseline.rule_v1.grounded_answer")),
+        None,
+        "Candidate grounded-answer artifact carries the retained recent-earnings revision under the psionic_candidate label for shadow evaluation.",
+    );
+
+    let promoted_verify = revision_entry(
+        CompiledAgentModuleKind::Verify,
+        "verify",
+        "verify",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        CompiledAgentArtifactLifecycleState::Promoted,
+        None,
+        0.82,
+        "compiled_agent.baseline.rule_v1.verify".to_string(),
+        &baseline_revision,
+        &default_row,
+        baseline_lineage,
+        None,
+        Some(String::from(PROMOTED_AT_UTC)),
+        "Promoted verify artifact remains the baseline rule revision.",
+    );
+
+    let candidate_verify = revision_entry(
+        CompiledAgentModuleKind::Verify,
+        "verify",
+        "verify",
+        "psionic_rule_revision",
+        "psionic_candidate",
+        "2026-03-29",
+        CompiledAgentArtifactLifecycleState::Candidate,
+        Some("psionic_candidate"),
+        0.82,
+        format!("{}.verify", grounded_candidate_revision.revision_id),
+        &grounded_candidate_revision,
+        &default_row,
+        grounded_lineage,
+        Some(String::from("compiled_agent.baseline.rule_v1.verify")),
+        None,
+        "Candidate verify artifact uses the same revision family as the current grounded-answer candidate so shadow runs preserve aligned grounded-answer verification semantics.",
+    );
+
+    let artifacts = vec![
+        promoted_route,
+        rollback_route,
+        promoted_tool_policy,
+        promoted_tool_arguments,
+        promoted_grounded_answer,
+        candidate_grounded_answer,
+        promoted_verify,
+        candidate_verify,
+    ];
+
+    let promoted_entry_count = artifacts
+        .iter()
+        .filter(|entry| entry.lifecycle_state == CompiledAgentArtifactLifecycleState::Promoted)
+        .count() as u32;
+    let candidate_entry_count = artifacts.len() as u32 - promoted_entry_count;
+    let mut entries_by_module = BTreeMap::new();
+    for entry in &artifacts {
+        *entries_by_module
+            .entry(format!("{:?}", entry.module).to_ascii_lowercase())
+            .or_insert(0) += 1;
+    }
+
+    let mut contract = CompiledAgentPromotedArtifactContract {
+        schema_version: String::from(COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_SCHEMA_VERSION),
+        ledger_id: String::from("compiled_agent.promoted_artifact_contract.v1"),
+        row_id: default_row.row_id.clone(),
+        promoted_entry_count,
+        candidate_entry_count,
+        entries_by_module,
+        artifacts,
+        summary: String::new(),
+        contract_digest: String::new(),
+    };
+    contract.summary = format!(
+        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph, including the promoted route model and the current psionic_candidate plus last_known_good labels.",
+        contract.promoted_entry_count, contract.candidate_entry_count
+    );
+    contract.contract_digest = stable_digest(b"compiled_agent_promoted_artifact_contract|", &contract);
+    Ok(contract)
+}
+
+pub fn write_compiled_agent_promoted_artifact_contract(
+    output_path: impl AsRef<Path>,
+) -> Result<CompiledAgentPromotedArtifactContract, CompiledAgentArtifactContractError> {
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| CompiledAgentArtifactContractError::CreateDir {
+            path: parent.display().to_string(),
+            error,
+        })?;
+    }
+    let contract = canonical_compiled_agent_promoted_artifact_contract()?;
+    let json = serde_json::to_string_pretty(&contract)?;
+    fs::write(output_path, format!("{json}\n")).map_err(|error| {
+        CompiledAgentArtifactContractError::Write {
+            path: output_path.display().to_string(),
+            error,
+        }
+    })?;
+    Ok(contract)
+}
+
+pub fn verify_compiled_agent_promoted_artifact_contract_fixture(
+) -> Result<CompiledAgentPromotedArtifactContract, CompiledAgentArtifactContractError> {
+    let path = compiled_agent_promoted_artifact_contract_fixture_path();
+    let expected = canonical_compiled_agent_promoted_artifact_contract()?;
+    let bytes = fs::read(&path).map_err(|error| CompiledAgentArtifactContractError::Read {
+        path: path.display().to_string(),
+        error,
+    })?;
+    let committed: CompiledAgentPromotedArtifactContract = serde_json::from_slice(&bytes)?;
+    if committed != expected {
+        return Err(CompiledAgentArtifactContractError::FixtureDrift {
+            path: path.display().to_string(),
+        });
+    }
+    Ok(committed)
+}
+
+fn route_candidate_route_revision(
+    route_model: CompiledAgentRouteModelArtifact,
+) -> CompiledAgentModuleRevisionSet {
+    let mut candidate = compiled_agent_baseline_revision_set();
+    candidate.revision_id = route_model.artifact_id.clone();
+    candidate.route_model_artifact = Some(route_model);
+    candidate
+}
+
+fn revision_entry(
+    module: CompiledAgentModuleKind,
+    module_name: &str,
+    signature_name: &str,
+    implementation_family: &str,
+    implementation_label: &str,
+    version: &str,
+    lifecycle_state: CompiledAgentArtifactLifecycleState,
+    candidate_label: Option<&str>,
+    confidence_floor: f32,
+    artifact_id: String,
+    revision: &CompiledAgentModuleRevisionSet,
+    default_row: &CompiledAgentDefaultLearnedRowContract,
+    validator_lineage: CompiledAgentArtifactValidatorLineage,
+    predecessor_artifact_id: Option<String>,
+    promoted_at_utc: Option<String>,
+    detail: &str,
+) -> CompiledAgentArtifactContractEntry {
+    CompiledAgentArtifactContractEntry {
+        module,
+        module_name: module_name.to_string(),
+        signature_name: signature_name.to_string(),
+        implementation_family: implementation_family.to_string(),
+        implementation_label: implementation_label.to_string(),
+        version: version.to_string(),
+        lifecycle_state,
+        candidate_label: candidate_label.map(ToOwned::to_owned),
+        compatibility_version: String::from(COMPILED_AGENT_COMPATIBILITY_VERSION),
+        confidence_floor,
+        artifact_digest: revision_digest(revision),
+        artifact_id,
+        row_id: default_row.row_id.clone(),
+        default_row: default_row.clone(),
+        validator_lineage,
+        predecessor_artifact_id,
+        rollback_artifact_id: None,
+        promoted_at_utc,
+        payload: CompiledAgentArtifactPayload::RevisionSet {
+            revision: revision.clone(),
+        },
+        detail: detail.to_string(),
+    }
+}
+
+fn validator_lineage(
+    validator_report_ref: &str,
+    validator_report: &CompiledAgentModuleEvalReport,
+    xtrain_cycle_receipt_ref: Option<&str>,
+    xtrain_cycle_receipt_digest: Option<&str>,
+) -> CompiledAgentArtifactValidatorLineage {
+    CompiledAgentArtifactValidatorLineage {
+        validator_report_ref: validator_report_ref.to_string(),
+        validator_report_digest: validator_report.report_digest.clone(),
+        xtrain_cycle_receipt_ref: xtrain_cycle_receipt_ref.map(ToOwned::to_owned),
+        xtrain_cycle_receipt_digest: xtrain_cycle_receipt_digest.map(ToOwned::to_owned),
+    }
+}
+
+fn revision_digest(revision: &CompiledAgentModuleRevisionSet) -> String {
+    stable_digest(b"compiled_agent_revision_artifact|", revision)
+}
+
+fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(prefix);
+    hasher.update(serde_json::to_vec(value).unwrap_or_default());
+    hex::encode(hasher.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        canonical_compiled_agent_promoted_artifact_contract,
+        verify_compiled_agent_promoted_artifact_contract_fixture,
+        CompiledAgentArtifactLifecycleState,
+    };
+    use psionic_eval::CompiledAgentModuleKind;
+
+    #[test]
+    fn promoted_artifact_contract_keeps_the_learned_route_promoted() -> Result<(), Box<dyn std::error::Error>> {
+        let contract = canonical_compiled_agent_promoted_artifact_contract()?;
+        let route = contract
+            .promoted_entry(CompiledAgentModuleKind::Route)
+            .expect("route entry missing");
+        assert_eq!(
+            route.lifecycle_state,
+            CompiledAgentArtifactLifecycleState::Promoted
+        );
+        assert_eq!(route.artifact_id, "compiled_agent.route.multinomial_nb_v1");
+        assert!(route.rollback_artifact_id.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn promoted_artifact_contract_fixture_matches_the_canonical_generator(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let contract = verify_compiled_agent_promoted_artifact_contract_fixture()?;
+        assert!(contract.promoted_entry_count >= 5);
+        Ok(())
+    }
+}

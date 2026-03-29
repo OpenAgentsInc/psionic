@@ -50,6 +50,7 @@ cargo run -q -p psionic-train --bin compiled_agent_xtrain_loop
 
 This artifact is retained and validator-scored inside `psionic` today.
 
-It does not by itself mean the `openagents` compiled-agent runtime is already
-using the learned route model as the promoted authority module. Promotion into
-that runtime remains a separate controlled step.
+It now appears in the retained compiled-agent promoted-artifact contract, but
+that still does not by itself mean the `openagents` compiled-agent runtime is
+already consuming it as live authority. Runtime adoption remains a separate
+controlled step.

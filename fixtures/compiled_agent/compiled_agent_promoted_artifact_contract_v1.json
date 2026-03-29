@@ -1,0 +1,732 @@
+{
+  "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
+  "ledger_id": "compiled_agent.promoted_artifact_contract.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "promoted_entry_count": 5,
+  "candidate_entry_count": 3,
+  "entries_by_module": {
+    "groundedanswer": 2,
+    "route": 2,
+    "toolarguments": 1,
+    "toolpolicy": 1,
+    "verify": 2
+  },
+  "artifacts": [
+    {
+      "module": "route",
+      "module_name": "intent_route",
+      "signature_name": "intent_route",
+      "implementation_family": "psionic_route_model",
+      "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+      "version": "2026-03-29",
+      "lifecycle_state": "promoted",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.8,
+      "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "artifact_digest": "5e6b51ca8914cf5a9a6d1467e8dbd3d3c5124b7aaf086f2dff638b209fb572b1",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json",
+        "validator_report_digest": "e1001d6bfd42c6aa7b55d85af003557f63c3c8369232e761c49591087bcc0bbf",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "predecessor_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "rollback_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "promoted_at_utc": "2026-03-29T00:00:00Z",
+      "payload": {
+        "payload_kind": "route_model",
+        "artifact": {
+          "schema_version": "psionic.compiled_agent.route_model.v1",
+          "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+          "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+          "model_family": "multinomial_naive_bayes",
+          "feature_profile": "unigram_plus_bigram",
+          "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+          "training_sample_count": 4,
+          "vocabulary_size": 44,
+          "smoothing_alpha": 1.0,
+          "class_priors_log": {
+            "provider_status": -1.3862943611198906,
+            "wallet_status": -1.3862943611198906,
+            "unsupported": -0.6931471805599453
+          },
+          "class_feature_log_probs": {
+            "provider_status": {
+              "bigram:a__poem": -4.007333185232471,
+              "bigram:about__gpus": -4.007333185232471,
+              "bigram:are__in": -4.007333185232471,
+              "bigram:balance__write": -4.007333185232471,
+              "bigram:can__i": -3.3141860046725258,
+              "bigram:do__not": -4.007333185232471,
+              "bigram:go__online": -3.3141860046725258,
+              "bigram:how__many": -4.007333185232471,
+              "bigram:i__go": -3.3141860046725258,
+              "bigram:in__the": -4.007333185232471,
+              "bigram:many__sats": -4.007333185232471,
+              "bigram:me__the": -4.007333185232471,
+              "bigram:not__tell": -4.007333185232471,
+              "bigram:online__right": -3.3141860046725258,
+              "bigram:poem__about": -4.007333185232471,
+              "bigram:right__now": -3.3141860046725258,
+              "bigram:sats__are": -4.007333185232471,
+              "bigram:tell__me": -4.007333185232471,
+              "bigram:the__wallet": -4.007333185232471,
+              "bigram:wallet__balance": -4.007333185232471,
+              "bigram:write__a": -4.007333185232471,
+              "token:a": -4.007333185232471,
+              "token:about": -4.007333185232471,
+              "token:are": -4.007333185232471,
+              "token:balance": -4.007333185232471,
+              "token:can": -3.3141860046725258,
+              "token:do": -4.007333185232471,
+              "token:go": -3.3141860046725258,
+              "token:gpus": -4.007333185232471,
+              "token:how": -4.007333185232471,
+              "token:i": -3.3141860046725258,
+              "token:in": -4.007333185232471,
+              "token:many": -4.007333185232471,
+              "token:me": -4.007333185232471,
+              "token:not": -4.007333185232471,
+              "token:now": -3.3141860046725258,
+              "token:online": -3.3141860046725258,
+              "token:poem": -4.007333185232471,
+              "token:right": -3.3141860046725258,
+              "token:sats": -4.007333185232471,
+              "token:tell": -4.007333185232471,
+              "token:the": -4.007333185232471,
+              "token:wallet": -4.007333185232471,
+              "token:write": -4.007333185232471
+            },
+            "wallet_status": {
+              "bigram:a__poem": -4.04305126783455,
+              "bigram:about__gpus": -4.04305126783455,
+              "bigram:are__in": -3.349904087274605,
+              "bigram:balance__write": -4.04305126783455,
+              "bigram:can__i": -4.04305126783455,
+              "bigram:do__not": -4.04305126783455,
+              "bigram:go__online": -4.04305126783455,
+              "bigram:how__many": -3.349904087274605,
+              "bigram:i__go": -4.04305126783455,
+              "bigram:in__the": -3.349904087274605,
+              "bigram:many__sats": -3.349904087274605,
+              "bigram:me__the": -4.04305126783455,
+              "bigram:not__tell": -4.04305126783455,
+              "bigram:online__right": -4.04305126783455,
+              "bigram:poem__about": -4.04305126783455,
+              "bigram:right__now": -4.04305126783455,
+              "bigram:sats__are": -3.349904087274605,
+              "bigram:tell__me": -4.04305126783455,
+              "bigram:the__wallet": -3.349904087274605,
+              "bigram:wallet__balance": -4.04305126783455,
+              "bigram:write__a": -4.04305126783455,
+              "token:a": -4.04305126783455,
+              "token:about": -4.04305126783455,
+              "token:are": -3.349904087274605,
+              "token:balance": -4.04305126783455,
+              "token:can": -4.04305126783455,
+              "token:do": -4.04305126783455,
+              "token:go": -4.04305126783455,
+              "token:gpus": -4.04305126783455,
+              "token:how": -3.349904087274605,
+              "token:i": -4.04305126783455,
+              "token:in": -3.349904087274605,
+              "token:many": -3.349904087274605,
+              "token:me": -4.04305126783455,
+              "token:not": -4.04305126783455,
+              "token:now": -4.04305126783455,
+              "token:online": -4.04305126783455,
+              "token:poem": -4.04305126783455,
+              "token:right": -4.04305126783455,
+              "token:sats": -3.349904087274605,
+              "token:tell": -4.04305126783455,
+              "token:the": -3.349904087274605,
+              "token:wallet": -3.349904087274605,
+              "token:write": -4.04305126783455
+            },
+            "unsupported": {
+              "bigram:a__poem": -3.2321210516182215,
+              "bigram:about__gpus": -3.2321210516182215,
+              "bigram:are__in": -4.330733340286331,
+              "bigram:balance__write": -3.6375861597263857,
+              "bigram:can__i": -4.330733340286331,
+              "bigram:do__not": -3.6375861597263857,
+              "bigram:go__online": -4.330733340286331,
+              "bigram:how__many": -4.330733340286331,
+              "bigram:i__go": -4.330733340286331,
+              "bigram:in__the": -4.330733340286331,
+              "bigram:many__sats": -4.330733340286331,
+              "bigram:me__the": -3.6375861597263857,
+              "bigram:not__tell": -3.6375861597263857,
+              "bigram:online__right": -4.330733340286331,
+              "bigram:poem__about": -3.2321210516182215,
+              "bigram:right__now": -4.330733340286331,
+              "bigram:sats__are": -4.330733340286331,
+              "bigram:tell__me": -3.6375861597263857,
+              "bigram:the__wallet": -3.6375861597263857,
+              "bigram:wallet__balance": -3.6375861597263857,
+              "bigram:write__a": -3.2321210516182215,
+              "token:a": -3.2321210516182215,
+              "token:about": -3.2321210516182215,
+              "token:are": -4.330733340286331,
+              "token:balance": -3.6375861597263857,
+              "token:can": -4.330733340286331,
+              "token:do": -3.6375861597263857,
+              "token:go": -4.330733340286331,
+              "token:gpus": -3.2321210516182215,
+              "token:how": -4.330733340286331,
+              "token:i": -4.330733340286331,
+              "token:in": -4.330733340286331,
+              "token:many": -4.330733340286331,
+              "token:me": -3.6375861597263857,
+              "token:not": -3.6375861597263857,
+              "token:now": -4.330733340286331,
+              "token:online": -4.330733340286331,
+              "token:poem": -3.2321210516182215,
+              "token:right": -4.330733340286331,
+              "token:sats": -4.330733340286331,
+              "token:tell": -3.6375861597263857,
+              "token:the": -3.6375861597263857,
+              "token:wallet": -3.6375861597263857,
+              "token:write": -3.2321210516182215
+            }
+          },
+          "class_default_feature_log_probs": {
+            "provider_status": -4.007333185232471,
+            "wallet_status": -4.04305126783455,
+            "unsupported": -4.330733340286331
+          },
+          "source_sample_ids": [
+            "sample.route.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
+            "sample.route.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+            "sample.route.receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
+            "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1"
+          ],
+          "training_accuracy": 1.0,
+          "detail": "Trained route model over replay-backed route samples using bag-of-token and bigram features. This is the first compiled-agent candidate backed by a learned artifact instead of a hand-authored keyword delta.",
+          "artifact_digest": "5e6b51ca8914cf5a9a6d1467e8dbd3d3c5124b7aaf086f2dff638b209fb572b1"
+        }
+      },
+      "detail": "Promoted route artifact sourced from fixtures/compiled_agent/compiled_agent_route_model_v1.json and validator-scored through the first bounded compiled-agent XTRAIN cycle."
+    },
+    {
+      "module": "route",
+      "module_name": "intent_route",
+      "signature_name": "intent_route",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "last_known_good",
+      "version": "2026-03-28",
+      "lifecycle_state": "candidate",
+      "candidate_label": "last_known_good",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.8,
+      "artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
+        "validator_report_digest": "f42ed95da16601f693455c615a46000c6f5e03eb31c670de34847271a3e007d5",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.baseline.rule_v1",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": false,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Rollback route artifact that preserves the last-known-good baseline revision for clean candidate-authority rollback."
+    },
+    {
+      "module": "tool_policy",
+      "module_name": "tool_policy",
+      "signature_name": "tool_policy",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "promoted",
+      "version": "2026-03-28",
+      "lifecycle_state": "promoted",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.8,
+      "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+      "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
+        "validator_report_digest": "f42ed95da16601f693455c615a46000c6f5e03eb31c670de34847271a3e007d5",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "promoted_at_utc": "2026-03-29T00:00:00Z",
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.baseline.rule_v1",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": false,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Promoted tool-policy artifact remains the baseline bounded rule revision."
+    },
+    {
+      "module": "tool_arguments",
+      "module_name": "tool_arguments",
+      "signature_name": "tool_arguments",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "promoted",
+      "version": "2026-03-28",
+      "lifecycle_state": "promoted",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.8,
+      "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+      "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
+        "validator_report_digest": "f42ed95da16601f693455c615a46000c6f5e03eb31c670de34847271a3e007d5",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "promoted_at_utc": "2026-03-29T00:00:00Z",
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.baseline.rule_v1",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": false,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Promoted tool-argument artifact remains the baseline bounded rule revision."
+    },
+    {
+      "module": "grounded_answer",
+      "module_name": "grounded_answer",
+      "signature_name": "grounded_answer",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "promoted",
+      "version": "2026-03-28",
+      "lifecycle_state": "promoted",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.82,
+      "artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
+        "validator_report_digest": "f42ed95da16601f693455c615a46000c6f5e03eb31c670de34847271a3e007d5",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "promoted_at_utc": "2026-03-29T00:00:00Z",
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.baseline.rule_v1",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": false,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Promoted grounded-answer artifact remains the baseline rule revision until a learned grounded artifact is retained and promoted."
+    },
+    {
+      "module": "grounded_answer",
+      "module_name": "grounded_answer",
+      "signature_name": "grounded_answer",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "psionic_candidate",
+      "version": "2026-03-29",
+      "lifecycle_state": "candidate",
+      "candidate_label": "psionic_candidate",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.82,
+      "artifact_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings",
+      "artifact_digest": "7a82898ee9c69dc85d8726f24a530f06d1cf2ee0d6c66de478e2bb03d338c924",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json",
+        "validator_report_digest": "5d924a21513da988d3d487da5c94913c00d3845bd7be5452cd4ef533e5545c54",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "predecessor_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": true,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Candidate grounded-answer artifact carries the retained recent-earnings revision under the psionic_candidate label for shadow evaluation."
+    },
+    {
+      "module": "verify",
+      "module_name": "verify",
+      "signature_name": "verify",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "promoted",
+      "version": "2026-03-28",
+      "lifecycle_state": "promoted",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.82,
+      "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+      "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
+        "validator_report_digest": "f42ed95da16601f693455c615a46000c6f5e03eb31c670de34847271a3e007d5",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "promoted_at_utc": "2026-03-29T00:00:00Z",
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.baseline.rule_v1",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": false,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Promoted verify artifact remains the baseline rule revision."
+    },
+    {
+      "module": "verify",
+      "module_name": "verify",
+      "signature_name": "verify",
+      "implementation_family": "psionic_rule_revision",
+      "implementation_label": "psionic_candidate",
+      "version": "2026-03-29",
+      "lifecycle_state": "candidate",
+      "candidate_label": "psionic_candidate",
+      "compatibility_version": "openagents.compiled_agent.first_graph.v1",
+      "confidence_floor": 0.82,
+      "artifact_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings.verify",
+      "artifact_digest": "7a82898ee9c69dc85d8726f24a530f06d1cf2ee0d6c66de478e2bb03d338c924",
+      "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+      "default_row": {
+        "schema_version": "psionic.compiled_agent_default_row.v1",
+        "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        "backend_label": "psionic_openai_server",
+        "host_label": "archlinux",
+        "accelerator_label": "rtx_4080_16gb",
+        "model_family": "qwen35",
+        "model_artifact": "qwen3.5-9b-q4_k_m-registry.gguf",
+        "model_path_hint": "~/models/qwen3.5/qwen3.5-9b-q4_k_m-registry.gguf",
+        "admitted_tasks": [
+          "intent_route",
+          "grounded_answer_from_supplied_facts",
+          "unsupported_refusal"
+        ],
+        "refusal_boundary": [
+          "broad autonomous task execution",
+          "silent tool selection without bounded contracts",
+          "unbounded long-context planning"
+        ],
+        "latency_target_p50_ms": 2500,
+        "prompt_token_budget": 512,
+        "completion_token_budget": 96,
+        "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+        "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
+      },
+      "validator_lineage": {
+        "validator_report_ref": "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json",
+        "validator_report_digest": "5d924a21513da988d3d487da5c94913c00d3845bd7be5452cd4ef533e5545c54",
+        "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "xtrain_cycle_receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+      },
+      "predecessor_artifact_id": "compiled_agent.baseline.rule_v1.verify",
+      "payload": {
+        "payload_kind": "revision_set",
+        "revision": {
+          "revision_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings",
+          "provider_route_keywords": [
+            "provider",
+            "online",
+            "ready",
+            "readiness"
+          ],
+          "wallet_route_keywords": [
+            "wallet",
+            "balance",
+            "sats"
+          ],
+          "negation_keywords": [],
+          "unsupported_route_keywords": [],
+          "include_provider_blockers": false,
+          "include_recent_earnings": true,
+          "verify_require_recent_earnings": false,
+          "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+        }
+      },
+      "detail": "Candidate verify artifact uses the same revision family as the current grounded-answer candidate so shadow runs preserve aligned grounded-answer verification semantics."
+    }
+  ],
+  "summary": "Compiled-agent promoted-artifact contract retains 5 promoted artifacts and 3 candidate artifacts for the first graph, including the promoted route model and the current psionic_candidate plus last_known_good labels.",
+  "contract_digest": "00a1d37618043ca004e17fd18099cc3749dfddd0e53109cf8e00b23611fdb8e8"
+}
