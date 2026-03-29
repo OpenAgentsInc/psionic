@@ -1,0 +1,120 @@
+{
+  "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
+  "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "model_family": "multinomial_naive_bayes",
+  "feature_profile": "route_plus_fact_signature",
+  "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+  "training_sample_count": 12,
+  "heldout_sample_count": 6,
+  "vocabulary_size": 13,
+  "smoothing_alpha": 1.0,
+  "class_priors_log": {
+    "provider_ready": -1.791759469228055,
+    "provider_blocked": -2.4849066497880004,
+    "wallet_balance_with_recent_earnings": -1.0986122886681098,
+    "unsupported_refusal": -0.8754687373538999
+  },
+  "class_feature_log_probs": {
+    "provider_ready": {
+      "provider_blocker_count:0": -1.9459101490553135,
+      "provider_blocker_count:1": -3.044522437723423,
+      "provider_blockers_present:false": -1.9459101490553135,
+      "provider_blockers_present:true": -3.044522437723423,
+      "provider_ready:false": -3.044522437723423,
+      "provider_ready:true": -1.9459101490553135,
+      "route:provider_status": -1.9459101490553135,
+      "route:unsupported": -3.044522437723423,
+      "route:wallet_status": -3.044522437723423,
+      "wallet_balance_present:true": -3.044522437723423,
+      "wallet_balance_zero:false": -3.044522437723423,
+      "wallet_recent_earnings_present:true": -3.044522437723423,
+      "wallet_recent_earnings_zero:false": -3.044522437723423
+    },
+    "provider_blocked": {
+      "provider_blocker_count:0": -2.833213344056216,
+      "provider_blocker_count:1": -2.1400661634962708,
+      "provider_blockers_present:false": -2.833213344056216,
+      "provider_blockers_present:true": -2.1400661634962708,
+      "provider_ready:false": -2.1400661634962708,
+      "provider_ready:true": -2.833213344056216,
+      "route:provider_status": -2.1400661634962708,
+      "route:unsupported": -2.833213344056216,
+      "route:wallet_status": -2.833213344056216,
+      "wallet_balance_present:true": -2.833213344056216,
+      "wallet_balance_zero:false": -2.833213344056216,
+      "wallet_recent_earnings_present:true": -2.833213344056216,
+      "wallet_recent_earnings_zero:false": -2.833213344056216
+    },
+    "wallet_balance_with_recent_earnings": {
+      "provider_blocker_count:0": -3.4965075614664802,
+      "provider_blocker_count:1": -3.4965075614664802,
+      "provider_blockers_present:false": -3.4965075614664802,
+      "provider_blockers_present:true": -3.4965075614664802,
+      "provider_ready:false": -3.4965075614664802,
+      "provider_ready:true": -3.4965075614664802,
+      "route:provider_status": -3.4965075614664802,
+      "route:unsupported": -3.4965075614664802,
+      "route:wallet_status": -1.8870696490323797,
+      "wallet_balance_present:true": -1.8870696490323797,
+      "wallet_balance_zero:false": -1.8870696490323797,
+      "wallet_recent_earnings_present:true": -1.8870696490323797,
+      "wallet_recent_earnings_zero:false": -1.8870696490323797
+    },
+    "unsupported_refusal": {
+      "provider_blocker_count:0": -2.890371757896165,
+      "provider_blocker_count:1": -2.890371757896165,
+      "provider_blockers_present:false": -2.890371757896165,
+      "provider_blockers_present:true": -2.890371757896165,
+      "provider_ready:false": -2.890371757896165,
+      "provider_ready:true": -2.890371757896165,
+      "route:provider_status": -2.890371757896165,
+      "route:unsupported": -1.0986122886681098,
+      "route:wallet_status": -2.890371757896165,
+      "wallet_balance_present:true": -2.890371757896165,
+      "wallet_balance_zero:false": -2.890371757896165,
+      "wallet_recent_earnings_present:true": -2.890371757896165,
+      "wallet_recent_earnings_zero:false": -2.890371757896165
+    }
+  },
+  "class_default_feature_log_probs": {
+    "provider_ready": -3.044522437723423,
+    "provider_blocked": -2.833213344056216,
+    "wallet_balance_with_recent_earnings": -3.4965075614664802,
+    "unsupported_refusal": -2.890371757896165
+  },
+  "program_templates": {
+    "provider_ready": "Provider is ready to go online.",
+    "provider_blocked": "Provider is not ready to go online.",
+    "wallet_balance_with_recent_earnings": "Wallet balance is {balance_sats} sats, with {recent_earnings_sats} sats of recent earnings.",
+    "unsupported_refusal": "I can currently answer only provider readiness and wallet balance questions."
+  },
+  "missing_facts_template": "Grounded facts were unavailable.",
+  "conflicting_facts_template": "Grounded facts were conflicting.",
+  "source_sample_ids": [
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1"
+  ],
+  "heldout_sample_ids": [
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_heldout_receipt_v1",
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_schedule_meeting_receipt_v1"
+  ],
+  "training_accuracy": 1.0,
+  "heldout_accuracy": 1.0,
+  "detail": "Trained grounded-answer model over explicit fact signatures only. The model predicts a narrow grounded-answer program from supplied tool facts and falls back on missing or conflicting facts instead of inventing unsupported synthesis.",
+  "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b"
+}

@@ -4,12 +4,13 @@ use std::{
 };
 
 use psionic_eval::{
+    build_compiled_agent_module_eval_report, compiled_agent_baseline_revision_set,
+    evaluate_compiled_agent_grounded_answer, evaluate_compiled_agent_route,
+    train_compiled_agent_grounded_answer_model, train_compiled_agent_route_model,
+    CompiledAgentGroundedAnswerModelArtifact, CompiledAgentGroundedAnswerTrainingSample,
     CompiledAgentModuleEvalReport, CompiledAgentModuleKind, CompiledAgentModuleRevisionSet,
     CompiledAgentPublicOutcomeKind, CompiledAgentRoute, CompiledAgentRouteModelArtifact,
     CompiledAgentRouteTrainingSample, CompiledAgentToolResult,
-    build_compiled_agent_module_eval_report, compiled_agent_baseline_revision_set,
-    evaluate_compiled_agent_grounded_answer, evaluate_compiled_agent_route,
-    train_compiled_agent_route_model,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -17,13 +18,15 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    CompiledAgentCorpusSplit, CompiledAgentReceiptError, CompiledAgentReplayBundle,
     canonical_compiled_agent_learning_receipt_ledger, canonical_compiled_agent_replay_bundle,
-    repo_relative_path,
+    repo_relative_path, CompiledAgentCorpusSplit, CompiledAgentReceiptError,
+    CompiledAgentReplayBundle,
 };
 
 pub const COMPILED_AGENT_ROUTE_MODEL_ARTIFACT_FIXTURE_PATH: &str =
     "fixtures/compiled_agent/compiled_agent_route_model_v1.json";
+pub const COMPILED_AGENT_GROUNDED_MODEL_ARTIFACT_FIXTURE_PATH: &str =
+    "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json";
 pub const COMPILED_AGENT_ROUTE_CANDIDATE_REPORT_FIXTURE_PATH: &str =
     "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json";
 pub const COMPILED_AGENT_GROUNDED_CANDIDATE_REPORT_FIXTURE_PATH: &str =
@@ -121,6 +124,11 @@ pub fn compiled_agent_route_model_artifact_fixture_path() -> PathBuf {
 }
 
 #[must_use]
+pub fn compiled_agent_grounded_model_artifact_fixture_path() -> PathBuf {
+    repo_relative_path(COMPILED_AGENT_GROUNDED_MODEL_ARTIFACT_FIXTURE_PATH)
+}
+
+#[must_use]
 pub fn compiled_agent_route_candidate_report_fixture_path() -> PathBuf {
     repo_relative_path(COMPILED_AGENT_ROUTE_CANDIDATE_REPORT_FIXTURE_PATH)
 }
@@ -135,8 +143,8 @@ pub fn compiled_agent_xtrain_cycle_receipt_fixture_path() -> PathBuf {
     repo_relative_path(COMPILED_AGENT_XTRAIN_CYCLE_RECEIPT_FIXTURE_PATH)
 }
 
-pub fn canonical_compiled_agent_route_model_artifact()
--> Result<CompiledAgentRouteModelArtifact, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_route_model_artifact(
+) -> Result<CompiledAgentRouteModelArtifact, CompiledAgentXtrainError> {
     let learning_ledger = canonical_compiled_agent_learning_receipt_ledger()?;
     let replay_bundle = canonical_compiled_agent_replay_bundle()?;
     let route_samples = replay_bundle
@@ -182,8 +190,60 @@ pub fn canonical_compiled_agent_route_model_artifact()
     ))
 }
 
-pub fn compiled_agent_route_candidate_revision()
--> Result<CompiledAgentModuleRevisionSet, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_grounded_model_artifact(
+) -> Result<CompiledAgentGroundedAnswerModelArtifact, CompiledAgentXtrainError> {
+    let learning_ledger = canonical_compiled_agent_learning_receipt_ledger()?;
+    let replay_bundle = canonical_compiled_agent_replay_bundle()?;
+    let grounded_samples = replay_bundle
+        .samples
+        .iter()
+        .filter(|sample| sample.module == CompiledAgentModuleKind::GroundedAnswer)
+        .map(|sample| {
+            Ok(CompiledAgentGroundedAnswerTrainingSample {
+                sample_id: sample.sample_id.clone(),
+                route: parse_route(sample.input.get("route"), &sample.sample_id)?,
+                tool_results: parse_tool_results(
+                    sample.input.get("tool_results"),
+                    &sample.sample_id,
+                )?,
+                expected_kind: parse_public_kind(
+                    sample.expected_output.get("kind"),
+                    &sample.sample_id,
+                )?,
+                expected_response: sample
+                    .expected_output
+                    .get("response")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                tags: sample.tags.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>, CompiledAgentXtrainError>>()?;
+    let heldout_grounded_samples = learning_ledger
+        .receipts
+        .iter()
+        .filter(|receipt| receipt.corpus_split == CompiledAgentCorpusSplit::HeldOut)
+        .map(|receipt| CompiledAgentGroundedAnswerTrainingSample {
+            sample_id: format!("heldout.grounded_answer.{}", receipt.receipt_id),
+            route: receipt.expected_route,
+            tool_results: receipt.observed_tool_results.clone(),
+            expected_kind: receipt.expected_public_response.kind,
+            expected_response: receipt.expected_public_response.response.clone(),
+            tags: receipt.tags.clone(),
+        })
+        .collect::<Vec<_>>();
+    Ok(train_compiled_agent_grounded_answer_model(
+        "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+        replay_bundle.bundle_digest,
+        &grounded_samples,
+        &heldout_grounded_samples,
+    ))
+}
+
+pub fn compiled_agent_route_candidate_revision(
+) -> Result<CompiledAgentModuleRevisionSet, CompiledAgentXtrainError> {
     let mut candidate = compiled_agent_baseline_revision_set();
     let route_model_artifact = canonical_compiled_agent_route_model_artifact()?;
     candidate.revision_id = route_model_artifact.artifact_id.clone();
@@ -191,34 +251,38 @@ pub fn compiled_agent_route_candidate_revision()
     Ok(candidate)
 }
 
-#[must_use]
-pub fn compiled_agent_grounded_candidate_revision() -> CompiledAgentModuleRevisionSet {
+pub fn compiled_agent_grounded_candidate_revision(
+) -> Result<CompiledAgentModuleRevisionSet, CompiledAgentXtrainError> {
     let mut candidate = compiled_agent_baseline_revision_set();
-    candidate.revision_id = String::from("compiled_agent.grounded_answer.rule_v2.recent_earnings");
-    candidate.include_recent_earnings = true;
-    candidate
+    let grounded_model_artifact = canonical_compiled_agent_grounded_model_artifact()?;
+    candidate.revision_id = grounded_model_artifact.artifact_id.clone();
+    candidate.grounded_answer_model_artifact = Some(grounded_model_artifact);
+    candidate.verify_require_recent_earnings = true;
+    Ok(candidate)
 }
 
-pub fn canonical_compiled_agent_route_candidate_report()
--> Result<CompiledAgentModuleEvalReport, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_route_candidate_report(
+) -> Result<CompiledAgentModuleEvalReport, CompiledAgentXtrainError> {
     Ok(build_compiled_agent_module_eval_report(
         &compiled_agent_route_candidate_revision()?,
     ))
 }
 
-#[must_use]
-pub fn canonical_compiled_agent_grounded_candidate_report() -> CompiledAgentModuleEvalReport {
-    build_compiled_agent_module_eval_report(&compiled_agent_grounded_candidate_revision())
+pub fn canonical_compiled_agent_grounded_candidate_report(
+) -> Result<CompiledAgentModuleEvalReport, CompiledAgentXtrainError> {
+    Ok(build_compiled_agent_module_eval_report(
+        &compiled_agent_grounded_candidate_revision()?,
+    ))
 }
 
-pub fn canonical_compiled_agent_xtrain_cycle_receipt()
--> Result<CompiledAgentXtrainCycleReceipt, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_xtrain_cycle_receipt(
+) -> Result<CompiledAgentXtrainCycleReceipt, CompiledAgentXtrainError> {
     let baseline = compiled_agent_baseline_revision_set();
     let replay_bundle = canonical_compiled_agent_replay_bundle()?;
     let baseline_report = build_compiled_agent_module_eval_report(&baseline);
     let route_candidate = compiled_agent_route_candidate_revision()?;
     let route_candidate_report = build_compiled_agent_module_eval_report(&route_candidate);
-    let grounded_candidate = compiled_agent_grounded_candidate_revision();
+    let grounded_candidate = compiled_agent_grounded_candidate_revision()?;
     let grounded_candidate_report = build_compiled_agent_module_eval_report(&grounded_candidate);
 
     let route_outcome = build_route_outcome(
@@ -287,12 +351,33 @@ pub fn write_compiled_agent_route_model_artifact(
     Ok(artifact)
 }
 
+pub fn write_compiled_agent_grounded_model_artifact(
+    output_path: impl AsRef<Path>,
+) -> Result<CompiledAgentGroundedAnswerModelArtifact, CompiledAgentXtrainError> {
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| CompiledAgentXtrainError::CreateDir {
+            path: parent.display().to_string(),
+            error,
+        })?;
+    }
+    let artifact = canonical_compiled_agent_grounded_model_artifact()?;
+    let json = serde_json::to_string_pretty(&artifact)?;
+    fs::write(output_path, format!("{json}\n")).map_err(|error| {
+        CompiledAgentXtrainError::Write {
+            path: output_path.display().to_string(),
+            error,
+        }
+    })?;
+    Ok(artifact)
+}
+
 pub fn write_compiled_agent_grounded_candidate_report(
     output_path: impl AsRef<Path>,
 ) -> Result<CompiledAgentModuleEvalReport, CompiledAgentXtrainError> {
     write_report(
         output_path,
-        &canonical_compiled_agent_grounded_candidate_report(),
+        &canonical_compiled_agent_grounded_candidate_report()?,
     )
 }
 
@@ -338,6 +423,27 @@ pub fn verify_compiled_agent_xtrain_fixtures() -> Result<(), CompiledAgentXtrain
         });
     }
 
+    let expected_grounded_model = canonical_compiled_agent_grounded_model_artifact()?;
+    let committed_grounded_model: CompiledAgentGroundedAnswerModelArtifact =
+        serde_json::from_slice(
+            &fs::read(compiled_agent_grounded_model_artifact_fixture_path()).map_err(|error| {
+                CompiledAgentXtrainError::Read {
+                    path: compiled_agent_grounded_model_artifact_fixture_path()
+                        .display()
+                        .to_string(),
+                    error,
+                }
+            })?,
+        )?;
+    if committed_grounded_model != expected_grounded_model {
+        return Err(CompiledAgentXtrainError::Read {
+            path: compiled_agent_grounded_model_artifact_fixture_path()
+                .display()
+                .to_string(),
+            error: std::io::Error::other("grounded model artifact drift"),
+        });
+    }
+
     let expected_route = canonical_compiled_agent_route_candidate_report()?;
     let committed_route: CompiledAgentModuleEvalReport = serde_json::from_slice(
         &fs::read(compiled_agent_route_candidate_report_fixture_path()).map_err(|error| {
@@ -358,7 +464,7 @@ pub fn verify_compiled_agent_xtrain_fixtures() -> Result<(), CompiledAgentXtrain
         });
     }
 
-    let expected_grounded = canonical_compiled_agent_grounded_candidate_report();
+    let expected_grounded = canonical_compiled_agent_grounded_candidate_report()?;
     let committed_grounded: CompiledAgentModuleEvalReport = serde_json::from_slice(
         &fs::read(compiled_agent_grounded_candidate_report_fixture_path()).map_err(|error| {
             CompiledAgentXtrainError::Read {
@@ -483,12 +589,13 @@ fn build_grounded_answer_outcome(
     };
     let reason = match decision {
         CompiledAgentPromotionDecision::Promote => String::from(
-            "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval and held-out surfaces non-regressing.",
+            "Trained grounded-answer candidate improves replay and held-out grounding while correctly falling back on missing and conflicting fact rows.",
         ),
         CompiledAgentPromotionDecision::Hold => String::from(
             "Candidate did not clear the grounded-answer validator gate cleanly enough to promote.",
         ),
     };
+    let grounded_model_artifact = candidate_revision.grounded_answer_model_artifact.as_ref();
     Ok(CompiledAgentXtrainModuleOutcome {
         module: CompiledAgentModuleKind::GroundedAnswer,
         decision,
@@ -498,11 +605,13 @@ fn build_grounded_answer_outcome(
             base_revision_id: baseline_revision.revision_id.clone(),
             candidate_revision_id: candidate_revision.revision_id.clone(),
             replay_bundle_digest: replay_bundle.bundle_digest.clone(),
-            candidate_artifact_ref: None,
-            candidate_artifact_digest: None,
+            candidate_artifact_ref: grounded_model_artifact
+                .map(|_| String::from(COMPILED_AGENT_GROUNDED_MODEL_ARTIFACT_FIXTURE_PATH)),
+            candidate_artifact_digest: grounded_model_artifact
+                .map(|artifact| artifact.artifact_digest.clone()),
             targeted_failure_classes: vec![String::from("grounded_answer_mismatch")],
             delta_summary: String::from(
-                "Extends the bounded wallet grounding template to include recent earnings when that fact is present in the receipt-backed tool result.",
+                "Trains a fact-only grounded-answer model from replay-backed grounded samples so supported answers and unsupported refusals are retained as a learned artifact, while missing or conflicting facts fall back cleanly instead of being guessed.",
             ),
         },
         validation,

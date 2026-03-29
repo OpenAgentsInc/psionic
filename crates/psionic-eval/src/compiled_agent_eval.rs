@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::CompiledAgentRouteModelArtifact;
+use crate::{CompiledAgentGroundedAnswerModelArtifact, CompiledAgentRouteModelArtifact};
 
 pub const COMPILED_AGENT_DEFAULT_ROW_SCHEMA_VERSION: &str = "psionic.compiled_agent_default_row.v1";
 pub const COMPILED_AGENT_DEFAULT_ROW_FIXTURE_PATH: &str =
@@ -74,6 +74,8 @@ pub struct CompiledAgentModuleRevisionSet {
     pub wallet_route_keywords: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route_model_artifact: Option<CompiledAgentRouteModelArtifact>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grounded_answer_model_artifact: Option<CompiledAgentGroundedAnswerModelArtifact>,
     pub negation_keywords: Vec<String>,
     pub unsupported_route_keywords: Vec<String>,
     pub include_provider_blockers: bool,
@@ -164,6 +166,7 @@ pub fn compiled_agent_baseline_revision_set() -> CompiledAgentModuleRevisionSet 
             String::from("sats"),
         ],
         route_model_artifact: None,
+        grounded_answer_model_artifact: None,
         negation_keywords: Vec::new(),
         unsupported_route_keywords: Vec::new(),
         include_provider_blockers: false,
@@ -232,6 +235,7 @@ mod tests {
     fn compiled_agent_baseline_revision_set_is_narrow() {
         let baseline = compiled_agent_baseline_revision_set();
         assert!(baseline.route_model_artifact.is_none());
+        assert!(baseline.grounded_answer_model_artifact.is_none());
         assert!(baseline.negation_keywords.is_empty());
         assert!(baseline.unsupported_route_keywords.is_empty());
         assert!(!baseline.include_provider_blockers);

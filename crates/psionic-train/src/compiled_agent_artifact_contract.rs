@@ -5,10 +5,10 @@ use std::{
 };
 
 use psionic_eval::{
-    build_compiled_agent_module_eval_report, compiled_agent_baseline_revision_set,
-    canonical_compiled_agent_default_row_contract, CompiledAgentDefaultLearnedRowContract,
-    CompiledAgentModuleEvalReport, CompiledAgentModuleKind, CompiledAgentModuleRevisionSet,
-    CompiledAgentRouteModelArtifact,
+    build_compiled_agent_module_eval_report, canonical_compiled_agent_default_row_contract,
+    compiled_agent_baseline_revision_set, CompiledAgentDefaultLearnedRowContract,
+    CompiledAgentGroundedAnswerModelArtifact, CompiledAgentModuleEvalReport,
+    CompiledAgentModuleKind, CompiledAgentModuleRevisionSet, CompiledAgentRouteModelArtifact,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -16,7 +16,7 @@ use thiserror::Error;
 
 use crate::{
     canonical_compiled_agent_route_model_artifact, canonical_compiled_agent_xtrain_cycle_receipt,
-    compiled_agent_grounded_candidate_revision, repo_relative_path, CompiledAgentXtrainError,
+    repo_relative_path, CompiledAgentXtrainError,
 };
 
 pub const COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_FIXTURE_PATH: &str =
@@ -29,9 +29,12 @@ const PROMOTED_AT_UTC: &str = "2026-03-29T00:00:00Z";
 const ROUTE_MODEL_FIXTURE_REF: &str = "fixtures/compiled_agent/compiled_agent_route_model_v1.json";
 const ROUTE_CANDIDATE_REPORT_REF: &str =
     "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json";
+const GROUNDED_MODEL_FIXTURE_REF: &str =
+    "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json";
 const GROUNDED_CANDIDATE_REPORT_REF: &str =
     "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json";
-const BASELINE_REPORT_REF: &str = "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json";
+const BASELINE_REPORT_REF: &str =
+    "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json";
 const XTRAIN_CYCLE_RECEIPT_REF: &str =
     "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json";
 
@@ -166,10 +169,13 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
     let default_row = canonical_compiled_agent_default_row_contract();
     let route_model = canonical_compiled_agent_route_model_artifact()?;
     let baseline_revision = compiled_agent_baseline_revision_set();
-    let grounded_candidate_revision = compiled_agent_grounded_candidate_revision();
+    let grounded_model_artifact = read_grounded_model_artifact_fixture()?;
+    let grounded_candidate_revision =
+        grounded_candidate_revision_from_artifact(grounded_model_artifact.clone());
     let baseline_report = build_compiled_agent_module_eval_report(&baseline_revision);
-    let route_candidate_report =
-        build_compiled_agent_module_eval_report(&route_candidate_route_revision(route_model.clone()));
+    let route_candidate_report = build_compiled_agent_module_eval_report(
+        &route_candidate_route_revision(route_model.clone()),
+    );
     let grounded_candidate_report =
         build_compiled_agent_module_eval_report(&grounded_candidate_revision);
     let xtrain_cycle = canonical_compiled_agent_xtrain_cycle_receipt()?;
@@ -283,38 +289,38 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         CompiledAgentModuleKind::GroundedAnswer,
         "grounded_answer",
         "grounded_answer",
-        "psionic_rule_revision",
+        "psionic_grounded_model",
         "promoted",
-        "2026-03-28",
+        "2026-03-29",
         CompiledAgentArtifactLifecycleState::Promoted,
         None,
-        0.82,
-        "compiled_agent.baseline.rule_v1.grounded_answer".to_string(),
-        &baseline_revision,
-        &default_row,
-        baseline_lineage.clone(),
-        None,
-        Some(String::from(PROMOTED_AT_UTC)),
-        "Promoted grounded-answer artifact remains the baseline rule revision until a learned grounded artifact is retained and promoted.",
-    );
-
-    let candidate_grounded_answer = revision_entry(
-        CompiledAgentModuleKind::GroundedAnswer,
-        "grounded_answer",
-        "grounded_answer",
-        "psionic_rule_revision",
-        "psionic_candidate",
-        "2026-03-29",
-        CompiledAgentArtifactLifecycleState::Candidate,
-        Some("psionic_candidate"),
         0.82,
         grounded_candidate_revision.revision_id.clone(),
         &grounded_candidate_revision,
         &default_row,
         grounded_lineage.clone(),
         Some(String::from("compiled_agent.baseline.rule_v1.grounded_answer")),
+        Some(String::from(PROMOTED_AT_UTC)),
+        "Promoted grounded-answer artifact now embeds the learned fact-only grounded model retained in the compiled-agent XTRAIN loop.",
+    );
+
+    let rollback_grounded_answer = revision_entry(
+        CompiledAgentModuleKind::GroundedAnswer,
+        "grounded_answer",
+        "grounded_answer",
+        "psionic_rule_revision",
+        "last_known_good",
+        "2026-03-28",
+        CompiledAgentArtifactLifecycleState::Candidate,
+        Some("last_known_good"),
+        0.82,
+        "compiled_agent.baseline.rule_v1.grounded_answer".to_string(),
+        &baseline_revision,
+        &default_row,
+        baseline_lineage.clone(),
         None,
-        "Candidate grounded-answer artifact carries the retained recent-earnings revision under the psionic_candidate label for shadow evaluation.",
+        None,
+        "Rollback grounded-answer artifact preserves the last-known-good baseline revision for clean rollback from the promoted learned grounded model.",
     );
 
     let promoted_verify = revision_entry(
@@ -340,7 +346,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         CompiledAgentModuleKind::Verify,
         "verify",
         "verify",
-        "psionic_rule_revision",
+        "psionic_grounded_model",
         "psionic_candidate",
         "2026-03-29",
         CompiledAgentArtifactLifecycleState::Candidate,
@@ -361,7 +367,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         promoted_tool_policy,
         promoted_tool_arguments,
         promoted_grounded_answer,
-        candidate_grounded_answer,
+        rollback_grounded_answer,
         promoted_verify,
         candidate_verify,
     ];
@@ -390,10 +396,13 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         contract_digest: String::new(),
     };
     contract.summary = format!(
-        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph, including the promoted route model and the current psionic_candidate plus last_known_good labels.",
-        contract.promoted_entry_count, contract.candidate_entry_count
+        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph, including the promoted route model, the promoted learned grounded-answer model from {}, and the current psionic_candidate plus last_known_good labels.",
+        contract.promoted_entry_count,
+        contract.candidate_entry_count,
+        GROUNDED_MODEL_FIXTURE_REF
     );
-    contract.contract_digest = stable_digest(b"compiled_agent_promoted_artifact_contract|", &contract);
+    contract.contract_digest =
+        stable_digest(b"compiled_agent_promoted_artifact_contract|", &contract);
     Ok(contract)
 }
 
@@ -402,9 +411,11 @@ pub fn write_compiled_agent_promoted_artifact_contract(
 ) -> Result<CompiledAgentPromotedArtifactContract, CompiledAgentArtifactContractError> {
     let output_path = output_path.as_ref();
     if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| CompiledAgentArtifactContractError::CreateDir {
-            path: parent.display().to_string(),
-            error,
+        fs::create_dir_all(parent).map_err(|error| {
+            CompiledAgentArtifactContractError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            }
         })?;
     }
     let contract = canonical_compiled_agent_promoted_artifact_contract()?;
@@ -427,12 +438,34 @@ pub fn verify_compiled_agent_promoted_artifact_contract_fixture(
         error,
     })?;
     let committed: CompiledAgentPromotedArtifactContract = serde_json::from_slice(&bytes)?;
-    if committed != expected {
+    let committed_json = serde_json::to_string_pretty(&committed)?;
+    let expected_json = serde_json::to_string_pretty(&expected)?;
+    if committed.contract_digest != expected.contract_digest || committed_json != expected_json {
         return Err(CompiledAgentArtifactContractError::FixtureDrift {
             path: path.display().to_string(),
         });
     }
     Ok(committed)
+}
+
+fn read_grounded_model_artifact_fixture(
+) -> Result<CompiledAgentGroundedAnswerModelArtifact, CompiledAgentArtifactContractError> {
+    let path = repo_relative_path(GROUNDED_MODEL_FIXTURE_REF);
+    let bytes = fs::read(&path).map_err(|error| CompiledAgentArtifactContractError::Read {
+        path: path.display().to_string(),
+        error,
+    })?;
+    Ok(serde_json::from_slice(&bytes)?)
+}
+
+fn grounded_candidate_revision_from_artifact(
+    grounded_model_artifact: CompiledAgentGroundedAnswerModelArtifact,
+) -> CompiledAgentModuleRevisionSet {
+    let mut candidate = compiled_agent_baseline_revision_set();
+    candidate.revision_id = grounded_model_artifact.artifact_id.clone();
+    candidate.grounded_answer_model_artifact = Some(grounded_model_artifact);
+    candidate.verify_require_recent_earnings = true;
+    candidate
 }
 
 fn route_candidate_route_revision(
@@ -523,7 +556,8 @@ mod tests {
     use psionic_eval::CompiledAgentModuleKind;
 
     #[test]
-    fn promoted_artifact_contract_keeps_the_learned_route_promoted() -> Result<(), Box<dyn std::error::Error>> {
+    fn promoted_artifact_contract_keeps_the_learned_route_promoted(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let contract = canonical_compiled_agent_promoted_artifact_contract()?;
         let route = contract
             .promoted_entry(CompiledAgentModuleKind::Route)
@@ -534,6 +568,25 @@ mod tests {
         );
         assert_eq!(route.artifact_id, "compiled_agent.route.multinomial_nb_v1");
         assert!(route.rollback_artifact_id.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn promoted_artifact_contract_keeps_the_learned_grounded_answer_promoted(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let contract = canonical_compiled_agent_promoted_artifact_contract()?;
+        let grounded = contract
+            .promoted_entry(CompiledAgentModuleKind::GroundedAnswer)
+            .expect("grounded-answer entry missing");
+        assert_eq!(
+            grounded.lifecycle_state,
+            CompiledAgentArtifactLifecycleState::Promoted
+        );
+        assert_eq!(
+            grounded.artifact_id,
+            "compiled_agent.grounded_answer.multinomial_nb_v1"
+        );
+        assert_eq!(grounded.implementation_family, "psionic_grounded_model");
         Ok(())
     }
 

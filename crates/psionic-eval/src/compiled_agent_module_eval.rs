@@ -363,6 +363,68 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             ),
         },
         CompiledAgentModuleEvalCase {
+            case_id: String::from("grounded_provider_missing_facts_fallback"),
+            module: CompiledAgentModuleKind::GroundedAnswer,
+            prompt: String::from("Can I go online right now?"),
+            tags: vec![
+                String::from("supported"),
+                String::from("provider"),
+                String::from("insufficient_facts"),
+            ],
+            route_input: Some(CompiledAgentRoute::ProviderStatus),
+            selected_tools: Vec::new(),
+            tool_results: vec![CompiledAgentToolResult {
+                tool_name: String::from("provider_status"),
+                payload: json!({"blockers": []}),
+            }],
+            candidate_answer: None,
+            expected_route: None,
+            expected_tool_names: Vec::new(),
+            expected_calls: Vec::new(),
+            expected_answer_substrings: vec![
+                String::from("unavailable"),
+                String::from("facts"),
+            ],
+            expected_verdict: None,
+            detail: String::from(
+                "Grounded-answer candidate should fall back when provider facts are missing instead of silently converting missing facts into a blocked answer.",
+            ),
+        },
+        CompiledAgentModuleEvalCase {
+            case_id: String::from("grounded_wallet_conflicting_facts_fallback"),
+            module: CompiledAgentModuleKind::GroundedAnswer,
+            prompt: String::from("Show me the wallet balance."),
+            tags: vec![
+                String::from("supported"),
+                String::from("wallet"),
+                String::from("conflicting_facts"),
+            ],
+            route_input: Some(CompiledAgentRoute::WalletStatus),
+            selected_tools: Vec::new(),
+            tool_results: vec![
+                CompiledAgentToolResult {
+                    tool_name: String::from("wallet_status"),
+                    payload: json!({"balance_sats": 1200, "recent_earnings_sats": 240}),
+                },
+                CompiledAgentToolResult {
+                    tool_name: String::from("wallet_status"),
+                    payload: json!({"balance_sats": 900, "recent_earnings_sats": 240}),
+                },
+            ],
+            candidate_answer: None,
+            expected_route: None,
+            expected_tool_names: Vec::new(),
+            expected_calls: Vec::new(),
+            expected_answer_substrings: vec![
+                String::from("conflicting"),
+                String::from("facts"),
+            ],
+            expected_verdict: None,
+            detail: String::from(
+                "Grounded-answer candidate should fall back when wallet facts conflict instead of choosing one arbitrarily.",
+            ),
+        },
+        CompiledAgentModuleEvalCase {
             case_id: String::from("verify_provider_accept"),
             module: CompiledAgentModuleKind::Verify,
             prompt: String::from("Can I go online right now?"),
@@ -755,6 +817,10 @@ pub fn evaluate_compiled_agent_grounded_answer(
     tool_results: &[CompiledAgentToolResult],
     revision: &CompiledAgentModuleRevisionSet,
 ) -> String {
+    if let Some(artifact) = revision.grounded_answer_model_artifact.as_ref() {
+        return crate::predict_compiled_agent_grounded_answer(artifact, route, tool_results)
+            .response;
+    }
     match route {
         CompiledAgentRoute::ProviderStatus => {
             let provider = tool_results
@@ -996,6 +1062,9 @@ mod tests {
                     .failed_case_ids
                     .iter()
                     .any(|case_id| case_id == "route_negated_wallet_false_positive")
+        }));
+        assert!(report.module_summaries.iter().any(|summary| {
+            summary.module == CompiledAgentModuleKind::GroundedAnswer && summary.total_cases >= 6
         }));
     }
 

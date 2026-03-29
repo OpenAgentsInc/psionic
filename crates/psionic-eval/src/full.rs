@@ -16,6 +16,8 @@ mod attnres;
 mod attnres_training;
 #[path = "compiled_agent_eval.rs"]
 mod compiled_agent_eval;
+#[path = "compiled_agent_grounded_model.rs"]
+mod compiled_agent_grounded_model;
 #[path = "compiled_agent_module_eval.rs"]
 mod compiled_agent_module_eval;
 #[path = "compiled_agent_route_model.rs"]
@@ -427,6 +429,7 @@ pub use apple_adapter_benchmark::*;
 pub use attnres::*;
 pub use attnres_training::*;
 pub use compiled_agent_eval::*;
+pub use compiled_agent_grounded_model::*;
 pub use compiled_agent_module_eval::*;
 pub use compiled_agent_route_model::*;
 pub use parameter_golf_benchmark::*;

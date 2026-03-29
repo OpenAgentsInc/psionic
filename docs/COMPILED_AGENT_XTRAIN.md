@@ -1,6 +1,6 @@
 # Compiled Agent XTRAIN
 
-> Status: validator-gated compiled-agent XTRAIN cycle with held-out gating, updated 2026-03-29.
+> Status: validator-gated compiled-agent XTRAIN cycle with learned route and grounded-answer artifacts, updated 2026-03-29.
 
 ## Why This Exists
 
@@ -21,7 +21,7 @@ Route candidate:
 
 Grounded-answer candidate:
 
-- `compiled_agent.grounded_answer.rule_v2.recent_earnings`
+- `compiled_agent.grounded_answer.multinomial_nb_v1`
 
 ## Validator Inputs
 
@@ -33,6 +33,7 @@ Grounded-answer candidate:
 ## Canonical Fixtures
 
 - `fixtures/compiled_agent/compiled_agent_route_model_v1.json`
+- `fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json`
 - `fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
@@ -43,10 +44,14 @@ Grounded-answer candidate:
 - route candidate is now a replay-trained route model artifact, not a hand-authored keyword guard
 - route candidate clears the retained negated-route false-positive case
 - route candidate now improves both replay and held-out route matches with no held-out regressions
-- grounded-answer candidate keeps the module eval surface non-regressing
+- grounded-answer candidate is now a replay-trained fact-only model artifact, not a rule revision
 - grounded-answer candidate improves replay fidelity on the wallet answer by
-  including recent earnings from the receipt-backed facts
+  learning the retained recent-earnings answer program from receipt-backed facts
 - grounded-answer candidate now also improves held-out wallet phrasing rows
+- grounded-answer candidate now passes the independent insufficient-facts and
+  conflicting-facts fallback rows
+- the promoted-artifact contract now hydrates the retained grounded-answer
+  artifact fixture instead of rebuilding a numerically drifted copy
 - promoted and candidate module authority is now exported through a retained
   runtime-consumable artifact contract instead of only being implied by docs
 
@@ -58,6 +63,8 @@ Grounded-answer candidate:
   `ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9`
 - source ledger digest:
   `d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3`
+- grounded-answer model digest:
+  `250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b`
 
 ## Scope Boundary
 

@@ -45,22 +45,27 @@
   "grounded_answer_outcome": {
     "module": "grounded_answer",
     "decision": "promote",
-    "reason": "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval and held-out surfaces non-regressing.",
+    "reason": "Trained grounded-answer candidate improves replay and held-out grounding while correctly falling back on missing and conflicting fact rows.",
     "delta": {
       "module": "grounded_answer",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
-      "candidate_revision_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings",
+      "candidate_revision_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+      "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
+      "candidate_artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b",
       "targeted_failure_classes": [
         "grounded_answer_mismatch"
       ],
-      "delta_summary": "Extends the bounded wallet grounding template to include recent earnings when that fact is present in the receipt-backed tool result."
+      "delta_summary": "Trains a fact-only grounded-answer model from replay-backed grounded samples so supported answers and unsupported refusals are retained as a learned artifact, while missing or conflicting facts fall back cleanly instead of being guessed."
     },
     "validation": {
       "module": "grounded_answer",
       "baseline_passed_cases": 4,
-      "candidate_passed_cases": 4,
-      "improvement_case_ids": [],
+      "candidate_passed_cases": 6,
+      "improvement_case_ids": [
+        "grounded_provider_missing_facts_fallback",
+        "grounded_wallet_conflicting_facts_fallback"
+      ],
       "regression_case_ids": [],
       "baseline_replay_match_count": 8,
       "candidate_replay_match_count": 12,
@@ -81,5 +86,5 @@
     }
   },
   "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9.",
-  "receipt_digest": "363d611bd520049f35e192422faeb769eab819b778e0c23c6980d85bab8d29df"
+  "receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
 }

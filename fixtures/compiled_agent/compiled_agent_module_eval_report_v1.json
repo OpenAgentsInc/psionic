@@ -171,6 +171,34 @@
       "detail": "Unsupported grounded-answer row should stay inside the narrow refusal template."
     },
     {
+      "case_id": "grounded_provider_missing_facts_fallback",
+      "module": "grounded_answer",
+      "pass": false,
+      "tags": [
+        "supported",
+        "provider",
+        "insufficient_facts"
+      ],
+      "expected_summary": "unavailable, facts",
+      "observed_summary": "Provider is not ready to go online.",
+      "failure_class": "grounding_miss",
+      "detail": "Grounded-answer candidate should fall back when provider facts are missing instead of silently converting missing facts into a blocked answer."
+    },
+    {
+      "case_id": "grounded_wallet_conflicting_facts_fallback",
+      "module": "grounded_answer",
+      "pass": false,
+      "tags": [
+        "supported",
+        "wallet",
+        "conflicting_facts"
+      ],
+      "expected_summary": "conflicting, facts",
+      "observed_summary": "The wallet contains 1200 sats.",
+      "failure_class": "grounding_miss",
+      "detail": "Grounded-answer candidate should fall back when wallet facts conflict instead of choosing one arbitrarily."
+    },
+    {
       "case_id": "verify_provider_accept",
       "module": "verify",
       "pass": true,
@@ -259,10 +287,15 @@
     },
     {
       "module": "grounded_answer",
-      "total_cases": 4,
+      "total_cases": 6,
       "passed_cases": 4,
-      "failed_case_ids": [],
-      "failure_classes": {}
+      "failed_case_ids": [
+        "grounded_provider_missing_facts_fallback",
+        "grounded_wallet_conflicting_facts_fallback"
+      ],
+      "failure_classes": {
+        "grounding_miss": 2
+      }
     },
     {
       "module": "verify",
@@ -280,7 +313,7 @@
   "generated_from_refs": [
     "docs/COMPILED_AGENT_DEFAULT_ROW_REFERENCE.md"
   ],
-  "summary": "Compiled-agent module eval report covers 19 cases across 5 module families with unsupported_pass=6/7, negated_pass=0/1, and tool_emission_is_not_success_cases=1.",
+  "summary": "Compiled-agent module eval report covers 21 cases across 5 module families with unsupported_pass=6/7, negated_pass=0/1, and tool_emission_is_not_success_cases=1.",
   "detail": "This report keeps route, tool-policy, tool-argument, grounded-answer, and verify surfaces independent so later GEPA and XTRAIN work can optimize bounded modules instead of a giant agent loop.",
-  "report_digest": "f42ed95da16601f693455c615a46000c6f5e03eb31c670de34847271a3e007d5"
+  "report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a"
 }
