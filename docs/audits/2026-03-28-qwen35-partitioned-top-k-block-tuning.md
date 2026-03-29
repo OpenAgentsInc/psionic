@@ -806,18 +806,114 @@ This is enough to justify keeping the code change because:
 The remaining follow-up is benchmark publication discipline, not uncertainty
 about whether the code change is directionally good.
 
+## Later Follow-On: Wider Top-K Lane Default Moved To `56` Blocks
+
+After the `256 x 12` tile-width follow-on landed, the next question was
+whether the widened sampled lane should still stay on the older `40`-block
+profile.
+
+The first idle RTX 4080 direct sweep on the warm qwen35 binary said no.
+
+### Direct override sweep on the widened sampled lane
+
+Using the real `sampled_topk100` contract on the idle RTX 4080 host, the
+current qwen35 binary was rerun with explicit overrides:
+
+- `PSIONIC_QWEN35_PARTITIONED_TOP_K_BLOCKS=40`
+- `PSIONIC_QWEN35_PARTITIONED_TOP_K_BLOCKS=56`
+
+The bounded-candidate path stayed intact on every direct gate:
+
+- `qwen35_output_modes=[top_k_candidates:100]`
+- `qwen35_raw_logits=false`
+
+Observed direct deltas:
+
+| Blocks | Model | Psionic tok/s | Delta vs `40` |
+| --- | --- | ---: | ---: |
+| `40` | `qwen3.5:0.8b` | `514.17` | baseline |
+| `56` | `qwen3.5:0.8b` | `519.68` | `+1.07%` |
+| `40` | `qwen3.5:2b` | `254.21` | baseline |
+| `56` | `qwen3.5:2b` | `254.85` | `+0.25%` |
+| `40` | `qwen3.5:4b` | `180.19` | baseline |
+| `56` | `qwen3.5:4b` | `180.62` | `+0.24%` |
+| `40` | `qwen3.5:9b` | `110.19` | baseline |
+| `56` | `qwen3.5:9b` | `110.33` | `+0.12%` |
+
+This is not a huge gain, but it is consistently positive on all four models.
+
+That direct sweep justified the runtime-default change:
+
+- commit `7c09066b` `Tune qwen35 large sampled top-k blocks`
+
+What changed:
+
+- `QWEN35_CUDA_PARTITIONED_TOP_K_BLOCKS_LARGE: 40 -> 56`
+- the smaller `top_k = 40` lane stayed at `48`
+
+### Targeted exact-commit rerun
+
+After landing `7c09066b`, the repo-owned narrowed rerun was:
+
+- `fixtures/qwen35/benchmarks/qwen35_ollama_matrix_20260329_032406_archlinux-.json`
+- `fixtures/qwen35/benchmarks/reports/qwen35_ollama_matrix_20260329_032406_archlinux-/one_page_summary.md`
+
+Scope:
+
+- models `qwen3.5:0.8b`, `qwen3.5:2b`, `qwen3.5:4b`, `qwen3.5:9b`
+- contract `sampled_topk100`
+- `repeats = 3`
+- idle RTX 4080 host
+- stable dedicated remote benchmark worktree and stable shared target dir
+
+Relative to the earlier exact `sampled_topk100` matrix from
+`20260329_011606`:
+
+| Model | Prior Psionic | New Psionic | Delta | Ollama |
+| --- | ---: | ---: | ---: | ---: |
+| `qwen3.5:0.8b` | `513.06` | `509.95` | `-0.61%` | `328.66` |
+| `qwen3.5:2b` | `253.55` | `255.26` | `+0.67%` | `205.72` |
+| `qwen3.5:4b` | `179.74` | `180.80` | `+0.59%` | `145.92` |
+| `qwen3.5:9b` | `109.98` | `110.39` | `+0.37%` | `97.76` |
+
+Interpretation:
+
+- the exact rerun confirms the wider-lane default is directionally right on
+  `2b`, `4b`, and `9b`
+- the `0.8b` row came in below the earlier exact checkpoint even though the
+  direct warm-binary override check still showed `56 > 40` on that same host
+- that means the exact narrowed rerun is still useful evidence, but it is not
+  strong enough by itself to claim a uniform gain on every model
+- the rows remain `mismatched`, so this stays a bounded sampled throughput
+  checkpoint rather than a parity checkpoint
+
+### Stable benchmark lane note
+
+This pass also established the right exact-rerun workflow on the remote host:
+
+- use a stable dedicated benchmark worktree instead of the dirty remote main
+  checkout
+- reuse a stable `CARGO_TARGET_DIR`
+- keep the idle-GPU guard in front of every row
+
+The first cold run on that lane still had to compile most of the serve stack,
+but once that target was seeded the narrowed exact rerun completed normally and
+the lane became reusable for later qwen35 optimization passes.
+
 ## Updated Next Steps
 
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
   are measured on a genuinely idle GPU
+- keep using the stable remote benchmark worktree and shared target dir for
+  exact-commit reruns instead of rebuilding from fresh paths
 - keep benchmark requests on `PrefixCacheMode::Bypass` until the later qwen35
   shared prefix-cache regression is classified and fixed separately
 - stop spending time on host-side sampler cleanups that only move results by
   noise-level deltas
 - stop spending time on non-partitioned `top_k = 40` crossover tuning on this
   host; that path is decisively slower
-- publish one fresh repo-owned exact-commit sampled matrix for `317a65d3` once
-  the remote rerun can start from an already-built or path-stable worktree
+- publish future exact-commit qwen35 sampled reruns from the stable benchmark
+  lane instead of starting over from fresh worktree paths
 - focus the next optimization pass inside the partitioned bounded-candidate
   lane where it can plausibly reduce actual sampled-step cost further:
   larger structural changes inside the partitioned scan itself, better
