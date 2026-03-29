@@ -4,7 +4,7 @@
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "baseline_revision_id": "compiled_agent.baseline.rule_v1",
   "evidence_class": "learned_lane",
-  "source_ledger_digest": "71f84bc71752ba77c8201249537fdd94c7b9d459c91a5a5f35da3ac623941165",
+  "source_ledger_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
   "training_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
     "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
@@ -23,7 +23,8 @@
     "receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
-    "receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1"
+    "receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
   ],
   "excluded_held_out_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
@@ -37,13 +38,14 @@
     "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
-    "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1"
+    "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1"
   ],
   "module_sample_counts": {
-    "grounded_answer": 18,
-    "route": 18
+    "grounded_answer": 19,
+    "route": 19
   },
-  "correction_sample_count": 15,
+  "correction_sample_count": 17,
   "samples": [
     {
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
@@ -1141,8 +1143,78 @@
         "kind": "grounded_answer",
         "response": "Provider is ready to go online."
       }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "runtime",
+        "provider",
+        "wallet",
+        "route_ambiguity",
+        "shadow_disagreement",
+        "correction_required",
+        "unsupported",
+        "training"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "negated_route_false_positive",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Do not tell me provider readiness. Compare the wallet and provider situation."
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "provider_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "runtime",
+        "provider",
+        "wallet",
+        "route_ambiguity",
+        "shadow_disagreement",
+        "correction_required",
+        "unsupported",
+        "training"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "negated_route_false_positive",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Do not tell me provider readiness. Compare the wallet and provider situation.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      }
     }
   ],
-  "summary": "Compiled-agent replay bundle retains 18 route samples and 18 grounded-answer samples from 18 training receipts while excluding 12 held-out receipts.",
-  "bundle_digest": "a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8"
+  "summary": "Compiled-agent replay bundle retains 19 route samples and 19 grounded-answer samples from 19 training receipts while excluding 13 held-out receipts.",
+  "bundle_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a"
 }

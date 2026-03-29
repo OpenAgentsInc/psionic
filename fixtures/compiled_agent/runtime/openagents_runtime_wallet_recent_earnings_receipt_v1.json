@@ -1,0 +1,347 @@
+{
+  "schema_version": 1,
+  "evidence_class": "learned_lane",
+  "captured_at_epoch_ms": 1774760262102,
+  "state": {
+    "provider_ready": true,
+    "provider_blockers": [],
+    "wallet_balance_sats": 1200,
+    "recent_earnings_sats": 240
+  },
+  "run": {
+    "public_response": {
+      "kind": "grounded_answer",
+      "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+    },
+    "internal_trace": {
+      "primary_phases": [
+        {
+          "phase": "intent_route",
+          "manifest": {
+            "module_name": "intent_route",
+            "signature_name": "intent_route",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.8
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?"
+          },
+          "output": {
+            "route": "wallet_status",
+            "rationale": "captured promoted authority route for openagents_runtime_wallet_recent_earnings_receipt_v1"
+          },
+          "confidence": 0.83,
+          "trace": {
+            "artifact_id": "compiled_agent.baseline.rule_v1.route",
+            "captured_from_runtime": true,
+            "authority_path": "promoted_contract"
+          }
+        },
+        {
+          "phase": "tool_policy",
+          "manifest": {
+            "module_name": "tool_policy",
+            "signature_name": "tool_policy",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.8
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?",
+            "route": "wallet_status",
+            "available_tools": [
+              {
+                "name": "provider_status",
+                "description": "Read provider readiness and blocker state."
+              },
+              {
+                "name": "wallet_status",
+                "description": "Read wallet balance and recent earnings."
+              }
+            ]
+          },
+          "output": {
+            "selected_tools": [
+              {
+                "name": "wallet_status",
+                "description": "Read wallet balance and recent earnings."
+              }
+            ],
+            "rationale": "captured promoted tool policy from runtime"
+          },
+          "confidence": 0.91,
+          "trace": {
+            "captured_from_runtime": true,
+            "authority_path": "promoted_contract"
+          }
+        },
+        {
+          "phase": "tool_arguments",
+          "manifest": {
+            "module_name": "tool_arguments",
+            "signature_name": "tool_arguments",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.8
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?",
+            "route": "wallet_status",
+            "selected_tools": [
+              {
+                "name": "wallet_status",
+                "description": "Read wallet balance and recent earnings."
+              }
+            ]
+          },
+          "output": {
+            "calls": [
+              {
+                "tool_name": "wallet_status",
+                "arguments": {}
+              }
+            ]
+          },
+          "confidence": 0.95,
+          "trace": {
+            "tool_count": 1,
+            "captured_from_runtime": true
+          }
+        },
+        {
+          "phase": "grounded_answer",
+          "manifest": {
+            "module_name": "grounded_answer",
+            "signature_name": "grounded_answer",
+            "implementation_family": "psionic_grounded_model",
+            "implementation_label": "promoted",
+            "version": "2026-03-29",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.82
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?",
+            "route": "wallet_status",
+            "tool_results": [
+              {
+                "tool_name": "wallet_status",
+                "payload": {
+                  "balance_sats": 1200,
+                  "recent_earnings_sats": 240
+                }
+              }
+            ]
+          },
+          "output": {
+            "answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
+            "grounded_tool_names": [
+              "wallet_status"
+            ]
+          },
+          "confidence": 0.88,
+          "trace": {
+            "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+            "captured_from_runtime": true,
+            "response_kind": "grounded_answer"
+          }
+        },
+        {
+          "phase": "verify",
+          "manifest": {
+            "module_name": "verify",
+            "signature_name": "verify",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.82
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?",
+            "route": "wallet_status",
+            "tool_calls": [
+              {
+                "tool_name": "wallet_status",
+                "arguments": {}
+              }
+            ],
+            "tool_results": [
+              {
+                "tool_name": "wallet_status",
+                "payload": {
+                  "balance_sats": 1200,
+                  "recent_earnings_sats": 240
+                }
+              }
+            ],
+            "candidate_answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+          },
+          "output": {
+            "verdict": "accept_grounded_answer",
+            "rationale": "captured promoted verify verdict from runtime"
+          },
+          "confidence": 0.9,
+          "trace": {
+            "captured_from_runtime": true,
+            "authority_path": "promoted_contract"
+          }
+        }
+      ],
+      "shadow_phases": [
+        {
+          "phase": "intent_route",
+          "manifest": {
+            "module_name": "intent_route",
+            "signature_name": "intent_route",
+            "implementation_family": "psionic_route_model",
+            "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+            "version": "2026-03-29",
+            "promotion_state": "candidate",
+            "confidence_floor": 0.8
+          },
+          "authority": "shadow",
+          "candidate_label": "psionic_candidate",
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?"
+          },
+          "output": {
+            "route": "wallet_status",
+            "rationale": "captured shadow route compare for openagents_runtime_wallet_recent_earnings_receipt_v1"
+          },
+          "confidence": 0.79,
+          "trace": {
+            "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+            "captured_from_runtime": true,
+            "shadow_compare": true
+          }
+        },
+        {
+          "phase": "grounded_answer",
+          "manifest": {
+            "module_name": "grounded_answer",
+            "signature_name": "grounded_answer",
+            "implementation_family": "psionic_grounded_model",
+            "implementation_label": "psionic_candidate",
+            "version": "2026-03-29",
+            "promotion_state": "candidate",
+            "confidence_floor": 0.82
+          },
+          "authority": "shadow",
+          "candidate_label": "psionic_candidate",
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?",
+            "route": "wallet_status",
+            "tool_results": [
+              {
+                "tool_name": "wallet_status",
+                "payload": {
+                  "balance_sats": 1200,
+                  "recent_earnings_sats": 240
+                }
+              }
+            ]
+          },
+          "output": {
+            "answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
+            "response_kind": "grounded_answer"
+          },
+          "confidence": 0.78,
+          "trace": {
+            "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+            "captured_from_runtime": true,
+            "shadow_compare": true
+          }
+        },
+        {
+          "phase": "verify",
+          "manifest": {
+            "module_name": "verify",
+            "signature_name": "verify",
+            "implementation_family": "psionic_grounded_model",
+            "implementation_label": "psionic_candidate",
+            "version": "2026-03-29",
+            "promotion_state": "candidate",
+            "confidence_floor": 0.82
+          },
+          "authority": "shadow",
+          "candidate_label": "psionic_candidate",
+          "input": {
+            "user_request": "What are the wallet balance and recent earnings right now?",
+            "route": "wallet_status",
+            "tool_results": [
+              {
+                "tool_name": "wallet_status",
+                "payload": {
+                  "balance_sats": 1200,
+                  "recent_earnings_sats": 240
+                }
+              }
+            ],
+            "candidate_answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+          },
+          "output": {
+            "verdict": "accept_grounded_answer",
+            "rationale": "captured shadow verify verdict from runtime"
+          },
+          "confidence": 0.77,
+          "trace": {
+            "captured_from_runtime": true,
+            "shadow_compare": true
+          }
+        }
+      ]
+    },
+    "lineage": {
+      "user_request": "What are the wallet balance and recent earnings right now?",
+      "route": "wallet_status",
+      "tool_calls": [
+        {
+          "tool_name": "wallet_status",
+          "arguments": {}
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_name": "wallet_status",
+          "payload": {
+            "balance_sats": 1200,
+            "recent_earnings_sats": 240
+          }
+        }
+      ],
+      "public_response": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_rule_revision:promoted:2026-03-28",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "grounded_answer:psionic_grounded_model:psionic_candidate:2026-03-29",
+        "verify:psionic_grounded_model:psionic_candidate:2026-03-29"
+      ]
+    }
+  }
+}

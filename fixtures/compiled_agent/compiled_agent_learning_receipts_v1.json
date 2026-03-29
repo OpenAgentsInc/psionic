@@ -34,7 +34,9 @@
     "fixtures/compiled_agent/source/openagents_negated_wallet_provider_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_negated_provider_wallet_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_recent_earnings_short_heldout_receipt_v1.json",
-    "fixtures/compiled_agent/source/openagents_wallet_provider_compare_heldout_receipt_v1.json"
+    "fixtures/compiled_agent/source/openagents_wallet_provider_compare_heldout_receipt_v1.json",
+    "fixtures/compiled_agent/runtime/openagents_runtime_shadow_compare_receipt_v1.json",
+    "fixtures/compiled_agent/runtime/openagents_runtime_wallet_recent_earnings_receipt_v1.json"
   ],
   "training_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
@@ -54,7 +56,8 @@
     "receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
-    "receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1"
+    "receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
   ],
   "held_out_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
@@ -68,7 +71,8 @@
     "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
-    "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1"
+    "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1"
   ],
   "correction_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
@@ -88,31 +92,32 @@
     "receipt.compiled_agent.learning.openagents_best_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
-    "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+    "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
   ],
   "split_receipt_counts": {
-    "held_out": 12,
-    "training": 18
+    "held_out": 13,
+    "training": 19
   },
   "task_family_counts": {
-    "provider": 9,
-    "unsupported": 13,
-    "wallet": 12
+    "provider": 10,
+    "unsupported": 14,
+    "wallet": 14
   },
   "module_failure_counts": {
-    "grounded_answer": 18,
-    "route": 10,
-    "tool_arguments": 10,
-    "tool_policy": 10,
-    "verify": 18
+    "grounded_answer": 19,
+    "route": 11,
+    "tool_arguments": 11,
+    "tool_policy": 11,
+    "verify": 19
   },
   "failure_class_counts": {
-    "grounded_answer_mismatch": 18,
-    "negated_route_false_positive": 2,
+    "grounded_answer_mismatch": 19,
+    "negated_route_false_positive": 3,
     "route_mismatch": 8,
-    "tool_argument_mismatch": 10,
-    "unexpected_tool_exposure": 10,
-    "unsafe_final_outcome": 18
+    "tool_argument_mismatch": 11,
+    "unexpected_tool_exposure": 11,
+    "unsafe_final_outcome": 19
   },
   "receipts": [
     {
@@ -2435,8 +2440,181 @@
       ],
       "operator_note": "Held-out ambiguity row for confidence calibration around mixed provider-versus-wallet intent without widening the task family.",
       "receipt_digest": "06b4fa886ec93bc22cfcfbf8d1f77c7858df4bc014a4289c0e17af869a949c3c"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/runtime/openagents_runtime_shadow_compare_receipt_v1.json",
+      "source_receipt_digest": "3703c16f7365c5b767f9a544597926558e602b6067f60aabf1c49ff10fc7d9b9",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262101,
+      "user_request": "Do not tell me provider readiness. Compare the wallet and provider situation.",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "provider_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "provider_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "provider_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "provider_status",
+          "payload": {
+            "ready": true,
+            "blockers": []
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_rule_revision:promoted:2026-03-28",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "grounded_answer:psionic_grounded_model:psionic_candidate:2026-03-29",
+        "verify:psionic_grounded_model:psionic_candidate:2026-03-29"
+      ],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.88,
+        "intent_route": 0.83,
+        "tool_arguments": 0.95,
+        "tool_policy": 0.91,
+        "verify": 0.9
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "negated_route_false_positive",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "runtime",
+        "provider",
+        "wallet",
+        "route_ambiguity",
+        "shadow_disagreement",
+        "correction_required",
+        "unsupported",
+        "training"
+      ],
+      "operator_note": "Sanitized runtime receipt from admitted-family traffic. Promoted authority answered provider readiness, the shadow route candidate refused, and operator review kept the comparison request in the unsupported lane.",
+      "receipt_digest": "2c0485ab22543d62ad4e579ac16a9463e93cc8fadaa5000524daa4340030dcfb"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/runtime/openagents_runtime_wallet_recent_earnings_receipt_v1.json",
+      "source_receipt_digest": "1812cf5442cf5387491bf3b645289139d125c6e3fd2227d15a76cfabfcfd335c",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262102,
+      "user_request": "What are the wallet balance and recent earnings right now?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "wallet_status",
+      "expected_route": "wallet_status",
+      "observed_tool_names": [
+        "wallet_status"
+      ],
+      "expected_tool_names": [
+        "wallet_status"
+      ],
+      "observed_tool_calls": [
+        {
+          "tool_name": "wallet_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "wallet_status",
+          "payload": {
+            "balance_sats": 1200,
+            "recent_earnings_sats": 240
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_rule_revision:promoted:2026-03-28",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "grounded_answer:psionic_grounded_model:psionic_candidate:2026-03-29",
+        "verify:psionic_grounded_model:psionic_candidate:2026-03-29"
+      ],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.88,
+        "intent_route": 0.83,
+        "tool_arguments": 0.95,
+        "tool_policy": 0.91,
+        "verify": 0.9
+      },
+      "corpus_split": "held_out",
+      "assessment": {
+        "route_correct": true,
+        "tool_policy_correct": true,
+        "tool_arguments_correct": true,
+        "grounded_answer_correct": true,
+        "verify_correct": true,
+        "overall_success": true,
+        "failure_classes": []
+      },
+      "tags": [
+        "runtime",
+        "wallet",
+        "recent_earnings",
+        "held_out",
+        "supported"
+      ],
+      "operator_note": "Sanitized runtime receipt for a supported wallet-plus-recent-earnings request. This row proves real admitted-family runtime evidence can enter the held-out validator split without changing the receipt contract.",
+      "receipt_digest": "ecf03b9d6bddc11729a64d668f99b5b57dfc4dda9a64d618998885d27cbcd468"
     }
   ],
-  "summary": "Compiled-agent learning ledger retains 30 source receipts (18 training, 12 held-out) with 12 fully-correct rows and 18 correction rows.",
-  "ledger_digest": "71f84bc71752ba77c8201249537fdd94c7b9d459c91a5a5f35da3ac623941165"
+  "summary": "Compiled-agent learning ledger retains 32 source receipts (19 training, 13 held-out) with 13 fully-correct rows and 19 correction rows.",
+  "ledger_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83"
 }

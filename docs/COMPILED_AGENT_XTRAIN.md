@@ -64,20 +64,22 @@ learned compiled-agent slice actually proved.
 - route candidate is a replay-trained route model artifact, not a hand-authored
   keyword guard
 - route candidate clears the retained negated-route false-positive case and
-  improves replay matches `13 -> 18`
+  improves replay matches `14 -> 19`
 - route candidate no longer promotes on the widened held-out split because the
   comparison row
   `receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1`
-  exposed a real ambiguity regression; held-out matches stay `7 -> 7`
+  exposed a real ambiguity regression; held-out matches stay `8 -> 8`
 - grounded-answer candidate is a replay-trained fact-only model artifact, not a
   rule revision
-- grounded-answer candidate improves replay fidelity `12 -> 18`
-- grounded-answer candidate also improves held-out fidelity `7 -> 10`
+- grounded-answer candidate improves replay fidelity `13 -> 19`
+- grounded-answer candidate also improves held-out fidelity `7 -> 11`
 - grounded-answer candidate continues to pass the independent
   insufficient-facts and conflicting-facts fallback rows
 - learned route and grounded artifacts are now normalized through JSON
   roundtrip before their digest is stamped, so the retained artifact digests,
   persisted fixtures, and runtime-loaded payloads all agree
+- sanitized runtime receipts now feed the same learning ledger and replay
+  bundle instead of living in a separate runtime-only path
 - the promoted-artifact contract now hydrates the retained grounded-answer
   artifact fixture and keeps route authority on the baseline revision when the
   validator says `hold`
@@ -91,17 +93,21 @@ learned compiled-agent slice actually proved.
 - route decision: `hold`
 - grounded-answer decision: `promote`
 - replay bundle digest:
-  `a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8`
+  `da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a`
 - source ledger digest:
-  `71f84bc71752ba77c8201249537fdd94c7b9d459c91a5a5f35da3ac623941165`
+  `48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83`
 - route model digest:
-  `935ffdec233c08e05b7e9377e9176ac6504518ef2512741e7efb5c90e0b1d1ce`
+  `0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f`
 - grounded-answer model digest:
-  `fbce731ad2b680a4cd1983e6127ebd140c8da40a7d1018cbc53b18b17a86ec01`
+  `1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f`
 - XTRAIN cycle receipt digest:
-  `e1de89d31db7c4bc03d98c06892c69a938aa13bb24db4bb199b4732fe80d89c4`
+  `5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6`
 - promoted-artifact contract digest:
-  `aa77ac9a5f0a342bff489c114927c11c5c54c368a2845b852d7be22600b7418a`
+  `5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa`
+- decentralized roles contract digest:
+  `cb8b46454720f10aff15287e95a31479a786eceefe334fc6a3b8436bda9c1e76`
+- decentralized role receipts digest:
+  `7e03dda7597ccba68585c9ffba1756da9a0ac2fc13566dd9412bad9966868f2a`
 
 ## Scope Boundary
 

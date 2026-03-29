@@ -17,6 +17,7 @@ use thiserror::Error;
 use crate::repo_relative_path;
 
 pub const COMPILED_AGENT_SOURCE_FIXTURE_DIR: &str = "fixtures/compiled_agent/source";
+pub const COMPILED_AGENT_RUNTIME_FIXTURE_DIR: &str = "fixtures/compiled_agent/runtime";
 pub const COMPILED_AGENT_LEARNING_RECEIPT_LEDGER_FIXTURE_PATH: &str =
     "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json";
 pub const COMPILED_AGENT_REPLAY_BUNDLE_FIXTURE_PATH: &str =
@@ -246,9 +247,35 @@ struct CanonicalSupervisionScenario {
     operator_note: &'static str,
 }
 
+#[derive(Clone)]
+struct CompiledAgentGovernedReceiptLabel {
+    expected_route: CompiledAgentRoute,
+    expected_public_response: CompiledAgentLearningPublicResponse,
+    corpus_split: CompiledAgentCorpusSplit,
+    tags: Vec<String>,
+    operator_note: String,
+}
+
+struct CanonicalRuntimeReceiptScenario {
+    fixture_name: &'static str,
+    source_receipt: CompiledAgentSourceReceipt,
+    label: CompiledAgentGovernedReceiptLabel,
+}
+
+struct CompiledAgentGovernedSourceReceipt {
+    source_fixture_ref: String,
+    source_receipt: CompiledAgentSourceReceipt,
+    label: CompiledAgentGovernedReceiptLabel,
+}
+
 #[must_use]
 pub fn compiled_agent_source_fixture_dir() -> PathBuf {
     repo_relative_path(COMPILED_AGENT_SOURCE_FIXTURE_DIR)
+}
+
+#[must_use]
+pub fn compiled_agent_runtime_fixture_dir() -> PathBuf {
+    repo_relative_path(COMPILED_AGENT_RUNTIME_FIXTURE_DIR)
 }
 
 #[must_use]
@@ -994,6 +1021,125 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
     ]
 }
 
+fn learning_label_from_scenario(
+    scenario: &CanonicalSupervisionScenario,
+) -> CompiledAgentGovernedReceiptLabel {
+    CompiledAgentGovernedReceiptLabel {
+        expected_route: scenario.expected_route,
+        expected_public_response: scenario.expected_public_response.clone(),
+        corpus_split: scenario.corpus_split,
+        tags: scenario.tags.iter().map(|tag| (*tag).to_string()).collect(),
+        operator_note: scenario.operator_note.to_string(),
+    }
+}
+
+fn canonical_runtime_receipt_scenarios() -> Vec<CanonicalRuntimeReceiptScenario> {
+    let unsupported = CompiledAgentLearningPublicResponse {
+        kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+        response: String::from(
+            "I can currently answer only provider readiness and wallet balance questions.",
+        ),
+    };
+    let wallet_grounded = CompiledAgentLearningPublicResponse {
+        kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+        response: String::from(
+            "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
+        ),
+    };
+
+    vec![
+        CanonicalRuntimeReceiptScenario {
+            fixture_name: "openagents_runtime_shadow_compare_receipt_v1.json",
+            source_receipt: build_runtime_source_receipt(
+                "openagents_runtime_shadow_compare_receipt_v1.json",
+                1_774_760_262_101,
+                "Do not tell me provider readiness. Compare the wallet and provider situation.",
+                CompiledAgentRuntimeState::default(),
+                CompiledAgentRoute::ProviderStatus,
+                CompiledAgentLearningPublicResponse {
+                    kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                    response: String::from("Provider is ready to go online."),
+                },
+                Some(CompiledAgentRoute::Unsupported),
+                Some(unsupported.clone()),
+            ),
+            label: CompiledAgentGovernedReceiptLabel {
+                expected_route: CompiledAgentRoute::Unsupported,
+                expected_public_response: unsupported.clone(),
+                corpus_split: CompiledAgentCorpusSplit::Training,
+                tags: vec![
+                    String::from("runtime"),
+                    String::from("provider"),
+                    String::from("wallet"),
+                    String::from("route_ambiguity"),
+                    String::from("shadow_disagreement"),
+                    String::from("correction_required"),
+                    String::from("unsupported"),
+                    String::from("training"),
+                ],
+                operator_note: String::from(
+                    "Sanitized runtime receipt from admitted-family traffic. Promoted authority answered provider readiness, the shadow route candidate refused, and operator review kept the comparison request in the unsupported lane.",
+                ),
+            },
+        },
+        CanonicalRuntimeReceiptScenario {
+            fixture_name: "openagents_runtime_wallet_recent_earnings_receipt_v1.json",
+            source_receipt: build_runtime_source_receipt(
+                "openagents_runtime_wallet_recent_earnings_receipt_v1.json",
+                1_774_760_262_102,
+                "What are the wallet balance and recent earnings right now?",
+                CompiledAgentRuntimeState::default(),
+                CompiledAgentRoute::WalletStatus,
+                wallet_grounded.clone(),
+                Some(CompiledAgentRoute::WalletStatus),
+                Some(wallet_grounded.clone()),
+            ),
+            label: CompiledAgentGovernedReceiptLabel {
+                expected_route: CompiledAgentRoute::WalletStatus,
+                expected_public_response: wallet_grounded,
+                corpus_split: CompiledAgentCorpusSplit::HeldOut,
+                tags: vec![
+                    String::from("runtime"),
+                    String::from("wallet"),
+                    String::from("recent_earnings"),
+                    String::from("held_out"),
+                    String::from("supported"),
+                ],
+                operator_note: String::from(
+                    "Sanitized runtime receipt for a supported wallet-plus-recent-earnings request. This row proves real admitted-family runtime evidence can enter the held-out validator split without changing the receipt contract.",
+                ),
+            },
+        },
+    ]
+}
+
+fn canonical_compiled_agent_governed_source_receipts() -> Vec<CompiledAgentGovernedSourceReceipt> {
+    let mut receipts = canonical_supervision_scenarios()
+        .into_iter()
+        .map(|scenario| CompiledAgentGovernedSourceReceipt {
+            source_fixture_ref: format!(
+                "{COMPILED_AGENT_SOURCE_FIXTURE_DIR}/{}",
+                scenario.fixture_name
+            ),
+            source_receipt: build_source_receipt(&scenario),
+            label: learning_label_from_scenario(&scenario),
+        })
+        .collect::<Vec<_>>();
+    receipts.extend(
+        canonical_runtime_receipt_scenarios()
+            .into_iter()
+            .map(|scenario| CompiledAgentGovernedSourceReceipt {
+                source_fixture_ref: format!(
+                    "{COMPILED_AGENT_RUNTIME_FIXTURE_DIR}/{}",
+                    scenario.fixture_name
+                ),
+                source_receipt: scenario.source_receipt,
+                label: scenario.label,
+            }),
+    );
+    receipts
+}
+
 pub fn load_compiled_agent_source_receipt(
     path: impl AsRef<Path>,
 ) -> Result<CompiledAgentSourceReceipt, CompiledAgentReceiptError> {
@@ -1015,6 +1161,15 @@ pub fn canonical_compiled_agent_source_receipts() -> Vec<(String, CompiledAgentS
                 build_source_receipt(&scenario),
             )
         })
+        .collect()
+}
+
+#[must_use]
+pub fn canonical_compiled_agent_runtime_source_receipts() -> Vec<(String, CompiledAgentSourceReceipt)>
+{
+    canonical_runtime_receipt_scenarios()
+        .into_iter()
+        .map(|scenario| (scenario.fixture_name.to_string(), scenario.source_receipt))
         .collect()
 }
 
@@ -1040,19 +1195,36 @@ pub fn write_compiled_agent_source_receipts(
     Ok(receipts)
 }
 
+pub fn write_compiled_agent_runtime_receipts(
+    output_dir: impl AsRef<Path>,
+) -> Result<Vec<(String, CompiledAgentSourceReceipt)>, CompiledAgentReceiptError> {
+    let output_dir = output_dir.as_ref();
+    fs::create_dir_all(output_dir).map_err(|error| CompiledAgentReceiptError::CreateDir {
+        path: output_dir.display().to_string(),
+        error,
+    })?;
+    let receipts = canonical_compiled_agent_runtime_source_receipts();
+    for (fixture_name, receipt) in &receipts {
+        let output_path = output_dir.join(fixture_name);
+        let json = serde_json::to_string_pretty(receipt)?;
+        fs::write(&output_path, format!("{json}\n")).map_err(|error| {
+            CompiledAgentReceiptError::Write {
+                path: output_path.display().to_string(),
+                error,
+            }
+        })?;
+    }
+    Ok(receipts)
+}
+
 pub fn canonical_compiled_agent_learning_receipt_ledger(
 ) -> Result<CompiledAgentLearningReceiptLedger, CompiledAgentReceiptError> {
     let mut receipts = Vec::new();
-    for scenario in canonical_supervision_scenarios() {
-        let source_fixture_ref = format!(
-            "{COMPILED_AGENT_SOURCE_FIXTURE_DIR}/{}",
-            scenario.fixture_name
-        );
-        let source_receipt = build_source_receipt(&scenario);
+    for governed in canonical_compiled_agent_governed_source_receipts() {
         receipts.push(build_learning_receipt(
-            &source_fixture_ref,
-            &source_receipt,
-            &scenario,
+            &governed.source_fixture_ref,
+            &governed.source_receipt,
+            &governed.label,
         )?);
     }
     build_learning_receipt_ledger(
@@ -1112,6 +1284,15 @@ pub fn write_compiled_agent_replay_bundle(
 pub fn verify_compiled_agent_learning_receipt_fixtures() -> Result<(), CompiledAgentReceiptError> {
     for (fixture_name, expected_source) in canonical_compiled_agent_source_receipts() {
         let source_path = compiled_agent_source_fixture_dir().join(&fixture_name);
+        let committed_source = load_compiled_agent_source_receipt(&source_path)?;
+        if committed_source != expected_source {
+            return Err(CompiledAgentReceiptError::FixtureDrift {
+                path: source_path.display().to_string(),
+            });
+        }
+    }
+    for (fixture_name, expected_source) in canonical_compiled_agent_runtime_source_receipts() {
+        let source_path = compiled_agent_runtime_fixture_dir().join(&fixture_name);
         let committed_source = load_compiled_agent_source_receipt(&source_path)?;
         if committed_source != expected_source {
             return Err(CompiledAgentReceiptError::FixtureDrift {
@@ -1367,6 +1548,330 @@ fn build_source_receipt(scenario: &CanonicalSupervisionScenario) -> CompiledAgen
     }
 }
 
+fn build_runtime_source_receipt(
+    fixture_name: &str,
+    captured_at_epoch_ms: u64,
+    user_request: &str,
+    runtime_state: CompiledAgentRuntimeState,
+    observed_route: CompiledAgentRoute,
+    observed_public_response: CompiledAgentLearningPublicResponse,
+    shadow_route: Option<CompiledAgentRoute>,
+    shadow_public_response: Option<CompiledAgentLearningPublicResponse>,
+) -> CompiledAgentSourceReceipt {
+    let observed_tool_calls = expected_tool_calls(observed_route);
+    let observed_tool_results = tool_results_for_route(observed_route, &runtime_state);
+
+    let route_manifest = manifest_with_state(
+        "intent_route",
+        "intent_route",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        "promoted",
+        0.8,
+    );
+    let tool_policy_manifest = manifest(
+        "tool_policy",
+        "tool_policy",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        0.8,
+    );
+    let tool_arguments_manifest = manifest(
+        "tool_arguments",
+        "tool_arguments",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        0.8,
+    );
+    let grounded_answer_manifest = manifest_with_state(
+        "grounded_answer",
+        "grounded_answer",
+        "psionic_grounded_model",
+        "promoted",
+        "2026-03-29",
+        "promoted",
+        0.82,
+    );
+    let verify_manifest = manifest(
+        "verify",
+        "verify",
+        "psionic_rule_revision",
+        "promoted",
+        "2026-03-28",
+        0.82,
+    );
+    let selected_tools = expected_tool_names(observed_route)
+        .into_iter()
+        .map(|tool_name| {
+            json!({
+                "name": tool_name,
+                "description": tool_description(tool_name.as_str()),
+            })
+        })
+        .collect::<Vec<_>>();
+    let verify_verdict = if observed_public_response.kind
+        == CompiledAgentPublicOutcomeKind::UnsupportedRefusal
+    {
+        "unsupported_refusal"
+    } else {
+        "accept_grounded_answer"
+    };
+
+    let primary_phases = vec![
+        CompiledAgentSourcePhaseTraceEntry {
+            phase: String::from("intent_route"),
+            manifest: route_manifest.clone(),
+            authority: String::from("promoted"),
+            candidate_label: None,
+            input: json!({ "user_request": user_request }),
+            output: json!({
+                "route": observed_route,
+                "rationale": format!(
+                    "captured promoted authority route for {}",
+                    fixture_slug(fixture_name)
+                ),
+            }),
+            confidence: 0.83,
+            trace: json!({
+                "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                "captured_from_runtime": true,
+                "authority_path": "promoted_contract",
+            }),
+        },
+        CompiledAgentSourcePhaseTraceEntry {
+            phase: String::from("tool_policy"),
+            manifest: tool_policy_manifest.clone(),
+            authority: String::from("promoted"),
+            candidate_label: None,
+            input: json!({
+                "user_request": user_request,
+                "route": observed_route,
+                "available_tools": compiled_agent_supported_tools(),
+            }),
+            output: json!({
+                "selected_tools": &selected_tools,
+                "rationale": "captured promoted tool policy from runtime",
+            }),
+            confidence: 0.91,
+            trace: json!({
+                "captured_from_runtime": true,
+                "authority_path": "promoted_contract",
+            }),
+        },
+        CompiledAgentSourcePhaseTraceEntry {
+            phase: String::from("tool_arguments"),
+            manifest: tool_arguments_manifest.clone(),
+            authority: String::from("promoted"),
+            candidate_label: None,
+            input: json!({
+                "user_request": user_request,
+                "route": observed_route,
+                "selected_tools": &selected_tools,
+            }),
+            output: json!({
+                "calls": &observed_tool_calls,
+            }),
+            confidence: 0.95,
+            trace: json!({
+                "tool_count": observed_tool_calls.len(),
+                "captured_from_runtime": true,
+            }),
+        },
+        CompiledAgentSourcePhaseTraceEntry {
+            phase: String::from("grounded_answer"),
+            manifest: grounded_answer_manifest.clone(),
+            authority: String::from("promoted"),
+            candidate_label: None,
+            input: json!({
+                "user_request": user_request,
+                "route": observed_route,
+                "tool_results": &observed_tool_results,
+            }),
+            output: json!({
+                "answer": observed_public_response.response,
+                "grounded_tool_names": observed_tool_calls
+                    .iter()
+                    .map(|call| call.tool_name.clone())
+                    .collect::<Vec<_>>(),
+            }),
+            confidence: 0.88,
+            trace: json!({
+                "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                "captured_from_runtime": true,
+                "response_kind": observed_public_response.kind,
+            }),
+        },
+        CompiledAgentSourcePhaseTraceEntry {
+            phase: String::from("verify"),
+            manifest: verify_manifest.clone(),
+            authority: String::from("promoted"),
+            candidate_label: None,
+            input: json!({
+                "user_request": user_request,
+                "route": observed_route,
+                "tool_calls": &observed_tool_calls,
+                "tool_results": &observed_tool_results,
+                "candidate_answer": observed_public_response.response,
+            }),
+            output: json!({
+                "verdict": verify_verdict,
+                "rationale": "captured promoted verify verdict from runtime",
+            }),
+            confidence: 0.9,
+            trace: json!({
+                "captured_from_runtime": true,
+                "authority_path": "promoted_contract",
+            }),
+        },
+    ];
+
+    let mut shadow_phases = Vec::new();
+    if let (Some(shadow_route), Some(shadow_public_response)) =
+        (shadow_route, shadow_public_response)
+    {
+        let shadow_tool_results = tool_results_for_route(shadow_route, &runtime_state);
+        let shadow_route_manifest = manifest_with_state(
+            "intent_route",
+            "intent_route",
+            "psionic_route_model",
+            "compiled_agent.route.multinomial_nb_v1",
+            "2026-03-29",
+            "candidate",
+            0.8,
+        );
+        let shadow_grounded_manifest = manifest_with_state(
+            "grounded_answer",
+            "grounded_answer",
+            "psionic_grounded_model",
+            "psionic_candidate",
+            "2026-03-29",
+            "candidate",
+            0.82,
+        );
+        let shadow_verify_manifest = manifest_with_state(
+            "verify",
+            "verify",
+            "psionic_grounded_model",
+            "psionic_candidate",
+            "2026-03-29",
+            "candidate",
+            0.82,
+        );
+        shadow_phases = vec![
+            CompiledAgentSourcePhaseTraceEntry {
+                phase: String::from("intent_route"),
+                manifest: shadow_route_manifest.clone(),
+                authority: String::from("shadow"),
+                candidate_label: Some(String::from("psionic_candidate")),
+                input: json!({ "user_request": user_request }),
+                output: json!({
+                    "route": shadow_route,
+                    "rationale": format!(
+                        "captured shadow route compare for {}",
+                        fixture_slug(fixture_name)
+                    ),
+                }),
+                confidence: 0.79,
+                trace: json!({
+                    "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                    "captured_from_runtime": true,
+                    "shadow_compare": true,
+                }),
+            },
+            CompiledAgentSourcePhaseTraceEntry {
+                phase: String::from("grounded_answer"),
+                manifest: shadow_grounded_manifest.clone(),
+                authority: String::from("shadow"),
+                candidate_label: Some(String::from("psionic_candidate")),
+                input: json!({
+                    "user_request": user_request,
+                    "route": shadow_route,
+                    "tool_results": &shadow_tool_results,
+                }),
+                output: json!({
+                    "answer": shadow_public_response.response,
+                    "response_kind": shadow_public_response.kind,
+                }),
+                confidence: 0.78,
+                trace: json!({
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "captured_from_runtime": true,
+                    "shadow_compare": true,
+                }),
+            },
+            CompiledAgentSourcePhaseTraceEntry {
+                phase: String::from("verify"),
+                manifest: shadow_verify_manifest.clone(),
+                authority: String::from("shadow"),
+                candidate_label: Some(String::from("psionic_candidate")),
+                input: json!({
+                    "user_request": user_request,
+                    "route": shadow_route,
+                    "tool_results": &shadow_tool_results,
+                    "candidate_answer": shadow_public_response.response,
+                }),
+                output: json!({
+                    "verdict": if shadow_public_response.kind == CompiledAgentPublicOutcomeKind::UnsupportedRefusal {
+                        "unsupported_refusal"
+                    } else {
+                        "accept_grounded_answer"
+                    },
+                    "rationale": "captured shadow verify verdict from runtime",
+                }),
+                confidence: 0.77,
+                trace: json!({
+                    "captured_from_runtime": true,
+                    "shadow_compare": true,
+                }),
+            },
+        ];
+    }
+
+    let authority_manifest_ids = vec![
+        route_manifest.manifest_id(),
+        tool_policy_manifest.manifest_id(),
+        tool_arguments_manifest.manifest_id(),
+        grounded_answer_manifest.manifest_id(),
+        verify_manifest.manifest_id(),
+    ];
+    let shadow_manifest_ids = shadow_phases
+        .iter()
+        .map(|phase| phase.manifest.manifest_id())
+        .collect::<Vec<_>>();
+
+    CompiledAgentSourceReceipt {
+        schema_version: 1,
+        evidence_class: CompiledAgentEvidenceClass::LearnedLane,
+        captured_at_epoch_ms,
+        state: runtime_state,
+        run: CompiledAgentSourceRun {
+            public_response: CompiledAgentSourcePublicResponse {
+                kind: observed_public_response.kind,
+                response: observed_public_response.response.clone(),
+            },
+            internal_trace: CompiledAgentSourceInternalTrace {
+                primary_phases,
+                shadow_phases,
+            },
+            lineage: CompiledAgentSourceLineage {
+                user_request: user_request.to_string(),
+                route: observed_route,
+                tool_calls: observed_tool_calls,
+                tool_results: observed_tool_results,
+                public_response: CompiledAgentSourcePublicResponse {
+                    kind: observed_public_response.kind,
+                    response: observed_public_response.response,
+                },
+                authority_manifest_ids,
+                shadow_manifest_ids,
+            },
+        },
+    }
+}
+
 fn manifest(
     module_name: &str,
     signature_name: &str,
@@ -1375,13 +1880,33 @@ fn manifest(
     version: &str,
     confidence_floor: f32,
 ) -> CompiledAgentSourceManifest {
+    manifest_with_state(
+        module_name,
+        signature_name,
+        implementation_family,
+        implementation_label,
+        version,
+        "promoted",
+        confidence_floor,
+    )
+}
+
+fn manifest_with_state(
+    module_name: &str,
+    signature_name: &str,
+    implementation_family: &str,
+    implementation_label: &str,
+    version: &str,
+    promotion_state: &str,
+    confidence_floor: f32,
+) -> CompiledAgentSourceManifest {
     CompiledAgentSourceManifest {
         module_name: module_name.to_string(),
         signature_name: signature_name.to_string(),
         implementation_family: implementation_family.to_string(),
         implementation_label: implementation_label.to_string(),
         version: version.to_string(),
-        promotion_state: String::from("promoted"),
+        promotion_state: promotion_state.to_string(),
         confidence_floor,
     }
 }
@@ -1461,11 +1986,11 @@ fn verify_confidence(scenario: &CanonicalSupervisionScenario) -> f32 {
 fn build_learning_receipt(
     source_fixture_ref: &str,
     source_receipt: &CompiledAgentSourceReceipt,
-    scenario: &CanonicalSupervisionScenario,
+    label: &CompiledAgentGovernedReceiptLabel,
 ) -> Result<CompiledAgentLearningReceipt, CompiledAgentReceiptError> {
     let observed_route = source_receipt.run.lineage.route;
-    let expected_route = scenario.expected_route;
-    let expected_response = scenario.expected_public_response.clone();
+    let expected_route = label.expected_route;
+    let expected_response = label.expected_public_response.clone();
     let observed_response = CompiledAgentLearningPublicResponse {
         kind: source_receipt.run.public_response.kind,
         response: source_receipt.run.public_response.response.clone(),
@@ -1545,7 +2070,7 @@ fn build_learning_receipt(
         authority_manifest_ids: source_receipt.run.lineage.authority_manifest_ids.clone(),
         shadow_manifest_ids: source_receipt.run.lineage.shadow_manifest_ids.clone(),
         primary_phase_confidences,
-        corpus_split: scenario.corpus_split,
+        corpus_split: label.corpus_split,
         assessment: CompiledAgentLearningAssessment {
             route_correct,
             tool_policy_correct,
@@ -1559,8 +2084,8 @@ fn build_learning_receipt(
                 && verify_correct,
             failure_classes,
         },
-        tags: scenario.tags.iter().map(|tag| (*tag).to_string()).collect(),
-        operator_note: scenario.operator_note.to_string(),
+        tags: label.tags.clone(),
+        operator_note: label.operator_note.clone(),
         receipt_digest: String::new(),
     };
     receipt.receipt_digest = stable_digest(b"compiled_agent_learning_receipt|", &receipt);
@@ -1944,9 +2469,11 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         canonical_compiled_agent_learning_receipt_ledger, canonical_compiled_agent_replay_bundle,
+        canonical_compiled_agent_runtime_source_receipts,
         canonical_compiled_agent_source_receipts,
         compiled_agent_learning_receipt_ledger_fixture_path,
-        compiled_agent_replay_bundle_fixture_path, compiled_agent_source_fixture_dir,
+        compiled_agent_replay_bundle_fixture_path, compiled_agent_runtime_fixture_dir,
+        compiled_agent_source_fixture_dir,
         verify_compiled_agent_learning_receipt_fixtures,
     };
     use psionic_eval::CompiledAgentEvidenceClass;
@@ -1955,18 +2482,22 @@ mod tests {
     fn compiled_agent_learning_ledger_retains_training_and_held_out_rows(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let ledger = canonical_compiled_agent_learning_receipt_ledger()?;
-        assert_eq!(ledger.receipts.len(), 30);
+        assert_eq!(ledger.receipts.len(), 32);
         assert_eq!(
             ledger.evidence_class,
             CompiledAgentEvidenceClass::LearnedLane
         );
-        assert_eq!(ledger.training_receipt_ids.len(), 18);
-        assert_eq!(ledger.held_out_receipt_ids.len(), 12);
-        assert_eq!(ledger.correction_receipt_ids.len(), 18);
+        assert_eq!(ledger.training_receipt_ids.len(), 19);
+        assert_eq!(ledger.held_out_receipt_ids.len(), 13);
+        assert_eq!(ledger.correction_receipt_ids.len(), 19);
         assert!(ledger
             .correction_receipt_ids
             .iter()
             .any(|receipt_id| receipt_id.contains("negated_wallet")));
+        assert!(ledger
+            .source_fixture_refs
+            .iter()
+            .any(|fixture| fixture.contains("/runtime/")));
         assert!(ledger.task_family_counts.get("provider").copied().unwrap_or(0) >= 6);
         assert!(ledger.task_family_counts.get("wallet").copied().unwrap_or(0) >= 10);
         assert!(
@@ -1981,7 +2512,7 @@ mod tests {
             ledger
                 .failure_class_counts
                 .get("negated_route_false_positive"),
-            Some(&2)
+            Some(&3)
         );
         Ok(())
     }
@@ -1994,12 +2525,12 @@ mod tests {
             bundle.evidence_class,
             CompiledAgentEvidenceClass::LearnedLane
         );
-        assert_eq!(bundle.training_receipt_ids.len(), 18);
-        assert_eq!(bundle.excluded_held_out_receipt_ids.len(), 12);
-        assert_eq!(bundle.module_sample_counts.get("route"), Some(&18));
+        assert_eq!(bundle.training_receipt_ids.len(), 19);
+        assert_eq!(bundle.excluded_held_out_receipt_ids.len(), 13);
+        assert_eq!(bundle.module_sample_counts.get("route"), Some(&19));
         assert_eq!(
             bundle.module_sample_counts.get("grounded_answer"),
-            Some(&18)
+            Some(&19)
         );
         assert!(bundle.correction_sample_count >= 10);
         Ok(())
@@ -2010,6 +2541,11 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         for (fixture_name, _) in canonical_compiled_agent_source_receipts() {
             assert!(compiled_agent_source_fixture_dir()
+                .join(fixture_name)
+                .exists());
+        }
+        for (fixture_name, _) in canonical_compiled_agent_runtime_source_receipts() {
+            assert!(compiled_agent_runtime_fixture_dir()
                 .join(fixture_name)
                 .exists());
         }

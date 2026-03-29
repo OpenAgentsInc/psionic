@@ -15,13 +15,15 @@ The current admitted task families stay intentionally narrow:
 
 ## Current Retained Counts
 
-- 30 retained source receipts
-- 18 training receipts
-- 12 held-out receipts
-- 36 replay samples
-- 18 route replay samples
-- 18 grounded-answer replay samples
-- 15 replay correction samples
+- 30 retained benchmark-style source receipts
+- 2 retained sanitized runtime receipts
+- 32 governed learning receipts
+- 19 training receipts
+- 13 held-out receipts
+- 38 replay samples
+- 19 route replay samples
+- 19 grounded-answer replay samples
+- 17 replay correction samples
 
 ## Training vs Held-Out Split
 
@@ -56,17 +58,19 @@ The expanded source receipts now cover:
 - route ambiguity
 - grounded synthesis drift
 - confidence-edge prompts that try to force an answer without supported facts
+- runtime shadow disagreement between promoted and candidate authority
+- runtime supported-wallet lineage captured under the same held-out contract
 
 ## Latest Honest Validator Result
 
 The widened held-out split did what it was supposed to do:
 
-- the route candidate still improves replay matches `13 -> 18`
+- the route candidate still improves replay matches `14 -> 19`
 - the route candidate no longer promotes because the held-out comparison row
   `openagents_wallet_provider_compare_heldout_receipt_v1` exposed a real
-  ambiguity regression
-- the grounded-answer candidate still promotes with replay matches `12 -> 18`
-  and held-out matches `7 -> 10`
+  ambiguity regression; held-out matches stay `8 -> 8`
+- the grounded-answer candidate still promotes with replay matches `13 -> 19`
+  and held-out matches `7 -> 11`
 
 This is the right phase-three outcome. Corpus growth made the bounded loop more
 credible by surfacing a route hold instead of letting the smaller proof bundle
@@ -77,6 +81,10 @@ overclaim generalization.
 Source receipts:
 
 - `fixtures/compiled_agent/source/`
+
+Runtime receipts:
+
+- `fixtures/compiled_agent/runtime/`
 
 Normalized learning ledger:
 

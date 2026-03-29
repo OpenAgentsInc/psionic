@@ -4,16 +4,16 @@
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "model_family": "multinomial_naive_bayes",
   "feature_profile": "route_plus_fact_signature",
-  "replay_bundle_digest": "a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8",
-  "training_sample_count": 18,
-  "heldout_sample_count": 12,
+  "replay_bundle_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+  "training_sample_count": 19,
+  "heldout_sample_count": 13,
   "vocabulary_size": 13,
   "smoothing_alpha": 1.0,
   "class_priors_log": {
-    "provider_ready": -1.5040773967762742,
-    "provider_blocked": -2.890371757896165,
-    "wallet_balance_with_recent_earnings": -1.0986122886681098,
-    "unsupported_refusal": -0.9444616088408514
+    "provider_ready": -1.55814461804655,
+    "provider_blocked": -2.9444389791664407,
+    "wallet_balance_with_recent_earnings": -1.1526795099383855,
+    "unsupported_refusal": -0.8649974374866046
   },
   "class_feature_log_probs": {
     "provider_ready": {
@@ -62,26 +62,26 @@
       "wallet_recent_earnings_zero:false": -1.8152899666382492
     },
     "unsupported_refusal": {
-      "provider_blocker_count:0": -2.995732273553991,
-      "provider_blocker_count:1": -2.995732273553991,
-      "provider_blockers_present:false": -2.995732273553991,
-      "provider_blockers_present:true": -2.995732273553991,
-      "provider_ready:false": -2.995732273553991,
-      "provider_ready:true": -2.995732273553991,
-      "route:provider_status": -2.995732273553991,
-      "route:unsupported": -0.916290731874155,
-      "route:wallet_status": -2.995732273553991,
-      "wallet_balance_present:true": -2.995732273553991,
-      "wallet_balance_zero:false": -2.995732273553991,
-      "wallet_recent_earnings_present:true": -2.995732273553991,
-      "wallet_recent_earnings_zero:false": -2.995732273553991
+      "provider_blocker_count:0": -3.044522437723423,
+      "provider_blocker_count:1": -3.044522437723423,
+      "provider_blockers_present:false": -3.044522437723423,
+      "provider_blockers_present:true": -3.044522437723423,
+      "provider_ready:false": -3.044522437723423,
+      "provider_ready:true": -3.044522437723423,
+      "route:provider_status": -3.044522437723423,
+      "route:unsupported": -0.8472978603872037,
+      "route:wallet_status": -3.044522437723423,
+      "wallet_balance_present:true": -3.044522437723423,
+      "wallet_balance_zero:false": -3.044522437723423,
+      "wallet_recent_earnings_present:true": -3.044522437723423,
+      "wallet_recent_earnings_zero:false": -3.044522437723423
     }
   },
   "class_default_feature_log_probs": {
     "provider_ready": -3.367295829986474,
     "provider_blocked": -2.833213344056216,
     "wallet_balance_with_recent_earnings": -3.7612001156935624,
-    "unsupported_refusal": -2.995732273553991
+    "unsupported_refusal": -3.044522437723423
   },
   "program_templates": {
     "provider_ready": "Provider is ready to go online.",
@@ -109,7 +109,8 @@
     "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
     "sample.grounded_answer.receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1",
     "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
-    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1"
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1",
+    "sample.grounded_answer.receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
   ],
   "heldout_sample_ids": [
     "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
@@ -123,10 +124,11 @@
     "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
     "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
     "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
-    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1"
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
+    "heldout.grounded_answer.receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1"
   ],
   "training_accuracy": 1.0,
-  "heldout_accuracy": 0.8333333,
+  "heldout_accuracy": 0.84615386,
   "detail": "Trained grounded-answer model over explicit fact signatures only. The model predicts a narrow grounded-answer program from supplied tool facts and falls back on missing or conflicting facts instead of inventing unsupported synthesis.",
-  "artifact_digest": "fbce731ad2b680a4cd1983e6127ebd140c8da40a7d1018cbc53b18b17a86ec01"
+  "artifact_digest": "1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f"
 }
