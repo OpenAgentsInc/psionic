@@ -30,6 +30,13 @@ pub enum CompiledAgentPublicOutcomeKind {
     ConfidenceFallback,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompiledAgentEvidenceClass {
+    LearnedLane,
+    StrongerEvidenceLane,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CompiledAgentToolSpec {
     pub name: String,

@@ -35,6 +35,7 @@ Top-level fields:
 - `schema_version`
 - `ledger_id`
 - `row_id`
+- `evidence_class`
 - `promoted_entry_count`
 - `candidate_entry_count`
 - `entries_by_module`
@@ -53,6 +54,7 @@ Each artifact entry records:
 - confidence floor
 - artifact id and digest
 - default learned row identity
+- evidence class
 - validator lineage
 - predecessor and rollback artifact ids when applicable
 - typed payload for either:
@@ -87,11 +89,17 @@ For the first graph:
 - shadow comparison loads from `lifecycle_state = candidate` plus the requested
   `candidate_label`
 - rollback should route to `rollback_artifact_id` when present
+- every artifact entry in the current contract stays inside `learned_lane`
 - receipts should retain:
   - artifact id
   - artifact digest
   - manifest id
   - candidate label when used
+
+Consumers must not merge later stronger-evidence artifacts into this learned
+contract implicitly. If a future stronger-evidence lane is introduced, it needs
+its own explicit contract rows and validator lineage rather than retroactively
+changing the meaning of this learned-lane promotion surface.
 
 ## Honest Boundary
 

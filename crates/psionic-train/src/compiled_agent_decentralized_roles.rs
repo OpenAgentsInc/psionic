@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use psionic_eval::CompiledAgentEvidenceClass;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -56,6 +57,14 @@ pub enum CompiledAgentDecentralizedRolesError {
     InvalidReceipts { detail: String },
     #[error("fixture `{path}` drifted from the canonical generator output")]
     FixtureDrift { path: String },
+    #[error(
+        "compiled-agent evidence class drifted in `{context}`: expected `{expected:?}` but found `{actual:?}`"
+    )]
+    MixedEvidenceClass {
+        context: String,
+        expected: CompiledAgentEvidenceClass,
+        actual: CompiledAgentEvidenceClass,
+    },
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
@@ -88,6 +97,8 @@ pub enum CompiledAgentRoleReceiptStatus {
 pub struct CompiledAgentRoleArtifactRef {
     pub artifact_ref: String,
     pub schema_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_class: Option<CompiledAgentEvidenceClass>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub digest_field: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -143,6 +154,7 @@ pub struct CompiledAgentDecentralizedRolesAuthorityPaths {
 pub struct CompiledAgentDecentralizedRolesContract {
     pub schema_version: String,
     pub contract_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub source_artifacts: Vec<CompiledAgentRoleArtifactRef>,
     pub roles: Vec<CompiledAgentDecentralizedRoleDefinition>,
     pub authority_paths: CompiledAgentDecentralizedRolesAuthorityPaths,
@@ -154,6 +166,7 @@ pub struct CompiledAgentDecentralizedRolesContract {
 pub struct CompiledAgentDecentralizedRoleReceipt {
     pub role: CompiledAgentDecentralizedRoleKind,
     pub receipt_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub status: CompiledAgentRoleReceiptStatus,
     pub input_refs: Vec<String>,
     pub output_refs: Vec<String>,
@@ -227,6 +240,18 @@ impl CompiledAgentDecentralizedRolesContract {
                 detail: String::from("source artifact refs drifted"),
             });
         }
+        for artifact in &self.source_artifacts {
+            if let Some(actual) = artifact.evidence_class {
+                ensure_matching_evidence_class(
+                    self.evidence_class,
+                    actual,
+                    format!(
+                        "compiled_agent_decentralized_roles_contract source {}",
+                        artifact.artifact_ref
+                    ),
+                )?;
+            }
+        }
 
         for role in &self.roles {
             if role.receipt_schema_version
@@ -296,6 +321,14 @@ impl CompiledAgentDecentralizedRoleReceipts {
         }
 
         for receipt in &self.receipts {
+            ensure_matching_evidence_class(
+                contract.evidence_class,
+                receipt.evidence_class,
+                format!(
+                    "compiled_agent_decentralized_role_receipt {}",
+                    receipt.receipt_id
+                ),
+            )?;
             let role = contract
                 .roles
                 .iter()
@@ -598,6 +631,7 @@ pub fn canonical_compiled_agent_decentralized_roles_contract(
     let mut contract = CompiledAgentDecentralizedRolesContract {
         schema_version: String::from(COMPILED_AGENT_DECENTRALIZED_ROLES_CONTRACT_SCHEMA_VERSION),
         contract_id: String::from(COMPILED_AGENT_DECENTRALIZED_ROLES_CONTRACT_ID),
+        evidence_class: CompiledAgentEvidenceClass::LearnedLane,
         source_artifacts,
         roles,
         authority_paths: CompiledAgentDecentralizedRolesAuthorityPaths {
@@ -623,6 +657,7 @@ pub fn canonical_compiled_agent_decentralized_role_receipts(
         CompiledAgentDecentralizedRoleReceipt {
             role: CompiledAgentDecentralizedRoleKind::ReplayGeneration,
             receipt_id: String::from("compiled_agent.role_receipt.replay_generation.v1"),
+            evidence_class: contract.evidence_class,
             status: CompiledAgentRoleReceiptStatus::AcceptedAfterHumanReview,
             input_refs: vec![String::from(LEARNING_RECEIPTS_REF)],
             output_refs: vec![String::from(REPLAY_BUNDLE_REF)],
@@ -639,6 +674,7 @@ pub fn canonical_compiled_agent_decentralized_role_receipts(
         CompiledAgentDecentralizedRoleReceipt {
             role: CompiledAgentDecentralizedRoleKind::RankingLabeling,
             receipt_id: String::from("compiled_agent.role_receipt.ranking_labeling.v1"),
+            evidence_class: contract.evidence_class,
             status: CompiledAgentRoleReceiptStatus::AcceptedAfterHumanReview,
             input_refs: vec![String::from(LEARNING_RECEIPTS_REF), String::from(REPLAY_BUNDLE_REF)],
             output_refs: vec![String::from(LEARNING_RECEIPTS_REF), String::from(REPLAY_BUNDLE_REF)],
@@ -655,6 +691,7 @@ pub fn canonical_compiled_agent_decentralized_role_receipts(
         CompiledAgentDecentralizedRoleReceipt {
             role: CompiledAgentDecentralizedRoleKind::ValidatorScoring,
             receipt_id: String::from("compiled_agent.role_receipt.validator_scoring.v1"),
+            evidence_class: contract.evidence_class,
             status: CompiledAgentRoleReceiptStatus::AcceptedAfterValidatorGate,
             input_refs: vec![
                 String::from(ROUTE_MODEL_REF),
@@ -677,6 +714,7 @@ pub fn canonical_compiled_agent_decentralized_role_receipts(
         CompiledAgentDecentralizedRoleReceipt {
             role: CompiledAgentDecentralizedRoleKind::BoundedModuleTraining,
             receipt_id: String::from("compiled_agent.role_receipt.bounded_module_training.v1"),
+            evidence_class: contract.evidence_class,
             status: CompiledAgentRoleReceiptStatus::QueuedForValidatorScoring,
             input_refs: vec![
                 String::from(DEFAULT_ROW_REF),
@@ -888,6 +926,11 @@ fn load_artifact_ref(
         .get("schema_version")
         .map(value_to_string)
         .unwrap_or_else(|| String::from("unknown"));
+    let evidence_class = value
+        .get("evidence_class")
+        .map(|value| serde_json::from_value(value.clone()))
+        .transpose()
+        .map_err(CompiledAgentDecentralizedRolesError::Json)?;
     let artifact_digest = digest_field
         .and_then(|field| value.get(field))
         .map(value_to_string);
@@ -907,12 +950,29 @@ fn load_artifact_ref(
     Ok(CompiledAgentRoleArtifactRef {
         artifact_ref: String::from(artifact_ref),
         schema_version,
+        evidence_class,
         digest_field: digest_field.map(String::from),
         artifact_digest,
         identity_field: identity_field.map(String::from),
         identity_value,
         detail: String::from(detail),
     })
+}
+
+fn ensure_matching_evidence_class(
+    expected: CompiledAgentEvidenceClass,
+    actual: CompiledAgentEvidenceClass,
+    context: String,
+) -> Result<(), CompiledAgentDecentralizedRolesError> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(CompiledAgentDecentralizedRolesError::MixedEvidenceClass {
+            context,
+            expected,
+            actual,
+        })
+    }
 }
 
 fn local_reference_path(
@@ -980,12 +1040,17 @@ mod tests {
         canonical_compiled_agent_decentralized_roles_contract,
         verify_compiled_agent_decentralized_role_fixtures, CompiledAgentDecentralizedRoleKind,
     };
+    use psionic_eval::CompiledAgentEvidenceClass;
 
     #[test]
     fn compiled_agent_decentralized_roles_contract_is_valid(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let contract = canonical_compiled_agent_decentralized_roles_contract()?;
         contract.validate()?;
+        assert_eq!(
+            contract.evidence_class,
+            CompiledAgentEvidenceClass::LearnedLane
+        );
         assert_eq!(contract.roles.len(), 4);
         assert!(contract
             .roles
@@ -1001,6 +1066,10 @@ mod tests {
         let receipts = canonical_compiled_agent_decentralized_role_receipts()?;
         receipts.validate(&contract)?;
         assert_eq!(receipts.receipts.len(), 4);
+        assert!(receipts
+            .receipts
+            .iter()
+            .all(|receipt| receipt.evidence_class == CompiledAgentEvidenceClass::LearnedLane));
         Ok(())
     }
 

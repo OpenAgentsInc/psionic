@@ -3,6 +3,7 @@
   "ledger_id": "compiled_agent.learning_receipt_ledger.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+  "evidence_class": "learned_lane",
   "source_fixture_refs": [
     "fixtures/compiled_agent/source/openagents_provider_ready_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_provider_blocked_receipt_v1.json",
@@ -82,7 +83,8 @@
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_provider_ready_receipt_v1.json",
-      "source_receipt_digest": "8caaf63cec98971cd3d8b1385fbb6c5c34318770afe0110ec45f3f83b14ac6a1",
+      "source_receipt_digest": "893c7de977d70e8da4cdb948e12f678a1ee201be78828d862deb639ac4f1fa8f",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262001,
       "user_request": "Can I go online right now?",
       "runtime_state": {
@@ -153,12 +155,13 @@
         "training"
       ],
       "operator_note": "Training success row for the narrow provider-ready path.",
-      "receipt_digest": "6c54400da168c15a0384b38ebf7bd9e1d675801c6df90e4fceb6afe4da263ec5"
+      "receipt_digest": "6d98e0db7c53305ab7495038753456ba3014676d8b181c89483b4227288e472a"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_provider_blocked_receipt_v1.json",
-      "source_receipt_digest": "145b3197cfe1b011ef214dfed3e479866ec88269c6eeeb73126303c209d4fe24",
+      "source_receipt_digest": "c332abece094a4e92cb525f683d31a22d4eb961d5ce74b2b748d58b25e72160a",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262002,
       "user_request": "Why can't I go online yet?",
       "runtime_state": {
@@ -234,12 +237,13 @@
         "training"
       ],
       "operator_note": "Training success row for provider-blocked grounding without widening into blocker summaries.",
-      "receipt_digest": "b04804605975b7d5da5a5821484ea06e633cd3e4d206bf885619c3ffcc1fd682"
+      "receipt_digest": "34ddb3c472a56c9e194f4fb35db963b7210df8e2dbb9b0745078d0c1f2262c06"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_provider_readiness_variant_receipt_v1.json",
-      "source_receipt_digest": "d75c06f77cd0f262b74e0381fee74077a3408a531c9ae4eaa5b63fcce68e2c76",
+      "source_receipt_digest": "cc5475d15bcfaf131521af4746e87b3ab3a959a227e901eb04c9bc9f7080b282",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262003,
       "user_request": "Is the provider ready for me to go online?",
       "runtime_state": {
@@ -311,12 +315,13 @@
         "training"
       ],
       "operator_note": "Training success row for a second provider-readiness phrasing.",
-      "receipt_digest": "e2db2b60704a5666c6ecdefb566d9a391ae8fb005870bd44440835ae0e99547e"
+      "receipt_digest": "1b8bc0da53982ad42f1be0a1698fe7d28eb3595af38718d36b42e446bab5c1bc"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_receipt_v1.json",
-      "source_receipt_digest": "e69c7838118b67788fa0a1ab2ec3ba45b9d619755765981a142a6598631573cd",
+      "source_receipt_digest": "4147c53958ce7c6321a9777e1191b2b4035f0896fc7247b7c11c2da744cd11ad",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262004,
       "user_request": "How many sats are in the wallet?",
       "runtime_state": {
@@ -393,12 +398,13 @@
         "correction_required"
       ],
       "operator_note": "Training correction row showing that the current authority still omits recent earnings on a plain wallet-balance request.",
-      "receipt_digest": "9777847edf4a0be188ae8af3590441e85fcf64dddbc3b696a18ebac3be435bdb"
+      "receipt_digest": "ed33b495fd686440ec8880a22fa738b6f9b1b67e38110464b8a8f7a96c2f1320"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_recent_earnings_receipt_v1.json",
-      "source_receipt_digest": "4fe7b9d184c22ee173500e0c0ea31debd240e8a9eb04870040dbeb12c60f374f",
+      "source_receipt_digest": "4b5259d86a6923a3285fc2aed88c443b5b0741c0b2f940992b90af23898eecb9",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262005,
       "user_request": "How many sats are in the wallet, and what are the recent earnings?",
       "runtime_state": {
@@ -475,12 +481,13 @@
         "correction_required"
       ],
       "operator_note": "Training correction row for an explicit wallet-plus-earnings request.",
-      "receipt_digest": "0336afc51a45e1ab065902bb07eeddbbced8dae7382382f8ba150a3d4cbfecaf"
+      "receipt_digest": "2d8a12a5c758314f8fd657f9924200dcf5b71b0f773c38135368ef7c69d035be"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_recent_earnings_phrase_receipt_v1.json",
-      "source_receipt_digest": "c3958e29df26234efabb66ebfd4a35fbb89f9ff155d8814f467edf801c5ab4d5",
+      "source_receipt_digest": "6f2c816175ad6703cc9e1fc1cc8d5ad0dacee6b52f8f215a07edc907eb02b054",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262006,
       "user_request": "What are my recent earnings in sats?",
       "runtime_state": {
@@ -557,12 +564,13 @@
         "correction_required"
       ],
       "operator_note": "Training correction row for a recent-earnings phrasing that still lands on the wallet lane.",
-      "receipt_digest": "437302b9611a31e590834023a91e1ed27cc216d4345d2babf21540f64efc9e44"
+      "receipt_digest": "48fbb85bd316f65118444c9d77cc8cda4bb4328b92e803be2c88101a9d110b69"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_balance_variant_receipt_v1.json",
-      "source_receipt_digest": "07ee55da0d548e7319358aebee547b7110f16c31984d29430b369f737681a882",
+      "source_receipt_digest": "613bef03fc5a94d1f24d8b319fd526a9506271d02130bb5a7367b1ad432ef52e",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 17747602620065,
       "user_request": "Tell me the wallet balance.",
       "runtime_state": {
@@ -638,12 +646,13 @@
         "correction_required"
       ],
       "operator_note": "Training correction row for a second wallet-balance phrasing so held-out balance requests are not the only non-question wording in the corpus.",
-      "receipt_digest": "5995c45cf258cde8104c2d3348a49468d52fbc9afb9bcb184ba1a5cb1e5a71c2"
+      "receipt_digest": "3a6b408c18a441a08631696fa9e1b2a9b65f6088f770bd08fceee4b796ea5127"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_unsupported_receipt_v1.json",
-      "source_receipt_digest": "5bc6c173f7d7f2f72cbb395b52a7e346f2ecaa335184cf43d45d6fb7612c25f2",
+      "source_receipt_digest": "bbb93007076aa48bcc4cfc86618cb25439ec4a7439dc992ac50b5e7051be5078",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262007,
       "user_request": "Write a poem about GPUs.",
       "runtime_state": {
@@ -697,12 +706,13 @@
         "training"
       ],
       "operator_note": "Training success row for the canonical unsupported refusal.",
-      "receipt_digest": "fa1d2aebd25d72cda875942fc8e2dd37649a1a574580e487a691d3a16fb73752"
+      "receipt_digest": "b76637b487e81d677060121f2f7f044d74d5fb715083a76b73afef6d283daed8"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_unsupported_restart_rig_receipt_v1.json",
-      "source_receipt_digest": "945b931293ae708e3978fd3ac9e9648c9d76bfb1bf97b003e3f67f8e6b141bf7",
+      "source_receipt_digest": "fbe01d30cb7777c842b15770deaa52e061023f33d6cc9434f0645348a93526ae",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262008,
       "user_request": "Restart my mining rig.",
       "runtime_state": {
@@ -757,12 +767,13 @@
         "provider_unrelated"
       ],
       "operator_note": "Training success row for a second unsupported request that stays cleanly refused.",
-      "receipt_digest": "9eb7a9828d93aec6a03710911942cca17521bf975365298aceb90414c466cce2"
+      "receipt_digest": "8aa17da80d6ae86dab916d56b48d9a92fa5afdbdd7d9fb05e02744cc7343579c"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_unsupported_calendar_receipt_v1.json",
-      "source_receipt_digest": "0644b5436af4eda62c4922e3a99cf6487963b0e2ec6807e395dd30a9bdd23774",
+      "source_receipt_digest": "60480f73f7f51611c97c7524ae92b65aaae46732a753886abdc4f8f65ef659ce",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 17747602620085,
       "user_request": "Create a calendar reminder for tomorrow.",
       "runtime_state": {
@@ -816,12 +827,13 @@
         "training"
       ],
       "operator_note": "Training success row for a calendar-style unsupported request so held-out scheduling prompts are not out-of-vocabulary.",
-      "receipt_digest": "a50e42375e26d3f44ab4dc7539cd66952c27b448de0e7879b850c581ac5cb47c"
+      "receipt_digest": "cbcc2ab5e047d12715314ccf8daeade8dd488f9e44b613e46614496156e02bdf"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_receipt_v1.json",
-      "source_receipt_digest": "eb0dcaedd062b659d945d1627753aa3534366453c662bfd9884bfd1491f3b96a",
+      "source_receipt_digest": "f90d3d27eea8281110d2a0a5341f83d68689d86bdbbc9f08e82b920385d51727",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262009,
       "user_request": "Should I go online or check the wallet balance first?",
       "runtime_state": {
@@ -875,12 +887,13 @@
         "training"
       ],
       "operator_note": "Training success row for ambiguous provider-versus-wallet phrasing that should refuse instead of guessing.",
-      "receipt_digest": "f0fba5c1e9a41aa8e176a0ddbfb2bc812e50c7807ab43dd3e86e22e95ff94c1b"
+      "receipt_digest": "cbc3e96ec61927fd7d27d788e62e4219ca88d70279d5156a0a07f0d89eb34dd9"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_negated_wallet_receipt_v1.json",
-      "source_receipt_digest": "0b34c6738cf7c68647cc7597b5c63d893fea1d2aba755e2228f087b731dff92d",
+      "source_receipt_digest": "e7fafcf6ce175cb9cc1c11dfe862ef99c1dd6e7c186f2628d6670f55c72bb240",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262010,
       "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
       "runtime_state": {
@@ -956,12 +969,13 @@
         "correction_required"
       ],
       "operator_note": "Training correction row for the first negated wallet false positive.",
-      "receipt_digest": "88e0688416d13b17d301afd6b8d2642b6872f7f972acaf45862e13a7dab55036"
+      "receipt_digest": "f2b5dd070f7cc11e5a0ae8a1a1be6d8751d30b07b696842706383dc31091d340"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_provider_account_ready_receipt_v1.json",
-      "source_receipt_digest": "ff3c1b0936b43b25bb6d3de5a433886b584a53f17d77db85fb0fb239463775ab",
+      "source_receipt_digest": "bd50d0b3416221ce33c09263ecedaf5b9de47b8ec15f57eeeaeeebcc2132bf68",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262011,
       "user_request": "Is my provider account ready?",
       "runtime_state": {
@@ -1033,12 +1047,13 @@
         "held_out"
       ],
       "operator_note": "Held-out provider-readiness phrasing for route and grounding validation.",
-      "receipt_digest": "d15bcaf9ec3cd3b935ac6163e37d16057ab1f42efeebcfb9760b93f0a42c51d1"
+      "receipt_digest": "6d4d6b94cb72473f37e0dd6a6ed75ccc31b0a86ad3a7476d0f596daee3bba639"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_balance_phrase_receipt_v1.json",
-      "source_receipt_digest": "e7a99bab483b80163d4c5d85101b96ec94248b2ee97a7065936058c3ca00a05c",
+      "source_receipt_digest": "17835153686ad0691d3ae8fa5ead3b38d147939f979deccb37431d0ccc9f6ec2",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262012,
       "user_request": "Show me the wallet balance.",
       "runtime_state": {
@@ -1114,12 +1129,13 @@
         "correction_required"
       ],
       "operator_note": "Held-out wallet phrasing to measure whether grounded-answer gains generalize past the replay rows.",
-      "receipt_digest": "e58c90b18500a38c8d7b0405feb94328faf8f26891ac05b8e3ccc0483f412237"
+      "receipt_digest": "89283221bc5c318ee7d929dca9cd2db97734a1ec37b47f0b20eff77e63ccf7e5"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_heldout_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_heldout_receipt_v1.json",
-      "source_receipt_digest": "82576dafc336dc7f67fc555e6c255c395403c95e6d5d8e7b1274cbd6a94856d0",
+      "source_receipt_digest": "4d57d42add89bd45a2b15dc084cea17cef36452acaaf3c02c8314924e10a7a83",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262013,
       "user_request": "Should I check provider status or the wallet balance first?",
       "runtime_state": {
@@ -1173,12 +1189,13 @@
         "held_out"
       ],
       "operator_note": "Held-out ambiguity row for route behavior that should still refuse instead of guessing.",
-      "receipt_digest": "27b2a6dafac7c400bfb39075fd0e2e5161ebb5c8a8b8d38862a83e7a1410c3bb"
+      "receipt_digest": "1e52adf15d3408f0b38ce793d23856c8390f0fb86299de18206c1404d617c21a"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_negated_provider_receipt_v1.json",
-      "source_receipt_digest": "91558db3ef56365282829cda9ac4110ad73aed24650e6502e27ff94fa36df99b",
+      "source_receipt_digest": "36734ee9a8ee2f3661b2b2c5c3e0b106317a98b008b74973f396aaf86580ba25",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262014,
       "user_request": "Do not tell me if I can go online; write a poem about GPUs.",
       "runtime_state": {
@@ -1254,12 +1271,13 @@
         "correction_required"
       ],
       "operator_note": "Held-out negated provider row mirroring the wallet false-positive class without sharing the exact replay wording.",
-      "receipt_digest": "18dc2d108001ff870000ad3b26b1555ac25544067bff1b2f05b5aaab81051642"
+      "receipt_digest": "b8c971e15512383fd66a2ee4a52e1097107ee8d3ad7ec823a508318cca078939"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_earnings_phrase_heldout_receipt_v1.json",
-      "source_receipt_digest": "1fb77f70fdff1f10f9ca686fde5047edc0ea62d642241781dcc81d0d8a6fbc00",
+      "source_receipt_digest": "2affd7392768ccc1d1f99bdebe623457ea7abb7e77040ced4a427c970876c993",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262015,
       "user_request": "Give me my wallet balance plus recent earnings.",
       "runtime_state": {
@@ -1335,12 +1353,13 @@
         "correction_required"
       ],
       "operator_note": "Held-out wallet-plus-earnings row for testing generalization beyond the replay bundle.",
-      "receipt_digest": "73080f462d7bb9e512d1ac116f06ac9ed95baa20e213b6d7f93f799cf86feeff"
+      "receipt_digest": "6fb42339070c1a34a0fdf8297985a43c0468d6d59549e5956eab7d5e8bf8e256"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_schedule_meeting_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_unsupported_schedule_meeting_receipt_v1.json",
-      "source_receipt_digest": "3a313de8e75784ea67d6c564fa98de813dcb98471ca778eebad16a506a615f12",
+      "source_receipt_digest": "565619b9255f1b9bd447a2a046548dcd48e2dbe20fffbd4cd865ef3e61a18b7c",
+      "evidence_class": "learned_lane",
       "captured_at_epoch_ms": 1774760262016,
       "user_request": "Schedule a meeting for tomorrow.",
       "runtime_state": {
@@ -1394,9 +1413,9 @@
         "held_out"
       ],
       "operator_note": "Held-out unsupported request to keep refusal quality measured away from the replay bundle.",
-      "receipt_digest": "ec7963b7db35c69b426fc92dc4c8b1f2f03848856e6573915208bfad72c1d24d"
+      "receipt_digest": "c3f89c48f99dd2044a874ecc04c0749e5c7c3fba96c5ec1cb9d0e6b626e2e420"
     }
   ],
   "summary": "Compiled-agent learning ledger retains 18 source receipts (12 training, 6 held-out) with 10 fully-correct rows and 8 correction rows.",
-  "ledger_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3"
+  "ledger_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7"
 }

@@ -3,7 +3,8 @@
   "bundle_id": "compiled_agent.replay_bundle.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "baseline_revision_id": "compiled_agent.baseline.rule_v1",
-  "source_ledger_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+  "evidence_class": "learned_lane",
+  "source_ledger_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
   "training_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
     "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
@@ -36,6 +37,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -57,6 +59,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -90,6 +93,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -112,6 +116,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -148,6 +153,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -170,6 +176,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -204,6 +211,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -228,6 +236,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "failure_correction",
       "tags": [
         "supported",
@@ -267,6 +276,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -291,6 +301,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "failure_correction",
       "tags": [
         "supported",
@@ -330,6 +341,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -354,6 +366,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "failure_correction",
       "tags": [
         "supported",
@@ -393,6 +406,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
@@ -416,6 +430,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "failure_correction",
       "tags": [
         "supported",
@@ -454,6 +469,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -475,6 +491,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -500,6 +517,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -522,6 +540,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -548,6 +567,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -569,6 +589,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -594,6 +615,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -615,6 +637,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "behavioral_clone",
       "tags": [
         "unsupported",
@@ -640,6 +663,7 @@
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "failure_correction",
       "tags": [
         "unsupported",
@@ -668,6 +692,7 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
+      "evidence_class": "learned_lane",
       "correction_kind": "failure_correction",
       "tags": [
         "unsupported",
@@ -698,5 +723,5 @@
     }
   ],
   "summary": "Compiled-agent replay bundle retains 12 route samples and 12 grounded-answer samples from 12 training receipts while excluding 6 held-out receipts.",
-  "bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9"
+  "bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18"
 }

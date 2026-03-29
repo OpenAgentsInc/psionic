@@ -2,6 +2,7 @@
   "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
   "ledger_id": "compiled_agent.promoted_artifact_contract.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "evidence_class": "learned_lane",
   "promoted_entry_count": 5,
   "candidate_entry_count": 3,
   "entries_by_module": {
@@ -23,7 +24,7 @@
       "compatibility_version": "openagents.compiled_agent.first_graph.v1",
       "confidence_floor": 0.8,
       "artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "artifact_digest": "445fb8f77ca203d81476c935165b0c95f31ea4f6a85285872e6e0692268f5e22",
+      "artifact_digest": "14ca68736ef5728c9621256363727672ace4ef3886433f349c16bc0029f23e93",
       "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
       "default_row": {
         "schema_version": "psionic.compiled_agent_default_row.v1",
@@ -50,11 +51,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json",
-        "validator_report_digest": "6c65df7603094c4b420897129f400d29abc61e02f722b3667cd793ba4a8e24ac",
+        "validator_report_digest": "e60b77e1cb3a47792a73960aed45e74a4350842d80fad55bcd542cdec523c1a3",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "predecessor_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "rollback_artifact_id": "compiled_agent.baseline.rule_v1.route",
@@ -67,7 +69,7 @@
           "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
           "model_family": "multinomial_naive_bayes",
           "feature_profile": "unigram_plus_bigram",
-          "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+          "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
           "training_sample_count": 12,
           "heldout_sample_count": 6,
           "vocabulary_size": 102,
@@ -421,7 +423,7 @@
           "training_accuracy": 1.0,
           "heldout_accuracy": 1.0,
           "detail": "Trained route model over replay-backed route samples using bag-of-token and bigram features. This is the first compiled-agent candidate backed by a learned artifact instead of a hand-authored keyword delta.",
-          "artifact_digest": "445fb8f77ca203d81476c935165b0c95f31ea4f6a85285872e6e0692268f5e22"
+          "artifact_digest": "14ca68736ef5728c9621256363727672ace4ef3886433f349c16bc0029f23e93"
         }
       },
       "detail": "Promoted route artifact sourced from fixtures/compiled_agent/compiled_agent_route_model_v1.json and validator-scored through the first bounded compiled-agent XTRAIN cycle."
@@ -465,11 +467,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
-        "validator_report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a",
+        "validator_report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "payload": {
         "payload_kind": "revision_set",
@@ -534,11 +537,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
-        "validator_report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a",
+        "validator_report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "promoted_at_utc": "2026-03-29T00:00:00Z",
       "payload": {
@@ -604,11 +608,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
-        "validator_report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a",
+        "validator_report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "promoted_at_utc": "2026-03-29T00:00:00Z",
       "payload": {
@@ -647,7 +652,7 @@
       "compatibility_version": "openagents.compiled_agent.first_graph.v1",
       "confidence_floor": 0.82,
       "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "artifact_digest": "30875fddac9f16334f62455f6e58503a5ff9509b125eda25632b3e014cd9914e",
+      "artifact_digest": "fc61f20278ef1e71f2b335aa566df6efde7d764bfe7529a9304a377b976ca577",
       "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
       "default_row": {
         "schema_version": "psionic.compiled_agent_default_row.v1",
@@ -674,11 +679,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json",
-        "validator_report_digest": "1d58b51b4549d5609711c8f9e045cd7a404c4b3d47001245176c323a03f6d7b1",
+        "validator_report_digest": "b12981f51622426542de3cd578f456725d4e46de8877688277af9a2becd0483c",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "predecessor_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "promoted_at_utc": "2026-03-29T00:00:00Z",
@@ -703,7 +709,7 @@
             "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
             "model_family": "multinomial_naive_bayes",
             "feature_profile": "route_plus_fact_signature",
-            "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+            "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
             "training_sample_count": 12,
             "heldout_sample_count": 6,
             "vocabulary_size": 13,
@@ -815,7 +821,7 @@
             "training_accuracy": 1.0,
             "heldout_accuracy": 1.0,
             "detail": "Trained grounded-answer model over explicit fact signatures only. The model predicts a narrow grounded-answer program from supplied tool facts and falls back on missing or conflicting facts instead of inventing unsupported synthesis.",
-            "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b"
+            "artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e"
           },
           "negation_keywords": [],
           "unsupported_route_keywords": [],
@@ -866,11 +872,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
-        "validator_report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a",
+        "validator_report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "payload": {
         "payload_kind": "revision_set",
@@ -935,11 +942,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
-        "validator_report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a",
+        "validator_report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "promoted_at_utc": "2026-03-29T00:00:00Z",
       "payload": {
@@ -979,7 +987,7 @@
       "compatibility_version": "openagents.compiled_agent.first_graph.v1",
       "confidence_floor": 0.82,
       "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1.verify",
-      "artifact_digest": "30875fddac9f16334f62455f6e58503a5ff9509b125eda25632b3e014cd9914e",
+      "artifact_digest": "fc61f20278ef1e71f2b335aa566df6efde7d764bfe7529a9304a377b976ca577",
       "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
       "default_row": {
         "schema_version": "psionic.compiled_agent_default_row.v1",
@@ -1006,11 +1014,12 @@
         "baseline_revision_id": "compiled_agent.baseline.rule_v1",
         "detail": "This is the first honest learned-row target for the compiled-agent loop. It is the local consumer-GPU qwen35 9B Q4_K_M row on archlinux, used for structured route selection across explicit provider-versus-wallet requests, grounded-answer-from-facts, and refusal work only."
       },
+      "evidence_class": "learned_lane",
       "validator_lineage": {
         "validator_report_ref": "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json",
-        "validator_report_digest": "1d58b51b4549d5609711c8f9e045cd7a404c4b3d47001245176c323a03f6d7b1",
+        "validator_report_digest": "b12981f51622426542de3cd578f456725d4e46de8877688277af9a2becd0483c",
         "xtrain_cycle_receipt_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
-        "xtrain_cycle_receipt_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa"
+        "xtrain_cycle_receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
       },
       "predecessor_artifact_id": "compiled_agent.baseline.rule_v1.verify",
       "payload": {
@@ -1034,7 +1043,7 @@
             "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
             "model_family": "multinomial_naive_bayes",
             "feature_profile": "route_plus_fact_signature",
-            "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+            "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
             "training_sample_count": 12,
             "heldout_sample_count": 6,
             "vocabulary_size": 13,
@@ -1146,7 +1155,7 @@
             "training_accuracy": 1.0,
             "heldout_accuracy": 1.0,
             "detail": "Trained grounded-answer model over explicit fact signatures only. The model predicts a narrow grounded-answer program from supplied tool facts and falls back on missing or conflicting facts instead of inventing unsupported synthesis.",
-            "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b"
+            "artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e"
           },
           "negation_keywords": [],
           "unsupported_route_keywords": [],
@@ -1159,6 +1168,6 @@
       "detail": "Candidate verify artifact uses the same revision family as the current grounded-answer candidate so shadow runs preserve aligned grounded-answer verification semantics."
     }
   ],
-  "summary": "Compiled-agent promoted-artifact contract retains 5 promoted artifacts and 3 candidate artifacts for the first graph, including the promoted route model, the promoted learned grounded-answer model from fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json, and the current psionic_candidate plus last_known_good labels.",
-  "contract_digest": "2fc2ce379ff944d169cce10630d80606d5a6885657e88532d450fd45be38db28"
+  "summary": "Compiled-agent promoted-artifact contract retains 5 promoted artifacts and 3 candidate artifacts for the first graph under LearnedLane evidence, including the promoted route model, the promoted learned grounded-answer model from fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json, and the current psionic_candidate plus last_known_good labels.",
+  "contract_digest": "56e87aaac0af0ad198a9a63745e5f242a19c49f5074ba0a1bd29618d45521e1c"
 }

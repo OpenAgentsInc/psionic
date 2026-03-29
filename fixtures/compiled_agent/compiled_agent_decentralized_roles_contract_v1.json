@@ -1,19 +1,22 @@
 {
   "schema_version": "psionic.compiled_agent.decentralized_roles_contract.v1",
   "contract_id": "compiled_agent.decentralized_roles.contract.v1",
+  "evidence_class": "learned_lane",
   "source_artifacts": [
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
       "schema_version": "psionic.compiled_agent.learning_receipts.v1",
+      "evidence_class": "learned_lane",
       "digest_field": "ledger_digest",
-      "artifact_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+      "artifact_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
       "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
     },
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
       "schema_version": "psionic.compiled_agent.replay_bundle.v1",
+      "evidence_class": "learned_lane",
       "digest_field": "bundle_digest",
-      "artifact_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+      "artifact_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
       "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
     },
     {
@@ -27,7 +30,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
       "schema_version": "psionic.compiled_agent.route_model.v1",
       "digest_field": "artifact_digest",
-      "artifact_digest": "445fb8f77ca203d81476c935165b0c95f31ea4f6a85285872e6e0692268f5e22",
+      "artifact_digest": "14ca68736ef5728c9621256363727672ace4ef3886433f349c16bc0029f23e93",
       "identity_field": "artifact_id",
       "identity_value": "compiled_agent.route.multinomial_nb_v1",
       "detail": "Retained replay-trained route artifact consumed by validator scoring and runtime authority."
@@ -36,7 +39,7 @@
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
       "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
       "digest_field": "artifact_digest",
-      "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b",
+      "artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e",
       "identity_field": "artifact_id",
       "identity_value": "compiled_agent.grounded_answer.multinomial_nb_v1",
       "detail": "Retained replay-trained grounded-answer artifact consumed by validator scoring and runtime authority."
@@ -44,22 +47,25 @@
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json",
       "schema_version": "1",
+      "evidence_class": "learned_lane",
       "digest_field": "report_digest",
-      "artifact_digest": "6c65df7603094c4b420897129f400d29abc61e02f722b3667cd793ba4a8e24ac",
+      "artifact_digest": "e60b77e1cb3a47792a73960aed45e74a4350842d80fad55bcd542cdec523c1a3",
       "detail": "Independent route candidate module-eval surface for validator scoring."
     },
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json",
       "schema_version": "1",
+      "evidence_class": "learned_lane",
       "digest_field": "report_digest",
-      "artifact_digest": "1d58b51b4549d5609711c8f9e045cd7a404c4b3d47001245176c323a03f6d7b1",
+      "artifact_digest": "b12981f51622426542de3cd578f456725d4e46de8877688277af9a2becd0483c",
       "detail": "Independent grounded-answer candidate module-eval surface for validator scoring."
     },
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
       "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
+      "evidence_class": "learned_lane",
       "digest_field": "receipt_digest",
-      "artifact_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa",
+      "artifact_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6",
       "identity_field": "cycle_id",
       "identity_value": "compiled_agent.xtrain.cycle.v1",
       "detail": "Canonical bounded XTRAIN cycle receipt for the current route and grounded candidates."
@@ -67,8 +73,9 @@
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json",
       "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
+      "evidence_class": "learned_lane",
       "digest_field": "contract_digest",
-      "artifact_digest": "2fc2ce379ff944d169cce10630d80606d5a6885657e88532d450fd45be38db28",
+      "artifact_digest": "56e87aaac0af0ad198a9a63745e5f242a19c49f5074ba0a1bd29618d45521e1c",
       "identity_field": "schema_version",
       "identity_value": "psionic.compiled_agent.promoted_artifact_contract.v1",
       "detail": "Runtime-consumable promoted-artifact contract retained after validator gating."
@@ -85,8 +92,9 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+            "artifact_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           }
         ],
@@ -105,8 +113,9 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
             "schema_version": "psionic.compiled_agent.replay_bundle.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "bundle_digest",
-            "artifact_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+            "artifact_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
             "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
           }
         ],
@@ -145,15 +154,17 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+            "artifact_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           },
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
             "schema_version": "psionic.compiled_agent.replay_bundle.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "bundle_digest",
-            "artifact_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+            "artifact_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
             "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
           }
         ],
@@ -172,15 +183,17 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+            "artifact_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           },
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
             "schema_version": "psionic.compiled_agent.replay_bundle.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "bundle_digest",
-            "artifact_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+            "artifact_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
             "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
           }
         ],
@@ -219,7 +232,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
             "schema_version": "psionic.compiled_agent.route_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "445fb8f77ca203d81476c935165b0c95f31ea4f6a85285872e6e0692268f5e22",
+            "artifact_digest": "14ca68736ef5728c9621256363727672ace4ef3886433f349c16bc0029f23e93",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.route.multinomial_nb_v1",
             "detail": "Retained replay-trained route artifact consumed by validator scoring and runtime authority."
@@ -228,7 +241,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
             "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b",
+            "artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.grounded_answer.multinomial_nb_v1",
             "detail": "Retained replay-trained grounded-answer artifact consumed by validator scoring and runtime authority."
@@ -236,22 +249,25 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_candidate_module_eval_report_v1.json",
             "schema_version": "1",
+            "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "6c65df7603094c4b420897129f400d29abc61e02f722b3667cd793ba4a8e24ac",
+            "artifact_digest": "e60b77e1cb3a47792a73960aed45e74a4350842d80fad55bcd542cdec523c1a3",
             "detail": "Independent route candidate module-eval surface for validator scoring."
           },
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json",
             "schema_version": "1",
+            "evidence_class": "learned_lane",
             "digest_field": "report_digest",
-            "artifact_digest": "1d58b51b4549d5609711c8f9e045cd7a404c4b3d47001245176c323a03f6d7b1",
+            "artifact_digest": "b12981f51622426542de3cd578f456725d4e46de8877688277af9a2becd0483c",
             "detail": "Independent grounded-answer candidate module-eval surface for validator scoring."
           },
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
             "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "receipt_digest",
-            "artifact_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa",
+            "artifact_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6",
             "identity_field": "cycle_id",
             "identity_value": "compiled_agent.xtrain.cycle.v1",
             "detail": "Canonical bounded XTRAIN cycle receipt for the current route and grounded candidates."
@@ -272,8 +288,9 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
             "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "receipt_digest",
-            "artifact_digest": "86ccff25b4322285d41fcd4f45710cc6a9c19137ec9ad968c09496ef9c13fbaa",
+            "artifact_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6",
             "identity_field": "cycle_id",
             "identity_value": "compiled_agent.xtrain.cycle.v1",
             "detail": "Canonical bounded XTRAIN cycle receipt for the current route and grounded candidates."
@@ -281,8 +298,9 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json",
             "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "contract_digest",
-            "artifact_digest": "2fc2ce379ff944d169cce10630d80606d5a6885657e88532d450fd45be38db28",
+            "artifact_digest": "56e87aaac0af0ad198a9a63745e5f242a19c49f5074ba0a1bd29618d45521e1c",
             "identity_field": "schema_version",
             "identity_value": "psionic.compiled_agent.promoted_artifact_contract.v1",
             "detail": "Runtime-consumable promoted-artifact contract retained after validator gating."
@@ -331,15 +349,17 @@
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
             "schema_version": "psionic.compiled_agent.learning_receipts.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "ledger_digest",
-            "artifact_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+            "artifact_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
             "detail": "Canonical compiled-agent learning ledger retained from normalized runtime receipts."
           },
           {
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
             "schema_version": "psionic.compiled_agent.replay_bundle.v1",
+            "evidence_class": "learned_lane",
             "digest_field": "bundle_digest",
-            "artifact_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+            "artifact_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
             "detail": "Canonical replay bundle emitted from the retained compiled-agent learning ledger."
           }
         ],
@@ -359,7 +379,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
             "schema_version": "psionic.compiled_agent.route_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "445fb8f77ca203d81476c935165b0c95f31ea4f6a85285872e6e0692268f5e22",
+            "artifact_digest": "14ca68736ef5728c9621256363727672ace4ef3886433f349c16bc0029f23e93",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.route.multinomial_nb_v1",
             "detail": "Retained replay-trained route artifact consumed by validator scoring and runtime authority."
@@ -368,7 +388,7 @@
             "artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
             "schema_version": "psionic.compiled_agent.grounded_answer_model.v1",
             "digest_field": "artifact_digest",
-            "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b",
+            "artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e",
             "identity_field": "artifact_id",
             "identity_value": "compiled_agent.grounded_answer.multinomial_nb_v1",
             "detail": "Retained replay-trained grounded-answer artifact consumed by validator scoring and runtime authority."
@@ -406,5 +426,5 @@
     "doc_path": "docs/COMPILED_AGENT_DECENTRALIZED_ROLES.md"
   },
   "claim_boundary": "These are pre-network governed compiled-agent improvement roles only. They operate on retained receipts, replay bundles, validator reports, and bounded candidate artifacts. They do not claim broad autonomous worker behavior, public incentives, or validator-free promotion.",
-  "contract_digest": "6c6c24c47170e925cae77ee6079ffcb96a45c682c01b392a6c9a7b4071a3f4c0"
+  "contract_digest": "40054609dd32f92a930fb7d71c309800445a547a303f9574da9cc46c1811bd94"
 }

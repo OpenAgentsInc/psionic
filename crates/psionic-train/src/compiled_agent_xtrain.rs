@@ -7,10 +7,11 @@ use psionic_eval::{
     build_compiled_agent_module_eval_report, compiled_agent_baseline_revision_set,
     evaluate_compiled_agent_grounded_answer, evaluate_compiled_agent_route,
     train_compiled_agent_grounded_answer_model, train_compiled_agent_route_model,
-    CompiledAgentGroundedAnswerModelArtifact, CompiledAgentGroundedAnswerTrainingSample,
-    CompiledAgentModuleEvalReport, CompiledAgentModuleKind, CompiledAgentModuleRevisionSet,
-    CompiledAgentPublicOutcomeKind, CompiledAgentRoute, CompiledAgentRouteModelArtifact,
-    CompiledAgentRouteTrainingSample, CompiledAgentToolResult,
+    CompiledAgentEvidenceClass, CompiledAgentGroundedAnswerModelArtifact,
+    CompiledAgentGroundedAnswerTrainingSample, CompiledAgentModuleEvalReport,
+    CompiledAgentModuleKind, CompiledAgentModuleRevisionSet, CompiledAgentPublicOutcomeKind,
+    CompiledAgentRoute, CompiledAgentRouteModelArtifact, CompiledAgentRouteTrainingSample,
+    CompiledAgentToolResult,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -52,6 +53,14 @@ pub enum CompiledAgentXtrainError {
     MissingGroundedRoute { sample_id: String },
     #[error("grounded replay sample `{sample_id}` has invalid tool results")]
     InvalidGroundedToolResults { sample_id: String },
+    #[error(
+        "compiled-agent evidence class drifted in `{context}`: expected `{expected:?}` but found `{actual:?}`"
+    )]
+    MixedEvidenceClass {
+        context: String,
+        expected: CompiledAgentEvidenceClass,
+        actual: CompiledAgentEvidenceClass,
+    },
     #[error(transparent)]
     Receipts(#[from] CompiledAgentReceiptError),
     #[error(transparent)]
@@ -110,6 +119,7 @@ pub struct CompiledAgentXtrainCycleReceipt {
     pub schema_version: String,
     pub cycle_id: String,
     pub row_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub source_ledger_digest: String,
     pub replay_bundle_digest: String,
     pub route_outcome: CompiledAgentXtrainModuleOutcome,
@@ -284,6 +294,22 @@ pub fn canonical_compiled_agent_xtrain_cycle_receipt(
     let route_candidate_report = build_compiled_agent_module_eval_report(&route_candidate);
     let grounded_candidate = compiled_agent_grounded_candidate_revision()?;
     let grounded_candidate_report = build_compiled_agent_module_eval_report(&grounded_candidate);
+    let evidence_class = replay_bundle.evidence_class;
+    ensure_matching_evidence_class(
+        evidence_class,
+        baseline_report.evidence_class,
+        "compiled_agent_xtrain.baseline_report",
+    )?;
+    ensure_matching_evidence_class(
+        evidence_class,
+        route_candidate_report.evidence_class,
+        "compiled_agent_xtrain.route_candidate_report",
+    )?;
+    ensure_matching_evidence_class(
+        evidence_class,
+        grounded_candidate_report.evidence_class,
+        "compiled_agent_xtrain.grounded_candidate_report",
+    )?;
 
     let route_outcome = build_route_outcome(
         &replay_bundle,
@@ -304,6 +330,7 @@ pub fn canonical_compiled_agent_xtrain_cycle_receipt(
         schema_version: String::from(XTRAIN_CYCLE_SCHEMA_VERSION),
         cycle_id: String::from("compiled_agent.xtrain.cycle.v1"),
         row_id: baseline_report.row_id.clone(),
+        evidence_class,
         source_ledger_digest: replay_bundle.source_ledger_digest.clone(),
         replay_bundle_digest: replay_bundle.bundle_digest.clone(),
         route_outcome,
@@ -319,6 +346,22 @@ pub fn canonical_compiled_agent_xtrain_cycle_receipt(
     );
     receipt.receipt_digest = stable_digest(b"compiled_agent_xtrain_cycle_receipt|", &receipt);
     Ok(receipt)
+}
+
+fn ensure_matching_evidence_class(
+    expected: CompiledAgentEvidenceClass,
+    actual: CompiledAgentEvidenceClass,
+    context: &str,
+) -> Result<(), CompiledAgentXtrainError> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(CompiledAgentXtrainError::MixedEvidenceClass {
+            context: context.to_string(),
+            expected,
+            actual,
+        })
+    }
 }
 
 pub fn write_compiled_agent_route_candidate_report(

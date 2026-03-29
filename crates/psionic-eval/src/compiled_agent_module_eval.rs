@@ -12,8 +12,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     compiled_agent_baseline_revision_set, compiled_agent_supported_tools,
-    CompiledAgentModuleRevisionSet, CompiledAgentRoute, CompiledAgentToolCall,
-    CompiledAgentToolResult,
+    CompiledAgentEvidenceClass, CompiledAgentModuleRevisionSet, CompiledAgentRoute,
+    CompiledAgentToolCall, CompiledAgentToolResult,
 };
 
 const REPORT_SCHEMA_VERSION: u16 = 1;
@@ -91,6 +91,7 @@ pub struct CompiledAgentModuleEvalReport {
     pub report_id: String,
     pub row_id: String,
     pub baseline_revision_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub case_reports: Vec<CompiledAgentModuleEvalCaseReport>,
     pub module_summaries: Vec<CompiledAgentModuleEvalSummary>,
     pub unsupported_case_count: u32,
@@ -590,6 +591,7 @@ pub fn build_compiled_agent_module_eval_report(
         report_id: String::from("compiled_agent.module_eval.report.v1"),
         row_id: String::from("compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1"),
         baseline_revision_id: revision.revision_id.clone(),
+        evidence_class: CompiledAgentEvidenceClass::LearnedLane,
         case_reports,
         module_summaries,
         unsupported_case_count,

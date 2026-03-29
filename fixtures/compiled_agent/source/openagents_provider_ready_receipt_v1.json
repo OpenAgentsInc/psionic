@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "evidence_class": "learned_lane",
   "captured_at_epoch_ms": 1774760262001,
   "state": {
     "provider_ready": true,

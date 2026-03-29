@@ -38,6 +38,12 @@ The role contract binds directly back to the retained compiled-agent loop:
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
 - `fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json`
 
+Every retained authority input in this first phase-three role contract now
+preserves an explicit `evidence_class` when that artifact is part of the
+learned compiled-agent loop. The current contract and retained role receipts
+stay in `learned_lane`. They do not silently absorb stronger-evidence or exact
+execution rows.
+
 ## What Each Role Does
 
 `replay_generation`
@@ -95,6 +101,8 @@ It does prove:
 - each early decentralized role has a machine-readable contract
 - each role has retained local receipts
 - each role links back into the real compiled-agent learning loop
+- each role now preserves the learned-lane evidence boundary explicitly so
+  future stronger-evidence lanes cannot be mixed in by accident
 
 It does not prove:
 

@@ -7,8 +7,9 @@ use std::{
 use psionic_eval::{
     build_compiled_agent_module_eval_report, canonical_compiled_agent_default_row_contract,
     compiled_agent_baseline_revision_set, CompiledAgentDefaultLearnedRowContract,
-    CompiledAgentGroundedAnswerModelArtifact, CompiledAgentModuleEvalReport,
-    CompiledAgentModuleKind, CompiledAgentModuleRevisionSet, CompiledAgentRouteModelArtifact,
+    CompiledAgentEvidenceClass, CompiledAgentGroundedAnswerModelArtifact,
+    CompiledAgentModuleEvalReport, CompiledAgentModuleKind, CompiledAgentModuleRevisionSet,
+    CompiledAgentRouteModelArtifact,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -48,6 +49,14 @@ pub enum CompiledAgentArtifactContractError {
     Write { path: String, error: std::io::Error },
     #[error("fixture `{path}` drifted from the canonical generator output")]
     FixtureDrift { path: String },
+    #[error(
+        "compiled-agent evidence class drifted in `{context}`: expected `{expected:?}` but found `{actual:?}`"
+    )]
+    MixedEvidenceClass {
+        context: String,
+        expected: CompiledAgentEvidenceClass,
+        actual: CompiledAgentEvidenceClass,
+    },
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
@@ -99,6 +108,7 @@ pub struct CompiledAgentArtifactContractEntry {
     pub artifact_digest: String,
     pub row_id: String,
     pub default_row: CompiledAgentDefaultLearnedRowContract,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub validator_lineage: CompiledAgentArtifactValidatorLineage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predecessor_artifact_id: Option<String>,
@@ -125,6 +135,7 @@ pub struct CompiledAgentPromotedArtifactContract {
     pub schema_version: String,
     pub ledger_id: String,
     pub row_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub promoted_entry_count: u32,
     pub candidate_entry_count: u32,
     pub entries_by_module: BTreeMap<String, u32>,
@@ -179,6 +190,22 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
     let grounded_candidate_report =
         build_compiled_agent_module_eval_report(&grounded_candidate_revision);
     let xtrain_cycle = canonical_compiled_agent_xtrain_cycle_receipt()?;
+    let evidence_class = xtrain_cycle.evidence_class;
+    ensure_matching_evidence_class(
+        evidence_class,
+        baseline_report.evidence_class,
+        "compiled_agent_promoted_artifact_contract.baseline_report",
+    )?;
+    ensure_matching_evidence_class(
+        evidence_class,
+        route_candidate_report.evidence_class,
+        "compiled_agent_promoted_artifact_contract.route_candidate_report",
+    )?;
+    ensure_matching_evidence_class(
+        evidence_class,
+        grounded_candidate_report.evidence_class,
+        "compiled_agent_promoted_artifact_contract.grounded_candidate_report",
+    )?;
 
     let baseline_lineage = validator_lineage(
         BASELINE_REPORT_REF,
@@ -215,6 +242,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         artifact_digest: route_model.artifact_digest.clone(),
         row_id: default_row.row_id.clone(),
         default_row: default_row.clone(),
+        evidence_class,
         validator_lineage: route_lineage,
         predecessor_artifact_id: Some(route_fallback_artifact_id.clone()),
         rollback_artifact_id: Some(route_fallback_artifact_id.clone()),
@@ -241,6 +269,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         route_fallback_artifact_id,
         &baseline_revision,
         &default_row,
+        evidence_class,
         baseline_lineage.clone(),
         None,
         None,
@@ -260,6 +289,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         "compiled_agent.baseline.rule_v1.tool_policy".to_string(),
         &baseline_revision,
         &default_row,
+        evidence_class,
         baseline_lineage.clone(),
         None,
         Some(String::from(PROMOTED_AT_UTC)),
@@ -279,6 +309,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         "compiled_agent.baseline.rule_v1.tool_arguments".to_string(),
         &baseline_revision,
         &default_row,
+        evidence_class,
         baseline_lineage.clone(),
         None,
         Some(String::from(PROMOTED_AT_UTC)),
@@ -298,6 +329,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         grounded_candidate_revision.revision_id.clone(),
         &grounded_candidate_revision,
         &default_row,
+        evidence_class,
         grounded_lineage.clone(),
         Some(String::from("compiled_agent.baseline.rule_v1.grounded_answer")),
         Some(String::from(PROMOTED_AT_UTC)),
@@ -317,6 +349,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         "compiled_agent.baseline.rule_v1.grounded_answer".to_string(),
         &baseline_revision,
         &default_row,
+        evidence_class,
         baseline_lineage.clone(),
         None,
         None,
@@ -336,6 +369,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         "compiled_agent.baseline.rule_v1.verify".to_string(),
         &baseline_revision,
         &default_row,
+        evidence_class,
         baseline_lineage,
         None,
         Some(String::from(PROMOTED_AT_UTC)),
@@ -355,6 +389,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         format!("{}.verify", grounded_candidate_revision.revision_id),
         &grounded_candidate_revision,
         &default_row,
+        evidence_class,
         grounded_lineage,
         Some(String::from("compiled_agent.baseline.rule_v1.verify")),
         None,
@@ -388,6 +423,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         schema_version: String::from(COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_SCHEMA_VERSION),
         ledger_id: String::from("compiled_agent.promoted_artifact_contract.v1"),
         row_id: default_row.row_id.clone(),
+        evidence_class,
         promoted_entry_count,
         candidate_entry_count,
         entries_by_module,
@@ -396,9 +432,10 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         contract_digest: String::new(),
     };
     contract.summary = format!(
-        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph, including the promoted route model, the promoted learned grounded-answer model from {}, and the current psionic_candidate plus last_known_good labels.",
+        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph under {:?} evidence, including the promoted route model, the promoted learned grounded-answer model from {}, and the current psionic_candidate plus last_known_good labels.",
         contract.promoted_entry_count,
         contract.candidate_entry_count,
+        contract.evidence_class,
         GROUNDED_MODEL_FIXTURE_REF
     );
     contract.contract_digest =
@@ -490,6 +527,7 @@ fn revision_entry(
     artifact_id: String,
     revision: &CompiledAgentModuleRevisionSet,
     default_row: &CompiledAgentDefaultLearnedRowContract,
+    evidence_class: CompiledAgentEvidenceClass,
     validator_lineage: CompiledAgentArtifactValidatorLineage,
     predecessor_artifact_id: Option<String>,
     promoted_at_utc: Option<String>,
@@ -510,6 +548,7 @@ fn revision_entry(
         artifact_id,
         row_id: default_row.row_id.clone(),
         default_row: default_row.clone(),
+        evidence_class,
         validator_lineage,
         predecessor_artifact_id,
         rollback_artifact_id: None,
@@ -518,6 +557,22 @@ fn revision_entry(
             revision: revision.clone(),
         },
         detail: detail.to_string(),
+    }
+}
+
+fn ensure_matching_evidence_class(
+    expected: CompiledAgentEvidenceClass,
+    actual: CompiledAgentEvidenceClass,
+    context: &str,
+) -> Result<(), CompiledAgentArtifactContractError> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(CompiledAgentArtifactContractError::MixedEvidenceClass {
+            context: context.to_string(),
+            expected,
+            actual,
+        })
     }
 }
 
@@ -553,12 +608,16 @@ mod tests {
         verify_compiled_agent_promoted_artifact_contract_fixture,
         CompiledAgentArtifactLifecycleState,
     };
-    use psionic_eval::CompiledAgentModuleKind;
+    use psionic_eval::{CompiledAgentEvidenceClass, CompiledAgentModuleKind};
 
     #[test]
     fn promoted_artifact_contract_keeps_the_learned_route_promoted(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let contract = canonical_compiled_agent_promoted_artifact_contract()?;
+        assert_eq!(
+            contract.evidence_class,
+            CompiledAgentEvidenceClass::LearnedLane
+        );
         let route = contract
             .promoted_entry(CompiledAgentModuleKind::Route)
             .expect("route entry missing");
@@ -567,6 +626,10 @@ mod tests {
             CompiledAgentArtifactLifecycleState::Promoted
         );
         assert_eq!(route.artifact_id, "compiled_agent.route.multinomial_nb_v1");
+        assert_eq!(
+            route.evidence_class,
+            CompiledAgentEvidenceClass::LearnedLane
+        );
         assert!(route.rollback_artifact_id.is_some());
         Ok(())
     }

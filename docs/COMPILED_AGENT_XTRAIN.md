@@ -30,6 +30,24 @@ Grounded-answer candidate:
 - held-out learning-receipt rows from
   `fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json`
 
+## Evidence Boundary
+
+The bounded loop now retains explicit `evidence_class` values across:
+
+- learning receipts
+- replay samples and replay bundles
+- independent module-eval reports
+- the XTRAIN cycle receipt
+- the promoted-artifact contract
+- decentralized-role receipts
+
+The current phase-three stack is still `learned_lane` only.
+
+Validator and contract generation now refuse silent mixing between
+`learned_lane` and `stronger_evidence_lane` rows. That keeps the current loop
+Tassadar-ready without letting later exact-execution evidence rewrite what the
+learned compiled-agent slice actually proved.
+
 ## Canonical Fixtures
 
 - `fixtures/compiled_agent/compiled_agent_route_model_v1.json`

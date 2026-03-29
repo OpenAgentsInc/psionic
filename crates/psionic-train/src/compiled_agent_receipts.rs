@@ -5,12 +5,12 @@ use std::{
 };
 
 use psionic_eval::{
-    CompiledAgentModuleKind, CompiledAgentPublicOutcomeKind, CompiledAgentRoute,
-    CompiledAgentRuntimeState, CompiledAgentToolCall, CompiledAgentToolResult,
     compiled_agent_baseline_revision_set, compiled_agent_supported_tools,
+    CompiledAgentEvidenceClass, CompiledAgentModuleKind, CompiledAgentPublicOutcomeKind,
+    CompiledAgentRoute, CompiledAgentRuntimeState, CompiledAgentToolCall, CompiledAgentToolResult,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -39,6 +39,14 @@ pub enum CompiledAgentReceiptError {
     MissingPhase { fixture: String, phase: String },
     #[error("fixture `{path}` drifted from the canonical generator output")]
     FixtureDrift { path: String },
+    #[error(
+        "compiled-agent evidence class drifted in `{context}`: expected `{expected:?}` but found `{actual:?}`"
+    )]
+    MixedEvidenceClass {
+        context: String,
+        expected: CompiledAgentEvidenceClass,
+        actual: CompiledAgentEvidenceClass,
+    },
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
@@ -109,6 +117,7 @@ pub struct CompiledAgentSourceRun {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CompiledAgentSourceReceipt {
     pub schema_version: u32,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub captured_at_epoch_ms: u64,
     pub state: CompiledAgentRuntimeState,
     pub run: CompiledAgentSourceRun,
@@ -143,6 +152,7 @@ pub struct CompiledAgentLearningReceipt {
     pub receipt_id: String,
     pub source_fixture_ref: String,
     pub source_receipt_digest: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub captured_at_epoch_ms: u64,
     pub user_request: String,
     pub runtime_state: CompiledAgentRuntimeState,
@@ -170,6 +180,7 @@ pub struct CompiledAgentLearningReceiptLedger {
     pub ledger_id: String,
     pub row_id: String,
     pub baseline_revision_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub source_fixture_refs: Vec<String>,
     pub training_receipt_ids: Vec<String>,
     pub held_out_receipt_ids: Vec<String>,
@@ -195,6 +206,7 @@ pub struct CompiledAgentReplaySample {
     pub sample_id: String,
     pub module: CompiledAgentModuleKind,
     pub source_receipt_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub correction_kind: CompiledAgentReplayCorrectionKind,
     pub tags: Vec<String>,
     pub failure_classes: Vec<String>,
@@ -209,6 +221,7 @@ pub struct CompiledAgentReplayBundle {
     pub bundle_id: String,
     pub row_id: String,
     pub baseline_revision_id: String,
+    pub evidence_class: CompiledAgentEvidenceClass,
     pub source_ledger_digest: String,
     pub training_receipt_ids: Vec<String>,
     pub excluded_held_out_receipt_ids: Vec<String>,
@@ -707,8 +720,8 @@ pub fn write_compiled_agent_source_receipts(
     Ok(receipts)
 }
 
-pub fn canonical_compiled_agent_learning_receipt_ledger()
--> Result<CompiledAgentLearningReceiptLedger, CompiledAgentReceiptError> {
+pub fn canonical_compiled_agent_learning_receipt_ledger(
+) -> Result<CompiledAgentLearningReceiptLedger, CompiledAgentReceiptError> {
     let mut receipts = Vec::new();
     for scenario in canonical_supervision_scenarios() {
         let source_fixture_ref = format!(
@@ -722,16 +735,16 @@ pub fn canonical_compiled_agent_learning_receipt_ledger()
             &scenario,
         )?);
     }
-    Ok(build_learning_receipt_ledger(
+    build_learning_receipt_ledger(
         receipts,
         &compiled_agent_baseline_revision_set().revision_id,
-    ))
+    )
 }
 
-pub fn canonical_compiled_agent_replay_bundle()
--> Result<CompiledAgentReplayBundle, CompiledAgentReceiptError> {
+pub fn canonical_compiled_agent_replay_bundle(
+) -> Result<CompiledAgentReplayBundle, CompiledAgentReceiptError> {
     let ledger = canonical_compiled_agent_learning_receipt_ledger()?;
-    Ok(build_compiled_agent_replay_bundle(&ledger))
+    build_compiled_agent_replay_bundle(&ledger)
 }
 
 pub fn write_compiled_agent_learning_receipt_ledger(
@@ -788,7 +801,7 @@ pub fn verify_compiled_agent_learning_receipt_fixtures() -> Result<(), CompiledA
     }
 
     let expected_ledger = canonical_compiled_agent_learning_receipt_ledger()?;
-    let expected_bundle = build_compiled_agent_replay_bundle(&expected_ledger);
+    let expected_bundle = build_compiled_agent_replay_bundle(&expected_ledger)?;
 
     let committed_ledger_bytes = fs::read(compiled_agent_learning_receipt_ledger_fixture_path())
         .map_err(|error| CompiledAgentReceiptError::Read {
@@ -1006,6 +1019,7 @@ fn build_source_receipt(scenario: &CanonicalSupervisionScenario) -> CompiledAgen
 
     CompiledAgentSourceReceipt {
         schema_version: 1,
+        evidence_class: CompiledAgentEvidenceClass::LearnedLane,
         captured_at_epoch_ms: scenario.captured_at_epoch_ms,
         state: scenario.runtime_state.clone(),
         run: CompiledAgentSourceRun {
@@ -1196,6 +1210,7 @@ fn build_learning_receipt(
         receipt_id,
         source_fixture_ref: source_fixture_ref.to_string(),
         source_receipt_digest,
+        evidence_class: source_receipt.evidence_class,
         captured_at_epoch_ms: source_receipt.captured_at_epoch_ms,
         user_request: source_receipt.run.lineage.user_request.clone(),
         runtime_state: source_receipt.state.clone(),
@@ -1235,7 +1250,8 @@ fn build_learning_receipt(
 fn build_learning_receipt_ledger(
     receipts: Vec<CompiledAgentLearningReceipt>,
     baseline_revision_id: &str,
-) -> CompiledAgentLearningReceiptLedger {
+) -> Result<CompiledAgentLearningReceiptLedger, CompiledAgentReceiptError> {
+    let evidence_class = expected_receipt_evidence_class(&receipts)?;
     let mut module_failure_counts = BTreeMap::new();
     let mut failure_class_counts = BTreeMap::new();
     let mut split_receipt_counts = BTreeMap::new();
@@ -1309,6 +1325,7 @@ fn build_learning_receipt_ledger(
         ledger_id: String::from("compiled_agent.learning_receipt_ledger.v1"),
         row_id: String::from("compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1"),
         baseline_revision_id: baseline_revision_id.to_string(),
+        evidence_class,
         source_fixture_refs,
         training_receipt_ids,
         held_out_receipt_ids,
@@ -1343,12 +1360,12 @@ fn build_learning_receipt_ledger(
         ledger.receipts.len().saturating_sub(success_count),
     );
     ledger.ledger_digest = stable_digest(b"compiled_agent_learning_ledger|", &ledger);
-    ledger
+    Ok(ledger)
 }
 
 fn build_compiled_agent_replay_bundle(
     ledger: &CompiledAgentLearningReceiptLedger,
-) -> CompiledAgentReplayBundle {
+) -> Result<CompiledAgentReplayBundle, CompiledAgentReceiptError> {
     let mut samples = Vec::new();
     for receipt in ledger
         .receipts
@@ -1375,11 +1392,13 @@ fn build_compiled_agent_replay_bundle(
             sample.correction_kind == CompiledAgentReplayCorrectionKind::FailureCorrection
         })
         .count() as u32;
+    ensure_replay_samples_match_evidence_class(&samples, ledger.evidence_class)?;
     let mut bundle = CompiledAgentReplayBundle {
         schema_version: String::from(REPLAY_BUNDLE_SCHEMA_VERSION),
         bundle_id: String::from("compiled_agent.replay_bundle.v1"),
         row_id: ledger.row_id.clone(),
         baseline_revision_id: ledger.baseline_revision_id.clone(),
+        evidence_class: ledger.evidence_class,
         source_ledger_digest: ledger.ledger_digest.clone(),
         training_receipt_ids: ledger.training_receipt_ids.clone(),
         excluded_held_out_receipt_ids: ledger.held_out_receipt_ids.clone(),
@@ -1405,7 +1424,41 @@ fn build_compiled_agent_replay_bundle(
         bundle.excluded_held_out_receipt_ids.len(),
     );
     bundle.bundle_digest = stable_digest(b"compiled_agent_replay_bundle|", &bundle);
-    bundle
+    Ok(bundle)
+}
+
+fn expected_receipt_evidence_class(
+    receipts: &[CompiledAgentLearningReceipt],
+) -> Result<CompiledAgentEvidenceClass, CompiledAgentReceiptError> {
+    let Some(expected) = receipts.first().map(|receipt| receipt.evidence_class) else {
+        return Ok(CompiledAgentEvidenceClass::LearnedLane);
+    };
+    for receipt in receipts.iter().skip(1) {
+        if receipt.evidence_class != expected {
+            return Err(CompiledAgentReceiptError::MixedEvidenceClass {
+                context: String::from("compiled_agent_learning_receipt_ledger"),
+                expected,
+                actual: receipt.evidence_class,
+            });
+        }
+    }
+    Ok(expected)
+}
+
+fn ensure_replay_samples_match_evidence_class(
+    samples: &[CompiledAgentReplaySample],
+    expected: CompiledAgentEvidenceClass,
+) -> Result<(), CompiledAgentReceiptError> {
+    for sample in samples {
+        if sample.evidence_class != expected {
+            return Err(CompiledAgentReceiptError::MixedEvidenceClass {
+                context: format!("compiled_agent_replay_bundle sample `{}`", sample.sample_id),
+                expected,
+                actual: sample.evidence_class,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn route_replay_sample(receipt: &CompiledAgentLearningReceipt) -> CompiledAgentReplaySample {
@@ -1418,6 +1471,7 @@ fn route_replay_sample(receipt: &CompiledAgentLearningReceipt) -> CompiledAgentR
         sample_id: format!("sample.route.{}", receipt.receipt_id),
         module: CompiledAgentModuleKind::Route,
         source_receipt_id: receipt.receipt_id.clone(),
+        evidence_class: receipt.evidence_class,
         correction_kind,
         tags: receipt.tags.clone(),
         failure_classes: if receipt.assessment.route_correct {
@@ -1449,6 +1503,7 @@ fn grounded_answer_replay_sample(
         sample_id: format!("sample.grounded_answer.{}", receipt.receipt_id),
         module: CompiledAgentModuleKind::GroundedAnswer,
         source_receipt_id: receipt.receipt_id.clone(),
+        evidence_class: receipt.evidence_class,
         correction_kind,
         tags: receipt.tags.clone(),
         failure_classes: if receipt.assessment.grounded_answer_correct {
@@ -1574,21 +1629,24 @@ mod tests {
         compiled_agent_replay_bundle_fixture_path, compiled_agent_source_fixture_dir,
         verify_compiled_agent_learning_receipt_fixtures,
     };
+    use psionic_eval::CompiledAgentEvidenceClass;
 
     #[test]
-    fn compiled_agent_learning_ledger_retains_training_and_held_out_rows()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn compiled_agent_learning_ledger_retains_training_and_held_out_rows(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let ledger = canonical_compiled_agent_learning_receipt_ledger()?;
         assert_eq!(ledger.receipts.len(), 18);
+        assert_eq!(
+            ledger.evidence_class,
+            CompiledAgentEvidenceClass::LearnedLane
+        );
         assert_eq!(ledger.training_receipt_ids.len(), 12);
         assert_eq!(ledger.held_out_receipt_ids.len(), 6);
         assert_eq!(ledger.correction_receipt_ids.len(), 8);
-        assert!(
-            ledger
-                .correction_receipt_ids
-                .iter()
-                .any(|receipt_id| receipt_id.contains("negated_wallet"))
-        );
+        assert!(ledger
+            .correction_receipt_ids
+            .iter()
+            .any(|receipt_id| receipt_id.contains("negated_wallet")));
         assert_eq!(ledger.task_family_counts.get("provider"), Some(&4));
         assert_eq!(ledger.task_family_counts.get("wallet"), Some(&6));
         assert_eq!(ledger.task_family_counts.get("unsupported"), Some(&8));
@@ -1602,9 +1660,13 @@ mod tests {
     }
 
     #[test]
-    fn compiled_agent_replay_bundle_targets_route_and_grounded_answer_first()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn compiled_agent_replay_bundle_targets_route_and_grounded_answer_first(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let bundle = canonical_compiled_agent_replay_bundle()?;
+        assert_eq!(
+            bundle.evidence_class,
+            CompiledAgentEvidenceClass::LearnedLane
+        );
         assert_eq!(bundle.training_receipt_ids.len(), 12);
         assert_eq!(bundle.excluded_held_out_receipt_ids.len(), 6);
         assert_eq!(bundle.module_sample_counts.get("route"), Some(&12));
@@ -1617,14 +1679,12 @@ mod tests {
     }
 
     #[test]
-    fn compiled_agent_learning_fixtures_match_committed_truth()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn compiled_agent_learning_fixtures_match_committed_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         for (fixture_name, _) in canonical_compiled_agent_source_receipts() {
-            assert!(
-                compiled_agent_source_fixture_dir()
-                    .join(fixture_name)
-                    .exists()
-            );
+            assert!(compiled_agent_source_fixture_dir()
+                .join(fixture_name)
+                .exists());
         }
         assert!(compiled_agent_learning_receipt_ledger_fixture_path().exists());
         assert!(compiled_agent_replay_bundle_fixture_path().exists());

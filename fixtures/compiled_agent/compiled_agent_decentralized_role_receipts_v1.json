@@ -1,10 +1,11 @@
 {
   "schema_version": "psionic.compiled_agent.decentralized_role_receipts.v1",
-  "contract_digest": "6c6c24c47170e925cae77ee6079ffcb96a45c682c01b392a6c9a7b4071a3f4c0",
+  "contract_digest": "40054609dd32f92a930fb7d71c309800445a547a303f9574da9cc46c1811bd94",
   "receipts": [
     {
       "role": "replay_generation",
       "receipt_id": "compiled_agent.role_receipt.replay_generation.v1",
+      "evidence_class": "learned_lane",
       "status": "accepted_after_human_review",
       "input_refs": [
         "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json"
@@ -23,6 +24,7 @@
     {
       "role": "ranking_labeling",
       "receipt_id": "compiled_agent.role_receipt.ranking_labeling.v1",
+      "evidence_class": "learned_lane",
       "status": "accepted_after_human_review",
       "input_refs": [
         "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
@@ -43,6 +45,7 @@
     {
       "role": "validator_scoring",
       "receipt_id": "compiled_agent.role_receipt.validator_scoring.v1",
+      "evidence_class": "learned_lane",
       "status": "accepted_after_validator_gate",
       "input_refs": [
         "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
@@ -66,6 +69,7 @@
     {
       "role": "bounded_module_training",
       "receipt_id": "compiled_agent.role_receipt.bounded_module_training.v1",
+      "evidence_class": "learned_lane",
       "status": "queued_for_validator_scoring",
       "input_refs": [
         "fixtures/compiled_agent/compiled_agent_default_row_v1.json",
@@ -84,6 +88,6 @@
       "detail": "The retained bounded-module-training reference path produces candidate artifacts only. Validator scoring still decides whether those candidates can move runtime authority."
     }
   ],
-  "summary": "Compiled-agent decentralized role receipts retain 4 governed pre-network roles tied back to contract 6c6c24c47170e925cae77ee6079ffcb96a45c682c01b392a6c9a7b4071a3f4c0.",
-  "receipts_digest": "30ece0cf4e6b0b6e2b8e7b7254180abb49988de6e95dc964b385fa311bf10b55"
+  "summary": "Compiled-agent decentralized role receipts retain 4 governed pre-network roles tied back to contract 40054609dd32f92a930fb7d71c309800445a547a303f9574da9cc46c1811bd94.",
+  "receipts_digest": "8e62c508615c109458c356574fea71846cb615120d879ea73f91b830362d3dcf"
 }

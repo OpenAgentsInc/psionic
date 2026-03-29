@@ -4,7 +4,7 @@
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "model_family": "multinomial_naive_bayes",
   "feature_profile": "route_plus_fact_signature",
-  "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
+  "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
   "training_sample_count": 12,
   "heldout_sample_count": 6,
   "vocabulary_size": 13,
@@ -116,5 +116,5 @@
   "training_accuracy": 1.0,
   "heldout_accuracy": 1.0,
   "detail": "Trained grounded-answer model over explicit fact signatures only. The model predicts a narrow grounded-answer program from supplied tool facts and falls back on missing or conflicting facts instead of inventing unsupported synthesis.",
-  "artifact_digest": "250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b"
+  "artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e"
 }
