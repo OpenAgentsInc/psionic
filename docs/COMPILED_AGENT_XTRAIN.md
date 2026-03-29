@@ -56,6 +56,8 @@ learned compiled-agent slice actually proved.
 - `fixtures/compiled_agent/compiled_agent_grounded_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
 - `fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json`
+- `fixtures/compiled_agent/compiled_agent_confidence_policy_v1.json`
+- `fixtures/compiled_agent/compiled_agent_shadow_disagreement_receipts_v1.json`
 - `fixtures/compiled_agent/compiled_agent_decentralized_roles_contract_v1.json`
 - `fixtures/compiled_agent/compiled_agent_decentralized_role_receipts_v1.json`
 
@@ -83,6 +85,10 @@ learned compiled-agent slice actually proved.
 - the promoted-artifact contract now hydrates the retained grounded-answer
   artifact fixture and keeps route authority on the baseline revision when the
   validator says `hold`
+- confidence bands, human-review triggers, and rollback thresholds are now
+  retained as machine-readable artifacts instead of living only in issue text
+- promoted-versus-candidate disagreement harvesting is now part of the normal
+  xtrain loop, including admitted-family runtime shadow traces
 - promoted and candidate module authority is exported through a retained
   runtime-consumable artifact contract instead of only being implied by docs
 - the first pre-network decentralized improvement roles are typed retained
@@ -104,6 +110,10 @@ learned compiled-agent slice actually proved.
   `5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6`
 - promoted-artifact contract digest:
   `5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa`
+- confidence policy digest:
+  `4a1e25a25f6bcc1e314e516fdadd0411181582844df9c31b68597b4558ce15b8`
+- shadow disagreement receipts digest:
+  `7636190e5a1901e909874a670f4d71191b9cacf85214d6675042819dc2454cad`
 - decentralized roles contract digest:
   `cb8b46454720f10aff15287e95a31479a786eceefe334fc6a3b8436bda9c1e76`
 - decentralized role receipts digest:

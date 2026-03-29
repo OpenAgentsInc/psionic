@@ -1,0 +1,112 @@
+{
+  "schema_version": "psionic.compiled_agent.confidence_policy.v1",
+  "policy_id": "compiled_agent.confidence_policy.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "evidence_class": "learned_lane",
+  "promoted_artifact_contract_digest": "5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa",
+  "xtrain_cycle_receipt_digest": "5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6",
+  "policies": [
+    {
+      "module": "route",
+      "promoted_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "promoted_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "candidate_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_digest": "0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f",
+      "candidate_label": "psionic_candidate",
+      "measured_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "thresholds": {
+        "high_confidence_min": 0.8,
+        "review_below": 0.6,
+        "promoted_confidence_floor": 0.8,
+        "rollback_on_heldout_regression_count": 1,
+        "rollback_on_runtime_regression_count": 1,
+        "human_review_on_low_confidence_disagreement": true,
+        "human_review_on_ambiguous_regression": true
+      },
+      "metrics": {
+        "disagreement_count": 9,
+        "runtime_disagreement_count": 1,
+        "low_confidence_disagreement_count": 1,
+        "human_review_count": 2,
+        "rollback_ready_count": 0,
+        "learned_correct_mean_confidence": 0.9411773,
+        "learned_incorrect_mean_confidence": 0.94501626,
+        "learned_min_confidence": 0.68381554,
+        "learned_max_confidence": 1.0,
+        "disagreement_receipt_ids": [
+          "disagreement.compiled_agent.route.openagents_best_provider_unsupported_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_negated_provider_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_negated_wallet_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_provider_exclusion_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_runtime_shadow_compare_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_wallet_address_heldout_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_wallet_address_unsupported_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_wallet_exclusion_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_wallet_provider_compare_heldout_receipt_v1"
+        ],
+        "human_review_receipt_ids": [
+          "disagreement.compiled_agent.route.openagents_runtime_shadow_compare_receipt_v1",
+          "disagreement.compiled_agent.route.openagents_wallet_address_heldout_receipt_v1"
+        ],
+        "rollback_ready_receipt_ids": []
+      },
+      "detail": "Confidence policy for Route is regenerated from the promoted-artifact contract, learning ledger, and XTRAIN receipt 5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6 so shadow disagreements, low-confidence bands, and rollback-ready regressions remain machine-auditable instead of ad hoc."
+    },
+    {
+      "module": "grounded_answer",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "promoted_artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+      "candidate_label": "last_known_good",
+      "measured_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "thresholds": {
+        "high_confidence_min": 0.85,
+        "review_below": 0.65,
+        "promoted_confidence_floor": 0.82,
+        "rollback_on_heldout_regression_count": 1,
+        "rollback_on_runtime_regression_count": 1,
+        "human_review_on_low_confidence_disagreement": true,
+        "human_review_on_ambiguous_regression": true
+      },
+      "metrics": {
+        "disagreement_count": 14,
+        "runtime_disagreement_count": 2,
+        "low_confidence_disagreement_count": 1,
+        "human_review_count": 5,
+        "rollback_ready_count": 0,
+        "learned_correct_mean_confidence": 0.94167984,
+        "learned_incorrect_mean_confidence": 0.0,
+        "learned_min_confidence": 0.0,
+        "learned_max_confidence": 0.9958507,
+        "disagreement_receipt_ids": [
+          "disagreement.compiled_agent.grounded_answer.openagents_negated_provider_wallet_heldout_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_negated_wallet_provider_heldout_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_provider_exclusion_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_recent_earnings_phrase_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_recent_earnings_short_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_runtime_shadow_compare_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_runtime_wallet_recent_earnings_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_balance_phrase_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_balance_variant_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_earnings_phrase_heldout_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_exclusion_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_recent_earnings_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+        ],
+        "human_review_receipt_ids": [
+          "disagreement.compiled_agent.grounded_answer.openagents_negated_provider_wallet_heldout_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_negated_wallet_provider_heldout_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_provider_exclusion_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_runtime_shadow_compare_receipt_v1",
+          "disagreement.compiled_agent.grounded_answer.openagents_wallet_exclusion_receipt_v1"
+        ],
+        "rollback_ready_receipt_ids": []
+      },
+      "detail": "Confidence policy for GroundedAnswer is regenerated from the promoted-artifact contract, learning ledger, and XTRAIN receipt 5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6 so shadow disagreements, low-confidence bands, and rollback-ready regressions remain machine-auditable instead of ad hoc."
+    }
+  ],
+  "summary": "Compiled-agent confidence policy retains 2 module policies and 23 disagreement receipts. Human review is queued for 7 disagreements and rollback is codified for 0 promoted regressions.",
+  "policy_digest": "4a1e25a25f6bcc1e314e516fdadd0411181582844df9c31b68597b4558ce15b8"
+}

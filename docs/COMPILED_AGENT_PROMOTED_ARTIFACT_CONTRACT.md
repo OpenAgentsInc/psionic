@@ -65,16 +65,26 @@ Each artifact entry records:
 
 The first retained contract carries:
 
-- promoted route authority backed by `compiled_agent.route.multinomial_nb_v1`
-- rollback-safe route fallback under `last_known_good`
-- promoted baseline artifacts for:
+- promoted route authority held on `compiled_agent.baseline.rule_v1.route`
+- shadow-only route candidate under `psionic_candidate`:
+  - `compiled_agent.route.multinomial_nb_v1`
+- promoted artifacts for:
   - `tool_policy`
   - `tool_arguments`
-  - `grounded_answer`
+  - `grounded_answer` via `compiled_agent.grounded_answer.multinomial_nb_v1`
   - `verify`
+- rollback-safe grounded-answer candidate under `last_known_good`:
+  - `compiled_agent.baseline.rule_v1.grounded_answer`
 - candidate artifacts under `psionic_candidate` for:
-  - `grounded_answer`
+  - `route`
   - `verify`
+
+Current retained counts:
+
+- 5 promoted entries
+- 3 candidate entries
+- contract digest:
+  `5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa`
 
 This is intentionally narrow. The contract is not trying to describe every
 future compiled-agent graph or every future module family yet.
@@ -90,6 +100,9 @@ For the first graph:
   `candidate_label`
 - rollback should route to `rollback_artifact_id` when present
 - every artifact entry in the current contract stays inside `learned_lane`
+- the retained confidence policy and disagreement receipts are the canonical
+  place to inspect low-confidence shadow disagreements, human-review triggers,
+  and rollback-ready regressions
 - receipts should retain:
   - artifact id
   - artifact digest

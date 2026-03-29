@@ -1,13 +1,17 @@
 use psionic_train::{
+    compiled_agent_confidence_policy_fixture_path,
     compiled_agent_grounded_candidate_report_fixture_path,
     compiled_agent_grounded_model_artifact_fixture_path,
     compiled_agent_promoted_artifact_contract_fixture_path,
     compiled_agent_route_candidate_report_fixture_path,
     compiled_agent_route_model_artifact_fixture_path,
+    compiled_agent_shadow_disagreement_receipts_fixture_path,
     compiled_agent_xtrain_cycle_receipt_fixture_path,
+    write_compiled_agent_confidence_policy,
     write_compiled_agent_grounded_candidate_report, write_compiled_agent_grounded_model_artifact,
     write_compiled_agent_promoted_artifact_contract, write_compiled_agent_route_candidate_report,
-    write_compiled_agent_route_model_artifact, write_compiled_agent_xtrain_cycle_receipt,
+    write_compiled_agent_route_model_artifact, write_compiled_agent_shadow_disagreement_receipts,
+    write_compiled_agent_xtrain_cycle_receipt,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,6 +27,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cycle = write_compiled_agent_xtrain_cycle_receipt(&cycle_path)?;
     let contract_path = compiled_agent_promoted_artifact_contract_fixture_path();
     let contract = write_compiled_agent_promoted_artifact_contract(&contract_path)?;
+    let confidence_policy_path = compiled_agent_confidence_policy_fixture_path();
+    let confidence_policy = write_compiled_agent_confidence_policy(&confidence_policy_path)?;
+    let disagreement_receipts_path = compiled_agent_shadow_disagreement_receipts_fixture_path();
+    let disagreement_receipts =
+        write_compiled_agent_shadow_disagreement_receipts(&disagreement_receipts_path)?;
 
     println!(
         "wrote route model artifact={} digest={}",
@@ -53,6 +62,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "wrote compiled-agent promoted artifact contract={} digest={}",
         contract_path.display(),
         contract.contract_digest
+    );
+    println!(
+        "wrote compiled-agent confidence policy={} digest={}",
+        confidence_policy_path.display(),
+        confidence_policy.policy_digest
+    );
+    println!(
+        "wrote compiled-agent shadow disagreement receipts={} digest={}",
+        disagreement_receipts_path.display(),
+        disagreement_receipts.receipts_digest
     );
     Ok(())
 }
