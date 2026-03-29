@@ -39,6 +39,7 @@ mod benchmarking;
 mod checkpoint_recovery;
 mod compiled_agent_learning;
 mod compiled_agent_receipts;
+mod compiled_agent_xtrain;
 mod content_addressed_artifact_exchange_contract;
 mod contributor_program_lineage;
 mod core_loop;
@@ -99,7 +100,6 @@ mod parameter_golf_homegolf_multiseed_package;
 mod parameter_golf_homegolf_score_runtime;
 mod parameter_golf_homegolf_strict_challenge;
 mod parameter_golf_homegolf_visualization;
-mod parameter_golf_xtrain_visualization;
 mod parameter_golf_promoted_promotion;
 mod parameter_golf_record_export_surface_contract;
 mod parameter_golf_record_folder_compatibility;
@@ -112,6 +112,7 @@ mod parameter_golf_single_h100_visualization;
 mod parameter_golf_submission;
 mod parameter_golf_submission_pr;
 mod parameter_golf_submission_runtime;
+mod parameter_golf_xtrain_visualization;
 mod psion_acceptance_matrix;
 mod psion_benchmark_label_generation;
 mod psion_benchmark_packages;
@@ -247,6 +248,7 @@ pub use benchmarking::*;
 pub use checkpoint_recovery::*;
 pub use compiled_agent_learning::*;
 pub use compiled_agent_receipts::*;
+pub use compiled_agent_xtrain::*;
 pub use content_addressed_artifact_exchange_contract::*;
 pub use contributor_program_lineage::*;
 pub use core_loop::*;
@@ -307,7 +309,6 @@ pub use parameter_golf_homegolf_multiseed_package::*;
 pub use parameter_golf_homegolf_score_runtime::*;
 pub use parameter_golf_homegolf_strict_challenge::*;
 pub use parameter_golf_homegolf_visualization::*;
-pub use parameter_golf_xtrain_visualization::*;
 pub use parameter_golf_promoted_promotion::*;
 pub use parameter_golf_record_export_surface_contract::*;
 pub use parameter_golf_record_folder_compatibility::*;
@@ -320,6 +321,7 @@ pub use parameter_golf_single_h100_visualization::*;
 pub use parameter_golf_submission::*;
 pub use parameter_golf_submission_pr::*;
 pub use parameter_golf_submission_runtime::*;
+pub use parameter_golf_xtrain_visualization::*;
 pub use psion_acceptance_matrix::*;
 pub use psion_benchmark_label_generation::*;
 pub use psion_benchmark_packages::*;
@@ -1312,8 +1314,8 @@ mod tests {
     }
 
     #[test]
-    fn observe_membership_advances_epoch_only_when_truth_changes(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn observe_membership_advances_epoch_only_when_truth_changes()
+    -> Result<(), Box<dyn std::error::Error>> {
         let stable = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1343,8 +1345,8 @@ mod tests {
     }
 
     #[test]
-    fn live_recovery_plan_exposes_recovery_and_late_join_semantics(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn live_recovery_plan_exposes_recovery_and_late_join_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1387,15 +1389,18 @@ mod tests {
             plan.recovery_context.late_joiner_node_ids,
             vec![String::from("worker-c")]
         );
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint));
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners));
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::RebalanceWorldSize));
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint)
+        );
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners)
+        );
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::RebalanceWorldSize)
+        );
         assert_eq!(plan.checkpoint_streams.len(), 1);
         assert!(!plan.plan_digest.is_empty());
         Ok(())

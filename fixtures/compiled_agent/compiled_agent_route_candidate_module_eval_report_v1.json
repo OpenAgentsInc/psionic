@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "report_id": "compiled_agent.module_eval.report.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "baseline_revision_id": "compiled_agent.route.rule_v2.negation_guard",
+  "case_reports": [
+    {
+      "case_id": "route_provider_ready",
+      "module": "route",
+      "pass": true,
+      "tags": [
+        "supported",
+        "provider"
+      ],
+      "expected_summary": "ProviderStatus",
+      "observed_summary": "ProviderStatus",
+      "detail": "Explicit provider readiness route should stay on the provider lane."
+    },
+    {
+      "case_id": "route_wallet_balance",
+      "module": "route",
+      "pass": true,
+      "tags": [
+        "supported",
+        "wallet"
+      ],
+      "expected_summary": "WalletStatus",
+      "observed_summary": "WalletStatus",
+      "detail": "Explicit wallet-balance route should stay on the wallet lane."
+    },
+    {
+      "case_id": "route_unsupported_poem",
+      "module": "route",
+      "pass": true,
+      "tags": [
+        "unsupported"
+      ],
+      "expected_summary": "Unsupported",
+      "observed_summary": "Unsupported",
+      "detail": "Out-of-scope prompt should route to unsupported."
+    },
+    {
+      "case_id": "route_negated_wallet_false_positive",
+      "module": "route",
+      "pass": true,
+      "tags": [
+        "unsupported",
+        "negated",
+        "known_gap"
+      ],
+      "expected_summary": "Unsupported",
+      "observed_summary": "Unsupported",
+      "detail": "Negated wallet mention should not silently become a wallet route, but the baseline revision still false-positives here."
+    },
+    {
+      "case_id": "tool_policy_provider_only",
+      "module": "tool_policy",
+      "pass": true,
+      "tags": [
+        "supported",
+        "provider"
+      ],
+      "expected_summary": "provider_status",
+      "observed_summary": "provider_status",
+      "detail": "Provider route should expose only the provider-status tool."
+    },
+    {
+      "case_id": "tool_policy_wallet_only",
+      "module": "tool_policy",
+      "pass": true,
+      "tags": [
+        "supported",
+        "wallet"
+      ],
+      "expected_summary": "wallet_status",
+      "observed_summary": "wallet_status",
+      "detail": "Wallet route should expose only the wallet-status tool."
+    },
+    {
+      "case_id": "tool_policy_unsupported_no_tools",
+      "module": "tool_policy",
+      "pass": true,
+      "tags": [
+        "unsupported"
+      ],
+      "expected_summary": "",
+      "observed_summary": "",
+      "detail": "Unsupported route should expose no tools."
+    },
+    {
+      "case_id": "tool_arguments_provider_empty_object",
+      "module": "tool_arguments",
+      "pass": true,
+      "tags": [
+        "supported",
+        "provider"
+      ],
+      "expected_summary": "[{\"tool_name\":\"provider_status\",\"arguments\":{}}]",
+      "observed_summary": "[{\"tool_name\":\"provider_status\",\"arguments\":{}}]",
+      "detail": "No-arg provider tool should emit an empty argument object only."
+    },
+    {
+      "case_id": "tool_arguments_wallet_empty_object",
+      "module": "tool_arguments",
+      "pass": true,
+      "tags": [
+        "supported",
+        "wallet"
+      ],
+      "expected_summary": "[{\"tool_name\":\"wallet_status\",\"arguments\":{}}]",
+      "observed_summary": "[{\"tool_name\":\"wallet_status\",\"arguments\":{}}]",
+      "detail": "No-arg wallet tool should emit an empty argument object only."
+    },
+    {
+      "case_id": "tool_arguments_unsupported_emits_nothing",
+      "module": "tool_arguments",
+      "pass": true,
+      "tags": [
+        "unsupported"
+      ],
+      "expected_summary": "[]",
+      "observed_summary": "[]",
+      "detail": "No selected tools means no tool calls should be emitted."
+    },
+    {
+      "case_id": "grounded_provider_ready",
+      "module": "grounded_answer",
+      "pass": true,
+      "tags": [
+        "supported",
+        "provider"
+      ],
+      "expected_summary": "ready, online",
+      "observed_summary": "Provider is ready to go online.",
+      "detail": "Provider grounded answer should reflect readiness from the returned facts."
+    },
+    {
+      "case_id": "grounded_provider_blocked",
+      "module": "grounded_answer",
+      "pass": true,
+      "tags": [
+        "supported",
+        "provider"
+      ],
+      "expected_summary": "not ready",
+      "observed_summary": "Provider is not ready to go online.",
+      "detail": "Provider grounded answer should reflect blocked readiness even on the narrow baseline."
+    },
+    {
+      "case_id": "grounded_wallet_balance",
+      "module": "grounded_answer",
+      "pass": true,
+      "tags": [
+        "supported",
+        "wallet"
+      ],
+      "expected_summary": "1200, sats",
+      "observed_summary": "The wallet contains 1200 sats.",
+      "detail": "Wallet grounded answer should include the returned balance on the narrow baseline."
+    },
+    {
+      "case_id": "grounded_unsupported_refusal",
+      "module": "grounded_answer",
+      "pass": true,
+      "tags": [
+        "unsupported"
+      ],
+      "expected_summary": "provider, wallet",
+      "observed_summary": "I can currently answer only provider readiness and wallet balance questions.",
+      "detail": "Unsupported grounded-answer row should stay inside the narrow refusal template."
+    },
+    {
+      "case_id": "verify_provider_accept",
+      "module": "verify",
+      "pass": true,
+      "tags": [
+        "supported",
+        "provider"
+      ],
+      "expected_summary": "AcceptGroundedAnswer",
+      "observed_summary": "AcceptGroundedAnswer",
+      "detail": "Verify should accept a provider answer that reflects returned readiness."
+    },
+    {
+      "case_id": "verify_wallet_accept",
+      "module": "verify",
+      "pass": true,
+      "tags": [
+        "supported",
+        "wallet"
+      ],
+      "expected_summary": "AcceptGroundedAnswer",
+      "observed_summary": "AcceptGroundedAnswer",
+      "detail": "Verify should accept a wallet answer that reflects the returned balance."
+    },
+    {
+      "case_id": "verify_wallet_missing_balance",
+      "module": "verify",
+      "pass": true,
+      "tags": [
+        "supported",
+        "wallet",
+        "failure"
+      ],
+      "expected_summary": "NeedsFallback",
+      "observed_summary": "NeedsFallback",
+      "detail": "Verify should reject wallet prose that omits the returned balance."
+    },
+    {
+      "case_id": "verify_unsupported_refusal_clean",
+      "module": "verify",
+      "pass": true,
+      "tags": [
+        "unsupported"
+      ],
+      "expected_summary": "UnsupportedRefusal",
+      "observed_summary": "UnsupportedRefusal",
+      "detail": "Verify should accept a clean unsupported refusal with no tool emission."
+    },
+    {
+      "case_id": "verify_unsupported_tool_leak",
+      "module": "verify",
+      "pass": true,
+      "tags": [
+        "unsupported",
+        "tool_emission_is_not_success"
+      ],
+      "expected_summary": "NeedsFallback",
+      "observed_summary": "NeedsFallback",
+      "detail": "Tool emission alone is not success; unsupported route with tool leakage must still fail verification."
+    }
+  ],
+  "module_summaries": [
+    {
+      "module": "route",
+      "total_cases": 4,
+      "passed_cases": 4,
+      "failed_case_ids": [],
+      "failure_classes": {}
+    },
+    {
+      "module": "tool_policy",
+      "total_cases": 3,
+      "passed_cases": 3,
+      "failed_case_ids": [],
+      "failure_classes": {}
+    },
+    {
+      "module": "tool_arguments",
+      "total_cases": 3,
+      "passed_cases": 3,
+      "failed_case_ids": [],
+      "failure_classes": {}
+    },
+    {
+      "module": "grounded_answer",
+      "total_cases": 4,
+      "passed_cases": 4,
+      "failed_case_ids": [],
+      "failure_classes": {}
+    },
+    {
+      "module": "verify",
+      "total_cases": 5,
+      "passed_cases": 5,
+      "failed_case_ids": [],
+      "failure_classes": {}
+    }
+  ],
+  "unsupported_case_count": 7,
+  "unsupported_case_pass_count": 7,
+  "negated_case_count": 1,
+  "negated_case_pass_count": 1,
+  "tool_emission_is_not_success_case_count": 1,
+  "generated_from_refs": [
+    "docs/COMPILED_AGENT_DEFAULT_ROW_REFERENCE.md"
+  ],
+  "summary": "Compiled-agent module eval report covers 19 cases across 5 module families with unsupported_pass=7/7, negated_pass=1/1, and tool_emission_is_not_success_cases=1.",
+  "detail": "This report keeps route, tool-policy, tool-argument, grounded-answer, and verify surfaces independent so later GEPA and XTRAIN work can optimize bounded modules instead of a giant agent loop.",
+  "report_digest": "3ec98452541f4fe66080ae74d6f4ea9857e06e14e751eded8902039adae07c52"
+}

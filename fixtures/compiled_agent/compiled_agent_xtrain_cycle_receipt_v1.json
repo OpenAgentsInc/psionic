@@ -1,0 +1,67 @@
+{
+  "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
+  "cycle_id": "compiled_agent.xtrain.cycle.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "source_ledger_digest": "8a8a876b53ea02940509fa43d988efc8d3d4e2c8b56c98f395f1c07876c750a9",
+  "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+  "route_outcome": {
+    "module": "route",
+    "decision": "promote",
+    "reason": "Candidate fixes the retained negated-route false positive with no module-eval or replay regressions.",
+    "delta": {
+      "module": "route",
+      "base_revision_id": "compiled_agent.baseline.rule_v1",
+      "candidate_revision_id": "compiled_agent.route.rule_v2.negation_guard",
+      "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+      "targeted_failure_classes": [
+        "negated_route_false_positive"
+      ],
+      "delta_summary": "Adds a bounded negation plus unsupported-context guard so `do not ... wallet balance ... poem` no longer routes to the wallet lane."
+    },
+    "validation": {
+      "module": "route",
+      "baseline_passed_cases": 3,
+      "candidate_passed_cases": 4,
+      "improvement_case_ids": [
+        "route_negated_wallet_false_positive"
+      ],
+      "regression_case_ids": [],
+      "baseline_replay_match_count": 3,
+      "candidate_replay_match_count": 4,
+      "replay_improvement_sample_ids": [
+        "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1"
+      ],
+      "replay_regression_sample_ids": []
+    }
+  },
+  "grounded_answer_outcome": {
+    "module": "grounded_answer",
+    "decision": "promote",
+    "reason": "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval surface non-regressing.",
+    "delta": {
+      "module": "grounded_answer",
+      "base_revision_id": "compiled_agent.baseline.rule_v1",
+      "candidate_revision_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings",
+      "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+      "targeted_failure_classes": [
+        "grounded_answer_mismatch"
+      ],
+      "delta_summary": "Extends the bounded wallet grounding template to include recent earnings when that fact is present in the receipt-backed tool result."
+    },
+    "validation": {
+      "module": "grounded_answer",
+      "baseline_passed_cases": 4,
+      "candidate_passed_cases": 4,
+      "improvement_case_ids": [],
+      "regression_case_ids": [],
+      "baseline_replay_match_count": 3,
+      "candidate_replay_match_count": 4,
+      "replay_improvement_sample_ids": [
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1"
+      ],
+      "replay_regression_sample_ids": []
+    }
+  },
+  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed.",
+  "receipt_digest": "648967fd87ed8be5e86730c6863059afd626be3c3c0379801859c838fc0345de"
+}

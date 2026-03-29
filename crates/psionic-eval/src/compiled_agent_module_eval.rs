@@ -120,7 +120,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: Vec::new(),
             expected_verdict: None,
-            detail: String::from("Explicit provider readiness route should stay on the provider lane."),
+            detail: String::from(
+                "Explicit provider readiness route should stay on the provider lane.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("route_wallet_balance"),
@@ -295,7 +297,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: vec![String::from("ready"), String::from("online")],
             expected_verdict: None,
-            detail: String::from("Provider grounded answer should reflect readiness from the returned facts."),
+            detail: String::from(
+                "Provider grounded answer should reflect readiness from the returned facts.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("grounded_provider_blocked"),
@@ -314,7 +318,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: vec![String::from("not ready")],
             expected_verdict: None,
-            detail: String::from("Provider grounded answer should reflect blocked readiness even on the narrow baseline."),
+            detail: String::from(
+                "Provider grounded answer should reflect blocked readiness even on the narrow baseline.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("grounded_wallet_balance"),
@@ -333,7 +339,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: vec![String::from("1200"), String::from("sats")],
             expected_verdict: None,
-            detail: String::from("Wallet grounded answer should include the returned balance on the narrow baseline."),
+            detail: String::from(
+                "Wallet grounded answer should include the returned balance on the narrow baseline.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("grounded_unsupported_refusal"),
@@ -349,7 +357,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: vec![String::from("provider"), String::from("wallet")],
             expected_verdict: None,
-            detail: String::from("Unsupported grounded-answer row should stay inside the narrow refusal template."),
+            detail: String::from(
+                "Unsupported grounded-answer row should stay inside the narrow refusal template.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("verify_provider_accept"),
@@ -368,7 +378,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: Vec::new(),
             expected_verdict: Some(CompiledAgentVerifyVerdict::AcceptGroundedAnswer),
-            detail: String::from("Verify should accept a provider answer that reflects returned readiness."),
+            detail: String::from(
+                "Verify should accept a provider answer that reflects returned readiness.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("verify_wallet_accept"),
@@ -387,13 +399,19 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: Vec::new(),
             expected_verdict: Some(CompiledAgentVerifyVerdict::AcceptGroundedAnswer),
-            detail: String::from("Verify should accept a wallet answer that reflects the returned balance."),
+            detail: String::from(
+                "Verify should accept a wallet answer that reflects the returned balance.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("verify_wallet_missing_balance"),
             module: CompiledAgentModuleKind::Verify,
             prompt: String::from("How many sats are in the wallet?"),
-            tags: vec![String::from("supported"), String::from("wallet"), String::from("failure")],
+            tags: vec![
+                String::from("supported"),
+                String::from("wallet"),
+                String::from("failure"),
+            ],
             route_input: Some(CompiledAgentRoute::WalletStatus),
             selected_tools: vec![String::from("wallet_status")],
             tool_results: vec![CompiledAgentToolResult {
@@ -406,7 +424,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: Vec::new(),
             expected_verdict: Some(CompiledAgentVerifyVerdict::NeedsFallback),
-            detail: String::from("Verify should reject wallet prose that omits the returned balance."),
+            detail: String::from(
+                "Verify should reject wallet prose that omits the returned balance.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("verify_unsupported_refusal_clean"),
@@ -424,7 +444,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: Vec::new(),
             expected_verdict: Some(CompiledAgentVerifyVerdict::UnsupportedRefusal),
-            detail: String::from("Verify should accept a clean unsupported refusal with no tool emission."),
+            detail: String::from(
+                "Verify should accept a clean unsupported refusal with no tool emission.",
+            ),
         },
         CompiledAgentModuleEvalCase {
             case_id: String::from("verify_unsupported_tool_leak"),
@@ -448,7 +470,9 @@ pub fn compiled_agent_module_eval_cases() -> Vec<CompiledAgentModuleEvalCase> {
             expected_calls: Vec::new(),
             expected_answer_substrings: Vec::new(),
             expected_verdict: Some(CompiledAgentVerifyVerdict::NeedsFallback),
-            detail: String::from("Tool emission alone is not success; unsupported route with tool leakage must still fail verification."),
+            detail: String::from(
+                "Tool emission alone is not success; unsupported route with tool leakage must still fail verification.",
+            ),
         },
     ]
 }
@@ -490,11 +514,13 @@ pub fn build_compiled_agent_module_eval_report(
         .count() as u32;
     let tool_emission_is_not_success_case_count = case_reports
         .iter()
-        .filter(|case| case.tags.iter().any(|tag| tag == "tool_emission_is_not_success"))
+        .filter(|case| {
+            case.tags
+                .iter()
+                .any(|tag| tag == "tool_emission_is_not_success")
+        })
         .count() as u32;
-    let generated_from_refs = vec![String::from(
-        "docs/COMPILED_AGENT_DEFAULT_ROW_REFERENCE.md",
-    )];
+    let generated_from_refs = vec![String::from("docs/COMPILED_AGENT_DEFAULT_ROW_REFERENCE.md")];
 
     let mut report = CompiledAgentModuleEvalReport {
         schema_version: REPORT_SCHEMA_VERSION,
@@ -565,8 +591,10 @@ fn evaluate_case(
 ) -> CompiledAgentModuleEvalCaseReport {
     match case.module {
         CompiledAgentModuleKind::Route => {
-            let observed = evaluate_route(case.prompt.as_str(), revision);
-            let expected = case.expected_route.expect("route cases need an expected route");
+            let observed = evaluate_compiled_agent_route(case.prompt.as_str(), revision);
+            let expected = case
+                .expected_route
+                .expect("route cases need an expected route");
             let pass = observed == expected;
             CompiledAgentModuleEvalCaseReport {
                 case_id: case.case_id.clone(),
@@ -581,10 +609,14 @@ fn evaluate_case(
         }
         CompiledAgentModuleKind::ToolPolicy => {
             let observed = select_tools(
-                case.route_input.expect("tool-policy cases need a route input"),
+                case.route_input
+                    .expect("tool-policy cases need a route input"),
                 &compiled_agent_supported_tools(),
             );
-            let observed_names = observed.into_iter().map(|tool| tool.name).collect::<Vec<_>>();
+            let observed_names = observed
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect::<Vec<_>>();
             let pass = observed_names == case.expected_tool_names;
             CompiledAgentModuleEvalCaseReport {
                 case_id: case.case_id.clone(),
@@ -612,7 +644,7 @@ fn evaluate_case(
             }
         }
         CompiledAgentModuleKind::GroundedAnswer => {
-            let observed = grounded_answer(
+            let observed = evaluate_compiled_agent_grounded_answer(
                 case.route_input
                     .expect("grounded-answer cases need a route input"),
                 case.tool_results.as_slice(),
@@ -660,10 +692,19 @@ fn evaluate_case(
     }
 }
 
-fn evaluate_route(prompt: &str, revision: &CompiledAgentModuleRevisionSet) -> CompiledAgentRoute {
+#[must_use]
+pub fn evaluate_compiled_agent_route(
+    prompt: &str,
+    revision: &CompiledAgentModuleRevisionSet,
+) -> CompiledAgentRoute {
     let tokens = normalized_tokens(prompt);
     let asks_provider = contains_any(&tokens, &revision.provider_route_keywords);
     let asks_wallet = contains_any(&tokens, &revision.wallet_route_keywords);
+    let contains_negation = contains_any(&tokens, &revision.negation_keywords);
+    let contains_unsupported_context = contains_any(&tokens, &revision.unsupported_route_keywords);
+    if contains_negation && contains_unsupported_context && (asks_provider || asks_wallet) {
+        return CompiledAgentRoute::Unsupported;
+    }
     match (asks_provider, asks_wallet) {
         (true, false) => CompiledAgentRoute::ProviderStatus,
         (false, true) => CompiledAgentRoute::WalletStatus,
@@ -671,7 +712,10 @@ fn evaluate_route(prompt: &str, revision: &CompiledAgentModuleRevisionSet) -> Co
     }
 }
 
-fn select_tools(route: CompiledAgentRoute, available_tools: &[crate::CompiledAgentToolSpec]) -> Vec<crate::CompiledAgentToolSpec> {
+fn select_tools(
+    route: CompiledAgentRoute,
+    available_tools: &[crate::CompiledAgentToolSpec],
+) -> Vec<crate::CompiledAgentToolSpec> {
     match route {
         CompiledAgentRoute::ProviderStatus => available_tools
             .iter()
@@ -697,7 +741,8 @@ fn emit_tool_calls(selected_tools: &[String]) -> Vec<CompiledAgentToolCall> {
         .collect()
 }
 
-fn grounded_answer(
+#[must_use]
+pub fn evaluate_compiled_agent_grounded_answer(
     route: CompiledAgentRoute,
     tool_results: &[CompiledAgentToolResult],
     revision: &CompiledAgentModuleRevisionSet,
@@ -802,7 +847,7 @@ fn verify_case(
             let answer = candidate_answer.to_ascii_lowercase();
             let mentions_balance = answer.contains(balance_sats.to_string().as_str());
             let mentions_earnings = answer.contains(earnings_sats.to_string().as_str());
-            if mentions_balance && (!revision.include_recent_earnings || mentions_earnings) {
+            if mentions_balance && (!revision.verify_require_recent_earnings || mentions_earnings) {
                 CompiledAgentVerifyVerdict::AcceptGroundedAnswer
             } else {
                 CompiledAgentVerifyVerdict::NeedsFallback
@@ -855,11 +900,9 @@ fn summarize_module(
     }
 }
 
-fn route_failure_class(
-    case: &CompiledAgentModuleEvalCase,
-    observed: CompiledAgentRoute,
-) -> String {
-    if case.tags.iter().any(|tag| tag == "negated") && observed == CompiledAgentRoute::WalletStatus {
+fn route_failure_class(case: &CompiledAgentModuleEvalCase, observed: CompiledAgentRoute) -> String {
+    if case.tags.iter().any(|tag| tag == "negated") && observed == CompiledAgentRoute::WalletStatus
+    {
         return String::from("negated_route_false_positive");
     }
     String::from("route_mismatch")
@@ -899,7 +942,9 @@ fn normalized_tokens(text: &str) -> Vec<String> {
 }
 
 fn contains_any(tokens: &[String], needles: &[String]) -> bool {
-    tokens.iter().any(|token| needles.iter().any(|needle| token == needle))
+    tokens
+        .iter()
+        .any(|token| needles.iter().any(|needle| token == needle))
 }
 
 fn repo_root() -> PathBuf {
@@ -936,11 +981,13 @@ mod tests {
         assert_eq!(report.module_summaries.len(), 5);
         assert_eq!(report.negated_case_count, 1);
         assert_eq!(report.tool_emission_is_not_success_case_count, 1);
-        assert!(report
-            .module_summaries
-            .iter()
-            .any(|summary| summary.module == CompiledAgentModuleKind::Route
-                && summary.failed_case_ids.iter().any(|case_id| case_id == "route_negated_wallet_false_positive")));
+        assert!(report.module_summaries.iter().any(|summary| {
+            summary.module == CompiledAgentModuleKind::Route
+                && summary
+                    .failed_case_ids
+                    .iter()
+                    .any(|case_id| case_id == "route_negated_wallet_false_positive")
+        }));
     }
 
     #[test]

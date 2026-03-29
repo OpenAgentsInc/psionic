@@ -70,8 +70,11 @@ pub struct CompiledAgentModuleRevisionSet {
     pub revision_id: String,
     pub provider_route_keywords: Vec<String>,
     pub wallet_route_keywords: Vec<String>,
+    pub negation_keywords: Vec<String>,
+    pub unsupported_route_keywords: Vec<String>,
     pub include_provider_blockers: bool,
     pub include_recent_earnings: bool,
+    pub verify_require_recent_earnings: bool,
     pub unsupported_template: String,
 }
 
@@ -156,8 +159,11 @@ pub fn compiled_agent_baseline_revision_set() -> CompiledAgentModuleRevisionSet 
             String::from("balance"),
             String::from("sats"),
         ],
+        negation_keywords: Vec::new(),
+        unsupported_route_keywords: Vec::new(),
         include_provider_blockers: false,
         include_recent_earnings: false,
+        verify_require_recent_earnings: false,
         unsupported_template: String::from(
             "I can currently answer only provider readiness and wallet balance questions.",
         ),
@@ -220,8 +226,11 @@ mod tests {
     #[test]
     fn compiled_agent_baseline_revision_set_is_narrow() {
         let baseline = compiled_agent_baseline_revision_set();
+        assert!(baseline.negation_keywords.is_empty());
+        assert!(baseline.unsupported_route_keywords.is_empty());
         assert!(!baseline.include_provider_blockers);
         assert!(!baseline.include_recent_earnings);
+        assert!(!baseline.verify_require_recent_earnings);
         assert_eq!(baseline.wallet_route_keywords.len(), 3);
     }
 
