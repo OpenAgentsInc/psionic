@@ -162,8 +162,7 @@ pub fn train_compiled_agent_route_model(
     };
     artifact.training_accuracy = route_training_accuracy(&artifact, samples);
     artifact.heldout_accuracy = route_training_accuracy(&artifact, heldout_samples);
-    artifact.artifact_digest = stable_digest(b"compiled_agent_route_model_artifact|", &artifact);
-    artifact
+    normalize_route_model_artifact(artifact)
 }
 
 #[must_use]
@@ -264,6 +263,18 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     hasher.update(prefix);
     hasher.update(serde_json::to_vec(value).unwrap_or_default());
     hex::encode(hasher.finalize())
+}
+
+fn normalize_route_model_artifact(
+    artifact: CompiledAgentRouteModelArtifact,
+) -> CompiledAgentRouteModelArtifact {
+    let bytes = serde_json::to_vec(&artifact).unwrap_or_default();
+    let mut normalized: CompiledAgentRouteModelArtifact =
+        serde_json::from_slice(&bytes).unwrap_or(artifact);
+    normalized.artifact_digest = String::new();
+    normalized.artifact_digest =
+        stable_digest(b"compiled_agent_route_model_artifact|", &normalized);
+    normalized
 }
 
 #[cfg(test)]

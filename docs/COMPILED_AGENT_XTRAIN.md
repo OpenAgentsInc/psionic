@@ -61,32 +61,47 @@ learned compiled-agent slice actually proved.
 
 ## Current Truth
 
-- route candidate is now a replay-trained route model artifact, not a hand-authored keyword guard
-- route candidate clears the retained negated-route false-positive case
-- route candidate now improves both replay and held-out route matches with no held-out regressions
-- grounded-answer candidate is now a replay-trained fact-only model artifact, not a rule revision
-- grounded-answer candidate improves replay fidelity on the wallet answer by
-  learning the retained recent-earnings answer program from receipt-backed facts
-- grounded-answer candidate now also improves held-out wallet phrasing rows
-- grounded-answer candidate now passes the independent insufficient-facts and
-  conflicting-facts fallback rows
+- route candidate is a replay-trained route model artifact, not a hand-authored
+  keyword guard
+- route candidate clears the retained negated-route false-positive case and
+  improves replay matches `13 -> 18`
+- route candidate no longer promotes on the widened held-out split because the
+  comparison row
+  `receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1`
+  exposed a real ambiguity regression; held-out matches stay `7 -> 7`
+- grounded-answer candidate is a replay-trained fact-only model artifact, not a
+  rule revision
+- grounded-answer candidate improves replay fidelity `12 -> 18`
+- grounded-answer candidate also improves held-out fidelity `7 -> 10`
+- grounded-answer candidate continues to pass the independent
+  insufficient-facts and conflicting-facts fallback rows
+- learned route and grounded artifacts are now normalized through JSON
+  roundtrip before their digest is stamped, so the retained artifact digests,
+  persisted fixtures, and runtime-loaded payloads all agree
 - the promoted-artifact contract now hydrates the retained grounded-answer
-  artifact fixture instead of rebuilding a numerically drifted copy
-- promoted and candidate module authority is now exported through a retained
+  artifact fixture and keeps route authority on the baseline revision when the
+  validator says `hold`
+- promoted and candidate module authority is exported through a retained
   runtime-consumable artifact contract instead of only being implied by docs
-- the first pre-network decentralized improvement roles are now typed retained
+- the first pre-network decentralized improvement roles are typed retained
   contracts and receipts rather than roadmap-only nouns
 
 ## Latest Retained Outcome
 
-- route decision: `promote`
+- route decision: `hold`
 - grounded-answer decision: `promote`
 - replay bundle digest:
-  `ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9`
+  `a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8`
 - source ledger digest:
-  `d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3`
+  `71f84bc71752ba77c8201249537fdd94c7b9d459c91a5a5f35da3ac623941165`
+- route model digest:
+  `935ffdec233c08e05b7e9377e9176ac6504518ef2512741e7efb5c90e0b1d1ce`
 - grounded-answer model digest:
-  `250dfa2deff1b02216195a3c40a4ff7865cf3b45e2f339d8c1f9679b47a0388b`
+  `fbce731ad2b680a4cd1983e6127ebd140c8da40a7d1018cbc53b18b17a86ec01`
+- XTRAIN cycle receipt digest:
+  `e1de89d31db7c4bc03d98c06892c69a938aa13bb24db4bb199b4732fe80d89c4`
+- promoted-artifact contract digest:
+  `aa77ac9a5f0a342bff489c114927c11c5c54c368a2845b852d7be22600b7418a`
 
 ## Scope Boundary
 
@@ -94,7 +109,9 @@ This makes the training loop more real, but it does not silently claim runtime
 promotion in `openagents`.
 
 - `psionic` now trains and retains a route-model artifact from the replay bundle
-- validator-gated XTRAIN evaluates that artifact as the route candidate
+- validator-gated XTRAIN evaluates that artifact as the route candidate and can
+  honestly keep it in shadow-only `hold` state when widened evidence says not
+  to promote
 - `psionic` now also publishes a retained promoted-artifact contract for runtime
   consumers
 - runtime adoption into the compiled-agent authority lane remains a separate

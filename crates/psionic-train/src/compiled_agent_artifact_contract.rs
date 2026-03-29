@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     canonical_compiled_agent_route_model_artifact, canonical_compiled_agent_xtrain_cycle_receipt,
-    repo_relative_path, CompiledAgentXtrainError,
+    repo_relative_path, CompiledAgentPromotionDecision, CompiledAgentXtrainError,
 };
 
 pub const COMPILED_AGENT_PROMOTED_ARTIFACT_CONTRACT_FIXTURE_PATH: &str =
@@ -227,54 +227,107 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
     );
 
     let route_fallback_artifact_id = String::from("compiled_agent.baseline.rule_v1.route");
-    let promoted_route = CompiledAgentArtifactContractEntry {
-        module: CompiledAgentModuleKind::Route,
-        module_name: String::from("intent_route"),
-        signature_name: String::from("intent_route"),
-        implementation_family: String::from("psionic_route_model"),
-        implementation_label: route_model.artifact_id.clone(),
-        version: String::from("2026-03-29"),
-        lifecycle_state: CompiledAgentArtifactLifecycleState::Promoted,
-        candidate_label: None,
-        compatibility_version: String::from(COMPILED_AGENT_COMPATIBILITY_VERSION),
-        confidence_floor: 0.8,
-        artifact_id: route_model.artifact_id.clone(),
-        artifact_digest: route_model.artifact_digest.clone(),
-        row_id: default_row.row_id.clone(),
-        default_row: default_row.clone(),
-        evidence_class,
-        validator_lineage: route_lineage,
-        predecessor_artifact_id: Some(route_fallback_artifact_id.clone()),
-        rollback_artifact_id: Some(route_fallback_artifact_id.clone()),
-        promoted_at_utc: Some(String::from(PROMOTED_AT_UTC)),
-        payload: CompiledAgentArtifactPayload::RouteModel {
-            artifact: route_model.clone(),
-        },
-        detail: format!(
-            "Promoted route artifact sourced from {} and validator-scored through the first bounded compiled-agent XTRAIN cycle.",
-            ROUTE_MODEL_FIXTURE_REF
-        ),
+    let (promoted_route, route_candidate_entries) = match xtrain_cycle.route_outcome.decision {
+        CompiledAgentPromotionDecision::Promote => {
+            let promoted_route = CompiledAgentArtifactContractEntry {
+                module: CompiledAgentModuleKind::Route,
+                module_name: String::from("intent_route"),
+                signature_name: String::from("intent_route"),
+                implementation_family: String::from("psionic_route_model"),
+                implementation_label: route_model.artifact_id.clone(),
+                version: String::from("2026-03-29"),
+                lifecycle_state: CompiledAgentArtifactLifecycleState::Promoted,
+                candidate_label: None,
+                compatibility_version: String::from(COMPILED_AGENT_COMPATIBILITY_VERSION),
+                confidence_floor: 0.8,
+                artifact_id: route_model.artifact_id.clone(),
+                artifact_digest: route_model.artifact_digest.clone(),
+                row_id: default_row.row_id.clone(),
+                default_row: default_row.clone(),
+                evidence_class,
+                validator_lineage: route_lineage.clone(),
+                predecessor_artifact_id: Some(route_fallback_artifact_id.clone()),
+                rollback_artifact_id: Some(route_fallback_artifact_id.clone()),
+                promoted_at_utc: Some(String::from(PROMOTED_AT_UTC)),
+                payload: CompiledAgentArtifactPayload::RouteModel {
+                    artifact: route_model.clone(),
+                },
+                detail: format!(
+                    "Promoted route artifact sourced from {} and validator-scored through the bounded compiled-agent XTRAIN cycle.",
+                    ROUTE_MODEL_FIXTURE_REF
+                ),
+            };
+            let rollback_route = revision_entry(
+                CompiledAgentModuleKind::Route,
+                "intent_route",
+                "intent_route",
+                "psionic_rule_revision",
+                "last_known_good",
+                "2026-03-28",
+                CompiledAgentArtifactLifecycleState::Candidate,
+                Some("last_known_good"),
+                0.8,
+                route_fallback_artifact_id,
+                &baseline_revision,
+                &default_row,
+                evidence_class,
+                baseline_lineage.clone(),
+                None,
+                None,
+                "Rollback route artifact that preserves the last-known-good baseline revision for clean candidate-authority rollback.",
+            );
+            (promoted_route, vec![rollback_route])
+        }
+        CompiledAgentPromotionDecision::Hold => {
+            let promoted_route = revision_entry(
+                CompiledAgentModuleKind::Route,
+                "intent_route",
+                "intent_route",
+                "psionic_rule_revision",
+                "promoted",
+                "2026-03-28",
+                CompiledAgentArtifactLifecycleState::Promoted,
+                None,
+                0.8,
+                route_fallback_artifact_id.clone(),
+                &baseline_revision,
+                &default_row,
+                evidence_class,
+                baseline_lineage.clone(),
+                None,
+                Some(String::from(PROMOTED_AT_UTC)),
+                "Promoted route artifact remains the last-known-good baseline revision because the widened held-out split held the learned route candidate.",
+            );
+            let route_candidate = CompiledAgentArtifactContractEntry {
+                module: CompiledAgentModuleKind::Route,
+                module_name: String::from("intent_route"),
+                signature_name: String::from("intent_route"),
+                implementation_family: String::from("psionic_route_model"),
+                implementation_label: route_model.artifact_id.clone(),
+                version: String::from("2026-03-29"),
+                lifecycle_state: CompiledAgentArtifactLifecycleState::Candidate,
+                candidate_label: Some(String::from("psionic_candidate")),
+                compatibility_version: String::from(COMPILED_AGENT_COMPATIBILITY_VERSION),
+                confidence_floor: 0.8,
+                artifact_id: route_model.artifact_id.clone(),
+                artifact_digest: route_model.artifact_digest.clone(),
+                row_id: default_row.row_id.clone(),
+                default_row: default_row.clone(),
+                evidence_class,
+                validator_lineage: route_lineage.clone(),
+                predecessor_artifact_id: Some(route_fallback_artifact_id.clone()),
+                rollback_artifact_id: Some(route_fallback_artifact_id),
+                promoted_at_utc: None,
+                payload: CompiledAgentArtifactPayload::RouteModel {
+                    artifact: route_model.clone(),
+                },
+                detail: String::from(
+                    "Route candidate stays shadow-only under `psionic_candidate` because the widened held-out split produced a real ambiguity regression and the validator kept authority on the baseline route revision.",
+                ),
+            };
+            (promoted_route, vec![route_candidate])
+        }
     };
-
-    let rollback_route = revision_entry(
-        CompiledAgentModuleKind::Route,
-        "intent_route",
-        "intent_route",
-        "psionic_rule_revision",
-        "last_known_good",
-        "2026-03-28",
-        CompiledAgentArtifactLifecycleState::Candidate,
-        Some("last_known_good"),
-        0.8,
-        route_fallback_artifact_id,
-        &baseline_revision,
-        &default_row,
-        evidence_class,
-        baseline_lineage.clone(),
-        None,
-        None,
-        "Rollback route artifact that preserves the last-known-good baseline revision for clean candidate-authority rollback.",
-    );
 
     let promoted_tool_policy = revision_entry(
         CompiledAgentModuleKind::ToolPolicy,
@@ -396,9 +449,8 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         "Candidate verify artifact uses the same revision family as the current grounded-answer candidate so shadow runs preserve aligned grounded-answer verification semantics.",
     );
 
-    let artifacts = vec![
+    let mut artifacts = vec![
         promoted_route,
-        rollback_route,
         promoted_tool_policy,
         promoted_tool_arguments,
         promoted_grounded_answer,
@@ -406,6 +458,7 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         promoted_verify,
         candidate_verify,
     ];
+    artifacts.extend(route_candidate_entries);
 
     let promoted_entry_count = artifacts
         .iter()
@@ -432,10 +485,14 @@ pub fn canonical_compiled_agent_promoted_artifact_contract(
         contract_digest: String::new(),
     };
     contract.summary = format!(
-        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph under {:?} evidence, including the promoted route model, the promoted learned grounded-answer model from {}, and the current psionic_candidate plus last_known_good labels.",
+        "Compiled-agent promoted-artifact contract retains {} promoted artifacts and {} candidate artifacts for the first graph under {:?} evidence. Route authority is currently `{}` after validator gating, and the promoted learned grounded-answer model still comes from {}.",
         contract.promoted_entry_count,
         contract.candidate_entry_count,
         contract.evidence_class,
+        match xtrain_cycle.route_outcome.decision {
+            CompiledAgentPromotionDecision::Promote => "compiled_agent.route.multinomial_nb_v1",
+            CompiledAgentPromotionDecision::Hold => "compiled_agent.baseline.rule_v1.route",
+        },
         GROUNDED_MODEL_FIXTURE_REF
     );
     contract.contract_digest =
@@ -475,9 +532,7 @@ pub fn verify_compiled_agent_promoted_artifact_contract_fixture(
         error,
     })?;
     let committed: CompiledAgentPromotedArtifactContract = serde_json::from_slice(&bytes)?;
-    let committed_json = serde_json::to_string_pretty(&committed)?;
-    let expected_json = serde_json::to_string_pretty(&expected)?;
-    if committed.contract_digest != expected.contract_digest || committed_json != expected_json {
+    if committed.contract_digest != expected.contract_digest || committed != expected {
         return Err(CompiledAgentArtifactContractError::FixtureDrift {
             path: path.display().to_string(),
         });
@@ -605,15 +660,17 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         canonical_compiled_agent_promoted_artifact_contract,
+        canonical_compiled_agent_xtrain_cycle_receipt,
         verify_compiled_agent_promoted_artifact_contract_fixture,
-        CompiledAgentArtifactLifecycleState,
+        CompiledAgentArtifactLifecycleState, CompiledAgentPromotionDecision,
     };
     use psionic_eval::{CompiledAgentEvidenceClass, CompiledAgentModuleKind};
 
     #[test]
-    fn promoted_artifact_contract_keeps_the_learned_route_promoted(
+    fn promoted_artifact_contract_follows_route_validator_truth(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let contract = canonical_compiled_agent_promoted_artifact_contract()?;
+        let xtrain_cycle = canonical_compiled_agent_xtrain_cycle_receipt()?;
         assert_eq!(
             contract.evidence_class,
             CompiledAgentEvidenceClass::LearnedLane
@@ -625,12 +682,28 @@ mod tests {
             route.lifecycle_state,
             CompiledAgentArtifactLifecycleState::Promoted
         );
-        assert_eq!(route.artifact_id, "compiled_agent.route.multinomial_nb_v1");
         assert_eq!(
             route.evidence_class,
             CompiledAgentEvidenceClass::LearnedLane
         );
-        assert!(route.rollback_artifact_id.is_some());
+        match xtrain_cycle.route_outcome.decision {
+            CompiledAgentPromotionDecision::Promote => {
+                assert_eq!(route.artifact_id, "compiled_agent.route.multinomial_nb_v1");
+                assert!(route.rollback_artifact_id.is_some());
+            }
+            CompiledAgentPromotionDecision::Hold => {
+                assert_eq!(route.artifact_id, "compiled_agent.baseline.rule_v1.route");
+                assert!(route.rollback_artifact_id.is_none());
+                let candidate = contract
+                    .candidate_entry(CompiledAgentModuleKind::Route, "psionic_candidate")
+                    .expect("route candidate entry missing");
+                assert_eq!(candidate.artifact_id, "compiled_agent.route.multinomial_nb_v1");
+                assert_eq!(
+                    candidate.lifecycle_state,
+                    CompiledAgentArtifactLifecycleState::Candidate
+                );
+            }
+        }
         Ok(())
     }
 

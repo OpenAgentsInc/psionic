@@ -15,13 +15,13 @@ The current admitted task families stay intentionally narrow:
 
 ## Current Retained Counts
 
-- 18 retained source receipts
-- 12 training receipts
-- 6 held-out receipts
-- 24 replay samples
-- 12 route replay samples
-- 12 grounded-answer replay samples
-- 6 correction receipts
+- 30 retained source receipts
+- 18 training receipts
+- 12 held-out receipts
+- 36 replay samples
+- 18 route replay samples
+- 18 grounded-answer replay samples
+- 15 replay correction samples
 
 ## Training vs Held-Out Split
 
@@ -51,10 +51,26 @@ The expanded source receipts now cover:
 - provider blocked state
 - wallet balance phrasing variation
 - recent-earnings phrasing variation
-- unsupported requests
+- unsupported wallet and provider requests
+- explicit negation and exclusion phrasing
 - route ambiguity
-- negated false positives
 - grounded synthesis drift
+- confidence-edge prompts that try to force an answer without supported facts
+
+## Latest Honest Validator Result
+
+The widened held-out split did what it was supposed to do:
+
+- the route candidate still improves replay matches `13 -> 18`
+- the route candidate no longer promotes because the held-out comparison row
+  `openagents_wallet_provider_compare_heldout_receipt_v1` exposed a real
+  ambiguity regression
+- the grounded-answer candidate still promotes with replay matches `12 -> 18`
+  and held-out matches `7 -> 10`
+
+This is the right phase-three outcome. Corpus growth made the bounded loop more
+credible by surfacing a route hold instead of letting the smaller proof bundle
+overclaim generalization.
 
 ## Canonical Fixture Set
 
@@ -80,7 +96,7 @@ cargo run -q -p psionic-train --bin compiled_agent_receipt_to_replay
 
 ## Honest Boundary
 
-This is now broad enough to make the first route-model result operationally
-more credible than the original toy proof.
+This is now broad enough to make the first bounded learning loop more credible
+than the original toy proof.
 
 It is still a narrow product lane, not a claim of broad autonomous coverage.

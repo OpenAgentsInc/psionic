@@ -3,19 +3,19 @@
   "cycle_id": "compiled_agent.xtrain.cycle.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "evidence_class": "learned_lane",
-  "source_ledger_digest": "0e892257acec0db8138490bbb788b321b03681bb040611801cb5a32bb459b8e7",
-  "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
+  "source_ledger_digest": "71f84bc71752ba77c8201249537fdd94c7b9d459c91a5a5f35da3ac623941165",
+  "replay_bundle_digest": "a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8",
   "route_outcome": {
     "module": "route",
-    "decision": "promote",
-    "reason": "Trained route candidate fixes the retained negated-route false positive with no module-eval, replay, or held-out regressions.",
+    "decision": "hold",
+    "reason": "Candidate did not clear the route validator gate cleanly enough to promote.",
     "delta": {
       "module": "route",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.route.multinomial_nb_v1",
-      "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
+      "replay_bundle_digest": "a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
-      "candidate_artifact_digest": "14ca68736ef5728c9621256363727672ace4ef3886433f349c16bc0029f23e93",
+      "candidate_artifact_digest": "935ffdec233c08e05b7e9377e9176ac6504518ef2512741e7efb5c90e0b1d1ce",
       "targeted_failure_classes": [
         "negated_route_false_positive"
       ],
@@ -29,18 +29,24 @@
         "route_negated_wallet_false_positive"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 11,
-      "candidate_replay_match_count": 12,
-      "baseline_heldout_match_count": 5,
-      "candidate_heldout_match_count": 6,
+      "baseline_replay_match_count": 13,
+      "candidate_replay_match_count": 18,
+      "baseline_heldout_match_count": 7,
+      "candidate_heldout_match_count": 7,
       "replay_improvement_sample_ids": [
-        "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1"
+        "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
+        "sample.route.receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
+        "sample.route.receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1",
+        "sample.route.receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
+        "sample.route.receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1"
       ],
       "replay_regression_sample_ids": [],
       "heldout_improvement_receipt_ids": [
         "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1"
       ],
-      "heldout_regression_receipt_ids": []
+      "heldout_regression_receipt_ids": [
+        "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1"
+      ]
     }
   },
   "grounded_answer_outcome": {
@@ -51,9 +57,9 @@
       "module": "grounded_answer",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "replay_bundle_digest": "10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18",
+      "replay_bundle_digest": "a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
-      "candidate_artifact_digest": "c43b529b69bc7442bb5f307019724700ef9cd2f80bebb9b8c2f69a8908f5777e",
+      "candidate_artifact_digest": "fbce731ad2b680a4cd1983e6127ebd140c8da40a7d1018cbc53b18b17a86ec01",
       "targeted_failure_classes": [
         "grounded_answer_mismatch"
       ],
@@ -68,24 +74,27 @@
         "grounded_wallet_conflicting_facts_fallback"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 8,
-      "candidate_replay_match_count": 12,
-      "baseline_heldout_match_count": 4,
-      "candidate_heldout_match_count": 6,
+      "baseline_replay_match_count": 12,
+      "candidate_replay_match_count": 18,
+      "baseline_heldout_match_count": 7,
+      "candidate_heldout_match_count": 10,
       "replay_improvement_sample_ids": [
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
-        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1"
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1"
       ],
       "replay_regression_sample_ids": [],
       "heldout_improvement_receipt_ids": [
         "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
-        "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1"
+        "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
+        "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1"
       ],
       "heldout_regression_receipt_ids": []
     }
   },
-  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle 10db964a6bd27a5e3c7fe6e3d2e4636668f3e7e9b93d071b329534e1046b4f18.",
-  "receipt_digest": "aec78edad0173229aba4ee7c437bec11616ec1979e9eee7e0dfbf8a7d10c81c6"
+  "summary": "Compiled-agent XTRAIN cycle retained route decision=Hold and grounded_answer decision=Promote on replay bundle a046cd4a216178f44d92e720fcc18c4caf7dd4de1e4826931dd9179f97fee4f8.",
+  "receipt_digest": "e1de89d31db7c4bc03d98c06892c69a938aa13bb24db4bb199b4732fe80d89c4"
 }

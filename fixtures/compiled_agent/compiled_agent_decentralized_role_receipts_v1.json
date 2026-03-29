@@ -1,6 +1,6 @@
 {
   "schema_version": "psionic.compiled_agent.decentralized_role_receipts.v1",
-  "contract_digest": "40054609dd32f92a930fb7d71c309800445a547a303f9574da9cc46c1811bd94",
+  "contract_digest": "226c113e77b0fc326386d8a5c15eb7ee694f7f90e6606a495366a7b3f8e9f648",
   "receipts": [
     {
       "role": "replay_generation",
@@ -88,6 +88,6 @@
       "detail": "The retained bounded-module-training reference path produces candidate artifacts only. Validator scoring still decides whether those candidates can move runtime authority."
     }
   ],
-  "summary": "Compiled-agent decentralized role receipts retain 4 governed pre-network roles tied back to contract 40054609dd32f92a930fb7d71c309800445a547a303f9574da9cc46c1811bd94.",
-  "receipts_digest": "8e62c508615c109458c356574fea71846cb615120d879ea73f91b830362d3dcf"
+  "summary": "Compiled-agent decentralized role receipts retain 4 governed pre-network roles tied back to contract 226c113e77b0fc326386d8a5c15eb7ee694f7f90e6606a495366a7b3f8e9f648.",
+  "receipts_digest": "5e7ef9988c6db8f536e76b3f1ffeb8885e5936d37db62bd955084a483541dd42"
 }
