@@ -1,6 +1,6 @@
 # Compiled Agent Learning Receipts
 
-> Status: canonical `AGENT-PLATFORM` receipt-to-replay substrate, updated 2026-03-28.
+> Status: canonical `AGENT-PLATFORM` receipt-to-replay substrate, updated 2026-03-29.
 
 ## Why This Exists
 
@@ -20,9 +20,23 @@ This layer is the first narrow handoff:
 Source receipts captured from the existing `openagents` harness:
 
 - `fixtures/compiled_agent/source/openagents_provider_ready_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_provider_blocked_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_provider_readiness_variant_receipt_v1.json`
 - `fixtures/compiled_agent/source/openagents_wallet_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_wallet_recent_earnings_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_recent_earnings_phrase_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_wallet_balance_variant_receipt_v1.json`
 - `fixtures/compiled_agent/source/openagents_unsupported_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_unsupported_restart_rig_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_unsupported_calendar_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_receipt_v1.json`
 - `fixtures/compiled_agent/source/openagents_negated_wallet_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_provider_account_ready_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_wallet_balance_phrase_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_heldout_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_negated_provider_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_wallet_earnings_phrase_heldout_receipt_v1.json`
+- `fixtures/compiled_agent/source/openagents_unsupported_schedule_meeting_receipt_v1.json`
 
 Normalized Psionic-owned artifacts:
 
@@ -37,6 +51,7 @@ Normalized Psionic-owned artifacts:
 - per-module correctness flags
 - failure classes
 - phase confidence map
+- corpus split between training and held-out
 - operator note for why the row matters
 
 ## What The Replay Bundle Keeps Explicit
@@ -45,6 +60,7 @@ Normalized Psionic-owned artifacts:
 - grounded-answer replay samples
 - behavioral-clone rows for already-correct behavior
 - failure-correction rows for retained mistakes
+- exclusion of held-out receipts from the training replay bundle
 
 The first correction row is deliberate:
 
@@ -64,10 +80,20 @@ cargo run -q -p psionic-train --bin compiled_agent_receipt_to_replay
 
 ## Current Truth
 
-- 4 retained source receipts
-- 1 correction receipt
-- 8 replay samples total
-- first training surfaces are route and grounded answer only
+- 18 retained source receipts
+- 12 training receipts
+- 6 held-out receipts
+- 6 correction receipts
+- 24 replay samples total
+- first training surfaces remain route and grounded answer only
+
+The current failure-class ledger retains:
+
+- `grounded_answer_mismatch`
+- `negated_route_false_positive`
+- `tool_argument_mismatch`
+- `unexpected_tool_exposure`
+- `unsafe_final_outcome`
 
 This is enough to make the first bounded XTRAIN loop real without pretending
 the whole serving stack or Tassadar lane must already be finished.

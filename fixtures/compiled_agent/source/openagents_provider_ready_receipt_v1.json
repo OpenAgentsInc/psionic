@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at_epoch_ms": 1774760262069,
+  "captured_at_epoch_ms": 1774760262001,
   "state": {
     "provider_ready": true,
     "provider_blockers": [],
@@ -19,9 +19,9 @@
           "manifest": {
             "module_name": "intent_route",
             "signature_name": "intent_route",
-            "implementation_family": "rule_v1",
-            "implementation_label": "promoted",
-            "version": "2026-03-28",
+            "implementation_family": "psionic_route_model",
+            "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+            "version": "2026-03-29",
             "promotion_state": "promoted",
             "confidence_floor": 0.8
           },
@@ -32,19 +32,12 @@
           },
           "output": {
             "route": "provider_status",
-            "rationale": "prompt asked about provider readiness"
+            "rationale": "captured authority route for openagents_provider_ready_receipt_v1"
           },
           "confidence": 0.94,
           "trace": {
-            "tokens": [
-              "can",
-              "i",
-              "go",
-              "online",
-              "right",
-              "now"
-            ],
-            "implementation_label": "promoted"
+            "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+            "captured_from_runtime": true
           }
         },
         {
@@ -52,7 +45,7 @@
           "manifest": {
             "module_name": "tool_policy",
             "signature_name": "tool_policy",
-            "implementation_family": "rule_v1",
+            "implementation_family": "psionic_rule_revision",
             "implementation_label": "promoted",
             "version": "2026-03-28",
             "promotion_state": "promoted",
@@ -81,12 +74,12 @@
                 "description": "Read provider readiness and blocker state."
               }
             ],
-            "rationale": "narrow slice exposes only the tool family required by the route"
+            "rationale": "captured authority tool policy"
           },
           "confidence": 0.92,
           "trace": {
             "route": "provider_status",
-            "implementation_label": "promoted"
+            "captured_from_runtime": true
           }
         },
         {
@@ -94,7 +87,7 @@
           "manifest": {
             "module_name": "tool_arguments",
             "signature_name": "tool_arguments",
-            "implementation_family": "rule_v1",
+            "implementation_family": "psionic_rule_revision",
             "implementation_label": "promoted",
             "version": "2026-03-28",
             "promotion_state": "promoted",
@@ -122,9 +115,8 @@
           },
           "confidence": 0.96,
           "trace": {
-            "route": "provider_status",
             "tool_count": 1,
-            "implementation_label": "promoted"
+            "captured_from_runtime": true
           }
         },
         {
@@ -132,7 +124,7 @@
           "manifest": {
             "module_name": "grounded_answer",
             "signature_name": "grounded_answer",
-            "implementation_family": "rule_v1",
+            "implementation_family": "psionic_rule_revision",
             "implementation_label": "promoted",
             "version": "2026-03-28",
             "promotion_state": "promoted",
@@ -161,9 +153,8 @@
           },
           "confidence": 0.94,
           "trace": {
-            "ready": true,
-            "blockers": [],
-            "implementation_label": "promoted"
+            "captured_from_runtime": true,
+            "response_kind": "grounded_answer"
           }
         },
         {
@@ -171,7 +162,7 @@
           "manifest": {
             "module_name": "verify",
             "signature_name": "verify",
-            "implementation_family": "rule_v1",
+            "implementation_family": "psionic_rule_revision",
             "implementation_label": "promoted",
             "version": "2026-03-28",
             "promotion_state": "promoted",
@@ -201,11 +192,11 @@
           },
           "output": {
             "verdict": "accept_grounded_answer",
-            "rationale": "provider answer reflects readiness"
+            "rationale": "captured authority verify verdict"
           },
           "confidence": 0.94,
           "trace": {
-            "implementation_label": "promoted"
+            "captured_from_runtime": true
           }
         }
       ],
@@ -234,11 +225,11 @@
         "response": "Provider is ready to go online."
       },
       "authority_manifest_ids": [
-        "intent_route:rule_v1:promoted:2026-03-28",
-        "tool_policy:rule_v1:promoted:2026-03-28",
-        "tool_arguments:rule_v1:promoted:2026-03-28",
-        "grounded_answer:rule_v1:promoted:2026-03-28",
-        "verify:rule_v1:promoted:2026-03-28"
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "shadow_manifest_ids": []
     }

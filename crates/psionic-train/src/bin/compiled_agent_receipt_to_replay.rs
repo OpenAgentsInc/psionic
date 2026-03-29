@@ -1,13 +1,21 @@
 use psionic_train::{
     compiled_agent_learning_receipt_ledger_fixture_path, compiled_agent_replay_bundle_fixture_path,
-    write_compiled_agent_learning_receipt_ledger, write_compiled_agent_replay_bundle,
+    compiled_agent_source_fixture_dir, write_compiled_agent_learning_receipt_ledger,
+    write_compiled_agent_replay_bundle, write_compiled_agent_source_receipts,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let source_dir = compiled_agent_source_fixture_dir();
+    let source_receipts = write_compiled_agent_source_receipts(&source_dir)?;
     let ledger_path = compiled_agent_learning_receipt_ledger_fixture_path();
     let ledger = write_compiled_agent_learning_receipt_ledger(&ledger_path)?;
     let bundle_path = compiled_agent_replay_bundle_fixture_path();
     let bundle = write_compiled_agent_replay_bundle(&bundle_path)?;
+    println!(
+        "wrote compiled-agent source receipts dir={} count={}",
+        source_dir.display(),
+        source_receipts.len()
+    );
     println!(
         "wrote compiled-agent learning ledger={} digest={}",
         ledger_path.display(),

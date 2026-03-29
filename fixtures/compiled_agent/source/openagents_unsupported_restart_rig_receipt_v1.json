@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at_epoch_ms": 1774760262004,
+  "captured_at_epoch_ms": 1774760262008,
   "state": {
     "provider_ready": true,
     "provider_blockers": [],
@@ -9,8 +9,8 @@
   },
   "run": {
     "public_response": {
-      "kind": "grounded_answer",
-      "response": "The wallet contains 1200 sats."
+      "kind": "unsupported_refusal",
+      "response": "I can currently answer only provider readiness and wallet balance questions."
     },
     "internal_trace": {
       "primary_phases": [
@@ -28,11 +28,11 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?"
+            "user_request": "Restart my mining rig."
           },
           "output": {
-            "route": "wallet_status",
-            "rationale": "captured authority route for openagents_wallet_receipt_v1"
+            "route": "unsupported",
+            "rationale": "captured authority route for openagents_unsupported_restart_rig_receipt_v1"
           },
           "confidence": 0.94,
           "trace": {
@@ -54,8 +54,8 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
+            "user_request": "Restart my mining rig.",
+            "route": "unsupported",
             "available_tools": [
               {
                 "name": "provider_status",
@@ -68,17 +68,12 @@
             ]
           },
           "output": {
-            "selected_tools": [
-              {
-                "name": "wallet_status",
-                "description": "Read wallet balance and recent earnings."
-              }
-            ],
+            "selected_tools": [],
             "rationale": "captured authority tool policy"
           },
           "confidence": 0.92,
           "trace": {
-            "route": "wallet_status",
+            "route": "unsupported",
             "captured_from_runtime": true
           }
         },
@@ -96,26 +91,16 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
-            "selected_tools": [
-              {
-                "name": "wallet_status",
-                "description": "Read wallet balance and recent earnings."
-              }
-            ]
+            "user_request": "Restart my mining rig.",
+            "route": "unsupported",
+            "selected_tools": []
           },
           "output": {
-            "calls": [
-              {
-                "tool_name": "wallet_status",
-                "arguments": {}
-              }
-            ]
+            "calls": []
           },
           "confidence": 0.96,
           "trace": {
-            "tool_count": 1,
+            "tool_count": 0,
             "captured_from_runtime": true
           }
         },
@@ -133,28 +118,18 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
-            "tool_results": [
-              {
-                "tool_name": "wallet_status",
-                "payload": {
-                  "balance_sats": 1200,
-                  "recent_earnings_sats": 240
-                }
-              }
-            ]
+            "user_request": "Restart my mining rig.",
+            "route": "unsupported",
+            "tool_results": []
           },
           "output": {
-            "answer": "The wallet contains 1200 sats.",
-            "grounded_tool_names": [
-              "wallet_status"
-            ]
+            "answer": "I can currently answer only provider readiness and wallet balance questions.",
+            "grounded_tool_names": []
           },
-          "confidence": 0.91,
+          "confidence": 0.94,
           "trace": {
             "captured_from_runtime": true,
-            "response_kind": "grounded_answer"
+            "response_kind": "unsupported_refusal"
           }
         },
         {
@@ -171,30 +146,17 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
-            "tool_calls": [
-              {
-                "tool_name": "wallet_status",
-                "arguments": {}
-              }
-            ],
-            "tool_results": [
-              {
-                "tool_name": "wallet_status",
-                "payload": {
-                  "balance_sats": 1200,
-                  "recent_earnings_sats": 240
-                }
-              }
-            ],
-            "candidate_answer": "The wallet contains 1200 sats."
+            "user_request": "Restart my mining rig.",
+            "route": "unsupported",
+            "tool_calls": [],
+            "tool_results": [],
+            "candidate_answer": "I can currently answer only provider readiness and wallet balance questions."
           },
           "output": {
-            "verdict": "accept_grounded_answer",
+            "verdict": "unsupported_refusal",
             "rationale": "captured authority verify verdict"
           },
-          "confidence": 0.89,
+          "confidence": 0.94,
           "trace": {
             "captured_from_runtime": true
           }
@@ -203,26 +165,13 @@
       "shadow_phases": []
     },
     "lineage": {
-      "user_request": "How many sats are in the wallet?",
-      "route": "wallet_status",
-      "tool_calls": [
-        {
-          "tool_name": "wallet_status",
-          "arguments": {}
-        }
-      ],
-      "tool_results": [
-        {
-          "tool_name": "wallet_status",
-          "payload": {
-            "balance_sats": 1200,
-            "recent_earnings_sats": 240
-          }
-        }
-      ],
+      "user_request": "Restart my mining rig.",
+      "route": "unsupported",
+      "tool_calls": [],
+      "tool_results": [],
       "public_response": {
-        "kind": "grounded_answer",
-        "response": "The wallet contains 1200 sats."
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
       },
       "authority_manifest_ids": [
         "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",

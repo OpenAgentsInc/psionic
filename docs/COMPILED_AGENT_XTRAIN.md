@@ -1,6 +1,6 @@
 # Compiled Agent XTRAIN
 
-> Status: first validator-gated compiled-agent XTRAIN cycle, updated 2026-03-28.
+> Status: validator-gated compiled-agent XTRAIN cycle with held-out gating, updated 2026-03-29.
 
 ## Why This Exists
 
@@ -27,6 +27,8 @@ Grounded-answer candidate:
 
 - independent module eval surface from `crates/psionic-eval/src/compiled_agent_module_eval.rs`
 - replay bundle from `fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json`
+- held-out learning-receipt rows from
+  `fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json`
 
 ## Canonical Fixtures
 
@@ -40,11 +42,22 @@ Grounded-answer candidate:
 
 - route candidate is now a replay-trained route model artifact, not a hand-authored keyword guard
 - route candidate clears the retained negated-route false-positive case
+- route candidate now improves both replay and held-out route matches with no held-out regressions
 - grounded-answer candidate keeps the module eval surface non-regressing
 - grounded-answer candidate improves replay fidelity on the wallet answer by
   including recent earnings from the receipt-backed facts
+- grounded-answer candidate now also improves held-out wallet phrasing rows
 - promoted and candidate module authority is now exported through a retained
   runtime-consumable artifact contract instead of only being implied by docs
+
+## Latest Retained Outcome
+
+- route decision: `promote`
+- grounded-answer decision: `promote`
+- replay bundle digest:
+  `ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9`
+- source ledger digest:
+  `d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3`
 
 ## Scope Boundary
 

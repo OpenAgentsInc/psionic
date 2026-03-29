@@ -3,12 +3,34 @@
   "bundle_id": "compiled_agent.replay_bundle.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "baseline_revision_id": "compiled_agent.baseline.rule_v1",
-  "source_ledger_digest": "8a8a876b53ea02940509fa43d988efc8d3d4e2c8b56c98f395f1c07876c750a9",
+  "source_ledger_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+  "training_receipt_ids": [
+    "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1"
+  ],
+  "excluded_held_out_receipt_ids": [
+    "receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_unsupported_schedule_meeting_receipt_v1"
+  ],
   "module_sample_counts": {
-    "grounded_answer": 4,
-    "route": 4
+    "grounded_answer": 12,
+    "route": 12
   },
-  "correction_sample_count": 2,
+  "correction_sample_count": 6,
   "samples": [
     {
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
@@ -17,7 +39,8 @@
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
-        "provider"
+        "provider",
+        "training"
       ],
       "failure_classes": [],
       "input": {
@@ -37,11 +60,126 @@
       "correction_kind": "behavioral_clone",
       "tags": [
         "supported",
-        "provider"
+        "provider",
+        "training"
       ],
       "failure_classes": [],
       "input": {
         "user_request": "Can I go online right now?",
+        "route": "provider_status",
+        "tool_results": [
+          {
+            "tool_name": "provider_status",
+            "payload": {
+              "ready": true,
+              "blockers": []
+            }
+          }
+        ]
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "provider",
+        "blocked",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Why can't I go online yet?"
+      },
+      "expected_output": {
+        "route": "provider_status"
+      },
+      "observed_output": {
+        "route": "provider_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "provider",
+        "blocked",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Why can't I go online yet?",
+        "route": "provider_status",
+        "tool_results": [
+          {
+            "tool_name": "provider_status",
+            "payload": {
+              "ready": false,
+              "blockers": [
+                "identity_verification"
+              ]
+            }
+          }
+        ]
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is not ready to go online."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is not ready to go online."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "provider",
+        "phrasing_variation",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Is the provider ready for me to go online?"
+      },
+      "expected_output": {
+        "route": "provider_status"
+      },
+      "observed_output": {
+        "route": "provider_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_provider_readiness_variant_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "provider",
+        "phrasing_variation",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Is the provider ready for me to go online?",
         "route": "provider_status",
         "tool_results": [
           {
@@ -70,7 +208,10 @@
       "tags": [
         "supported",
         "wallet",
-        "recent_earnings_target"
+        "grounded_synthesis_drift",
+        "recent_earnings_target",
+        "training",
+        "correction_required"
       ],
       "failure_classes": [],
       "input": {
@@ -87,13 +228,19 @@
       "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
       "module": "grounded_answer",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
-      "correction_kind": "behavioral_clone",
+      "correction_kind": "failure_correction",
       "tags": [
         "supported",
         "wallet",
-        "recent_earnings_target"
+        "grounded_synthesis_drift",
+        "recent_earnings_target",
+        "training",
+        "correction_required"
       ],
-      "failure_classes": [],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "unsafe_final_outcome"
+      ],
       "input": {
         "user_request": "How many sats are in the wallet?",
         "route": "wallet_status",
@@ -113,7 +260,194 @@
       },
       "observed_output": {
         "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "wallet",
+        "recent_earnings",
+        "grounded_synthesis_drift",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "How many sats are in the wallet, and what are the recent earnings?"
+      },
+      "expected_output": {
+        "route": "wallet_status"
+      },
+      "observed_output": {
+        "route": "wallet_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "supported",
+        "wallet",
+        "recent_earnings",
+        "grounded_synthesis_drift",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "How many sats are in the wallet, and what are the recent earnings?",
+        "route": "wallet_status",
+        "tool_results": [
+          {
+            "tool_name": "wallet_status",
+            "payload": {
+              "balance_sats": 1200,
+              "recent_earnings_sats": 240
+            }
+          }
+        ]
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "wallet",
+        "recent_earnings",
+        "phrasing_variation",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "What are my recent earnings in sats?"
+      },
+      "expected_output": {
+        "route": "wallet_status"
+      },
+      "observed_output": {
+        "route": "wallet_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "supported",
+        "wallet",
+        "recent_earnings",
+        "phrasing_variation",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "What are my recent earnings in sats?",
+        "route": "wallet_status",
+        "tool_results": [
+          {
+            "tool_name": "wallet_status",
+            "payload": {
+              "balance_sats": 1200,
+              "recent_earnings_sats": 240
+            }
+          }
+        ]
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "supported",
+        "wallet",
+        "phrasing_variation",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Tell me the wallet balance."
+      },
+      "expected_output": {
+        "route": "wallet_status"
+      },
+      "observed_output": {
+        "route": "wallet_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "supported",
+        "wallet",
+        "phrasing_variation",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Tell me the wallet balance.",
+        "route": "wallet_status",
+        "tool_results": [
+          {
+            "tool_name": "wallet_status",
+            "payload": {
+              "balance_sats": 1200,
+              "recent_earnings_sats": 240
+            }
+          }
+        ]
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
       }
     },
     {
@@ -122,7 +456,9 @@
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
       "correction_kind": "behavioral_clone",
       "tags": [
-        "unsupported"
+        "unsupported",
+        "refusal_quality",
+        "training"
       ],
       "failure_classes": [],
       "input": {
@@ -141,11 +477,153 @@
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
       "correction_kind": "behavioral_clone",
       "tags": [
-        "unsupported"
+        "unsupported",
+        "refusal_quality",
+        "training"
       ],
       "failure_classes": [],
       "input": {
         "user_request": "Write a poem about GPUs.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "unsupported",
+        "refusal_quality",
+        "training",
+        "provider_unrelated"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Restart my mining rig."
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "unsupported"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "unsupported",
+        "refusal_quality",
+        "training",
+        "provider_unrelated"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Restart my mining rig.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "unsupported",
+        "refusal_quality",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Create a calendar reminder for tomorrow."
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "unsupported"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "unsupported",
+        "refusal_quality",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Create a calendar reminder for tomorrow.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Should I go online or check the wallet balance first?"
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "unsupported"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "correction_kind": "behavioral_clone",
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "training"
+      ],
+      "failure_classes": [],
+      "input": {
+        "user_request": "Should I go online or check the wallet balance first?",
         "route": "unsupported",
         "tool_results": []
       },
@@ -166,6 +644,7 @@
       "tags": [
         "unsupported",
         "negated",
+        "training",
         "correction_required"
       ],
       "failure_classes": [
@@ -193,6 +672,7 @@
       "tags": [
         "unsupported",
         "negated",
+        "training",
         "correction_required"
       ],
       "failure_classes": [
@@ -213,10 +693,10 @@
       },
       "observed_output": {
         "kind": "grounded_answer",
-        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+        "response": "The wallet contains 1200 sats."
       }
     }
   ],
-  "summary": "Compiled-agent replay bundle retains 4 route samples and 4 grounded-answer samples with 2 correction samples.",
-  "bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed"
+  "summary": "Compiled-agent replay bundle retains 12 route samples and 12 grounded-answer samples from 12 training receipts while excluding 6 held-out receipts.",
+  "bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9"
 }

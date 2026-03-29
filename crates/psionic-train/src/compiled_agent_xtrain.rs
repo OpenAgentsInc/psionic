@@ -4,11 +4,12 @@ use std::{
 };
 
 use psionic_eval::{
+    CompiledAgentModuleEvalReport, CompiledAgentModuleKind, CompiledAgentModuleRevisionSet,
+    CompiledAgentPublicOutcomeKind, CompiledAgentRoute, CompiledAgentRouteModelArtifact,
+    CompiledAgentRouteTrainingSample, CompiledAgentToolResult,
     build_compiled_agent_module_eval_report, compiled_agent_baseline_revision_set,
     evaluate_compiled_agent_grounded_answer, evaluate_compiled_agent_route,
-    train_compiled_agent_route_model, CompiledAgentModuleEvalReport, CompiledAgentModuleKind,
-    CompiledAgentModuleRevisionSet, CompiledAgentPublicOutcomeKind, CompiledAgentRoute,
-    CompiledAgentRouteModelArtifact, CompiledAgentRouteTrainingSample, CompiledAgentToolResult,
+    train_compiled_agent_route_model,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,8 +17,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    canonical_compiled_agent_replay_bundle, repo_relative_path, CompiledAgentReceiptError,
-    CompiledAgentReplayBundle,
+    CompiledAgentCorpusSplit, CompiledAgentReceiptError, CompiledAgentReplayBundle,
+    canonical_compiled_agent_learning_receipt_ledger, canonical_compiled_agent_replay_bundle,
+    repo_relative_path,
 };
 
 pub const COMPILED_AGENT_ROUTE_MODEL_ARTIFACT_FIXTURE_PATH: &str =
@@ -83,8 +85,12 @@ pub struct CompiledAgentModuleValidation {
     pub regression_case_ids: Vec<String>,
     pub baseline_replay_match_count: u32,
     pub candidate_replay_match_count: u32,
+    pub baseline_heldout_match_count: u32,
+    pub candidate_heldout_match_count: u32,
     pub replay_improvement_sample_ids: Vec<String>,
     pub replay_regression_sample_ids: Vec<String>,
+    pub heldout_improvement_receipt_ids: Vec<String>,
+    pub heldout_regression_receipt_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -129,8 +135,9 @@ pub fn compiled_agent_xtrain_cycle_receipt_fixture_path() -> PathBuf {
     repo_relative_path(COMPILED_AGENT_XTRAIN_CYCLE_RECEIPT_FIXTURE_PATH)
 }
 
-pub fn canonical_compiled_agent_route_model_artifact(
-) -> Result<CompiledAgentRouteModelArtifact, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_route_model_artifact()
+-> Result<CompiledAgentRouteModelArtifact, CompiledAgentXtrainError> {
+    let learning_ledger = canonical_compiled_agent_learning_receipt_ledger()?;
     let replay_bundle = canonical_compiled_agent_replay_bundle()?;
     let route_samples = replay_bundle
         .samples
@@ -155,16 +162,28 @@ pub fn canonical_compiled_agent_route_model_artifact(
             })
         })
         .collect::<Result<Vec<_>, CompiledAgentXtrainError>>()?;
+    let heldout_route_samples = learning_ledger
+        .receipts
+        .iter()
+        .filter(|receipt| receipt.corpus_split == CompiledAgentCorpusSplit::HeldOut)
+        .map(|receipt| CompiledAgentRouteTrainingSample {
+            sample_id: format!("heldout.route.{}", receipt.receipt_id),
+            user_request: receipt.user_request.clone(),
+            expected_route: receipt.expected_route,
+            tags: receipt.tags.clone(),
+        })
+        .collect::<Vec<_>>();
     Ok(train_compiled_agent_route_model(
         "compiled_agent.route.multinomial_nb_v1",
         "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
         replay_bundle.bundle_digest,
         &route_samples,
+        &heldout_route_samples,
     ))
 }
 
-pub fn compiled_agent_route_candidate_revision(
-) -> Result<CompiledAgentModuleRevisionSet, CompiledAgentXtrainError> {
+pub fn compiled_agent_route_candidate_revision()
+-> Result<CompiledAgentModuleRevisionSet, CompiledAgentXtrainError> {
     let mut candidate = compiled_agent_baseline_revision_set();
     let route_model_artifact = canonical_compiled_agent_route_model_artifact()?;
     candidate.revision_id = route_model_artifact.artifact_id.clone();
@@ -180,8 +199,8 @@ pub fn compiled_agent_grounded_candidate_revision() -> CompiledAgentModuleRevisi
     candidate
 }
 
-pub fn canonical_compiled_agent_route_candidate_report(
-) -> Result<CompiledAgentModuleEvalReport, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_route_candidate_report()
+-> Result<CompiledAgentModuleEvalReport, CompiledAgentXtrainError> {
     Ok(build_compiled_agent_module_eval_report(
         &compiled_agent_route_candidate_revision()?,
     ))
@@ -192,8 +211,8 @@ pub fn canonical_compiled_agent_grounded_candidate_report() -> CompiledAgentModu
     build_compiled_agent_module_eval_report(&compiled_agent_grounded_candidate_revision())
 }
 
-pub fn canonical_compiled_agent_xtrain_cycle_receipt(
-) -> Result<CompiledAgentXtrainCycleReceipt, CompiledAgentXtrainError> {
+pub fn canonical_compiled_agent_xtrain_cycle_receipt()
+-> Result<CompiledAgentXtrainCycleReceipt, CompiledAgentXtrainError> {
     let baseline = compiled_agent_baseline_revision_set();
     let replay_bundle = canonical_compiled_agent_replay_bundle()?;
     let baseline_report = build_compiled_agent_module_eval_report(&baseline);
@@ -397,8 +416,10 @@ fn build_route_outcome(
     )?;
     let decision = if validation.regression_case_ids.is_empty()
         && validation.replay_regression_sample_ids.is_empty()
+        && validation.heldout_regression_receipt_ids.is_empty()
         && validation.candidate_passed_cases > validation.baseline_passed_cases
         && validation.candidate_replay_match_count > validation.baseline_replay_match_count
+        && validation.candidate_heldout_match_count >= validation.baseline_heldout_match_count
     {
         CompiledAgentPromotionDecision::Promote
     } else {
@@ -406,7 +427,7 @@ fn build_route_outcome(
     };
     let reason = match decision {
         CompiledAgentPromotionDecision::Promote => String::from(
-            "Trained route candidate fixes the retained negated-route false positive with no module-eval or replay regressions.",
+            "Trained route candidate fixes the retained negated-route false positive with no module-eval, replay, or held-out regressions.",
         ),
         CompiledAgentPromotionDecision::Hold => String::from(
             "Candidate did not clear the route validator gate cleanly enough to promote.",
@@ -422,9 +443,8 @@ fn build_route_outcome(
             base_revision_id: baseline_revision.revision_id.clone(),
             candidate_revision_id: candidate_revision.revision_id.clone(),
             replay_bundle_digest: replay_bundle.bundle_digest.clone(),
-            candidate_artifact_ref: route_model_artifact.map(|_| {
-                String::from(COMPILED_AGENT_ROUTE_MODEL_ARTIFACT_FIXTURE_PATH)
-            }),
+            candidate_artifact_ref: route_model_artifact
+                .map(|_| String::from(COMPILED_AGENT_ROUTE_MODEL_ARTIFACT_FIXTURE_PATH)),
             candidate_artifact_digest: route_model_artifact
                 .map(|artifact| artifact.artifact_digest.clone()),
             targeted_failure_classes: vec![String::from("negated_route_false_positive")],
@@ -452,8 +472,10 @@ fn build_grounded_answer_outcome(
     )?;
     let decision = if validation.regression_case_ids.is_empty()
         && validation.replay_regression_sample_ids.is_empty()
+        && validation.heldout_regression_receipt_ids.is_empty()
         && validation.candidate_replay_match_count > validation.baseline_replay_match_count
         && validation.candidate_passed_cases >= validation.baseline_passed_cases
+        && validation.candidate_heldout_match_count >= validation.baseline_heldout_match_count
     {
         CompiledAgentPromotionDecision::Promote
     } else {
@@ -461,7 +483,7 @@ fn build_grounded_answer_outcome(
     };
     let reason = match decision {
         CompiledAgentPromotionDecision::Promote => String::from(
-            "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval surface non-regressing.",
+            "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval and held-out surfaces non-regressing.",
         ),
         CompiledAgentPromotionDecision::Hold => String::from(
             "Candidate did not clear the grounded-answer validator gate cleanly enough to promote.",
@@ -494,6 +516,7 @@ fn validate_route_candidate(
     baseline_revision: &CompiledAgentModuleRevisionSet,
     candidate_revision: &CompiledAgentModuleRevisionSet,
 ) -> Result<CompiledAgentModuleValidation, CompiledAgentXtrainError> {
+    let learning_ledger = canonical_compiled_agent_learning_receipt_ledger()?;
     let baseline_summary = module_summary(baseline_report, CompiledAgentModuleKind::Route)?;
     let candidate_summary = module_summary(candidate_report, CompiledAgentModuleKind::Route)?;
     let improvement_case_ids = improvement_case_ids(
@@ -510,6 +533,10 @@ fn validate_route_candidate(
         route_replay_matches(replay_bundle, baseline_revision)?;
     let (candidate_replay_match_count, candidate_replay_matches) =
         route_replay_matches(replay_bundle, candidate_revision)?;
+    let (baseline_heldout_match_count, baseline_heldout_matches) =
+        route_heldout_matches(&learning_ledger, baseline_revision);
+    let (candidate_heldout_match_count, candidate_heldout_matches) =
+        route_heldout_matches(&learning_ledger, candidate_revision);
     Ok(CompiledAgentModuleValidation {
         module: CompiledAgentModuleKind::Route,
         baseline_passed_cases: baseline_summary.passed_cases,
@@ -518,6 +545,8 @@ fn validate_route_candidate(
         regression_case_ids,
         baseline_replay_match_count,
         candidate_replay_match_count,
+        baseline_heldout_match_count,
+        candidate_heldout_match_count,
         replay_improvement_sample_ids: candidate_replay_matches
             .iter()
             .filter(|sample_id| !baseline_replay_matches.contains(sample_id))
@@ -526,6 +555,16 @@ fn validate_route_candidate(
         replay_regression_sample_ids: baseline_replay_matches
             .iter()
             .filter(|sample_id| !candidate_replay_matches.contains(sample_id))
+            .cloned()
+            .collect(),
+        heldout_improvement_receipt_ids: candidate_heldout_matches
+            .iter()
+            .filter(|receipt_id| !baseline_heldout_matches.contains(receipt_id))
+            .cloned()
+            .collect(),
+        heldout_regression_receipt_ids: baseline_heldout_matches
+            .iter()
+            .filter(|receipt_id| !candidate_heldout_matches.contains(receipt_id))
             .cloned()
             .collect(),
     })
@@ -538,6 +577,7 @@ fn validate_grounded_candidate(
     baseline_revision: &CompiledAgentModuleRevisionSet,
     candidate_revision: &CompiledAgentModuleRevisionSet,
 ) -> Result<CompiledAgentModuleValidation, CompiledAgentXtrainError> {
+    let learning_ledger = canonical_compiled_agent_learning_receipt_ledger()?;
     let baseline_summary =
         module_summary(baseline_report, CompiledAgentModuleKind::GroundedAnswer)?;
     let candidate_summary =
@@ -556,6 +596,10 @@ fn validate_grounded_candidate(
         grounded_replay_matches(replay_bundle, baseline_revision)?;
     let (candidate_replay_match_count, candidate_replay_matches) =
         grounded_replay_matches(replay_bundle, candidate_revision)?;
+    let (baseline_heldout_match_count, baseline_heldout_matches) =
+        grounded_heldout_matches(&learning_ledger, baseline_revision);
+    let (candidate_heldout_match_count, candidate_heldout_matches) =
+        grounded_heldout_matches(&learning_ledger, candidate_revision);
     Ok(CompiledAgentModuleValidation {
         module: CompiledAgentModuleKind::GroundedAnswer,
         baseline_passed_cases: baseline_summary.passed_cases,
@@ -564,6 +608,8 @@ fn validate_grounded_candidate(
         regression_case_ids,
         baseline_replay_match_count,
         candidate_replay_match_count,
+        baseline_heldout_match_count,
+        candidate_heldout_match_count,
         replay_improvement_sample_ids: candidate_replay_matches
             .iter()
             .filter(|sample_id| !baseline_replay_matches.contains(sample_id))
@@ -572,6 +618,16 @@ fn validate_grounded_candidate(
         replay_regression_sample_ids: baseline_replay_matches
             .iter()
             .filter(|sample_id| !candidate_replay_matches.contains(sample_id))
+            .cloned()
+            .collect(),
+        heldout_improvement_receipt_ids: candidate_heldout_matches
+            .iter()
+            .filter(|receipt_id| !baseline_heldout_matches.contains(receipt_id))
+            .cloned()
+            .collect(),
+        heldout_regression_receipt_ids: baseline_heldout_matches
+            .iter()
+            .filter(|receipt_id| !candidate_heldout_matches.contains(receipt_id))
             .cloned()
             .collect(),
     })
@@ -627,6 +683,59 @@ fn grounded_replay_matches(
         }
     }
     Ok((matches.len() as u32, matches))
+}
+
+fn route_heldout_matches(
+    learning_ledger: &crate::CompiledAgentLearningReceiptLedger,
+    revision: &CompiledAgentModuleRevisionSet,
+) -> (u32, Vec<String>) {
+    let matches = learning_ledger
+        .receipts
+        .iter()
+        .filter(|receipt| receipt.corpus_split == CompiledAgentCorpusSplit::HeldOut)
+        .filter(|receipt| {
+            evaluate_compiled_agent_route(receipt.user_request.as_str(), revision)
+                == receipt.expected_route
+        })
+        .map(|receipt| receipt.receipt_id.clone())
+        .collect::<Vec<_>>();
+    (matches.len() as u32, matches)
+}
+
+fn grounded_heldout_matches(
+    learning_ledger: &crate::CompiledAgentLearningReceiptLedger,
+    revision: &CompiledAgentModuleRevisionSet,
+) -> (u32, Vec<String>) {
+    let matches = learning_ledger
+        .receipts
+        .iter()
+        .filter(|receipt| receipt.corpus_split == CompiledAgentCorpusSplit::HeldOut)
+        .filter(|receipt| {
+            let observed = evaluate_compiled_agent_grounded_answer(
+                receipt.expected_route,
+                expected_tool_results_for_receipt(receipt),
+                revision,
+            );
+            observed == receipt.expected_public_response.response
+                && receipt.expected_public_response.kind
+                    == match receipt.expected_route {
+                        CompiledAgentRoute::Unsupported => {
+                            CompiledAgentPublicOutcomeKind::UnsupportedRefusal
+                        }
+                        CompiledAgentRoute::ProviderStatus | CompiledAgentRoute::WalletStatus => {
+                            CompiledAgentPublicOutcomeKind::GroundedAnswer
+                        }
+                    }
+        })
+        .map(|receipt| receipt.receipt_id.clone())
+        .collect::<Vec<_>>();
+    (matches.len() as u32, matches)
+}
+
+fn expected_tool_results_for_receipt(
+    receipt: &crate::CompiledAgentLearningReceipt,
+) -> &[CompiledAgentToolResult] {
+    receipt.observed_tool_results.as_slice()
 }
 
 fn write_report(

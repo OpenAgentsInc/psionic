@@ -2,19 +2,19 @@
   "schema_version": "psionic.compiled_agent.xtrain_cycle.v1",
   "cycle_id": "compiled_agent.xtrain.cycle.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
-  "source_ledger_digest": "8a8a876b53ea02940509fa43d988efc8d3d4e2c8b56c98f395f1c07876c750a9",
-  "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+  "source_ledger_digest": "d6d9066e1cfef58d199aa5ea3e97a7e211623366779d2250d47fe2c0a7eacad3",
+  "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
   "route_outcome": {
     "module": "route",
     "decision": "promote",
-    "reason": "Trained route candidate fixes the retained negated-route false positive with no module-eval or replay regressions.",
+    "reason": "Trained route candidate fixes the retained negated-route false positive with no module-eval, replay, or held-out regressions.",
     "delta": {
       "module": "route",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.route.multinomial_nb_v1",
-      "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+      "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
-      "candidate_artifact_digest": "5e6b51ca8914cf5a9a6d1467e8dbd3d3c5124b7aaf086f2dff638b209fb572b1",
+      "candidate_artifact_digest": "445fb8f77ca203d81476c935165b0c95f31ea4f6a85285872e6e0692268f5e22",
       "targeted_failure_classes": [
         "negated_route_false_positive"
       ],
@@ -28,23 +28,29 @@
         "route_negated_wallet_false_positive"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 3,
-      "candidate_replay_match_count": 4,
+      "baseline_replay_match_count": 11,
+      "candidate_replay_match_count": 12,
+      "baseline_heldout_match_count": 5,
+      "candidate_heldout_match_count": 6,
       "replay_improvement_sample_ids": [
         "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1"
       ],
-      "replay_regression_sample_ids": []
+      "replay_regression_sample_ids": [],
+      "heldout_improvement_receipt_ids": [
+        "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1"
+      ],
+      "heldout_regression_receipt_ids": []
     }
   },
   "grounded_answer_outcome": {
     "module": "grounded_answer",
     "decision": "promote",
-    "reason": "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval surface non-regressing.",
+    "reason": "Candidate improves replay-target grounding on the wallet answer while keeping the independent module eval and held-out surfaces non-regressing.",
     "delta": {
       "module": "grounded_answer",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.grounded_answer.rule_v2.recent_earnings",
-      "replay_bundle_digest": "db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed",
+      "replay_bundle_digest": "ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9",
       "targeted_failure_classes": [
         "grounded_answer_mismatch"
       ],
@@ -56,14 +62,24 @@
       "candidate_passed_cases": 4,
       "improvement_case_ids": [],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 3,
-      "candidate_replay_match_count": 4,
+      "baseline_replay_match_count": 8,
+      "candidate_replay_match_count": 12,
+      "baseline_heldout_match_count": 4,
+      "candidate_heldout_match_count": 6,
       "replay_improvement_sample_ids": [
-        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1"
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1"
       ],
-      "replay_regression_sample_ids": []
+      "replay_regression_sample_ids": [],
+      "heldout_improvement_receipt_ids": [
+        "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
+        "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1"
+      ],
+      "heldout_regression_receipt_ids": []
     }
   },
-  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle db026842e0f48fd8a37b018981c9f67b5ba43f9c68f288918199dc181ee1d5ed.",
-  "receipt_digest": "3035f015476259c3a6404c216f39cab2ccb5626b0db5d56a68fc1b4fb53537c0"
+  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle ba512235bf016ff3c30283b8b6052bfc13cbc9c07fa8f4d5a3a6d0b60174e8c9.",
+  "receipt_digest": "363d611bd520049f35e192422faeb769eab819b778e0c23c6980d85bab8d29df"
 }

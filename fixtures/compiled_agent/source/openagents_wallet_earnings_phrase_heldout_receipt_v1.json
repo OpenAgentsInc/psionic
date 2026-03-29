@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at_epoch_ms": 1774760262004,
+  "captured_at_epoch_ms": 1774760262015,
   "state": {
     "provider_ready": true,
     "provider_blockers": [],
@@ -28,11 +28,11 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?"
+            "user_request": "Give me my wallet balance plus recent earnings."
           },
           "output": {
             "route": "wallet_status",
-            "rationale": "captured authority route for openagents_wallet_receipt_v1"
+            "rationale": "captured authority route for openagents_wallet_earnings_phrase_heldout_receipt_v1"
           },
           "confidence": 0.94,
           "trace": {
@@ -54,7 +54,7 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
+            "user_request": "Give me my wallet balance plus recent earnings.",
             "route": "wallet_status",
             "available_tools": [
               {
@@ -96,7 +96,7 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
+            "user_request": "Give me my wallet balance plus recent earnings.",
             "route": "wallet_status",
             "selected_tools": [
               {
@@ -133,7 +133,7 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
+            "user_request": "Give me my wallet balance plus recent earnings.",
             "route": "wallet_status",
             "tool_results": [
               {
@@ -171,7 +171,7 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
+            "user_request": "Give me my wallet balance plus recent earnings.",
             "route": "wallet_status",
             "tool_calls": [
               {
@@ -203,7 +203,7 @@
       "shadow_phases": []
     },
     "lineage": {
-      "user_request": "How many sats are in the wallet?",
+      "user_request": "Give me my wallet balance plus recent earnings.",
       "route": "wallet_status",
       "tool_calls": [
         {

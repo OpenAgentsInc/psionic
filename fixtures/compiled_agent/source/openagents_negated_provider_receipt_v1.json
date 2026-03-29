@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at_epoch_ms": 1774760262004,
+  "captured_at_epoch_ms": 1774760262014,
   "state": {
     "provider_ready": true,
     "provider_blockers": [],
@@ -10,7 +10,7 @@
   "run": {
     "public_response": {
       "kind": "grounded_answer",
-      "response": "The wallet contains 1200 sats."
+      "response": "Provider is ready to go online."
     },
     "internal_trace": {
       "primary_phases": [
@@ -28,13 +28,13 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?"
+            "user_request": "Do not tell me if I can go online; write a poem about GPUs."
           },
           "output": {
-            "route": "wallet_status",
-            "rationale": "captured authority route for openagents_wallet_receipt_v1"
+            "route": "provider_status",
+            "rationale": "captured authority route for openagents_negated_provider_receipt_v1"
           },
-          "confidence": 0.94,
+          "confidence": 0.86,
           "trace": {
             "artifact_id": "compiled_agent.route.multinomial_nb_v1",
             "captured_from_runtime": true
@@ -54,8 +54,8 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
+            "user_request": "Do not tell me if I can go online; write a poem about GPUs.",
+            "route": "provider_status",
             "available_tools": [
               {
                 "name": "provider_status",
@@ -70,15 +70,15 @@
           "output": {
             "selected_tools": [
               {
-                "name": "wallet_status",
-                "description": "Read wallet balance and recent earnings."
+                "name": "provider_status",
+                "description": "Read provider readiness and blocker state."
               }
             ],
             "rationale": "captured authority tool policy"
           },
           "confidence": 0.92,
           "trace": {
-            "route": "wallet_status",
+            "route": "provider_status",
             "captured_from_runtime": true
           }
         },
@@ -96,19 +96,19 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
+            "user_request": "Do not tell me if I can go online; write a poem about GPUs.",
+            "route": "provider_status",
             "selected_tools": [
               {
-                "name": "wallet_status",
-                "description": "Read wallet balance and recent earnings."
+                "name": "provider_status",
+                "description": "Read provider readiness and blocker state."
               }
             ]
           },
           "output": {
             "calls": [
               {
-                "tool_name": "wallet_status",
+                "tool_name": "provider_status",
                 "arguments": {}
               }
             ]
@@ -133,25 +133,25 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
+            "user_request": "Do not tell me if I can go online; write a poem about GPUs.",
+            "route": "provider_status",
             "tool_results": [
               {
-                "tool_name": "wallet_status",
+                "tool_name": "provider_status",
                 "payload": {
-                  "balance_sats": 1200,
-                  "recent_earnings_sats": 240
+                  "ready": true,
+                  "blockers": []
                 }
               }
             ]
           },
           "output": {
-            "answer": "The wallet contains 1200 sats.",
+            "answer": "Provider is ready to go online.",
             "grounded_tool_names": [
-              "wallet_status"
+              "provider_status"
             ]
           },
-          "confidence": 0.91,
+          "confidence": 0.94,
           "trace": {
             "captured_from_runtime": true,
             "response_kind": "grounded_answer"
@@ -171,24 +171,24 @@
           "authority": "promoted",
           "candidate_label": null,
           "input": {
-            "user_request": "How many sats are in the wallet?",
-            "route": "wallet_status",
+            "user_request": "Do not tell me if I can go online; write a poem about GPUs.",
+            "route": "provider_status",
             "tool_calls": [
               {
-                "tool_name": "wallet_status",
+                "tool_name": "provider_status",
                 "arguments": {}
               }
             ],
             "tool_results": [
               {
-                "tool_name": "wallet_status",
+                "tool_name": "provider_status",
                 "payload": {
-                  "balance_sats": 1200,
-                  "recent_earnings_sats": 240
+                  "ready": true,
+                  "blockers": []
                 }
               }
             ],
-            "candidate_answer": "The wallet contains 1200 sats."
+            "candidate_answer": "Provider is ready to go online."
           },
           "output": {
             "verdict": "accept_grounded_answer",
@@ -203,26 +203,26 @@
       "shadow_phases": []
     },
     "lineage": {
-      "user_request": "How many sats are in the wallet?",
-      "route": "wallet_status",
+      "user_request": "Do not tell me if I can go online; write a poem about GPUs.",
+      "route": "provider_status",
       "tool_calls": [
         {
-          "tool_name": "wallet_status",
+          "tool_name": "provider_status",
           "arguments": {}
         }
       ],
       "tool_results": [
         {
-          "tool_name": "wallet_status",
+          "tool_name": "provider_status",
           "payload": {
-            "balance_sats": 1200,
-            "recent_earnings_sats": 240
+            "ready": true,
+            "blockers": []
           }
         }
       ],
       "public_response": {
         "kind": "grounded_answer",
-        "response": "The wallet contains 1200 sats."
+        "response": "Provider is ready to go online."
       },
       "authority_manifest_ids": [
         "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",

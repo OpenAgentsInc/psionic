@@ -24,13 +24,16 @@ pub struct CompiledAgentRouteModelArtifact {
     pub feature_profile: String,
     pub replay_bundle_digest: String,
     pub training_sample_count: u32,
+    pub heldout_sample_count: u32,
     pub vocabulary_size: u32,
     pub smoothing_alpha: f64,
     pub class_priors_log: BTreeMap<CompiledAgentRoute, f64>,
     pub class_feature_log_probs: BTreeMap<CompiledAgentRoute, BTreeMap<String, f64>>,
     pub class_default_feature_log_probs: BTreeMap<CompiledAgentRoute, f64>,
     pub source_sample_ids: Vec<String>,
+    pub heldout_sample_ids: Vec<String>,
     pub training_accuracy: f32,
+    pub heldout_accuracy: f32,
     pub detail: String,
     pub artifact_digest: String,
 }
@@ -63,6 +66,7 @@ pub fn train_compiled_agent_route_model(
     row_id: impl Into<String>,
     replay_bundle_digest: impl Into<String>,
     samples: &[CompiledAgentRouteTrainingSample],
+    heldout_samples: &[CompiledAgentRouteTrainingSample],
 ) -> CompiledAgentRouteModelArtifact {
     let smoothing_alpha = 1.0_f64;
     let artifact_id = artifact_id.into();
@@ -135,19 +139,29 @@ pub fn train_compiled_agent_route_model(
         feature_profile: String::from("unigram_plus_bigram"),
         replay_bundle_digest,
         training_sample_count: samples.len() as u32,
+        heldout_sample_count: heldout_samples.len() as u32,
         vocabulary_size: vocabulary.len() as u32,
         smoothing_alpha,
         class_priors_log,
         class_feature_log_probs,
         class_default_feature_log_probs,
-        source_sample_ids: samples.iter().map(|sample| sample.sample_id.clone()).collect(),
+        source_sample_ids: samples
+            .iter()
+            .map(|sample| sample.sample_id.clone())
+            .collect(),
+        heldout_sample_ids: heldout_samples
+            .iter()
+            .map(|sample| sample.sample_id.clone())
+            .collect(),
         training_accuracy: 0.0,
+        heldout_accuracy: 0.0,
         detail: String::from(
             "Trained route model over replay-backed route samples using bag-of-token and bigram features. This is the first compiled-agent candidate backed by a learned artifact instead of a hand-authored keyword delta.",
         ),
         artifact_digest: String::new(),
     };
     artifact.training_accuracy = route_training_accuracy(&artifact, samples);
+    artifact.heldout_accuracy = route_training_accuracy(&artifact, heldout_samples);
     artifact.artifact_digest = stable_digest(b"compiled_agent_route_model_artifact|", &artifact);
     artifact
 }
@@ -255,9 +269,9 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
+        CompiledAgentRoutePrediction, CompiledAgentRouteTrainingSample,
         compiled_agent_route_features, predict_compiled_agent_route,
-        train_compiled_agent_route_model, CompiledAgentRoutePrediction,
-        CompiledAgentRouteTrainingSample,
+        train_compiled_agent_route_model,
     };
     use crate::CompiledAgentRoute;
 
@@ -298,6 +312,7 @@ mod tests {
             "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
             "replay-digest",
             &samples,
+            &[],
         );
         let prediction = predict_compiled_agent_route(
             &artifact,
@@ -356,12 +371,14 @@ mod tests {
             "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
             "replay-digest",
             &samples,
+            &[],
         );
         for sample in &samples {
             let prediction = predict_compiled_agent_route(&artifact, sample.user_request.as_str());
             assert_eq!(prediction.route, sample.expected_route);
         }
         assert_eq!(artifact.training_sample_count, 4);
+        assert_eq!(artifact.heldout_sample_count, 0);
         assert_eq!(artifact.training_accuracy, 1.0);
     }
 }
