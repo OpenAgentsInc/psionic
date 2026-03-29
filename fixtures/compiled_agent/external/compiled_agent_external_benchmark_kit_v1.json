@@ -1,0 +1,208 @@
+{
+  "schema_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+  "contract_id": "compiled_agent.external_benchmark_kit.contract.v1",
+  "admitted_task_family": "compiled_agent.first_graph.admitted_family.v1",
+  "evidence_class": "learned_lane",
+  "receipt_schema_version": "psionic.compiled_agent.learning_receipts.v1",
+  "replay_bundle_schema_version": "psionic.compiled_agent.replay_bundle.v1",
+  "decentralized_roles_contract_schema_version": "psionic.compiled_agent.decentralized_roles_contract.v1",
+  "contributor_contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+  "contract_artifacts": [
+    {
+      "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
+      "schema_version": "psionic.compiled_agent.learning_receipts.v1",
+      "artifact_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
+      "detail": "Current compiled-agent governed learning ledger."
+    },
+    {
+      "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
+      "schema_version": "psionic.compiled_agent.replay_bundle.v1",
+      "artifact_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+      "detail": "Current compiled-agent replay-bundle contract shape."
+    },
+    {
+      "artifact_ref": "fixtures/compiled_agent/compiled_agent_decentralized_roles_contract_v1.json",
+      "schema_version": "psionic.compiled_agent.decentralized_roles_contract.v1",
+      "artifact_digest": "303bf8445d4afbae4a329b2cb9d3b9be8619f77aa1113d9b96fb0b62b2ef81fc",
+      "detail": "Current bounded decentralized-role contract."
+    },
+    {
+      "artifact_ref": "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json",
+      "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
+      "artifact_digest": "5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa",
+      "detail": "Current promoted-artifact authority contract consumed by the runtime."
+    }
+  ],
+  "benchmark_rows": [
+    {
+      "row_id": "external.provider_ready.v1",
+      "prompt": "Can I go online right now?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "expected_route": "provider_status",
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "corpus_split": "training",
+      "tags": [
+        "external",
+        "benchmark",
+        "provider",
+        "training"
+      ],
+      "failure_taxonomy_targets": [
+        "route_mismatch"
+      ],
+      "operator_note": "External benchmark row for the canonical supported provider-ready path."
+    },
+    {
+      "row_id": "external.provider_blocked.v1",
+      "prompt": "Why can't I go online yet?",
+      "runtime_state": {
+        "provider_ready": false,
+        "provider_blockers": [
+          "wallet_locked"
+        ],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "expected_route": "provider_status",
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is not ready to go online."
+      },
+      "corpus_split": "held_out",
+      "tags": [
+        "external",
+        "benchmark",
+        "provider",
+        "held_out"
+      ],
+      "failure_taxonomy_targets": [
+        "grounded_answer_mismatch"
+      ],
+      "operator_note": "External benchmark row for provider-blocked grounding without widening into blocker summaries."
+    },
+    {
+      "row_id": "external.wallet_balance.v1",
+      "prompt": "How many sats are in the wallet?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "expected_route": "wallet_status",
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "corpus_split": "training",
+      "tags": [
+        "external",
+        "benchmark",
+        "wallet",
+        "training"
+      ],
+      "failure_taxonomy_targets": [
+        "grounded_answer_mismatch"
+      ],
+      "operator_note": "External benchmark row for the admitted wallet-balance path under the promoted grounded model."
+    },
+    {
+      "row_id": "external.wallet_variant.v1",
+      "prompt": "What's the wallet balance in sats?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 3400,
+        "recent_earnings_sats": 180
+      },
+      "expected_route": "wallet_status",
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 3400 sats, with 180 sats of recent earnings."
+      },
+      "corpus_split": "held_out",
+      "tags": [
+        "external",
+        "benchmark",
+        "wallet",
+        "held_out"
+      ],
+      "failure_taxonomy_targets": [
+        "grounded_answer_mismatch"
+      ],
+      "operator_note": "External benchmark row for a held-out wallet phrasing variation."
+    },
+    {
+      "row_id": "external.unsupported_gpu_poem.v1",
+      "prompt": "Write a poem about GPUs.",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "expected_route": "unsupported",
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "corpus_split": "training",
+      "tags": [
+        "external",
+        "benchmark",
+        "unsupported",
+        "training"
+      ],
+      "failure_taxonomy_targets": [
+        "unexpected_tool_exposure"
+      ],
+      "operator_note": "External benchmark row for a clean unsupported refusal outside the admitted family."
+    },
+    {
+      "row_id": "external.negated_wallet.v1",
+      "prompt": "What is not my wallet balance?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "expected_route": "unsupported",
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "corpus_split": "held_out",
+      "tags": [
+        "external",
+        "benchmark",
+        "wallet",
+        "negated",
+        "held_out"
+      ],
+      "failure_taxonomy_targets": [
+        "negated_route_false_positive",
+        "grounded_answer_mismatch"
+      ],
+      "operator_note": "External benchmark row that should stay unsupported and expose the retained negated-wallet weakness if it regresses."
+    }
+  ],
+  "failure_taxonomy": [
+    "route_mismatch",
+    "negated_route_false_positive",
+    "unexpected_tool_exposure",
+    "tool_argument_mismatch",
+    "grounded_answer_mismatch",
+    "unsafe_final_outcome"
+  ],
+  "claim_boundary": "This package stays on the first narrow compiled-agent family. It does not claim broad agent evaluation, external promotion authority, or raw-log admission into training.",
+  "contract_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8"
+}

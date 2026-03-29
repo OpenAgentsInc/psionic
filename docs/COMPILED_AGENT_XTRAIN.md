@@ -64,6 +64,8 @@ learned compiled-agent slice actually proved.
 - `fixtures/compiled_agent/compiled_agent_route_tfidf_centroid_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_grounded_tfidf_centroid_candidate_module_eval_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_stronger_candidate_family_report_v1.json`
+- `fixtures/compiled_agent/external/compiled_agent_external_benchmark_kit_v1.json`
+- `fixtures/compiled_agent/external/compiled_agent_external_benchmark_run_v1.json`
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
 - `fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json`
 - `fixtures/compiled_agent/compiled_agent_confidence_policy_v1.json`
@@ -107,6 +109,9 @@ learned compiled-agent slice actually proved.
 - those same decentralized roles now rerun as a retained boring dry run over
   the stricter bounded corpus and runtime-ingested receipts without weakening
   validator or rollback discipline
+- the first outside-compatible benchmark pack now emits external contributor
+  receipts in the same bounded ledger shape, with one retained review-required
+  negated-wallet row to keep the current route weakness visible
 - stronger bounded candidate families can now be evaluated against the same
   route and grounded-answer contracts without changing the runtime interface
 - the retained stronger-family report now keeps the incumbent NB candidates on

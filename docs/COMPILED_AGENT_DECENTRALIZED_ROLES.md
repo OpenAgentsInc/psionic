@@ -60,6 +60,13 @@ family through:
 - `receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1`
 - `receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1`
 
+The first outside-compatible benchmark package now sits beside those internal
+authority inputs and uses the same admitted family instead of inventing a new
+contract shape:
+
+- `fixtures/compiled_agent/external/compiled_agent_external_benchmark_kit_v1.json`
+- `fixtures/compiled_agent/external/compiled_agent_external_benchmark_run_v1.json`
+
 ## What Each Role Does
 
 `replay_generation`

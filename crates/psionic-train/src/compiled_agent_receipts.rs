@@ -247,14 +247,16 @@ struct CanonicalSupervisionScenario {
     operator_note: &'static str,
 }
 
-#[derive(Clone)]
-struct CompiledAgentGovernedReceiptLabel {
-    expected_route: CompiledAgentRoute,
-    expected_public_response: CompiledAgentLearningPublicResponse,
-    corpus_split: CompiledAgentCorpusSplit,
-    tags: Vec<String>,
-    operator_note: String,
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CompiledAgentReceiptSupervisionLabel {
+    pub expected_route: CompiledAgentRoute,
+    pub expected_public_response: CompiledAgentLearningPublicResponse,
+    pub corpus_split: CompiledAgentCorpusSplit,
+    pub tags: Vec<String>,
+    pub operator_note: String,
 }
+
+type CompiledAgentGovernedReceiptLabel = CompiledAgentReceiptSupervisionLabel;
 
 struct CanonicalRuntimeReceiptScenario {
     fixture_name: &'static str,
@@ -1231,6 +1233,27 @@ pub fn canonical_compiled_agent_learning_receipt_ledger(
         receipts,
         &compiled_agent_baseline_revision_set().revision_id,
     )
+}
+
+pub fn build_compiled_agent_learning_receipt_from_source(
+    source_fixture_ref: &str,
+    source_receipt: &CompiledAgentSourceReceipt,
+    label: &CompiledAgentReceiptSupervisionLabel,
+) -> Result<CompiledAgentLearningReceipt, CompiledAgentReceiptError> {
+    build_learning_receipt(source_fixture_ref, source_receipt, label)
+}
+
+pub fn build_compiled_agent_learning_receipt_ledger_from_receipts(
+    receipts: Vec<CompiledAgentLearningReceipt>,
+    baseline_revision_id: &str,
+) -> Result<CompiledAgentLearningReceiptLedger, CompiledAgentReceiptError> {
+    build_learning_receipt_ledger(receipts, baseline_revision_id)
+}
+
+pub fn build_compiled_agent_replay_bundle_from_ledger(
+    ledger: &CompiledAgentLearningReceiptLedger,
+) -> Result<CompiledAgentReplayBundle, CompiledAgentReceiptError> {
+    build_compiled_agent_replay_bundle(ledger)
 }
 
 pub fn canonical_compiled_agent_replay_bundle(
