@@ -736,6 +736,76 @@ Interpretation:
 - the new shape did not weaken the clean `top_k = 40` evidence enough to
   outweigh the wider-lane gain
 
+## Later Follow-On: `256 x 12` Tile Shape Moved The Sampled Lane Again
+
+After the `256 x 8` follow-on, the next question was whether the same
+`256`-thread block could profitably carry a wider per-thread tile again without
+giving back the clean bounded-candidate lane.
+
+The next landed code change was:
+
+- commit `317a65d3` `Adjust qwen35 top-k tile width`
+
+What changed:
+
+- `kLogitsTopKItemsPerThread: 8 -> 12`
+- block size stays `256`
+- tile width becomes `3072` logits per block pass
+
+This pass was first gated by direct Psionic-only A/B pilots on the idle RTX
+4080 host against the preserved `256 x 8` baseline binary.
+
+Those pilots stayed on the bounded-candidate output path:
+
+- `qwen35_output_modes=[top_k_candidates:40]` or `[top_k_candidates:100]`
+- `qwen35_raw_logits=false`
+
+### Direct pilot deltas vs the `256 x 8` baseline
+
+| Contract | Model | Prior Psionic | New Psionic | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `sampled_topk40` | `qwen3.5:0.8b` | `519.62` | `521.21` | `+0.31%` |
+| `sampled_topk40` | `qwen3.5:2b` | `256.12` | `256.45` | `+0.13%` |
+| `sampled_topk40` | `qwen3.5:4b` | `181.04` | `181.09` | `+0.03%` |
+| `sampled_topk40` | `qwen3.5:9b` | `110.77` | `110.77` | `-0.00%` |
+| `sampled_topk100` | `qwen3.5:0.8b` | `513.14` | `514.86` | `+0.34%` |
+| `sampled_topk100` | `qwen3.5:2b` | `251.06` | `253.80` | `+1.09%` |
+| `sampled_topk100` | `qwen3.5:4b` | `179.58` | `180.01` | `+0.24%` |
+| `sampled_topk100` | `qwen3.5:9b` | `109.88` | `109.93` | `+0.05%` |
+
+Interpretation:
+
+- the new shape is modestly better, not dramatically better
+- the gain is strongest on the wider sampled lane and smaller models
+- the largest clean sampled row stayed effectively flat instead of regressing
+- bounded-candidate output remained intact on every direct gate
+
+### Why this landed before a fresh canonical matrix artifact
+
+The first exact-commit full matrix rerun from a fresh remote worktree hit two
+separate non-throughput problems:
+
+- the idle-GPU guard correctly refused to start while a stray
+  `psionic-openai-server` process still held CUDA residency
+- after that process was killed, a fresh-worktree rerun still had to rebuild
+  the full serve stack from a different filesystem path, which invalidated
+  most of the shared target cache and turned the exact-commit matrix into a
+  long build-bound step instead of a clean throughput rerun
+
+That means the direct pilot numbers above are currently the best clean
+evidence for `317a65d3`.
+
+This is enough to justify keeping the code change because:
+
+- all sampled pilot rows moved flat-to-up
+- the wider `top_k = 100` lane improved on every screened model
+- the clean `top_k = 40` lane did not suffer a meaningful regression
+- the candidate stayed on bounded-candidate output instead of falling back to
+  `raw_logits`
+
+The remaining follow-up is benchmark publication discipline, not uncertainty
+about whether the code change is directionally good.
+
 ## Updated Next Steps
 
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
@@ -746,9 +816,8 @@ Interpretation:
   noise-level deltas
 - stop spending time on non-partitioned `top_k = 40` crossover tuning on this
   host; that path is decisively slower
-- stop spending time on partitioned launch-shape nudges that only reshuffle
-  the same `2048`-logit tile width by tiny amounts unless a later host shows a
-  clearly different optimum
+- publish one fresh repo-owned exact-commit sampled matrix for `317a65d3` once
+  the remote rerun can start from an already-built or path-stable worktree
 - focus the next optimization pass inside the partitioned bounded-candidate
   lane where it can plausibly reduce actual sampled-step cost further:
   larger structural changes inside the partitioned scan itself, better
