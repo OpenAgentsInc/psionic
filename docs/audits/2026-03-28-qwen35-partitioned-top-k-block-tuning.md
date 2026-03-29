@@ -902,6 +902,9 @@ the lane became reusable for later qwen35 optimization passes.
 
 ## Updated Next Steps
 
+- stop spending time on nearby top-k launch-shape tweaks that only help
+  `qwen3.5:0.8b` while regressing `2b`, `4b`, or `9b`; the rejected `256 x 16`
+  and `384 x 8` probes below make that pattern explicit
 - keep using the row-by-row isolation runner so future qwen35 tuning passes
   are measured on a genuinely idle GPU
 - keep using the stable remote benchmark worktree and shared target dir for
@@ -912,6 +915,9 @@ the lane became reusable for later qwen35 optimization passes.
   noise-level deltas
 - stop spending time on non-partitioned `top_k = 40` crossover tuning on this
   host; that path is decisively slower
+- focus the next serious sampled-speed pass on reducing the host/device
+  boundary itself, especially bounded-candidate post-processing or device-side
+  sampling work, rather than another small launch-shape shuffle
 - publish future exact-commit qwen35 sampled reruns from the stable benchmark
   lane instead of starting over from fresh worktree paths
 - focus the next optimization pass inside the partitioned bounded-candidate
@@ -919,3 +925,87 @@ the lane became reusable for later qwen35 optimization passes.
   larger structural changes inside the partitioned scan itself, better
   bounded-candidate output handling around the wider lane, or broader step
   fusion around the bounded-candidate output path
+
+## Later Follow-On: `256 x 16` Helped Only `0.8b` And Regressed The Broader Lane
+
+After the `256 x 12` checkpoint, the next direct probe tested whether pushing
+more work back into each thread would reduce sampled-step cost again:
+
+- old shape: `256 threads x 12 items`
+- probe shape: `256 threads x 16 items`
+- tile width: `3072 -> 4096` logits per block pass
+
+This was benchmarked as a direct idle-host A/B against a preserved baseline
+binary from current `main` on the stable remote benchmark lane, not as a new
+canonical matrix.
+
+The bounded-candidate path stayed intact on every direct gate:
+
+- `qwen35_output_modes=[top_k_candidates:40]` or `[top_k_candidates:100]`
+- `qwen35_raw_logits=false`
+
+### Direct pilot deltas vs the preserved baseline
+
+| Contract | Model | Prior Psionic | Probe Psionic | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `sampled_topk40` | `qwen3.5:0.8b` | `522.85` | `524.93` | `+0.40%` |
+| `sampled_topk40` | `qwen3.5:2b` | `256.99` | `256.54` | `-0.18%` |
+| `sampled_topk40` | `qwen3.5:4b` | `181.58` | `181.28` | `-0.17%` |
+| `sampled_topk40` | `qwen3.5:9b` | `110.71` | `110.54` | `-0.15%` |
+| `sampled_topk100` | `qwen3.5:0.8b` | `519.53` | `516.63` | `-0.56%` |
+| `sampled_topk100` | `qwen3.5:2b` | `255.18` | `254.06` | `-0.44%` |
+| `sampled_topk100` | `qwen3.5:4b` | `180.49` | `180.16` | `-0.18%` |
+| `sampled_topk100` | `qwen3.5:9b` | `110.28` | `110.20` | `-0.07%` |
+
+Interpretation:
+
+- this is not a broad qwen35 throughput gain
+- the extra per-thread tile width helps only the smallest clean row
+- the wider sampled lane regresses on every screened model
+
+This probe was rejected immediately and never landed on `main`.
+
+## Later Follow-On: `384 x 8` Also Failed To Generalize
+
+The next direct probe kept the current `3072`-logit tile width but moved work
+back toward thread-level parallelism:
+
+- old shape: `256 threads x 12 items`
+- probe shape: `384 threads x 8 items`
+- tile width stays `3072` logits per block pass
+
+The rationale was narrow and grounded in prior wins:
+
+- the older `128 x 16 -> 256 x 8` move had helped at a smaller tile width
+- this probe checked whether the same "more threads at the same tile" pattern
+  still held after the later `3072`-logit checkpoint
+
+This was again benchmarked as a direct idle-host A/B against the preserved
+baseline binary from current `main` on the stable remote benchmark lane.
+
+The bounded-candidate path again stayed intact on every direct gate:
+
+- `qwen35_output_modes=[top_k_candidates:40]` or `[top_k_candidates:100]`
+- `qwen35_raw_logits=false`
+
+### Direct pilot deltas vs the preserved baseline
+
+| Contract | Model | Prior Psionic | Probe Psionic | Delta |
+| --- | --- | ---: | ---: | ---: |
+| `sampled_topk40` | `qwen3.5:0.8b` | `517.16` | `526.31` | `+1.77%` |
+| `sampled_topk40` | `qwen3.5:2b` | `257.01` | `256.55` | `-0.18%` |
+| `sampled_topk40` | `qwen3.5:4b` | `181.70` | `181.39` | `-0.17%` |
+| `sampled_topk40` | `qwen3.5:9b` | `110.71` | `110.62` | `-0.09%` |
+| `sampled_topk100` | `qwen3.5:0.8b` | `519.84` | `518.37` | `-0.28%` |
+| `sampled_topk100` | `qwen3.5:2b` | `255.13` | `254.62` | `-0.20%` |
+| `sampled_topk100` | `qwen3.5:4b` | `180.56` | `180.37` | `-0.11%` |
+| `sampled_topk100` | `qwen3.5:9b` | `110.30` | `110.20` | `-0.09%` |
+
+Interpretation:
+
+- this repeats the same lesson as the `256 x 16` probe
+- another nearby launch-shape change can juice the smallest clean row
+- it still does not improve the broader qwen35 sampled lane that matters for
+  the published Ollama comparison
+
+This probe was also rejected immediately and never landed on `main`.
