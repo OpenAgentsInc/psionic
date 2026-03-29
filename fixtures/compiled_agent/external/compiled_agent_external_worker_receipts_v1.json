@@ -1,0 +1,218 @@
+{
+  "schema_version": "psionic.compiled_agent.external_worker_receipts.v1",
+  "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+  "receipts": [
+    {
+      "role": "bounded_module_training",
+      "submission_id": "compiled_agent.external_worker_submission.bounded_module_training.v1",
+      "contributor": {
+        "contributor_id": "contrib.external.alpha",
+        "display_name": "External Contributor Alpha",
+        "source_machine_id": "external.alpha.archlinux.rtx4080",
+        "machine_class": "consumer_gpu",
+        "environment_class": "external_bounded_beta",
+        "declared_capabilities": [
+          "compiled_agent_benchmark",
+          "runtime_receipt_collection"
+        ],
+        "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+        "attested_at_epoch_ms": 1774800000000
+      },
+      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "evidence_class": "learned_lane",
+      "validator_status": "passed",
+      "quarantine_status": "held",
+      "review_state": "accepted",
+      "promotion_authority_granted": false,
+      "runtime_authority_granted": false,
+      "input_refs": [
+        "fixtures/compiled_agent/compiled_agent_default_row_v1.json",
+        "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
+        "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_replay_proposal_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_quarantine_report_v1.json"
+      ],
+      "output_refs": [
+        "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
+        "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
+        "fixtures/compiled_agent/compiled_agent_route_tfidf_centroid_model_v1.json",
+        "fixtures/compiled_agent/compiled_agent_grounded_answer_tfidf_centroid_model_v1.json"
+      ],
+      "source_submission_ids": [
+        "proposal.compiled_agent.external_replay.alpha.v1"
+      ],
+      "source_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1"
+      ],
+      "emitted_ids": [
+        "compiled_agent.route.multinomial_nb_v1",
+        "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "compiled_agent.route.tfidf_centroid_v1",
+        "compiled_agent.grounded_answer.tfidf_centroid_v1"
+      ],
+      "failure_classes": [
+        "none"
+      ],
+      "next_consumer": "compiled_agent.role.validator_scoring.v1",
+      "detail": "An external bounded-module-training worker can emit candidate artifacts behind the same narrow route and grounded-answer contracts, but those artifacts still queue for validator scoring before any promotion decision."
+    },
+    {
+      "role": "ranking_labeling",
+      "submission_id": "compiled_agent.external_worker_submission.ranking_labeling.v1",
+      "contributor": {
+        "contributor_id": "contrib.external.alpha",
+        "display_name": "External Contributor Alpha",
+        "source_machine_id": "external.alpha.archlinux.rtx4080",
+        "machine_class": "consumer_gpu",
+        "environment_class": "external_bounded_beta",
+        "declared_capabilities": [
+          "compiled_agent_benchmark",
+          "runtime_receipt_collection"
+        ],
+        "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+        "attested_at_epoch_ms": 1774800000000
+      },
+      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "evidence_class": "learned_lane",
+      "validator_status": "passed",
+      "quarantine_status": "held",
+      "review_state": "review_required",
+      "promotion_authority_granted": false,
+      "runtime_authority_granted": false,
+      "input_refs": [
+        "fixtures/compiled_agent/external/compiled_agent_external_benchmark_run_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_submission_staging_ledger_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_quarantine_report_v1.json"
+      ],
+      "output_refs": [
+        "fixtures/compiled_agent/external/compiled_agent_external_submission_staging_ledger_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_quarantine_report_v1.json"
+      ],
+      "source_submission_ids": [
+        "submission.compiled_agent.external_benchmark.alpha.v1",
+        "submission.compiled_agent.external_runtime_disagreement.alpha.v1",
+        "proposal.compiled_agent.external_replay.alpha.v1"
+      ],
+      "source_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_external_benchmark_run_v1.json#external.negated_wallet",
+        "receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1"
+      ],
+      "emitted_ids": [
+        "compiled_agent.external_worker.label_review.negated_wallet.v1",
+        "compiled_agent.external_worker.label_review.runtime_shadow.v1"
+      ],
+      "failure_classes": [
+        "human_review_required"
+      ],
+      "next_consumer": "compiled_agent.external_worker.review.label_curation",
+      "detail": "An external ranking-and-labeling worker can curate review-required external rows, but those outputs stay in the same human-review boundary before they can change replay or held-out truth."
+    },
+    {
+      "role": "replay_generation",
+      "submission_id": "compiled_agent.external_worker_submission.replay_generation.v1",
+      "contributor": {
+        "contributor_id": "contrib.external.alpha",
+        "display_name": "External Contributor Alpha",
+        "source_machine_id": "external.alpha.archlinux.rtx4080",
+        "machine_class": "consumer_gpu",
+        "environment_class": "external_bounded_beta",
+        "declared_capabilities": [
+          "compiled_agent_benchmark",
+          "runtime_receipt_collection"
+        ],
+        "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+        "attested_at_epoch_ms": 1774800000000
+      },
+      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "evidence_class": "learned_lane",
+      "validator_status": "passed",
+      "quarantine_status": "replay_candidate_eligible",
+      "review_state": "accepted",
+      "promotion_authority_granted": false,
+      "runtime_authority_granted": false,
+      "input_refs": [
+        "fixtures/compiled_agent/external/compiled_agent_external_benchmark_run_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_submission_staging_ledger_v1.json",
+        "fixtures/compiled_agent/external/compiled_agent_external_quarantine_report_v1.json"
+      ],
+      "output_refs": [
+        "fixtures/compiled_agent/external/compiled_agent_external_replay_proposal_v1.json"
+      ],
+      "source_submission_ids": [
+        "submission.compiled_agent.external_benchmark.alpha.v1",
+        "submission.compiled_agent.external_runtime_disagreement.alpha.v1",
+        "proposal.compiled_agent.external_replay.alpha.v1"
+      ],
+      "source_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_external_benchmark_run_v1.json#external.provider_blocked",
+        "receipt.compiled_agent.learning.compiled_agent_external_benchmark_run_v1.json#external.provider_ready",
+        "receipt.compiled_agent.learning.compiled_agent_external_benchmark_run_v1.json#external.unsupported_gpu_poem",
+        "receipt.compiled_agent.learning.compiled_agent_external_benchmark_run_v1.json#external.wallet_balance",
+        "receipt.compiled_agent.learning.compiled_agent_external_benchmark_run_v1.json#external.wallet_variant"
+      ],
+      "emitted_ids": [
+        "sample.route.receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1",
+        "proposal.compiled_agent.external_replay.alpha.v1"
+      ],
+      "failure_classes": [
+        "none"
+      ],
+      "next_consumer": "compiled_agent.role.validator_scoring.v1",
+      "detail": "An external replay-generation worker can now produce a bounded replay proposal from admitted external evidence, and that proposal can flow into the same bounded training queue without granting runtime or promotion authority."
+    },
+    {
+      "role": "validator_scoring",
+      "submission_id": "compiled_agent.external_worker_submission.validator_scoring.v1",
+      "contributor": {
+        "contributor_id": "contrib.external.alpha",
+        "display_name": "External Contributor Alpha",
+        "source_machine_id": "external.alpha.archlinux.rtx4080",
+        "machine_class": "consumer_gpu",
+        "environment_class": "external_bounded_beta",
+        "declared_capabilities": [
+          "compiled_agent_benchmark",
+          "runtime_receipt_collection"
+        ],
+        "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+        "attested_at_epoch_ms": 1774800000000
+      },
+      "contract_digest": "0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a",
+      "evidence_class": "learned_lane",
+      "validator_status": "failed",
+      "quarantine_status": "rejected",
+      "review_state": "rejected",
+      "promotion_authority_granted": false,
+      "runtime_authority_granted": false,
+      "input_refs": [
+        "fixtures/compiled_agent/external/compiled_agent_external_quarantine_report_v1.json",
+        "fixtures/compiled_agent/compiled_agent_confidence_policy_v1.json",
+        "fixtures/compiled_agent/compiled_agent_shadow_disagreement_receipts_v1.json",
+        "fixtures/compiled_agent/compiled_agent_stronger_candidate_family_report_v1.json",
+        "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json"
+      ],
+      "output_refs": [
+        "fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json",
+        "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json"
+      ],
+      "source_submission_ids": [
+        "submission.compiled_agent.external_runtime_disagreement.alpha.v1",
+        "proposal.compiled_agent.external_replay.alpha.v1"
+      ],
+      "source_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1"
+      ],
+      "emitted_ids": [
+        "compiled_agent.external_worker.validator_scoring.review_packet.v1"
+      ],
+      "failure_classes": [
+        "promotion_authority_escalation_blocked"
+      ],
+      "next_consumer": "compiled_agent.external_worker.rejection.validator_mismatch",
+      "detail": "The retained external validator-scoring submission is rejected because outside workers can score bounded candidates, but they cannot directly move promotion or runtime authority."
+    }
+  ],
+  "summary": "Compiled-agent external worker receipts retain 4 governed outside-worker role submissions with 2 accepted, 1 rejected, and 1 review-required outcomes on the admitted family.",
+  "receipts_digest": "e9b42272444d0b0781c07ffc141a8c3642e66093dda65b17f0c4d287d971ac13"
+}

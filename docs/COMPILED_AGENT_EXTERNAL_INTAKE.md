@@ -118,3 +118,6 @@ It does not yet prove:
 - outside-facing product onboarding
 - contributor trust or accounting surfaces
 - broad external traffic ingestion
+
+The next retained boundary after intake is now described in
+`docs/COMPILED_AGENT_EXTERNAL_WORKERS.md`.

@@ -68,6 +68,9 @@ contract shape:
 - `fixtures/compiled_agent/external/compiled_agent_external_benchmark_run_v1.json`
 - `fixtures/compiled_agent/external/compiled_agent_external_submission_staging_ledger_v1.json`
 - `fixtures/compiled_agent/external/compiled_agent_external_quarantine_report_v1.json`
+- `fixtures/compiled_agent/external/compiled_agent_external_worker_beta_contract_v1.json`
+- `fixtures/compiled_agent/external/compiled_agent_external_worker_receipts_v1.json`
+- `fixtures/compiled_agent/external/compiled_agent_external_worker_dry_run_v1.json`
 
 ## What Each Role Does
 
@@ -118,6 +121,12 @@ Current retained dry-run truth:
   `1895a9d50c00d49261e8e00ccf3cdbca4fa38b098407b29aca8ea5ed3810192a`
 - validator discipline unchanged: `true`
 - rollback discipline unchanged: `true`
+- external worker beta contract digest:
+  `0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a`
+- external worker receipts digest:
+  `e9b42272444d0b0781c07ffc141a8c3642e66093dda65b17f0c4d287d971ac13`
+- external worker dry-run digest:
+  `e576a14307d2149312d2dcd3dca92b35b39e4fc1750e0c52d85cdb82336a8fce`
 
 ## Local Reference Runner
 
