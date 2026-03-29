@@ -3,19 +3,19 @@
   "cycle_id": "compiled_agent.xtrain.cycle.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "evidence_class": "learned_lane",
-  "source_ledger_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
-  "replay_bundle_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+  "source_ledger_digest": "6dd2c757e2a4534210899a667edb82b1c819d64592d3b4aca07a2a6cf1864812",
+  "replay_bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c",
   "route_outcome": {
     "module": "route",
-    "decision": "hold",
-    "reason": "Candidate did not clear the route validator gate cleanly enough to promote.",
+    "decision": "promote",
+    "reason": "Trained route candidate fixes the retained negated-route false positive with no module-eval, replay, or held-out regressions.",
     "delta": {
       "module": "route",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.route.multinomial_nb_v1",
-      "replay_bundle_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+      "replay_bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
-      "candidate_artifact_digest": "0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f",
+      "candidate_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
       "targeted_failure_classes": [
         "negated_route_false_positive"
       ],
@@ -29,24 +29,24 @@
         "route_negated_wallet_false_positive"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 14,
-      "candidate_replay_match_count": 19,
-      "baseline_heldout_match_count": 8,
-      "candidate_heldout_match_count": 8,
+      "baseline_replay_match_count": 19,
+      "candidate_replay_match_count": 25,
+      "baseline_heldout_match_count": 10,
+      "candidate_heldout_match_count": 12,
       "replay_improvement_sample_ids": [
         "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
         "sample.route.receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
         "sample.route.receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1",
+        "sample.route.receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1",
         "sample.route.receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
         "sample.route.receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1"
       ],
       "replay_regression_sample_ids": [],
       "heldout_improvement_receipt_ids": [
-        "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1"
+        "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
+        "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1"
       ],
-      "heldout_regression_receipt_ids": [
-        "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1"
-      ]
+      "heldout_regression_receipt_ids": []
     }
   },
   "grounded_answer_outcome": {
@@ -57,9 +57,9 @@
       "module": "grounded_answer",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "replay_bundle_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+      "replay_bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
-      "candidate_artifact_digest": "1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f",
+      "candidate_artifact_digest": "5a7bd1af3709dc6c24fb75627c898c37993ee3946f402ce0761fc5adc211a708",
       "targeted_failure_classes": [
         "grounded_answer_mismatch"
       ],
@@ -74,16 +74,17 @@
         "grounded_wallet_conflicting_facts_fallback"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 13,
-      "candidate_replay_match_count": 19,
-      "baseline_heldout_match_count": 7,
-      "candidate_heldout_match_count": 11,
+      "baseline_replay_match_count": 18,
+      "candidate_replay_match_count": 25,
+      "baseline_heldout_match_count": 9,
+      "candidate_heldout_match_count": 13,
       "replay_improvement_sample_ids": [
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
+        "sample.grounded_answer.receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1"
       ],
       "replay_regression_sample_ids": [],
@@ -96,6 +97,6 @@
       "heldout_regression_receipt_ids": []
     }
   },
-  "summary": "Compiled-agent XTRAIN cycle retained route decision=Hold and grounded_answer decision=Promote on replay bundle da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a.",
-  "receipt_digest": "5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6"
+  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle 0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c.",
+  "receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45"
 }

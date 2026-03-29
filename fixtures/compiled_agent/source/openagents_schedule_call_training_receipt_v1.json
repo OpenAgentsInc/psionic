@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "evidence_class": "learned_lane",
+  "captured_at_epoch_ms": 17747602620086,
+  "state": {
+    "provider_ready": true,
+    "provider_blockers": [],
+    "wallet_balance_sats": 1200,
+    "recent_earnings_sats": 240
+  },
+  "run": {
+    "public_response": {
+      "kind": "unsupported_refusal",
+      "response": "I can currently answer only provider readiness and wallet balance questions."
+    },
+    "internal_trace": {
+      "primary_phases": [
+        {
+          "phase": "intent_route",
+          "manifest": {
+            "module_name": "intent_route",
+            "signature_name": "intent_route",
+            "implementation_family": "psionic_route_model",
+            "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+            "version": "2026-03-29",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.8
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "Schedule a call for tomorrow afternoon."
+          },
+          "output": {
+            "route": "unsupported",
+            "rationale": "captured authority route for openagents_schedule_call_training_receipt_v1"
+          },
+          "confidence": 0.94,
+          "trace": {
+            "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+            "captured_from_runtime": true
+          }
+        },
+        {
+          "phase": "tool_policy",
+          "manifest": {
+            "module_name": "tool_policy",
+            "signature_name": "tool_policy",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.8
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "Schedule a call for tomorrow afternoon.",
+            "route": "unsupported",
+            "available_tools": [
+              {
+                "name": "provider_status",
+                "description": "Read provider readiness and blocker state."
+              },
+              {
+                "name": "wallet_status",
+                "description": "Read wallet balance and recent earnings."
+              }
+            ]
+          },
+          "output": {
+            "selected_tools": [],
+            "rationale": "captured authority tool policy"
+          },
+          "confidence": 0.92,
+          "trace": {
+            "route": "unsupported",
+            "captured_from_runtime": true
+          }
+        },
+        {
+          "phase": "tool_arguments",
+          "manifest": {
+            "module_name": "tool_arguments",
+            "signature_name": "tool_arguments",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.8
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "Schedule a call for tomorrow afternoon.",
+            "route": "unsupported",
+            "selected_tools": []
+          },
+          "output": {
+            "calls": []
+          },
+          "confidence": 0.96,
+          "trace": {
+            "tool_count": 0,
+            "captured_from_runtime": true
+          }
+        },
+        {
+          "phase": "grounded_answer",
+          "manifest": {
+            "module_name": "grounded_answer",
+            "signature_name": "grounded_answer",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.82
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "Schedule a call for tomorrow afternoon.",
+            "route": "unsupported",
+            "tool_results": []
+          },
+          "output": {
+            "answer": "I can currently answer only provider readiness and wallet balance questions.",
+            "grounded_tool_names": []
+          },
+          "confidence": 0.94,
+          "trace": {
+            "captured_from_runtime": true,
+            "response_kind": "unsupported_refusal"
+          }
+        },
+        {
+          "phase": "verify",
+          "manifest": {
+            "module_name": "verify",
+            "signature_name": "verify",
+            "implementation_family": "psionic_rule_revision",
+            "implementation_label": "promoted",
+            "version": "2026-03-28",
+            "promotion_state": "promoted",
+            "confidence_floor": 0.82
+          },
+          "authority": "promoted",
+          "candidate_label": null,
+          "input": {
+            "user_request": "Schedule a call for tomorrow afternoon.",
+            "route": "unsupported",
+            "tool_calls": [],
+            "tool_results": [],
+            "candidate_answer": "I can currently answer only provider readiness and wallet balance questions."
+          },
+          "output": {
+            "verdict": "unsupported_refusal",
+            "rationale": "captured authority verify verdict"
+          },
+          "confidence": 0.94,
+          "trace": {
+            "captured_from_runtime": true
+          }
+        }
+      ],
+      "shadow_phases": []
+    },
+    "lineage": {
+      "user_request": "Schedule a call for tomorrow afternoon.",
+      "route": "unsupported",
+      "tool_calls": [],
+      "tool_results": [],
+      "public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": []
+    }
+  }
+}

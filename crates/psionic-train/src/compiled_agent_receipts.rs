@@ -264,10 +264,11 @@ struct CanonicalRuntimeReceiptScenario {
     label: CompiledAgentGovernedReceiptLabel,
 }
 
-struct CompiledAgentGovernedSourceReceipt {
-    source_fixture_ref: String,
-    source_receipt: CompiledAgentSourceReceipt,
-    label: CompiledAgentGovernedReceiptLabel,
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompiledAgentGovernedSourceReceipt {
+    pub source_fixture_ref: String,
+    pub source_receipt: CompiledAgentSourceReceipt,
+    pub label: CompiledAgentGovernedReceiptLabel,
 }
 
 #[must_use]
@@ -531,6 +532,25 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
             operator_note: "Training success row for a calendar-style unsupported request so held-out scheduling prompts are not out-of-vocabulary.",
         },
         CanonicalSupervisionScenario {
+            fixture_name: "openagents_schedule_call_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_008_6,
+            user_request: "Schedule a call for tomorrow afternoon.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::Unsupported,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &["unsupported", "refusal_quality", "training"],
+            operator_note: "Training success row for a second scheduling-style unsupported request so the route learner does not regress on held-out meeting language.",
+        },
+        CanonicalSupervisionScenario {
             fixture_name: "openagents_ambiguous_provider_wallet_receipt_v1.json",
             captured_at_epoch_ms: 1_774_760_262_009,
             user_request: "Should I go online or check the wallet balance first?",
@@ -548,6 +568,106 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
             corpus_split: CompiledAgentCorpusSplit::Training,
             tags: &["unsupported", "route_ambiguity", "training"],
             operator_note: "Training success row for ambiguous provider-versus-wallet phrasing that should refuse instead of guessing.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_wallet_provider_compare_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_009_100,
+            user_request: "Should I go online first or wait until the wallet grows more?",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "confidence_edge",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for provider-versus-wallet comparison phrasing that should refuse instead of drifting toward provider readiness.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_wait_wallet_earnings_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_009_150,
+            user_request: "Should I wait for more wallet earnings before going online?",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "confidence_edge",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for the wait-for-wallet-earnings phrasing so the route learner refuses mixed earnings-versus-go-online planning language instead of collapsing onto provider status.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_provider_wallet_better_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_009_200,
+            user_request: "Is it better to check provider readiness or the wallet first?",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "confidence_edge",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for mixed provider-versus-wallet planning language that should stay in the admitted refusal lane.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_wallet_grow_compare_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_009_250,
+            user_request: "Is it better to go online now or wait for the wallet to grow more?",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "confidence_edge",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for the go-online-versus-wallet-growth comparison phrasing so the route learner refuses the admitted ambiguity family instead of collapsing onto wallet status.",
         },
         CanonicalSupervisionScenario {
             fixture_name: "openagents_negated_wallet_receipt_v1.json",
@@ -623,6 +743,34 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
                 "correction_required",
             ],
             operator_note: "Training correction row for exclusion wording where the promoted authority still chases wallet tokens instead of the requested provider answer.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_ignore_provider_wallet_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_010_650,
+            user_request: "Ignore provider readiness. Show me the wallet balance.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::WalletStatus,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from(
+                    "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "supported",
+                "wallet",
+                "negated",
+                "exclusion",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for an ignore-provider phrasing so exclusion handling does not depend on the earlier retained wording.",
         },
         CanonicalSupervisionScenario {
             fixture_name: "openagents_wallet_address_unsupported_receipt_v1.json",
@@ -793,6 +941,31 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
             corpus_split: CompiledAgentCorpusSplit::HeldOut,
             tags: &["unsupported", "route_ambiguity", "held_out"],
             operator_note: "Held-out ambiguity row for route behavior that should still refuse instead of guessing.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_wallet_provider_wait_heldout_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_013_100,
+            user_request: "Should I wait for more wallet earnings before I go online?",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: unsupported.clone(),
+            },
+            corpus_split: CompiledAgentCorpusSplit::HeldOut,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "confidence_edge",
+                "held_out",
+                "correction_required",
+            ],
+            operator_note: "Held-out compare row for deciding whether the route candidate learned to refuse provider-versus-wallet planning language instead of picking a side.",
         },
         CanonicalSupervisionScenario {
             fixture_name: "openagents_negated_provider_receipt_v1.json",
@@ -970,6 +1143,32 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
             operator_note: "Held-out negated wallet row to test whether route learning generalizes past the exact exclusion wording in replay.",
         },
         CanonicalSupervisionScenario {
+            fixture_name: "openagents_ignore_wallet_provider_heldout_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_020_100,
+            user_request: "Ignore the wallet balance. Tell me if the provider is ready.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::ProviderStatus,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            corpus_split: CompiledAgentCorpusSplit::HeldOut,
+            tags: &[
+                "supported",
+                "provider",
+                "negated",
+                "exclusion",
+                "held_out",
+                "correction_required",
+            ],
+            operator_note: "Held-out ignore-wallet phrasing for checking that the route candidate generalizes the provider exclusion fix beyond the replay rows.",
+        },
+        CanonicalSupervisionScenario {
             fixture_name: "openagents_wallet_recent_earnings_short_heldout_receipt_v1.json",
             captured_at_epoch_ms: 1_774_760_262_021,
             user_request: "How many sats have I earned recently in the wallet?",
@@ -1019,6 +1218,33 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
             corpus_split: CompiledAgentCorpusSplit::HeldOut,
             tags: &["unsupported", "route_ambiguity", "confidence_edge", "held_out"],
             operator_note: "Held-out ambiguity row for confidence calibration around mixed provider-versus-wallet intent without widening the task family.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_wallet_provider_better_heldout_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_100,
+            user_request: "Is it better to go online now or keep waiting for the wallet to grow?",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::HeldOut,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "confidence_edge",
+                "held_out",
+                "correction_required",
+            ],
+            operator_note: "Second held-out compare row for the same narrow ambiguity family so route promotion depends on a real pattern and not one lucky wording.",
         },
     ]
 }
@@ -1140,6 +1366,24 @@ fn canonical_compiled_agent_governed_source_receipts() -> Vec<CompiledAgentGover
             }),
     );
     receipts
+}
+
+pub fn canonical_compiled_agent_governed_source_receipt(
+    fixture_name: &str,
+) -> Result<CompiledAgentGovernedSourceReceipt, CompiledAgentReceiptError> {
+    canonical_compiled_agent_governed_source_receipts()
+        .into_iter()
+        .find(|receipt| {
+            receipt.source_fixture_ref.ends_with(fixture_name)
+                || receipt.source_fixture_ref == fixture_name
+        })
+        .ok_or_else(|| CompiledAgentReceiptError::Read {
+            path: fixture_name.to_string(),
+            error: std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "canonical compiled-agent governed receipt fixture was not found",
+            ),
+        })
 }
 
 pub fn load_compiled_agent_source_receipt(

@@ -21,7 +21,7 @@ use crate::{
     build_compiled_agent_learning_receipt_from_source,
     build_compiled_agent_learning_receipt_ledger_from_receipts,
     build_compiled_agent_replay_bundle_from_ledger,
-    canonical_compiled_agent_external_benchmark_kit,
+    canonical_compiled_agent_governed_source_receipt,
     canonical_compiled_agent_external_benchmark_run,
     canonical_compiled_agent_external_contributor_identity,
     canonical_compiled_agent_promoted_artifact_contract, repo_relative_path,
@@ -29,6 +29,7 @@ use crate::{
     CompiledAgentArtifactLifecycleState, CompiledAgentArtifactPayload, CompiledAgentCorpusSplit,
     CompiledAgentDisagreementReason, CompiledAgentExternalBenchmarkError,
     CompiledAgentExternalBenchmarkRun, CompiledAgentExternalContributorIdentity,
+    retained_compiled_agent_external_benchmark_kit,
     CompiledAgentReceiptError, CompiledAgentReceiptSupervisionLabel, CompiledAgentReplaySample,
     CompiledAgentReviewDisposition, CompiledAgentSourceManifest, CompiledAgentSourcePhaseTraceEntry,
     CompiledAgentSourceReceipt,
@@ -263,14 +264,14 @@ impl CompiledAgentExternalRuntimeReceiptSubmission {
     }
 
     pub fn validate(&self) -> Result<(), CompiledAgentExternalIntakeError> {
-        let contract = canonical_compiled_agent_external_benchmark_kit()?;
+        let contract = retained_compiled_agent_external_benchmark_kit()?;
         if self.schema_version != COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_SCHEMA_VERSION
         {
             return Err(CompiledAgentExternalIntakeError::InvalidRuntimeSubmission {
                 detail: String::from("schema_version drifted"),
             });
         }
-        if self.submission_id != EXTERNAL_RUNTIME_SUBMISSION_ID {
+        if !valid_runtime_submission_id(self.submission_id.as_str()) {
             return Err(CompiledAgentExternalIntakeError::InvalidRuntimeSubmission {
                 detail: String::from("submission_id drifted"),
             });
@@ -313,7 +314,7 @@ impl CompiledAgentExternalReplayProposal {
     }
 
     pub fn validate(&self) -> Result<(), CompiledAgentExternalIntakeError> {
-        let contract = canonical_compiled_agent_external_benchmark_kit()?;
+        let contract = retained_compiled_agent_external_benchmark_kit()?;
         if self.schema_version != COMPILED_AGENT_EXTERNAL_REPLAY_PROPOSAL_SCHEMA_VERSION {
             return Err(CompiledAgentExternalIntakeError::InvalidReplayProposal {
                 detail: String::from("schema_version drifted"),
@@ -367,7 +368,7 @@ impl CompiledAgentExternalSubmissionStagingLedger {
                 detail: String::from("schema_version drifted"),
             });
         }
-        if self.ledger_id != EXTERNAL_STAGING_LEDGER_ID {
+        if !valid_staging_ledger_id(self.ledger_id.as_str()) {
             return Err(CompiledAgentExternalIntakeError::InvalidStagingLedger {
                 detail: String::from("ledger_id drifted"),
             });
@@ -403,7 +404,7 @@ impl CompiledAgentExternalQuarantineReport {
                 detail: String::from("schema_version drifted"),
             });
         }
-        if self.report_id != EXTERNAL_QUARANTINE_REPORT_ID {
+        if !valid_quarantine_report_id(self.report_id.as_str()) {
             return Err(CompiledAgentExternalIntakeError::InvalidQuarantineReport {
                 detail: String::from("report_id drifted"),
             });
@@ -444,48 +445,60 @@ pub fn compiled_agent_external_quarantine_report_fixture_path() -> PathBuf {
 
 pub fn canonical_compiled_agent_external_runtime_receipt_submission(
 ) -> Result<CompiledAgentExternalRuntimeReceiptSubmission, CompiledAgentExternalIntakeError> {
-    let contract = canonical_compiled_agent_external_benchmark_kit()?;
-    let benchmark_run = canonical_compiled_agent_external_benchmark_run()?;
-    let negated_row = benchmark_run
-        .row_runs
-        .iter()
-        .find(|row| row.row_id == "external.negated_wallet.v1")
-        .ok_or_else(|| CompiledAgentExternalIntakeError::InvalidRuntimeSubmission {
-            detail: String::from("negated wallet row missing from canonical external benchmark run"),
-        })?;
     let contributor = canonical_compiled_agent_external_contributor_identity();
-    let source_receipt = build_runtime_shadow_compare_receipt(
-        &negated_row.source_receipt,
-        &negated_row.row_id,
+    build_compiled_agent_external_runtime_receipt_submission_from_fixture(
+        COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_FIXTURE_PATH,
+        EXTERNAL_RUNTIME_SUBMISSION_ID,
+        "openagents_negated_wallet_receipt_v1.json",
         &contributor,
-    )?;
+        vec![
+            String::from("external"),
+            String::from("runtime"),
+            String::from("shadow_compare"),
+            String::from("negated"),
+            String::from("quarantine_training_candidate"),
+        ],
+        String::from(
+            "External runtime disagreement receipt that keeps the promoted baseline route and the shadow learned route side by side on the admitted negated-wallet regression row. It remains review-required, but it is staged as a replay-training candidate instead of a held-out benchmark row.",
+        ),
+        String::from(
+            "This retained external runtime receipt keeps one real admitted-family disagreement in the governed source-receipt shape so it can be shadow-scored before any replay admission.",
+        ),
+    )
+}
+
+pub fn build_compiled_agent_external_runtime_receipt_submission_from_fixture(
+    _payload_ref: &str,
+    submission_id: &str,
+    fixture_name: &str,
+    contributor: &CompiledAgentExternalContributorIdentity,
+    tags: Vec<String>,
+    operator_note: String,
+    detail: String,
+) -> Result<CompiledAgentExternalRuntimeReceiptSubmission, CompiledAgentExternalIntakeError> {
     let mut submission = CompiledAgentExternalRuntimeReceiptSubmission {
         schema_version: String::from(
             COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_SCHEMA_VERSION,
         ),
-        submission_id: String::from(EXTERNAL_RUNTIME_SUBMISSION_ID),
-        contributor,
-        contract_digest: contract.contract_digest,
+        submission_id: submission_id.to_string(),
+        contributor: contributor.clone(),
+        contract_digest: retained_compiled_agent_external_benchmark_kit()?.contract_digest,
         evidence_class: CompiledAgentEvidenceClass::LearnedLane,
-        source_receipt,
-        label: CompiledAgentReceiptSupervisionLabel {
-            expected_route: negated_row.expected_route,
-            expected_public_response: negated_row.expected_public_response.clone(),
-            corpus_split: CompiledAgentCorpusSplit::Training,
-            tags: vec![
-                String::from("external"),
-                String::from("runtime"),
-                String::from("shadow_compare"),
-                String::from("negated"),
-                String::from("quarantine_training_candidate"),
-            ],
-            operator_note: String::from(
-                "External runtime disagreement receipt that keeps the promoted baseline route and the shadow learned route side by side on the admitted negated-wallet regression row. It remains review-required, but it is staged as a replay-training candidate instead of a held-out benchmark row.",
-            ),
+        source_receipt: build_runtime_shadow_compare_receipt_for_fixture(
+            fixture_name,
+            contributor,
+        )?,
+        label: {
+            let governed = canonical_compiled_agent_governed_source_receipt(fixture_name)?;
+            CompiledAgentReceiptSupervisionLabel {
+                expected_route: governed.label.expected_route,
+                expected_public_response: governed.label.expected_public_response,
+                corpus_split: CompiledAgentCorpusSplit::Training,
+                tags,
+                operator_note,
+            }
         },
-        detail: String::from(
-            "This retained external runtime receipt keeps one real admitted-family disagreement in the governed source-receipt shape so it can be shadow-scored before any replay admission.",
-        ),
+        detail,
         payload_digest: String::new(),
     };
     submission.payload_digest = submission.stable_digest();
@@ -495,7 +508,7 @@ pub fn canonical_compiled_agent_external_runtime_receipt_submission(
 
 pub fn canonical_compiled_agent_external_replay_proposal(
 ) -> Result<CompiledAgentExternalReplayProposal, CompiledAgentExternalIntakeError> {
-    let contract = canonical_compiled_agent_external_benchmark_kit()?;
+    let contract = retained_compiled_agent_external_benchmark_kit()?;
     let runtime_submission = canonical_compiled_agent_external_runtime_receipt_submission()?;
     let learning_receipt = build_compiled_agent_learning_receipt_from_source(
         COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_FIXTURE_PATH,
@@ -528,7 +541,7 @@ pub fn canonical_compiled_agent_external_replay_proposal(
 
 pub fn canonical_compiled_agent_external_submission_staging_ledger(
 ) -> Result<CompiledAgentExternalSubmissionStagingLedger, CompiledAgentExternalIntakeError> {
-    let contract = canonical_compiled_agent_external_benchmark_kit()?;
+    let contract = retained_compiled_agent_external_benchmark_kit()?;
     let promoted_contract = canonical_compiled_agent_promoted_artifact_contract()?;
     let benchmark_run = canonical_compiled_agent_external_benchmark_run()?;
     let runtime_submission = canonical_compiled_agent_external_runtime_receipt_submission()?;
@@ -538,10 +551,17 @@ pub fn canonical_compiled_agent_external_submission_staging_ledger(
         benchmark_record,
         benchmark_review_learning_receipt,
         benchmark_shadow_ids,
-    ) = build_benchmark_submission_record(&benchmark_run)?;
+    ) = build_benchmark_submission_record_with_payload_ref(
+        String::from("submission.compiled_agent.external_benchmark.alpha.v1"),
+        String::from(COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_FIXTURE_PATH),
+        &benchmark_run,
+    )?;
     let invalid_record = build_invalid_benchmark_submission_record(&benchmark_run, &contract)?;
     let (runtime_record, runtime_learning_receipt, runtime_shadow_ids) =
-        build_runtime_submission_record(&runtime_submission)?;
+        build_runtime_submission_record_with_payload_ref(
+            String::from(COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_FIXTURE_PATH),
+            &runtime_submission,
+        )?;
     let replay_record = build_replay_submission_record(&replay_proposal)?;
 
     let submissions = vec![
@@ -610,10 +630,16 @@ pub fn canonical_compiled_agent_external_quarantine_report(
     let staging_ledger = canonical_compiled_agent_external_submission_staging_ledger()?;
     let promoted_contract = canonical_compiled_agent_promoted_artifact_contract()?;
     let benchmark_run = canonical_compiled_agent_external_benchmark_run()?;
-    let (_, benchmark_review_learning_receipt, _) =
-        build_benchmark_submission_record(&benchmark_run)?;
+    let (_, benchmark_review_learning_receipt, _) = build_benchmark_submission_record_with_payload_ref(
+        String::from("submission.compiled_agent.external_benchmark.alpha.v1"),
+        String::from(COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_FIXTURE_PATH),
+        &benchmark_run,
+    )?;
     let runtime_submission = canonical_compiled_agent_external_runtime_receipt_submission()?;
-    let (_, runtime_learning_receipt, _) = build_runtime_submission_record(&runtime_submission)?;
+    let (_, runtime_learning_receipt, _) = build_runtime_submission_record_with_payload_ref(
+        String::from(COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_FIXTURE_PATH),
+        &runtime_submission,
+    )?;
 
     let mut shadow_assessments = Vec::new();
     shadow_assessments.extend(build_shadow_assessments(
@@ -744,7 +770,9 @@ pub fn verify_compiled_agent_external_intake_fixtures(
     Ok(())
 }
 
-fn build_benchmark_submission_record(
+pub(crate) fn build_benchmark_submission_record_with_payload_ref(
+    submission_id: String,
+    payload_ref: String,
     benchmark_run: &CompiledAgentExternalBenchmarkRun,
 ) -> Result<
     (
@@ -754,7 +782,7 @@ fn build_benchmark_submission_record(
     ),
     CompiledAgentExternalIntakeError,
 > {
-    let contract = canonical_compiled_agent_external_benchmark_kit()?;
+    let contract = retained_compiled_agent_external_benchmark_kit()?;
     let schema_conformant =
         benchmark_run.schema_version == crate::COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_SCHEMA_VERSION;
     let digest_integrity = benchmark_run.run_digest == benchmark_run.stable_digest();
@@ -771,10 +799,7 @@ fn build_benchmark_submission_record(
 
     for row_run in &benchmark_run.row_runs {
         let learning_receipt = build_compiled_agent_learning_receipt_from_source(
-            format!(
-                "{}#{}",
-                COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_FIXTURE_PATH, row_run.row_id
-            )
+            format!("{payload_ref}#{}", row_run.row_id)
             .as_str(),
             &row_run.source_receipt,
             &CompiledAgentReceiptSupervisionLabel {
@@ -807,14 +832,14 @@ fn build_benchmark_submission_record(
         ),
     ];
     let record = CompiledAgentExternalSubmissionRecord {
-        submission_id: String::from("submission.compiled_agent.external_benchmark.alpha.v1"),
+        submission_id,
         submission_kind: CompiledAgentExternalSubmissionKind::BenchmarkRun,
         contributor_id: benchmark_run.contributor.contributor_id.clone(),
         source_machine_id: benchmark_run.contributor.source_machine_id.clone(),
         machine_class: benchmark_run.contributor.machine_class.clone(),
         environment_class: benchmark_run.contributor.environment_class.clone(),
         contract_version: benchmark_run.contributor.contract_version_accepted.clone(),
-        payload_ref: String::from(COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_FIXTURE_PATH),
+        payload_ref,
         payload_schema_version: benchmark_run.schema_version.clone(),
         payload_digest: benchmark_run.run_digest.clone(),
         evidence_class: benchmark_run.evidence_class,
@@ -903,7 +928,8 @@ fn build_invalid_benchmark_submission_record(
     })
 }
 
-fn build_runtime_submission_record(
+pub(crate) fn build_runtime_submission_record_with_payload_ref(
+    payload_ref: String,
     submission: &CompiledAgentExternalRuntimeReceiptSubmission,
 ) -> Result<
     (
@@ -915,7 +941,7 @@ fn build_runtime_submission_record(
 > {
     submission.validate()?;
     let learning_receipt = build_compiled_agent_learning_receipt_from_source(
-        COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_FIXTURE_PATH,
+        payload_ref.as_str(),
         &submission.source_receipt,
         &submission.label,
     )?;
@@ -931,7 +957,7 @@ fn build_runtime_submission_record(
         machine_class: submission.contributor.machine_class.clone(),
         environment_class: submission.contributor.environment_class.clone(),
         contract_version: submission.contributor.contract_version_accepted.clone(),
-        payload_ref: String::from(COMPILED_AGENT_EXTERNAL_RUNTIME_RECEIPT_SUBMISSION_FIXTURE_PATH),
+        payload_ref,
         payload_schema_version: submission.schema_version.clone(),
         payload_digest: submission.payload_digest.clone(),
         evidence_class: submission.evidence_class,
@@ -1006,7 +1032,7 @@ fn build_replay_submission_record(
     })
 }
 
-fn build_shadow_assessments(
+pub(crate) fn build_shadow_assessments(
     submission_id: &str,
     learning_receipt: &crate::CompiledAgentLearningReceipt,
     source_receipt: Option<CompiledAgentSourceReceipt>,
@@ -1058,11 +1084,7 @@ fn build_route_shadow_assessment(
     let (reason, disposition) =
         disagreement_reason(promoted_matches_expected, candidate_matches_expected);
     CompiledAgentExternalShadowAssessment {
-        assessment_id: if submission_id == EXTERNAL_RUNTIME_SUBMISSION_ID {
-            String::from("assessment.compiled_agent.external_runtime.route.v1")
-        } else {
-            String::from("assessment.compiled_agent.external_benchmark.negated_wallet.route.v1")
-        },
+        assessment_id: shadow_assessment_id(submission_id, "route"),
         submission_id: submission_id.to_string(),
         module: CompiledAgentModuleKind::Route,
         source_receipt_id: learning_receipt.receipt_id.clone(),
@@ -1110,13 +1132,7 @@ fn build_grounded_shadow_assessment(
     let (reason, disposition) =
         disagreement_reason(promoted_matches_expected, candidate_matches_expected);
     CompiledAgentExternalShadowAssessment {
-        assessment_id: if submission_id == EXTERNAL_RUNTIME_SUBMISSION_ID {
-            String::from("assessment.compiled_agent.external_runtime.grounded_answer.v1")
-        } else {
-            String::from(
-                "assessment.compiled_agent.external_benchmark.negated_wallet.grounded_answer.v1",
-            )
-        },
+        assessment_id: shadow_assessment_id(submission_id, "grounded_answer"),
         submission_id: submission_id.to_string(),
         module: CompiledAgentModuleKind::GroundedAnswer,
         source_receipt_id: learning_receipt.receipt_id.clone(),
@@ -1155,7 +1171,20 @@ fn build_grounded_shadow_assessment(
     }
 }
 
-fn build_runtime_shadow_compare_receipt(
+pub(crate) fn build_runtime_shadow_compare_receipt_for_fixture(
+    fixture_name: &str,
+    contributor: &CompiledAgentExternalContributorIdentity,
+) -> Result<CompiledAgentSourceReceipt, CompiledAgentExternalIntakeError> {
+    let governed = canonical_compiled_agent_governed_source_receipt(fixture_name)?;
+    let row_id = fixture_name.trim_end_matches(".json").replace('.', "_");
+    build_runtime_shadow_compare_receipt(
+        &governed.source_receipt,
+        row_id.as_str(),
+        contributor,
+    )
+}
+
+pub(crate) fn build_runtime_shadow_compare_receipt(
     promoted_receipt: &CompiledAgentSourceReceipt,
     row_id: &str,
     contributor: &CompiledAgentExternalContributorIdentity,
@@ -1538,6 +1567,25 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     hasher.update(prefix);
     hasher.update(&bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn valid_runtime_submission_id(submission_id: &str) -> bool {
+    !submission_id.is_empty() && submission_id.starts_with("submission.compiled_agent.")
+}
+
+fn valid_staging_ledger_id(ledger_id: &str) -> bool {
+    ledger_id == EXTERNAL_STAGING_LEDGER_ID
+        || ledger_id.starts_with("compiled_agent.tailnet_submission_staging_ledger.")
+}
+
+fn valid_quarantine_report_id(report_id: &str) -> bool {
+    report_id == EXTERNAL_QUARANTINE_REPORT_ID
+        || report_id.starts_with("compiled_agent.tailnet_quarantine_report.")
+}
+
+fn shadow_assessment_id(submission_id: &str, module_label: &str) -> String {
+    let normalized = submission_id.replace('.', "_");
+    format!("assessment.{normalized}.{module_label}.v1")
 }
 
 #[cfg(test)]

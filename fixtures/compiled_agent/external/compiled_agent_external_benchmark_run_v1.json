@@ -14,7 +14,7 @@
     "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
     "attested_at_epoch_ms": 1774800000000
   },
-  "contract_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8",
+  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
   "evidence_class": "learned_lane",
   "externally_sourced": true,
   "accepted_row_ids": [
@@ -184,7 +184,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
                 }
               },
               {
@@ -283,7 +283,7 @@
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for the canonical supported provider-ready path.",
-      "row_digest": "ad6f2f06741884fd6df31b56fe7469027848ddcc4ed86ed62eb86ccba4afb8c9"
+      "row_digest": "b2fbe2c79dfc8b94fe2365749e9a7a8111f5c34454069fadf0bb54561612726a"
     },
     {
       "row_id": "external.provider_blocked.v1",
@@ -445,7 +445,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
                 }
               },
               {
@@ -548,7 +548,7 @@
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for provider-blocked grounding without widening into blocker summaries.",
-      "row_digest": "bc3fef61dc5c8a94f8cf0adee6d8cf0e46f7bb9e324e6d012a2a7c7eb7b94a2e"
+      "row_digest": "1ffbfefedef7f1e845aa24a20749c5f96c088ebb033f4670302ed73f9c4b783e"
     },
     {
       "row_id": "external.wallet_balance.v1",
@@ -706,7 +706,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
                 }
               },
               {
@@ -805,7 +805,7 @@
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for the admitted wallet-balance path under the promoted grounded model.",
-      "row_digest": "4c7ded1ea6868a4f324d44162016b3073f34019d53ec1b645433196a9742d04d"
+      "row_digest": "46faf91c2db77d5f0af25bfc546e767acd9e33fbe70ea6af5456a4480ccbfb76"
     },
     {
       "row_id": "external.wallet_variant.v1",
@@ -963,7 +963,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
                 }
               },
               {
@@ -1062,7 +1062,7 @@
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for a held-out wallet phrasing variation.",
-      "row_digest": "6f7b8fb2b9879061682c70877d7c9631991a0f9c43360a97298d9e0d5bdf24a0"
+      "row_digest": "60175cf08e22c812ca37a2ceb5e7638c53df7a11e853b6140640264d67328dfe"
     },
     {
       "row_id": "external.unsupported_gpu_poem.v1",
@@ -1197,7 +1197,7 @@
                 "confidence": 0.95,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
                 }
               },
               {
@@ -1270,7 +1270,7 @@
       "validator_outcome": "accepted",
       "failure_classes": [],
       "operator_note": "External benchmark row for a clean unsupported refusal outside the admitted family.",
-      "row_digest": "652adff09c571527a39e96d98ce32410bfb7a310e14ae4d097094638d5ae366f"
+      "row_digest": "6d99c432ceeb67ae1fc4ec128ac5568ca99146b994f13813dfd8d58b09e5cf77"
     },
     {
       "row_id": "external.negated_wallet.v1",
@@ -1428,7 +1428,7 @@
                 "confidence": 0.91,
                 "trace": {
                   "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-                  "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+                  "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
                 }
               },
               {
@@ -1534,9 +1534,9 @@
         "unsafe_final_outcome"
       ],
       "operator_note": "External benchmark row that should stay unsupported and expose the retained negated-wallet weakness if it regresses.",
-      "row_digest": "d73e26dce2bdadebb44c3f437df58af7c5e1d336a9147ffc9a5b79460285e700"
+      "row_digest": "1f8b4b68929863709fdb708ba437e536267c1d9d4a30a08ab44c10ca3a896645"
     }
   ],
   "summary": "External benchmark run retained 6 rows for contributor `contrib.external.alpha` with 5 accepted rows and 1 review-required rows on the admitted compiled-agent family.",
-  "run_digest": "0d26ba6d9805902e8d0284883d1c5b79ef3299cfa14d7f8b247d40bca7af6283"
+  "run_digest": "c0f9b4344d94ea41b2134d5ab0e55287675f4c6abe76cd7478a5a96bdaa6694f"
 }

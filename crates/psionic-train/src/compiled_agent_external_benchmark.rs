@@ -52,6 +52,32 @@ const COMPILED_AGENT_EXTERNAL_BENCHMARK_CONTRACT_ID: &str =
 const COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_ID: &str =
     "compiled_agent.external_benchmark_run.v1";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompiledAgentExternalContributorProfile {
+    ExternalAlpha,
+    TailnetM5Mlx,
+    TailnetArchlinuxRtx4080Cuda,
+}
+
+impl CompiledAgentExternalContributorProfile {
+    pub const fn profile_id(self) -> &'static str {
+        match self {
+            Self::ExternalAlpha => "external_alpha",
+            Self::TailnetM5Mlx => "tailnet_m5_mlx",
+            Self::TailnetArchlinuxRtx4080Cuda => "tailnet_archlinux_rtx4080_cuda",
+        }
+    }
+
+    pub const fn display_label(self) -> &'static str {
+        match self {
+            Self::ExternalAlpha => "External Contributor Alpha",
+            Self::TailnetM5Mlx => "Tailnet M5 MLX",
+            Self::TailnetArchlinuxRtx4080Cuda => "Tailnet Archlinux RTX 4080 CUDA",
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum CompiledAgentExternalBenchmarkError {
     #[error("failed to create `{path}`: {error}")]
@@ -306,20 +332,108 @@ pub fn compiled_agent_external_benchmark_run_fixture_path() -> PathBuf {
     repo_relative_path(COMPILED_AGENT_EXTERNAL_BENCHMARK_RUN_FIXTURE_PATH)
 }
 
+pub fn load_compiled_agent_external_benchmark_kit(
+    path: impl AsRef<Path>,
+) -> Result<CompiledAgentExternalBenchmarkKit, CompiledAgentExternalBenchmarkError> {
+    let path = path.as_ref();
+    let bytes = fs::read(path).map_err(|error| CompiledAgentExternalBenchmarkError::Read {
+        path: path.display().to_string(),
+        error,
+    })?;
+    let contract: CompiledAgentExternalBenchmarkKit = serde_json::from_slice(&bytes)?;
+    contract.validate()?;
+    Ok(contract)
+}
+
+pub fn retained_compiled_agent_external_benchmark_kit(
+) -> Result<CompiledAgentExternalBenchmarkKit, CompiledAgentExternalBenchmarkError> {
+    let path = compiled_agent_external_benchmark_kit_fixture_path();
+    if path.exists() {
+        load_compiled_agent_external_benchmark_kit(&path)
+    } else {
+        canonical_compiled_agent_external_benchmark_kit()
+    }
+}
+
 #[must_use]
 pub fn canonical_compiled_agent_external_contributor_identity() -> CompiledAgentExternalContributorIdentity {
-    CompiledAgentExternalContributorIdentity {
-        contributor_id: String::from("contrib.external.alpha"),
-        display_name: String::from("External Contributor Alpha"),
-        source_machine_id: String::from("external.alpha.archlinux.rtx4080"),
-        machine_class: String::from("consumer_gpu"),
-        environment_class: String::from("external_bounded_beta"),
-        declared_capabilities: vec![
-            String::from("compiled_agent_benchmark"),
-            String::from("runtime_receipt_collection"),
-        ],
-        contract_version_accepted: String::from(COMPILED_AGENT_EXTERNAL_BENCHMARK_KIT_SCHEMA_VERSION),
-        attested_at_epoch_ms: 1_774_800_000_000,
+    compiled_agent_external_contributor_identity_for_profile(
+        CompiledAgentExternalContributorProfile::ExternalAlpha,
+    )
+}
+
+#[must_use]
+pub fn compiled_agent_external_contributor_identity_for_profile(
+    profile: CompiledAgentExternalContributorProfile,
+) -> CompiledAgentExternalContributorIdentity {
+    match profile {
+        CompiledAgentExternalContributorProfile::ExternalAlpha => {
+            CompiledAgentExternalContributorIdentity {
+                contributor_id: String::from("contrib.external.alpha"),
+                display_name: String::from("External Contributor Alpha"),
+                source_machine_id: String::from("external.alpha.archlinux.rtx4080"),
+                machine_class: String::from("consumer_gpu"),
+                environment_class: String::from("external_bounded_beta"),
+                declared_capabilities: vec![
+                    String::from("compiled_agent_benchmark"),
+                    String::from("runtime_receipt_collection"),
+                ],
+                contract_version_accepted: String::from(
+                    COMPILED_AGENT_EXTERNAL_BENCHMARK_KIT_SCHEMA_VERSION,
+                ),
+                attested_at_epoch_ms: 1_774_800_000_000,
+            }
+        }
+        CompiledAgentExternalContributorProfile::TailnetM5Mlx => {
+            CompiledAgentExternalContributorIdentity {
+                contributor_id: String::from("contrib.tailnet.m5"),
+                display_name: String::from("Tailnet M5 MLX"),
+                source_machine_id: String::from("tailnet.macbook-pro-m5.mlx"),
+                machine_class: String::from("apple_silicon_mlx"),
+                environment_class: String::from("tailnet_external_beta"),
+                declared_capabilities: vec![
+                    String::from("compiled_agent_benchmark"),
+                    String::from("runtime_receipt_collection"),
+                    String::from("bounded_training_coordination"),
+                ],
+                contract_version_accepted: String::from(
+                    COMPILED_AGENT_EXTERNAL_BENCHMARK_KIT_SCHEMA_VERSION,
+                ),
+                attested_at_epoch_ms: 1_774_900_010_000,
+            }
+        }
+        CompiledAgentExternalContributorProfile::TailnetArchlinuxRtx4080Cuda => {
+            CompiledAgentExternalContributorIdentity {
+                contributor_id: String::from("contrib.tailnet.archlinux_rtx4080"),
+                display_name: String::from("Tailnet Archlinux RTX 4080 CUDA"),
+                source_machine_id: String::from("tailnet.archlinux.rtx4080.cuda"),
+                machine_class: String::from("consumer_gpu_cuda"),
+                environment_class: String::from("tailnet_external_beta"),
+                declared_capabilities: vec![
+                    String::from("compiled_agent_benchmark"),
+                    String::from("runtime_receipt_collection"),
+                    String::from("bounded_module_training"),
+                ],
+                contract_version_accepted: String::from(
+                    COMPILED_AGENT_EXTERNAL_BENCHMARK_KIT_SCHEMA_VERSION,
+                ),
+                attested_at_epoch_ms: 1_774_900_020_000,
+            }
+        }
+    }
+}
+
+#[must_use]
+pub fn compiled_agent_external_contributor_profile_from_id(
+    profile_id: &str,
+) -> Option<CompiledAgentExternalContributorProfile> {
+    match profile_id {
+        "external_alpha" => Some(CompiledAgentExternalContributorProfile::ExternalAlpha),
+        "tailnet_m5_mlx" => Some(CompiledAgentExternalContributorProfile::TailnetM5Mlx),
+        "tailnet_archlinux_rtx4080_cuda" => Some(
+            CompiledAgentExternalContributorProfile::TailnetArchlinuxRtx4080Cuda,
+        ),
+        _ => None,
     }
 }
 
@@ -599,6 +713,7 @@ pub fn run_compiled_agent_external_benchmark_kit(
         let source_receipt = build_external_source_receipt(
             row,
             &row.runtime_state,
+            contributor,
             route_entry,
             tool_policy_entry,
             tool_arguments_entry,
@@ -860,6 +975,7 @@ fn public_response_from_verdict(
 fn build_external_source_receipt(
     row: &CompiledAgentExternalBenchmarkRow,
     runtime_state: &CompiledAgentRuntimeState,
+    contributor: &CompiledAgentExternalContributorIdentity,
     route_entry: &CompiledAgentArtifactContractEntry,
     tool_policy_entry: &CompiledAgentArtifactContractEntry,
     tool_arguments_entry: &CompiledAgentArtifactContractEntry,
@@ -974,7 +1090,7 @@ fn build_external_source_receipt(
     CompiledAgentSourceReceipt {
         schema_version: 1,
         evidence_class: CompiledAgentEvidenceClass::LearnedLane,
-        captured_at_epoch_ms: canonical_compiled_agent_external_contributor_identity().attested_at_epoch_ms,
+        captured_at_epoch_ms: contributor.attested_at_epoch_ms,
         state: runtime_state.clone(),
         run: CompiledAgentSourceRun {
             public_response: public_response.clone(),

@@ -1,0 +1,21 @@
+{
+  "schema_version": "psionic.compiled_agent.tailnet_governed_run.v1",
+  "run_id": "compiled_agent.tailnet_governed_run.v1",
+  "evidence_class": "learned_lane",
+  "local_bundle_digest": "8a1755d9ffaa3af2aff425129dde232b318c8bf839f707324409e4af390b0c3a",
+  "remote_bundle_digest": "c47df518233bd687bd88b442002840f8fedc45960db8298795db8562a097022d",
+  "staging_ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2",
+  "quarantine_report_digest": "90492578580c808d8639f7a920b641fe8e717446509c74e9126d5e0c6d91c6c4",
+  "tailnet_learning_ledger_digest": "f0c2e7cc9a884dec8d030da6f30c7f7155c761415a28d4685501b040b44275a3",
+  "tailnet_replay_bundle_digest": "05889986e497765869edcc8b5edc0066ab4bbe916bb867ec29e2ddf085cb0908",
+  "route_preview_artifact_digest": "6551d2067f7c70b1ccf9afb85ae8db92cb95f7ea21ecf61809a73a2aa742b699",
+  "grounded_preview_artifact_digest": "ac5c75d1d105313b467cb63e824da5fa0b9769d323ff047092c92841ecd61cea",
+  "route_preview_training_accuracy": 1.0,
+  "grounded_preview_training_accuracy": 1.0,
+  "contributor_ids": [
+    "contrib.tailnet.m5",
+    "contrib.tailnet.archlinux_rtx4080"
+  ],
+  "summary": "Tailnet-first governed run retained one shared admitted-family training window across `contrib.tailnet.m5` and `contrib.tailnet.archlinux_rtx4080` with 10 accepted learning receipts, route preview accuracy 1.00, and grounded preview accuracy 1.00.",
+  "run_digest": "dc9ab99b00fa05ae990693b5e758cc728d7d06dcef36bb51b86bf769c7f18b37"
+}

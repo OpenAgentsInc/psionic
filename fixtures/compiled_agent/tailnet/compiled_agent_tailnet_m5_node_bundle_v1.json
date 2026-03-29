@@ -1,0 +1,2410 @@
+{
+  "schema_version": "psionic.compiled_agent.tailnet_node_bundle.v1",
+  "bundle_id": "compiled_agent.tailnet_node_bundle.m5.v1",
+  "contributor_profile": "tailnet_m5_mlx",
+  "contributor": {
+    "contributor_id": "contrib.tailnet.m5",
+    "display_name": "Tailnet M5 MLX",
+    "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+    "machine_class": "apple_silicon_mlx",
+    "environment_class": "tailnet_external_beta",
+    "declared_capabilities": [
+      "compiled_agent_benchmark",
+      "runtime_receipt_collection",
+      "bounded_training_coordination"
+    ],
+    "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+    "attested_at_epoch_ms": 1774900010000
+  },
+  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
+  "evidence_class": "learned_lane",
+  "benchmark_run": {
+    "schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
+    "run_id": "compiled_agent.external_benchmark_run.v1",
+    "contributor": {
+      "contributor_id": "contrib.tailnet.m5",
+      "display_name": "Tailnet M5 MLX",
+      "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+      "machine_class": "apple_silicon_mlx",
+      "environment_class": "tailnet_external_beta",
+      "declared_capabilities": [
+        "compiled_agent_benchmark",
+        "runtime_receipt_collection",
+        "bounded_training_coordination"
+      ],
+      "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "attested_at_epoch_ms": 1774900010000
+    },
+    "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
+    "evidence_class": "learned_lane",
+    "externally_sourced": true,
+    "accepted_row_ids": [
+      "external.provider_ready.v1",
+      "external.provider_blocked.v1",
+      "external.wallet_balance.v1",
+      "external.wallet_variant.v1",
+      "external.unsupported_gpu_poem.v1"
+    ],
+    "review_row_ids": [
+      "external.negated_wallet.v1"
+    ],
+    "row_runs": [
+      {
+        "row_id": "external.provider_ready.v1",
+        "source_receipt": {
+          "schema_version": 1,
+          "evidence_class": "learned_lane",
+          "captured_at_epoch_ms": 1774900010000,
+          "state": {
+            "provider_ready": true,
+            "provider_blockers": [],
+            "wallet_balance_sats": 1200,
+            "recent_earnings_sats": 240
+          },
+          "run": {
+            "public_response": {
+              "kind": "grounded_answer",
+              "response": "Provider is ready to go online."
+            },
+            "internal_trace": {
+              "primary_phases": [
+                {
+                  "phase": "intent_route",
+                  "manifest": {
+                    "module_name": "intent_route",
+                    "signature_name": "intent_route",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Can I go online right now?"
+                  },
+                  "output": {
+                    "route": "provider_status"
+                  },
+                  "confidence": 0.93,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                    "source": "external_benchmark_kit"
+                  }
+                },
+                {
+                  "phase": "tool_policy",
+                  "manifest": {
+                    "module_name": "tool_policy",
+                    "signature_name": "tool_policy",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Can I go online right now?",
+                    "route": "provider_status",
+                    "available_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      },
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "selected_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      }
+                    ]
+                  },
+                  "confidence": 0.92,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "tool_arguments",
+                  "manifest": {
+                    "module_name": "tool_arguments",
+                    "signature_name": "tool_arguments",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Can I go online right now?",
+                    "route": "provider_status",
+                    "selected_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "calls": [
+                      {
+                        "tool_name": "provider_status",
+                        "arguments": {}
+                      }
+                    ]
+                  },
+                  "confidence": 0.96,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "grounded_answer",
+                  "manifest": {
+                    "module_name": "grounded_answer",
+                    "signature_name": "grounded_answer",
+                    "implementation_family": "psionic_grounded_model",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-29",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Can I go online right now?",
+                    "route": "provider_status",
+                    "tool_results": [
+                      {
+                        "tool_name": "provider_status",
+                        "payload": {
+                          "ready": true,
+                          "blockers": []
+                        }
+                      }
+                    ]
+                  },
+                  "output": {
+                    "answer": "Provider is ready to go online.",
+                    "response_kind": "grounded_answer"
+                  },
+                  "confidence": 0.91,
+                  "trace": {
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  }
+                },
+                {
+                  "phase": "verify",
+                  "manifest": {
+                    "module_name": "verify",
+                    "signature_name": "verify",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Can I go online right now?",
+                    "route": "provider_status",
+                    "tool_calls": [
+                      {
+                        "tool_name": "provider_status",
+                        "arguments": {}
+                      }
+                    ],
+                    "tool_results": [
+                      {
+                        "tool_name": "provider_status",
+                        "payload": {
+                          "ready": true,
+                          "blockers": []
+                        }
+                      }
+                    ],
+                    "candidate_answer": "Provider is ready to go online."
+                  },
+                  "output": {
+                    "verdict": "accept_grounded_answer"
+                  },
+                  "confidence": 0.9,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                }
+              ],
+              "shadow_phases": []
+            },
+            "lineage": {
+              "user_request": "Can I go online right now?",
+              "route": "provider_status",
+              "tool_calls": [
+                {
+                  "tool_name": "provider_status",
+                  "arguments": {}
+                }
+              ],
+              "tool_results": [
+                {
+                  "tool_name": "provider_status",
+                  "payload": {
+                    "ready": true,
+                    "blockers": []
+                  }
+                }
+              ],
+              "public_response": {
+                "kind": "grounded_answer",
+                "response": "Provider is ready to go online."
+              },
+              "authority_manifest_ids": [
+                "intent_route:psionic_rule_revision:promoted:2026-03-28",
+                "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+                "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+                "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+                "verify:psionic_rule_revision:promoted:2026-03-28"
+              ],
+              "shadow_manifest_ids": []
+            }
+          }
+        },
+        "expected_route": "provider_status",
+        "expected_public_response": {
+          "kind": "grounded_answer",
+          "response": "Provider is ready to go online."
+        },
+        "corpus_split": "training",
+        "tags": [
+          "external",
+          "benchmark",
+          "provider",
+          "training"
+        ],
+        "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+        "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "primary_confidence": 0.9,
+        "validator_outcome": "accepted",
+        "failure_classes": [],
+        "operator_note": "External benchmark row for the canonical supported provider-ready path.",
+        "row_digest": "81f5452e0ad842c38a30e6b1df0b72bf3f17944d25da9509b0e521905a7c9652"
+      },
+      {
+        "row_id": "external.provider_blocked.v1",
+        "source_receipt": {
+          "schema_version": 1,
+          "evidence_class": "learned_lane",
+          "captured_at_epoch_ms": 1774900010000,
+          "state": {
+            "provider_ready": false,
+            "provider_blockers": [
+              "wallet_locked"
+            ],
+            "wallet_balance_sats": 1200,
+            "recent_earnings_sats": 240
+          },
+          "run": {
+            "public_response": {
+              "kind": "grounded_answer",
+              "response": "Provider is not ready to go online."
+            },
+            "internal_trace": {
+              "primary_phases": [
+                {
+                  "phase": "intent_route",
+                  "manifest": {
+                    "module_name": "intent_route",
+                    "signature_name": "intent_route",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Why can't I go online yet?"
+                  },
+                  "output": {
+                    "route": "provider_status"
+                  },
+                  "confidence": 0.93,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                    "source": "external_benchmark_kit"
+                  }
+                },
+                {
+                  "phase": "tool_policy",
+                  "manifest": {
+                    "module_name": "tool_policy",
+                    "signature_name": "tool_policy",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Why can't I go online yet?",
+                    "route": "provider_status",
+                    "available_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      },
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "selected_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      }
+                    ]
+                  },
+                  "confidence": 0.92,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "tool_arguments",
+                  "manifest": {
+                    "module_name": "tool_arguments",
+                    "signature_name": "tool_arguments",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Why can't I go online yet?",
+                    "route": "provider_status",
+                    "selected_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "calls": [
+                      {
+                        "tool_name": "provider_status",
+                        "arguments": {}
+                      }
+                    ]
+                  },
+                  "confidence": 0.96,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "grounded_answer",
+                  "manifest": {
+                    "module_name": "grounded_answer",
+                    "signature_name": "grounded_answer",
+                    "implementation_family": "psionic_grounded_model",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-29",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Why can't I go online yet?",
+                    "route": "provider_status",
+                    "tool_results": [
+                      {
+                        "tool_name": "provider_status",
+                        "payload": {
+                          "ready": false,
+                          "blockers": [
+                            "wallet_locked"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "output": {
+                    "answer": "Provider is not ready to go online.",
+                    "response_kind": "grounded_answer"
+                  },
+                  "confidence": 0.91,
+                  "trace": {
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  }
+                },
+                {
+                  "phase": "verify",
+                  "manifest": {
+                    "module_name": "verify",
+                    "signature_name": "verify",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Why can't I go online yet?",
+                    "route": "provider_status",
+                    "tool_calls": [
+                      {
+                        "tool_name": "provider_status",
+                        "arguments": {}
+                      }
+                    ],
+                    "tool_results": [
+                      {
+                        "tool_name": "provider_status",
+                        "payload": {
+                          "ready": false,
+                          "blockers": [
+                            "wallet_locked"
+                          ]
+                        }
+                      }
+                    ],
+                    "candidate_answer": "Provider is not ready to go online."
+                  },
+                  "output": {
+                    "verdict": "accept_grounded_answer"
+                  },
+                  "confidence": 0.9,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                }
+              ],
+              "shadow_phases": []
+            },
+            "lineage": {
+              "user_request": "Why can't I go online yet?",
+              "route": "provider_status",
+              "tool_calls": [
+                {
+                  "tool_name": "provider_status",
+                  "arguments": {}
+                }
+              ],
+              "tool_results": [
+                {
+                  "tool_name": "provider_status",
+                  "payload": {
+                    "ready": false,
+                    "blockers": [
+                      "wallet_locked"
+                    ]
+                  }
+                }
+              ],
+              "public_response": {
+                "kind": "grounded_answer",
+                "response": "Provider is not ready to go online."
+              },
+              "authority_manifest_ids": [
+                "intent_route:psionic_rule_revision:promoted:2026-03-28",
+                "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+                "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+                "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+                "verify:psionic_rule_revision:promoted:2026-03-28"
+              ],
+              "shadow_manifest_ids": []
+            }
+          }
+        },
+        "expected_route": "provider_status",
+        "expected_public_response": {
+          "kind": "grounded_answer",
+          "response": "Provider is not ready to go online."
+        },
+        "corpus_split": "held_out",
+        "tags": [
+          "external",
+          "benchmark",
+          "provider",
+          "held_out"
+        ],
+        "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+        "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "primary_confidence": 0.9,
+        "validator_outcome": "accepted",
+        "failure_classes": [],
+        "operator_note": "External benchmark row for provider-blocked grounding without widening into blocker summaries.",
+        "row_digest": "4678f846045998c81dde450f95fbe356dbb449c4548a4aa1eab5a9f572c88ad0"
+      },
+      {
+        "row_id": "external.wallet_balance.v1",
+        "source_receipt": {
+          "schema_version": 1,
+          "evidence_class": "learned_lane",
+          "captured_at_epoch_ms": 1774900010000,
+          "state": {
+            "provider_ready": true,
+            "provider_blockers": [],
+            "wallet_balance_sats": 1200,
+            "recent_earnings_sats": 240
+          },
+          "run": {
+            "public_response": {
+              "kind": "grounded_answer",
+              "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+            },
+            "internal_trace": {
+              "primary_phases": [
+                {
+                  "phase": "intent_route",
+                  "manifest": {
+                    "module_name": "intent_route",
+                    "signature_name": "intent_route",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "How many sats are in the wallet?"
+                  },
+                  "output": {
+                    "route": "wallet_status"
+                  },
+                  "confidence": 0.93,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                    "source": "external_benchmark_kit"
+                  }
+                },
+                {
+                  "phase": "tool_policy",
+                  "manifest": {
+                    "module_name": "tool_policy",
+                    "signature_name": "tool_policy",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "How many sats are in the wallet?",
+                    "route": "wallet_status",
+                    "available_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      },
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "selected_tools": [
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "confidence": 0.92,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "tool_arguments",
+                  "manifest": {
+                    "module_name": "tool_arguments",
+                    "signature_name": "tool_arguments",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "How many sats are in the wallet?",
+                    "route": "wallet_status",
+                    "selected_tools": [
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "calls": [
+                      {
+                        "tool_name": "wallet_status",
+                        "arguments": {}
+                      }
+                    ]
+                  },
+                  "confidence": 0.96,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "grounded_answer",
+                  "manifest": {
+                    "module_name": "grounded_answer",
+                    "signature_name": "grounded_answer",
+                    "implementation_family": "psionic_grounded_model",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-29",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "How many sats are in the wallet?",
+                    "route": "wallet_status",
+                    "tool_results": [
+                      {
+                        "tool_name": "wallet_status",
+                        "payload": {
+                          "balance_sats": 1200,
+                          "recent_earnings_sats": 240
+                        }
+                      }
+                    ]
+                  },
+                  "output": {
+                    "answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
+                    "response_kind": "grounded_answer"
+                  },
+                  "confidence": 0.91,
+                  "trace": {
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  }
+                },
+                {
+                  "phase": "verify",
+                  "manifest": {
+                    "module_name": "verify",
+                    "signature_name": "verify",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "How many sats are in the wallet?",
+                    "route": "wallet_status",
+                    "tool_calls": [
+                      {
+                        "tool_name": "wallet_status",
+                        "arguments": {}
+                      }
+                    ],
+                    "tool_results": [
+                      {
+                        "tool_name": "wallet_status",
+                        "payload": {
+                          "balance_sats": 1200,
+                          "recent_earnings_sats": 240
+                        }
+                      }
+                    ],
+                    "candidate_answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+                  },
+                  "output": {
+                    "verdict": "accept_grounded_answer"
+                  },
+                  "confidence": 0.9,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                }
+              ],
+              "shadow_phases": []
+            },
+            "lineage": {
+              "user_request": "How many sats are in the wallet?",
+              "route": "wallet_status",
+              "tool_calls": [
+                {
+                  "tool_name": "wallet_status",
+                  "arguments": {}
+                }
+              ],
+              "tool_results": [
+                {
+                  "tool_name": "wallet_status",
+                  "payload": {
+                    "balance_sats": 1200,
+                    "recent_earnings_sats": 240
+                  }
+                }
+              ],
+              "public_response": {
+                "kind": "grounded_answer",
+                "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+              },
+              "authority_manifest_ids": [
+                "intent_route:psionic_rule_revision:promoted:2026-03-28",
+                "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+                "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+                "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+                "verify:psionic_rule_revision:promoted:2026-03-28"
+              ],
+              "shadow_manifest_ids": []
+            }
+          }
+        },
+        "expected_route": "wallet_status",
+        "expected_public_response": {
+          "kind": "grounded_answer",
+          "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+        },
+        "corpus_split": "training",
+        "tags": [
+          "external",
+          "benchmark",
+          "wallet",
+          "training"
+        ],
+        "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+        "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "primary_confidence": 0.9,
+        "validator_outcome": "accepted",
+        "failure_classes": [],
+        "operator_note": "External benchmark row for the admitted wallet-balance path under the promoted grounded model.",
+        "row_digest": "6891d912490387b5045406a883b47925b9f2a8783bfaa7e0b702817a47aed388"
+      },
+      {
+        "row_id": "external.wallet_variant.v1",
+        "source_receipt": {
+          "schema_version": 1,
+          "evidence_class": "learned_lane",
+          "captured_at_epoch_ms": 1774900010000,
+          "state": {
+            "provider_ready": true,
+            "provider_blockers": [],
+            "wallet_balance_sats": 3400,
+            "recent_earnings_sats": 180
+          },
+          "run": {
+            "public_response": {
+              "kind": "grounded_answer",
+              "response": "Wallet balance is 3400 sats, with 180 sats of recent earnings."
+            },
+            "internal_trace": {
+              "primary_phases": [
+                {
+                  "phase": "intent_route",
+                  "manifest": {
+                    "module_name": "intent_route",
+                    "signature_name": "intent_route",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What's the wallet balance in sats?"
+                  },
+                  "output": {
+                    "route": "wallet_status"
+                  },
+                  "confidence": 0.93,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                    "source": "external_benchmark_kit"
+                  }
+                },
+                {
+                  "phase": "tool_policy",
+                  "manifest": {
+                    "module_name": "tool_policy",
+                    "signature_name": "tool_policy",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What's the wallet balance in sats?",
+                    "route": "wallet_status",
+                    "available_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      },
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "selected_tools": [
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "confidence": 0.92,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "tool_arguments",
+                  "manifest": {
+                    "module_name": "tool_arguments",
+                    "signature_name": "tool_arguments",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What's the wallet balance in sats?",
+                    "route": "wallet_status",
+                    "selected_tools": [
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "calls": [
+                      {
+                        "tool_name": "wallet_status",
+                        "arguments": {}
+                      }
+                    ]
+                  },
+                  "confidence": 0.96,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "grounded_answer",
+                  "manifest": {
+                    "module_name": "grounded_answer",
+                    "signature_name": "grounded_answer",
+                    "implementation_family": "psionic_grounded_model",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-29",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What's the wallet balance in sats?",
+                    "route": "wallet_status",
+                    "tool_results": [
+                      {
+                        "tool_name": "wallet_status",
+                        "payload": {
+                          "balance_sats": 3400,
+                          "recent_earnings_sats": 180
+                        }
+                      }
+                    ]
+                  },
+                  "output": {
+                    "answer": "Wallet balance is 3400 sats, with 180 sats of recent earnings.",
+                    "response_kind": "grounded_answer"
+                  },
+                  "confidence": 0.91,
+                  "trace": {
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  }
+                },
+                {
+                  "phase": "verify",
+                  "manifest": {
+                    "module_name": "verify",
+                    "signature_name": "verify",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What's the wallet balance in sats?",
+                    "route": "wallet_status",
+                    "tool_calls": [
+                      {
+                        "tool_name": "wallet_status",
+                        "arguments": {}
+                      }
+                    ],
+                    "tool_results": [
+                      {
+                        "tool_name": "wallet_status",
+                        "payload": {
+                          "balance_sats": 3400,
+                          "recent_earnings_sats": 180
+                        }
+                      }
+                    ],
+                    "candidate_answer": "Wallet balance is 3400 sats, with 180 sats of recent earnings."
+                  },
+                  "output": {
+                    "verdict": "accept_grounded_answer"
+                  },
+                  "confidence": 0.9,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                }
+              ],
+              "shadow_phases": []
+            },
+            "lineage": {
+              "user_request": "What's the wallet balance in sats?",
+              "route": "wallet_status",
+              "tool_calls": [
+                {
+                  "tool_name": "wallet_status",
+                  "arguments": {}
+                }
+              ],
+              "tool_results": [
+                {
+                  "tool_name": "wallet_status",
+                  "payload": {
+                    "balance_sats": 3400,
+                    "recent_earnings_sats": 180
+                  }
+                }
+              ],
+              "public_response": {
+                "kind": "grounded_answer",
+                "response": "Wallet balance is 3400 sats, with 180 sats of recent earnings."
+              },
+              "authority_manifest_ids": [
+                "intent_route:psionic_rule_revision:promoted:2026-03-28",
+                "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+                "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+                "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+                "verify:psionic_rule_revision:promoted:2026-03-28"
+              ],
+              "shadow_manifest_ids": []
+            }
+          }
+        },
+        "expected_route": "wallet_status",
+        "expected_public_response": {
+          "kind": "grounded_answer",
+          "response": "Wallet balance is 3400 sats, with 180 sats of recent earnings."
+        },
+        "corpus_split": "held_out",
+        "tags": [
+          "external",
+          "benchmark",
+          "wallet",
+          "held_out"
+        ],
+        "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+        "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "primary_confidence": 0.9,
+        "validator_outcome": "accepted",
+        "failure_classes": [],
+        "operator_note": "External benchmark row for a held-out wallet phrasing variation.",
+        "row_digest": "277fa3c565155528a93e156c48fbf9fe8acf40be2236d56cc9148b5a044b9aa7"
+      },
+      {
+        "row_id": "external.unsupported_gpu_poem.v1",
+        "source_receipt": {
+          "schema_version": 1,
+          "evidence_class": "learned_lane",
+          "captured_at_epoch_ms": 1774900010000,
+          "state": {
+            "provider_ready": true,
+            "provider_blockers": [],
+            "wallet_balance_sats": 1200,
+            "recent_earnings_sats": 240
+          },
+          "run": {
+            "public_response": {
+              "kind": "unsupported_refusal",
+              "response": "I can currently answer only provider readiness and wallet balance questions."
+            },
+            "internal_trace": {
+              "primary_phases": [
+                {
+                  "phase": "intent_route",
+                  "manifest": {
+                    "module_name": "intent_route",
+                    "signature_name": "intent_route",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Write a poem about GPUs."
+                  },
+                  "output": {
+                    "route": "unsupported"
+                  },
+                  "confidence": 0.88,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                    "source": "external_benchmark_kit"
+                  }
+                },
+                {
+                  "phase": "tool_policy",
+                  "manifest": {
+                    "module_name": "tool_policy",
+                    "signature_name": "tool_policy",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Write a poem about GPUs.",
+                    "route": "unsupported",
+                    "available_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      },
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "selected_tools": []
+                  },
+                  "confidence": 0.92,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "tool_arguments",
+                  "manifest": {
+                    "module_name": "tool_arguments",
+                    "signature_name": "tool_arguments",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Write a poem about GPUs.",
+                    "route": "unsupported",
+                    "selected_tools": []
+                  },
+                  "output": {
+                    "calls": []
+                  },
+                  "confidence": 0.96,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "grounded_answer",
+                  "manifest": {
+                    "module_name": "grounded_answer",
+                    "signature_name": "grounded_answer",
+                    "implementation_family": "psionic_grounded_model",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-29",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Write a poem about GPUs.",
+                    "route": "unsupported",
+                    "tool_results": []
+                  },
+                  "output": {
+                    "answer": "I can currently answer only provider readiness and wallet balance questions.",
+                    "response_kind": "unsupported_refusal"
+                  },
+                  "confidence": 0.95,
+                  "trace": {
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  }
+                },
+                {
+                  "phase": "verify",
+                  "manifest": {
+                    "module_name": "verify",
+                    "signature_name": "verify",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "Write a poem about GPUs.",
+                    "route": "unsupported",
+                    "tool_calls": [],
+                    "tool_results": [],
+                    "candidate_answer": "I can currently answer only provider readiness and wallet balance questions."
+                  },
+                  "output": {
+                    "verdict": "unsupported_refusal"
+                  },
+                  "confidence": 0.9,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                }
+              ],
+              "shadow_phases": []
+            },
+            "lineage": {
+              "user_request": "Write a poem about GPUs.",
+              "route": "unsupported",
+              "tool_calls": [],
+              "tool_results": [],
+              "public_response": {
+                "kind": "unsupported_refusal",
+                "response": "I can currently answer only provider readiness and wallet balance questions."
+              },
+              "authority_manifest_ids": [
+                "intent_route:psionic_rule_revision:promoted:2026-03-28",
+                "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+                "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+                "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+                "verify:psionic_rule_revision:promoted:2026-03-28"
+              ],
+              "shadow_manifest_ids": []
+            }
+          }
+        },
+        "expected_route": "unsupported",
+        "expected_public_response": {
+          "kind": "unsupported_refusal",
+          "response": "I can currently answer only provider readiness and wallet balance questions."
+        },
+        "corpus_split": "training",
+        "tags": [
+          "external",
+          "benchmark",
+          "unsupported",
+          "training"
+        ],
+        "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+        "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "primary_confidence": 0.88,
+        "validator_outcome": "accepted",
+        "failure_classes": [],
+        "operator_note": "External benchmark row for a clean unsupported refusal outside the admitted family.",
+        "row_digest": "7c7a4a13cb4614c6f92d01a96ef8bc6018a78dd267be597b6f77c90950aece7e"
+      },
+      {
+        "row_id": "external.negated_wallet.v1",
+        "source_receipt": {
+          "schema_version": 1,
+          "evidence_class": "learned_lane",
+          "captured_at_epoch_ms": 1774900010000,
+          "state": {
+            "provider_ready": true,
+            "provider_blockers": [],
+            "wallet_balance_sats": 1200,
+            "recent_earnings_sats": 240
+          },
+          "run": {
+            "public_response": {
+              "kind": "grounded_answer",
+              "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+            },
+            "internal_trace": {
+              "primary_phases": [
+                {
+                  "phase": "intent_route",
+                  "manifest": {
+                    "module_name": "intent_route",
+                    "signature_name": "intent_route",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What is not my wallet balance?"
+                  },
+                  "output": {
+                    "route": "wallet_status"
+                  },
+                  "confidence": 0.79,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.route",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
+                    "source": "external_benchmark_kit"
+                  }
+                },
+                {
+                  "phase": "tool_policy",
+                  "manifest": {
+                    "module_name": "tool_policy",
+                    "signature_name": "tool_policy",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What is not my wallet balance?",
+                    "route": "wallet_status",
+                    "available_tools": [
+                      {
+                        "name": "provider_status",
+                        "description": "Read provider readiness and blocker state."
+                      },
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "selected_tools": [
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "confidence": 0.92,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "tool_arguments",
+                  "manifest": {
+                    "module_name": "tool_arguments",
+                    "signature_name": "tool_arguments",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.8
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What is not my wallet balance?",
+                    "route": "wallet_status",
+                    "selected_tools": [
+                      {
+                        "name": "wallet_status",
+                        "description": "Read wallet balance and recent earnings."
+                      }
+                    ]
+                  },
+                  "output": {
+                    "calls": [
+                      {
+                        "tool_name": "wallet_status",
+                        "arguments": {}
+                      }
+                    ]
+                  },
+                  "confidence": 0.96,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                },
+                {
+                  "phase": "grounded_answer",
+                  "manifest": {
+                    "module_name": "grounded_answer",
+                    "signature_name": "grounded_answer",
+                    "implementation_family": "psionic_grounded_model",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-29",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What is not my wallet balance?",
+                    "route": "wallet_status",
+                    "tool_results": [
+                      {
+                        "tool_name": "wallet_status",
+                        "payload": {
+                          "balance_sats": 1200,
+                          "recent_earnings_sats": 240
+                        }
+                      }
+                    ]
+                  },
+                  "output": {
+                    "answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
+                    "response_kind": "grounded_answer"
+                  },
+                  "confidence": 0.91,
+                  "trace": {
+                    "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+                    "artifact_digest": "99445573706679cd9d19d322e6c7140a7754d292294361dc0db1a7e58f091487"
+                  }
+                },
+                {
+                  "phase": "verify",
+                  "manifest": {
+                    "module_name": "verify",
+                    "signature_name": "verify",
+                    "implementation_family": "psionic_rule_revision",
+                    "implementation_label": "promoted",
+                    "version": "2026-03-28",
+                    "promotion_state": "promoted",
+                    "confidence_floor": 0.82
+                  },
+                  "authority": "promoted",
+                  "candidate_label": null,
+                  "input": {
+                    "user_request": "What is not my wallet balance?",
+                    "route": "wallet_status",
+                    "tool_calls": [
+                      {
+                        "tool_name": "wallet_status",
+                        "arguments": {}
+                      }
+                    ],
+                    "tool_results": [
+                      {
+                        "tool_name": "wallet_status",
+                        "payload": {
+                          "balance_sats": 1200,
+                          "recent_earnings_sats": 240
+                        }
+                      }
+                    ],
+                    "candidate_answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+                  },
+                  "output": {
+                    "verdict": "accept_grounded_answer"
+                  },
+                  "confidence": 0.9,
+                  "trace": {
+                    "artifact_id": "compiled_agent.baseline.rule_v1.verify",
+                    "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+                  }
+                }
+              ],
+              "shadow_phases": []
+            },
+            "lineage": {
+              "user_request": "What is not my wallet balance?",
+              "route": "wallet_status",
+              "tool_calls": [
+                {
+                  "tool_name": "wallet_status",
+                  "arguments": {}
+                }
+              ],
+              "tool_results": [
+                {
+                  "tool_name": "wallet_status",
+                  "payload": {
+                    "balance_sats": 1200,
+                    "recent_earnings_sats": 240
+                  }
+                }
+              ],
+              "public_response": {
+                "kind": "grounded_answer",
+                "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+              },
+              "authority_manifest_ids": [
+                "intent_route:psionic_rule_revision:promoted:2026-03-28",
+                "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+                "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+                "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+                "verify:psionic_rule_revision:promoted:2026-03-28"
+              ],
+              "shadow_manifest_ids": []
+            }
+          }
+        },
+        "expected_route": "unsupported",
+        "expected_public_response": {
+          "kind": "unsupported_refusal",
+          "response": "I can currently answer only provider readiness and wallet balance questions."
+        },
+        "corpus_split": "held_out",
+        "tags": [
+          "external",
+          "benchmark",
+          "wallet",
+          "negated",
+          "held_out"
+        ],
+        "route_artifact_id": "compiled_agent.baseline.rule_v1.route",
+        "grounded_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+        "primary_confidence": 0.79,
+        "validator_outcome": "review_required",
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ],
+        "operator_note": "External benchmark row that should stay unsupported and expose the retained negated-wallet weakness if it regresses.",
+        "row_digest": "9e8bf9f28405d70716fc7ba3c14c2416ddc96159df9d8fcb84e5fdc7b258f23f"
+      }
+    ],
+    "summary": "External benchmark run retained 6 rows for contributor `contrib.tailnet.m5` with 5 accepted rows and 1 review-required rows on the admitted compiled-agent family.",
+    "run_digest": "70cbaaeec8a1e7fc63755661b41c47da1a5b17830ad1b933c4b3eb2e7ea12288"
+  },
+  "runtime_submissions": [
+    {
+      "schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+      "contributor": {
+        "contributor_id": "contrib.tailnet.m5",
+        "display_name": "Tailnet M5 MLX",
+        "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+        "machine_class": "apple_silicon_mlx",
+        "environment_class": "tailnet_external_beta",
+        "declared_capabilities": [
+          "compiled_agent_benchmark",
+          "runtime_receipt_collection",
+          "bounded_training_coordination"
+        ],
+        "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+        "attested_at_epoch_ms": 1774900010000
+      },
+      "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
+      "evidence_class": "learned_lane",
+      "source_receipt": {
+        "schema_version": 1,
+        "evidence_class": "learned_lane",
+        "captured_at_epoch_ms": 1774900010011,
+        "state": {
+          "provider_ready": true,
+          "provider_blockers": [],
+          "wallet_balance_sats": 1200,
+          "recent_earnings_sats": 240
+        },
+        "run": {
+          "public_response": {
+            "kind": "unsupported_refusal",
+            "response": "I can currently answer only provider readiness and wallet balance questions."
+          },
+          "internal_trace": {
+            "primary_phases": [
+              {
+                "phase": "intent_route",
+                "manifest": {
+                  "module_name": "intent_route",
+                  "signature_name": "intent_route",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?"
+                },
+                "output": {
+                  "route": "unsupported",
+                  "rationale": "captured authority route for openagents_wallet_provider_compare_heldout_receipt_v1"
+                },
+                "confidence": 0.84,
+                "trace": {
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "captured_from_runtime": true
+                }
+              },
+              {
+                "phase": "tool_policy",
+                "manifest": {
+                  "module_name": "tool_policy",
+                  "signature_name": "tool_policy",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "available_tools": [
+                    {
+                      "name": "provider_status",
+                      "description": "Read provider readiness and blocker state."
+                    },
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ]
+                },
+                "output": {
+                  "selected_tools": [],
+                  "rationale": "captured authority tool policy"
+                },
+                "confidence": 0.92,
+                "trace": {
+                  "route": "unsupported",
+                  "captured_from_runtime": true
+                }
+              },
+              {
+                "phase": "tool_arguments",
+                "manifest": {
+                  "module_name": "tool_arguments",
+                  "signature_name": "tool_arguments",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "selected_tools": []
+                },
+                "output": {
+                  "calls": []
+                },
+                "confidence": 0.96,
+                "trace": {
+                  "tool_count": 0,
+                  "captured_from_runtime": true
+                }
+              },
+              {
+                "phase": "grounded_answer",
+                "manifest": {
+                  "module_name": "grounded_answer",
+                  "signature_name": "grounded_answer",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.82
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "tool_results": []
+                },
+                "output": {
+                  "answer": "I can currently answer only provider readiness and wallet balance questions.",
+                  "grounded_tool_names": []
+                },
+                "confidence": 0.94,
+                "trace": {
+                  "captured_from_runtime": true,
+                  "response_kind": "unsupported_refusal"
+                }
+              },
+              {
+                "phase": "verify",
+                "manifest": {
+                  "module_name": "verify",
+                  "signature_name": "verify",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.82
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "tool_calls": [],
+                  "tool_results": [],
+                  "candidate_answer": "I can currently answer only provider readiness and wallet balance questions."
+                },
+                "output": {
+                  "verdict": "unsupported_refusal",
+                  "rationale": "captured authority verify verdict"
+                },
+                "confidence": 0.94,
+                "trace": {
+                  "captured_from_runtime": true
+                }
+              }
+            ],
+            "shadow_phases": [
+              {
+                "phase": "intent_route",
+                "manifest": {
+                  "module_name": "intent_route",
+                  "signature_name": "intent_route",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
+                  "promotion_state": "candidate",
+                  "confidence_floor": 0.8
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?"
+                },
+                "output": {
+                  "route": "unsupported"
+                },
+                "confidence": 0.9999978,
+                "trace": {
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2a444268542969ebd4c964b826a4e5a4efcb65dc3468835e8d82e4c36036cafc",
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_provider_compare_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "tool_policy",
+                "manifest": {
+                  "module_name": "tool_policy",
+                  "signature_name": "tool_policy",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "available_tools": [
+                    {
+                      "name": "provider_status",
+                      "description": "Read provider readiness and blocker state."
+                    },
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ]
+                },
+                "output": {
+                  "selected_tools": []
+                },
+                "confidence": 0.9,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_provider_compare_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "tool_arguments",
+                "manifest": {
+                  "module_name": "tool_arguments",
+                  "signature_name": "tool_arguments",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "selected_tools": []
+                },
+                "output": {
+                  "calls": []
+                },
+                "confidence": 0.92,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_provider_compare_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "grounded_answer",
+                "manifest": {
+                  "module_name": "grounded_answer",
+                  "signature_name": "grounded_answer",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "last_known_good",
+                  "version": "2026-03-28",
+                  "promotion_state": "candidate",
+                  "confidence_floor": 0.82
+                },
+                "authority": "shadow",
+                "candidate_label": "last_known_good",
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "tool_results": []
+                },
+                "output": {
+                  "answer": "I can currently answer only provider readiness and wallet balance questions.",
+                  "response_kind": "unsupported_refusal"
+                },
+                "confidence": 0.78,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_provider_compare_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "verify",
+                "manifest": {
+                  "module_name": "verify",
+                  "signature_name": "verify",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.82
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "Should I go online first or wait until the wallet grows?",
+                  "route": "unsupported",
+                  "tool_calls": [],
+                  "tool_results": [],
+                  "candidate_answer": "I can currently answer only provider readiness and wallet balance questions."
+                },
+                "output": {
+                  "verdict": "unsupported_refusal"
+                },
+                "confidence": 0.81,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_provider_compare_heldout_receipt_v1"
+                }
+              }
+            ]
+          },
+          "lineage": {
+            "user_request": "Should I go online first or wait until the wallet grows?",
+            "route": "unsupported",
+            "tool_calls": [],
+            "tool_results": [],
+            "public_response": {
+              "kind": "unsupported_refusal",
+              "response": "I can currently answer only provider readiness and wallet balance questions."
+            },
+            "authority_manifest_ids": [
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+              "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+              "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+              "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+              "verify:psionic_rule_revision:promoted:2026-03-28"
+            ],
+            "shadow_manifest_ids": [
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+              "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+              "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+              "grounded_answer:psionic_rule_revision:last_known_good:2026-03-28",
+              "verify:psionic_rule_revision:promoted:2026-03-28"
+            ]
+          }
+        }
+      },
+      "label": {
+        "expected_route": "unsupported",
+        "expected_public_response": {
+          "kind": "unsupported_refusal",
+          "response": "I can currently answer only provider readiness and wallet balance questions."
+        },
+        "corpus_split": "training",
+        "tags": [
+          "external",
+          "tailnet",
+          "runtime",
+          "tailnet_m5_mlx",
+          "route_ambiguity"
+        ],
+        "operator_note": "Tailnet-first runtime disagreement receipt from `tailnet.macbook-pro-m5.mlx` on fixture `openagents_wallet_provider_compare_heldout_receipt_v1.json`."
+      },
+      "detail": "This Tailnet-first runtime receipt preserves contributor identity `contrib.tailnet.m5` and machine class `apple_silicon_mlx` while keeping disagreement evidence in the governed external contract.",
+      "payload_digest": "ebb9e8608f7ac9634d57b5565f935e02701a2c6998f6e673e94b781a4775c31d"
+    },
+    {
+      "schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+      "contributor": {
+        "contributor_id": "contrib.tailnet.m5",
+        "display_name": "Tailnet M5 MLX",
+        "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+        "machine_class": "apple_silicon_mlx",
+        "environment_class": "tailnet_external_beta",
+        "declared_capabilities": [
+          "compiled_agent_benchmark",
+          "runtime_receipt_collection",
+          "bounded_training_coordination"
+        ],
+        "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
+        "attested_at_epoch_ms": 1774900010000
+      },
+      "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
+      "evidence_class": "learned_lane",
+      "source_receipt": {
+        "schema_version": 1,
+        "evidence_class": "learned_lane",
+        "captured_at_epoch_ms": 1774900010011,
+        "state": {
+          "provider_ready": true,
+          "provider_blockers": [],
+          "wallet_balance_sats": 1200,
+          "recent_earnings_sats": 240
+        },
+        "run": {
+          "public_response": {
+            "kind": "grounded_answer",
+            "response": "The wallet contains 1200 sats."
+          },
+          "internal_trace": {
+            "primary_phases": [
+              {
+                "phase": "intent_route",
+                "manifest": {
+                  "module_name": "intent_route",
+                  "signature_name": "intent_route",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?"
+                },
+                "output": {
+                  "route": "wallet_status",
+                  "rationale": "captured authority route for openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+                },
+                "confidence": 0.94,
+                "trace": {
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "captured_from_runtime": true
+                }
+              },
+              {
+                "phase": "tool_policy",
+                "manifest": {
+                  "module_name": "tool_policy",
+                  "signature_name": "tool_policy",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "available_tools": [
+                    {
+                      "name": "provider_status",
+                      "description": "Read provider readiness and blocker state."
+                    },
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ]
+                },
+                "output": {
+                  "selected_tools": [
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ],
+                  "rationale": "captured authority tool policy"
+                },
+                "confidence": 0.92,
+                "trace": {
+                  "route": "wallet_status",
+                  "captured_from_runtime": true
+                }
+              },
+              {
+                "phase": "tool_arguments",
+                "manifest": {
+                  "module_name": "tool_arguments",
+                  "signature_name": "tool_arguments",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "selected_tools": [
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ]
+                },
+                "output": {
+                  "calls": [
+                    {
+                      "tool_name": "wallet_status",
+                      "arguments": {}
+                    }
+                  ]
+                },
+                "confidence": 0.96,
+                "trace": {
+                  "tool_count": 1,
+                  "captured_from_runtime": true
+                }
+              },
+              {
+                "phase": "grounded_answer",
+                "manifest": {
+                  "module_name": "grounded_answer",
+                  "signature_name": "grounded_answer",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.82
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "tool_results": [
+                    {
+                      "tool_name": "wallet_status",
+                      "payload": {
+                        "balance_sats": 1200,
+                        "recent_earnings_sats": 240
+                      }
+                    }
+                  ]
+                },
+                "output": {
+                  "answer": "The wallet contains 1200 sats.",
+                  "grounded_tool_names": [
+                    "wallet_status"
+                  ]
+                },
+                "confidence": 0.91,
+                "trace": {
+                  "captured_from_runtime": true,
+                  "response_kind": "grounded_answer"
+                }
+              },
+              {
+                "phase": "verify",
+                "manifest": {
+                  "module_name": "verify",
+                  "signature_name": "verify",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.82
+                },
+                "authority": "promoted",
+                "candidate_label": null,
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "tool_calls": [
+                    {
+                      "tool_name": "wallet_status",
+                      "arguments": {}
+                    }
+                  ],
+                  "tool_results": [
+                    {
+                      "tool_name": "wallet_status",
+                      "payload": {
+                        "balance_sats": 1200,
+                        "recent_earnings_sats": 240
+                      }
+                    }
+                  ],
+                  "candidate_answer": "The wallet contains 1200 sats."
+                },
+                "output": {
+                  "verdict": "accept_grounded_answer",
+                  "rationale": "captured authority verify verdict"
+                },
+                "confidence": 0.89,
+                "trace": {
+                  "captured_from_runtime": true
+                }
+              }
+            ],
+            "shadow_phases": [
+              {
+                "phase": "intent_route",
+                "manifest": {
+                  "module_name": "intent_route",
+                  "signature_name": "intent_route",
+                  "implementation_family": "psionic_route_model",
+                  "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+                  "version": "2026-03-29",
+                  "promotion_state": "candidate",
+                  "confidence_floor": 0.8
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?"
+                },
+                "output": {
+                  "route": "wallet_status"
+                },
+                "confidence": 0.99999356,
+                "trace": {
+                  "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+                  "artifact_digest": "2a444268542969ebd4c964b826a4e5a4efcb65dc3468835e8d82e4c36036cafc",
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "tool_policy",
+                "manifest": {
+                  "module_name": "tool_policy",
+                  "signature_name": "tool_policy",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "available_tools": [
+                    {
+                      "name": "provider_status",
+                      "description": "Read provider readiness and blocker state."
+                    },
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ]
+                },
+                "output": {
+                  "selected_tools": [
+                    {
+                      "name": "wallet_status",
+                      "description": "Read wallet balance and recent earnings."
+                    }
+                  ]
+                },
+                "confidence": 0.9,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "tool_arguments",
+                "manifest": {
+                  "module_name": "tool_arguments",
+                  "signature_name": "tool_arguments",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.8
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "selected_tools": [
+                    "wallet_status"
+                  ]
+                },
+                "output": {
+                  "calls": [
+                    {
+                      "tool_name": "wallet_status",
+                      "arguments": {}
+                    }
+                  ]
+                },
+                "confidence": 0.92,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "grounded_answer",
+                "manifest": {
+                  "module_name": "grounded_answer",
+                  "signature_name": "grounded_answer",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "last_known_good",
+                  "version": "2026-03-28",
+                  "promotion_state": "candidate",
+                  "confidence_floor": 0.82
+                },
+                "authority": "shadow",
+                "candidate_label": "last_known_good",
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "tool_results": [
+                    {
+                      "tool_name": "wallet_status",
+                      "payload": {
+                        "balance_sats": 1200,
+                        "recent_earnings_sats": 240
+                      }
+                    }
+                  ]
+                },
+                "output": {
+                  "answer": "The wallet contains 1200 sats.",
+                  "response_kind": "grounded_answer"
+                },
+                "confidence": 0.78,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+                }
+              },
+              {
+                "phase": "verify",
+                "manifest": {
+                  "module_name": "verify",
+                  "signature_name": "verify",
+                  "implementation_family": "psionic_rule_revision",
+                  "implementation_label": "promoted",
+                  "version": "2026-03-28",
+                  "promotion_state": "promoted",
+                  "confidence_floor": 0.82
+                },
+                "authority": "shadow",
+                "candidate_label": "psionic_candidate",
+                "input": {
+                  "user_request": "How many sats have I earned recently in the wallet?",
+                  "route": "wallet_status",
+                  "tool_calls": [
+                    {
+                      "tool_name": "wallet_status",
+                      "arguments": {}
+                    }
+                  ],
+                  "tool_results": [
+                    {
+                      "tool_name": "wallet_status",
+                      "payload": {
+                        "balance_sats": 1200,
+                        "recent_earnings_sats": 240
+                      }
+                    }
+                  ],
+                  "candidate_answer": "The wallet contains 1200 sats."
+                },
+                "output": {
+                  "verdict": "accept_grounded_answer"
+                },
+                "confidence": 0.81,
+                "trace": {
+                  "captured_from_external_runtime": true,
+                  "row_id": "openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+                }
+              }
+            ]
+          },
+          "lineage": {
+            "user_request": "How many sats have I earned recently in the wallet?",
+            "route": "wallet_status",
+            "tool_calls": [
+              {
+                "tool_name": "wallet_status",
+                "arguments": {}
+              }
+            ],
+            "tool_results": [
+              {
+                "tool_name": "wallet_status",
+                "payload": {
+                  "balance_sats": 1200,
+                  "recent_earnings_sats": 240
+                }
+              }
+            ],
+            "public_response": {
+              "kind": "grounded_answer",
+              "response": "The wallet contains 1200 sats."
+            },
+            "authority_manifest_ids": [
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+              "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+              "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+              "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+              "verify:psionic_rule_revision:promoted:2026-03-28"
+            ],
+            "shadow_manifest_ids": [
+              "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+              "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+              "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+              "grounded_answer:psionic_rule_revision:last_known_good:2026-03-28",
+              "verify:psionic_rule_revision:promoted:2026-03-28"
+            ]
+          }
+        }
+      },
+      "label": {
+        "expected_route": "wallet_status",
+        "expected_public_response": {
+          "kind": "grounded_answer",
+          "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+        },
+        "corpus_split": "training",
+        "tags": [
+          "external",
+          "tailnet",
+          "runtime",
+          "tailnet_m5_mlx",
+          "grounded_synthesis_drift"
+        ],
+        "operator_note": "Tailnet-first runtime disagreement receipt from `tailnet.macbook-pro-m5.mlx` on fixture `openagents_wallet_recent_earnings_short_heldout_receipt_v1.json`."
+      },
+      "detail": "This Tailnet-first runtime receipt preserves contributor identity `contrib.tailnet.m5` and machine class `apple_silicon_mlx` while keeping disagreement evidence in the governed external contract.",
+      "payload_digest": "1a2904e8bb9d51aec7fe9756070213e3f2bce25f50e7b54378c0fe23af5db662"
+    }
+  ],
+  "summary": "Tailnet node bundle for contributor `contrib.tailnet.m5` retains one governed benchmark run and 2 runtime disagreement submissions on the admitted compiled-agent family.",
+  "bundle_digest": "8a1755d9ffaa3af2aff425129dde232b318c8bf839f707324409e4af390b0c3a"
+}

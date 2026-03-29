@@ -11,25 +11,25 @@
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_learning_receipts_v1.json",
       "schema_version": "psionic.compiled_agent.learning_receipts.v1",
-      "artifact_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83",
+      "artifact_digest": "2d4b6abc8d58d72a175bf8c6a789b781d20ec4f02795190939ae3835c9e6feb5",
       "detail": "Current compiled-agent governed learning ledger."
     },
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_replay_bundle_v1.json",
       "schema_version": "psionic.compiled_agent.replay_bundle.v1",
-      "artifact_digest": "da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a",
+      "artifact_digest": "c26008d2ff4d07ddc960a4c6d0264111a1cc1a3fc7e6f1170685154f33a2fd7a",
       "detail": "Current compiled-agent replay-bundle contract shape."
     },
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_decentralized_roles_contract_v1.json",
       "schema_version": "psionic.compiled_agent.decentralized_roles_contract.v1",
-      "artifact_digest": "303bf8445d4afbae4a329b2cb9d3b9be8619f77aa1113d9b96fb0b62b2ef81fc",
+      "artifact_digest": "0402c08caea94ebbe41430820f0eb5f8bdb3d58ef9f30a5224c960a1be85bfe0",
       "detail": "Current bounded decentralized-role contract."
     },
     {
       "artifact_ref": "fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json",
       "schema_version": "psionic.compiled_agent.promoted_artifact_contract.v1",
-      "artifact_digest": "5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa",
+      "artifact_digest": "af2fb4054c73aace7a249c24d180ccf6947b5db4be462655d48b61cba835aaa4",
       "detail": "Current promoted-artifact authority contract consumed by the runtime."
     }
   ],
@@ -204,5 +204,5 @@
     "unsafe_final_outcome"
   ],
   "claim_boundary": "This package stays on the first narrow compiled-agent family. It does not claim broad agent evaluation, external promotion authority, or raw-log admission into training.",
-  "contract_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8"
+  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4"
 }

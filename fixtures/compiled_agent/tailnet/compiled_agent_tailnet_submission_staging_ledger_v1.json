@@ -1,0 +1,292 @@
+{
+  "schema_version": "psionic.compiled_agent.external_submission_staging_ledger.v1",
+  "ledger_id": "compiled_agent.tailnet_submission_staging_ledger.v1",
+  "row_id": "compiled_agent.tailnet_external_beta.v1",
+  "evidence_class": "learned_lane",
+  "contributor_contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+  "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
+  "total_submission_count": 6,
+  "accepted_submission_count": 6,
+  "rejected_submission_count": 0,
+  "review_required_submission_count": 6,
+  "replay_candidate_submission_count": 2,
+  "submissions": [
+    {
+      "submission_id": "submission.compiled_agent.tailnet.m5.benchmark.v1",
+      "submission_kind": "benchmark_run",
+      "contributor_id": "contrib.tailnet.m5",
+      "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+      "machine_class": "apple_silicon_mlx",
+      "environment_class": "tailnet_external_beta",
+      "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run",
+      "payload_schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
+      "payload_digest": "70cbaaeec8a1e7fc63755661b41c47da1a5b17830ad1b933c4b3eb2e7ea12288",
+      "evidence_class": "learned_lane",
+      "validation_checks": {
+        "schema_conformant": true,
+        "digest_integrity": true,
+        "contract_version_match": true,
+        "benchmark_consistency": true,
+        "environment_metadata_present": true,
+        "contributor_identity_linked": true,
+        "shadow_scored": false
+      },
+      "validator_status": "passed",
+      "quarantine_status": "held",
+      "review_state": "review_required",
+      "quarantined_learning_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.negated_wallet",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.provider_blocked",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.provider_ready",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.unsupported_gpu_poem",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.wallet_balance",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.wallet_variant"
+      ],
+      "replay_candidate_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.provider_blocked",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.provider_ready",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.unsupported_gpu_poem",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.wallet_balance",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.wallet_variant"
+      ],
+      "proposed_replay_sample_ids": [],
+      "review_required_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.negated_wallet"
+      ],
+      "shadow_assessment_ids": [
+        "assessment.compiled_agent.external_benchmark.negated_wallet.route.v1",
+        "assessment.compiled_agent.external_benchmark.negated_wallet.grounded_answer.v1"
+      ],
+      "failure_classes": [
+        "negated_route_false_positive"
+      ],
+      "detail": "The canonical external benchmark submission passed schema, digest, and contract checks, but one held-out negated-wallet row remains review-required. Accepted rows can enter replay-candidate state without letting the review-required row become authority."
+    },
+    {
+      "submission_id": "submission.compiled_agent.tailnet.archlinux.benchmark.v1",
+      "submission_kind": "benchmark_run",
+      "contributor_id": "contrib.tailnet.archlinux_rtx4080",
+      "source_machine_id": "tailnet.archlinux.rtx4080.cuda",
+      "machine_class": "consumer_gpu_cuda",
+      "environment_class": "tailnet_external_beta",
+      "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run",
+      "payload_schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
+      "payload_digest": "1bf65ad57ec22c9308af2033ad2cd72a4980377db8343c52227d47cb0a297ee8",
+      "evidence_class": "learned_lane",
+      "validation_checks": {
+        "schema_conformant": true,
+        "digest_integrity": true,
+        "contract_version_match": true,
+        "benchmark_consistency": true,
+        "environment_metadata_present": true,
+        "contributor_identity_linked": true,
+        "shadow_scored": false
+      },
+      "validator_status": "passed",
+      "quarantine_status": "held",
+      "review_state": "review_required",
+      "quarantined_learning_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.negated_wallet",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.provider_blocked",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.provider_ready",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.unsupported_gpu_poem",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_balance",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_variant"
+      ],
+      "replay_candidate_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.provider_blocked",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.provider_ready",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.unsupported_gpu_poem",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_balance",
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_variant"
+      ],
+      "proposed_replay_sample_ids": [],
+      "review_required_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.negated_wallet"
+      ],
+      "shadow_assessment_ids": [
+        "assessment.compiled_agent.external_benchmark.negated_wallet.route.v1",
+        "assessment.compiled_agent.external_benchmark.negated_wallet.grounded_answer.v1"
+      ],
+      "failure_classes": [
+        "negated_route_false_positive"
+      ],
+      "detail": "The canonical external benchmark submission passed schema, digest, and contract checks, but one held-out negated-wallet row remains review-required. Accepted rows can enter replay-candidate state without letting the review-required row become authority."
+    },
+    {
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+      "submission_kind": "runtime_receipt",
+      "contributor_id": "contrib.tailnet.m5",
+      "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+      "machine_class": "apple_silicon_mlx",
+      "environment_class": "tailnet_external_beta",
+      "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+      "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
+      "payload_digest": "ebb9e8608f7ac9634d57b5565f935e02701a2c6998f6e673e94b781a4775c31d",
+      "evidence_class": "learned_lane",
+      "validation_checks": {
+        "schema_conformant": true,
+        "digest_integrity": true,
+        "contract_version_match": true,
+        "benchmark_consistency": true,
+        "environment_metadata_present": true,
+        "contributor_identity_linked": true,
+        "shadow_scored": true
+      },
+      "validator_status": "passed",
+      "quarantine_status": "shadow_scored",
+      "review_state": "review_required",
+      "quarantined_learning_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1"
+      ],
+      "replay_candidate_receipt_ids": [],
+      "proposed_replay_sample_ids": [],
+      "review_required_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1"
+      ],
+      "shadow_assessment_ids": [
+        "assessment.compiled_agent.external_runtime.route.v1",
+        "assessment.compiled_agent.external_runtime.grounded_answer.v1"
+      ],
+      "failure_classes": [],
+      "detail": "The external runtime disagreement receipt passed intake validation, was retained in quarantine, and was immediately shadow-scored against the promoted-versus-candidate route and grounded modules before any replay admission."
+    },
+    {
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+      "submission_kind": "runtime_receipt",
+      "contributor_id": "contrib.tailnet.m5",
+      "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+      "machine_class": "apple_silicon_mlx",
+      "environment_class": "tailnet_external_beta",
+      "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+      "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
+      "payload_digest": "1a2904e8bb9d51aec7fe9756070213e3f2bce25f50e7b54378c0fe23af5db662",
+      "evidence_class": "learned_lane",
+      "validation_checks": {
+        "schema_conformant": true,
+        "digest_integrity": true,
+        "contract_version_match": true,
+        "benchmark_consistency": true,
+        "environment_metadata_present": true,
+        "contributor_identity_linked": true,
+        "shadow_scored": true
+      },
+      "validator_status": "passed",
+      "quarantine_status": "shadow_scored",
+      "review_state": "review_required",
+      "quarantined_learning_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2"
+      ],
+      "replay_candidate_receipt_ids": [],
+      "proposed_replay_sample_ids": [],
+      "review_required_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2"
+      ],
+      "shadow_assessment_ids": [
+        "assessment.compiled_agent.external_runtime.route.v1",
+        "assessment.compiled_agent.external_runtime.grounded_answer.v1"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "unsafe_final_outcome"
+      ],
+      "detail": "The external runtime disagreement receipt passed intake validation, was retained in quarantine, and was immediately shadow-scored against the promoted-versus-candidate route and grounded modules before any replay admission."
+    },
+    {
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+      "submission_kind": "runtime_receipt",
+      "contributor_id": "contrib.tailnet.archlinux_rtx4080",
+      "source_machine_id": "tailnet.archlinux.rtx4080.cuda",
+      "machine_class": "consumer_gpu_cuda",
+      "environment_class": "tailnet_external_beta",
+      "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+      "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
+      "payload_digest": "8c63724d163748ea4fb8f753eb030ae7f320d0d970cf4674bfb18c310486463f",
+      "evidence_class": "learned_lane",
+      "validation_checks": {
+        "schema_conformant": true,
+        "digest_integrity": true,
+        "contract_version_match": true,
+        "benchmark_consistency": true,
+        "environment_metadata_present": true,
+        "contributor_identity_linked": true,
+        "shadow_scored": true
+      },
+      "validator_status": "passed",
+      "quarantine_status": "shadow_scored",
+      "review_state": "review_required",
+      "quarantined_learning_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1"
+      ],
+      "replay_candidate_receipt_ids": [],
+      "proposed_replay_sample_ids": [],
+      "review_required_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1"
+      ],
+      "shadow_assessment_ids": [
+        "assessment.compiled_agent.external_runtime.route.v1",
+        "assessment.compiled_agent.external_runtime.grounded_answer.v1"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "detail": "The external runtime disagreement receipt passed intake validation, was retained in quarantine, and was immediately shadow-scored against the promoted-versus-candidate route and grounded modules before any replay admission."
+    },
+    {
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1",
+      "submission_kind": "runtime_receipt",
+      "contributor_id": "contrib.tailnet.archlinux_rtx4080",
+      "source_machine_id": "tailnet.archlinux.rtx4080.cuda",
+      "machine_class": "consumer_gpu_cuda",
+      "environment_class": "tailnet_external_beta",
+      "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
+      "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1",
+      "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
+      "payload_digest": "3cf0a1c48242febb504c6b50510a2b1d8556a08eccfe745ff560f765eb056273",
+      "evidence_class": "learned_lane",
+      "validation_checks": {
+        "schema_conformant": true,
+        "digest_integrity": true,
+        "contract_version_match": true,
+        "benchmark_consistency": true,
+        "environment_metadata_present": true,
+        "contributor_identity_linked": true,
+        "shadow_scored": true
+      },
+      "validator_status": "passed",
+      "quarantine_status": "shadow_scored",
+      "review_state": "review_required",
+      "quarantined_learning_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2"
+      ],
+      "replay_candidate_receipt_ids": [],
+      "proposed_replay_sample_ids": [],
+      "review_required_receipt_ids": [
+        "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2"
+      ],
+      "shadow_assessment_ids": [
+        "assessment.compiled_agent.external_runtime.route.v1",
+        "assessment.compiled_agent.external_runtime.grounded_answer.v1"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "detail": "The external runtime disagreement receipt passed intake validation, was retained in quarantine, and was immediately shadow-scored against the promoted-versus-candidate route and grounded modules before any replay admission."
+    }
+  ],
+  "summary": "Tailnet-first staging ledger retained 6 submissions across the M5 and archlinux RTX 4080 nodes: 6 accepted into quarantine, 0 rejected, 6 review-required, and 2 replay-candidate submission records.",
+  "ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2"
+}

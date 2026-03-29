@@ -15,7 +15,6 @@ use crate::{
     canonical_compiled_agent_decentralized_role_dry_run_report,
     canonical_compiled_agent_decentralized_role_receipts,
     canonical_compiled_agent_decentralized_roles_contract,
-    canonical_compiled_agent_external_benchmark_kit,
     canonical_compiled_agent_external_contributor_identity,
     canonical_compiled_agent_external_quarantine_report,
     canonical_compiled_agent_external_replay_proposal,
@@ -25,6 +24,7 @@ use crate::{
     canonical_compiled_agent_shadow_disagreement_receipts,
     canonical_compiled_agent_stronger_candidate_family_report,
     canonical_compiled_agent_xtrain_cycle_receipt, repo_relative_path,
+    retained_compiled_agent_external_benchmark_kit,
     CompiledAgentDecentralizedRoleDefinition, CompiledAgentDecentralizedRoleDryRunReport,
     CompiledAgentDecentralizedRoleKind, CompiledAgentDecentralizedRolesError,
     CompiledAgentExternalBenchmarkError, CompiledAgentExternalContributorIdentity,
@@ -439,7 +439,7 @@ pub fn compiled_agent_external_worker_dry_run_fixture_path() -> PathBuf {
 
 pub fn canonical_compiled_agent_external_worker_beta_contract(
 ) -> Result<CompiledAgentExternalWorkerBetaContract, CompiledAgentExternalWorkersError> {
-    let benchmark_kit = canonical_compiled_agent_external_benchmark_kit()?;
+    let benchmark_kit = retained_compiled_agent_external_benchmark_kit()?;
     let internal_contract = canonical_compiled_agent_decentralized_roles_contract()?;
     let source_artifacts = canonical_external_worker_source_artifacts()?;
     let roles = canonical_external_worker_roles(&internal_contract, &source_artifacts)?;
@@ -671,7 +671,7 @@ pub fn canonical_compiled_agent_external_worker_dry_run_report(
 ) -> Result<CompiledAgentExternalWorkerDryRunReport, CompiledAgentExternalWorkersError> {
     let contract = canonical_compiled_agent_external_worker_beta_contract()?;
     let receipts = canonical_compiled_agent_external_worker_receipts()?;
-    let benchmark_kit = canonical_compiled_agent_external_benchmark_kit()?;
+    let benchmark_kit = retained_compiled_agent_external_benchmark_kit()?;
     let staging_ledger = canonical_compiled_agent_external_submission_staging_ledger()?;
     let quarantine_report = canonical_compiled_agent_external_quarantine_report()?;
     let base_dry_run = canonical_compiled_agent_decentralized_role_dry_run_report()?;

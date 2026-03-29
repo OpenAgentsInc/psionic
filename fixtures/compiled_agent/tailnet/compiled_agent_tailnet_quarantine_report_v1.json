@@ -1,0 +1,360 @@
+{
+  "schema_version": "psionic.compiled_agent.external_quarantine_report.v1",
+  "report_id": "compiled_agent.tailnet_quarantine_report.v1",
+  "row_id": "compiled_agent.tailnet_external_beta.v1",
+  "evidence_class": "learned_lane",
+  "staging_ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2",
+  "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
+  "accepted_submission_ids": [
+    "submission.compiled_agent.tailnet.m5.benchmark.v1",
+    "submission.compiled_agent.tailnet.archlinux.benchmark.v1",
+    "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+    "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+    "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+    "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1"
+  ],
+  "rejected_submission_ids": [],
+  "review_required_submission_ids": [
+    "submission.compiled_agent.tailnet.m5.benchmark.v1",
+    "submission.compiled_agent.tailnet.archlinux.benchmark.v1",
+    "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+    "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+    "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+    "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1"
+  ],
+  "replay_candidate_receipt_ids": [
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.provider_blocked",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.provider_ready",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.unsupported_gpu_poem",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.wallet_balance",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.wallet_variant",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.provider_blocked",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.provider_ready",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.unsupported_gpu_poem",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_balance",
+    "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_variant"
+  ],
+  "proposed_replay_sample_ids": [],
+  "shadow_assessments": [
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_archlinux_benchmark_v1.grounded_answer.v1",
+      "submission_id": "submission.compiled_agent.tailnet.archlinux.benchmark.v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.negated_wallet",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "candidate_output": {
+        "route": "wallet_status",
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.91,
+      "candidate_confidence": 0.78,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored grounded synthesis for `receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.negated_wallet` against promoted `compiled_agent.grounded_answer.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.grounded_answer` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_archlinux_benchmark_v1.route.v1",
+      "submission_id": "submission.compiled_agent.tailnet.archlinux.benchmark.v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.negated_wallet",
+      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "route": "wallet_status"
+      },
+      "candidate_output": {
+        "route": "wallet_status"
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.79,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.negated_wallet` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_m5_benchmark_v1.grounded_answer.v1",
+      "submission_id": "submission.compiled_agent.tailnet.m5.benchmark.v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.negated_wallet",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "candidate_output": {
+        "route": "wallet_status",
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.91,
+      "candidate_confidence": 0.78,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored grounded synthesis for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.negated_wallet` against promoted `compiled_agent.grounded_answer.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.grounded_answer` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_m5_benchmark_v1.route.v1",
+      "submission_id": "submission.compiled_agent.tailnet.m5.benchmark.v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.negated_wallet",
+      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "route": "wallet_status"
+      },
+      "candidate_output": {
+        "route": "wallet_status"
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.79,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run#external.negated_wallet` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_archlinux_rtx4080_cuda_runtime_1_v1.grounded_answer.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "candidate_output": {
+        "route": "unsupported",
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.94,
+      "candidate_confidence": 0.78,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored grounded synthesis for `receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1` against promoted `compiled_agent.grounded_answer.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.grounded_answer` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_archlinux_rtx4080_cuda_runtime_1_v1.route.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1",
+      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "route": "provider_status"
+      },
+      "candidate_output": {
+        "route": "unsupported"
+      },
+      "expected_output": {
+        "route": "wallet_status"
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.86,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_archlinux_rtx4080_cuda_runtime_2_v1.grounded_answer.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "candidate_output": {
+        "route": "wallet_status",
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.91,
+      "candidate_confidence": 0.78,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored grounded synthesis for `receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2` against promoted `compiled_agent.grounded_answer.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.grounded_answer` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_archlinux_rtx4080_cuda_runtime_2_v1.route.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2",
+      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "route": "wallet_status"
+      },
+      "candidate_output": {
+        "route": "wallet_status"
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.94,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_m5_mlx_runtime_1_v1.grounded_answer.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "candidate_output": {
+        "route": "unsupported",
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "promoted_matches_expected": true,
+      "candidate_matches_expected": true,
+      "promoted_confidence": 0.94,
+      "candidate_confidence": 0.78,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored grounded synthesis for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1` against promoted `compiled_agent.grounded_answer.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.grounded_answer` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_m5_mlx_runtime_1_v1.route.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1",
+      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "route": "unsupported"
+      },
+      "candidate_output": {
+        "route": "unsupported"
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "promoted_matches_expected": true,
+      "candidate_matches_expected": true,
+      "promoted_confidence": 0.84,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_m5_mlx_runtime_2_v1.grounded_answer.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2",
+      "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "candidate_output": {
+        "route": "wallet_status",
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_output": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "promoted_matches_expected": false,
+      "candidate_matches_expected": false,
+      "promoted_confidence": 0.91,
+      "candidate_confidence": 0.78,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored grounded synthesis for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2` against promoted `compiled_agent.grounded_answer.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.grounded_answer` before any replay admission."
+    },
+    {
+      "assessment_id": "assessment.submission_compiled_agent_tailnet_tailnet_m5_mlx_runtime_2_v1.route.v1",
+      "submission_id": "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2",
+      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
+      "candidate_label": "last_known_good",
+      "promoted_output": {
+        "route": "wallet_status"
+      },
+      "candidate_output": {
+        "route": "wallet_status"
+      },
+      "expected_output": {
+        "route": "wallet_status"
+      },
+      "promoted_matches_expected": true,
+      "candidate_matches_expected": true,
+      "promoted_confidence": 0.94,
+      "reason": "ambiguous_regression",
+      "disposition": "human_review_required",
+      "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
+    }
+  ],
+  "summary": "Tailnet-first quarantine retained 6 accepted submissions, 0 rejected submissions, 6 review-required submissions, and 12 shadow assessments while preserving separate contributor identity for the M5 and archlinux nodes.",
+  "report_digest": "90492578580c808d8639f7a920b641fe8e717446509c74e9126d5e0c6d91c6c4"
+}

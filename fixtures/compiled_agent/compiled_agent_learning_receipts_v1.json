@@ -15,10 +15,16 @@
     "fixtures/compiled_agent/source/openagents_unsupported_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_unsupported_restart_rig_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_unsupported_calendar_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_schedule_call_training_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_wallet_provider_compare_training_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_wait_wallet_earnings_training_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_provider_wallet_better_training_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_wallet_grow_compare_training_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_negated_wallet_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_exclusion_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_provider_exclusion_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_ignore_provider_wallet_training_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_address_unsupported_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_best_provider_unsupported_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_recent_earnings_short_receipt_v1.json",
@@ -26,6 +32,7 @@
     "fixtures/compiled_agent/source/openagents_provider_account_ready_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_balance_phrase_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_heldout_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_wallet_provider_wait_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_negated_provider_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_earnings_phrase_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_unsupported_schedule_meeting_receipt_v1.json",
@@ -33,8 +40,10 @@
     "fixtures/compiled_agent/source/openagents_best_provider_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_negated_wallet_provider_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_negated_provider_wallet_heldout_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_ignore_wallet_provider_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_recent_earnings_short_heldout_receipt_v1.json",
     "fixtures/compiled_agent/source/openagents_wallet_provider_compare_heldout_receipt_v1.json",
+    "fixtures/compiled_agent/source/openagents_wallet_provider_better_heldout_receipt_v1.json",
     "fixtures/compiled_agent/runtime/openagents_runtime_shadow_compare_receipt_v1.json",
     "fixtures/compiled_agent/runtime/openagents_runtime_wallet_recent_earnings_receipt_v1.json"
   ],
@@ -49,10 +58,16 @@
     "receipt.compiled_agent.learning.openagents_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_unsupported_restart_rig_receipt_v1",
     "receipt.compiled_agent.learning.openagents_unsupported_calendar_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_schedule_call_training_receipt_v1",
     "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_provider_compare_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wait_wallet_earnings_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_provider_wallet_better_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_grow_compare_training_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
     "receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
@@ -63,6 +78,7 @@
     "receipt.compiled_agent.learning.openagents_provider_account_ready_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
     "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_provider_wait_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_unsupported_schedule_meeting_receipt_v1",
@@ -70,8 +86,10 @@
     "receipt.compiled_agent.learning.openagents_best_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_provider_better_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1"
   ],
   "correction_receipt_ids": [
@@ -79,45 +97,53 @@
     "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
     "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_provider_compare_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wait_wallet_earnings_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_provider_wallet_better_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_grow_compare_training_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
     "receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_provider_wait_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_address_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_best_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_wallet_provider_better_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
   ],
   "split_receipt_counts": {
-    "held_out": 13,
-    "training": 19
+    "held_out": 16,
+    "training": 25
   },
   "task_family_counts": {
-    "provider": 10,
-    "unsupported": 14,
-    "wallet": 14
+    "provider": 11,
+    "unsupported": 21,
+    "wallet": 15
   },
   "module_failure_counts": {
-    "grounded_answer": 19,
-    "route": 11,
-    "tool_arguments": 11,
-    "tool_policy": 11,
-    "verify": 19
+    "grounded_answer": 27,
+    "route": 19,
+    "tool_arguments": 19,
+    "tool_policy": 19,
+    "verify": 27
   },
   "failure_class_counts": {
-    "grounded_answer_mismatch": 19,
+    "grounded_answer_mismatch": 27,
     "negated_route_false_positive": 3,
-    "route_mismatch": 8,
-    "tool_argument_mismatch": 11,
-    "unexpected_tool_exposure": 11,
-    "unsafe_final_outcome": 19
+    "route_mismatch": 16,
+    "tool_argument_mismatch": 19,
+    "unexpected_tool_exposure": 19,
+    "unsafe_final_outcome": 27
   },
   "receipts": [
     {
@@ -870,6 +896,66 @@
       "receipt_digest": "cbcc2ab5e047d12715314ccf8daeade8dd488f9e44b613e46614496156e02bdf"
     },
     {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_schedule_call_training_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_schedule_call_training_receipt_v1.json",
+      "source_receipt_digest": "34b32ea277b77ecac838feeef62061fd01781c4c34d5e246fe78159cdc0a43b5",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 17747602620086,
+      "user_request": "Schedule a call for tomorrow afternoon.",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "unsupported",
+      "expected_route": "unsupported",
+      "observed_tool_names": [],
+      "expected_tool_names": [],
+      "observed_tool_calls": [],
+      "observed_tool_results": [],
+      "observed_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.94,
+        "intent_route": 0.94,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.94
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": true,
+        "tool_policy_correct": true,
+        "tool_arguments_correct": true,
+        "grounded_answer_correct": true,
+        "verify_correct": true,
+        "overall_success": true,
+        "failure_classes": []
+      },
+      "tags": [
+        "unsupported",
+        "refusal_quality",
+        "training"
+      ],
+      "operator_note": "Training success row for a second scheduling-style unsupported request so the route learner does not regress on held-out meeting language.",
+      "receipt_digest": "413ef8e470f9f1317e33ac5ae66f5987a1c33365d3c78a9f1284233508834193"
+    },
+    {
       "receipt_id": "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_ambiguous_provider_wallet_receipt_v1.json",
       "source_receipt_digest": "f90d3d27eea8281110d2a0a5341f83d68689d86bdbbc9f08e82b920385d51727",
@@ -928,6 +1014,338 @@
       ],
       "operator_note": "Training success row for ambiguous provider-versus-wallet phrasing that should refuse instead of guessing.",
       "receipt_digest": "cbc3e96ec61927fd7d27d788e62e4219ca88d70279d5156a0a07f0d89eb34dd9"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_provider_compare_training_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_provider_compare_training_receipt_v1.json",
+      "source_receipt_digest": "bdd49c63fcbe3d390e429f48936d0e0e2fd4dd5b21d5dde0e3cb63ef90cfbe80",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262009100,
+      "user_request": "Should I go online first or wait until the wallet grows more?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "provider_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "provider_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "provider_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "provider_status",
+          "payload": {
+            "ready": true,
+            "blockers": []
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.94,
+        "intent_route": 0.84,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "operator_note": "Training correction row for provider-versus-wallet comparison phrasing that should refuse instead of drifting toward provider readiness.",
+      "receipt_digest": "5f12d3d6be9505a8c4e3462f78a6b0505e2041b1a9ef82f55f7cefeaef77d449"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_wait_wallet_earnings_training_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wait_wallet_earnings_training_receipt_v1.json",
+      "source_receipt_digest": "bb1ff3d2e7b2635e80e9c31cced6213ab551c8ace2ec74c8458aaf3af7be718f",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262009150,
+      "user_request": "Should I wait for more wallet earnings before going online?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "provider_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "provider_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "provider_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "provider_status",
+          "payload": {
+            "ready": true,
+            "blockers": []
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.94,
+        "intent_route": 0.84,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "operator_note": "Training correction row for the wait-for-wallet-earnings phrasing so the route learner refuses mixed earnings-versus-go-online planning language instead of collapsing onto provider status.",
+      "receipt_digest": "07d1bd34ee7d5575ad10d94113dac216a12f78c90e7e596f9756482547dba342"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_provider_wallet_better_training_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_provider_wallet_better_training_receipt_v1.json",
+      "source_receipt_digest": "ff3b5b11c97ad3889398c22385058aefbb1d794e0f02e75ae280ec628879ae28",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262009200,
+      "user_request": "Is it better to check provider readiness or the wallet first?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "wallet_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "wallet_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "wallet_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "wallet_status",
+          "payload": {
+            "balance_sats": 1200,
+            "recent_earnings_sats": 240
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.91,
+        "intent_route": 0.84,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "operator_note": "Training correction row for mixed provider-versus-wallet planning language that should stay in the admitted refusal lane.",
+      "receipt_digest": "030a23db4c2a933cacc8f26af489dcd6832b68081a28275fc5a68a7df762db96"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_grow_compare_training_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_grow_compare_training_receipt_v1.json",
+      "source_receipt_digest": "3536d7d68afae309b65838cd090783aa5892958b04720c9479c1de1d8e558897",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262009250,
+      "user_request": "Is it better to go online now or wait for the wallet to grow more?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "wallet_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "wallet_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "wallet_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "wallet_status",
+          "payload": {
+            "balance_sats": 1200,
+            "recent_earnings_sats": 240
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.91,
+        "intent_route": 0.84,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "operator_note": "Training correction row for the go-online-versus-wallet-growth comparison phrasing so the route learner refuses the admitted ambiguity family instead of collapsing onto wallet status.",
+      "receipt_digest": "e6914a17ee79eebf4504833a28efa23983a27b6a9b76099a57b46118da8f9a28"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
@@ -1184,6 +1602,92 @@
       ],
       "operator_note": "Training correction row for exclusion wording where the promoted authority still chases wallet tokens instead of the requested provider answer.",
       "receipt_digest": "8f3abe9ca07014b00497400c16f4785a0de72bf0364fb575d65826132b131271"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_ignore_provider_wallet_training_receipt_v1.json",
+      "source_receipt_digest": "598886673c3e0ae4e4ecfceed02e9d4e7ff3acd05dcf8aa92f25f20ca99e377e",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262010650,
+      "user_request": "Ignore provider readiness. Show me the wallet balance.",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "provider_status",
+      "expected_route": "wallet_status",
+      "observed_tool_names": [
+        "provider_status"
+      ],
+      "expected_tool_names": [
+        "wallet_status"
+      ],
+      "observed_tool_calls": [
+        {
+          "tool_name": "provider_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "provider_status",
+          "payload": {
+            "ready": true,
+            "blockers": []
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.94,
+        "intent_route": 0.86,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "training",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "supported",
+        "wallet",
+        "negated",
+        "exclusion",
+        "training",
+        "correction_required"
+      ],
+      "operator_note": "Training correction row for an ignore-provider phrasing so exclusion handling does not depend on the earlier retained wording.",
+      "receipt_digest": "a5863ccb44129236782285c9ce084c8be19f396e54c499a8adc24c8008fdf9bb"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1",
@@ -1734,6 +2238,89 @@
       ],
       "operator_note": "Held-out ambiguity row for route behavior that should still refuse instead of guessing.",
       "receipt_digest": "1e52adf15d3408f0b38ce793d23856c8390f0fb86299de18206c1404d617c21a"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_provider_wait_heldout_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_provider_wait_heldout_receipt_v1.json",
+      "source_receipt_digest": "f32537b8d9e5a16c0b1f7f3b8b84838f1ee118a97e905ef5b9762e320a030678",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262013100,
+      "user_request": "Should I wait for more wallet earnings before I go online?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "provider_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "provider_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "provider_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "provider_status",
+          "payload": {
+            "ready": true,
+            "blockers": []
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.94,
+        "intent_route": 0.84,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "held_out",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "confidence_edge",
+        "held_out",
+        "correction_required"
+      ],
+      "operator_note": "Held-out compare row for deciding whether the route candidate learned to refuse provider-versus-wallet planning language instead of picking a side.",
+      "receipt_digest": "080c4f1ff97d3927cb2c111054b0dd6cf1489db6f7bc3c17993030504650a18b"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
@@ -2298,6 +2885,92 @@
       "receipt_digest": "7042bf2d667e0e70f9465ac68eeec745e615cd4c4e38d1baa1780f495ca33bbc"
     },
     {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_ignore_wallet_provider_heldout_receipt_v1.json",
+      "source_receipt_digest": "e490a0bc8f791322e87e0b5890f563cf834b59af4455fd6377e7568ec9c52ee4",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262020100,
+      "user_request": "Ignore the wallet balance. Tell me if the provider is ready.",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "wallet_status",
+      "expected_route": "provider_status",
+      "observed_tool_names": [
+        "wallet_status"
+      ],
+      "expected_tool_names": [
+        "provider_status"
+      ],
+      "observed_tool_calls": [
+        {
+          "tool_name": "wallet_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "wallet_status",
+          "payload": {
+            "balance_sats": 1200,
+            "recent_earnings_sats": 240
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_public_response": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.91,
+        "intent_route": 0.86,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "held_out",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "supported",
+        "provider",
+        "negated",
+        "exclusion",
+        "held_out",
+        "correction_required"
+      ],
+      "operator_note": "Held-out ignore-wallet phrasing for checking that the route candidate generalizes the provider exclusion fix beyond the replay rows.",
+      "receipt_digest": "1f49ddd887709f84ee9d12b43f2ea57e9fbacbe4da3b2a0d0db94714735045fb"
+    },
+    {
       "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
       "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_recent_earnings_short_heldout_receipt_v1.json",
       "source_receipt_digest": "46e67a0fdffa0a981481829b679c793dde47e54d8602e386ddb6c2a627272705",
@@ -2440,6 +3113,89 @@
       ],
       "operator_note": "Held-out ambiguity row for confidence calibration around mixed provider-versus-wallet intent without widening the task family.",
       "receipt_digest": "06b4fa886ec93bc22cfcfbf8d1f77c7858df4bc014a4289c0e17af869a949c3c"
+    },
+    {
+      "receipt_id": "receipt.compiled_agent.learning.openagents_wallet_provider_better_heldout_receipt_v1",
+      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_wallet_provider_better_heldout_receipt_v1.json",
+      "source_receipt_digest": "559d7e814f78f94173e6e7e7dc0e8605ba380e8b12b330a9e19c1a3794636c9d",
+      "evidence_class": "learned_lane",
+      "captured_at_epoch_ms": 1774760262022100,
+      "user_request": "Is it better to go online now or keep waiting for the wallet to grow?",
+      "runtime_state": {
+        "provider_ready": true,
+        "provider_blockers": [],
+        "wallet_balance_sats": 1200,
+        "recent_earnings_sats": 240
+      },
+      "observed_route": "wallet_status",
+      "expected_route": "unsupported",
+      "observed_tool_names": [
+        "wallet_status"
+      ],
+      "expected_tool_names": [],
+      "observed_tool_calls": [
+        {
+          "tool_name": "wallet_status",
+          "arguments": {}
+        }
+      ],
+      "observed_tool_results": [
+        {
+          "tool_name": "wallet_status",
+          "payload": {
+            "balance_sats": 1200,
+            "recent_earnings_sats": 240
+          }
+        }
+      ],
+      "observed_public_response": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      },
+      "expected_public_response": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "authority_manifest_ids": [
+        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
+        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
+        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
+        "verify:psionic_rule_revision:promoted:2026-03-28"
+      ],
+      "shadow_manifest_ids": [],
+      "primary_phase_confidences": {
+        "grounded_answer": 0.91,
+        "intent_route": 0.84,
+        "tool_arguments": 0.96,
+        "tool_policy": 0.92,
+        "verify": 0.89
+      },
+      "corpus_split": "held_out",
+      "assessment": {
+        "route_correct": false,
+        "tool_policy_correct": false,
+        "tool_arguments_correct": false,
+        "grounded_answer_correct": false,
+        "verify_correct": false,
+        "overall_success": false,
+        "failure_classes": [
+          "grounded_answer_mismatch",
+          "route_mismatch",
+          "tool_argument_mismatch",
+          "unexpected_tool_exposure",
+          "unsafe_final_outcome"
+        ]
+      },
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "confidence_edge",
+        "held_out",
+        "correction_required"
+      ],
+      "operator_note": "Second held-out compare row for the same narrow ambiguity family so route promotion depends on a real pattern and not one lucky wording.",
+      "receipt_digest": "af82584c2812c29be5051b3906fb45f73afdea94508e146daa1eb579f77b2eef"
     },
     {
       "receipt_id": "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
@@ -2615,6 +3371,6 @@
       "receipt_digest": "ecf03b9d6bddc11729a64d668f99b5b57dfc4dda9a64d618998885d27cbcd468"
     }
   ],
-  "summary": "Compiled-agent learning ledger retains 32 source receipts (19 training, 13 held-out) with 13 fully-correct rows and 19 correction rows.",
-  "ledger_digest": "48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83"
+  "summary": "Compiled-agent learning ledger retains 41 source receipts (25 training, 16 held-out) with 14 fully-correct rows and 27 correction rows.",
+  "ledger_digest": "6dd2c757e2a4534210899a667edb82b1c819d64592d3b4aca07a2a6cf1864812"
 }

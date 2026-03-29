@@ -1,6 +1,6 @@
 # Compiled Agent XTRAIN
 
-> Status: validator-gated compiled-agent XTRAIN cycle with learned route and grounded-answer artifacts, updated 2026-03-29.
+> Status: validator-gated compiled-agent XTRAIN cycle with promoted learned route and grounded-answer artifacts after the Tailnet-first M5 plus RTX 4080 pilot, updated 2026-03-29.
 
 ## Why This Exists
 
@@ -73,6 +73,11 @@ learned compiled-agent slice actually proved.
 - `fixtures/compiled_agent/external/compiled_agent_external_worker_beta_contract_v1.json`
 - `fixtures/compiled_agent/external/compiled_agent_external_worker_receipts_v1.json`
 - `fixtures/compiled_agent/external/compiled_agent_external_worker_dry_run_v1.json`
+- `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json`
+- `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json`
+- `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_submission_staging_ledger_v1.json`
+- `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_quarantine_report_v1.json`
+- `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_governed_run_v1.json`
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
 - `fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json`
 - `fixtures/compiled_agent/compiled_agent_confidence_policy_v1.json`
@@ -83,20 +88,30 @@ learned compiled-agent slice actually proved.
 
 ## Current Truth
 
+- the first Tailnet-first governed contributor run is now real:
+  - local M5 bundle digest `8a1755d9ffaa3af2aff425129dde232b318c8bf839f707324409e4af390b0c3a`
+  - remote RTX 4080 bundle digest `c47df518233bd687bd88b442002840f8fedc45960db8298795db8562a097022d`
+  - shared retained external benchmark contract digest
+    `9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4`
+  - governed run digest
+    `dc9ab99b00fa05ae990693b5e758cc728d7d06dcef36bb51b86bf769c7f18b37`
 - route candidate is a replay-trained route model artifact, not a hand-authored
   keyword guard
-- route candidate clears the retained negated-route false-positive case and
-  improves replay matches `14 -> 19`
-- route candidate no longer promotes on the widened held-out split because the
-  comparison row
-  `receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1`
-  exposed a real ambiguity regression; held-out matches stay `8 -> 8`
+- the route path now promotes honestly under unchanged validator thresholds
+- route validation now clears with:
+  - eval `3 -> 4`
+  - replay `19 -> 25`
+  - held-out `10 -> 12`
+  - no replay or held-out regressions
 - grounded-answer candidate is a replay-trained fact-only model artifact, not a
   rule revision
-- grounded-answer candidate improves replay fidelity `13 -> 19`
-- grounded-answer candidate also improves held-out fidelity `7 -> 11`
+- grounded-answer candidate now improves replay fidelity `19 -> 25`
+- grounded-answer candidate also improves held-out fidelity `9 -> 13`
 - grounded-answer candidate continues to pass the independent
   insufficient-facts and conflicting-facts fallback rows
+- the promoted-artifact contract now keeps the learned route artifact promoted
+  and retains the baseline route as the rollback candidate with label
+  `last_known_good`
 - learned route and grounded artifacts are now normalized through JSON
   roundtrip before their digest is stamped, so the retained artifact digests,
   persisted fixtures, and runtime-loaded payloads all agree
@@ -133,30 +148,30 @@ learned compiled-agent slice actually proved.
 
 ## Latest Retained Outcome
 
-- route decision: `hold`
+- route decision: `promote`
 - grounded-answer decision: `promote`
 - replay bundle digest:
-  `da0e79fdfdea3b751fd90e84178b219693d5e3a348c675ebad8d4eeda25c600a`
+  `0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c`
 - source ledger digest:
-  `48ebcfa41ae8f52a80745eb803be332e04596d63a293b965df260382fde07f83`
+  `6dd2c757e2a4534210899a667edb82b1c819d64592d3b4aca07a2a6cf1864812`
 - route model digest:
-  `0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f`
+  `cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac`
 - grounded-answer model digest:
-  `1bcac89576e47ae4a1174a00077db3a389213ed2998bbafb5b76b199ea92839f`
+  `5a7bd1af3709dc6c24fb75627c898c37993ee3946f402ce0761fc5adc211a708`
 - stronger route model digest:
-  `bfacfe8d8cc8a5c8d77fd14fd9cd38018c02b63fcc29e3c74527bacce831e93f`
+  `f6d653e5b16fc7f99420f7ec1f99764da05981a761d53af70de4374136f512c3`
 - stronger grounded-answer model digest:
-  `8d9269dbba68b6a329c8896163d8b00d1b386b7caf1f4fbc2b79ae9e7d2e1524`
+  `3adc205ed4b2855a8cad36fe61a1d9c40d9ffac2733ed464e5b73409b403e413`
 - stronger candidate family report digest:
-  `19a09dba96ba7e152dea9c2604ce3e106fe98942d1d3064f481ca69aee30aec4`
+  `04112b458376e968b518c0c1653ed939c2748dd471592c408e2574029bbc8479`
 - XTRAIN cycle receipt digest:
-  `5bcaf4f72761ba90693bed44e926cf7c1e5ca418b0d58bc43dfc7e33076042e6`
+  `4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45`
 - promoted-artifact contract digest:
-  `5f4ed2e440803e71b54fc1a97da9c96d7c8b5bc152187a4a5a916af6805994fa`
+  `80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720`
 - confidence policy digest:
-  `4a1e25a25f6bcc1e314e516fdadd0411181582844df9c31b68597b4558ce15b8`
+  `51c1182a1e0c699ab878182c72e7ee7ba0eb83c42f41203edce080bde3595fb1`
 - shadow disagreement receipts digest:
-  `7636190e5a1901e909874a670f4d71191b9cacf85214d6675042819dc2454cad`
+  `0548cec6c9a09dfc07e6aea3623467763adccf4d308ac5c7ddd369bdfa60e0b8`
 - decentralized roles contract digest:
   `303bf8445d4afbae4a329b2cb9d3b9be8619f77aa1113d9b96fb0b62b2ef81fc`
 - decentralized role receipts digest:

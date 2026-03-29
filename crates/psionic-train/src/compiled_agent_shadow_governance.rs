@@ -22,9 +22,9 @@ use crate::{
     canonical_compiled_agent_runtime_source_receipts,
     canonical_compiled_agent_xtrain_cycle_receipt, repo_relative_path,
     CompiledAgentArtifactContractEntry, CompiledAgentArtifactContractError,
-    CompiledAgentArtifactPayload, CompiledAgentCorpusSplit, CompiledAgentLearningReceipt,
-    CompiledAgentPromotedArtifactContract, CompiledAgentReceiptError, CompiledAgentSourceReceipt,
-    CompiledAgentXtrainError,
+    CompiledAgentArtifactLifecycleState, CompiledAgentArtifactPayload,
+    CompiledAgentCorpusSplit, CompiledAgentLearningReceipt, CompiledAgentPromotedArtifactContract,
+    CompiledAgentReceiptError, CompiledAgentSourceReceipt, CompiledAgentXtrainError,
 };
 
 pub const COMPILED_AGENT_CONFIDENCE_POLICY_FIXTURE_PATH: &str =
@@ -956,13 +956,20 @@ fn module_candidate_entry<'a>(
     module: CompiledAgentModuleKind,
     contract: &'a CompiledAgentPromotedArtifactContract,
 ) -> Result<&'a CompiledAgentArtifactContractEntry, CompiledAgentShadowGovernanceError> {
-    let label = match module {
-        CompiledAgentModuleKind::Route => "psionic_candidate",
-        CompiledAgentModuleKind::GroundedAnswer => "last_known_good",
-        _ => "candidate",
+    let preferred_labels: &[&str] = match module {
+        CompiledAgentModuleKind::Route => &["psionic_candidate", "last_known_good"],
+        CompiledAgentModuleKind::GroundedAnswer => &["last_known_good", "psionic_candidate"],
+        _ => &["candidate", "last_known_good"],
     };
-    contract
-        .candidate_entry(module, label)
+    preferred_labels
+        .iter()
+        .find_map(|label| contract.candidate_entry(module, label))
+        .or_else(|| {
+            contract.artifacts.iter().find(|entry| {
+                entry.module == module
+                    && entry.lifecycle_state == CompiledAgentArtifactLifecycleState::Candidate
+            })
+        })
         .ok_or_else(|| CompiledAgentShadowGovernanceError::MissingCandidateEntry {
             module: format!("{module:?}"),
         })

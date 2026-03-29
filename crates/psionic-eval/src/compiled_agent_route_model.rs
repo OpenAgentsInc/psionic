@@ -63,6 +63,10 @@ pub fn compiled_agent_route_features(prompt: &str) -> Vec<String> {
     for pair in tokens.windows(2) {
         features.push(format!("bigram:{}__{}", pair[0], pair[1]));
     }
+    for triple in tokens.windows(3) {
+        features.push(format!("trigram:{}__{}__{}", triple[0], triple[1], triple[2]));
+    }
+    append_route_marker_features(&tokens, &mut features);
     features
 }
 
@@ -142,7 +146,7 @@ pub fn train_compiled_agent_route_model(
         artifact_id,
         row_id,
         model_family: String::from("multinomial_naive_bayes"),
-        feature_profile: String::from("unigram_plus_bigram"),
+        feature_profile: String::from("unigram_bigram_trigram_plus_route_markers"),
         replay_bundle_digest,
         training_sample_count: samples.len() as u32,
         heldout_sample_count: heldout_samples.len() as u32,
@@ -256,7 +260,7 @@ pub fn train_compiled_agent_route_tfidf_centroid_model(
         artifact_id,
         row_id,
         model_family: String::from("tfidf_centroid"),
-        feature_profile: String::from("normalized_tfidf_unigram_plus_bigram"),
+        feature_profile: String::from("normalized_tfidf_unigram_bigram_trigram_plus_route_markers"),
         replay_bundle_digest,
         training_sample_count: samples.len() as u32,
         heldout_sample_count: heldout_samples.len() as u32,
@@ -483,6 +487,56 @@ fn normalized_tokens(text: &str) -> Vec<String> {
         .collect()
 }
 
+fn append_route_marker_features(tokens: &[String], features: &mut Vec<String>) {
+    let provider_surface = contains_any_token(tokens, &["provider", "online", "ready", "readiness"]);
+    let wallet_surface = contains_any_token(tokens, &["wallet", "balance", "sats", "earnings"]);
+    let negation_surface = contains_any_token(
+        tokens,
+        &["not", "dont", "don't", "no", "without", "skip", "ignore", "rather"],
+    );
+    let compare_surface = contains_any_token(
+        tokens,
+        &[
+            "compare", "vs", "versus", "or", "first", "better", "wait", "until", "grow",
+            "grows", "before",
+        ],
+    );
+    let unsupported_boundary_surface = contains_any_token(
+        tokens,
+        &["address", "copy", "best", "choose", "poem", "calendar", "meeting"],
+    );
+
+    if provider_surface {
+        features.push(String::from("marker:provider_surface"));
+    }
+    if wallet_surface {
+        features.push(String::from("marker:wallet_surface"));
+    }
+    if negation_surface {
+        features.push(String::from("marker:negation_surface"));
+    }
+    if compare_surface {
+        features.push(String::from("marker:compare_surface"));
+    }
+    if provider_surface && wallet_surface {
+        features.push(String::from("marker:mixed_provider_wallet_surface"));
+    }
+    if provider_surface && wallet_surface && compare_surface {
+        features.push(String::from("marker:provider_wallet_compare_ambiguity"));
+    }
+    if provider_surface && wallet_surface && negation_surface {
+        features.push(String::from("marker:provider_wallet_exclusion"));
+    }
+    if (provider_surface || wallet_surface) && unsupported_boundary_surface {
+        features.push(String::from("marker:unsupported_boundary_surface"));
+    }
+}
+
+fn contains_any_token(tokens: &[String], needles: &[&str]) -> bool {
+    let token_set = tokens.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    needles.iter().any(|needle| token_set.contains(needle))
+}
+
 fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     let mut hasher = Sha256::new();
     hasher.update(prefix);
@@ -563,6 +617,16 @@ mod tests {
         assert!(features.contains(&String::from("token:wallet")));
         assert!(features.contains(&String::from("token:balance")));
         assert!(features.contains(&String::from("bigram:wallet__balance")));
+        assert!(features.contains(&String::from("marker:wallet_surface")));
+    }
+
+    #[test]
+    fn compiled_agent_route_features_include_compare_ambiguity_marker() {
+        let features =
+            compiled_agent_route_features("Should I go online first or wait until the wallet grows?");
+        assert!(features.contains(&String::from(
+            "marker:provider_wallet_compare_ambiguity"
+        )));
     }
 
     #[test]
