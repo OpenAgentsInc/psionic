@@ -136,6 +136,10 @@ than just run tensor math.
   and handle-reuse packet at `docs/PSION_RVLLM_CUBLAS_WARMUP.md`, together
   with machine-readable `psionic_cuda_startup` startup evidence in
   `qwen35_cuda_bench --json-out`.
+- The same pass now also retains one explicit GPU logits-selection packet at
+  `docs/PSION_RVLLM_GPU_LOGITS_SELECTION.md`, binding the already-shipped
+  qwen35 and gpt-oss device-argmax / bounded-candidate lanes to explicit
+  readback-byte and raw-logits fallback truth.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
