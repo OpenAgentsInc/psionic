@@ -135,6 +135,12 @@ lives at:
 - `docs/PSION_EXECUTOR_CONTINUE_RESTART_POLICY.md`
 - `fixtures/psion/executor/psion_executor_continue_restart_policy_v1.json`
 
+The failure-bundle taxonomy packet that now freezes canonical incident classes
+and current emitted bundle posture lives at:
+
+- `docs/PSION_EXECUTOR_FAILURE_BUNDLE_TAXONOMY.md`
+- `fixtures/psion/executor/psion_executor_failure_bundle_taxonomy_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_review_workflow_fixtures`

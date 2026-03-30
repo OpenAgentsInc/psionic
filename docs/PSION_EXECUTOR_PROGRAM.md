@@ -174,6 +174,10 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md` owns the first canonical
   mandatory live-metrics packet that freezes the minimum long-run metric set on
   top of the retained local-cluster ledger and dashboard rows
+- `docs/PSION_EXECUTOR_FAILURE_BUNDLE_TAXONOMY.md` owns the first canonical
+  failure-bundle taxonomy packet that freezes long-run incident classes and
+  emitted bundle posture on top of the retained live-metrics and weekly-review
+  surfaces
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

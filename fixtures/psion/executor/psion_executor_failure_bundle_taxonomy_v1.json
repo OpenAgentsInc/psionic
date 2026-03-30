@@ -1,0 +1,90 @@
+{
+  "schema_version": "psion.executor.failure_bundle_taxonomy.v1",
+  "taxonomy_id": "psion_executor_failure_bundle_taxonomy_v1",
+  "live_metrics_ref": "fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json",
+  "live_metrics_digest": "ed90d86a315b4c37427dcbc4353f6113cacc89862ffdd3ceefa8a7161c2d04c6",
+  "incident_policy_ref": "fixtures/psion/executor/psion_executor_continue_restart_policy_v1.json",
+  "incident_policy_digest": "40ef44b2c92651ab7e5ae3c7c039388bf472ca05467fc679054ffe4fb8413186",
+  "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
+  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "taxonomy_rows": [
+    {
+      "bundle_type_id": "optimizer_failure",
+      "default_owner_role": "executor_lane_operator",
+      "continue_restart_posture": "restart_from_last_green_checkpoint",
+      "detail": "Optimizer instability invalidates the live training state and should restart from the last green checkpoint.",
+      "row_digest": "3781054ec9a3cebdfb3fbbc5d28b9fe9ac6e7a36b20fe74f1d6252c7fdef7e52"
+    },
+    {
+      "bundle_type_id": "batch_failure",
+      "default_owner_role": "executor_lane_operator",
+      "continue_restart_posture": "restart_after_batch_boundary_recheck",
+      "detail": "Batch construction or corruption failure requires a restart after the batch boundary is revalidated.",
+      "row_digest": "395c9d49c13fd355300dc437b707707e0f742b0784f7efc25ff1edb2f8df0c6b"
+    },
+    {
+      "bundle_type_id": "dataloader_stall",
+      "default_owner_role": "review_cadence_owner",
+      "continue_restart_posture": "hold_until_stall_source_explained",
+      "detail": "Dataloader stalls require explanation before weekly review treats the run as healthy.",
+      "row_digest": "bb2bfd926ea56b9b353d4028ffdf595f920e2f58b8147636143226a82f681f25"
+    },
+    {
+      "bundle_type_id": "memory_pressure",
+      "default_owner_role": "executor_lane_operator",
+      "continue_restart_posture": "restart_under_tighter_headroom",
+      "detail": "Memory pressure requires a restart with restored headroom or a tighter admitted batch posture.",
+      "row_digest": "87c629dcecdf94e1887214744d445d3ca8620121389d13642d5daa609eb0fa43"
+    },
+    {
+      "bundle_type_id": "thermal_anomaly",
+      "default_owner_role": "review_cadence_owner",
+      "continue_restart_posture": "hold_until_thermal_posture_green",
+      "detail": "Thermal anomalies block clean continuation until the device returns to a declared green posture.",
+      "row_digest": "9b0bd7e2a36a8200e0c9b5ef0f719fa71995ed012fa9aa11e379d0c3f524713c"
+    },
+    {
+      "bundle_type_id": "slow_node_behavior",
+      "default_owner_role": "review_cadence_owner",
+      "continue_restart_posture": "continue_under_review_no_promotion",
+      "detail": "Slow-node behavior may continue under review, but it blocks clean promotion claims.",
+      "row_digest": "3d18e05d41e8b4de0f530052a56f646217a5955babdccb44eda7e38b7a3bf105"
+    },
+    {
+      "bundle_type_id": "topology_failure",
+      "default_owner_role": "executor_lane_operator",
+      "continue_restart_posture": "restart_after_topology_repair",
+      "detail": "Topology failure requires repair of the admitted launch or cluster shape before restart.",
+      "row_digest": "f6aa476866033a5d0e01e41ec66d9d4248f2480b5ee0c4e00377d0458bba8115"
+    }
+  ],
+  "emitted_rows": [
+    {
+      "emission_id": "psion_executor_failure_bundle_emission_mlx_v1",
+      "row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+      "active_bundle_type": "no_active_failure_bundle",
+      "emission_status": "green_no_failure_bundle",
+      "review_requirement": "review_references_current_bundle_type",
+      "detail": "The retained MLX candidate row stays green and does not currently emit a failure bundle.",
+      "row_digest": "c790395fb7fdfbe0da8d44186d9f0356cd2d2cb456d37fb1ac43a690e518b47a"
+    },
+    {
+      "emission_id": "psion_executor_failure_bundle_emission_4080_v1",
+      "row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+      "active_bundle_type": "slow_node_behavior",
+      "emission_status": "watch_bundle_emitted",
+      "review_requirement": "review_references_current_bundle_type",
+      "detail": "The retained 4080 current-best row emits `slow_node_behavior` because its live throughput posture trails the retained MLX row and must remain explicit in review.",
+      "row_digest": "218ed4fdbb2dc71621576804b8d5c9aeda8ff765f1e8d35bf9ccee38d4ec42bb"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md",
+    "docs/PSION_EXECUTOR_CONTINUE_RESTART_POLICY.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+  ],
+  "summary": "The admitted executor lane now has one canonical failure-bundle taxonomy. Optimizer, batch, dataloader, memory, thermal, slow-node, and topology failures have explicit bundle types, and retained ledger rows now emit their current bundle posture into the same weekly review path.",
+  "packet_digest": "167de1726490b46baa6ab8dba39f1a10d19bec10180614bc2c72e515596ab0aa"
+}

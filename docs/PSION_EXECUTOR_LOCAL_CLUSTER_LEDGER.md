@@ -115,6 +115,11 @@ The follow-on mandatory live-metrics packet now lives at:
 - `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md`
 - `fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json`
 
+The follow-on failure-bundle taxonomy packet now lives at:
+
+- `docs/PSION_EXECUTOR_FAILURE_BUNDLE_TAXONOMY.md`
+- `fixtures/psion/executor/psion_executor_failure_bundle_taxonomy_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_ledger_fixtures`
