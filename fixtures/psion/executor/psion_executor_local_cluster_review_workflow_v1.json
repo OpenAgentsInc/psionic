@@ -1,0 +1,112 @@
+{
+  "schema_version": "psion.executor.local_cluster_review_workflow.v1",
+  "workflow_id": "psion_executor_local_cluster_review_workflow_v1",
+  "ownership_ref": "docs/PSION_EXECUTOR_OWNERSHIP.md",
+  "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
+  "dashboard_digest": "06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f",
+  "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
+  "ledger_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
+  "autoblocks_ref": "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json",
+  "autoblocks_digest": "1ea4d6cb038b59550548308513c63727a67f6e82b3f6e59f3573946eaf58d88f",
+  "baseline_review_template": {
+    "template_id": "psion_executor_weekly_baseline_review_template_v1",
+    "review_kind": "baseline_review",
+    "cadence_id": "executor_weekly_baseline_review.v1",
+    "reviewer_role": "Weekly baseline review owner",
+    "frozen_pack_only": true,
+    "required_refs": [
+      "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+      "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
+      "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json"
+    ],
+    "required_fact_ids": [
+      "frozen_pack_results_only",
+      "current_best_row_visible",
+      "active_block_ids_visible",
+      "reference_linear_anchor_visible"
+    ],
+    "decision_rule": "Hold the frozen baseline as the active floor unless the current-best row stays tied to frozen-pack truth and all active auto-block ids clear.",
+    "detail": "The weekly baseline review template keeps the baseline decision anchored to frozen-pack truth, the retained current-best row, and the canonical auto-block report.",
+    "template_digest": "042b45e975336f4f0fc5af612c8039a206c52933ff3fca645fdee442c96dfdbc"
+  },
+  "ablation_review_template": {
+    "template_id": "psion_executor_weekly_ablation_review_template_v1",
+    "review_kind": "ablation_review",
+    "cadence_id": "executor_weekly_ablation_review.v1",
+    "reviewer_role": "Weekly ablation review owner",
+    "frozen_pack_only": true,
+    "required_refs": [
+      "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
+      "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
+      "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json"
+    ],
+    "required_fact_ids": [
+      "same_budget_only",
+      "frozen_pack_results_only",
+      "current_best_row_visible",
+      "active_block_ids_visible"
+    ],
+    "decision_rule": "Authorize no new same-budget ablation win unless the candidate stays inside frozen-pack truth and the current-best row no longer carries active phase-exit or promotion blocks.",
+    "detail": "The weekly ablation review template keeps same-budget decisions tied to the retained local-cluster ledger and the canonical auto-block report instead of ad hoc experiment summaries.",
+    "template_digest": "b20d44cbffa4aa65c863440dc9d74410cb14fbd3710fdb7230eaa7fe8df967d8"
+  },
+  "current_decisions": [
+    {
+      "review_id": "psion_executor_weekly_baseline_review_2026w14_v1",
+      "review_kind": "baseline_review",
+      "cadence_window_id": "2026-W14",
+      "reviewer_role": "Weekly baseline review owner",
+      "reviewer_identity": "Christopher David",
+      "cited_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "cited_row_ids": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ],
+      "cited_block_ids": [
+        "missing_eval_fact_current_best",
+        "missing_export_fact_current_best"
+      ],
+      "decision": "hold_frozen_baseline",
+      "status": "blocked_current_best",
+      "detail": "The weekly baseline review keeps the frozen baseline in place because current-best row `psion_executor_local_cluster_ledger_row_4080_v1` still carries active blocks [missing_eval_fact_current_best, missing_export_fact_current_best]. Only the frozen pack ids [\"tassadar.eval.frequent.v0\", \"tassadar.eval.promotion.v0\"] were admitted as review truth.",
+      "decision_digest": "cade59562a2f0a71399b8f38fe92c67af46f592c4ebe525fc992bf7a82c7fb7e"
+    },
+    {
+      "review_id": "psion_executor_weekly_ablation_review_2026w14_v1",
+      "review_kind": "ablation_review",
+      "cadence_window_id": "2026-W14",
+      "reviewer_role": "Weekly ablation review owner",
+      "reviewer_identity": "Christopher David",
+      "cited_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "cited_row_ids": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ],
+      "cited_block_ids": [
+        "missing_eval_fact_current_best",
+        "missing_export_fact_current_best"
+      ],
+      "decision": "hold_same_budget_follow_on",
+      "status": "blocked_current_best",
+      "detail": "The weekly ablation review refuses to authorize a new same-budget winner while current-best row `psion_executor_local_cluster_ledger_row_4080_v1` still carries active blocks [missing_eval_fact_current_best, missing_export_fact_current_best]. The cited evidence remains limited to frozen pack ids [\"tassadar.eval.frequent.v0\", \"tassadar.eval.promotion.v0\"] plus retained ledger/dashboard/autoblock facts.",
+      "decision_digest": "5b2f12446bde053ac7a5e920f053092cd2aee7931d4c12885bb47a33d1ddf932"
+    }
+  ],
+  "frozen_pack_only_rule": "Only frozen frequent-pack and promotion-pack results plus the canonical ledger/dashboard/autoblock surfaces count toward weekly review decisions. Partial probes, ad hoc experiments, and convenience subsets do not count as review truth.",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_OWNERSHIP.md",
+    "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md"
+  ],
+  "summary": "The admitted executor lane now has one canonical weekly review workflow. Baseline and ablation decisions both cite frozen-pack ids, retained ledger rows, and active auto-block ids instead of informal review prose.",
+  "workflow_digest": "920d5cc2b4a4e20bd951c4a2cc0776d3a56ad7dc3191e3aed3baab9ab95a014a"
+}
