@@ -1,0 +1,52 @@
+{
+  "schema_version": "psion.executor.mlx_checkpoint_compatibility.v1",
+  "packet_id": "psion_executor_mlx_checkpoint_compatibility_v1",
+  "admitted_profile_id": "local_mac_mlx_aarch64",
+  "forward_load_parity_ref": "fixtures/psion/executor/psion_executor_mlx_forward_load_parity_v1.json",
+  "forward_load_parity_sha256": "88963c554065ce30850ec3fe3965f179eb6d3e3f4018b4aecc5d96a25aef2620",
+  "retained_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+  "retained_report_sha256": "ba9da70b60669297e03029fdddab5606d80b4cd6c345e1d3eb1f88d537f529f6",
+  "retained_report_schema_version": "psionic.open_adapter_same_node_wallclock_benchmark.v1",
+  "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "logical_device_kind": "metal",
+  "logical_device_label": "metal:0",
+  "retained_run_id": "same-node-wallclock-retained-mlx",
+  "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+  "completed_steps": 93184,
+  "portable_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+  "portable_bundle_sha256": "4a345019512aae63c517c3261439e0dbd3a1a113745c80ae4244250abfff3e91",
+  "deferred_import_plan_digest": "8932fc2305dd3cf091902e163bb70a74c0e380f707af56a3c53718ad43cb2ccd",
+  "deferred_import_tensor_count": 6,
+  "deferred_tensor_count": 6,
+  "restore_facts": {
+    "model_family": "gpt_oss.decoder_lm_head_lora",
+    "revision": "swarm-local-v1",
+    "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+    "state_dict_digest": "8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8",
+    "training_group_count": 2,
+    "tensor_count": 6,
+    "tokenizer_contract_digest": "fcf08524b93c86925d94d62fc785c5b45a33ddc9d54b39e2e3643b24810d564c"
+  },
+  "compatibility_contract_digest": "fba40c5402d57ca5efbaad21f8b93b663328377e1d6c5bad5fef2449376ee6d1",
+  "compatibility_signature_lines": [
+    "model_family=gpt_oss.decoder_lm_head_lora",
+    "revision=swarm-local-v1",
+    "state_dict_digest=8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8",
+    "contract_digest=fba40c5402d57ca5efbaad21f8b93b663328377e1d6c5bad5fef2449376ee6d1",
+    "PsionicStateDict|import=Supported|export=Supported|roundtrip=Supported",
+    "PsionicManifestSafetensors|import=Supported|export=Supported|roundtrip=Supported",
+    "TorchStateDictJson|import=Supported|export=Supported|roundtrip=Supported",
+    "Gguf|import=Supported|export=Unsupported|roundtrip=Unsupported",
+    "TorchPickle|import=Unsupported|export=Unsupported|roundtrip=Unsupported",
+    "LegacyOpaqueCheckpoint|import=Unsupported|export=Unsupported|roundtrip=Unsupported"
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/MODEL_IO_REFERENCE.md",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors"
+  ],
+  "summary": "The admitted Mac MLX executor profile now has one checkpoint compatibility packet built from `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json` and `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors`. The retained MLX run kept checkpoint family `benchmark.open_adapter.same_node.mlx.retained` through 93184 steps, the portable bundle imports through a deferred plan digest `8932fc2305dd3cf091902e163bb70a74c0e380f707af56a3c53718ad43cb2ccd`, eager restore reproduces state-dict digest `8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8`, and the compatibility contract stays explicit instead of hiding model-IO boundaries.",
+  "packet_digest": "61c0d651e14f53b9fbeeaa583bdcd282d10ebb5906b1785a0921151ccb184081"
+}

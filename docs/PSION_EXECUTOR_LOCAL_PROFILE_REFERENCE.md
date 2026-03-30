@@ -66,10 +66,14 @@ It is grounded in the already-shipped surfaces:
 The first executor-lane MLX load/forward boundary is now also explicit:
 
 - `docs/PSION_EXECUTOR_MLX_FORWARD_LOAD_PARITY.md`
+- `docs/PSION_EXECUTOR_MLX_CHECKPOINT_COMPATIBILITY.md`
 
 That packet keeps the shipped MLX entrypoint, admitted forward probe, bounded
 converted-equivalent load lane, and explicit parity gaps in one reviewable
-place before smoke-run and checkpoint work starts citing the Mac profile.
+place before smoke-run and checkpoint work starts citing the Mac profile. The
+checkpoint packet then binds the retained same-node MLX bundle back into the
+canonical model-IO import and compatibility contract instead of leaving MLX
+checkpoint claims as a freeform note.
 
 ## Current Admitted 4080 Tailnet Profile
 
