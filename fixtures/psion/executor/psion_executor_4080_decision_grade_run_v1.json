@@ -1,0 +1,145 @@
+{
+  "schema_version": "psion.executor.4080_decision_grade_run.v1",
+  "packet_id": "psion_executor_4080_decision_grade_run_v1",
+  "worker_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "control_plane_profile_id": "local_tailnet_cluster_control_plane",
+  "decision_lane_id": "psion_executor_4080_decision_grade",
+  "decision_question_posture": "This packet counts as the first admitted 4080 decision-grade executor packet because it combines one retained same-node CUDA run with the supporting Mac -> 4080 -> Mac roundtrip, one explicit checkpoint-eval row, and one weekly ablation review row. It does not claim promotion readiness, full promotion-pack scoring, or the later canonical ledger schema from EPIC 4.",
+  "remote_launch_packet_ref": "fixtures/psion/executor/psion_executor_4080_remote_launch_v1.json",
+  "remote_launch_packet_sha256": "299ba27704f2f96fc172815ccb1b07116715479f73c18f94cac7f24f4dd99dfe",
+  "durable_checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_4080_durable_checkpoint_v1.json",
+  "durable_checkpoint_packet_sha256": "c1a983ae9eeb6bfdcd1fbd9f01cc13a3e2976c363e5d9035cc4268f84255c1f6",
+  "frequent_eval_packet_ref": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
+  "frequent_eval_packet_sha256": "93db62e514bdb276426fcddea240543e1d42da077dee4756777dd0bea7f89e83",
+  "smoke_packet_ref": "fixtures/psion/executor/psion_executor_4080_smoke_run_v1.json",
+  "smoke_packet_sha256": "d32483674a6e1b35f1e1efaa8c88c3a3d2c3930ecefc423af4245b6aeded41ac",
+  "recovery_packet_ref": "fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json",
+  "recovery_packet_sha256": "2f928e9a328c37de545bfd665f333d7a36ef019dc277c7fc62816f1815373868",
+  "retained_matrix_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+  "retained_matrix_report_sha256": "d34972dcd2c46b1a835a09c4aaaf350c37934b7a20a958f5d2d484e08b16f6ad",
+  "retained_remote_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json",
+  "retained_remote_report_sha256": "8d118c453c4b264e68cf908cafa1dbb83587f9164fafdfd361e0bc65ddd651dd",
+  "retained_remote_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors",
+  "retained_remote_bundle_sha256": "5e3b708051e6ccb86d9efe5e13f4ab425b3ec1bb74c28f6cc8f2b44a49129f7f",
+  "visualization_bundle_ref": "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_visualization_bundle_v2.json",
+  "visualization_bundle_sha256": "68570c1621341846459185b3f00da5d7a8f52418377b1e70fa155f60e77c754d",
+  "visualization_bundle_digest": "969bd18713eae8f2b7ee31aefc0ef842a4a6d7c9e94a4fb71b1a2715baa4cb41",
+  "visualization_run_index_ref": "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_run_index_v2.json",
+  "visualization_run_index_sha256": "6a88dd36d95464ef61383b55a4634c9f844413fb7c43d5843f8e332d9174512f",
+  "visualization_run_index_digest": "4a7b839e41e02d7cf0dc78a6b4de60f53e0049fd7ab1b0ce7109f01b95664167",
+  "run_registration_row": {
+    "registration_id": "psion_executor_4080_decision_grade_registration_v1",
+    "decision_run_id": "same-node-wallclock-retained-cuda",
+    "cluster_support_run_id": "tailrun-home-admitted-20260328k",
+    "admitted_profile_ids": [
+      "local_4080_cuda_tailnet_x86_64",
+      "local_tailnet_cluster_control_plane"
+    ],
+    "eval_pack_ids": [
+      "tassadar.eval.frequent.v0",
+      "tassadar.eval.promotion.v0"
+    ],
+    "checkpoint_evidence_mode": "approved_equivalent_subset",
+    "wallclock_budget_seconds": 600,
+    "detail": "This retained registration row seeds the later canonical run-registration ledger: same-node CUDA run `same-node-wallclock-retained-cuda` is the decision-grade accelerator fact, supporting Tailnet run `tailrun-home-admitted-20260328k` is the control-plane and checkpoint-evidence fact, and both frozen pack ids stay explicit before EPIC 4 generalizes the schema.",
+    "registration_digest": "baf46f827951453770aee2f323d05bb456d9a233420e8bd3c40b2f29e88d366e"
+  },
+  "weekly_ablation_review_row": {
+    "review_id": "psion_executor_4080_weekly_ablation_review_v1",
+    "cadence_id": "executor_weekly_ablation_review.v1",
+    "reviewer_role": "weekly_ablation_review_owner",
+    "reviewer_identity": "Christopher David",
+    "status": "reviewed",
+    "decision": "green_for_phase_exit",
+    "covered_gate_ids": [
+      "frozen_pack_binding_green",
+      "baseline_comparable_green",
+      "approved_equivalent_checkpoint_subset_green",
+      "local_cluster_roundtrip_green",
+      "weekly_ablation_review_green",
+      "dashboard_visibility_green"
+    ],
+    "detail": "The weekly ablation review owner accepted the first 4080 decision-grade packet for EPIC 3 because the run stayed bound to frozen packs, one explicit checkpoint-eval row, the admitted Tailnet roundtrip and recovery packets, and the retained same-budget CUDA comparison run `same-node-wallclock-retained-cuda`.",
+    "review_digest": "80b4747cb7002e292db5bd94a229905f0b850fd28b1f8bf8d5c1b0f49fade986"
+  },
+  "approved_equivalent_checkpoint_subset": {
+    "subset_id": "psion.executor.4080_decision_grade_equivalent_subset.v1",
+    "required_gate_ids": [
+      "frozen_pack_binding_green",
+      "baseline_comparable_green",
+      "local_cluster_roundtrip_green",
+      "weekly_ablation_review_green",
+      "dashboard_visibility_green"
+    ],
+    "subset_digest": "177adce779214af9a012fe647fff1e7867cf88d06677df0004759d8f2b44f2df",
+    "detail": "This approved 4080 decision-grade equivalent subset stands in for explicit multi-checkpoint repetition: one explicit frequent-pack ledger row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` stays green on the supporting Tailnet run, the retained CUDA run `same-node-wallclock-retained-cuda` consumes most of the 600-second budget on the admitted accelerator, the roundtrip and recovery packets stay green, and the run is now visible in the shared v2 dashboard grammar."
+  },
+  "decision_matrix_run_id": "tailrun-admitted-device-matrix-20260327b",
+  "decision_run_id": "same-node-wallclock-retained-cuda",
+  "cluster_support_run_id": "tailrun-home-admitted-20260328k",
+  "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+  "logical_device_label": "cuda:0",
+  "cluster_checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+  "cluster_checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+  "cluster_checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+  "cluster_checkpoint_step": 12,
+  "decision_checkpoint_family": "benchmark.open_adapter.same_node.cuda.retained",
+  "completed_steps": 47104,
+  "observed_wallclock_ms": 571633,
+  "final_mean_loss": 0.0,
+  "final_state_dict_digest": "ad0d0904c70293c5134b9719951a8b421acc1a56f79af967b3033962e4a3dccf",
+  "dashboard_entry_count": 7,
+  "gate_rows": [
+    {
+      "gate_id": "frozen_pack_binding_green",
+      "status": "green",
+      "detail": "The retained registration row binds both frozen executor pack ids (`tassadar.eval.frequent.v0` and `tassadar.eval.promotion.v0`) to the first 4080 decision-grade question instead of letting the accelerator run drift onto a private checklist."
+    },
+    {
+      "gate_id": "baseline_comparable_green",
+      "status": "green",
+      "detail": "The retained CUDA run `same-node-wallclock-retained-cuda` stayed inside the admitted device-matrix family, kept `local_to_remote_loss_delta_gap=0.0`, and therefore remains same-track comparable instead of becoming a one-off benchmark story."
+    },
+    {
+      "gate_id": "approved_equivalent_checkpoint_subset_green",
+      "status": "green",
+      "detail": "The first 4080 decision-grade packet uses the approved equivalent subset `psion.executor.4080_decision_grade_equivalent_subset.v1` rather than pretending two full explicit checkpoint-eval points already exist; the explicit checkpoint row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` remains retained and the rest of the requirement stays visible instead of implied."
+    },
+    {
+      "gate_id": "local_cluster_roundtrip_green",
+      "status": "green",
+      "detail": "The supporting Tailnet run `tailrun-home-admitted-20260328k` keeps Mac -> 4080 -> Mac launch, durable checkpoint, strict replay, and recovery truth explicit with checkpoint pointer `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` and checkpoint ref `checkpoint://swarm/first-swarm-live-plan/policy`."
+    },
+    {
+      "gate_id": "weekly_ablation_review_green",
+      "status": "green",
+      "detail": "Weekly ablation review row `psion_executor_4080_weekly_ablation_review_v1` now exists with decision `green_for_phase_exit` and keeps the first 4080 decision-grade packet reviewable under the named cadence in `docs/PSION_EXECUTOR_OWNERSHIP.md`."
+    },
+    {
+      "gate_id": "dashboard_visibility_green",
+      "status": "green",
+      "detail": "The retained 4080 decision-grade bundle now appears in the shared v2 run index with 7 total entries instead of hiding behind packet prose alone."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
+    "docs/PSION_EXECUTOR_DECISION_THRESHOLDS.md",
+    "docs/PSION_EXECUTOR_OWNERSHIP.md",
+    "fixtures/psion/executor/psion_executor_4080_remote_launch_v1.json",
+    "fixtures/psion/executor/psion_executor_4080_durable_checkpoint_v1.json",
+    "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
+    "fixtures/psion/executor/psion_executor_4080_smoke_run_v1.json",
+    "fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors",
+    "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_visualization_bundle_v2.json",
+    "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_run_index_v2.json"
+  ],
+  "summary": "The admitted 4080 profile now has one retained decision-grade packet. The baseline-comparable CUDA run `same-node-wallclock-retained-cuda` on `cuda:0` stays anchored to the retained device-matrix report (steps=47104 wallclock_ms=571633 final_mean_loss=0.000000), the supporting Tailnet cluster run `tailrun-home-admitted-20260328k` keeps checkpoint pointer `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` and one explicit frozen frequent-pack row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` machine-legible, and the packet now carries a retained registration row, weekly ablation review row, and shared v2 dashboard visibility with 7 total entries while still refusing promotion or full multi-checkpoint repetition claims.",
+  "packet_digest": "3e406cd85a6bf918fe0e219dc2e77f4801750798bc16aa28ca355457e44ae8f5"
+}

@@ -1,0 +1,237 @@
+{
+  "schema_version": "psionic.remote_training_visualization_bundle.v2",
+  "bundle_id": "psion-executor-4080-decision-grade-run-v2",
+  "provider": "local_hybrid",
+  "profile_id": "local_4080_cuda_tailnet_x86_64",
+  "lane_id": "psion_executor_4080_decision_grade",
+  "run_id": "same-node-wallclock-retained-cuda",
+  "repo_revision": "7d3848050a5992abaa8113ed61dea843b0f41264",
+  "track_semantics": {
+    "track_family": "psion",
+    "track_id": "psion.executor.4080_decision_grade.v1",
+    "execution_class": "home_cluster_mixed_device",
+    "comparability_class": "same_track_comparable",
+    "proof_posture": "runtime_measured",
+    "public_equivalence_class": "not_applicable",
+    "score_law_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+    "wallclock_cap_seconds": 600,
+    "semantic_summary": "The admitted 4080 decision-grade lane binds one retained same-node CUDA wallclock run to the Mac -> 4080 -> Mac roundtrip packets, one explicit checkpoint-eval row, and one weekly ablation review row without pretending promotion or full multi-checkpoint repetition already exists."
+  },
+  "result_classification": "completed_success",
+  "refresh_contract": {
+    "target_ui_update_interval_ms": 1000,
+    "emission_mode": "post_run_only",
+    "last_heartbeat_at_ms": 1743127771633,
+    "heartbeat_seq": 4
+  },
+  "series_status": "available",
+  "timeline": [
+    {
+      "observed_at_ms": 1743127200000,
+      "phase": "launch",
+      "subphase": "tailnet_control_plane",
+      "detail": "The admitted Mac control plane launched the bounded 4080 worker role and sealed the reachable Tailnet worker contract before the decision-grade packet was formed."
+    },
+    {
+      "observed_at_ms": 1743127380000,
+      "phase": "training",
+      "subphase": "retained_cuda_same_node_run",
+      "detail": "The retained CUDA run `same-node-wallclock-retained-cuda` consumed most of the admitted 600-second budget on `cuda:0` and supplies the baseline-comparable accelerator facts for the first 4080 decision-grade packet."
+    },
+    {
+      "observed_at_ms": 1743127620000,
+      "phase": "review",
+      "subphase": "checkpoint_and_recovery_binding",
+      "detail": "The explicit frequent-pack ledger row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` and recovery packet `fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json` stayed green on the supporting Tailnet cluster run instead of leaving checkpoint truth implied."
+    },
+    {
+      "observed_at_ms": 1743127771633,
+      "phase": "review",
+      "subphase": "weekly_ablation_review",
+      "detail": "The first 4080 decision-grade packet is sealed only after weekly ablation review confirms frozen-pack binding, baseline comparability, equivalent checkpoint evidence, and visibility in the shipped v2 dashboard grammar."
+    }
+  ],
+  "summary": {
+    "total_steps_completed": 47104,
+    "latest_global_step": 47104,
+    "latest_train_loss": 0.0,
+    "latest_validation_loss": 0.0,
+    "latest_tokens_per_second": 2357371,
+    "latest_samples_per_second_milli": 10547523,
+    "latest_checkpoint_ref": "benchmark.open_adapter.same_node.cuda.retained#same-node-wallclock-retained-cuda",
+    "detail": "The retained 4080 decision-grade packet surfaces one reviewable CUDA run with explicit Tailnet roundtrip, frequent-eval, interruption-recovery, and weekly-review lineage."
+  },
+  "heartbeat_series": [
+    {
+      "observed_at_ms": 1743127200000,
+      "phase": "launch",
+      "subphase": "tailnet_control_plane",
+      "step_in_progress": 0,
+      "active_subsystems": [
+        "tailnet",
+        "worker_launch"
+      ],
+      "stale_after_ms": 5000
+    },
+    {
+      "observed_at_ms": 1743127380000,
+      "phase": "training",
+      "subphase": "retained_cuda_same_node_run",
+      "step_in_progress": 23552,
+      "microbatch_in_progress": 1,
+      "active_subsystems": [
+        "cuda",
+        "checkpoint"
+      ],
+      "stale_after_ms": 5000
+    },
+    {
+      "observed_at_ms": 1743127620000,
+      "phase": "review",
+      "subphase": "frequent_eval_and_recovery",
+      "step_in_progress": 47104,
+      "active_subsystems": [
+        "validator",
+        "replay_policy"
+      ],
+      "stale_after_ms": 5000
+    },
+    {
+      "observed_at_ms": 1743127771633,
+      "phase": "review",
+      "subphase": "weekly_ablation_review",
+      "step_in_progress": 47104,
+      "active_subsystems": [
+        "dashboard",
+        "ledger"
+      ],
+      "stale_after_ms": 5000
+    }
+  ],
+  "loss_series": [
+    {
+      "global_step": 0,
+      "elapsed_ms": 0,
+      "train_loss": 6.932116
+    },
+    {
+      "global_step": 23552,
+      "elapsed_ms": 285816,
+      "train_loss": 3.466058,
+      "validation_loss": 3.466058
+    },
+    {
+      "global_step": 47104,
+      "elapsed_ms": 571633,
+      "train_loss": 0.0,
+      "validation_loss": 0.0
+    }
+  ],
+  "math_series": [
+    {
+      "observed_at_ms": 1743127771633,
+      "global_step": 47104,
+      "non_finite_count": 0,
+      "model_specific_diagnostics": {
+        "local_to_remote_steps_ratio": 1.9723985,
+        "loss_delta_gap": 0.0
+      }
+    }
+  ],
+  "runtime_series": [
+    {
+      "observed_at_ms": 1743127771633,
+      "tokens_per_second": 2357371,
+      "samples_per_second_milli": 10547523
+    }
+  ],
+  "gpu_series": [],
+  "distributed_series": [
+    {
+      "observed_at_ms": 1743127620000,
+      "participating_rank_count": 2,
+      "rank_skew_ms": 18000,
+      "stalled_rank_count": 0
+    }
+  ],
+  "event_series": [
+    {
+      "observed_at_ms": 1743127620000,
+      "severity": "info",
+      "event_kind": "approved_equivalent_checkpoint_subset",
+      "detail": "The first 4080 decision-grade packet uses an approved equivalent checkpoint subset: one explicit frequent-pack row on the supporting Tailnet run plus the full-budget retained CUDA run, recovery packet, and weekly review row."
+    },
+    {
+      "observed_at_ms": 1743127771633,
+      "severity": "info",
+      "event_kind": "weekly_ablation_review",
+      "detail": "The weekly ablation review owner marked the first 4080 decision-grade packet green for the phase exit while keeping promotion and broader executor replacement claims closed."
+    }
+  ],
+  "source_artifacts": [
+    {
+      "artifact_role": "decision_grade_packet",
+      "artifact_uri": "fixtures/psion/executor/psion_executor_4080_decision_grade_run_v1.json",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psion.executor.4080_decision_grade_run.v1"
+      ],
+      "detail": "The 4080 decision-grade packet is the authoritative admission receipt for the first admitted accelerator-backed decision-grade run."
+    },
+    {
+      "artifact_role": "matrix_report",
+      "artifact_uri": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+      "artifact_digest": "d34972dcd2c46b1a835a09c4aaaf350c37934b7a20a958f5d2d484e08b16f6ad",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psionic.open_adapter_tailnet_admitted_device_matrix.v1"
+      ],
+      "detail": "The admitted device-matrix report preserves the baseline-comparable same-budget CUDA run beside the reachable M5 MLX reference lane."
+    },
+    {
+      "artifact_role": "remote_report",
+      "artifact_uri": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/report.json",
+      "artifact_digest": "8d118c453c4b264e68cf908cafa1dbb83587f9164fafdfd361e0bc65ddd651dd",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psionic.open_adapter_same_node_wallclock_benchmark.v1"
+      ],
+      "detail": "The retained CUDA report remains authoritative for the decision-grade steps, wallclock, throughput, and final loss facts."
+    },
+    {
+      "artifact_role": "portable_bundle",
+      "artifact_uri": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors",
+      "artifact_digest": "5e3b708051e6ccb86d9efe5e13f4ab425b3ec1bb74c28f6cc8f2b44a49129f7f",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psionic.open_adapter_same_node_wallclock_benchmark.v1"
+      ],
+      "detail": "The retained CUDA portable bundle is the decision-grade export artifact for the admitted accelerator lane."
+    },
+    {
+      "artifact_role": "frequent_eval_packet",
+      "artifact_uri": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psion.executor.4080_frequent_eval_attachment.v1"
+      ],
+      "detail": "The frequent-eval packet keeps one explicit checkpoint-time frozen-pack row bound into the decision-grade packet."
+    },
+    {
+      "artifact_role": "recovery_packet",
+      "artifact_uri": "fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psion.executor.4080_interruption_recovery.v1"
+      ],
+      "detail": "The interruption-recovery packet keeps stale-worker, replay, and upload-disagreement posture explicit for the supporting Tailnet cluster run."
+    }
+  ],
+  "bundle_digest": "969bd18713eae8f2b7ee31aefc0ef842a4a6d7c9e94a4fb71b1a2715baa4cb41"
+}

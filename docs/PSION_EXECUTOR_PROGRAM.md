@@ -129,6 +129,9 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md` owns the retained
   interruption-recovery packet and restore-evidence contract for the admitted
   4080 worker lane
+- `docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md` owns the retained 4080
+  decision-grade packet, run-registration row, weekly ablation review row, and
+  shared v2 dashboard visibility packet for the admitted 4080 worker lane
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

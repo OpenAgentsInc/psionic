@@ -154,6 +154,37 @@ That keeps the decision-grade lane honest too:
 - Mac -> 4080 -> Mac roundtrip truth remains deferred to EPIC 3 rather than
   being implied by local-only visibility
 
+### 4080 Decision-Grade Equivalent Subset
+
+Phase-one 4080 decision-grade work now has one explicit accelerator-backed
+packet, but it still does not pretend that the retained Tailnet cluster run
+already emitted repeated multi-checkpoint promotion-pack coverage.
+
+So the first 4080 decision-grade packet uses one approved equivalent subset:
+
+- subset id: `psion.executor.4080_decision_grade_equivalent_subset.v1`
+- required gates:
+  `frozen_pack_binding_green`,
+  `baseline_comparable_green`,
+  `local_cluster_roundtrip_green`,
+  `weekly_ablation_review_green`,
+  `dashboard_visibility_green`
+
+That keeps the 4080 decision-grade lane honest too:
+
+- the retained CUDA run must consume most of the admitted local budget
+- one explicit frequent-pack checkpoint row must remain retained on the
+  supporting Tailnet run
+- the supporting Tailnet run must keep launch, checkpoint, replay, and
+  recovery truth green
+- the run must bind into one retained weekly ablation review row instead of
+  becoming an operator-memory story
+- the run must appear in the shipped remote-training `v2` bundle and run-index
+  grammar
+- promotion-pack scoring and broader replacement truth remain deferred to later
+  promotion work instead of being implied by one accelerator-backed decision
+  packet
+
 ## `tassadar.eval.promotion.v0`
 
 This is the first executor promotion pack.

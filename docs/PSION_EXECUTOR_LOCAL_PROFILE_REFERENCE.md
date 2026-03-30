@@ -192,6 +192,15 @@ The artifact return rule is now explicit too:
 - the Mac controller-owned run root is the canonical counting artifact home
 - partial remote outputs do not count until the retained bundle exists locally
 
+The current decision-grade closeout is explicit too:
+
+- `docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md` combines the retained
+  same-node CUDA decision run with the supporting Tailnet launch, checkpoint,
+  frequent-eval, smoke, and recovery packets
+- that packet carries one retained run-registration row and one retained weekly
+  ablation review row so the first 4080 decision-grade run is reviewable now
+  instead of waiting for EPIC 4 to invent the vocabulary afterward
+
 ## Honest Boundary
 
 This catalog still does not claim:

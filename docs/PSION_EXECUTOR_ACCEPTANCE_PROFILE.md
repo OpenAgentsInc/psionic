@@ -73,6 +73,11 @@ Every executor-capable candidate must keep all of the following green:
   `docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md` may count as the approved
   equivalent local subset, but it does not waive the later roundtrip gate for
   broader executor claims
+- for the first admitted 4080 decision-grade question,
+  `docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md` may count as the approved
+  equivalent checkpoint subset only because it still keeps one explicit
+  checkpoint-eval row, one weekly ablation review row, and the supporting
+  Tailnet roundtrip/recovery packets visible together
 
 ### Consumer-seam gate
 
