@@ -1,0 +1,184 @@
+{
+  "schema_version": "psion.executor.local_cluster_ledger.v1",
+  "ledger_id": "psion_executor_local_cluster_ledger_v1",
+  "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
+  "registration_packet_sha256": "17c04733fad4b2cf1a2c2ef5c4861dd8fcff0c90a72714ed2a56243ee794bc08",
+  "registration_packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_sha256": "84ce0ae59eacb7c3d180ebf8dfb6753239488cad03404b0d9ec91923012cc502",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
+  "rows": [
+    {
+      "row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+      "registration_id": "psion_executor_local_cluster_registration_mlx_v1",
+      "run_id": "same-node-wallclock-retained-mlx",
+      "search_run_ids": [
+        "same-node-wallclock-retained-mlx",
+        "tailrun-admitted-device-matrix-20260327b"
+      ],
+      "admitted_profile_id": "local_mac_mlx_aarch64",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "candidate_status": "candidate",
+      "eval_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "config_summary": "MLX local decision-grade registration keeps profile `local_mac_mlx_aarch64` with stop condition `Consume the admitted 600 second local MLX decision-grade budget while keeping the frozen frequent and promotion packs bound to the retained same-node run.` and batch geometry 8x128 under the canonical local-cluster schema.",
+      "checkpoint_lineage": {
+        "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+        "export_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+        "export_artifact_digest": "88006c8f787eb0e031a9e413778659e701689a7f217b669b6525d129ec45f6b1",
+        "detail": "The local MLX row keeps the retained same-node checkpoint family explicit and records the Mac export-inspection bundle plus torch-style compatibility artifact as the current export lineage."
+      },
+      "cost_posture": {
+        "wallclock_budget_seconds": 600,
+        "observed_duration_ms": 573332,
+        "budget_burn_ratio": 0.955553333333333,
+        "detail": "The retained same-node MLX decision-grade run consumed most of the admitted 600 second budget without requiring a remote worker or later roundtrip recovery proof."
+      },
+      "metric_posture": {
+        "completed_steps": 93184,
+        "final_mean_loss": 0.0,
+        "observed_steps_per_second": 162.53061053630358,
+        "observed_samples_per_second": 20803.91814864686,
+        "observed_source_tokens_per_second": 4649675.706222572,
+        "detail": "The retained same-node MLX report remains the canonical metric source for the local Mac row and stays directly comparable to the 4080 row through the shared admitted-device matrix."
+      },
+      "failure_facts": [
+        {
+          "fact_id": "same_node_mlx_no_retained_failure_window",
+          "status": "green",
+          "detail": "No retained interruption or export failure remains open on the same-node MLX decision-grade row once the Mac export-inspection packet is bound into the ledger."
+        }
+      ],
+      "export_status": "green",
+      "recovery_status": "not_required_same_node",
+      "detail": "The local MLX ledger row binds registration, metric, and export facts into one searchable record so the Mac lane no longer depends on reading separate decision and export packets by hand.",
+      "row_digest": "a181d94f23a2ed60b5ece4440beed8f7bea5b69ec9e395baff5d3585d1285410"
+    },
+    {
+      "row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+      "registration_id": "psion_executor_local_cluster_registration_4080_v1",
+      "run_id": "tailrun-home-admitted-20260328k",
+      "search_run_ids": [
+        "tailrun-home-admitted-20260328k",
+        "same-node-wallclock-retained-cuda",
+        "tailrun-admitted-device-matrix-20260327b"
+      ],
+      "admitted_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "candidate_status": "current_best",
+      "eval_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "config_summary": "4080 decision-grade registration keeps worker profile `local_4080_cuda_tailnet_x86_64` with control-plane `local_tailnet_cluster_control_plane` and stop condition `Consume the admitted 600 second 4080 decision-grade budget while keeping the frozen frequent and promotion packs bound to the supporting Tailnet cluster run and its retained same-node CUDA comparison run.` under the canonical local-cluster schema.",
+      "checkpoint_lineage": {
+        "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+        "checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+        "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+        "detail": "The 4080 row keeps the supporting Tailnet checkpoint family, pointer digest, and checkpoint ref explicit, but export back onto the Mac remains pending until the roundtrip issue lands."
+      },
+      "cost_posture": {
+        "wallclock_budget_seconds": 600,
+        "observed_duration_ms": 571633,
+        "budget_burn_ratio": 0.952721666666667,
+        "detail": "The retained 4080 decision-grade run consumed most of the admitted 600 second accelerator budget and remains the current-best accelerator-backed local row."
+      },
+      "metric_posture": {
+        "completed_steps": 47104,
+        "final_mean_loss": 0.0,
+        "observed_steps_per_second": 82.40252049829174,
+        "observed_samples_per_second": 10547.522623781342,
+        "observed_source_tokens_per_second": 2357371.30641513,
+        "detail": "The retained same-node CUDA report remains the canonical metric source for the 4080 row and is still explicitly tied back to the supporting Tailnet cluster workflow."
+      },
+      "failure_facts": [
+        {
+          "fact_id": "unsupported_precision_publish_refusal",
+          "status": "refused",
+          "detail": "open adapter backend does not yet support precision policy `Bf16Mixed`"
+        },
+        {
+          "fact_id": "stale_worker_replay_required",
+          "status": "replay_required",
+          "detail": "Stale worker remains replay-required with aggregation blocked at timeout 5000 ms."
+        },
+        {
+          "fact_id": "upload_disagreement_rejected",
+          "status": "rejected",
+          "detail": "Upload disagreement still resolves as rejected inside the retained recovery drill instead of silently entering lineage."
+        },
+        {
+          "fact_id": "uneven_worker_speed_wait_then_replay",
+          "status": "wait_then_replay",
+          "detail": "Uneven worker speed remains explicit at 18000 ms observed skew."
+        }
+      ],
+      "export_status": "pending_mac_roundtrip_validation",
+      "recovery_status": "green",
+      "detail": "The 4080 ledger row binds registration, checkpoint lineage, retained failure drills, and explicit export-pending posture into one searchable record so the accelerator lane no longer hides its current gap behind separate packet prose.",
+      "row_digest": "78d08622a1daee7e4b4913b59e82a3081354edd6a2ad0dc3242ced2ddd07630e"
+    }
+  ],
+  "search_index": {
+    "run_id_to_row_ids": {
+      "same-node-wallclock-retained-cuda": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ],
+      "same-node-wallclock-retained-mlx": [
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ],
+      "tailrun-admitted-device-matrix-20260327b": [
+        "psion_executor_local_cluster_ledger_row_4080_v1",
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ],
+      "tailrun-home-admitted-20260328k": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ]
+    },
+    "profile_id_to_row_ids": {
+      "local_4080_cuda_tailnet_x86_64": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ],
+      "local_mac_mlx_aarch64": [
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ]
+    },
+    "eval_pack_id_to_row_ids": {
+      "tassadar.eval.frequent.v0": [
+        "psion_executor_local_cluster_ledger_row_4080_v1",
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ],
+      "tassadar.eval.promotion.v0": [
+        "psion_executor_local_cluster_ledger_row_4080_v1",
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ]
+    },
+    "model_id_to_row_ids": {
+      "tassadar-article-transformer-trace-bound-trained-v0": [
+        "psion_executor_local_cluster_ledger_row_4080_v1",
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ]
+    },
+    "candidate_status_to_row_ids": {
+      "candidate": [
+        "psion_executor_local_cluster_ledger_row_mlx_v1"
+      ],
+      "current_best": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ]
+    }
+  },
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md",
+    "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md",
+    "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md",
+    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md"
+  ],
+  "summary": "The executor lane now has one searchable local-cluster ledger. It joins the canonical MLX and 4080 run registrations with checkpoint lineage, cost, metric, failure, recovery, and export posture so expensive local executor runs stop living as separate packet fragments.",
+  "ledger_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632"
+}

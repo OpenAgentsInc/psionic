@@ -135,6 +135,8 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md` owns the canonical
   Mac-and-4080 run-registration schema that later local-cluster ledger,
   dashboard, and roundtrip artifacts build on
+- `docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md` owns the first searchable
+  cumulative ledger for the retained MLX and 4080 executor rows
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

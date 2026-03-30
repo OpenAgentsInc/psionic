@@ -53,11 +53,11 @@ validation at the schema boundary instead of staying review-time guesswork.
 ## Current Retained Truth
 
 - packet digest:
-  `1e8b0b72529359eb14a3eb5d4005e5370dfcdc5442fc8d5aa78a8db13e954d08`
+  `cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474`
 - MLX registration digest:
   `37ec1615b4724e087b757b846ac34eb11094b2f953d6e0be2ea8deb41ad17f2f`
 - 4080 registration digest:
-  `100b8d8f4e6f30f3e4b9ba93ea5b657b73be0d92aee4817c39636e0332bc3717`
+  `cf4327e6f9b3dc714ad156aa7a6aee2888ce72bfde4a273744aa6cbf976b3ba9`
 - model id:
   `tassadar-article-transformer-trace-bound-trained-v0`
 - MLX run id:
