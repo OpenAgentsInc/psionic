@@ -156,6 +156,9 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_CURRICULUM_BOUNDARIES.md` owns the first canonical
   stagewise curriculum packet that binds the executor mixture to explicit
   boundary-anchor, frequent-pack, and promotion-pack transitions
+- `docs/PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION.md` owns the first canonical
+  mixture-review report that keeps per-family slice deltas separate from
+  run-level throughput and stability regressions on the current-best 4080 row
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

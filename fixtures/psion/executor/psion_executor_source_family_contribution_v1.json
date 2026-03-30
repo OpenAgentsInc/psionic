@@ -1,0 +1,227 @@
+{
+  "schema_version": "psion.executor.source_family_contribution.v1",
+  "report_id": "psion_executor_source_family_contribution_v1",
+  "mixture_ref": "fixtures/psion/executor/psion_executor_canonical_mixture_v0.json",
+  "mixture_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
+  "local_cluster_ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
+  "local_cluster_ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
+  "baseline_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+  "baseline_row_digest": "a181d94f23a2ed60b5ece4440beed8f7bea5b69ec9e395baff5d3585d1285410",
+  "candidate_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+  "candidate_row_digest": "7b334f3a3a13b062453e4d6cc06b0f41b330036e6aac6042e7f88a002e4fcc56",
+  "source_family_rows": [
+    {
+      "source_family_id": "executor.boundary_prefix_traces",
+      "initial_weight_bps": 2200,
+      "primary_eval_slice_ids": [
+        "frequent_exactness_cases_v0",
+        "frequent_held_out_exclusions_v0"
+      ],
+      "exactness_delta_bps": 0,
+      "held_out_slice_deltas": [
+        {
+          "slice_id": "frequent_held_out_exclusions_v0",
+          "delta_bps": 0,
+          "detail": "Boundary-prefix traces keep the held-out exclusion boundary flat on the retained baseline packet.",
+          "row_digest": "dbdb5b37556fcc7b6af72b1c4e697efafae1e249e7937d118fb222c64028f15c"
+        }
+      ],
+      "adversarial_slice_deltas": [],
+      "detail": "Boundary-prefix traces remain a zero-delta family on the retained baseline: frequent exactness and held-out exclusion slices stay green and unchanged while later mixture runs are still pending.",
+      "row_digest": "20ff51630e0ee610de4d6159646ae204d9265ff97717dd7777a3277c4ba5b2bc"
+    },
+    {
+      "source_family_id": "executor.article_route_direct_traces",
+      "initial_weight_bps": 1800,
+      "primary_eval_slice_ids": [
+        "frequent_exactness_cases_v0",
+        "promotion_exactness_suite_v0",
+        "promotion_held_out_suite_v0"
+      ],
+      "exactness_delta_bps": 0,
+      "held_out_slice_deltas": [
+        {
+          "slice_id": "frequent_held_out_exclusions_v0",
+          "delta_bps": 0,
+          "detail": "Article-route direct traces do not move the retained frequent held-out exclusions on the current baseline.",
+          "row_digest": "990d0735070eccfd2bd1039b9b1d401746404d713874d516e603cbff4942d473"
+        },
+        {
+          "slice_id": "promotion_held_out_suite_v0",
+          "delta_bps": 0,
+          "detail": "Article-route direct traces keep the retained promotion held-out suite flat on the current baseline packet.",
+          "row_digest": "0bbe80a7ea4156fa7a2562650b4b0c9d6c38df20074cf0862eb3e6119ff3922a"
+        }
+      ],
+      "adversarial_slice_deltas": [],
+      "detail": "Article-route direct traces keep both frequent and promotion exactness slices flat on the retained baseline packet; no held-out movement is credited yet because no new mixture candidate has run.",
+      "row_digest": "37f03ce6471e14e489cf8b0262f00aaf92d3d0eae68eb11b343ecd4e09a37cdb"
+    },
+    {
+      "source_family_id": "executor.long_loop_kernel_traces",
+      "initial_weight_bps": 2000,
+      "primary_eval_slice_ids": [
+        "promotion_exactness_suite_v0",
+        "promotion_held_out_suite_v0",
+        "promotion_adversarial_suite_v0"
+      ],
+      "exactness_delta_bps": 0,
+      "held_out_slice_deltas": [
+        {
+          "slice_id": "promotion_held_out_suite_v0",
+          "delta_bps": 0,
+          "detail": "Long-loop kernel traces keep the retained promotion held-out suite flat at baseline.",
+          "row_digest": "2175b61017711f7e7a661895657c18c3ff1565a5bb6ea61b5bdba48f6eae385a"
+        }
+      ],
+      "adversarial_slice_deltas": [
+        {
+          "slice_id": "promotion_adversarial_suite_v0",
+          "delta_bps": 0,
+          "detail": "Long-loop kernel traces keep the adversarial promotion slice flat on the retained baseline packet.",
+          "row_digest": "b43e8348af23e6b4301a1bcf2b93ebe9c279b087393756a37e01cc282289b5b7"
+        }
+      ],
+      "detail": "Long-loop kernel traces are the heaviest promotion-stage family, but the retained packet still records zero exactness, held-out, and adversarial movement until a new mixture candidate exists.",
+      "row_digest": "6baebdeef683d760eb4605a92a03a48576d3952371cbacdb904a6beb342d9217"
+    },
+    {
+      "source_family_id": "executor.sudoku_v0_traces",
+      "initial_weight_bps": 1600,
+      "primary_eval_slice_ids": [
+        "promotion_exactness_suite_v0"
+      ],
+      "exactness_delta_bps": 0,
+      "held_out_slice_deltas": [],
+      "adversarial_slice_deltas": [],
+      "detail": "Sudoku traces remain a pure exactness-support family in the retained report and currently show zero delta against the frozen promotion exactness suite.",
+      "row_digest": "1ce0a0e0ad0aabd66218c07a27f9dd4df03a20d5a887e08e4dd7156433fae4c3"
+    },
+    {
+      "source_family_id": "executor.hungarian_matching_traces",
+      "initial_weight_bps": 1600,
+      "primary_eval_slice_ids": [
+        "promotion_exactness_suite_v0"
+      ],
+      "exactness_delta_bps": 0,
+      "held_out_slice_deltas": [],
+      "adversarial_slice_deltas": [],
+      "detail": "Hungarian-matching traces remain a pure exactness-support family in the retained report and currently show zero delta against the frozen promotion exactness suite.",
+      "row_digest": "33e3f6b79111bd22a872487bcd9337c5fbab00c5f5544d79bcca14c44258a8e5"
+    },
+    {
+      "source_family_id": "executor.refusal_negative_traces",
+      "initial_weight_bps": 800,
+      "primary_eval_slice_ids": [
+        "frequent_held_out_exclusions_v0",
+        "promotion_held_out_suite_v0",
+        "promotion_adversarial_suite_v0"
+      ],
+      "exactness_delta_bps": 0,
+      "held_out_slice_deltas": [
+        {
+          "slice_id": "frequent_held_out_exclusions_v0",
+          "delta_bps": 0,
+          "detail": "Refusal-negative traces keep the retained held-out exclusion boundary flat on the baseline packet.",
+          "row_digest": "977cf1636b63bcafbedb0339e040ae326006d506910524a9716ec30e0d849264"
+        },
+        {
+          "slice_id": "promotion_held_out_suite_v0",
+          "delta_bps": 0,
+          "detail": "Refusal-negative traces keep the promotion held-out suite flat on the baseline packet.",
+          "row_digest": "5c05e407f40f9c885bf4fbb38cf844b91e60c9717d10a869ccd165c891d715b2"
+        }
+      ],
+      "adversarial_slice_deltas": [
+        {
+          "slice_id": "promotion_adversarial_suite_v0",
+          "delta_bps": 0,
+          "detail": "Refusal-negative traces keep the adversarial promotion slice flat on the baseline packet.",
+          "row_digest": "bf347c21a712e3fa9025ec1d660b30e8a367590ce008c4c2ded2c6a1c9f038b9"
+        }
+      ],
+      "detail": "Refusal-negative traces still contribute only boundary integrity on the retained packet: held-out and adversarial slices remain flat until a fresh mixture candidate is compared.",
+      "row_digest": "149192845db6d9d1fb0e8e41d2abda5f6823f55b84427f81d5ec95a2ee98e655"
+    }
+  ],
+  "throughput_regressions": [
+    {
+      "metric_id": "observed_steps_per_second",
+      "baseline_profile_id": "local_mac_mlx_aarch64",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "baseline_value": 162.53061053630358,
+      "candidate_value": 82.40252049829174,
+      "delta_value": -80.12809003801185,
+      "regression": true,
+      "detail": "The current-best 4080 row is still slower than the retained MLX row on raw step throughput, so mixture review must keep accelerator throughput regressions visible instead of hiding them behind source-family prose.",
+      "row_digest": "73b8dce0ed563ad740cc31e2e02fed83ae9724636ddb3a6690f10c31ac0173ab"
+    },
+    {
+      "metric_id": "observed_samples_per_second",
+      "baseline_profile_id": "local_mac_mlx_aarch64",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "baseline_value": 20803.91814864686,
+      "candidate_value": 10547.522623781342,
+      "delta_value": -10256.395524865517,
+      "regression": true,
+      "detail": "Sample throughput is still below the retained MLX row on the admitted matrix, so weekly mixture review can see the accelerator deficit directly.",
+      "row_digest": "56a246c2f63bb7cb45d182923dc95e057d26c899e70eed9d32410992e9a44a6a"
+    },
+    {
+      "metric_id": "observed_source_tokens_per_second",
+      "baseline_profile_id": "local_mac_mlx_aarch64",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "baseline_value": 4649675.706222572,
+      "candidate_value": 2357371.30641513,
+      "delta_value": -2292304.3998074424,
+      "regression": true,
+      "detail": "Source-token throughput remains below the retained MLX row, which keeps throughput regressions explicit even while exactness and held-out deltas stay flat.",
+      "row_digest": "24c722dcb27adc515ce6c622bc8c9bac9997c4248b5845b89918523e24cf986e"
+    }
+  ],
+  "stability_regressions": [
+    {
+      "fact_id": "unsupported_precision_publish_refusal",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "regression_class": "publication_refusal",
+      "status": "refused",
+      "detail": "open adapter backend does not yet support precision policy `Bf16Mixed`",
+      "row_digest": "9f37f6f5497219f381133b76cf3f9409f1807145042926dc27547ae9a5e458ce"
+    },
+    {
+      "fact_id": "stale_worker_replay_required",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "regression_class": "recovery_gate",
+      "status": "replay_required",
+      "detail": "Stale worker remains replay-required with aggregation blocked at timeout 5000 ms.",
+      "row_digest": "74809472a048b17f285514c719ca9d9808f62d7a43f1a40cd66a7980a302527d"
+    },
+    {
+      "fact_id": "upload_disagreement_rejected",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "regression_class": "lineage_rejection",
+      "status": "rejected",
+      "detail": "Upload disagreement still resolves as rejected inside the retained recovery drill instead of silently entering lineage.",
+      "row_digest": "ed9189350964edd498d6f690ef0f47bbef5464beefc724bff001728ca8fa028c"
+    },
+    {
+      "fact_id": "uneven_worker_speed_wait_then_replay",
+      "candidate_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "regression_class": "worker_skew",
+      "status": "wait_then_replay",
+      "detail": "Uneven worker speed remains explicit at 18000 ms observed skew.",
+      "row_digest": "177b4ae0106ed9391e910e19fd0c96cc2a13ba7f667b1fbc56996c32a269b698"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md",
+    "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+  ],
+  "summary": "The executor lane now has one canonical source-family contribution report. It keeps all six source-family weights explicit against baseline-truth slice deltas (exactness, held-out, adversarial all remain flat at zero on the retained baseline), while the run-level section keeps 3 throughput regressions and 4 stability regressions visible on the current-best 4080 row instead of letting mixture review hide infrastructure debt.",
+  "report_digest": "c1e57dfd5187b778d10604f460553913786be9c5752e785ce0842f2aff66e42d"
+}
