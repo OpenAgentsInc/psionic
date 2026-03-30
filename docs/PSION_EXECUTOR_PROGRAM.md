@@ -104,6 +104,13 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_HULL_CACHE_BENCHMARK.md` owns the retained
   `HullKVCache` versus `reference_linear` benchmark packet and the fast-route
   promotion-block rule when serving truth turns red on the frozen closeout set
+- `docs/PSION_EXECUTOR_RESEARCH_BRANCH.md` owns the retained research-only
+  2D-head / executor-style branch packet that keeps experimental fast-path
+  work bound to the closeout trio, export truth, and carrier-binding truth
+- `docs/PSION_EXECUTOR_PERCEPTA_CLOSEOUT_STATUS.md` owns the retained bounded
+  Percepta / Tassadar-computation status packet that rolls workload truth,
+  fast-path truth, route-replacement truth, and research-branch posture into
+  one explicit `red | partial | green_bounded` verdict
 - `docs/PSION_EXECUTOR_BASELINE_TRUTH.md` owns the frozen `trained-v0`
   baseline-truth packet for those packs
 - `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md` owns the suite-by-suite prompt,

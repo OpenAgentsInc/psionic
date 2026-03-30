@@ -65,6 +65,8 @@ It keeps the actual bounded rule explicit:
 
 The next executor closeout surfaces build directly on this packet:
 
+- `docs/PSION_EXECUTOR_RESEARCH_BRANCH.md`
+- `docs/PSION_EXECUTOR_PERCEPTA_CLOSEOUT_STATUS.md`
 - `docs/PSION_EXECUTOR_TRACE_NATIVE_METRICS.md`
 - `docs/PSION_EXECUTOR_ARTICLE_CLOSEOUT_SET.md`
 - `docs/ROADMAP_PSION.md`

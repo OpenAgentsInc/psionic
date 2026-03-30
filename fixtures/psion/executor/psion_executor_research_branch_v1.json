@@ -1,0 +1,80 @@
+{
+  "schema_version": "psion.executor.research_branch.v1",
+  "packet_id": "psion_executor_research_branch_v1",
+  "branch_id": "psion.executor.research_branch.executor_style.v1",
+  "branch_status": "research_only",
+  "canonical_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "canonical_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "closeout_set_ref": "fixtures/psion/executor/psion_executor_article_closeout_set_v1.json",
+  "closeout_set_digest": "2de570208df4bec06457bb0699e34f42099c9a191c4eeeb31bcd2d71b8f70734",
+  "hull_cache_benchmark_ref": "fixtures/psion/executor/psion_executor_hull_cache_benchmark_v1.json",
+  "hull_cache_benchmark_digest": "67277c9c0e8d7e9f0fe4ef3c3bf882b62258712c9eb15cd425152a8c331e6668",
+  "mac_export_inspection_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+  "mac_export_inspection_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+  "fast_route_legitimacy_summary_ref": "fixtures/tassadar/reports/tassadar_post_article_fast_route_legitimacy_and_carrier_binding_contract_summary.json",
+  "fast_route_legitimacy_summary_digest": "3c7ae6551d9d451f815b3c97c4ee6ccb3dda186466d869ea3dc831cd5c5b47e0",
+  "closeout_evaluation_complete": true,
+  "route_truth_guard_green": true,
+  "export_truth_guard_green": true,
+  "carrier_binding_guard_green": true,
+  "widening_claim_blocked": true,
+  "experiments": [
+    {
+      "experiment_id": "two_d_head_hard_max_candidate",
+      "experiment_family": "two_d_head_executor_style",
+      "research_posture": "research_only_not_direct_carrier",
+      "evaluated_closeout_workload_ids": [
+        "hungarian_matching",
+        "long_loop_kernel",
+        "sudoku_v0_test_a"
+      ],
+      "route_truth_guard_ids": [
+        "reference_linear_truth_anchor_required",
+        "hull_cache_serving_truth_required",
+        "canonical_fast_route_legitimacy_required"
+      ],
+      "export_truth_guard_ids": [
+        "portable_bundle_roundtrip_required",
+        "cpu_route_validation_required",
+        "replacement_publication_required"
+      ],
+      "direct_replacement_allowed": false,
+      "widening_claim_allowed": false,
+      "detail": "Research-only 2D-head executor-style candidate. It stays bound to the frozen closeout trio, inherits the `reference_linear` truth anchor, and cannot bypass export or replacement truth.",
+      "row_digest": "bc89f6529725cd8ff3a20954c6e2578bd58d29d805ce077ba142b745fa4a21f9"
+    },
+    {
+      "experiment_id": "executor_style_hierarchical_hull_candidate",
+      "experiment_family": "hierarchical_hull_executor_style",
+      "research_posture": "research_only_not_direct_carrier",
+      "evaluated_closeout_workload_ids": [
+        "hungarian_matching",
+        "long_loop_kernel",
+        "sudoku_v0_test_a"
+      ],
+      "route_truth_guard_ids": [
+        "reference_linear_truth_anchor_required",
+        "hull_cache_serving_truth_required",
+        "canonical_fast_route_legitimacy_required"
+      ],
+      "export_truth_guard_ids": [
+        "portable_bundle_roundtrip_required",
+        "cpu_route_validation_required",
+        "replacement_publication_required"
+      ],
+      "direct_replacement_allowed": false,
+      "widening_claim_allowed": false,
+      "detail": "Research-only hierarchical-hull executor-style candidate. It stays measured only against the admitted closeout trio and remains outside direct carrier or replacement authority until later explicit promotion.",
+      "row_digest": "b3d694890a9d89a0dd93214af917a945b2e37c610862c173c1f698704fb455df"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_HULL_CACHE_BENCHMARK.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+    "fixtures/tassadar/reports/tassadar_post_article_fast_route_legitimacy_and_carrier_binding_contract_summary.json"
+  ],
+  "summary": "The executor lane now keeps one explicit research-only branch for 2D-head and executor-style fast-path experiments. That branch is bound to the frozen closeout trio, the retained HullKVCache benchmark truth, the Mac export inspection receipt, and the post-article carrier-binding contract instead of being treated as direct replacement authority.",
+  "packet_digest": "ce7334ffa96c452d076af8053fe149d296b4b0770e97269b835a6f927c6a31c9"
+}

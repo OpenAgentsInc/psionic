@@ -80,6 +80,7 @@ It does something narrower and more useful:
 
 The next executor closeout surfaces build directly on this packet:
 
+- `docs/PSION_EXECUTOR_PERCEPTA_CLOSEOUT_STATUS.md`
 - `docs/PSION_EXECUTOR_HULL_CACHE_BENCHMARK.md`
 - `docs/PSION_EXECUTOR_ARTICLE_CLOSEOUT_SET.md`
 - `docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md`
