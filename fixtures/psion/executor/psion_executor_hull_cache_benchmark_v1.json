@@ -1,0 +1,126 @@
+{
+  "schema_version": "psion.executor.hull_cache_benchmark.v1",
+  "packet_id": "psion_executor_hull_cache_benchmark_v1",
+  "trace_native_metrics_ref": "fixtures/psion/executor/psion_executor_trace_native_metrics_v1.json",
+  "trace_native_metrics_digest": "0ba90acb2a4b23c74699c55ef897eb5d9f0ef01bce05d68e03d6840538541a89",
+  "benchmark_report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+  "benchmark_report_sha256": "f371e3cd3e065e4efecd7217f907224a054b9f42fa2ab1cb7ea3644956f93674",
+  "candidate_rows": [
+    {
+      "trace_native_candidate_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+      "candidate_status": "candidate",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "run_id": "same-node-wallclock-retained-mlx",
+      "workload_rows": [
+        {
+          "closeout_workload_id": "hungarian_matching",
+          "benchmark_workload_target": "hungarian_matching",
+          "reference_linear_steps_per_second": 2315775.1940175337,
+          "hull_cache_steps_per_second": 3915923.7689977735,
+          "hull_cache_speedup_over_reference_linear": 1.690977509006051,
+          "hull_cache_remaining_gap_vs_cpu_reference": 2.3194468307271436,
+          "exactness_green": true,
+          "trace_digest_green": true,
+          "serving_truth_status": "green",
+          "promotion_blocker": false,
+          "detail": "Closeout workload `hungarian_matching` on candidate row `psion_executor_local_cluster_ledger_row_mlx_v1` keeps `reference_linear` at 2315775.194018 steps/s and `hull_cache` at 3915923.768998 steps/s for speedup 1.690978. Serving truth stays `green`.",
+          "row_digest": "4a280e981d7db412d5e7daa2b84bc87823cf1d6c38e313ee61b4e8b6a3fda5a1"
+        },
+        {
+          "closeout_workload_id": "long_loop_kernel",
+          "benchmark_workload_target": "long_loop_kernel",
+          "reference_linear_steps_per_second": 4284.341213237536,
+          "hull_cache_steps_per_second": 13959282.55760528,
+          "hull_cache_speedup_over_reference_linear": 3258.209807023449,
+          "hull_cache_remaining_gap_vs_cpu_reference": 1.0711934288899922,
+          "exactness_green": true,
+          "trace_digest_green": true,
+          "serving_truth_status": "green",
+          "promotion_blocker": false,
+          "detail": "Closeout workload `long_loop_kernel` on candidate row `psion_executor_local_cluster_ledger_row_mlx_v1` keeps `reference_linear` at 4284.341213 steps/s and `hull_cache` at 13959282.557605 steps/s for speedup 3258.209807. Serving truth stays `green`.",
+          "row_digest": "1c6b56f31e8e7bd2de8a9ffa26dc18555ead093803ffb42ffff9f77ff5ab10de"
+        },
+        {
+          "closeout_workload_id": "sudoku_v0_test_a",
+          "benchmark_workload_target": "sudoku_class",
+          "reference_linear_steps_per_second": 95154.02433608224,
+          "hull_cache_steps_per_second": 4868401.796537931,
+          "hull_cache_speedup_over_reference_linear": 51.16338305716662,
+          "hull_cache_remaining_gap_vs_cpu_reference": 2.548278294637131,
+          "exactness_green": true,
+          "trace_digest_green": true,
+          "serving_truth_status": "green",
+          "promotion_blocker": false,
+          "detail": "Closeout workload `sudoku_v0_test_a` on candidate row `psion_executor_local_cluster_ledger_row_mlx_v1` keeps `reference_linear` at 95154.024336 steps/s and `hull_cache` at 4868401.796538 steps/s for speedup 51.163383. Serving truth stays `green`.",
+          "row_digest": "c16c94f820a65ac0e99bd0bde95649c7768e0cbfd914baaa5f115bf7d2d83802"
+        }
+      ],
+      "row_digest": "a172525943ba2aa4d091519b76ce32ced5064a6b26841874a1f880fd5d6eebf3"
+    },
+    {
+      "trace_native_candidate_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+      "candidate_status": "current_best",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "run_id": "tailrun-home-admitted-20260328k",
+      "workload_rows": [
+        {
+          "closeout_workload_id": "hungarian_matching",
+          "benchmark_workload_target": "hungarian_matching",
+          "reference_linear_steps_per_second": 2315775.1940175337,
+          "hull_cache_steps_per_second": 3915923.7689977735,
+          "hull_cache_speedup_over_reference_linear": 1.690977509006051,
+          "hull_cache_remaining_gap_vs_cpu_reference": 2.3194468307271436,
+          "exactness_green": true,
+          "trace_digest_green": true,
+          "serving_truth_status": "green",
+          "promotion_blocker": false,
+          "detail": "Closeout workload `hungarian_matching` on candidate row `psion_executor_local_cluster_ledger_row_4080_v1` keeps `reference_linear` at 2315775.194018 steps/s and `hull_cache` at 3915923.768998 steps/s for speedup 1.690978. Serving truth stays `green`.",
+          "row_digest": "1a1b022a962b43b86cbd9a1a7412f865a54473519155bfc55f137ac928170868"
+        },
+        {
+          "closeout_workload_id": "long_loop_kernel",
+          "benchmark_workload_target": "long_loop_kernel",
+          "reference_linear_steps_per_second": 4284.341213237536,
+          "hull_cache_steps_per_second": 13959282.55760528,
+          "hull_cache_speedup_over_reference_linear": 3258.209807023449,
+          "hull_cache_remaining_gap_vs_cpu_reference": 1.0711934288899922,
+          "exactness_green": true,
+          "trace_digest_green": true,
+          "serving_truth_status": "green",
+          "promotion_blocker": false,
+          "detail": "Closeout workload `long_loop_kernel` on candidate row `psion_executor_local_cluster_ledger_row_4080_v1` keeps `reference_linear` at 4284.341213 steps/s and `hull_cache` at 13959282.557605 steps/s for speedup 3258.209807. Serving truth stays `green`.",
+          "row_digest": "7833dcaab45555f15483a599fe74d43d15ef0bbe14ba65400cd4367d900498cd"
+        },
+        {
+          "closeout_workload_id": "sudoku_v0_test_a",
+          "benchmark_workload_target": "sudoku_class",
+          "reference_linear_steps_per_second": 95154.02433608224,
+          "hull_cache_steps_per_second": 4868401.796537931,
+          "hull_cache_speedup_over_reference_linear": 51.16338305716662,
+          "hull_cache_remaining_gap_vs_cpu_reference": 2.548278294637131,
+          "exactness_green": true,
+          "trace_digest_green": true,
+          "serving_truth_status": "green",
+          "promotion_blocker": false,
+          "detail": "Closeout workload `sudoku_v0_test_a` on candidate row `psion_executor_local_cluster_ledger_row_4080_v1` keeps `reference_linear` at 95154.024336 steps/s and `hull_cache` at 4868401.796538 steps/s for speedup 51.163383. Serving truth stays `green`.",
+          "row_digest": "d03e64512b62582f60e8764ab7536af15707f1772b66bc29d8b7a86c074e156a"
+        }
+      ],
+      "row_digest": "7fe9c03c3c4ffbc051cb46d17237b131afbb704b021d45743bd62e034d834c9d"
+    }
+  ],
+  "min_speedup_over_reference_linear": 1.690977509006051,
+  "max_speedup_over_reference_linear": 3258.209807023449,
+  "max_remaining_gap_vs_cpu_reference": 2.548278294637131,
+  "all_serving_truth_green": true,
+  "promotion_blocked": false,
+  "promotion_block_reason": "none_all_closeout_workloads_green",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_TRACE_NATIVE_METRICS.md",
+    "fixtures/psion/executor/psion_executor_trace_native_metrics_v1.json",
+    "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+  ],
+  "summary": "The executor lane now keeps one explicit `HullKVCache` versus `reference_linear` benchmark packet over the frozen bounded article closeout trio, including speedup ratios and an explicit promotion-block rule when fast-route serving truth turns red.",
+  "packet_digest": "67277c9c0e8d7e9f0fe4ef3c3bf882b62258712c9eb15cd425152a8c331e6668"
+}

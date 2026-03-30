@@ -101,6 +101,9 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_TRACE_NATIVE_METRICS.md` owns the retained
   per-candidate and per-workload trace-native metrics packet that binds the
   frozen closeout set into the canonical local-cluster ledger surface
+- `docs/PSION_EXECUTOR_HULL_CACHE_BENCHMARK.md` owns the retained
+  `HullKVCache` versus `reference_linear` benchmark packet and the fast-route
+  promotion-block rule when serving truth turns red on the frozen closeout set
 - `docs/PSION_EXECUTOR_BASELINE_TRUTH.md` owns the frozen `trained-v0`
   baseline-truth packet for those packs
 - `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md` owns the suite-by-suite prompt,
