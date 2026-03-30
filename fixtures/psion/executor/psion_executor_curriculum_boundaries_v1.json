@@ -1,0 +1,73 @@
+{
+  "schema_version": "psion.executor.curriculum_boundaries.v1",
+  "curriculum_id": "psion_executor_curriculum_boundaries_v1",
+  "mixture_ref": "fixtures/psion/executor/psion_executor_canonical_mixture_v0.json",
+  "mixture_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044",
+  "stage_boundaries": [
+    {
+      "stage_id": "boundary_anchor_32",
+      "sequence_index": 1,
+      "target_window_tokens": 32,
+      "dominant_source_family_id": "executor.boundary_prefix_traces",
+      "certified_pack_ids": [
+        "tassadar.eval.frequent.v0"
+      ],
+      "required_suite_ids": [
+        "frequent_exactness_cases_v0",
+        "frequent_held_out_exclusions_v0"
+      ],
+      "transition_rule": "Advance only after two retained runs keep frequent exactness saturated and frequent held-out exclusions green at the 32-token anchor.",
+      "detail": "The first stage keeps the curriculum anchored to the same `MAX_TARGET_WINDOW_TOKENS=32` boundary that the canonical mixture manifest fixes as the executor lane's first hard closure target.",
+      "row_digest": "8f5ed75dd56ac79da8e995196bf17fb981d008c00b1aac286f4d919e19486c43"
+    },
+    {
+      "stage_id": "frequent_pack_certification",
+      "sequence_index": 2,
+      "target_window_tokens": 128,
+      "dominant_source_family_id": "executor.article_route_direct_traces",
+      "certified_pack_ids": [
+        "tassadar.eval.frequent.v0"
+      ],
+      "required_suite_ids": [
+        "frequent_exactness_cases_v0",
+        "frequent_held_out_exclusions_v0",
+        "frequent_operator_review_cases_v0",
+        "frequent_throughput_blockers_v0"
+      ],
+      "transition_rule": "Advance only after the full frequent pack stays green with no throughput-blocker or operator-review regressions on the admitted local profiles.",
+      "detail": "The second stage widens beyond the boundary anchor only once the entire frequent pack certifies route, refusal, held-out exclusion, and throughput posture together.",
+      "row_digest": "c7395a5e862c176944a97aa3e738bfa98491379825d48aea7c1ea56d0652915f"
+    },
+    {
+      "stage_id": "promotion_pack_certification",
+      "sequence_index": 3,
+      "target_window_tokens": 512,
+      "dominant_source_family_id": "executor.long_loop_kernel_traces",
+      "certified_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "required_suite_ids": [
+        "promotion_exactness_suite_v0",
+        "promotion_held_out_suite_v0",
+        "promotion_adversarial_suite_v0",
+        "promotion_runtime_blockers_v0",
+        "promotion_serving_blockers_v0",
+        "promotion_reference_linear_anchor_checks_v0",
+        "promotion_hull_cache_fast_route_checks_v0"
+      ],
+      "transition_rule": "Stay in the terminal stage until promotion exactness, held-out, and adversarial regressions remain zero, runtime and serving blockers remain green, and the `reference_linear` / `hull_cache` checks remain within the retained decision thresholds.",
+      "detail": "The final stage is performance-driven by the certified promotion pack instead of intuition. It is the only stage where a same-budget candidate may become promotion-eligible.",
+      "row_digest": "8b55c227f2603bbf578cd63c8c657720455eed9068123aff32f39b5d39be1639"
+    }
+  ],
+  "transition_policy": "Every stage transition is pack-certified. Train-looking loss or replay gains do not advance the executor curriculum unless the certified required-suite set for the current stage stays green under the frozen frequent/promotion packs.",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_DECISION_THRESHOLDS.md"
+  ],
+  "summary": "The executor lane now has one canonical stagewise curriculum packet. Boundary-anchor, frequent-pack, and promotion-pack transitions are now explicit, performance-driven, and certified against the same frozen pack surfaces that already govern the lane.",
+  "packet_digest": "e237098c092ae07b637c48a1600b09fa00fb8cf57c531a1828ad27f3bec0c48e"
+}
