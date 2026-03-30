@@ -73,6 +73,8 @@ It does make the current review boundary honest:
   “hardware and recovery still have explicit debt”
 - the refreshed report now cites the same mixture-version-aware registration
   and ledger stack that the weekly cadence packet uses
+- the refreshed report is now also the retained evidence source for the
+  misleading-mixture rollback policy packet
 
 ## Validation
 

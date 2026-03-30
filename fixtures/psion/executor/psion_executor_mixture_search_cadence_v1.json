@@ -2,7 +2,7 @@
   "schema_version": "psion.executor.mixture_search_cadence.v1",
   "cadence_id": "psion_executor_weekly_mixture_search_cadence_v1",
   "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
-  "review_workflow_digest": "7d0a4f354cf31bdfb4aa127f2fee38310ec030a0ce5219594888e8dac912ea6e",
+  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
   "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
   "registration_packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229",
   "canonical_mixture_ref": "fixtures/psion/executor/psion_executor_canonical_mixture_v0.json",
@@ -42,5 +42,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
   ],
   "summary": "The executor lane now has one canonical weekly mixture-search cadence packet. Registration rows carry the active mixture version, only one new mixture version may open per weekly review, and the pre-lane-health concurrency ceiling is explicitly limited to two registered runs on the active mixture.",
-  "packet_digest": "f082656602c575ca4dd258ce1f38d59bacaa6ce40380b8c8e9e21a7ea7219631"
+  "packet_digest": "fa57db04bd92add44606276cecbbe78015cd5380754bc3384e63c06c07823c66"
 }

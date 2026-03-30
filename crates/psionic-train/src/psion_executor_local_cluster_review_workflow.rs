@@ -7,12 +7,16 @@ use thiserror::Error;
 use crate::{
     builtin_executor_baseline_truth_record, builtin_executor_local_cluster_autoblocks_report,
     builtin_executor_local_cluster_dashboard_packet, builtin_executor_local_cluster_ledger,
+    builtin_executor_mixture_rollback_policy_packet,
     PsionExecutorBaselineTruthError, PsionExecutorLocalClusterAutoblocksError,
     PsionExecutorLocalClusterCandidateStatus, PsionExecutorLocalClusterDashboardError,
-    PsionExecutorLocalClusterLedgerError, PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH,
+    PsionExecutorLocalClusterLedgerError, PsionExecutorMixtureRollbackPolicyError,
+    PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH,
     PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS_FIXTURE_PATH,
     PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_FIXTURE_PATH,
     PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH,
+    PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY_DOC_PATH,
+    PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY_FIXTURE_PATH,
 };
 
 /// Stable schema version for the canonical local-cluster weekly review workflow.
@@ -34,10 +38,16 @@ const PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_DOC_PATH: &str =
 const PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md";
 const PSION_EXECUTOR_BASELINE_TRUTH_DOC_PATH: &str = "docs/PSION_EXECUTOR_BASELINE_TRUTH.md";
+const PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION_FIXTURE_PATH: &str =
+    "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json";
 const BASELINE_TEMPLATE_ID: &str = "psion_executor_weekly_baseline_review_template_v1";
 const ABLATION_TEMPLATE_ID: &str = "psion_executor_weekly_ablation_review_template_v1";
+const MIXTURE_ROLLBACK_TEMPLATE_ID: &str =
+    "psion_executor_weekly_mixture_rollback_review_template_v1";
 const BASELINE_DECISION_ID: &str = "psion_executor_weekly_baseline_review_2026w14_v1";
 const ABLATION_DECISION_ID: &str = "psion_executor_weekly_ablation_review_2026w14_v1";
+const MIXTURE_ROLLBACK_DECISION_ID: &str =
+    "psion_executor_weekly_mixture_rollback_review_2026w14_v1";
 
 #[derive(Debug, Error)]
 pub enum PsionExecutorLocalClusterReviewWorkflowError {
@@ -72,6 +82,8 @@ pub enum PsionExecutorLocalClusterReviewWorkflowError {
     Ledger(#[from] PsionExecutorLocalClusterLedgerError),
     #[error(transparent)]
     Autoblocks(#[from] PsionExecutorLocalClusterAutoblocksError),
+    #[error(transparent)]
+    RollbackPolicy(#[from] PsionExecutorMixtureRollbackPolicyError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,8 +129,11 @@ pub struct PsionExecutorLocalClusterReviewWorkflowPacket {
     pub baseline_truth_digest: String,
     pub autoblocks_ref: String,
     pub autoblocks_digest: String,
+    pub mixture_rollback_policy_ref: String,
+    pub mixture_rollback_policy_digest: String,
     pub baseline_review_template: PsionExecutorLocalClusterReviewTemplate,
     pub ablation_review_template: PsionExecutorLocalClusterReviewTemplate,
+    pub mixture_rollback_review_template: PsionExecutorLocalClusterReviewTemplate,
     pub current_decisions: Vec<PsionExecutorLocalClusterReviewDecision>,
     pub frozen_pack_only_rule: String,
     pub support_refs: Vec<String>,
@@ -294,6 +309,14 @@ impl PsionExecutorLocalClusterReviewWorkflowPacket {
                 self.autoblocks_digest.as_str(),
             ),
             (
+                "psion_executor_local_cluster_review_workflow.mixture_rollback_policy_ref",
+                self.mixture_rollback_policy_ref.as_str(),
+            ),
+            (
+                "psion_executor_local_cluster_review_workflow.mixture_rollback_policy_digest",
+                self.mixture_rollback_policy_digest.as_str(),
+            ),
+            (
                 "psion_executor_local_cluster_review_workflow.frozen_pack_only_rule",
                 self.frozen_pack_only_rule.as_str(),
             ),
@@ -308,16 +331,33 @@ impl PsionExecutorLocalClusterReviewWorkflowPacket {
         ] {
             ensure_nonempty(value, field)?;
         }
-        if self.current_decisions.len() != 2 {
+        if self.current_decisions.len() != 3 {
             return Err(PsionExecutorLocalClusterReviewWorkflowError::InvalidValue {
                 field: String::from("psion_executor_local_cluster_review_workflow.current_decisions"),
-                detail: String::from("workflow must keep one baseline and one ablation decision"),
+                detail: String::from(
+                    "workflow must keep one baseline, one ablation, and one mixture rollback decision",
+                ),
             });
         }
         self.baseline_review_template.validate()?;
         self.ablation_review_template.validate()?;
+        self.mixture_rollback_review_template.validate()?;
         for decision in &self.current_decisions {
             decision.validate()?;
+        }
+        for review_kind in ["baseline_review", "ablation_review", "mixture_rollback_review"] {
+            if !self
+                .current_decisions
+                .iter()
+                .any(|decision| decision.review_kind == review_kind)
+            {
+                return Err(PsionExecutorLocalClusterReviewWorkflowError::InvalidValue {
+                    field: String::from(
+                        "psion_executor_local_cluster_review_workflow.current_decisions[].review_kind",
+                    ),
+                    detail: format!("missing required review kind `{review_kind}`"),
+                });
+            }
         }
         if self.support_refs.is_empty() {
             return Err(PsionExecutorLocalClusterReviewWorkflowError::MissingField {
@@ -341,6 +381,7 @@ pub fn builtin_executor_local_cluster_review_workflow_packet(
     let ledger = builtin_executor_local_cluster_ledger(workspace_root)?;
     let baseline_truth = builtin_executor_baseline_truth_record(workspace_root)?;
     let autoblocks = builtin_executor_local_cluster_autoblocks_report(workspace_root)?;
+    let rollback_policy = builtin_executor_mixture_rollback_policy_packet(workspace_root)?;
 
     let current_best_row = ledger
         .rows_for_candidate_status(PsionExecutorLocalClusterCandidateStatus::CurrentBest)
@@ -352,9 +393,11 @@ pub fn builtin_executor_local_cluster_review_workflow_packet(
 
     let baseline_template = build_baseline_template();
     let ablation_template = build_ablation_template();
+    let mixture_rollback_template = build_mixture_rollback_template();
     let current_decisions = vec![
         build_baseline_decision(current_best_row, &autoblocks)?,
         build_ablation_decision(current_best_row, &autoblocks)?,
+        build_mixture_rollback_decision(current_best_row, &autoblocks, &rollback_policy)?,
     ];
 
     let mut packet = PsionExecutorLocalClusterReviewWorkflowPacket {
@@ -369,8 +412,13 @@ pub fn builtin_executor_local_cluster_review_workflow_packet(
         baseline_truth_digest: baseline_truth.record_digest,
         autoblocks_ref: String::from(PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS_FIXTURE_PATH),
         autoblocks_digest: autoblocks.report_digest,
+        mixture_rollback_policy_ref: String::from(
+            PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY_FIXTURE_PATH,
+        ),
+        mixture_rollback_policy_digest: rollback_policy.packet_digest,
         baseline_review_template: baseline_template,
         ablation_review_template: ablation_template,
+        mixture_rollback_review_template: mixture_rollback_template,
         current_decisions,
         frozen_pack_only_rule: String::from(
             "Only frozen frequent-pack and promotion-pack results plus the canonical ledger/dashboard/autoblock surfaces count toward weekly review decisions. Partial probes, ad hoc experiments, and convenience subsets do not count as review truth.",
@@ -382,9 +430,10 @@ pub fn builtin_executor_local_cluster_review_workflow_packet(
             String::from(PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_DOC_PATH),
             String::from(PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_DOC_PATH),
             String::from(PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS_DOC_PATH),
+            String::from(PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY_DOC_PATH),
         ],
         summary: String::from(
-            "The admitted executor lane now has one canonical weekly review workflow. Baseline and ablation decisions both cite frozen-pack ids, retained ledger rows, and active auto-block ids instead of informal review prose.",
+            "The admitted executor lane now has one canonical weekly review workflow. Baseline, ablation, and mixture-rollback decisions all cite frozen-pack ids, retained ledger rows, active auto-block ids, and the canonical rollback policy instead of informal review prose.",
         ),
         workflow_digest: String::new(),
     };
@@ -466,6 +515,36 @@ fn build_ablation_template() -> PsionExecutorLocalClusterReviewTemplate {
     template
 }
 
+fn build_mixture_rollback_template() -> PsionExecutorLocalClusterReviewTemplate {
+    let mut template = PsionExecutorLocalClusterReviewTemplate {
+        template_id: String::from(MIXTURE_ROLLBACK_TEMPLATE_ID),
+        review_kind: String::from("mixture_rollback_review"),
+        cadence_id: String::from("executor_weekly_mixture_rollback_review.v1"),
+        reviewer_role: String::from("Weekly mixture rollback review owner"),
+        frozen_pack_only: true,
+        required_refs: vec![
+            String::from(PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION_FIXTURE_PATH),
+            String::from(PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY_FIXTURE_PATH),
+            String::from(PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS_FIXTURE_PATH),
+        ],
+        required_fact_ids: vec![
+            String::from("held_out_regressions_visible"),
+            String::from("adversarial_regressions_visible"),
+            String::from("rollback_trigger_visible"),
+            String::from("single_lever_retry_rule_visible"),
+        ],
+        decision_rule: String::from(
+            "If a provisional same-budget mixture win posts any negative held-out or adversarial slice delta, roll it back immediately and constrain the next retry to one lever.",
+        ),
+        detail: String::from(
+            "The weekly mixture rollback review template keeps misleading-win rollback tied to the canonical source-family contribution report, the canonical rollback policy packet, and the active auto-block report instead of ad hoc experiment narratives.",
+        ),
+        template_digest: String::new(),
+    };
+    template.template_digest = stable_template_digest(&template);
+    template
+}
+
 fn build_baseline_decision(
     current_best_row: &crate::PsionExecutorLocalClusterLedgerRow,
     autoblocks: &crate::PsionExecutorLocalClusterAutoblocksReport,
@@ -540,6 +619,43 @@ fn build_ablation_decision(
                 "The weekly ablation review now sees current-best row `{}` as phase-exit green and free of active promotion blocks; same-budget follow-on decisions can proceed from frozen pack ids {:?} instead of export-side blockers.",
                 current_best_row.row_id,
                 current_best_row.eval_pack_ids
+            )
+        },
+        decision_digest: String::new(),
+    };
+    decision.decision_digest = stable_decision_digest(&decision);
+    Ok(decision)
+}
+
+fn build_mixture_rollback_decision(
+    current_best_row: &crate::PsionExecutorLocalClusterLedgerRow,
+    autoblocks: &crate::PsionExecutorLocalClusterAutoblocksReport,
+    rollback_policy: &crate::PsionExecutorMixtureRollbackPolicyPacket,
+) -> Result<PsionExecutorLocalClusterReviewDecision, PsionExecutorLocalClusterReviewWorkflowError> {
+    let allowed_levers = rollback_policy
+        .retry_constraint
+        .allowed_lever_classes
+        .join(", ");
+    let mut decision = PsionExecutorLocalClusterReviewDecision {
+        review_id: String::from(MIXTURE_ROLLBACK_DECISION_ID),
+        review_kind: String::from("mixture_rollback_review"),
+        cadence_window_id: String::from("2026-W14"),
+        reviewer_role: String::from("Weekly mixture rollback review owner"),
+        reviewer_identity: String::from("Christopher David"),
+        cited_pack_ids: current_best_row.eval_pack_ids.clone(),
+        cited_row_ids: vec![current_best_row.row_id.clone()],
+        cited_block_ids: autoblocks.active_promotion_block_ids.clone(),
+        decision: rollback_policy.rollback_decision.clone(),
+        status: rollback_policy.rollback_status.clone(),
+        detail: if rollback_policy.rollback_triggered {
+            format!(
+                "The weekly mixture rollback review rolled back the provisional same-budget mixture win on row `{}` because the canonical rollback policy packet recorded active slice regressions. The next admitted retry is capped at one lever with allowed lever classes [{}].",
+                current_best_row.row_id, allowed_levers
+            )
+        } else {
+            format!(
+                "The weekly mixture rollback review found no retained misleading mixture win on row `{}` this week: the canonical rollback policy packet records no provisional same-budget win claim and no active held-out or adversarial rollback trigger. If a future provisional win regresses those slices, the next admitted retry stays capped at one lever with allowed lever classes [{}].",
+                current_best_row.row_id, allowed_levers
             )
         },
         decision_digest: String::new(),
@@ -672,6 +788,7 @@ mod tests {
         let packet = builtin_executor_local_cluster_review_workflow_packet(root.as_path())?;
         assert!(packet.baseline_review_template.frozen_pack_only);
         assert!(packet.ablation_review_template.frozen_pack_only);
+        assert!(packet.mixture_rollback_review_template.frozen_pack_only);
         for decision in &packet.current_decisions {
             assert_eq!(decision.cited_pack_ids.len(), 2);
         }

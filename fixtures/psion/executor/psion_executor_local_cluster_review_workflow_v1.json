@@ -10,6 +10,8 @@
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "autoblocks_ref": "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json",
   "autoblocks_digest": "f5e86eff4633b2710aac7c0e65ffd9a517d23be2574fe53890bcdf13ba4e8bbc",
+  "mixture_rollback_policy_ref": "fixtures/psion/executor/psion_executor_mixture_rollback_policy_v1.json",
+  "mixture_rollback_policy_digest": "36cd968e3dbeb3810a4da9ca8ebcb1b2b097af2077993c469f461b98dceba9cf",
   "baseline_review_template": {
     "template_id": "psion_executor_weekly_baseline_review_template_v1",
     "review_kind": "baseline_review",
@@ -51,6 +53,27 @@
     "decision_rule": "Authorize no new same-budget ablation win unless the candidate stays inside frozen-pack truth and the current-best row no longer carries active promotion blocks.",
     "detail": "The weekly ablation review template keeps same-budget decisions tied to the retained local-cluster ledger and the canonical auto-block report instead of ad hoc experiment summaries.",
     "template_digest": "0364307416eed3d1236d8f1c64da4f36611f6335e375a9ba29b2ff7f11e4bc39"
+  },
+  "mixture_rollback_review_template": {
+    "template_id": "psion_executor_weekly_mixture_rollback_review_template_v1",
+    "review_kind": "mixture_rollback_review",
+    "cadence_id": "executor_weekly_mixture_rollback_review.v1",
+    "reviewer_role": "Weekly mixture rollback review owner",
+    "frozen_pack_only": true,
+    "required_refs": [
+      "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
+      "fixtures/psion/executor/psion_executor_mixture_rollback_policy_v1.json",
+      "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json"
+    ],
+    "required_fact_ids": [
+      "held_out_regressions_visible",
+      "adversarial_regressions_visible",
+      "rollback_trigger_visible",
+      "single_lever_retry_rule_visible"
+    ],
+    "decision_rule": "If a provisional same-budget mixture win posts any negative held-out or adversarial slice delta, roll it back immediately and constrain the next retry to one lever.",
+    "detail": "The weekly mixture rollback review template keeps misleading-win rollback tied to the canonical source-family contribution report, the canonical rollback policy packet, and the active auto-block report instead of ad hoc experiment narratives.",
+    "template_digest": "cbfad6ab745df942e02615f88393543d0497bde97ac47b4ce24b9f6eca81cf76"
   },
   "current_decisions": [
     {
@@ -94,6 +117,27 @@
       "status": "promotion_blocked_current_best",
       "detail": "The weekly ablation review refuses to authorize a new same-budget winner while current-best row `psion_executor_local_cluster_ledger_row_4080_v1` still carries active promotion blocks [missing_eval_fact_current_best]. The cited evidence remains limited to frozen pack ids [\"tassadar.eval.frequent.v0\", \"tassadar.eval.promotion.v0\"] plus retained ledger/dashboard/autoblock facts.",
       "decision_digest": "8e467ccc7ce5bd5574cdcfc4bc6c143ed5fd8732b965a92fc2a85201e0fce178"
+    },
+    {
+      "review_id": "psion_executor_weekly_mixture_rollback_review_2026w14_v1",
+      "review_kind": "mixture_rollback_review",
+      "cadence_window_id": "2026-W14",
+      "reviewer_role": "Weekly mixture rollback review owner",
+      "reviewer_identity": "Christopher David",
+      "cited_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "cited_row_ids": [
+        "psion_executor_local_cluster_ledger_row_4080_v1"
+      ],
+      "cited_block_ids": [
+        "missing_eval_fact_current_best"
+      ],
+      "decision": "hold_no_misleading_mixture_win",
+      "status": "no_misleading_win_current_week",
+      "detail": "The weekly mixture rollback review found no retained misleading mixture win on row `psion_executor_local_cluster_ledger_row_4080_v1` this week: the canonical rollback policy packet records no provisional same-budget win claim and no active held-out or adversarial rollback trigger. If a future provisional win regresses those slices, the next admitted retry stays capped at one lever with allowed lever classes [source_family_weight_bps, held_out_exclusion_boundary, curriculum_stage_boundary].",
+      "decision_digest": "bae7ced2d9cbb9c86b1bc253eef3afc8569aa2da1376ddb7500df90a4ba015e4"
     }
   ],
   "frozen_pack_only_rule": "Only frozen frequent-pack and promotion-pack results plus the canonical ledger/dashboard/autoblock surfaces count toward weekly review decisions. Partial probes, ad hoc experiments, and convenience subsets do not count as review truth.",
@@ -103,8 +147,9 @@
     "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
-    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md"
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md",
+    "docs/PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY.md"
   ],
-  "summary": "The admitted executor lane now has one canonical weekly review workflow. Baseline and ablation decisions both cite frozen-pack ids, retained ledger rows, and active auto-block ids instead of informal review prose.",
-  "workflow_digest": "7d0a4f354cf31bdfb4aa127f2fee38310ec030a0ce5219594888e8dac912ea6e"
+  "summary": "The admitted executor lane now has one canonical weekly review workflow. Baseline, ablation, and mixture-rollback decisions all cite frozen-pack ids, retained ledger rows, active auto-block ids, and the canonical rollback policy instead of informal review prose.",
+  "workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf"
 }

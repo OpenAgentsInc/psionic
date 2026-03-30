@@ -37,7 +37,13 @@ The packet makes three operational rules explicit:
 ## Current Retained Truth
 
 - packet digest:
-  `f082656602c575ca4dd258ce1f38d59bacaa6ce40380b8c8e9e21a7ea7219631`
+  `fa57db04bd92add44606276cecbbe78015cd5380754bc3384e63c06c07823c66`
+- review workflow digest:
+  `c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf`
+- registration packet digest:
+  `dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229`
+- canonical mixture digest:
+  `09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044`
 - active mixture version:
   `psion_executor_canonical_mixture_v0`
 - current review window:
@@ -61,8 +67,9 @@ It does make the current rule explicit:
 
 - the active mixture version is frozen into registration truth
 - the lane may not quietly open uncontrolled parallel mixture experiments
-- the current weekly review still reports a promotion block on current-best,
-  so the cadence remains conservative on purpose
+- the refreshed weekly review now includes the mixture-rollback decision and
+  still reports a promotion block on current-best, so the cadence remains
+  conservative on purpose
 
 ## Validation
 

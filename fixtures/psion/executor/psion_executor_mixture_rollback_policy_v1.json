@@ -1,0 +1,55 @@
+{
+  "schema_version": "psion.executor.mixture_rollback_policy.v1",
+  "policy_id": "psion_executor_mixture_rollback_policy_v1",
+  "canonical_mixture_ref": "fixtures/psion/executor/psion_executor_canonical_mixture_v0.json",
+  "canonical_mixture_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044",
+  "active_mixture_version_id": "psion_executor_canonical_mixture_v0",
+  "source_family_contribution_ref": "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
+  "source_family_contribution_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794",
+  "baseline_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+  "candidate_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+  "same_budget_win_claim_present": false,
+  "rollback_triggered": false,
+  "rollback_decision": "hold_no_misleading_mixture_win",
+  "rollback_status": "no_misleading_win_current_week",
+  "trigger_rows": [
+    {
+      "trigger_id": "held_out_negative_delta_after_provisional_win",
+      "same_budget_win_required": true,
+      "delta_scope": "held_out",
+      "negative_delta_count": 0,
+      "trigger_active": false,
+      "rollback_action": "rollback_candidate_and_hold_promotion",
+      "detail": "Rollback any provisional same-budget mixture winner immediately when a held-out slice regresses, then keep promotion on hold until the next constrained retry clears frozen-pack review.",
+      "row_digest": "21277f9c0e3620507f341504424c37edfdcd671f81b21d59feab6dc89da5b111"
+    },
+    {
+      "trigger_id": "adversarial_negative_delta_after_provisional_win",
+      "same_budget_win_required": true,
+      "delta_scope": "adversarial",
+      "negative_delta_count": 0,
+      "trigger_active": false,
+      "rollback_action": "rollback_candidate_and_hold_promotion",
+      "detail": "Rollback any provisional same-budget mixture winner immediately when an adversarial slice regresses, then keep promotion on hold until the next constrained retry clears frozen-pack review.",
+      "row_digest": "cc6ff222aca556f73b8bd547ba52ad4d738081734a05614c7c364b5d6f52ef1e"
+    }
+  ],
+  "retry_constraint": {
+    "max_changed_levers": 1,
+    "allowed_lever_classes": [
+      "source_family_weight_bps",
+      "held_out_exclusion_boundary",
+      "curriculum_stage_boundary"
+    ],
+    "detail": "After a misleading mixture win rolls back, the next admitted retry may change exactly one lever: one family-weight adjustment, one exclusion-boundary adjustment, or one curriculum-boundary adjustment. Multi-lever retries remain out of policy until a clean frozen-pack review exists.",
+    "row_digest": "f5a0a3e83825dd9ec09516e2799fba007df1f1bdcf04b8a2019d49e32bdc99c2"
+  },
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md",
+    "docs/PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+  ],
+  "summary": "The executor lane now has one canonical mixture rollback policy packet. No provisional same-budget mixture win is retained this week, but any future held-out or adversarial regression under a provisional win will trigger rollback and limit the next retry to one lever.",
+  "packet_digest": "36cd968e3dbeb3810a4da9ca8ebcb1b2b097af2077993c469f461b98dceba9cf"
+}
