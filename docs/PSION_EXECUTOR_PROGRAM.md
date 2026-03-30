@@ -99,6 +99,8 @@ This doc does not claim:
   baseline-truth packet for those packs
 - `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md` owns the suite-by-suite prompt,
   normalization, and post-processing audit for those packs
+- `docs/PSION_EXECUTOR_DECISION_THRESHOLDS.md` owns the retained variance and
+  minimum-meaningful-delta packet for promotion comparisons
 - `docs/PSION_EXECUTOR_OWNERSHIP.md` owns named owners and review cadence
 - `docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md` owns the admitted local
   executor profile catalog

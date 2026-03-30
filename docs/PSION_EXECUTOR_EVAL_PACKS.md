@@ -41,6 +41,17 @@ Decision-grade run admission for the executor lane assumes this audit packet
 stays green, because unchecked prompt formatting, normalization, or
 post-processing would invalidate the packs even if baseline truth stayed green.
 
+## Decision-Threshold Binding
+
+The promotion pack now also has one committed decision-threshold packet:
+
+- `docs/PSION_EXECUTOR_DECISION_THRESHOLDS.md`
+- `fixtures/psion/executor/psion_executor_decision_thresholds_v1.json`
+
+That packet replays the retained baseline three times, records the current
+promotion aggregates, and freezes the minimum meaningful deltas later same-
+budget comparisons are allowed to claim.
+
 ## What Landed
 
 `psionic-train` now owns one typed executor eval-pack catalog with two packs:

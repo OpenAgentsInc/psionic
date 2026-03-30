@@ -1,0 +1,350 @@
+{
+  "schema_version": "psion.executor_decision_thresholds.v1",
+  "record_id": "psion_executor_decision_thresholds_v1",
+  "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+  "eval_pack_catalog_digest": "21cb825b3135feda7ef12037a7b1dcc6de8ccffcda3328e981d9e26fe41e4e04",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_digest": "6277cd804fb00e402ff0434243dbb87d4824abff95bb871043fe71ca1d99a76f",
+  "replay_passes": [
+    {
+      "pass_id": "baseline_replay_pass_01",
+      "posture": "retained_fixture_replay",
+      "source_refs": [
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json"
+      ],
+      "measurements": [
+        {
+          "suite_id": "promotion_exactness_suite_v0",
+          "metric_id": "promotion_exactness_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of exactness-case regressions relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_held_out_suite_v0",
+          "metric_id": "promotion_held_out_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of held-out mismatches or refusals relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_adversarial_suite_v0",
+          "metric_id": "promotion_adversarial_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of adversarial mismatches or refusals relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_runtime_blockers_v0",
+          "metric_id": "promotion_runtime_blocker_red_count",
+          "observed_value": 0.0,
+          "detail": "Count of red runtime-blocker checklist rows relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_serving_blockers_v0",
+          "metric_id": "promotion_serving_blocker_red_count",
+          "observed_value": 0.0,
+          "detail": "Count of red serving-blocker checklist rows relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_reference_linear_anchor_checks_v0",
+          "metric_id": "promotion_reference_linear_anchor_median_steps_per_second",
+          "observed_value": 1301202.009229342,
+          "detail": "Median reference-linear anchor throughput across the admitted promotion anchor cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_median_steps_per_second",
+          "observed_value": 4180102.356236452,
+          "detail": "Median hull-cache throughput across the admitted fast-route promotion cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_min_speedup_over_reference_linear",
+          "observed_value": 1.690977509006051,
+          "detail": "Minimum hull-cache speedup over the reference-linear anchor across the admitted fast-route promotion cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_max_remaining_gap_vs_cpu_reference",
+          "observed_value": 2.683604159673364,
+          "detail": "Maximum remaining CPU-reference gap across the admitted fast-route promotion cases."
+        }
+      ],
+      "detail": "Replay the retained baseline packet without rerunning heavyweight GPU jobs so later promotion logic starts from one committed measurement spine."
+    },
+    {
+      "pass_id": "baseline_replay_pass_02",
+      "posture": "retained_fixture_replay",
+      "source_refs": [
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json"
+      ],
+      "measurements": [
+        {
+          "suite_id": "promotion_exactness_suite_v0",
+          "metric_id": "promotion_exactness_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of exactness-case regressions relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_held_out_suite_v0",
+          "metric_id": "promotion_held_out_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of held-out mismatches or refusals relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_adversarial_suite_v0",
+          "metric_id": "promotion_adversarial_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of adversarial mismatches or refusals relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_runtime_blockers_v0",
+          "metric_id": "promotion_runtime_blocker_red_count",
+          "observed_value": 0.0,
+          "detail": "Count of red runtime-blocker checklist rows relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_serving_blockers_v0",
+          "metric_id": "promotion_serving_blocker_red_count",
+          "observed_value": 0.0,
+          "detail": "Count of red serving-blocker checklist rows relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_reference_linear_anchor_checks_v0",
+          "metric_id": "promotion_reference_linear_anchor_median_steps_per_second",
+          "observed_value": 1301202.009229342,
+          "detail": "Median reference-linear anchor throughput across the admitted promotion anchor cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_median_steps_per_second",
+          "observed_value": 4180102.356236452,
+          "detail": "Median hull-cache throughput across the admitted fast-route promotion cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_min_speedup_over_reference_linear",
+          "observed_value": 1.690977509006051,
+          "detail": "Minimum hull-cache speedup over the reference-linear anchor across the admitted fast-route promotion cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_max_remaining_gap_vs_cpu_reference",
+          "observed_value": 2.683604159673364,
+          "detail": "Maximum remaining CPU-reference gap across the admitted fast-route promotion cases."
+        }
+      ],
+      "detail": "Replay the retained baseline packet without rerunning heavyweight GPU jobs so later promotion logic starts from one committed measurement spine."
+    },
+    {
+      "pass_id": "baseline_replay_pass_03",
+      "posture": "retained_fixture_replay",
+      "source_refs": [
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json"
+      ],
+      "measurements": [
+        {
+          "suite_id": "promotion_exactness_suite_v0",
+          "metric_id": "promotion_exactness_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of exactness-case regressions relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_held_out_suite_v0",
+          "metric_id": "promotion_held_out_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of held-out mismatches or refusals relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_adversarial_suite_v0",
+          "metric_id": "promotion_adversarial_regression_count",
+          "observed_value": 0.0,
+          "detail": "Count of adversarial mismatches or refusals relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_runtime_blockers_v0",
+          "metric_id": "promotion_runtime_blocker_red_count",
+          "observed_value": 0.0,
+          "detail": "Count of red runtime-blocker checklist rows relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_serving_blockers_v0",
+          "metric_id": "promotion_serving_blocker_red_count",
+          "observed_value": 0.0,
+          "detail": "Count of red serving-blocker checklist rows relative to the frozen baseline suite."
+        },
+        {
+          "suite_id": "promotion_reference_linear_anchor_checks_v0",
+          "metric_id": "promotion_reference_linear_anchor_median_steps_per_second",
+          "observed_value": 1301202.009229342,
+          "detail": "Median reference-linear anchor throughput across the admitted promotion anchor cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_median_steps_per_second",
+          "observed_value": 4180102.356236452,
+          "detail": "Median hull-cache throughput across the admitted fast-route promotion cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_min_speedup_over_reference_linear",
+          "observed_value": 1.690977509006051,
+          "detail": "Minimum hull-cache speedup over the reference-linear anchor across the admitted fast-route promotion cases."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "metric_id": "promotion_hull_cache_max_remaining_gap_vs_cpu_reference",
+          "observed_value": 2.683604159673364,
+          "detail": "Maximum remaining CPU-reference gap across the admitted fast-route promotion cases."
+        }
+      ],
+      "detail": "Replay the retained baseline packet without rerunning heavyweight GPU jobs so later promotion logic starts from one committed measurement spine."
+    }
+  ],
+  "thresholds": [
+    {
+      "threshold_id": "promotion_exactness_regression_count_v0",
+      "suite_id": "promotion_exactness_suite_v0",
+      "metric_id": "promotion_exactness_regression_count",
+      "direction": "zero_regression",
+      "baseline_value": 0.0,
+      "observed_min": 0.0,
+      "observed_max": 0.0,
+      "observed_span": 0.0,
+      "policy_floor": 1.0,
+      "minimum_meaningful_delta": 1.0,
+      "regression_hold_delta": 1.0,
+      "promotion_use": "Any exactness regression above baseline holds the candidate immediately.",
+      "detail": "Retained baseline replays observed zero noise, so any change of one regression row is material and promotion-blocking."
+    },
+    {
+      "threshold_id": "promotion_held_out_regression_count_v0",
+      "suite_id": "promotion_held_out_suite_v0",
+      "metric_id": "promotion_held_out_regression_count",
+      "direction": "zero_regression",
+      "baseline_value": 0.0,
+      "observed_min": 0.0,
+      "observed_max": 0.0,
+      "observed_span": 0.0,
+      "policy_floor": 1.0,
+      "minimum_meaningful_delta": 1.0,
+      "regression_hold_delta": 1.0,
+      "promotion_use": "Any held-out mismatch or refusal above baseline holds the candidate immediately.",
+      "detail": "Retained baseline replays observed zero noise, so any change of one regression row is material and promotion-blocking."
+    },
+    {
+      "threshold_id": "promotion_adversarial_regression_count_v0",
+      "suite_id": "promotion_adversarial_suite_v0",
+      "metric_id": "promotion_adversarial_regression_count",
+      "direction": "zero_regression",
+      "baseline_value": 0.0,
+      "observed_min": 0.0,
+      "observed_max": 0.0,
+      "observed_span": 0.0,
+      "policy_floor": 1.0,
+      "minimum_meaningful_delta": 1.0,
+      "regression_hold_delta": 1.0,
+      "promotion_use": "Any adversarial mismatch or refusal above baseline holds the candidate immediately.",
+      "detail": "Retained baseline replays observed zero noise, so any change of one regression row is material and promotion-blocking."
+    },
+    {
+      "threshold_id": "promotion_runtime_blocker_red_count_v0",
+      "suite_id": "promotion_runtime_blockers_v0",
+      "metric_id": "promotion_runtime_blocker_red_count",
+      "direction": "zero_regression",
+      "baseline_value": 0.0,
+      "observed_min": 0.0,
+      "observed_max": 0.0,
+      "observed_span": 0.0,
+      "policy_floor": 1.0,
+      "minimum_meaningful_delta": 1.0,
+      "regression_hold_delta": 1.0,
+      "promotion_use": "Any red runtime-blocker checklist row above baseline holds the candidate immediately.",
+      "detail": "Retained baseline replays observed zero noise, so any change of one regression row is material and promotion-blocking."
+    },
+    {
+      "threshold_id": "promotion_serving_blocker_red_count_v0",
+      "suite_id": "promotion_serving_blockers_v0",
+      "metric_id": "promotion_serving_blocker_red_count",
+      "direction": "zero_regression",
+      "baseline_value": 0.0,
+      "observed_min": 0.0,
+      "observed_max": 0.0,
+      "observed_span": 0.0,
+      "policy_floor": 1.0,
+      "minimum_meaningful_delta": 1.0,
+      "regression_hold_delta": 1.0,
+      "promotion_use": "Any red serving-blocker checklist row above baseline holds the candidate immediately.",
+      "detail": "Retained baseline replays observed zero noise, so any change of one regression row is material and promotion-blocking."
+    },
+    {
+      "threshold_id": "promotion_reference_linear_anchor_median_steps_per_second_v0",
+      "suite_id": "promotion_reference_linear_anchor_checks_v0",
+      "metric_id": "promotion_reference_linear_anchor_median_steps_per_second",
+      "direction": "higher_is_better",
+      "baseline_value": 1301202.009229342,
+      "observed_min": 1301202.009229342,
+      "observed_max": 1301202.009229342,
+      "observed_span": 0.0,
+      "policy_floor": 65060.100461467104,
+      "minimum_meaningful_delta": 65060.100461467104,
+      "regression_hold_delta": 65060.100461467104,
+      "promotion_use": "Promotion may claim a reference-linear throughput win only when the anchor median moves by at least five percent; an equal drop holds the candidate.",
+      "detail": "Retained baseline replays showed zero noise, but phase-one promotion still requires a non-zero conservative floor before claiming throughput improvement."
+    },
+    {
+      "threshold_id": "promotion_hull_cache_median_steps_per_second_v0",
+      "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+      "metric_id": "promotion_hull_cache_median_steps_per_second",
+      "direction": "higher_is_better",
+      "baseline_value": 4180102.356236452,
+      "observed_min": 4180102.356236452,
+      "observed_max": 4180102.356236452,
+      "observed_span": 0.0,
+      "policy_floor": 209005.1178118226,
+      "minimum_meaningful_delta": 209005.1178118226,
+      "regression_hold_delta": 209005.1178118226,
+      "promotion_use": "Promotion may claim a hull-cache throughput win only when the fast-route median moves by at least five percent; an equal drop holds the candidate.",
+      "detail": "Retained baseline replays showed zero noise, but phase-one promotion still requires a non-zero conservative floor before claiming throughput improvement."
+    },
+    {
+      "threshold_id": "promotion_hull_cache_min_speedup_over_reference_linear_v0",
+      "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+      "metric_id": "promotion_hull_cache_min_speedup_over_reference_linear",
+      "direction": "higher_is_better",
+      "baseline_value": 1.690977509006051,
+      "observed_min": 1.690977509006051,
+      "observed_max": 1.690977509006051,
+      "observed_span": 0.0,
+      "policy_floor": 0.05,
+      "minimum_meaningful_delta": 0.05,
+      "regression_hold_delta": 0.05,
+      "promotion_use": "Promotion may claim a fast-route speedup win only when the minimum speedup clears baseline by at least 0.05; an equal drop holds the candidate before the absolute 1.5 floor is even considered.",
+      "detail": "Retained baseline replays showed zero noise, but phase-one promotion still requires a non-zero conservative floor before claiming throughput improvement."
+    },
+    {
+      "threshold_id": "promotion_hull_cache_max_remaining_gap_vs_cpu_reference_v0",
+      "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+      "metric_id": "promotion_hull_cache_max_remaining_gap_vs_cpu_reference",
+      "direction": "lower_is_better",
+      "baseline_value": 2.683604159673364,
+      "observed_min": 2.683604159673364,
+      "observed_max": 2.683604159673364,
+      "observed_span": 0.0,
+      "policy_floor": 0.05,
+      "minimum_meaningful_delta": 0.05,
+      "regression_hold_delta": 0.05,
+      "promotion_use": "Promotion may claim a CPU-gap improvement only when the worst remaining gap shrinks by at least 0.05; an equal increase holds the candidate before the absolute 3.0 ceiling is even considered.",
+      "detail": "Retained baseline replays showed zero noise, but phase-one promotion still requires a non-zero conservative floor before claiming lower CPU-gap wins."
+    }
+  ],
+  "summary": "Replayed the retained executor baseline 3 times; observed zero retained noise on 9 promotion aggregates and froze conservative decision floors for exactness, held-out, adversarial, runtime, serving, anchor throughput, and fast-route throughput.",
+  "record_digest": "fd669205c6874d107162ac82f760fcc4b2e95de803cb39a6fdb267dd5e751ec0"
+}

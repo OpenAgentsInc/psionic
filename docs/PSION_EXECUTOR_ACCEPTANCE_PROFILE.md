@@ -92,9 +92,11 @@ must keep these retained review packets green:
 
 - `docs/PSION_EXECUTOR_BASELINE_TRUTH.md`
 - `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md`
+- `docs/PSION_EXECUTOR_DECISION_THRESHOLDS.md`
 
 That keeps prompt formatting, normalization, post-processing, and manual review
-boundaries explicit instead of hidden inside benchmark summaries.
+boundaries explicit instead of hidden inside benchmark summaries, and it keeps
+promotion deltas tied to one retained threshold packet instead of intuition.
 
 ## Frozen Pack Binding
 
@@ -103,4 +105,4 @@ boundaries explicit instead of hidden inside benchmark summaries.
   blockers frozen between serious runs
 - `tassadar.eval.promotion.v0` is the promotion pack that binds the exactness,
   held-out, adversarial, runtime, serving, `reference_linear`, `hull_cache`,
-  and throughput-threshold surfaces back to this profile
+  throughput-threshold, and decision-threshold surfaces back to this profile
