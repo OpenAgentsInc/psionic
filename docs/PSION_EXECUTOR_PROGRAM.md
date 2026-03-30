@@ -159,6 +159,9 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION.md` owns the first canonical
   mixture-review report that keeps per-family slice deltas separate from
   run-level throughput and stability regressions on the current-best 4080 row
+- `docs/PSION_EXECUTOR_MIXTURE_SEARCH_CADENCE.md` owns the first canonical
+  weekly mixture-search cadence packet that freezes the active mixture version
+  into run registration truth and limits pre-lane-health parallel search
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

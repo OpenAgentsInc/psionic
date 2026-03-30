@@ -42,13 +42,13 @@ collapse into one boolean when the roundtrip closes before the eval truth does.
 ## Current Retained Truth
 
 - report digest:
-  `50ea5e3fcf52d3650437ef038a31a26a0bcc96fdf619b8f566a05d9764363be3`
+  `f5e86eff4633b2710aac7c0e65ffd9a517d23be2574fe53890bcdf13ba4e8bbc`
 - current-best row id:
   `psion_executor_local_cluster_ledger_row_4080_v1`
 - dashboard digest:
-  `5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7`
+  `026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28`
 - ledger digest:
-  `9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3`
+  `618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c`
 - baseline truth digest:
   `43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c`
 - frequent-eval digest:

@@ -3,9 +3,9 @@
   "report_id": "psion_executor_local_cluster_autoblocks_v1",
   "current_best_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
   "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
-  "dashboard_digest": "5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7",
+  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
+  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "frequent_eval_ref": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
@@ -31,18 +31,18 @@
       "scope": "phase_exit_and_promotion",
       "status": "green",
       "owner_surface_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-      "owner_surface_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
+      "owner_surface_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
       "detail": "The current-best row `psion_executor_local_cluster_ledger_row_4080_v1` keeps recovery status `green`. Anything outside `green` or `not_required_same_node` blocks both phase exit and promotion automatically.",
-      "block_digest": "f345a0fb32a21646789ea5609393589e5e1f5fa43243def2835d9ab88847d730"
+      "block_digest": "4dd063cdb0bc3b27ae3b458a906a10dfda19cd8e31b0826b8ffecf571de8d0a0"
     },
     {
       "block_id": "missing_export_fact_current_best",
       "scope": "phase_exit_and_promotion",
       "status": "green",
       "owner_surface_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
-      "owner_surface_digest": "dc2d4cc82a4b5b952032991ca5786c8c2aadd4bb6155801d85c73c07798a1ef1",
+      "owner_surface_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299",
       "detail": "The roundtrip closeout packet keeps the current-best export posture explicit as `green` on row `psion_executor_local_cluster_ledger_row_4080_v1`. Until that turns green, the local-cluster phase exit and promotion gates stay blocked instead of relying on review memory. Current cluster closure status is `green`.",
-      "block_digest": "75e50ad108c63b0b4b62ad4ebca2fabfaae6a3850042c3cb15aca51799cf9c04"
+      "block_digest": "b6804cb400abbe70441b6f4297c7bab02a143efc85546112d8d4978dd3800b8e"
     },
     {
       "block_id": "missing_reference_linear_anchor",
@@ -63,5 +63,5 @@
     "docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md"
   ],
   "summary": "The admitted executor lane now has one canonical auto-block report for local-cluster promotion and phase exits. Missing eval, recovery, export, and `reference_linear` anchor facts are now machine-readable block rows instead of narrative review notes, and promotion-only eval blockers stay distinct from cluster-closure facts.",
-  "report_digest": "50ea5e3fcf52d3650437ef038a31a26a0bcc96fdf619b8f566a05d9764363be3"
+  "report_digest": "f5e86eff4633b2710aac7c0e65ffd9a517d23be2574fe53890bcdf13ba4e8bbc"
 }

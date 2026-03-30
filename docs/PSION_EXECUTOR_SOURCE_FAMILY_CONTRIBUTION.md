@@ -35,13 +35,13 @@ The report makes two things explicit instead of mixing them together in prose:
 ## Current Retained Truth
 
 - report digest:
-  `c1e57dfd5187b778d10604f460553913786be9c5752e785ce0842f2aff66e42d`
+  `124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794`
 - mixture digest:
   `09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044`
 - baseline-truth digest:
-  `1cbcce5abbae31597533a62e80d5c5e1e4aa622410b883ac5a06c02f0f264784`
+  `43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c`
 - local-cluster ledger digest:
-  `9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3`
+  `618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c`
 - source-family count:
   `6`
 - throughput regression count:
@@ -71,6 +71,8 @@ It does make the current review boundary honest:
 - stability regressions remain visible on the current-best 4080 row
 - weekly mixture review can now separate “family contributed nothing yet” from
   “hardware and recovery still have explicit debt”
+- the refreshed report now cites the same mixture-version-aware registration
+  and ledger stack that the weekly cadence packet uses
 
 ## Validation
 

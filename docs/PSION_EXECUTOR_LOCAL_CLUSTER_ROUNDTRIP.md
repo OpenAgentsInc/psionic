@@ -46,9 +46,9 @@ artifact with one machine-readable answer.
 ## Current Retained Truth
 
 - packet digest:
-  `dc2d4cc82a4b5b952032991ca5786c8c2aadd4bb6155801d85c73c07798a1ef1`
+  `820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299`
 - registration packet digest:
-  `cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474`
+  `dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229`
 - remote-launch packet digest:
   `19aef8ffcf62006272d40206793d22f031a064a63dbc1254ad69ccd1351f4158`
 - durable-checkpoint packet digest:

@@ -2,8 +2,8 @@
   "schema_version": "psion.executor.local_cluster_ledger.v1",
   "ledger_id": "psion_executor_local_cluster_ledger_v1",
   "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
-  "registration_packet_sha256": "17c04733fad4b2cf1a2c2ef5c4861dd8fcff0c90a72714ed2a56243ee794bc08",
-  "registration_packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474",
+  "registration_packet_sha256": "48e454d54bc9076fe3bf2063f8d25354671b879962ce804c9903d03fb3c75951",
+  "registration_packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_sha256": "84ce0ae59eacb7c3d180ebf8dfb6753239488cad03404b0d9ec91923012cc502",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
@@ -188,5 +188,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md"
   ],
   "summary": "The executor lane now has one searchable local-cluster ledger. It joins the canonical MLX and 4080 run registrations with checkpoint lineage, cost, metric, failure, recovery, export, and roundtrip-closure posture so expensive local executor runs stop living as separate packet fragments.",
-  "ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3"
+  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c"
 }

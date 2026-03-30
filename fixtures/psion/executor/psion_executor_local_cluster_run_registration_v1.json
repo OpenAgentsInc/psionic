@@ -17,6 +17,7 @@
       "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
       "logical_device_label": "metal:0",
       "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "mixture_version_id": "psion_executor_canonical_mixture_v0",
       "candidate_status": "candidate",
       "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
       "eval_pack_ids": [
@@ -42,8 +43,8 @@
         "expected_source_tokens_per_second": 4649675.706222572,
         "detail": "Expected throughput stays anchored to the retained same-node MLX report that the admitted-device matrix and MLX decision-grade packet already cite."
       },
-      "detail": "This canonical registration row binds the retained same-node MLX decision-grade run to the admitted local Mac profile, the frozen executor eval packs, the local-first wallclock budget, and the model id that baseline truth already freezes.",
-      "registration_digest": "37ec1615b4724e087b757b846ac34eb11094b2f953d6e0be2ea8deb41ad17f2f"
+      "detail": "This canonical registration row binds the retained same-node MLX decision-grade run to the admitted local Mac profile, the frozen executor eval packs, the current canonical mixture version, the local-first wallclock budget, and the model id that baseline truth already freezes.",
+      "registration_digest": "d326ad89e5ec8984b6794ccc77e129814bf596e8853cc0fbd83b31af72524a21"
     },
     {
       "registration_id": "psion_executor_local_cluster_registration_4080_v1",
@@ -61,6 +62,7 @@
       "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
       "logical_device_label": "cuda:0",
       "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "mixture_version_id": "psion_executor_canonical_mixture_v0",
       "candidate_status": "current_best",
       "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
       "eval_pack_ids": [
@@ -87,14 +89,15 @@
         "expected_source_tokens_per_second": 2357371.30641513,
         "detail": "Expected throughput stays anchored to the retained same-node CUDA report that the 4080 decision-grade packet already binds into the admitted local-cluster comparison."
       },
-      "detail": "This canonical registration row binds the supporting Tailnet cluster run and retained same-node CUDA decision run to the admitted 4080 worker profile, the Tailnet control-plane profile, the frozen executor eval packs, and the retained checkpoint family that later ledger rows will search.",
-      "registration_digest": "cf4327e6f9b3dc714ad156aa7a6aee2888ce72bfde4a273744aa6cbf976b3ba9"
+      "detail": "This canonical registration row binds the supporting Tailnet cluster run and retained same-node CUDA decision run to the admitted 4080 worker profile, the Tailnet control-plane profile, the frozen executor eval packs, the current canonical mixture version, and the retained checkpoint family that later ledger rows will search.",
+      "registration_digest": "2e023b59b65e8efec98a41eb093127ec414671e0a3b4b310eb4c79b69ec898ae"
     }
   ],
   "support_refs": [
     "docs/PSION_EXECUTOR_PROGRAM.md",
     "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
     "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md",
     "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
     "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md",
     "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md",
@@ -102,6 +105,6 @@
     "fixtures/training/compute_sources/local_mlx_mac_workstation_v1.json",
     "fixtures/training/compute_sources/local_rtx4080_workstation_v1.json"
   ],
-  "summary": "The executor lane now has one canonical local-cluster run-registration schema. Both the retained MLX decision-grade run and the retained 4080 decision-grade run register the admitted profile, budget, observed duration, frozen eval packs, stop condition, batch geometry, memory headroom posture, and expected throughput facts in the same machine-readable packet, and missing required fields now block admission by validation instead of staying doc-only.",
-  "packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474"
+  "summary": "The executor lane now has one canonical local-cluster run-registration schema. Both the retained MLX decision-grade run and the retained 4080 decision-grade run register the admitted profile, current canonical mixture version, budget, observed duration, frozen eval packs, stop condition, batch geometry, memory headroom posture, and expected throughput facts in the same machine-readable packet, and missing required fields now block admission by validation instead of staying doc-only.",
+  "packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229"
 }

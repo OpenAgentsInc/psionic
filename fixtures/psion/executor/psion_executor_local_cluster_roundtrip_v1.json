@@ -2,7 +2,7 @@
   "schema_version": "psion.executor.local_cluster_roundtrip.v1",
   "packet_id": "psion_executor_local_cluster_roundtrip_v1",
   "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
-  "registration_packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474",
+  "registration_packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229",
   "remote_launch_packet_ref": "fixtures/psion/executor/psion_executor_4080_remote_launch_v1.json",
   "remote_launch_packet_digest": "19aef8ffcf62006272d40206793d22f031a064a63dbc1254ad69ccd1351f4158",
   "durable_checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_4080_durable_checkpoint_v1.json",
@@ -86,5 +86,5 @@
     "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md"
   ],
   "summary": "The executor lane now has one retained local-cluster roundtrip closeout packet. Current-best run `tailrun-home-admitted-20260328k` keeps all six admitted steps green across the Mac controller, the 4080 worker, and the Mac-side validation return path, so EPIC 4 cluster closure is now machine-legible instead of implied by separate launch, checkpoint, recovery, and export packets.",
-  "packet_digest": "dc2d4cc82a4b5b952032991ca5786c8c2aadd4bb6155801d85c73c07798a1ef1"
+  "packet_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299"
 }

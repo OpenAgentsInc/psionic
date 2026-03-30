@@ -6,9 +6,10 @@ use thiserror::Error;
 
 use crate::{
     builtin_executor_4080_decision_grade_run_packet, builtin_executor_4080_smoke_run_packet,
-    builtin_executor_baseline_truth_record, builtin_executor_mlx_decision_grade_run_packet,
-    PsionExecutor4080DecisionGradeRunError, PsionExecutor4080SmokeRunError,
-    PsionExecutorBaselineTruthError, PsionExecutorMlxDecisionGradeRunError,
+    builtin_executor_baseline_truth_record, builtin_executor_canonical_mixture_packet,
+    builtin_executor_mlx_decision_grade_run_packet, PsionExecutor4080DecisionGradeRunError,
+    PsionExecutor4080SmokeRunError, PsionExecutorBaselineTruthError,
+    PsionExecutorCanonicalMixtureError, PsionExecutorMlxDecisionGradeRunError,
 };
 
 /// Stable schema version for the canonical local-cluster run-registration packet.
@@ -38,6 +39,8 @@ const PSION_EXECUTOR_PROGRAM_DOC_PATH: &str = "docs/PSION_EXECUTOR_PROGRAM.md";
 const PSION_EXECUTOR_LOCAL_PROFILE_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md";
 const PSION_EXECUTOR_EVAL_PACK_DOC_PATH: &str = "docs/PSION_EXECUTOR_EVAL_PACKS.md";
+const PSION_EXECUTOR_CANONICAL_MIXTURE_DOC_PATH: &str =
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md";
 const PSION_EXECUTOR_MLX_DECISION_GRADE_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md";
 const PSION_EXECUTOR_4080_DECISION_GRADE_DOC_PATH: &str =
@@ -78,6 +81,8 @@ pub enum PsionExecutorLocalClusterRunRegistrationError {
     Smoke4080(#[from] PsionExecutor4080SmokeRunError),
     #[error(transparent)]
     BaselineTruth(#[from] PsionExecutorBaselineTruthError),
+    #[error(transparent)]
+    CanonicalMixture(#[from] PsionExecutorCanonicalMixtureError),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -125,6 +130,7 @@ pub struct PsionExecutorLocalClusterRunRegistrationRow {
     pub execution_backend_label: String,
     pub logical_device_label: String,
     pub model_id: String,
+    pub mixture_version_id: String,
     pub candidate_status: PsionExecutorLocalClusterCandidateStatus,
     pub checkpoint_family: String,
     pub eval_pack_ids: Vec<String>,
@@ -276,6 +282,10 @@ impl PsionExecutorLocalClusterRunRegistrationRow {
                 self.model_id.as_str(),
             ),
             (
+                "psion_executor_local_cluster_run_registration.registration_rows[].mixture_version_id",
+                self.mixture_version_id.as_str(),
+            ),
+            (
                 "psion_executor_local_cluster_run_registration.registration_rows[].checkpoint_family",
                 self.checkpoint_family.as_str(),
             ),
@@ -422,6 +432,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
 ) -> Result<PsionExecutorLocalClusterRunRegistrationPacket, PsionExecutorLocalClusterRunRegistrationError>
 {
     let baseline = builtin_executor_baseline_truth_record(workspace_root)?;
+    let canonical_mixture = builtin_executor_canonical_mixture_packet(workspace_root)?;
     let mlx_packet = builtin_executor_mlx_decision_grade_run_packet(workspace_root)?;
     let cuda_packet = builtin_executor_4080_decision_grade_run_packet(workspace_root)?;
     let smoke_packet = builtin_executor_4080_smoke_run_packet(workspace_root)?;
@@ -446,6 +457,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
             execution_backend_label: mlx_packet.execution_backend_label.clone(),
             logical_device_label: mlx_packet.logical_device_label.clone(),
             model_id: baseline.model_id.clone(),
+            mixture_version_id: canonical_mixture.mixture_id.clone(),
             candidate_status: PsionExecutorLocalClusterCandidateStatus::Candidate,
             checkpoint_family: mlx_packet.checkpoint_family.clone(),
             eval_pack_ids: vec![String::from(FREQUENT_PACK_ID), String::from(PROMOTION_PACK_ID)],
@@ -480,7 +492,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
                 ),
             },
             detail: String::from(
-                "This canonical registration row binds the retained same-node MLX decision-grade run to the admitted local Mac profile, the frozen executor eval packs, the local-first wallclock budget, and the model id that baseline truth already freezes.",
+                "This canonical registration row binds the retained same-node MLX decision-grade run to the admitted local Mac profile, the frozen executor eval packs, the current canonical mixture version, the local-first wallclock budget, and the model id that baseline truth already freezes.",
             ),
             registration_digest: String::new(),
         },
@@ -500,6 +512,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
             execution_backend_label: String::from("open_adapter_backend.cuda.gpt_oss_lm_head"),
             logical_device_label: String::from("cuda:0"),
             model_id: baseline.model_id.clone(),
+            mixture_version_id: canonical_mixture.mixture_id.clone(),
             candidate_status: PsionExecutorLocalClusterCandidateStatus::CurrentBest,
             checkpoint_family: smoke_packet.checkpoint_family.clone(),
             eval_pack_ids: cuda_packet.run_registration_row.eval_pack_ids.clone(),
@@ -534,7 +547,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
                 ),
             },
             detail: String::from(
-                "This canonical registration row binds the supporting Tailnet cluster run and retained same-node CUDA decision run to the admitted 4080 worker profile, the Tailnet control-plane profile, the frozen executor eval packs, and the retained checkpoint family that later ledger rows will search.",
+                "This canonical registration row binds the supporting Tailnet cluster run and retained same-node CUDA decision run to the admitted 4080 worker profile, the Tailnet control-plane profile, the frozen executor eval packs, the current canonical mixture version, and the retained checkpoint family that later ledger rows will search.",
             ),
             registration_digest: String::new(),
         },
@@ -552,6 +565,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
             String::from(PSION_EXECUTOR_PROGRAM_DOC_PATH),
             String::from(PSION_EXECUTOR_LOCAL_PROFILE_DOC_PATH),
             String::from(PSION_EXECUTOR_EVAL_PACK_DOC_PATH),
+            String::from(PSION_EXECUTOR_CANONICAL_MIXTURE_DOC_PATH),
             String::from(PSION_EXECUTOR_BASELINE_TRUTH_DOC_PATH),
             String::from(PSION_EXECUTOR_MLX_DECISION_GRADE_DOC_PATH),
             String::from(PSION_EXECUTOR_4080_SMOKE_RUN_DOC_PATH),
@@ -560,7 +574,7 @@ pub fn builtin_executor_local_cluster_run_registration_packet(
             String::from(LOCAL_4080_COMPUTE_SOURCE_FIXTURE_PATH),
         ],
         summary: String::from(
-            "The executor lane now has one canonical local-cluster run-registration schema. Both the retained MLX decision-grade run and the retained 4080 decision-grade run register the admitted profile, budget, observed duration, frozen eval packs, stop condition, batch geometry, memory headroom posture, and expected throughput facts in the same machine-readable packet, and missing required fields now block admission by validation instead of staying doc-only.",
+            "The executor lane now has one canonical local-cluster run-registration schema. Both the retained MLX decision-grade run and the retained 4080 decision-grade run register the admitted profile, current canonical mixture version, budget, observed duration, frozen eval packs, stop condition, batch geometry, memory headroom posture, and expected throughput facts in the same machine-readable packet, and missing required fields now block admission by validation instead of staying doc-only.",
         ),
         packet_digest: String::new(),
     };
@@ -668,6 +682,10 @@ mod tests {
         let root = workspace_root();
         let packet = builtin_executor_local_cluster_run_registration_packet(root.as_path())?;
         packet.validate()?;
+        assert!(packet
+            .registration_rows
+            .iter()
+            .all(|row| row.mixture_version_id == "psion_executor_canonical_mixture_v0"));
         Ok(())
     }
 

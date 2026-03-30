@@ -6,7 +6,7 @@
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "local_cluster_ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "local_cluster_ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
+  "local_cluster_ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
   "baseline_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
   "baseline_row_digest": "a181d94f23a2ed60b5ece4440beed8f7bea5b69ec9e395baff5d3585d1285410",
   "candidate_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
@@ -223,5 +223,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
   ],
   "summary": "The executor lane now has one canonical source-family contribution report. It keeps all six source-family weights explicit against baseline-truth slice deltas (exactness, held-out, adversarial all remain flat at zero on the retained baseline), while the run-level section keeps 3 throughput regressions and 4 stability regressions visible on the current-best 4080 row instead of letting mixture review hide infrastructure debt.",
-  "report_digest": "c1e57dfd5187b778d10604f460553913786be9c5752e785ce0842f2aff66e42d"
+  "report_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794"
 }

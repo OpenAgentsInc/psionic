@@ -37,6 +37,7 @@ Both rows now register the same required fields:
 - run id plus search run ids
 - model id
 - candidate status
+- active mixture version id
 - frozen eval-pack ids
 - wallclock budget
 - observed duration
@@ -53,13 +54,15 @@ validation at the schema boundary instead of staying review-time guesswork.
 ## Current Retained Truth
 
 - packet digest:
-  `cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474`
+  `dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229`
 - MLX registration digest:
-  `37ec1615b4724e087b757b846ac34eb11094b2f953d6e0be2ea8deb41ad17f2f`
+  `d326ad89e5ec8984b6794ccc77e129814bf596e8853cc0fbd83b31af72524a21`
 - 4080 registration digest:
-  `cf4327e6f9b3dc714ad156aa7a6aee2888ce72bfde4a273744aa6cbf976b3ba9`
+  `2e023b59b65e8efec98a41eb093127ec414671e0a3b4b310eb4c79b69ec898ae`
 - model id:
   `tassadar-article-transformer-trace-bound-trained-v0`
+- active mixture version:
+  `psion_executor_canonical_mixture_v0`
 - MLX run id:
   `same-node-wallclock-retained-mlx`
 - MLX profile:
@@ -88,6 +91,7 @@ The registration packet now acts as the first hard admission grammar for local
 executor runs:
 
 - missing profile ids fail validation
+- missing mixture version ids fail validation
 - missing eval-pack ids fail validation
 - zero budget or zero observed duration fails validation
 - missing batch geometry fails validation

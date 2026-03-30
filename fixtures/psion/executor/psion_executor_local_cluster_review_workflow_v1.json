@@ -3,13 +3,13 @@
   "workflow_id": "psion_executor_local_cluster_review_workflow_v1",
   "ownership_ref": "docs/PSION_EXECUTOR_OWNERSHIP.md",
   "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
-  "dashboard_digest": "5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7",
+  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
+  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "autoblocks_ref": "fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json",
-  "autoblocks_digest": "50ea5e3fcf52d3650437ef038a31a26a0bcc96fdf619b8f566a05d9764363be3",
+  "autoblocks_digest": "f5e86eff4633b2710aac7c0e65ffd9a517d23be2574fe53890bcdf13ba4e8bbc",
   "baseline_review_template": {
     "template_id": "psion_executor_weekly_baseline_review_template_v1",
     "review_kind": "baseline_review",
@@ -106,5 +106,5 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md"
   ],
   "summary": "The admitted executor lane now has one canonical weekly review workflow. Baseline and ablation decisions both cite frozen-pack ids, retained ledger rows, and active auto-block ids instead of informal review prose.",
-  "workflow_digest": "5b70189bcb3929f68a605307c7afbe330dd9bb8e03db02def44d0d625bb0a7bf"
+  "workflow_digest": "7d0a4f354cf31bdfb4aa127f2fee38310ec030a0ce5219594888e8dac912ea6e"
 }

@@ -53,7 +53,7 @@ by hand.
 ## Current Retained Truth
 
 - dashboard digest:
-  `5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7`
+  `026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28`
 - baseline panel digest:
   `7463e54f038488aca1032ef48a8a9cea9d1cf44ab9e5e6d5cfd879613df0e3b1`
 - current-best panel digest:

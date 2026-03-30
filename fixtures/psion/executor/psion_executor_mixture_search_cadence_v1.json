@@ -1,0 +1,46 @@
+{
+  "schema_version": "psion.executor.mixture_search_cadence.v1",
+  "cadence_id": "psion_executor_weekly_mixture_search_cadence_v1",
+  "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
+  "review_workflow_digest": "7d0a4f354cf31bdfb4aa127f2fee38310ec030a0ce5219594888e8dac912ea6e",
+  "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
+  "registration_packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229",
+  "canonical_mixture_ref": "fixtures/psion/executor/psion_executor_canonical_mixture_v0.json",
+  "canonical_mixture_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044",
+  "current_review_window_id": "2026-W14",
+  "active_mixture_version_id": "psion_executor_canonical_mixture_v0",
+  "max_new_mixture_versions_per_review": 1,
+  "max_concurrent_registered_runs_before_lane_health": 2,
+  "current_lane_health_status": "promotion_blocked_current_best",
+  "current_lane_health_block_ids": [
+    "missing_eval_fact_current_best"
+  ],
+  "registered_rows": [
+    {
+      "registration_id": "psion_executor_local_cluster_registration_mlx_v1",
+      "run_id": "same-node-wallclock-retained-mlx",
+      "admitted_profile_id": "local_mac_mlx_aarch64",
+      "candidate_status": "candidate",
+      "mixture_version_id": "psion_executor_canonical_mixture_v0",
+      "row_digest": "e48803e7117fb605657e76b51539dad3771e93f54e3b03c4bbfc5e82f088ccb8"
+    },
+    {
+      "registration_id": "psion_executor_local_cluster_registration_4080_v1",
+      "run_id": "tailrun-home-admitted-20260328k",
+      "admitted_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "candidate_status": "current_best",
+      "mixture_version_id": "psion_executor_canonical_mixture_v0",
+      "row_digest": "08f5ad86ee125b8aa82465c4b8422402a73826fe8c91a7d5de0f413d6fa527e6"
+    }
+  ],
+  "versioning_rule": "At most one new executor mixture version may be admitted in a weekly review window. Any new version must be named and reviewed against the canonical frozen-pack workflow before another version is opened.",
+  "concurrency_rule": "Before lane health clears, the executor lane may keep at most two concurrently registered runs on the active mixture version. Additional parallel experiments are blocked until the baseline weekly review no longer reports active promotion blocks.",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+  ],
+  "summary": "The executor lane now has one canonical weekly mixture-search cadence packet. Registration rows carry the active mixture version, only one new mixture version may open per weekly review, and the pre-lane-health concurrency ceiling is explicitly limited to two registered runs on the active mixture.",
+  "packet_digest": "f082656602c575ca4dd258ce1f38d59bacaa6ce40380b8c8e9e21a7ea7219631"
+}

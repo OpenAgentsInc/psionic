@@ -55,16 +55,20 @@ That means the admitted MLX and 4080 executor runs are no longer “look in five
 packets and remember how they connect.” They now have one cumulative ledger
 surface.
 
+The retained rows now also inherit the active mixture version from the
+registration packet, so weekly mixture review can stay cumulative instead of
+reconstructing mixture identity from separate admission prose.
+
 ## Current Retained Truth
 
 - ledger digest:
-  `9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3`
+  `618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c`
 - registration packet digest:
-  `cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474`
+  `dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229`
 - baseline truth digest:
   `43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c`
 - roundtrip packet digest:
-  `dc2d4cc82a4b5b952032991ca5786c8c2aadd4bb6155801d85c73c07798a1ef1`
+  `820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299`
 - MLX ledger row digest:
   `a181d94f23a2ed60b5ece4440beed8f7bea5b69ec9e395baff5d3585d1285410`
 - 4080 ledger row digest:

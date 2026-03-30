@@ -44,17 +44,17 @@ That means the executor lane now has one durable answer to:
 ## Current Retained Truth
 
 - workflow digest:
-  `5b70189bcb3929f68a605307c7afbe330dd9bb8e03db02def44d0d625bb0a7bf`
+  `7d0a4f354cf31bdfb4aa127f2fee38310ec030a0ce5219594888e8dac912ea6e`
 - ownership ref:
   `docs/PSION_EXECUTOR_OWNERSHIP.md`
 - dashboard digest:
-  `5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7`
+  `026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28`
 - ledger digest:
-  `9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3`
+  `618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c`
 - baseline-truth digest:
   `43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c`
 - auto-block report digest:
-  `50ea5e3fcf52d3650437ef038a31a26a0bcc96fdf619b8f566a05d9764363be3`
+  `f5e86eff4633b2710aac7c0e65ffd9a517d23be2574fe53890bcdf13ba4e8bbc`
 - baseline template digest:
   `2e93b06b083329e0a39a2fa2db8ed36e97347ebce4c7149f8d335bdda0ccd363`
 - ablation template digest:
@@ -103,6 +103,11 @@ It does something more useful:
 
 That is the first point of the workflow: review cadence is now retained even
 when phase exit is green and the right promotion answer is still "hold."
+
+The follow-on weekly mixture-search cadence packet now lives at:
+
+- `docs/PSION_EXECUTOR_MIXTURE_SEARCH_CADENCE.md`
+- `fixtures/psion/executor/psion_executor_mixture_search_cadence_v1.json`
 
 ## Validation
 
