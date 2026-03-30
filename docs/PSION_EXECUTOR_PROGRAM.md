@@ -95,6 +95,9 @@ This doc does not claim:
   acceptance profile
 - `docs/PSION_EXECUTOR_EVAL_PACKS.md` owns the frozen frequent and promotion
   eval packs
+- `docs/PSION_EXECUTOR_ARTICLE_CLOSEOUT_SET.md` owns the frozen bounded
+  article-workload closeout set that later executor closeout, trace-native
+  metrics, fast-route benchmark, and status-report work must cite
 - `docs/PSION_EXECUTOR_BASELINE_TRUTH.md` owns the frozen `trained-v0`
   baseline-truth packet for those packs
 - `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md` owns the suite-by-suite prompt,

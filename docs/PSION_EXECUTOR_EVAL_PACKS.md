@@ -52,6 +52,21 @@ That packet replays the retained baseline three times, records the current
 promotion aggregates, and freezes the minimum meaningful deltas later same-
 budget comparisons are allowed to claim.
 
+## Bounded Article Closeout Binding
+
+The frozen packs now also have one explicit bounded closeout-set packet:
+
+- `docs/PSION_EXECUTOR_ARTICLE_CLOSEOUT_SET.md`
+- `fixtures/psion/executor/psion_executor_article_closeout_set_v1.json`
+
+That packet freezes the three canonical article-style closeout workloads used
+by later trace-native metric work, fast-route benchmark work, and bounded
+Percepta-closeout status reporting:
+
+- `long_loop_kernel`
+- `sudoku_v0_test_a`
+- `hungarian_matching`
+
 ## What Landed
 
 `psionic-train` now owns one typed executor eval-pack catalog with two packs:

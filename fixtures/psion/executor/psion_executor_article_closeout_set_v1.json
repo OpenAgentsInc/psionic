@@ -1,0 +1,67 @@
+{
+  "schema_version": "psion.executor.article_closeout_set.v1",
+  "packet_id": "psion_executor_article_closeout_set_v1",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
+  "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+  "eval_pack_catalog_digest": "c89e6dd679f24d468b0a87525370aa630618241926126c2e977fc8683ad53594",
+  "workload_rows": [
+    {
+      "workload_id": "long_loop_kernel",
+      "workload_family": "bounded_article_executor",
+      "promotion_pack_id": "tassadar.eval.promotion.v0",
+      "frequent_pack_id": "tassadar.eval.frequent.v0",
+      "required_for_promotion": true,
+      "required_for_local_cluster_validation": true,
+      "local_cluster_visibility_ref": "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+      "promotion_visibility_ref": "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+      "detail": "Closeout workload `long_loop_kernel` stays frozen for both promotion review and local-cluster validation on the admitted executor lane.",
+      "row_digest": "99eac4f7ca8bce9d56d2dac48a9ec80122dd1c7d8b70a108c9c93650193a67e7"
+    },
+    {
+      "workload_id": "sudoku_v0_test_a",
+      "workload_family": "bounded_article_executor",
+      "promotion_pack_id": "tassadar.eval.promotion.v0",
+      "frequent_pack_id": "tassadar.eval.frequent.v0",
+      "required_for_promotion": true,
+      "required_for_local_cluster_validation": true,
+      "local_cluster_visibility_ref": "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+      "promotion_visibility_ref": "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+      "detail": "Closeout workload `sudoku_v0_test_a` stays frozen for both promotion review and local-cluster validation on the admitted executor lane.",
+      "row_digest": "1621215779c3d186946878c6ebc7afd8b8b8a35fe3e3207df49b0d2c6ce28015"
+    },
+    {
+      "workload_id": "hungarian_matching",
+      "workload_family": "bounded_article_executor",
+      "promotion_pack_id": "tassadar.eval.promotion.v0",
+      "frequent_pack_id": "tassadar.eval.frequent.v0",
+      "required_for_promotion": true,
+      "required_for_local_cluster_validation": true,
+      "local_cluster_visibility_ref": "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+      "promotion_visibility_ref": "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+      "detail": "Closeout workload `hungarian_matching` stays frozen for both promotion review and local-cluster validation on the admitted executor lane.",
+      "row_digest": "0c157b9ee3d01a2efae98d21dee51435093498ca26ca14badda2984ba810a7e8"
+    }
+  ],
+  "promotion_validation_refs": [
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_PROGRAM.md"
+  ],
+  "local_cluster_validation_refs": [
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
+    "docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md"
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_BASELINE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+    "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
+    "docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md"
+  ],
+  "summary": "The executor lane now freezes one bounded article-workload closeout set across promotion review and local-cluster validation: long_loop_kernel, sudoku_v0_test_a, and hungarian_matching.",
+  "packet_digest": "2de570208df4bec06457bb0699e34f42099c9a191c4eeeb31bcd2d71b8f70734"
+}

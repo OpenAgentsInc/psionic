@@ -43,6 +43,12 @@ The representative phase-one executor workloads are:
 These are the workloads that later executor promotion, route replacement, and
 bounded Percepta/Tassadar-closeout work must cite by default.
 
+The retained packet that now freezes this trio as the canonical bounded
+closeout set lives at:
+
+- `docs/PSION_EXECUTOR_ARTICLE_CLOSEOUT_SET.md`
+- `fixtures/psion/executor/psion_executor_article_closeout_set_v1.json`
+
 ## Use Rule
 
 Use this doc as the stable reference when a later issue needs to say:
