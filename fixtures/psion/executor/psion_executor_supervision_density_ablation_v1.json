@@ -1,0 +1,74 @@
+{
+  "schema_version": "psion.executor.supervision_density_ablation.v1",
+  "packet_id": "psion_executor_supervision_density_ablation_v1",
+  "run_id": "tailrun-home-admitted-20260329f",
+  "review_window_id": "2026-W15",
+  "same_budget_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "baseline_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v0-supervision-density-candidate-v1",
+  "source_family_contribution_ref": "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
+  "source_family_contribution_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794",
+  "throughput_report_ref": "fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json",
+  "throughput_report_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7",
+  "long_run_rehearsal_ref": "fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json",
+  "long_run_rehearsal_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2",
+  "failure_bundle_taxonomy_ref": "fixtures/psion/executor/psion_executor_failure_bundle_taxonomy_v1.json",
+  "failure_bundle_taxonomy_digest": "167de1726490b46baa6ab8dba39f1a10d19bec10180614bc2c72e515596ab0aa",
+  "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
+  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "verdict_rows": [
+    {
+      "dimension_id": "exactness",
+      "baseline_value": "0 bps retained exactness delta",
+      "candidate_value": "+6 bps exactness delta",
+      "delta_summary": "+6 bps",
+      "status": "green",
+      "detail": "The same-budget supervision-density shift improves retained exactness without widening the admitted executor family.",
+      "row_digest": "2a2794cda160513c768faacf80cba33d29c125fc37394d1ba75f008d8c04b4dd"
+    },
+    {
+      "dimension_id": "held_out",
+      "baseline_value": "0 bps retained held-out delta",
+      "candidate_value": "+1 bps held-out delta",
+      "delta_summary": "+1 bps",
+      "status": "green",
+      "detail": "Held-out behavior stays green and improves slightly, so the same-budget supervision change remains admissible inside the frozen review path.",
+      "row_digest": "7dbc62316fbfead14763767098d838b5aa7e7d9f3c5f348a3da75be1e268cb2f"
+    },
+    {
+      "dimension_id": "throughput",
+      "baseline_value": "82.402520498292 steps/s",
+      "candidate_value": "85.714920498292 steps/s",
+      "delta_summary": "3.312400000000 steps/s",
+      "status": "green",
+      "detail": "Training throughput improves modestly while staying on the same admitted 4080 profile and same-budget review surface.",
+      "row_digest": "2eda0c4f802082691ee049add7594d424b30db60d79402e61af211058451345b"
+    },
+    {
+      "dimension_id": "stability",
+      "baseline_value": "0 retained long-run regressions",
+      "candidate_value": "0 new stability regressions",
+      "delta_summary": "0 regressions",
+      "status": "green",
+      "detail": "The supervision-density variant inherits the green long-run rehearsal and produces no new failure-bundle or review-workflow regressions.",
+      "row_digest": "d22be5e7731890d6410bb0e62d0cf3b8bd35036df9a03a545c9ce9953488c76d"
+    }
+  ],
+  "exactness_delta_bps": 6,
+  "held_out_delta_bps": 1,
+  "throughput_steps_per_second_delta": 3.312400000000011,
+  "stability_regression_count": 0,
+  "all_dimensions_green": true,
+  "review_decision": "retain_supervision_density_variant_for_candidate",
+  "promotion_posture": "retain_supervision_density_variant_for_trained_v1_candidate",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION.md",
+    "docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md",
+    "docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md",
+    "docs/PSION_EXECUTOR_FAILURE_BUNDLE_TAXONOMY.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+  ],
+  "summary": "The executor lane now has one retained supervision-density ablation packet. The same-budget 4080 variant is judged on exactness, held-out, throughput, and stability together, stays green on all four dimensions, and therefore remains eligible for the later trained-v1 candidate packet.",
+  "packet_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe"
+}

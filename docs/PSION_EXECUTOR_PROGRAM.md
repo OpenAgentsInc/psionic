@@ -199,6 +199,10 @@ This doc does not claim:
   canonical same-budget trace-family weighting ablation packet that keeps the
   change inside one mixture-weight lever class, reports explicit per-family
   and per-slice deltas, and binds held-out rollback truth into retained review
+- `docs/PSION_EXECUTOR_SUPERVISION_DENSITY_ABLATION.md` owns the first
+  canonical same-budget supervision-density ablation packet that keeps
+  exactness, held-out, throughput, and stability in one retained verdict
+  instead of letting the lane trade one dimension against the others
 - `docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md` owns the first
   canonical phase-two pre-flight checklist packet that freezes launch blockers
   for the admitted MLX and 4080 decision-grade run types
