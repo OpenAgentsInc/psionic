@@ -140,6 +140,11 @@ than just run tensor math.
   `docs/PSION_RVLLM_GPU_LOGITS_SELECTION.md`, binding the already-shipped
   qwen35 and gpt-oss device-argmax / bounded-candidate lanes to explicit
   readback-byte and raw-logits fallback truth.
+- The same pass now also retains one explicit sampling-loop packet at
+  `docs/PSION_RVLLM_SAMPLING_LOOP.md`, making the admitted seeded sampler,
+  exact bounded-candidate replay lane, and sparse penalty scratch-reuse path
+  machine-visible instead of leaving that hot-path truth buried inside
+  `qwen35.rs` and `gpt_oss.rs`.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
