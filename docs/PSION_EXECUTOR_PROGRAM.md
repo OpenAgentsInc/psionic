@@ -195,6 +195,10 @@ This doc does not claim:
   effective batch fixed, makes the peak-memory versus throughput tradeoff
   explicit, and logs the retained 4080 result for review instead of claiming a
   new promotion lever
+- `docs/PSION_EXECUTOR_TRACE_FAMILY_WEIGHTING_ABLATION.md` owns the first
+  canonical same-budget trace-family weighting ablation packet that keeps the
+  change inside one mixture-weight lever class, reports explicit per-family
+  and per-slice deltas, and binds held-out rollback truth into retained review
 - `docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md` owns the first
   canonical phase-two pre-flight checklist packet that freezes launch blockers
   for the admitted MLX and 4080 decision-grade run types

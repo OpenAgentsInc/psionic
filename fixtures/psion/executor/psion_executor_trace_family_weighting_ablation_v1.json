@@ -1,0 +1,105 @@
+{
+  "schema_version": "psion.executor.trace_family_weighting_ablation.v1",
+  "packet_id": "psion_executor_trace_family_weighting_ablation_v1",
+  "run_id": "tailrun-home-admitted-20260329e",
+  "review_window_id": "2026-W15",
+  "same_budget_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "baseline_mixture_ref": "fixtures/psion/executor/psion_executor_canonical_mixture_v0.json",
+  "baseline_mixture_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044",
+  "baseline_mixture_id": "psion_executor_canonical_mixture_v0",
+  "candidate_mixture_id": "psion_executor_canonical_mixture_trace_weighting_candidate_v1",
+  "baseline_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v0-trace-weighting-candidate-v1",
+  "source_family_contribution_ref": "fixtures/psion/executor/psion_executor_source_family_contribution_v1.json",
+  "source_family_contribution_digest": "124f39356d3b439af224f99e72220e67ad05b212f73433d93c8f141c3354e794",
+  "rollback_policy_ref": "fixtures/psion/executor/psion_executor_mixture_rollback_policy_v1.json",
+  "rollback_policy_digest": "36cd968e3dbeb3810a4da9ca8ebcb1b2b097af2077993c469f461b98dceba9cf",
+  "changed_weight_rows": [
+    {
+      "source_family_id": "executor.boundary_prefix_traces",
+      "baseline_weight_bps": 2200,
+      "candidate_weight_bps": 2000,
+      "delta_bps": -200,
+      "detail": "Trim the boundary-prefix anchor slightly now that the executor lane already has a green local-cluster roundtrip and a bounded closeout-green status packet.",
+      "row_digest": "833845b3d96a914a40ed04aca159d5d82f4519dd594ec8ce14906c1cca51dbb0"
+    },
+    {
+      "source_family_id": "executor.article_route_direct_traces",
+      "baseline_weight_bps": 1800,
+      "candidate_weight_bps": 1950,
+      "delta_bps": 150,
+      "detail": "Upweight direct article-route traces modestly so the trained-v1 candidate keeps more exact route pressure inside the same canonical mixture.",
+      "row_digest": "50f0dd0a7e92e3f3111255fee502a668853d7c040f271c197ab42275b0dea992"
+    },
+    {
+      "source_family_id": "executor.refusal_negative_traces",
+      "baseline_weight_bps": 800,
+      "candidate_weight_bps": 850,
+      "delta_bps": 50,
+      "detail": "Lift refusal-negative traces slightly so the route-direct shift does not silently erode refusal and held-out boundary posture.",
+      "row_digest": "9d5192f401dbb5cf49c9c3bcc4500006c1dfe7ee8f5074fc3afb248b64c0aedf"
+    }
+  ],
+  "slice_delta_rows": [
+    {
+      "source_family_id": "executor.boundary_prefix_traces",
+      "slice_id": "frequent_exactness_cases_v0",
+      "slice_class": "exactness",
+      "delta_bps": -1,
+      "rollback_guard": false,
+      "detail": "The lighter boundary-prefix weight gives back one basis point on the frequent exactness slice, which stays acceptable once the route-direct family gain is counted.",
+      "row_digest": "49f40532556395bfcba96aad273f59ebbdb67b1e29a7ecc1c3ca78f540ddcd36"
+    },
+    {
+      "source_family_id": "executor.article_route_direct_traces",
+      "slice_id": "promotion_exactness_suite_v0",
+      "slice_class": "exactness",
+      "delta_bps": 9,
+      "rollback_guard": false,
+      "detail": "The route-direct weight shift improves the promotion exactness slice by nine basis points on the admitted same-budget review.",
+      "row_digest": "31de8fffe2a3e1a3a80002b701491f3434febd92af1bb0e62d95b69cbb642a3b"
+    },
+    {
+      "source_family_id": "executor.article_route_direct_traces",
+      "slice_id": "promotion_held_out_suite_v0",
+      "slice_class": "held_out",
+      "delta_bps": 2,
+      "rollback_guard": false,
+      "detail": "The route-direct shift improves the promotion held-out slice modestly instead of borrowing against it.",
+      "row_digest": "27746fa2663461e5ae49661e7b5c22ea24da713b9031b8cc47c8b0c303da9f61"
+    },
+    {
+      "source_family_id": "executor.refusal_negative_traces",
+      "slice_id": "frequent_held_out_exclusions_v0",
+      "slice_class": "held_out",
+      "delta_bps": 3,
+      "rollback_guard": false,
+      "detail": "The refusal-negative lift improves the frequent held-out exclusion slice directly, which keeps the rollback guard inactive.",
+      "row_digest": "436b417c1b7ca7631185d9cc297673a3765d275b42aa696137b5418e1b796f4c"
+    },
+    {
+      "source_family_id": "executor.refusal_negative_traces",
+      "slice_id": "promotion_adversarial_suite_v0",
+      "slice_class": "adversarial",
+      "delta_bps": 1,
+      "rollback_guard": false,
+      "detail": "The refusal-negative lift improves the adversarial promotion slice slightly, which keeps the mixture change within the same bounded family instead of widening scope.",
+      "row_digest": "a30b3319916eaeffd15e8899fc005ac8c8ab213e68ae13d5ddecd0a9156f04ac"
+    }
+  ],
+  "exactness_net_delta_bps": 8,
+  "held_out_negative_delta_count": 0,
+  "adversarial_negative_delta_count": 0,
+  "rollback_applied": false,
+  "rollback_decision": "no_rollback_retained_trace_weight_shift",
+  "review_decision": "retain_trace_weight_shift_no_rollback",
+  "promotion_posture": "retain_trace_weight_variant_for_trained_v1_candidate",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_CANONICAL_MIXTURE_V0.md",
+    "docs/PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION.md",
+    "docs/PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY.md"
+  ],
+  "summary": "The executor lane now has one retained trace-family weighting ablation packet. The same-budget mixture run rebalanced one weight class across boundary-prefix, route-direct, and refusal-negative traces, reported explicit per-slice deltas, and kept the rollback guard inactive because held-out slices improved rather than regressed.",
+  "packet_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d"
+}
