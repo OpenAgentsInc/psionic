@@ -93,6 +93,7 @@ This doc does not claim:
   artifact naming policy
 - `docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md` owns the executor-capable
   acceptance profile
+- `docs/PSION_EXECUTOR_OWNERSHIP.md` owns named owners and review cadence
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge
