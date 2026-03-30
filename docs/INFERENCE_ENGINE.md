@@ -149,6 +149,10 @@ than just run tensor math.
   `docs/PSION_RVLLM_PREFLIGHT_BUNDLE.md`, tying together graph capture,
   cuBLAS warmup, allocator-pool posture, kernel-cache posture, and cold-versus-
   warm startup evidence for the admitted CUDA serving lane.
+- The same pass now also retains one explicit paged-KV manager packet at
+  `docs/PSION_RVLLM_PAGED_KV_MANAGER.md`, making logical page layout,
+  owner-bound growth accounting, spill policy, residency movement, and refusal
+  posture explicit instead of leaving the block-manager contract implicit.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
