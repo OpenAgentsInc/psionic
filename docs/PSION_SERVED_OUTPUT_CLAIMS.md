@@ -34,6 +34,10 @@ shown, and what published context or latency envelope is in force.
 - `docs/PSION_GENERIC_LOAD_AND_GENERATE.md` records the first retained generic
   learned-lane runtime packet that reuses this claim-posture contract on a real
   artifact-backed load-and-generate seam.
+- `docs/PSION_FAMILY_SERVE_VOCABULARY.md` records the family-level language for
+  how generic learned, plugin-conditioned, and executor-capable `Psion` lanes
+  reuse or project this claim discipline without collapsing into one evidence
+  class.
 
 The stable schema version is `psion.served_output_claim_posture.v1`.
 

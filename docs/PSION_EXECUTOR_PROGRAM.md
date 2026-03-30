@@ -238,6 +238,9 @@ This doc does not claim:
   promotion packet, throughput, long-run recovery, export, and bounded
   closeout facts into one phase-one replacement verdict
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
+- `docs/PSION_FAMILY_SERVE_VOCABULARY.md` owns the shared family serve and
+  claim vocabulary that keeps the executor-capable row explicit under the
+  umbrella family without flattening it into the generic learned lane
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge
 - `docs/ROADMAP_TASSADAR_INDEX.md` remains the executor artifact index

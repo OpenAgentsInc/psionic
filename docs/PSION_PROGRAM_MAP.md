@@ -55,6 +55,11 @@ artifact-backed runtime. That packet is a family-integrity proof, not a second
 serve stack and not a claim that the generic family has already closed the full
 compact-decoder-anchor runtime gap.
 
+The umbrella family now also has one canonical family serve vocabulary in
+`docs/PSION_FAMILY_SERVE_VOCABULARY.md`. That packet keeps generic learned,
+plugin-conditioned, and executor-capable rows visible under one family name
+without flattening their evidence classes.
+
 ## Dependency Order
 
 The `Psion` program is dependency-ordered in four tracks:

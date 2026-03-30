@@ -50,6 +50,10 @@ explicit answer to a simpler question:
 - `docs/PSION_SERVED_EVIDENCE.md` and `docs/PSION_SERVED_OUTPUT_CLAIMS.md`
   remain the lower served-evidence and claim-posture contracts that later
   plugin-conditioned serving work must reuse instead of replacing.
+- `docs/PSION_FAMILY_SERVE_VOCABULARY.md` now records how the
+  plugin-conditioned lane sits inside the broader family serve vocabulary
+  without flattening this lane into either the generic learned row or the
+  executor-capable row.
 
 ## Combined Claim Boundary
 
