@@ -1,0 +1,165 @@
+{
+  "schema_version": "psion.executor.phase_two_preflight_checklist.v1",
+  "checklist_id": "psion_executor_phase_two_preflight_checklist_v1",
+  "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
+  "registration_packet_digest": "dfad1972f358be079ddd80ac73f5ec85200c16e1e5a708fb11a18bc765cec229",
+  "blocking_rule": "any_red_item_blocks_launch",
+  "checklist_items": [
+    {
+      "item_id": "device_health",
+      "category_id": "device_health",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md"
+      ],
+      "detail": "The admitted Mac and 4080 profiles must still be healthy and available before any phase-two launch starts.",
+      "row_digest": "d922002a9cb2a04acf720a7c48e5781bd6afd93bc361ba2c829df54f4a4bc58f"
+    },
+    {
+      "item_id": "path_integrity",
+      "category_id": "paths",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md"
+      ],
+      "detail": "Model path, checkpoint path, log path, and export target path must be resolved before launch.",
+      "row_digest": "8da0b35fb554c8145b028c80c1313ad93e9a392119ceb049760d26f946370e17"
+    },
+    {
+      "item_id": "dry_batch",
+      "category_id": "dry_batch",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_MLX_SMOKE_RUN.md",
+        "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md"
+      ],
+      "detail": "Each admitted run class must have a retained dry-batch or smoke-run proof before decision-grade work starts.",
+      "row_digest": "2133906642e191740367faf8b903ce4c6c94735f0edfb9592bdcede2f44d575c"
+    },
+    {
+      "item_id": "eval_attach",
+      "category_id": "eval_attach",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+        "docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md"
+      ],
+      "detail": "Certified eval packs and the checkpoint-time eval attach path must be explicit before launch.",
+      "row_digest": "53a4452acab064e8fc321a065dea5cea22f2a4fae7cfe162b258852c29b086ba"
+    },
+    {
+      "item_id": "resume_rehearsal",
+      "category_id": "resume_rehearsal",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_MLX_CHECKPOINT_COMPATIBILITY.md",
+        "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md"
+      ],
+      "detail": "Resume and recovery posture must already be rehearsed on the admitted hardware path.",
+      "row_digest": "97fde5ba35603a4e9b2a350da4bb8062f9e06f7ff1e3b5f1640887e73293603e"
+    },
+    {
+      "item_id": "ledger_fields",
+      "category_id": "ledger_fields",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md"
+      ],
+      "detail": "Run registration and ledger fields must be fully known before launch so long runs cannot hide missing facts.",
+      "row_digest": "550615c96f671eeff505974045cdfdc948b4d0f3fd50f0141188edfc5c2dd011"
+    },
+    {
+      "item_id": "export_plan",
+      "category_id": "export_plan",
+      "blocking_color": "red_blocks_launch",
+      "applies_to_run_types": [
+        "mlx_decision_grade",
+        "cuda_4080_decision_grade"
+      ],
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md"
+      ],
+      "detail": "Every phase-two run must name its export inspection and replacement-validation target before launch.",
+      "row_digest": "1d2806dcc4e38dec090fb41674099ca0ecbca74ef6e4cead113319564a5c7839"
+    }
+  ],
+  "run_type_rows": [
+    {
+      "run_type_id": "mlx_decision_grade",
+      "admitted_profile_id": "local_mac_mlx_aarch64",
+      "current_registration_id": "psion_executor_local_cluster_registration_mlx_v1",
+      "current_run_id": "same-node-wallclock-retained-mlx",
+      "required_item_ids": [
+        "device_health",
+        "path_integrity",
+        "dry_batch",
+        "eval_attach",
+        "resume_rehearsal",
+        "ledger_fields",
+        "export_plan"
+      ],
+      "launch_blocked_if_any_red": true,
+      "detail": "The admitted MLX decision-grade path is blocked if any pre-flight item remains red.",
+      "row_digest": "9770236ff04e5683be456aefa8ab48d0d31c583c484e81fd938dc50fe1f56b6e"
+    },
+    {
+      "run_type_id": "cuda_4080_decision_grade",
+      "admitted_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "current_registration_id": "psion_executor_local_cluster_registration_4080_v1",
+      "current_run_id": "tailrun-home-admitted-20260328k",
+      "required_item_ids": [
+        "device_health",
+        "path_integrity",
+        "dry_batch",
+        "eval_attach",
+        "resume_rehearsal",
+        "ledger_fields",
+        "export_plan"
+      ],
+      "launch_blocked_if_any_red": true,
+      "detail": "The admitted 4080 decision-grade path is blocked if any pre-flight item remains red.",
+      "row_digest": "0e6f2620c1faf7bd51342d329369e843e466aa7939690a7ebbe1056c1ec4f5c9"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md",
+    "docs/PSION_EXECUTOR_MLX_SMOKE_RUN.md",
+    "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md",
+    "docs/PSION_EXECUTOR_MLX_CHECKPOINT_COMPATIBILITY.md",
+    "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md"
+  ],
+  "summary": "The admitted executor lane now has one phase-two pre-flight checklist packet. Device health, paths, dry-batch proof, eval attach, resume rehearsal, ledger fields, and export plan are frozen as red launch blockers for the admitted MLX and 4080 decision-grade run types.",
+  "packet_digest": "5c8f4c8448b396b5bc1b7def7e6216cf6e03f4e2ad61e363c0d83b68faec7068"
+}
