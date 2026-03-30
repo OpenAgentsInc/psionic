@@ -91,6 +91,22 @@ It freezes four required surfaces:
 This pack does not decide promotion. It exists so checkpoint-time review uses
 one frozen spine instead of one-off arguments.
 
+### First 4080 Tailnet Attachment Packet
+
+The first admitted 4080 checkpoint-time attachment packet is now explicit too:
+
+- `docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md`
+- `fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json`
+
+That packet keeps one retained per-checkpoint ledger row explicit for the
+admitted Mac -> 4080 rerun. It also keeps the current honest boundary explicit:
+
+- operator-review cases can already score on the retained infrastructure rerun
+- exactness, held-out exclusions, and throughput blockers stay explicitly
+  unscored on that retained rerun
+- missing or unscored frequent-pack coverage blocks later promotion instead of
+  silently disappearing
+
 ### MLX Smoke Subset
 
 Phase-one MLX smoke runs may cite one admitted local subset of

@@ -1,0 +1,95 @@
+{
+  "schema_version": "psion.executor.4080_frequent_eval_attachment.v1",
+  "packet_id": "psion_executor_4080_frequent_eval_attachment_v1",
+  "worker_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "control_plane_profile_id": "local_tailnet_cluster_control_plane",
+  "durable_checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_4080_durable_checkpoint_v1.json",
+  "durable_checkpoint_packet_sha256": "c1a983ae9eeb6bfdcd1fbd9f01cc13a3e2976c363e5d9035cc4268f84255c1f6",
+  "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+  "eval_pack_catalog_sha256": "b6b4683128af9eb7d2eb901bfa4a3cba10247c21858d8f096a01fc593c679d5f",
+  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "frequent_pack_digest": "aa61897f9b4731421865a9cb38f2633ccbbd2fc60dcb140fb567ae21d14c73e8",
+  "retained_run_bundle_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/first_swarm_real_run_bundle.json",
+  "retained_run_bundle_sha256": "35c4cdaba64e5b4b235e3d1f77cc506cc74ec6bcf9a8f8eb9309bf9441e0bc83",
+  "run_id": "tailrun-home-admitted-20260328k",
+  "pack_id": "tassadar.eval.frequent.v0",
+  "missing_eval_blocks_promotion": true,
+  "promotion_blocker_summary": "Any admitted 4080 checkpoint without an attached frequent-pack ledger row is non-promotable. On the retained 2026-03-28 rerun, exactness, held-out, and throughput suites stay explicitly unscored and therefore continue blocking promotion even though the operator-review suite is green.",
+  "checkpoint_eval_row": {
+    "ledger_row_id": "psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+    "pack_id": "tassadar.eval.frequent.v0",
+    "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+    "checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+    "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+    "checkpoint_step": 12,
+    "suite_results": [
+      {
+        "suite_id": "frequent_exactness_cases_v0",
+        "status": "blocked_missing_executor_outputs",
+        "required_for_green": true,
+        "detail": "The retained 2026-03-28 admitted rerun is an open-adapter infrastructure run, not an executor candidate output run, so exactness cases stay explicitly unscored and therefore block promotion instead of disappearing from review."
+      },
+      {
+        "suite_id": "frequent_held_out_exclusions_v0",
+        "status": "blocked_missing_executor_outputs",
+        "required_for_green": true,
+        "detail": "Held-out exclusion review stays attached to the checkpoint ledger row, but this retained infrastructure run does not emit executor outputs that could honestly score the held-out suite."
+      },
+      {
+        "suite_id": "frequent_operator_review_cases_v0",
+        "status": "green",
+        "required_for_green": true,
+        "detail": "The admitted rerun can already score the operator-review slice because artifact completeness, checkpoint-path readback, export smoke, and Mac -> 4080 -> Mac roundtrip evidence are all retained explicitly."
+      },
+      {
+        "suite_id": "frequent_throughput_blockers_v0",
+        "status": "blocked_missing_executor_metrics",
+        "required_for_green": true,
+        "detail": "Throughput blockers remain attached as required review surfaces, but the retained open-adapter infrastructure run does not emit the admitted executor fast-route metrics and therefore stays non-promotable until later decision-grade packets score them honestly."
+      }
+    ],
+    "case_results": [
+      {
+        "suite_id": "frequent_operator_review_cases_v0",
+        "case_id": "artifact_packet_complete",
+        "status": "green",
+        "detail": "The admitted 4080 lane now keeps the remote-launch packet, durable-checkpoint packet, retained rerun bundle, and merged portable bundle together as one reviewable artifact packet."
+      },
+      {
+        "suite_id": "frequent_operator_review_cases_v0",
+        "case_id": "checkpoint_restore_rehearsal_green",
+        "status": "green",
+        "detail": "The durable-checkpoint packet already proves explicit pointer receipts plus control-plane portable-bundle readback on the retained rerun; the later live interruption rehearsal stays separate in `PSION-0305`."
+      },
+      {
+        "suite_id": "frequent_operator_review_cases_v0",
+        "case_id": "export_smoke_green",
+        "status": "green",
+        "detail": "The merged portable bundle imports cleanly through the shipped model-IO surface, so export smoke is already explicit on the retained rerun."
+      },
+      {
+        "suite_id": "frequent_operator_review_cases_v0",
+        "case_id": "local_cluster_roundtrip_green",
+        "status": "green",
+        "detail": "The retained rerun already completed the Mac -> 4080 -> Mac roundtrip and returned the merged artifacts to the controller-owned bundle root."
+      }
+    ],
+    "promotion_blocker_ids": [
+      "frequent_exactness_cases_v0",
+      "frequent_held_out_exclusions_v0",
+      "frequent_throughput_blockers_v0"
+    ],
+    "promotion_blocked": true,
+    "ledger_row_digest": "7b9b1159894d59c216bf4e8c069036a9c2820b9f949a7298d13ba93d4a52eaa4"
+  },
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_4080_DURABLE_CHECKPOINT.md",
+    "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260328k/first_swarm_real_run_bundle.json"
+  ],
+  "summary": "The admitted 4080 lane now has one automatic frequent-pack attachment packet. The retained rerun at checkpoint pointer digest `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` stores one per-checkpoint ledger row keyed to `tassadar.eval.frequent.v0`, keeps the operator-review suite green, and makes missing or unscored frequent-pack coverage a hard promotion blocker instead of a silent omission.",
+  "packet_digest": "b61245ffc124b3a8fd9ec3e15bee20782fe4538f30a4595829e735bdbc360fb7"
+}

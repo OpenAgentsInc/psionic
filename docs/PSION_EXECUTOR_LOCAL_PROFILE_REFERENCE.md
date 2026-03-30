@@ -130,6 +130,7 @@ The first admitted remote-launch packet for this profile is now explicit too:
 
 - `docs/PSION_EXECUTOR_4080_REMOTE_LAUNCH.md`
 - `docs/PSION_EXECUTOR_4080_DURABLE_CHECKPOINT.md`
+- `docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md`
 
 That packet binds the shipped Tailnet operator script, the retained operator
 manifest, the retained admitted run bundle, and the Linux RTX 4080
@@ -139,7 +140,10 @@ durable-checkpoint packet then upgrades that same lane into one explicit
 checkpoint path by binding the retained pointer digest, both worker submission
 receipts, the remote contributor checkpoint family, and the merged portable
 bundle import path back onto the Mac control plane without pretending the live
-interruption drill is already done.
+interruption drill is already done. The frequent-eval attachment packet then
+binds the frozen frequent pack to that retained checkpoint row, keeps the
+operator-review suite explicit, and makes missing or unscored frequent-pack
+coverage a hard blocker instead of a silent omission.
 
 ## Current Admitted Tailnet Control-Plane Profile
 
