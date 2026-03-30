@@ -181,6 +181,11 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY.md` owns the first canonical
   rollback policy packet for misleading mixture wins and the single-lever retry
   constraint that weekly review now retains directly
+- `docs/PSION_EXECUTOR_OPTIMIZER_ABLATION.md` owns the first canonical
+  same-budget optimizer ablation packet that repeats one promising 4080 result
+  once, checks it against the frozen decision-threshold packet, and retains it
+  only because the repeat still clears the frozen noise band without exactness,
+  held-out, or adversarial regressions
 - `docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md` owns the first
   canonical phase-two pre-flight checklist packet that freezes launch blockers
   for the admitted MLX and 4080 decision-grade run types
