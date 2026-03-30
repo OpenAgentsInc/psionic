@@ -105,6 +105,15 @@ The follow-on mandatory live-metrics packet now lives at:
 - `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md`
 - `fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json`
 
+The follow-on trace-native metrics packet now lives at:
+
+- `docs/PSION_EXECUTOR_TRACE_NATIVE_METRICS.md`
+- `fixtures/psion/executor/psion_executor_trace_native_metrics_v1.json`
+
+That packet keeps the current-best and candidate rows paired with the frozen
+article closeout workloads so dashboard review can see trace length, exactness,
+and fast-route throughput without reconstructing the benchmark report by hand.
+
 The follow-on unified throughput packet that keeps dashboard training
 throughput and Mac serving throughput in one retained surface now lives at:
 

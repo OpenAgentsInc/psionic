@@ -110,6 +110,15 @@ That packet projects the frozen baseline, the retained current-best row, and
 the retained candidate row from this ledger instead of inventing a separate
 review-only truth source.
 
+The follow-on trace-native metrics packet now lives at:
+
+- `docs/PSION_EXECUTOR_TRACE_NATIVE_METRICS.md`
+- `fixtures/psion/executor/psion_executor_trace_native_metrics_v1.json`
+
+That packet keeps the frozen article closeout trio visible per retained
+candidate row and per workload, binding trace length, exactness, and
+`reference_linear` versus `hull_cache` throughput into this ledger surface.
+
 The follow-on mandatory live-metrics packet now lives at:
 
 - `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md`

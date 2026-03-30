@@ -73,6 +73,7 @@ It does something narrower and more useful:
 
 The next executor closeout surfaces now build directly on this packet:
 
+- `docs/PSION_EXECUTOR_TRACE_NATIVE_METRICS.md`
 - `docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md`
 - `docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md`
 - `docs/ROADMAP_PSION.md`
