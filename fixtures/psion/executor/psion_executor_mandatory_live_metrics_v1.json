@@ -1,0 +1,73 @@
+{
+  "schema_version": "psion.executor.mandatory_live_metrics.v1",
+  "metrics_id": "psion_executor_mandatory_live_metrics_v1",
+  "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
+  "ledger_digest": "618605effd540810a884fb6797bee683327033cdaae3e79fa5ab0fec51b7b63c",
+  "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
+  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28",
+  "required_metric_ids": [
+    "training_loss",
+    "exactness_delta_bps",
+    "held_out_delta_bps",
+    "tokens_per_second",
+    "step_latency_ms",
+    "checkpoint_latency_ms",
+    "gradient_norm_or_clipping",
+    "memory_headroom",
+    "device_health_or_thermals",
+    "dataloader_stalls",
+    "recovery_latency_ms"
+  ],
+  "metrics_rows": [
+    {
+      "row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+      "candidate_status": "candidate",
+      "training_loss": "0.0000",
+      "exactness_delta_bps": 0,
+      "held_out_delta_bps": 0,
+      "tokens_per_second": 4649676,
+      "step_latency_ms": 6,
+      "checkpoint_latency_ms": 384,
+      "gradient_norm_bucket": "retained_nominal_band",
+      "gradient_clipping_status": "not_triggered",
+      "memory_headroom_bytes": 0,
+      "device_health_status": "green_nominal",
+      "thermal_status": "green_no_throttle",
+      "dataloader_stall_count": 0,
+      "recovery_latency_ms": 1,
+      "export_status": "green",
+      "detail": "Retained live metrics row for `psion_executor_local_cluster_ledger_row_mlx_v1` built from canonical ledger throughput, registration headroom, source-family deltas, and interruption-recovery posture.",
+      "row_digest": "96cc1ca65b3e0f1984fe90af63ed0a1b26613c9307668fd9efc334b48ec8f91d"
+    },
+    {
+      "row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+      "candidate_status": "current_best",
+      "training_loss": "0.0000",
+      "exactness_delta_bps": 0,
+      "held_out_delta_bps": 0,
+      "tokens_per_second": 2357371,
+      "step_latency_ms": 12,
+      "checkpoint_latency_ms": 768,
+      "gradient_norm_bucket": "retained_nominal_band",
+      "gradient_clipping_status": "not_triggered",
+      "memory_headroom_bytes": 21474836480,
+      "device_health_status": "green_nominal",
+      "thermal_status": "green_no_throttle",
+      "dataloader_stall_count": 0,
+      "recovery_latency_ms": 5000,
+      "export_status": "green",
+      "detail": "Retained live metrics row for `psion_executor_local_cluster_ledger_row_4080_v1` built from canonical ledger throughput, registration headroom, source-family deltas, and interruption-recovery posture.",
+      "row_digest": "c4887a616b683e734d3f2093256e359c67fd9fb91651e77f13fb3a36d1a8984d"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md",
+    "docs/PSION_EXECUTOR_SOURCE_FAMILY_CONTRIBUTION.md",
+    "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md"
+  ],
+  "summary": "The admitted executor lane now has one mandatory live-metrics packet built directly on the canonical local-cluster ledger and dashboard. Training loss, exactness and held-out deltas, throughput, latency, gradient posture, memory headroom, device health, dataloader stalls, recovery latency, and export status are now frozen as one required metric set for the retained MLX baseline row and 4080 current-best row.",
+  "packet_digest": "ed90d86a315b4c37427dcbc4353f6113cacc89862ffdd3ceefa8a7161c2d04c6"
+}

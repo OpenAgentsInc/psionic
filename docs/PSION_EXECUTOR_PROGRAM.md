@@ -171,6 +171,9 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_CONTINUE_RESTART_POLICY.md` owns the first canonical
   incident-policy packet that freezes continue-vs-restart handling for the
   admitted executor lane and binds it to the weekly review surface
+- `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md` owns the first canonical
+  mandatory live-metrics packet that freezes the minimum long-run metric set on
+  top of the retained local-cluster ledger and dashboard rows
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

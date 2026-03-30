@@ -100,6 +100,11 @@ That report turns missing eval, recovery, export, and `reference_linear`
 anchor facts into explicit phase-exit and promotion blocks on top of this
 dashboard.
 
+The follow-on mandatory live-metrics packet now lives at:
+
+- `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md`
+- `fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_dashboard_fixtures`

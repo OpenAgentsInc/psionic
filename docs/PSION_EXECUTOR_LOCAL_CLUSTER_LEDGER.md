@@ -110,6 +110,11 @@ That packet projects the frozen baseline, the retained current-best row, and
 the retained candidate row from this ledger instead of inventing a separate
 review-only truth source.
 
+The follow-on mandatory live-metrics packet now lives at:
+
+- `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md`
+- `fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_ledger_fixtures`
