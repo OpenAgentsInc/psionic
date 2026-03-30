@@ -1,0 +1,70 @@
+{
+  "schema_version": "psion.executor.tokenizer_architecture_gate.v1",
+  "packet_id": "psion_executor_tokenizer_architecture_gate_v1",
+  "required_successful_ablation_runs": 5,
+  "successful_same_baseline_run_count": 5,
+  "evidence_rows": [
+    {
+      "issue_id": "#776",
+      "ablation_id": "psion_executor_optimizer_ablation_v1",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "evidence_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "success_class": "successful_same_baseline_run",
+      "detail": "The optimizer ablation is retained as a successful same-baseline run because it repeated cleanly, stayed outside the frozen noise band, and kept zero regressions.",
+      "row_digest": "56247f30c6f3848565286935a8b77e1f3cc848329caee3c838b34d97bc8cc3ed"
+    },
+    {
+      "issue_id": "#777",
+      "ablation_id": "psion_executor_scheduler_ablation_v1",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_scheduler_ablation_v1.json",
+      "evidence_digest": "b78acc30a3c31cafd51d70c8cf2f634605f87242f872d1f9c9ab7ba42557e167",
+      "success_class": "successful_same_baseline_run",
+      "detail": "The scheduler ablation counts as a successful same-baseline run because it stayed baseline-comparable, reviewable, and regression-free even though it remained below the promotion-noise threshold.",
+      "row_digest": "58bcdafa2e90c679821a1ff3aee806505d9bae1001e1d4d2990d41069dd5853d"
+    },
+    {
+      "issue_id": "#778",
+      "ablation_id": "psion_executor_batch_accumulation_ablation_v1",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_batch_accumulation_ablation_v1.json",
+      "evidence_digest": "96e495b8dad2e1563664766fd3f51e6140c6aae6ac7c349c26abeb007074a2d9",
+      "success_class": "successful_same_baseline_run",
+      "detail": "The batch / accumulation ablation counts as a successful same-baseline run because it kept effective batch fixed, made the memory tradeoff explicit, and kept zero regressions.",
+      "row_digest": "07db125cfb1922c400c1cacf99e6a213f2bbe2584bcd0993b5bee72e063c6afa"
+    },
+    {
+      "issue_id": "#779",
+      "ablation_id": "psion_executor_trace_family_weighting_ablation_v1",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_trace_family_weighting_ablation_v1.json",
+      "evidence_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d",
+      "success_class": "successful_same_baseline_run",
+      "detail": "The trace-family weighting ablation counts as a successful same-baseline run because the held-out rollback guard stayed inactive while the mixture shift remained inside one lever class.",
+      "row_digest": "b7e741000fd6097fa46b13e221ebe9924df09626ef62f289ae08631feeab85a2"
+    },
+    {
+      "issue_id": "#780",
+      "ablation_id": "psion_executor_supervision_density_ablation_v1",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "evidence_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "success_class": "successful_same_baseline_run",
+      "detail": "The supervision-density ablation counts as a successful same-baseline run because exactness, held-out, throughput, and stability all stayed green together.",
+      "row_digest": "db5e1588dcc4230f9f745babaa0169d35c870b42f13463ccc5811ef7ea7ae486"
+    }
+  ],
+  "compression_limit_evidence_present": false,
+  "fit_limit_evidence_present": false,
+  "tokenizer_issue_open_allowed": false,
+  "architecture_issue_open_allowed": true,
+  "tokenizer_block_reason": "No retained executor packet shows a real compression or fit limit yet, so tokenizer work remains blocked behind evidence.",
+  "architecture_gate_reason": "Five successful same-baseline ablations now exist, so architecture work may open if it becomes necessary after the current trained-v1 candidate path is exhausted.",
+  "review_decision": "keep_tokenizer_blocked_allow_architecture_only_after_ablation_tranche",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_OPTIMIZER_ABLATION.md",
+    "docs/PSION_EXECUTOR_SCHEDULER_ABLATION.md",
+    "docs/PSION_EXECUTOR_BATCH_ACCUMULATION_ABLATION.md",
+    "docs/PSION_EXECUTOR_TRACE_FAMILY_WEIGHTING_ABLATION.md",
+    "docs/PSION_EXECUTOR_SUPERVISION_DENSITY_ABLATION.md"
+  ],
+  "summary": "The executor lane now has one retained tokenizer/architecture evidence-gate packet. Tokenizer work stays blocked because no compression or fit limit is real yet, while architecture work becomes eligible only because the full five-run same-baseline ablation tranche now exists.",
+  "packet_digest": "16c78e7bb8d7da5caee43da2a793df31b708ac4935a210aec74edce818d06fe0"
+}

@@ -203,6 +203,10 @@ This doc does not claim:
   canonical same-budget supervision-density ablation packet that keeps
   exactness, held-out, throughput, and stability in one retained verdict
   instead of letting the lane trade one dimension against the others
+- `docs/PSION_EXECUTOR_TOKENIZER_ARCHITECTURE_GATE.md` owns the first
+  canonical evidence-gate packet that keeps tokenizer work blocked until
+  compression or fit limits are real and only allows architecture work after
+  the full five-run same-baseline ablation tranche exists
 - `docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md` owns the first
   canonical phase-two pre-flight checklist packet that freezes launch blockers
   for the admitted MLX and 4080 decision-grade run types
