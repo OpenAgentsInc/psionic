@@ -14,6 +14,12 @@ It exists so the repo can point at one durable, reviewable learned-lane map
 instead of asking readers to reconstruct the program from scattered issue
 titles or doc filenames.
 
+This doc is the generic learned `Psion` family map.
+
+It is not the executor-capable `Psion` umbrella contract. That split now lives
+in `docs/PSION_EXECUTOR_PROGRAM.md`, which keeps generic compact-decoder
+`Psion` separate from the bounded executor-capable `Tassadar` profile.
+
 ## Claim Boundary
 
 This tranche is for a learned bounded-success systems model with explicit route
@@ -27,7 +33,7 @@ It is not:
 - implicit execution hidden behind language answers
 
 Exact executor closure remains separate work under the `Tassadar` lane and its
-canonical docs.
+canonical docs, including `docs/PSION_EXECUTOR_PROGRAM.md`.
 
 The current reference pilot is also a CPU-reference lane. It remains a valid
 bounded operator, receipt, checkpoint, and promotion fixture, but it is not a
