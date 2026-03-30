@@ -108,6 +108,100 @@ pub const GGML_Q8_1_BLOCK_BYTES: usize = 36;
 const CUDA_PUBLIC_ATTENTION_MAX_SEQUENCE: usize = 1024;
 const CUDA_PUBLIC_STANDARD_ROPE_BASE: f32 = 10_000.0;
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CudaAllocatorPoolTelemetry {
+    /// Number of fresh device allocations taken on the admitted lane.
+    pub cold_allocations: u64,
+    /// Number of exact-spec buffers reused from the pool.
+    pub reuse_hits: u64,
+    /// Number of buffers retained into the pool on drop.
+    pub returned_buffers: u64,
+    /// Number of returned buffers evicted instead of cached.
+    pub evicted_returns: u64,
+}
+
+#[derive(Debug)]
+struct CudaAllocatorPool {
+    policy: AllocatorPoolPolicy,
+    state: AllocatorPoolState,
+    telemetry: CudaAllocatorPoolTelemetry,
+    cached: BTreeMap<String, Vec<(usize, usize)>>,
+}
+
+impl CudaAllocatorPool {
+    fn new(policy: AllocatorPoolPolicy) -> Self {
+        Self {
+            policy,
+            state: AllocatorPoolState::default(),
+            telemetry: CudaAllocatorPoolTelemetry::default(),
+            cached: BTreeMap::new(),
+        }
+    }
+
+    fn report(&self) -> AllocatorPoolReport {
+        AllocatorPoolReport {
+            policy: self.policy.clone(),
+            state: self.state.clone(),
+        }
+    }
+
+    fn telemetry(&self) -> CudaAllocatorPoolTelemetry {
+        self.telemetry.clone()
+    }
+
+    fn checkout(&mut self, cache_key: &str, byte_len: usize) -> Option<usize> {
+        if self.policy.mode != psionic_runtime::AllocatorPoolMode::ExactTensorSpec {
+            return None;
+        }
+        let cached = self.cached.get_mut(cache_key)?;
+        let (cached_len, device_ptr) = cached.pop()?;
+        debug_assert_eq!(cached_len, byte_len);
+        self.state.cached_buffers = self.state.cached_buffers.saturating_sub(1);
+        self.state.cached_bytes = self.state.cached_bytes.saturating_sub(cached_len as u64);
+        self.telemetry.reuse_hits = self.telemetry.reuse_hits.saturating_add(1);
+        if cached.is_empty() {
+            self.cached.remove(cache_key);
+        }
+        Some(device_ptr)
+    }
+
+    fn record_cold_allocation(&mut self) {
+        self.telemetry.cold_allocations = self.telemetry.cold_allocations.saturating_add(1);
+    }
+
+    fn checkin(&mut self, cache_key: String, byte_len: usize, device_ptr: usize) -> bool {
+        if self.policy.mode != psionic_runtime::AllocatorPoolMode::ExactTensorSpec {
+            self.telemetry.evicted_returns = self.telemetry.evicted_returns.saturating_add(1);
+            return false;
+        }
+        let within_buffer_limit = self.state.cached_buffers < self.policy.max_cached_buffers;
+        let within_byte_limit =
+            self.state.cached_bytes.saturating_add(byte_len as u64) <= self.policy.max_cached_bytes;
+        if !within_buffer_limit || !within_byte_limit {
+            self.telemetry.evicted_returns = self.telemetry.evicted_returns.saturating_add(1);
+            return false;
+        }
+        self.cached
+            .entry(cache_key)
+            .or_default()
+            .push((byte_len, device_ptr));
+        self.state.cached_buffers = self.state.cached_buffers.saturating_add(1);
+        self.state.cached_bytes = self.state.cached_bytes.saturating_add(byte_len as u64);
+        self.telemetry.returned_buffers = self.telemetry.returned_buffers.saturating_add(1);
+        true
+    }
+}
+
+fn allocator_pool_cache_key(spec: &TensorSpec) -> String {
+    format!(
+        "{:?}|{:?}|{}|{}",
+        spec.shape().dims(),
+        spec.dtype(),
+        spec.device().kind(),
+        spec.device().ordinal()
+    )
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ScaledDotProductAttentionBackwardTarget {
     Query,
@@ -3625,7 +3719,6 @@ enum CudaBackendState {
 struct AvailableCudaBackend {
     descriptor: DeviceDescriptor,
     platform: platform::ConfiguredBackend,
-    allocator_pool: AllocatorPoolReport,
     execution_plan_cache: CudaExecutionPlanCache,
     kernel_cache: KernelCacheReport,
 }
@@ -3654,20 +3747,16 @@ impl CudaBackend {
                         state: CudaBackendState::Unavailable(report.health),
                     };
                 };
-                let allocator_pool = AllocatorPoolReport {
-                    policy: cuda_allocator_pool_policy(),
-                    state: AllocatorPoolState::default(),
-                };
+                let allocator_pool = cuda_allocator_pool_policy();
                 let kernel_cache = KernelCacheReport {
                     policy: KernelCachePolicy::disabled(),
                     state: KernelCacheState::default(),
                 };
-                match platform::configure_backend(descriptor.clone()) {
+                match platform::configure_backend(descriptor.clone(), allocator_pool) {
                     Ok(platform) => Self {
                         state: CudaBackendState::Available(Box::new(AvailableCudaBackend {
                             descriptor,
                             platform,
-                            allocator_pool,
                             execution_plan_cache: CudaExecutionPlanCache::new(
                                 cuda_execution_plan_cache_policy(),
                             ),
@@ -3709,20 +3798,34 @@ impl CudaBackend {
     #[must_use]
     pub fn runtime_resources(&self) -> Option<BackendRuntimeResources> {
         match &self.state {
-            CudaBackendState::Available(backend) => Some(BackendRuntimeResources {
-                execution_plan_cache: backend.execution_plan_cache.report(),
-                allocator_pool: backend.allocator_pool.clone(),
-                kernel_cache: backend.kernel_cache.clone(),
-                device_memory_budget: Some(DeviceMemoryBudget::new(
-                    backend.descriptor.memory_capacity_bytes,
-                    backend.allocator_pool.policy.max_cached_bytes,
-                    backend
-                        .kernel_cache
-                        .policy
-                        .max_cached_bytes
-                        .unwrap_or(backend.kernel_cache.state.cached_bytes),
-                )),
-            }),
+            CudaBackendState::Available(backend) => {
+                let allocator_pool = backend.platform.allocator_pool_report();
+                Some(BackendRuntimeResources {
+                    execution_plan_cache: backend.execution_plan_cache.report(),
+                    allocator_pool: allocator_pool.clone(),
+                    kernel_cache: backend.kernel_cache.clone(),
+                    device_memory_budget: Some(DeviceMemoryBudget::new(
+                        backend.descriptor.memory_capacity_bytes,
+                        allocator_pool.policy.max_cached_bytes,
+                        backend
+                            .kernel_cache
+                            .policy
+                            .max_cached_bytes
+                            .unwrap_or(backend.kernel_cache.state.cached_bytes),
+                    )),
+                })
+            }
+            CudaBackendState::Unavailable(_) => None,
+        }
+    }
+
+    /// Returns explicit allocator-pool telemetry for the selected CUDA device.
+    #[must_use]
+    pub fn allocator_pool_telemetry(&self) -> Option<CudaAllocatorPoolTelemetry> {
+        match &self.state {
+            CudaBackendState::Available(backend) => {
+                Some(backend.platform.allocator_pool_telemetry())
+            }
             CudaBackendState::Unavailable(_) => None,
         }
     }
@@ -4164,7 +4267,7 @@ impl CudaBackend {
                     spec.storage_size()
                 ))
             })?;
-        let platform_buffer = backend.platform.allocate(byte_len)?;
+        let platform_buffer = backend.platform.allocate(spec, byte_len)?;
         Ok(CudaBuffer {
             spec: spec.clone(),
             byte_len,
@@ -4551,7 +4654,7 @@ impl AvailableCudaBackend {
                     spec.storage_size()
                 ))
             })?;
-        let platform_buffer = self.platform.allocate(byte_len)?;
+        let platform_buffer = self.platform.allocate(spec, byte_len)?;
         Ok(CudaBuffer {
             spec: spec.clone(),
             byte_len,
@@ -8959,13 +9062,17 @@ fn parse_memory_bytes(value: &str) -> Option<u64> {
 mod platform {
     use std::{
         ffi::{CStr, c_char, c_int, c_longlong, c_void},
-        sync::Arc,
+        sync::{Arc, Mutex},
     };
 
     use libloading::Library;
 
-    use super::{CudaCommandStatus, CudaCommandWait, QuantizationMode};
-    use psionic_runtime::RuntimeError;
+    use super::{
+        CudaAllocatorPool, CudaAllocatorPoolTelemetry, CudaCommandStatus, CudaCommandWait,
+        QuantizationMode, allocator_pool_cache_key,
+    };
+    use psionic_core::TensorSpec;
+    use psionic_runtime::{AllocatorPoolPolicy, AllocatorPoolReport, RuntimeError};
 
     type CudaError = i32;
     type CudaStream = *mut c_void;
@@ -10187,6 +10294,7 @@ mod platform {
     pub(super) struct ConfiguredBackend {
         runtime: Arc<CudaRuntime>,
         stream: CudaStream,
+        allocator_pool: Arc<Mutex<CudaAllocatorPool>>,
     }
 
     #[derive(Clone)]
@@ -10214,10 +10322,17 @@ mod platform {
         capturing: bool,
     }
 
+    struct PoolReturnToken {
+        allocator_pool: Arc<Mutex<CudaAllocatorPool>>,
+        cache_key: String,
+        byte_len: usize,
+    }
+
     struct PlatformBufferInner {
         runtime: Arc<CudaRuntime>,
         device_ptr: *mut c_void,
         allocation_owner: Option<Arc<PlatformBufferInner>>,
+        pool_return: Option<PoolReturnToken>,
     }
 
     struct PlatformHostBufferInner {
@@ -10259,19 +10374,57 @@ mod platform {
     }
 
     impl ConfiguredBackend {
-        pub(super) fn allocate(&self, byte_len: usize) -> Result<PlatformBuffer, RuntimeError> {
+        pub(super) fn allocator_pool_report(&self) -> AllocatorPoolReport {
+            self.allocator_pool
+                .lock()
+                .expect("cuda allocator pool mutex should not be poisoned")
+                .report()
+        }
+
+        pub(super) fn allocator_pool_telemetry(&self) -> CudaAllocatorPoolTelemetry {
+            self.allocator_pool
+                .lock()
+                .expect("cuda allocator pool mutex should not be poisoned")
+                .telemetry()
+        }
+
+        pub(super) fn allocate(
+            &self,
+            spec: &TensorSpec,
+            byte_len: usize,
+        ) -> Result<PlatformBuffer, RuntimeError> {
             self.runtime.set_device()?;
-            let mut device_ptr = std::ptr::null_mut();
             let allocation_len = byte_len.max(1);
-            self.runtime.check(
-                unsafe { (self.runtime.cuda_malloc)(&mut device_ptr, allocation_len) },
-                "cudaMalloc",
-            )?;
+            let cache_key = allocator_pool_cache_key(spec);
+            let device_ptr = if let Some(cached_ptr) = self
+                .allocator_pool
+                .lock()
+                .expect("cuda allocator pool mutex should not be poisoned")
+                .checkout(cache_key.as_str(), allocation_len)
+            {
+                cached_ptr as *mut c_void
+            } else {
+                let mut device_ptr = std::ptr::null_mut();
+                self.runtime.check(
+                    unsafe { (self.runtime.cuda_malloc)(&mut device_ptr, allocation_len) },
+                    "cudaMalloc",
+                )?;
+                self.allocator_pool
+                    .lock()
+                    .expect("cuda allocator pool mutex should not be poisoned")
+                    .record_cold_allocation();
+                device_ptr
+            };
             Ok(PlatformBuffer {
                 inner: Arc::new(PlatformBufferInner {
                     runtime: Arc::clone(&self.runtime),
                     device_ptr,
                     allocation_owner: None,
+                    pool_return: Some(PoolReturnToken {
+                        allocator_pool: Arc::clone(&self.allocator_pool),
+                        cache_key,
+                        byte_len: allocation_len,
+                    }),
                 }),
             })
         }
@@ -10365,6 +10518,7 @@ mod platform {
                     device_ptr: unsafe { self.inner.device_ptr.cast::<u8>().add(byte_offset) }
                         .cast(),
                     allocation_owner: Some(Arc::clone(&self.inner)),
+                    pool_return: None,
                 }),
             })
         }
@@ -10533,6 +10687,7 @@ mod platform {
                     runtime: Arc::clone(&self.runtime),
                     device_ptr,
                     allocation_owner: None,
+                    pool_return: None,
                 }),
             })
         }
@@ -15075,6 +15230,21 @@ mod platform {
                 return;
             }
             if !self.device_ptr.is_null() {
+                if let Some(pool_return) = &self.pool_return {
+                    let cached = pool_return
+                        .allocator_pool
+                        .lock()
+                        .expect("cuda allocator pool mutex should not be poisoned")
+                        .checkin(
+                            pool_return.cache_key.clone(),
+                            pool_return.byte_len,
+                            self.device_ptr as usize,
+                        );
+                    if cached {
+                        self.device_ptr = std::ptr::null_mut();
+                        return;
+                    }
+                }
                 let _ = self.runtime.set_device();
                 let _ = self.runtime.check(
                     unsafe { (self.runtime.cuda_free)(self.device_ptr) },
@@ -15219,6 +15389,7 @@ mod platform {
 
     pub(super) fn configure_backend(
         descriptor: super::DeviceDescriptor,
+        allocator_pool_policy: AllocatorPoolPolicy,
     ) -> Result<ConfiguredBackend, RuntimeError> {
         let runtime = CudaRuntime::load(descriptor.device.ordinal())?;
         runtime.set_device()?;
@@ -15227,7 +15398,11 @@ mod platform {
             unsafe { (runtime.cuda_stream_create)(&mut stream) },
             "cudaStreamCreate",
         )?;
-        Ok(ConfiguredBackend { runtime, stream })
+        Ok(ConfiguredBackend {
+            runtime,
+            stream,
+            allocator_pool: Arc::new(Mutex::new(CudaAllocatorPool::new(allocator_pool_policy))),
+        })
     }
 
     impl Drop for ConfiguredBackend {
@@ -15281,8 +15456,9 @@ mod platform {
 
 #[cfg(not(target_os = "linux"))]
 mod platform {
-    use super::{CudaCommandStatus, CudaCommandWait, QuantizationMode};
-    use psionic_runtime::RuntimeError;
+    use super::{CudaAllocatorPoolTelemetry, CudaCommandStatus, CudaCommandWait, QuantizationMode};
+    use psionic_core::TensorSpec;
+    use psionic_runtime::{AllocatorPoolPolicy, AllocatorPoolReport, RuntimeError};
 
     #[derive(Clone)]
     pub(super) struct PlatformBuffer;
@@ -15297,7 +15473,22 @@ mod platform {
     pub(super) struct ConfiguredBackend;
 
     impl ConfiguredBackend {
-        pub(super) fn allocate(&self, _byte_len: usize) -> Result<PlatformBuffer, RuntimeError> {
+        pub(super) fn allocator_pool_report(&self) -> AllocatorPoolReport {
+            AllocatorPoolReport {
+                policy: AllocatorPoolPolicy::disabled(),
+                state: Default::default(),
+            }
+        }
+
+        pub(super) fn allocator_pool_telemetry(&self) -> CudaAllocatorPoolTelemetry {
+            CudaAllocatorPoolTelemetry::default()
+        }
+
+        pub(super) fn allocate(
+            &self,
+            _spec: &TensorSpec,
+            _byte_len: usize,
+        ) -> Result<PlatformBuffer, RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda runtime substrate currently requires Linux libcudart",
             )))
@@ -15395,7 +15586,10 @@ mod platform {
             )))
         }
 
-        pub(super) fn read_bytes_prefix_into(&self, _output: &mut [u8]) -> Result<(), RuntimeError> {
+        pub(super) fn read_bytes_prefix_into(
+            &self,
+            _output: &mut [u8],
+        ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "cuda runtime substrate currently requires Linux libcudart",
             )))
@@ -16891,6 +17085,7 @@ mod platform {
 
     pub(super) fn configure_backend(
         _descriptor: super::DeviceDescriptor,
+        _allocator_pool_policy: AllocatorPoolPolicy,
     ) -> Result<ConfiguredBackend, RuntimeError> {
         Err(RuntimeError::Backend(String::from(
             "cuda runtime substrate currently requires Linux libcudart",
@@ -16914,15 +17109,50 @@ mod tests {
 
     use super::CudaMemorySpace;
     use super::{
-        CudaBackend, CudaBuffer, CudaCommandStatus, CudaCommandWait, HealthStatus, SUPPORTED_OPS,
+        CudaAllocatorPool, CudaBackend, CudaBuffer, CudaCommandStatus, CudaCommandWait,
+        HealthStatus, SUPPORTED_OPS, allocator_pool_cache_key,
         architecture_from_compute_capability, cuda_health, parse_inventory_row, parse_mig_profile,
         recovery_profile, risk_profile, validate_supported_plan,
     };
     use psionic_runtime::{
-        Allocator, BackendDegradedPolicy, BackendSelectionState, BufferHandle, DeviceDiscovery,
-        ExecutionResult, NvidiaRecoveryAction, NvidiaRiskLevel, RuntimeError,
+        Allocator, AllocatorPoolPolicy, BackendDegradedPolicy, BackendSelectionState, BufferHandle,
+        DeviceDiscovery, ExecutionResult, NvidiaRecoveryAction, NvidiaRiskLevel, RuntimeError,
         ServedProductBackendPolicy,
     };
+
+    #[test]
+    fn allocator_pool_reuses_exact_tensor_spec() {
+        let device = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
+        let spec = TensorSpec::new(Shape::new(vec![2, 8]), DType::F16, device);
+        let cache_key = allocator_pool_cache_key(&spec);
+        let mut pool = CudaAllocatorPool::new(AllocatorPoolPolicy::exact_tensor_spec(2, 128));
+        assert_eq!(pool.checkout(cache_key.as_str(), 32), None);
+        pool.record_cold_allocation();
+        assert!(pool.checkin(cache_key.clone(), 32, 0xfeedusize));
+        assert_eq!(pool.report().state.cached_buffers, 1);
+        assert_eq!(pool.report().state.cached_bytes, 32);
+        assert_eq!(pool.checkout(cache_key.as_str(), 32), Some(0xfeedusize));
+        assert_eq!(pool.report().state.cached_buffers, 0);
+        assert_eq!(pool.report().state.cached_bytes, 0);
+        let telemetry = pool.telemetry();
+        assert_eq!(telemetry.cold_allocations, 1);
+        assert_eq!(telemetry.reuse_hits, 1);
+        assert_eq!(telemetry.returned_buffers, 1);
+        assert_eq!(telemetry.evicted_returns, 0);
+    }
+
+    #[test]
+    fn allocator_pool_enforces_budget_and_records_evictions() {
+        let device = Device::new(DeviceKind::Cuda, 0, Some(String::from("cuda:0")));
+        let spec = TensorSpec::new(Shape::new(vec![4, 4]), DType::F32, device);
+        let cache_key = allocator_pool_cache_key(&spec);
+        let mut pool = CudaAllocatorPool::new(AllocatorPoolPolicy::exact_tensor_spec(1, 64));
+        assert!(pool.checkin(cache_key.clone(), 64, 0xbeefusize));
+        assert!(!pool.checkin(cache_key, 64, 0xcafeusize));
+        assert_eq!(pool.report().state.cached_buffers, 1);
+        assert_eq!(pool.report().state.cached_bytes, 64);
+        assert_eq!(pool.telemetry().evicted_returns, 1);
+    }
 
     impl GraphBackendConformanceHarness for CudaBackend {
         type Buffer = CudaBuffer;

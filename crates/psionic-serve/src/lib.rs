@@ -29,6 +29,7 @@ mod psion_rvllm_attention_backend;
 mod psion_rvllm_cublas_warmup;
 mod psion_rvllm_cuda_graph_pool;
 mod psion_rvllm_gpu_logits_selection;
+mod psion_rvllm_memory_pool;
 mod psion_rvllm_paged_kv_manager;
 mod psion_rvllm_prefill_decode_scheduler;
 mod psion_rvllm_preflight_bundle;
@@ -80,6 +81,7 @@ pub use psion_rvllm_attention_backend::*;
 pub use psion_rvllm_cublas_warmup::*;
 pub use psion_rvllm_cuda_graph_pool::*;
 pub use psion_rvllm_gpu_logits_selection::*;
+pub use psion_rvllm_memory_pool::*;
 pub use psion_rvllm_paged_kv_manager::*;
 pub use psion_rvllm_prefill_decode_scheduler::*;
 pub use psion_rvllm_preflight_bundle::*;
@@ -2010,9 +2012,7 @@ pub struct CudaGraphReplayMetrics {
 impl CudaGraphReplayMetrics {
     fn accumulate(&mut self, other: &Self) {
         self.step_count = self.step_count.saturating_add(other.step_count);
-        self.replay_hit_count = self
-            .replay_hit_count
-            .saturating_add(other.replay_hit_count);
+        self.replay_hit_count = self.replay_hit_count.saturating_add(other.replay_hit_count);
         self.replay_miss_count = self
             .replay_miss_count
             .saturating_add(other.replay_miss_count);

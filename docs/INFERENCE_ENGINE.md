@@ -162,6 +162,11 @@ than just run tensor math.
   `docs/PSION_RVLLM_ATTENTION_BACKEND.md`, making the current CUDA attention
   backend selector explicit so dense f16 KV remains the default while
   turboquant KV and q8_1 output fusion stay capability-gated alternates.
+- The same pass now also retains one explicit memory-pool packet at
+  `docs/PSION_RVLLM_MEMORY_POOL.md`, making the exact-spec CUDA allocator pool
+  real for the admitted decode lane and binding before/after allocation count,
+  steady-state memory, and long-run leak posture into one explicit runtime
+  packet instead of leaving allocator reuse as an unimplemented contract.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
