@@ -129,11 +129,17 @@ Checkpoint and connectivity expectations are now explicit too:
 The first admitted remote-launch packet for this profile is now explicit too:
 
 - `docs/PSION_EXECUTOR_4080_REMOTE_LAUNCH.md`
+- `docs/PSION_EXECUTOR_4080_DURABLE_CHECKPOINT.md`
 
 That packet binds the shipped Tailnet operator script, the retained operator
 manifest, the retained admitted run bundle, and the Linux RTX 4080
 acknowledgement receipt into one reviewable launch packet before later
-checkpoint, eval, smoke, and recovery packets start citing the 4080 lane.
+checkpoint, eval, smoke, and recovery packets start citing the 4080 lane. The
+durable-checkpoint packet then upgrades that same lane into one explicit
+checkpoint path by binding the retained pointer digest, both worker submission
+receipts, the remote contributor checkpoint family, and the merged portable
+bundle import path back onto the Mac control plane without pretending the live
+interruption drill is already done.
 
 ## Current Admitted Tailnet Control-Plane Profile
 

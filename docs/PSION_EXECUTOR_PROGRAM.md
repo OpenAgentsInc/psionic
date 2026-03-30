@@ -118,6 +118,9 @@ This doc does not claim:
   profile
 - `docs/PSION_EXECUTOR_4080_REMOTE_LAUNCH.md` owns the retained Mac -> 4080
   Tailnet launch packet for the admitted 4080 worker lane
+- `docs/PSION_EXECUTOR_4080_DURABLE_CHECKPOINT.md` owns the retained 4080
+  checkpoint-pointer, submission-anchor, and control-plane readback packet for
+  the admitted 4080 worker lane
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge
