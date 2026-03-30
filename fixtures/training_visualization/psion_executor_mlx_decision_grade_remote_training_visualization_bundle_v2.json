@@ -1,0 +1,193 @@
+{
+  "schema_version": "psionic.remote_training_visualization_bundle.v2",
+  "bundle_id": "psion-executor-mlx-decision-grade-run-v2",
+  "provider": "local_hybrid",
+  "profile_id": "local_mac_mlx_aarch64",
+  "lane_id": "psion_executor_mlx_local_decision_grade",
+  "run_id": "same-node-wallclock-retained-mlx",
+  "repo_revision": "7d3848050a5992abaa8113ed61dea843b0f41264",
+  "track_semantics": {
+    "track_family": "psion",
+    "track_id": "psion.executor.mlx_local_decision_grade.v1",
+    "execution_class": "single_node",
+    "comparability_class": "same_track_comparable",
+    "proof_posture": "runtime_measured",
+    "public_equivalence_class": "not_applicable",
+    "score_law_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+    "wallclock_cap_seconds": 600,
+    "semantic_summary": "The admitted Mac MLX decision-grade executor lane stays local-only, keeps one retained post-run dashboard packet in the shared v2 training surfaces, and does not claim cross-device closure or promotion authority."
+  },
+  "result_classification": "completed_success",
+  "refresh_contract": {
+    "target_ui_update_interval_ms": 1000,
+    "emission_mode": "post_run_only",
+    "last_heartbeat_at_ms": 1742951773332,
+    "heartbeat_seq": 3
+  },
+  "series_status": "available",
+  "timeline": [
+    {
+      "observed_at_ms": 1742951200000,
+      "phase": "dataset_staging",
+      "subphase": "executor_subset_admission",
+      "detail": "The admitted Mac MLX profile sealed the executor-local question and budget before the retained decision-grade run packet was formed."
+    },
+    {
+      "observed_at_ms": 1742951486666,
+      "phase": "training",
+      "subphase": "bounded_local_run",
+      "detail": "The retained MLX run `same-node-wallclock-retained-mlx` kept the same-node Rust-only lane alive for most of the 600-second budget and remained inside the admitted Mac-only question boundary."
+    },
+    {
+      "observed_at_ms": 1742951773332,
+      "phase": "review",
+      "subphase": "decision_grade_packet",
+      "detail": "Checkpoint compatibility, smoke prerequisites, and the shared v2 run-index entry were sealed together so the MLX-local run appears beside the rest of the admitted run set."
+    }
+  ],
+  "summary": {
+    "total_steps_completed": 93184,
+    "latest_global_step": 93184,
+    "latest_train_loss": 0.0,
+    "latest_validation_loss": 0.0,
+    "latest_tokens_per_second": 4649676,
+    "latest_samples_per_second_milli": 20803918,
+    "latest_checkpoint_ref": "benchmark.open_adapter.same_node.mlx.retained#same-node-wallclock-retained-mlx",
+    "detail": "The retained Mac MLX decision-grade packet surfaces one post-run dashboard-visible local executor run with restore, export, and visibility facts preserved."
+  },
+  "heartbeat_series": [
+    {
+      "observed_at_ms": 1742951200000,
+      "phase": "dataset_staging",
+      "subphase": "executor_subset_admission",
+      "step_in_progress": 0,
+      "active_subsystems": [
+        "mlx",
+        "operator_review"
+      ],
+      "stale_after_ms": 5000
+    },
+    {
+      "observed_at_ms": 1742951486666,
+      "phase": "training",
+      "subphase": "bounded_local_run",
+      "step_in_progress": 46592,
+      "microbatch_in_progress": 1,
+      "active_subsystems": [
+        "mlx",
+        "checkpoint"
+      ],
+      "stale_after_ms": 5000
+    },
+    {
+      "observed_at_ms": 1742951773332,
+      "phase": "review",
+      "subphase": "decision_grade_packet",
+      "step_in_progress": 93184,
+      "active_subsystems": [
+        "dashboard",
+        "ledger"
+      ],
+      "stale_after_ms": 5000
+    }
+  ],
+  "loss_series": [
+    {
+      "global_step": 0,
+      "elapsed_ms": 0,
+      "train_loss": 6.932116
+    },
+    {
+      "global_step": 46592,
+      "elapsed_ms": 286666,
+      "train_loss": 3.466058,
+      "validation_loss": 3.466058
+    },
+    {
+      "global_step": 93184,
+      "elapsed_ms": 573332,
+      "train_loss": 0.0,
+      "validation_loss": 0.0
+    }
+  ],
+  "math_series": [
+    {
+      "observed_at_ms": 1742951773332,
+      "global_step": 93184,
+      "non_finite_count": 0
+    }
+  ],
+  "runtime_series": [
+    {
+      "observed_at_ms": 1742951773332,
+      "tokens_per_second": 4649676,
+      "samples_per_second_milli": 20803918
+    }
+  ],
+  "gpu_series": [],
+  "distributed_series": [],
+  "event_series": [
+    {
+      "observed_at_ms": 1742951773332,
+      "severity": "info",
+      "event_kind": "decision_grade_visibility",
+      "detail": "The retained MLX-local decision-grade run was sealed into the shared track-aware dashboard bundle and run index instead of staying a one-off local note."
+    }
+  ],
+  "source_artifacts": [
+    {
+      "artifact_role": "decision_grade_packet",
+      "artifact_uri": "fixtures/psion/executor/psion_executor_mlx_decision_grade_run_v1.json",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psion.executor.mlx_decision_grade_run.v1"
+      ],
+      "detail": "The decision-grade packet is the authoritative executor-lane admission receipt for the retained Mac MLX run."
+    },
+    {
+      "artifact_role": "matrix_report",
+      "artifact_uri": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+      "artifact_digest": "d34972dcd2c46b1a835a09c4aaaf350c37934b7a20a958f5d2d484e08b16f6ad",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psionic.open_adapter_tailnet_admitted_device_matrix.v1"
+      ],
+      "detail": "The admitted device-matrix report preserves the local MLX run beside the reachable Tailnet accelerator comparison lane."
+    },
+    {
+      "artifact_role": "local_report",
+      "artifact_uri": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+      "artifact_digest": "ba9da70b60669297e03029fdddab5606d80b4cd6c345e1d3eb1f88d537f529f6",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psionic.open_adapter_same_node_wallclock_benchmark.v1"
+      ],
+      "detail": "The retained same-node MLX report remains authoritative for steps, wallclock, throughput, and final loss facts."
+    },
+    {
+      "artifact_role": "portable_bundle",
+      "artifact_uri": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+      "artifact_digest": "4a345019512aae63c517c3261439e0dbd3a1a113745c80ae4244250abfff3e91",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psion.executor.mlx_checkpoint_compatibility.v1"
+      ],
+      "detail": "The durable portable bundle remains the export artifact bound into the decision-grade packet."
+    },
+    {
+      "artifact_role": "checkpoint_packet",
+      "artifact_uri": "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
+      "source_kind": "runtime_owned",
+      "authoritative": true,
+      "source_receipt_ids": [
+        "psion.executor.mlx_checkpoint_compatibility.v1"
+      ],
+      "detail": "The checkpoint packet remains authoritative for deferred import-plan and eager restore truth on the retained MLX bundle."
+    }
+  ],
+  "bundle_digest": "eddf60778cdf2a5a46e50bca0bd1121a6feb3247a623e6e677a9995ae21b7fc4"
+}

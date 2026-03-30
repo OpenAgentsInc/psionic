@@ -1,0 +1,77 @@
+{
+  "schema_version": "psion.executor.mlx_decision_grade_run.v1",
+  "packet_id": "psion_executor_mlx_decision_grade_run_v1",
+  "admitted_profile_id": "local_mac_mlx_aarch64",
+  "decision_lane_id": "psion_executor_mlx_local_decision_grade",
+  "decision_question_posture": "This packet counts only for explicitly MLX-local executor-lane questions and does not claim cross-device cluster closure, remote launch authority, or promotion readiness.",
+  "smoke_packet_ref": "fixtures/psion/executor/psion_executor_mlx_smoke_run_v1.json",
+  "smoke_packet_sha256": "1160de4c1439dfd220ed4d3c5f3800833b50f09ffd28888f3de03eaeec278a75",
+  "checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
+  "checkpoint_packet_sha256": "ae31831fe9d325e2c91aabc87ab8626f3e76d1e489fe54bb690d6d5abee2a033",
+  "retained_local_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+  "retained_local_report_sha256": "ba9da70b60669297e03029fdddab5606d80b4cd6c345e1d3eb1f88d537f529f6",
+  "retained_matrix_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+  "retained_matrix_report_sha256": "d34972dcd2c46b1a835a09c4aaaf350c37934b7a20a958f5d2d484e08b16f6ad",
+  "visualization_bundle_ref": "fixtures/training_visualization/psion_executor_mlx_decision_grade_remote_training_visualization_bundle_v2.json",
+  "visualization_bundle_sha256": "0a60511e8489af2568c807b654b860c1ece30b01d75b1432dfeaa41917e6ea62",
+  "visualization_bundle_digest": "eddf60778cdf2a5a46e50bca0bd1121a6feb3247a623e6e677a9995ae21b7fc4",
+  "visualization_run_index_ref": "fixtures/training_visualization/psion_executor_mlx_decision_grade_remote_training_run_index_v2.json",
+  "visualization_run_index_sha256": "96e5f01adeafa38069a455f9b8bb675cb44e367260094500a77280d7b22d7437",
+  "visualization_run_index_digest": "62d68d666f615ccdffc3152e7974d0d967f9696a52cb012b1c8bc0b72eba48cd",
+  "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "logical_device_label": "metal:0",
+  "retained_run_id": "same-node-wallclock-retained-mlx",
+  "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+  "completed_steps": 93184,
+  "observed_wallclock_ms": 573332,
+  "final_mean_loss": 0.0,
+  "final_state_dict_digest": "8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8",
+  "dashboard_entry_count": 7,
+  "approved_equivalent_local_subset": {
+    "subset_id": "psion.executor.mlx_local_decision_grade_equivalent_subset.v1",
+    "required_gate_ids": [
+      "full_budget_retained_run_green",
+      "checkpoint_restore_rehearsal_green",
+      "export_smoke_green",
+      "dashboard_visibility_green"
+    ],
+    "subset_digest": "91a74a9d1edc1ff1ea0bd3ed758a7e0aad7d264afeae38322f7595ad3b8cba8b",
+    "detail": "This approved MLX-local equivalent subset stands in for explicit checkpoint-pack repetition: the retained run consumed most of the admitted local wallclock budget, the checkpoint packet kept restore green, the durable bundle kept export smoke green, and the shared v2 dashboard surfaces now show the run beside the shipped training lanes."
+  },
+  "gate_rows": [
+    {
+      "gate_id": "full_budget_retained_run_green",
+      "status": "green",
+      "detail": "The retained MLX run `same-node-wallclock-retained-mlx` stayed alive for 573332ms against a 600s target and therefore counts as the long-budget local run fact for the Mac-only decision-grade question."
+    },
+    {
+      "gate_id": "checkpoint_restore_rehearsal_green",
+      "status": "green",
+      "detail": "The prerequisite checkpoint packet kept deferred import-plan and eager restore truth green on the retained MLX portable bundle."
+    },
+    {
+      "gate_id": "export_smoke_green",
+      "status": "green",
+      "detail": "The retained same-node report and durable portable bundle still carry the export smoke fact inside the admitted Mac profile."
+    },
+    {
+      "gate_id": "dashboard_visibility_green",
+      "status": "green",
+      "detail": "The retained MLX decision-grade bundle now appears in the shared v2 run index with 7 total entries, so the run is visible beside the shipped training surfaces instead of hiding behind a one-off local report."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "fixtures/psion/executor/psion_executor_mlx_smoke_run_v1.json",
+    "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/matrix_report.json",
+    "fixtures/training_visualization/psion_executor_mlx_decision_grade_remote_training_visualization_bundle_v2.json",
+    "fixtures/training_visualization/psion_executor_mlx_decision_grade_remote_training_run_index_v2.json"
+  ],
+  "summary": "The admitted Mac MLX profile now has one retained decision-grade packet for the explicitly MLX-local executor question. Run `same-node-wallclock-retained-mlx` on `metal:0` stays anchored to the retained same-node report (steps=93184 wallclock_ms=573332 final_mean_loss=0.000000), reuses the green checkpoint/export prerequisites, and is now visible in the shared v2 dashboard bundle/index family with 7 total entries while still refusing to claim the Mac -> 4080 -> Mac roundtrip before EPIC 3.",
+  "packet_digest": "1b69444b0c1352bac9343426769bb2e3eb1d857e765bb8cd0eded6fc830ac1cd"
+}

@@ -66,6 +66,10 @@ Every executor-capable candidate must keep all of the following green:
 
 - at least one green Mac -> 4080 -> Mac local-cluster roundtrip exists for the
   candidate path where required by the phase
+- for the explicitly MLX-local decision-grade question before EPIC 3,
+  `docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md` may count as the approved
+  equivalent local subset, but it does not waive the later roundtrip gate for
+  broader executor claims
 
 ### Consumer-seam gate
 

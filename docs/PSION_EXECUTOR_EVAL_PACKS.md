@@ -114,6 +114,30 @@ That keeps the smoke lane honest:
 - Mac -> 4080 -> Mac roundtrip truth remains an EPIC 3 obligation instead of a
   fake green check on a Mac-only smoke run
 
+### MLX Decision-Grade Equivalent Local Subset
+
+Phase-one MLX decision-grade work is still local-only, so the first
+decision-grade packet uses one approved equivalent local subset instead of
+pretending the Mac already has the same checkpoint-pack repetition posture as
+the later 4080 lane:
+
+- subset id: `psion.executor.mlx_local_decision_grade_equivalent_subset.v1`
+- required gates:
+  `full_budget_retained_run_green`,
+  `checkpoint_restore_rehearsal_green`,
+  `export_smoke_green`,
+  `dashboard_visibility_green`
+
+That keeps the decision-grade lane honest too:
+
+- the retained MLX run must consume most of the admitted local budget
+- restore must remain green through the checkpoint-compatibility packet
+- export must remain green through the durable bundle
+- the run must appear in the shipped remote-training `v2` bundle and run-index
+  grammar
+- Mac -> 4080 -> Mac roundtrip truth remains deferred to EPIC 3 rather than
+  being implied by local-only visibility
+
 ## `tassadar.eval.promotion.v0`
 
 This is the first executor promotion pack.

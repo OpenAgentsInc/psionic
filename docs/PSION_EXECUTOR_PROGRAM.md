@@ -110,6 +110,9 @@ This doc does not claim:
   checkpoint save/load compatibility packet for the admitted Mac profile
 - `docs/PSION_EXECUTOR_MLX_SMOKE_RUN.md` owns the retained MLX smoke-run
   packet and admitted frequent-pack subset for the admitted Mac profile
+- `docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md` owns the retained MLX-local
+  decision-grade packet plus the shared v2 dashboard visibility packet for the
+  admitted Mac profile
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge
