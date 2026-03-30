@@ -15,7 +15,8 @@ evidence.
 - Inference and serving: [docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)
-- Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+- Repo-local library roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+- Executor-capable Psion program: [docs/PSION_EXECUTOR_PROGRAM.md](docs/PSION_EXECUTOR_PROGRAM.md)
 
 ## Main Tracks
 

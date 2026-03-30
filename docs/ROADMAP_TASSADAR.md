@@ -26,6 +26,10 @@ Use that file for:
 This repo-local file remains a stable bridge so existing issue links keep
 landing on something truthful instead of a stale copied roadmap.
 
+It is subordinate to `docs/PSION_EXECUTOR_PROGRAM.md` for the umbrella/profile
+split. This file is the executor-lane bridge, not the umbrella `Psion`
+program roadmap.
+
 ## Current Repo-Local Summary
 
 As of 2026-03-19, the live external roadmap and the current GitHub `tassadar`

@@ -6,6 +6,7 @@ artifact-bearing Tassadar phases.
 It is subordinate to:
 
 - `README.md`
+- `docs/PSION_EXECUTOR_PROGRAM.md`
 - `docs/ROADMAP_TASSADAR.md` (repo-local bridge to the live roadmap)
 - `docs/ROADMAP.md`
 - `docs/ARCHITECTURE.md`
@@ -15,6 +16,9 @@ exists so contributors can answer a much narrower question quickly:
 
 > for one landed Tassadar phase, which committed root, audit, validator, and
 > claim boundary should I cite?
+
+It does not own the umbrella `Psion` program split. Use
+`docs/PSION_EXECUTOR_PROGRAM.md` for that rule.
 
 ## Current Operator Entrypoints
 

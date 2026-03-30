@@ -18,11 +18,12 @@
 > and
 > `docs/audits/2026-03-15-psionic-tinygrad-philosophy-pytorch-drop-in-audit.md`.
 >
-> This is now the canonical full-library roadmap for `crates/psionic-*`.
-> `ROADMAP_CLUSTER.md`, `ROADMAP_FM.md`, `ROADMAP_METAL.md`,
-> `ROADMAP_MLX.md`, and `ROADMAP_PARAMETERGOLF.md` remain useful
-> lane-specific references, but they are no longer the canonical answer to
-> "what is the Psionic program overall?"
+> This is the repo-local full-library roadmap for `crates/psionic-*`.
+> It is not the workspace-level umbrella roadmap for `Psion`.
+> `docs/PSION_EXECUTOR_PROGRAM.md` now owns the executor-capable naming/program
+> split, while `ROADMAP_CLUSTER.md`, `ROADMAP_FM.md`, `ROADMAP_METAL.md`,
+> `ROADMAP_MLX.md`, and `ROADMAP_PARAMETERGOLF.md` remain useful lane-specific
+> references.
 
 ## Executive Summary
 
