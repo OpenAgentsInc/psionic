@@ -1,0 +1,57 @@
+{
+  "schema_version": "psion.executor.4080_remote_launch.v1",
+  "packet_id": "psion_executor_4080_remote_launch_v1",
+  "worker_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "control_plane_profile_id": "local_tailnet_cluster_control_plane",
+  "launch_entrypoint_ref": "scripts/run-first-swarm-tailnet-admitted-live.sh",
+  "launch_entrypoint_sha256": "96d26eb0a701acea39767c5af0a2f5516010cb92befe143539bf066e89c31266",
+  "operator_manifest_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json",
+  "operator_manifest_sha256": "a08631ebe784f591c3c6bc1a77a8c43f56a12685db2337d40aeba50009148f05",
+  "retained_bundle_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json",
+  "retained_bundle_sha256": "2666bec1a4ddbd65f3910e20c65ec4ddeb98a49620c0a56e39431c108689ff36",
+  "coordinator_report_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/coordinator_runtime_report.json",
+  "coordinator_report_sha256": "a55ea43f4dd9b567bc213203a022aa62eafcf839e725f84f5643b74125c7cc18",
+  "contributor_report_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/contributor_runtime_report.json",
+  "contributor_report_sha256": "b09eb8417025e11adc11d79900828fc69b0723b56b741f1353f002840673b886",
+  "run_id": "tailrun-home-admitted-20260327e",
+  "git_ref": "dc868e1803365c7f1938431c84ba48dcf28fef4e",
+  "topology_contract_digest": "144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07",
+  "workflow_plan_digest": "573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821",
+  "coordinator_endpoint": "100.127.107.31:35200",
+  "contributor_endpoint": "100.108.56.85:35201",
+  "coordinator_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "contributor_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+  "contributor_host": "archlinux",
+  "contributor_session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260327e",
+  "contributor_acknowledged_at_ms": 1774635670162,
+  "contributor_acknowledgement_digest": "0779a0a548e9c84701e279c42f4e525138f816619093748abaa22488f127e3de",
+  "checklist_rows": [
+    {
+      "checklist_id": "launch_command_documented_green",
+      "status": "green",
+      "detail": "The admitted Tailnet operator path stays explicit in `scripts/run-first-swarm-tailnet-admitted-live.sh` instead of hiding the 4080 launch behind ad hoc shell history."
+    },
+    {
+      "checklist_id": "config_transfer_green",
+      "status": "green",
+      "detail": "The launch script still stages repo state with `git archive` over SSH, materializes the remote worktree, and binds topology digest `144481e413d4892b375e7b5f2fd8d24b7d98094806506b0e00a34262a2a9aa07` plus workflow-plan digest `573b6df00266981819b8cb08654ac6e6f727418cb5a46768255e8ea27b2f2821` into the same retained admitted run."
+    },
+    {
+      "checklist_id": "worker_acknowledgement_green",
+      "status": "green",
+      "detail": "The coordinator report retains one acknowledgement receipt for worker `swarm-linux-4080-a` with session `swarm-linux-4080-a-session-tailrun-home-admitted-20260327e` and digest `0779a0a548e9c84701e279c42f4e525138f816619093748abaa22488f127e3de`."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md",
+    "scripts/run-first-swarm-tailnet-admitted-live.sh",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260327e/first_swarm_real_run_bundle.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260327e/coordinator_runtime_report.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260327e/contributor_runtime_report.json"
+  ],
+  "summary": "The admitted 4080 lane now has one typed remote-launch packet. The Mac control plane launches the retained Tailnet run through `scripts/run-first-swarm-tailnet-admitted-live.sh`, stages repo state and run config onto host `archlinux`, records worker acknowledgement digest `0779a0a548e9c84701e279c42f4e525138f816619093748abaa22488f127e3de`, and keeps the Linux RTX 4080 contributor endpoint `100.108.56.85:35201` bound to the same topology and workflow digests used by the retained run bundle. The retained run bundle SHA stays checked against the committed bundle bytes before this packet counts.",
+  "packet_digest": "19aef8ffcf62006272d40206793d22f031a064a63dbc1254ad69ccd1351f4158"
+}

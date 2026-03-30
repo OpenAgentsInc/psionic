@@ -126,6 +126,15 @@ Checkpoint and connectivity expectations are now explicit too:
 - Tailnet SSH reachability to `archlinux` is required before the profile counts
 - coordinator and contributor ports remain operator-selected and bounded
 
+The first admitted remote-launch packet for this profile is now explicit too:
+
+- `docs/PSION_EXECUTOR_4080_REMOTE_LAUNCH.md`
+
+That packet binds the shipped Tailnet operator script, the retained operator
+manifest, the retained admitted run bundle, and the Linux RTX 4080
+acknowledgement receipt into one reviewable launch packet before later
+checkpoint, eval, smoke, and recovery packets start citing the 4080 lane.
+
 ## Current Admitted Tailnet Control-Plane Profile
 
 `local_tailnet_cluster_control_plane` is now the explicit local-first

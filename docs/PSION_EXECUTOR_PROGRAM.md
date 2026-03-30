@@ -116,6 +116,8 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md` owns the retained Mac-local
   export inspection and CPU-route validation packet for the admitted Mac
   profile
+- `docs/PSION_EXECUTOR_4080_REMOTE_LAUNCH.md` owns the retained Mac -> 4080
+  Tailnet launch packet for the admitted 4080 worker lane
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge
