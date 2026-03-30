@@ -190,6 +190,11 @@ This doc does not claim:
   same-budget scheduler and warmup ablation packet that keeps the retained
   4080 result directly comparable to the frozen baseline, logs it for review,
   and keeps it explicitly below the frozen promotion-noise threshold
+- `docs/PSION_EXECUTOR_BATCH_ACCUMULATION_ABLATION.md` owns the first
+  canonical same-budget batch-size and accumulation ablation packet that keeps
+  effective batch fixed, makes the peak-memory versus throughput tradeoff
+  explicit, and logs the retained 4080 result for review instead of claiming a
+  new promotion lever
 - `docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md` owns the first
   canonical phase-two pre-flight checklist packet that freezes launch blockers
   for the admitted MLX and 4080 decision-grade run types
