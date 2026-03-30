@@ -1,0 +1,1130 @@
+{
+  "schema_version": "psion.executor_baseline_truth.v1",
+  "record_id": "psion_executor_baseline_truth_v1",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "report_reproductions": [
+    {
+      "report_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "generated_report_digest": "3776767477f8e61ab1e5aaf496296f663d2f190739dce6b9235a0f61110b5606",
+      "committed_report_digest": "3776767477f8e61ab1e5aaf496296f663d2f190739dce6b9235a0f61110b5606",
+      "committed_fixture_sha256": "f371e3cd3e065e4efecd7217f907224a054b9f42fa2ab1cb7ea3644956f93674",
+      "matches_committed_fixture": true,
+      "detail": "Reconstructed the frequent and promotion exactness surfaces from the committed article benchmark fixture and kept the retained `trained-v0` benchmark digest explicit."
+    },
+    {
+      "report_ref": "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+      "generated_report_digest": "a55aaf47f82bf19828185bbae659951c5d6e058324b4f9399b645f7d652dbc62",
+      "committed_report_digest": "a55aaf47f82bf19828185bbae659951c5d6e058324b4f9399b645f7d652dbc62",
+      "committed_fixture_sha256": "ecf482f04ed3fe0bc65df30254b11b80578a744bce2f1e637d28366d68c5057e",
+      "matches_committed_fixture": true,
+      "detail": "Reconstructed held-out and adversarial executor truth from the committed generalization-gate fixture and kept the retained `trained-v0` digest explicit."
+    },
+    {
+      "report_ref": "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+      "generated_report_digest": "88ddea608361c0596f92a61ad17a899aa048ce93b9d3a12d9885d3e4055ae475",
+      "committed_report_digest": "88ddea608361c0596f92a61ad17a899aa048ce93b9d3a12d9885d3e4055ae475",
+      "committed_fixture_sha256": "4ce8949f82e803675c62ec3a6c804329fd72d8ba3f820b5aaab6342033cdc6ca",
+      "matches_committed_fixture": true,
+      "detail": "Reconstructed the held-out exclusion boundary from the committed independence-audit fixture and kept the retained `trained-v0` digest explicit."
+    }
+  ],
+  "suite_truths": [
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_exactness_cases_v0",
+      "suite_class": "exactness_cases",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "micro_wasm_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `micro_wasm_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "branch_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `branch_heavy_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "memory_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `memory_heavy_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "long_loop_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `long_loop_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "sudoku_v0_test_a",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `sudoku_v0_test_a` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "hungarian_matching",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `hungarian_matching` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        }
+      ],
+      "detail": "Exactness suites are reproduced mechanically from the committed article benchmark report and remain green on the current `trained-v0` baseline."
+    },
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_held_out_exclusions_v0",
+      "suite_class": "held_out_exclusions",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json"
+      ],
+      "manual_review_required": true,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "spec_quiz_eval_pack_v1",
+          "posture": "boundary_checklist",
+          "metrics": [
+            {
+              "metric_id": "boundary_status",
+              "observed_value": "excluded",
+              "detail": "The row remains in the frozen exclusion boundary and is not allowed to leak into training."
+            }
+          ],
+          "detail": "Excluded row `spec_quiz_eval_pack_v1` remains blocked from the training surface and stays inside the frozen held-out boundary."
+        },
+        {
+          "case_id": "vendor_manual_private_scan_v1",
+          "posture": "boundary_checklist",
+          "metrics": [
+            {
+              "metric_id": "boundary_status",
+              "observed_value": "excluded",
+              "detail": "The row remains in the frozen exclusion boundary and is not allowed to leak into training."
+            }
+          ],
+          "detail": "Excluded row `vendor_manual_private_scan_v1` remains blocked from the training surface and stays inside the frozen held-out boundary."
+        },
+        {
+          "case_id": "forum_scrape_misc_001",
+          "posture": "boundary_checklist",
+          "metrics": [
+            {
+              "metric_id": "boundary_status",
+              "observed_value": "excluded",
+              "detail": "The row remains in the frozen exclusion boundary and is not allowed to leak into training."
+            }
+          ],
+          "detail": "Excluded row `forum_scrape_misc_001` remains blocked from the training surface and stays inside the frozen held-out boundary."
+        }
+      ],
+      "detail": "Held-out exclusions are boundary-truth, not accuracy metrics; the baseline stays green because the exclusion boundary remains frozen and independent."
+    },
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_operator_review_cases_v0",
+      "suite_class": "operator_review_cases",
+      "support_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md"
+      ],
+      "manual_review_required": true,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "artifact_packet_complete",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `artifact_packet_complete` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "checkpoint_restore_rehearsal_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `checkpoint_restore_rehearsal_green` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "export_smoke_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `export_smoke_green` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "local_cluster_roundtrip_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `local_cluster_roundtrip_green` stays green in the current baseline packet."
+        }
+      ],
+      "detail": "Operator-review checklist stays explicit for artifact packet completeness, restore rehearsal, export smoke, and the local-cluster roundtrip."
+    },
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_throughput_blockers_v0",
+      "suite_class": "throughput_blockers",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "micro_wasm_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "1060859.8123",
+              "detail": "Reference-linear throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "4742588.6655",
+              "detail": "Hull-cache throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "4.470514",
+              "detail": "Hull-cache speedup over the reference-linear anchor stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "1.799768",
+              "detail": "Remaining CPU-reference gap stayed machine-visible."
+            },
+            {
+              "metric_id": "used_decode_fallback",
+              "observed_value": "false",
+              "detail": "Fast-route fallback remained explicit instead of hidden."
+            }
+          ],
+          "detail": "Throughput blocker case `micro_wasm_kernel` stayed green with no hidden fallback and the retained fast-route metrics remained present."
+        },
+        {
+          "case_id": "branch_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "1127109.5881",
+              "detail": "Reference-linear throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "3675966.1377",
+              "detail": "Hull-cache throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "3.261410",
+              "detail": "Hull-cache speedup over the reference-linear anchor stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "2.683604",
+              "detail": "Remaining CPU-reference gap stayed machine-visible."
+            },
+            {
+              "metric_id": "used_decode_fallback",
+              "observed_value": "false",
+              "detail": "Fast-route fallback remained explicit instead of hidden."
+            }
+          ],
+          "detail": "Throughput blocker case `branch_heavy_kernel` stayed green with no hidden fallback and the retained fast-route metrics remained present."
+        },
+        {
+          "case_id": "memory_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "1475294.4303",
+              "detail": "Reference-linear throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "4444280.9435",
+              "detail": "Hull-cache throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "3.012470",
+              "detail": "Hull-cache speedup over the reference-linear anchor stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "1.982315",
+              "detail": "Remaining CPU-reference gap stayed machine-visible."
+            },
+            {
+              "metric_id": "used_decode_fallback",
+              "observed_value": "false",
+              "detail": "Fast-route fallback remained explicit instead of hidden."
+            }
+          ],
+          "detail": "Throughput blocker case `memory_heavy_kernel` stayed green with no hidden fallback and the retained fast-route metrics remained present."
+        },
+        {
+          "case_id": "hungarian_matching",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "2315775.1940",
+              "detail": "Reference-linear throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "3915923.7690",
+              "detail": "Hull-cache throughput stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "1.690978",
+              "detail": "Hull-cache speedup over the reference-linear anchor stayed machine-visible."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "2.319447",
+              "detail": "Remaining CPU-reference gap stayed machine-visible."
+            },
+            {
+              "metric_id": "used_decode_fallback",
+              "observed_value": "false",
+              "detail": "Fast-route fallback remained explicit instead of hidden."
+            }
+          ],
+          "detail": "Throughput blocker case `hungarian_matching` stayed green with no hidden fallback and the retained fast-route metrics remained present."
+        }
+      ],
+      "detail": "Frequent throughput blockers are reproduced from the same article benchmark report so fast-route and anchor throughput remain visible before promotion review."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_exactness_suite_v0",
+      "suite_class": "exactness_cases",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "micro_wasm_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `micro_wasm_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "branch_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `branch_heavy_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "memory_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `memory_heavy_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "long_loop_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `long_loop_kernel` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "sudoku_v0_test_a",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `sudoku_v0_test_a` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "sudoku_v0_test_b",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `sudoku_v0_test_b` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        },
+        {
+          "case_id": "hungarian_matching",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "final_output_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Final output exactness remained saturated."
+            },
+            {
+              "metric_id": "step_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Per-step exactness remained saturated."
+            },
+            {
+              "metric_id": "halt_exactness_bps",
+              "observed_value": "10000",
+              "detail": "Halt exactness remained saturated."
+            },
+            {
+              "metric_id": "status",
+              "observed_value": "Passed",
+              "detail": "Benchmark status stayed passed."
+            }
+          ],
+          "detail": "Exactness case `hungarian_matching` stayed green under the rebuilt article benchmark with requested decode `HullCache` and effective decode `HullCache`."
+        }
+      ],
+      "detail": "Exactness suites are reproduced mechanically from the committed article benchmark report and remain green on the current `trained-v0` baseline."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_held_out_suite_v0",
+      "suite_class": "held_out_suite",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "micro_wasm_kernel",
+          "posture": "boundary_checklist",
+          "metrics": [
+            {
+              "metric_id": "lineage_split",
+              "observed_value": "HeldOut",
+              "detail": "The training anchor row stays in the retained lineage contract and is not reclassified as held-out evidence."
+            },
+            {
+              "metric_id": "trace_step_count",
+              "observed_value": "49",
+              "detail": "Trace-step count stayed explicit in the baseline truth packet."
+            }
+          ],
+          "detail": "Training-anchor row `micro_wasm_kernel` remains explicit in the independence audit so the held-out suite keeps its boundary instead of collapsing into one scalar."
+        },
+        {
+          "case_id": "branch_heavy_kernel",
+          "posture": "boundary_checklist",
+          "metrics": [
+            {
+              "metric_id": "lineage_split",
+              "observed_value": "HeldOut",
+              "detail": "The training anchor row stays in the retained lineage contract and is not reclassified as held-out evidence."
+            },
+            {
+              "metric_id": "trace_step_count",
+              "observed_value": "45",
+              "detail": "Trace-step count stayed explicit in the baseline truth packet."
+            }
+          ],
+          "detail": "Training-anchor row `branch_heavy_kernel` remains explicit in the independence audit so the held-out suite keeps its boundary instead of collapsing into one scalar."
+        },
+        {
+          "case_id": "memory_heavy_kernel",
+          "posture": "boundary_checklist",
+          "metrics": [
+            {
+              "metric_id": "lineage_split",
+              "observed_value": "HeldOut",
+              "detail": "The training anchor row stays in the retained lineage contract and is not reclassified as held-out evidence."
+            },
+            {
+              "metric_id": "trace_step_count",
+              "observed_value": "31",
+              "detail": "Trace-step count stayed explicit in the baseline truth packet."
+            }
+          ],
+          "detail": "Training-anchor row `memory_heavy_kernel` remains explicit in the independence audit so the held-out suite keeps its boundary instead of collapsing into one scalar."
+        },
+        {
+          "case_id": "randomized_sudoku_v0_holdout_a",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "runtime_exactness_posture",
+              "observed_value": "Exact",
+              "detail": "Held-out evaluation stayed exact under the retained reference-linear generalization gate."
+            },
+            {
+              "metric_id": "outputs_equal",
+              "observed_value": "true",
+              "detail": "Held-out outputs stayed equal."
+            },
+            {
+              "metric_id": "halt_equal",
+              "observed_value": "true",
+              "detail": "Held-out halt posture stayed equal."
+            }
+          ],
+          "detail": "Held-out executor case `randomized_sudoku_v0_holdout_a` stayed exact under the retained generalization gate."
+        },
+        {
+          "case_id": "randomized_hungarian_v0_holdout_a",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "runtime_exactness_posture",
+              "observed_value": "Exact",
+              "detail": "Held-out evaluation stayed exact under the retained reference-linear generalization gate."
+            },
+            {
+              "metric_id": "outputs_equal",
+              "observed_value": "true",
+              "detail": "Held-out outputs stayed equal."
+            },
+            {
+              "metric_id": "halt_equal",
+              "observed_value": "true",
+              "detail": "Held-out halt posture stayed equal."
+            }
+          ],
+          "detail": "Held-out executor case `randomized_hungarian_v0_holdout_a` stayed exact under the retained generalization gate."
+        }
+      ],
+      "detail": "Held-out promotion truth stays green because the retained generalization gate reported exact_case_count=6 mismatch_case_count=0 refused_case_count=0 while the independence audit kept the training anchors explicit."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_adversarial_suite_v0",
+      "suite_class": "adversarial_suite",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "adversarial_sudoku_9x9_clustered_a",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "runtime_exactness_posture",
+              "observed_value": "Exact",
+              "detail": "Adversarial evaluation stayed exact."
+            },
+            {
+              "metric_id": "outputs_equal",
+              "observed_value": "true",
+              "detail": "Adversarial outputs stayed equal."
+            },
+            {
+              "metric_id": "halt_equal",
+              "observed_value": "true",
+              "detail": "Adversarial halt posture stayed equal."
+            }
+          ],
+          "detail": "Adversarial executor case `adversarial_sudoku_9x9_clustered_a` stayed exact under the retained generalization gate."
+        },
+        {
+          "case_id": "adversarial_hungarian_10x10_permuted_a",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "runtime_exactness_posture",
+              "observed_value": "Exact",
+              "detail": "Adversarial evaluation stayed exact."
+            },
+            {
+              "metric_id": "outputs_equal",
+              "observed_value": "true",
+              "detail": "Adversarial outputs stayed equal."
+            },
+            {
+              "metric_id": "halt_equal",
+              "observed_value": "true",
+              "detail": "Adversarial halt posture stayed equal."
+            }
+          ],
+          "detail": "Adversarial executor case `adversarial_hungarian_10x10_permuted_a` stayed exact under the retained generalization gate."
+        }
+      ],
+      "detail": "Adversarial promotion truth stays green because the retained generalization gate kept adversarial exact_case_count=2 and mismatch_case_count=0 on the current `trained-v0` baseline."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_runtime_blockers_v0",
+      "suite_class": "runtime_blockers",
+      "support_refs": [
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+        "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md"
+      ],
+      "manual_review_required": true,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "cpu_matrix_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `cpu_matrix_green` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "checkpoint_restore_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `checkpoint_restore_green` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "local_cluster_roundtrip_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `local_cluster_roundtrip_green` stays green in the current baseline packet."
+        }
+      ],
+      "detail": "Runtime blockers stay checklist-backed because CPU validation, restore rehearsal, and the cluster roundtrip are promotion blockers even when exactness remains green."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_serving_blockers_v0",
+      "suite_class": "serving_blockers",
+      "support_refs": [
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+        "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+        "fixtures/tassadar/reports/tassadar_article_hybrid_workflow_artifact.json"
+      ],
+      "manual_review_required": true,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "export_packet_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `export_packet_green` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "replacement_packet_green",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `replacement_packet_green` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "promoted_artifact_compatible",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `promoted_artifact_compatible` stays green in the current baseline packet."
+        },
+        {
+          "case_id": "shadow_rollback_safe",
+          "posture": "manual_checklist",
+          "metrics": [
+            {
+              "metric_id": "checklist_status",
+              "observed_value": "green",
+              "detail": "The retained operator or consumer checklist currently stays green."
+            }
+          ],
+          "detail": "Checklist row `shadow_rollback_safe` stays green in the current baseline packet."
+        }
+      ],
+      "detail": "Serving blockers stay checklist-backed because export, replacement, promoted-artifact compatibility, and rollback safety are consumer-facing seams rather than rubric-only metrics."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_reference_linear_anchor_checks_v0",
+      "suite_class": "reference_linear_anchor_checks",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "micro_wasm_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "1060859.8123",
+              "detail": "Reference-linear anchor throughput stayed present."
+            },
+            {
+              "metric_id": "effective_decode_mode",
+              "observed_value": "HullCache",
+              "detail": "The effective decode mode remained explicit."
+            }
+          ],
+          "detail": "`reference_linear` anchor case `micro_wasm_kernel` stayed green in the rebuilt article benchmark."
+        },
+        {
+          "case_id": "branch_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "1127109.5881",
+              "detail": "Reference-linear anchor throughput stayed present."
+            },
+            {
+              "metric_id": "effective_decode_mode",
+              "observed_value": "HullCache",
+              "detail": "The effective decode mode remained explicit."
+            }
+          ],
+          "detail": "`reference_linear` anchor case `branch_heavy_kernel` stayed green in the rebuilt article benchmark."
+        },
+        {
+          "case_id": "memory_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "1475294.4303",
+              "detail": "Reference-linear anchor throughput stayed present."
+            },
+            {
+              "metric_id": "effective_decode_mode",
+              "observed_value": "HullCache",
+              "detail": "The effective decode mode remained explicit."
+            }
+          ],
+          "detail": "`reference_linear` anchor case `memory_heavy_kernel` stayed green in the rebuilt article benchmark."
+        },
+        {
+          "case_id": "hungarian_matching",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.reference_linear_steps_per_second",
+              "observed_value": "2315775.1940",
+              "detail": "Reference-linear anchor throughput stayed present."
+            },
+            {
+              "metric_id": "effective_decode_mode",
+              "observed_value": "HullCache",
+              "detail": "The effective decode mode remained explicit."
+            }
+          ],
+          "detail": "`reference_linear` anchor case `hungarian_matching` stayed green in the rebuilt article benchmark."
+        }
+      ],
+      "detail": "`reference_linear` remains the measured baseline truth anchor on the current `trained-v0` executor baseline."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+      "suite_class": "hull_cache_fast_route_checks",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md"
+      ],
+      "manual_review_required": false,
+      "aggregate_green": true,
+      "case_rows": [
+        {
+          "case_id": "micro_wasm_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "4742588.6655",
+              "detail": "Hull-cache throughput remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "4.470514",
+              "detail": "Hull-cache speedup remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "1.799768",
+              "detail": "Remaining CPU-reference gap remained explicit."
+            }
+          ],
+          "detail": "`hull_cache` fast-route case `micro_wasm_kernel` stayed green on the admitted workload family."
+        },
+        {
+          "case_id": "branch_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "3675966.1377",
+              "detail": "Hull-cache throughput remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "3.261410",
+              "detail": "Hull-cache speedup remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "2.683604",
+              "detail": "Remaining CPU-reference gap remained explicit."
+            }
+          ],
+          "detail": "`hull_cache` fast-route case `branch_heavy_kernel` stayed green on the admitted workload family."
+        },
+        {
+          "case_id": "memory_heavy_kernel",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "4444280.9435",
+              "detail": "Hull-cache throughput remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "3.012470",
+              "detail": "Hull-cache speedup remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "1.982315",
+              "detail": "Remaining CPU-reference gap remained explicit."
+            }
+          ],
+          "detail": "`hull_cache` fast-route case `memory_heavy_kernel` stayed green on the admitted workload family."
+        },
+        {
+          "case_id": "hungarian_matching",
+          "posture": "automated_metric",
+          "metrics": [
+            {
+              "metric_id": "tassadar.hull_cache_steps_per_second",
+              "observed_value": "3915923.7690",
+              "detail": "Hull-cache throughput remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+              "observed_value": "1.690978",
+              "detail": "Hull-cache speedup remained explicit."
+            },
+            {
+              "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+              "observed_value": "2.319447",
+              "detail": "Remaining CPU-reference gap remained explicit."
+            }
+          ],
+          "detail": "`hull_cache` fast-route case `hungarian_matching` stayed green on the admitted workload family."
+        }
+      ],
+      "detail": "`hull_cache` remains the admitted fast-route target on the current `trained-v0` executor baseline."
+    }
+  ],
+  "discrepancy_notes": [],
+  "summary": "Reproduced `trained-v0` truth for both frozen executor packs: exactness_suites_green=true held_out_green=true adversarial_green=true committed_report_reproductions=3.",
+  "record_digest": "1cbcce5abbae31597533a62e80d5c5e1e4aa622410b883ac5a06c02f0f264784"
+}

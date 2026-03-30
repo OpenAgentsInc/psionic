@@ -95,6 +95,8 @@ This doc does not claim:
   acceptance profile
 - `docs/PSION_EXECUTOR_EVAL_PACKS.md` owns the frozen frequent and promotion
   eval packs
+- `docs/PSION_EXECUTOR_BASELINE_TRUTH.md` owns the frozen `trained-v0`
+  baseline-truth packet for those packs
 - `docs/PSION_EXECUTOR_OWNERSHIP.md` owns named owners and review cadence
 - `docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md` owns the admitted local
   executor profile catalog

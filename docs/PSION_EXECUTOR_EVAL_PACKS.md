@@ -19,6 +19,16 @@ Run from the repo root:
 cargo run -q -p psionic-train --example psion_executor_eval_pack_fixtures
 ```
 
+## Baseline Truth Binding
+
+The frozen packs now have one committed baseline-truth overlay:
+
+- `docs/PSION_EXECUTOR_BASELINE_TRUTH.md`
+- `fixtures/psion/executor/psion_executor_baseline_truth_v1.json`
+
+That packet reconstructs `trained-v0` truth across all frozen suite ids before
+later variance or promotion-delta work starts arguing from the packs.
+
 ## What Landed
 
 `psionic-train` now owns one typed executor eval-pack catalog with two packs:
