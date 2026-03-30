@@ -1,0 +1,178 @@
+{
+  "schema_version": "psionic.compiled_agent.phase_six_operational_report.v1",
+  "report_id": "compiled_agent.phase_six.operational_report.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "evidence_class": "learned_lane",
+  "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+  "tailnet_cadence": {
+    "previous_governed_run_digest": "dc9ab99b00fa05ae990693b5e758cc728d7d06dcef36bb51b86bf769c7f18b37",
+    "current_governed_run_digest": "a6f3caf208fb510793d048fa44e8bab8f2761282f0a1c6d42d0845fe8208f2dc",
+    "previous_staging_ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2",
+    "current_staging_ledger_digest": "5f4ce9b6126629220a69083eaa62f029bfd4054af38161cee52092489d0dabf8",
+    "previous_quarantine_report_digest": "90492578580c808d8639f7a920b641fe8e717446509c74e9126d5e0c6d91c6c4",
+    "current_quarantine_report_digest": "1b71d21d1f1f0ca2ea2b2420709c91b8f1d6012cdcd884ee91bfe1431ddf00a3",
+    "previous_xtrain_cycle_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+    "current_xtrain_cycle_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
+    "previous_route_decision": "promote",
+    "current_route_decision": "promote",
+    "previous_grounded_decision": "promote",
+    "current_grounded_decision": "promote",
+    "current_review_required_submission_count": 6,
+    "current_rejected_submission_count": 0,
+    "alerts": [
+      {
+        "kind": "heldout_regression",
+        "triggered": false,
+        "detail": "Held-out regression stays fail-closed for both route and grounded-answer promotion decisions."
+      },
+      {
+        "kind": "quarantine_spike",
+        "triggered": false,
+        "detail": "Tailnet review-required=6 rejected=0 against prior review-required=6 rejected=0."
+      },
+      {
+        "kind": "validator_boundary_violation",
+        "triggered": false,
+        "detail": "No submission crossed the validator boundary with schema, contract, or digest drift while remaining non-rejected."
+      }
+    ]
+  },
+  "route": {
+    "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
+    "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
+    "decision": "promote",
+    "baseline_replay_match_count": 22,
+    "candidate_replay_match_count": 28,
+    "baseline_heldout_match_count": 13,
+    "candidate_heldout_match_count": 14,
+    "retained_regression_count": 0,
+    "previous_replay_match_count": 25,
+    "previous_heldout_match_count": 12,
+    "previous_regression_count": 0,
+    "permanent_regression_trap_receipt_ids": [
+      "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_wait_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_address_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_best_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_better_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_heldout_receipt_v1"
+    ],
+    "ambiguous_check_receipt_ids": [
+      "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_compare_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wait_wallet_earnings_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_provider_wallet_better_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_grow_compare_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_ambiguous_provider_wallet_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_wait_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_provider_better_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
+    ],
+    "human_review_receipt_ids": [
+      "disagreement.compiled_agent.route.openagents_ignore_wallet_provider_heldout_receipt_v1",
+      "disagreement.compiled_agent.route.openagents_negated_wallet_provider_heldout_receipt_v1",
+      "disagreement.compiled_agent.route.openagents_runtime_shadow_compare_receipt_v1",
+      "disagreement.compiled_agent.route.openagents_wallet_address_heldout_receipt_v1"
+    ],
+    "learned_correct_mean_confidence": 0.89200014,
+    "learned_incorrect_mean_confidence": 0.8866666,
+    "low_confidence_disagreement_count": 1,
+    "confidence_watch_receipt_ids": [
+      "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1"
+    ]
+  },
+  "grounded_answer": {
+    "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
+    "promoted_artifact_digest": "869217d751e61e52f32f1dfdd0f5dc18d3e9c0a1d15dce0f86066356075b2782",
+    "decision": "promote",
+    "baseline_replay_match_count": 21,
+    "candidate_replay_match_count": 28,
+    "baseline_heldout_match_count": 12,
+    "candidate_heldout_match_count": 16,
+    "retained_regression_count": 0,
+    "disagreement_receipt_ids": [
+      "receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
+      "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1"
+    ],
+    "human_review_receipt_ids": [
+      "disagreement.compiled_agent.grounded_answer.openagents_ignore_provider_wallet_training_receipt_v1",
+      "disagreement.compiled_agent.grounded_answer.openagents_ignore_wallet_provider_heldout_receipt_v1",
+      "disagreement.compiled_agent.grounded_answer.openagents_negated_provider_wallet_heldout_receipt_v1",
+      "disagreement.compiled_agent.grounded_answer.openagents_negated_wallet_provider_heldout_receipt_v1",
+      "disagreement.compiled_agent.grounded_answer.openagents_provider_exclusion_receipt_v1",
+      "disagreement.compiled_agent.grounded_answer.openagents_runtime_shadow_compare_receipt_v1",
+      "disagreement.compiled_agent.grounded_answer.openagents_wallet_exclusion_receipt_v1"
+    ],
+    "new_failure_class_count": 14
+  },
+  "external_evidence_boundary": {
+    "staging_ledger_digest": "035a9a3b928df3a27fed1d7770f7a9805f5774354dcbd9c5e16acb4f2252e5c2",
+    "quarantine_report_digest": "c53147143de900e4c8675cc2688bc5b17fbe8ba56fd31c2b5827ec5c62ac2e4e",
+    "anomaly_submission_ids": [
+      "submission.compiled_agent.external_benchmark_invalid.alpha.v1",
+      "submission.compiled_agent.external_runtime_disagreement.alpha.v1"
+    ],
+    "fail_closed_submission_ids": [
+      "submission.compiled_agent.external_benchmark_invalid.alpha.v1"
+    ],
+    "trusted_signal_contributor_ids": [],
+    "watch_contributor_ids": [
+      "contrib.external.alpha"
+    ],
+    "contributor_trust_histories": [
+      {
+        "contributor_id": "contrib.external.alpha",
+        "source_machine_id": "",
+        "accepted_submission_count": 0,
+        "rejected_submission_count": 1,
+        "review_required_submission_count": 0,
+        "replay_candidate_submission_count": 0,
+        "anomaly_count": 3,
+        "trust_posture": "watch",
+        "detail": "Contributor `contrib.external.alpha` triggered 1 rejected submissions and 3 anomaly flags, so the intake path tightens review posture while keeping the same quarantine boundary and no authority expansion."
+      },
+      {
+        "contributor_id": "contrib.external.alpha",
+        "source_machine_id": "external.alpha.archlinux.rtx4080",
+        "accepted_submission_count": 3,
+        "rejected_submission_count": 0,
+        "review_required_submission_count": 3,
+        "replay_candidate_submission_count": 1,
+        "anomaly_count": 1,
+        "trust_posture": "neutral",
+        "detail": "Contributor `contrib.external.alpha` remains neutral while the beta accumulates more accepted bounded evidence."
+      }
+    ]
+  },
+  "summary": "Phase six keeps the Tailnet-first compiled-agent loop repeatable with route decision=Promote, grounded decision=Promote, 13 permanent route traps, and 2 anomaly-gated external submissions.",
+  "report_digest": "b0d4061de01e35a21b83ff6c2f57fb5737905420cfb110d031c0116c3fabad86"
+}

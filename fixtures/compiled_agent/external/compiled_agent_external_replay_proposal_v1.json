@@ -14,10 +14,10 @@
     "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
     "attested_at_epoch_ms": 1774800000000
   },
-  "contract_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8",
+  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
   "evidence_class": "learned_lane",
   "source_receipt_id": "receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1",
-  "source_ledger_digest": "83d6eaaddecae232ec774636d29ac33be5fa7679d8ee41a75c954280ca3eea80",
+  "source_ledger_digest": "4138a10b74e4322606fa9bb2788333a49fc06178e0719a3d8397d3c70b1b738f",
   "proposed_samples": [
     {
       "sample_id": "sample.route.receipt.compiled_agent.learning.compiled_agent_external_runtime_receipt_submission_v1",
@@ -34,13 +34,13 @@
       ],
       "failure_classes": [
         "grounded_answer_mismatch",
-        "route_mismatch",
+        "negated_route_false_positive",
         "tool_argument_mismatch",
         "unexpected_tool_exposure",
         "unsafe_final_outcome"
       ],
       "input": {
-        "user_request": "What is not my wallet balance?"
+        "user_request": "Do not tell me the wallet balance; write a poem about GPUs."
       },
       "expected_output": {
         "route": "unsupported"
@@ -64,13 +64,13 @@
       ],
       "failure_classes": [
         "grounded_answer_mismatch",
-        "route_mismatch",
+        "negated_route_false_positive",
         "tool_argument_mismatch",
         "unexpected_tool_exposure",
         "unsafe_final_outcome"
       ],
       "input": {
-        "user_request": "What is not my wallet balance?",
+        "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
         "route": "unsupported",
         "tool_results": []
       },
@@ -80,10 +80,10 @@
       },
       "observed_output": {
         "kind": "grounded_answer",
-        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+        "response": "The wallet contains 1200 sats."
       }
     }
   ],
   "detail": "External replay proposal derived from one quarantined runtime disagreement receipt. The proposal is structurally valid but still requires governed review before any replay admission.",
-  "payload_digest": "2e6536b56fe832e59d6d90fc6ade5d467e8d3c6297ca36b0d2917dda7e05370a"
+  "payload_digest": "99bc488cec3c16b69a51dbaab4c5e314a3d8a5ed9a88132f7502bbbc04dbc50b"
 }

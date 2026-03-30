@@ -1,6 +1,6 @@
 # Compiled Agent XTRAIN
 
-> Status: validator-gated compiled-agent XTRAIN cycle with promoted learned route and grounded-answer artifacts after the Tailnet-first M5 plus RTX 4080 pilot, updated 2026-03-29.
+> Status: validator-gated compiled-agent XTRAIN cycle with promoted learned route and grounded-answer artifacts after the retained phase-six rerun, updated 2026-03-29.
 
 ## Why This Exists
 
@@ -79,6 +79,7 @@ learned compiled-agent slice actually proved.
 - `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_quarantine_report_v1.json`
 - `fixtures/compiled_agent/tailnet/compiled_agent_tailnet_governed_run_v1.json`
 - `fixtures/compiled_agent/compiled_agent_xtrain_cycle_receipt_v1.json`
+- `fixtures/compiled_agent/compiled_agent_phase_six_operational_report_v1.json`
 - `fixtures/compiled_agent/compiled_agent_promoted_artifact_contract_v1.json`
 - `fixtures/compiled_agent/compiled_agent_confidence_policy_v1.json`
 - `fixtures/compiled_agent/compiled_agent_shadow_disagreement_receipts_v1.json`
@@ -88,102 +89,70 @@ learned compiled-agent slice actually proved.
 
 ## Current Truth
 
-- the first Tailnet-first governed contributor run is now real:
-  - local M5 bundle digest `8a1755d9ffaa3af2aff425129dde232b318c8bf839f707324409e4af390b0c3a`
-  - remote RTX 4080 bundle digest `c47df518233bd687bd88b442002840f8fedc45960db8298795db8562a097022d`
-  - shared retained external benchmark contract digest
-    `9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4`
+- the Tailnet-first loop is now retained as a repeatable phase-six run instead
+  of a one-off demo:
+  - local M5 bundle digest `5a8f3fa13bfd67c1609251f4f9a4ad9c514e688d892c3f6f16e155a46ed9dda9`
+  - remote RTX 4080 bundle digest `f2682730f546c68715e66bd0bdb2144a792c1eacb44838feefa4ab59b4b90ec4`
   - governed run digest
-    `dc9ab99b00fa05ae990693b5e758cc728d7d06dcef36bb51b86bf769c7f18b37`
-- route candidate is a replay-trained route model artifact, not a hand-authored
-  keyword guard
-- the route path now promotes honestly under unchanged validator thresholds
+    `a6f3caf208fb510793d048fa44e8bab8f2761282f0a1c6d42d0845fe8208f2dc`
+  - phase-six operational report digest
+    `b0d4061de01e35a21b83ff6c2f57fb5737905420cfb110d031c0116c3fabad86`
+- route candidate is still a replay-trained route model artifact, not a
+  hand-authored keyword guard
+- the route path still promotes under unchanged validator thresholds
 - route validation now clears with:
   - eval `3 -> 4`
-  - replay `19 -> 25`
-  - held-out `10 -> 12`
+  - replay `22 -> 28`
+  - held-out `13 -> 14`
   - no replay or held-out regressions
-- grounded-answer candidate is a replay-trained fact-only model artifact, not a
-  rule revision
-- grounded-answer candidate now improves replay fidelity `19 -> 25`
-- grounded-answer candidate also improves held-out fidelity `9 -> 13`
-- grounded-answer candidate continues to pass the independent
-  insufficient-facts and conflicting-facts fallback rows
-- the promoted-artifact contract now keeps the learned route artifact promoted
-  and retains the baseline route as the rollback candidate with label
-  `last_known_good`
-- learned route and grounded artifacts are now normalized through JSON
-  roundtrip before their digest is stamped, so the retained artifact digests,
-  persisted fixtures, and runtime-loaded payloads all agree
-- sanitized runtime receipts now feed the same learning ledger and replay
-  bundle instead of living in a separate runtime-only path
-- the promoted-artifact contract now hydrates the retained grounded-answer
-  artifact fixture and keeps route authority on the baseline revision when the
-  validator says `hold`
-- confidence bands, human-review triggers, and rollback thresholds are now
-  retained as machine-readable artifacts instead of living only in issue text
-- promoted-versus-candidate disagreement harvesting is now part of the normal
-  xtrain loop, including admitted-family runtime shadow traces
-- promoted and candidate module authority is exported through a retained
-  runtime-consumable artifact contract instead of only being implied by docs
-- the first pre-network decentralized improvement roles are typed retained
-  contracts and receipts rather than roadmap-only nouns
-- those same decentralized roles now rerun as a retained boring dry run over
-  the stricter bounded corpus and runtime-ingested receipts without weakening
-  validator or rollback discipline
-- the first outside-compatible benchmark pack now emits external contributor
-  receipts in the same bounded ledger shape, with one retained review-required
-  negated-wallet row to keep the current route weakness visible
-- external benchmark runs, runtime disagreement receipts, and replay proposals
-  can now enter a retained staging ledger and quarantine report without
-  weakening the evidence-versus-authority boundary
-- outside workers can now execute the four admitted early roles on the same
-  narrow family and submit governed receipts that are accepted, rejected, or
-  routed for review without granting promotion or runtime authority
-- stronger bounded candidate families can now be evaluated against the same
-  route and grounded-answer contracts without changing the runtime interface
-- the retained stronger-family report now keeps the incumbent NB candidates on
-  both modules because the TF-IDF centroid family only tied the widened eval,
-  replay, and held-out surfaces
+- grounded-answer candidate is still a replay-trained fact-only model artifact,
+  not a rule revision
+- grounded-answer candidate now clears:
+  - replay `21 -> 28`
+  - held-out `12 -> 16`
+  - no replay or held-out regressions
+- the promoted-artifact contract now reflects the latest retained route and
+  grounded artifacts after the widened phase-six rerun
+- confidence bands, human-review triggers, rollback thresholds, and
+  promoted-versus-candidate disagreement harvesting are still retained as
+  machine-readable artifacts
+- route now also retains permanent regression-trap held-out rows for compare,
+  exclusion, negation, and provider-vs-wallet ambiguity instead of only the
+  earlier phase-five failures
+- external intake now adds anomaly flags and contributor trust posture while
+  keeping the same staging -> quarantine -> replay boundary
+- the retained stronger-family report still keeps the incumbent NB candidates
+  on both modules because the TF-IDF centroid family does not beat the widened
+  eval, replay, and held-out surfaces honestly
 
 ## Latest Retained Outcome
 
 - route decision: `promote`
 - grounded-answer decision: `promote`
 - replay bundle digest:
-  `0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c`
+  `85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036`
 - source ledger digest:
-  `6dd2c757e2a4534210899a667edb82b1c819d64592d3b4aca07a2a6cf1864812`
+  `22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e`
 - route model digest:
-  `cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac`
+  `2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c`
 - grounded-answer model digest:
-  `5a7bd1af3709dc6c24fb75627c898c37993ee3946f402ce0761fc5adc211a708`
+  `869217d751e61e52f32f1dfdd0f5dc18d3e9c0a1d15dce0f86066356075b2782`
 - stronger route model digest:
-  `f6d653e5b16fc7f99420f7ec1f99764da05981a761d53af70de4374136f512c3`
+  `4230c12f354af0cbde18f0d0f7fe128758dcb085750086f01f361b981cac5336`
 - stronger grounded-answer model digest:
-  `3adc205ed4b2855a8cad36fe61a1d9c40d9ffac2733ed464e5b73409b403e413`
+  `47acc85795914944fec15dd706f5c553a210e8a52484b77b4ce964eafe349b1c`
 - stronger candidate family report digest:
-  `04112b458376e968b518c0c1653ed939c2748dd471592c408e2574029bbc8479`
+  `fc1c32a58dbc93aeddab9fb5fcc913b59809d129c44bc8b995fd1036e2375298`
 - XTRAIN cycle receipt digest:
-  `4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45`
+  `b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073`
 - promoted-artifact contract digest:
-  `80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720`
+  `5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4`
 - confidence policy digest:
-  `51c1182a1e0c699ab878182c72e7ee7ba0eb83c42f41203edce080bde3595fb1`
+  `a38c5a52ba39e60d3b9f7d6396f4dacb9e7c641b34b1cdb9fa5d2b03490b317e`
 - shadow disagreement receipts digest:
-  `0548cec6c9a09dfc07e6aea3623467763adccf4d308ac5c7ddd369bdfa60e0b8`
-- decentralized roles contract digest:
-  `303bf8445d4afbae4a329b2cb9d3b9be8619f77aa1113d9b96fb0b62b2ef81fc`
-- decentralized role receipts digest:
-  `a9bcc9c0f4042c5d690b3ee99ff51bb20d6a29372dc592ba0465d7fecc634dc7`
-- decentralized role dry-run digest:
-  `1895a9d50c00d49261e8e00ccf3cdbca4fa38b098407b29aca8ea5ed3810192a`
-- external worker beta contract digest:
-  `0faec27692dca082fbd58837b7722ba20bcda22ac3f3db0b0f97309abb23539a`
-- external worker receipts digest:
-  `e9b42272444d0b0781c07ffc141a8c3642e66093dda65b17f0c4d287d971ac13`
-- external worker dry-run digest:
-  `e576a14307d2149312d2dcd3dca92b35b39e4fc1750e0c52d85cdb82336a8fce`
+  `be6c101f629f8c70afa4f293c690fc50af1468f5fa43d3ccb9093ccc1095fe5d`
+- phase-six operational report digest:
+  `b0d4061de01e35a21b83ff6c2f57fb5737905420cfb110d031c0116c3fabad86`
 
 ## Scope Boundary
 
@@ -207,6 +176,6 @@ Regenerate the canonical validator outputs:
 cargo run -q -p psionic-train --bin compiled_agent_xtrain_loop
 ```
 
-This is the first real bounded XTRAIN loop for the compiled-agent path. It does
-not try to mutate the whole system at once, and it does not make Tassadar a
-blocker.
+This is still the bounded XTRAIN loop for the compiled-agent path. Phase six
+does not widen the family or relax the gates. It keeps the loop repeatable and
+harder to game while the same narrow evidence family grows.

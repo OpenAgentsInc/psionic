@@ -1,7 +1,8 @@
 # Compiled Agent External Intake
 
-> Status: governed external evidence staging and quarantine for the admitted
-> compiled-agent family, updated 2026-03-29.
+> Status: governed external evidence staging, quarantine, anomaly detection,
+> and contributor trust posture for the admitted compiled-agent family, updated
+> 2026-03-29.
 
 ## Why This Exists
 
@@ -61,6 +62,27 @@ Accepted and review-required rows still stay outside authority. They are
 retained only as quarantined evidence until the existing validator and review
 logic says otherwise.
 
+Phase six adds explicit anomaly flags and contributor trust posture while
+keeping the same evidence boundary.
+
+Anomaly kinds now include:
+
+- schema mismatch
+- contract mismatch
+- digest mismatch
+- missing environment metadata
+- structurally inconsistent disagreement receipts
+- unusual confidence patterns
+
+Trust posture now stays machine-legible inside the staging ledger:
+
+- `trusted_signal`
+- `neutral`
+- `watch`
+
+That posture can tighten review or highlight stronger bounded evidence, but it
+still cannot bypass staging, quarantine, replay review, or promotion gates.
+
 ## Quarantine Rules
 
 The quarantine report keeps outside evidence reviewable instead of silently
@@ -89,8 +111,21 @@ The first retained intake path keeps one important external disagreement live:
   and grounded-answer authority
 - the derived replay proposal is structurally valid but still review-required
 
+Phase six now retains a stricter external ledger shape:
+
+- staging ledger digest:
+  `035a9a3b928df3a27fed1d7770f7a9805f5774354dcbd9c5e16acb4f2252e5c2`
+- quarantine report digest:
+  `c53147143de900e4c8675cc2688bc5b17fbe8ba56fd31c2b5827ec5c62ac2e4e`
+- anomaly submission count: `2`
+- fail-closed submission ids:
+  - `submission.compiled_agent.external_benchmark_invalid.alpha.v1`
+- watch contributor ids:
+  - `contrib.external.alpha`
+
 This is the exact boundary the bounded learning loop needs: outside evidence is
-admitted as evidence, not mistaken for authority.
+admitted as evidence, not mistaken for authority, and repeated noisy behavior
+becomes more visible without granting or removing authority.
 
 ## Local Runner
 
@@ -119,5 +154,6 @@ It does not yet prove:
 - contributor trust or accounting surfaces
 - broad external traffic ingestion
 
-The next retained boundary after intake is now described in
-`docs/COMPILED_AGENT_EXTERNAL_WORKERS.md`.
+The phase-six operational view that compares these intake artifacts against the
+current Tailnet run and XTRAIN loop is now described in
+`docs/COMPILED_AGENT_PHASE_SIX.md`.

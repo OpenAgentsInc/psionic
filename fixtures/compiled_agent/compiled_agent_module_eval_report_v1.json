@@ -3,6 +3,7 @@
   "report_id": "compiled_agent.module_eval.report.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+  "evidence_class": "learned_lane",
   "case_reports": [
     {
       "case_id": "route_provider_ready",
@@ -315,5 +316,5 @@
   ],
   "summary": "Compiled-agent module eval report covers 21 cases across 5 module families with unsupported_pass=6/7, negated_pass=0/1, and tool_emission_is_not_success_cases=1.",
   "detail": "This report keeps route, tool-policy, tool-argument, grounded-answer, and verify surfaces independent so later GEPA and XTRAIN work can optimize bounded modules instead of a giant agent loop.",
-  "report_digest": "109b39338c2244f8320664e1202e261ec74b6f35e23ffefadaa3b590b0c75e6a"
+  "report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f"
 }

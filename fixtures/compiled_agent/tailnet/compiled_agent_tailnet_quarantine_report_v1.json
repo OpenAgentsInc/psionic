@@ -3,8 +3,8 @@
   "report_id": "compiled_agent.tailnet_quarantine_report.v1",
   "row_id": "compiled_agent.tailnet_external_beta.v1",
   "evidence_class": "learned_lane",
-  "staging_ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2",
-  "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
+  "staging_ledger_digest": "5f4ce9b6126629220a69083eaa62f029bfd4054af38161cee52092489d0dabf8",
+  "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
   "accepted_submission_ids": [
     "submission.compiled_agent.tailnet.m5.benchmark.v1",
     "submission.compiled_agent.tailnet.archlinux.benchmark.v1",
@@ -35,6 +35,15 @@
     "receipt.compiled_agent.learning.compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run#external.wallet_variant"
   ],
   "proposed_replay_sample_ids": [],
+  "anomaly_submission_ids": [
+    "submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
+    "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
+    "submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1"
+  ],
+  "trusted_signal_contributor_ids": [],
+  "watch_contributor_ids": [
+    "contrib.tailnet.archlinux_rtx4080"
+  ],
   "shadow_assessments": [
     {
       "assessment_id": "assessment.submission_compiled_agent_tailnet_archlinux_benchmark_v1.grounded_answer.v1",
@@ -355,6 +364,6 @@
       "detail": "External intake shadow-scored route authority for `receipt.compiled_agent.learning.compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2` against promoted `compiled_agent.route.multinomial_nb_v1` and candidate `compiled_agent.baseline.rule_v1.route` before any replay admission."
     }
   ],
-  "summary": "Tailnet-first quarantine retained 6 accepted submissions, 0 rejected submissions, 6 review-required submissions, and 12 shadow assessments while preserving separate contributor identity for the M5 and archlinux nodes.",
-  "report_digest": "90492578580c808d8639f7a920b641fe8e717446509c74e9126d5e0c6d91c6c4"
+  "summary": "Tailnet-first quarantine retained 6 accepted submissions, 0 rejected submissions, 6 review-required submissions, 3 anomaly-flagged submissions, and 12 shadow assessments while preserving separate contributor identity for the M5 and archlinux nodes.",
+  "report_digest": "1b71d21d1f1f0ca2ea2b2420709c91b8f1d6012cdcd884ee91bfe1431ddf00a3"
 }

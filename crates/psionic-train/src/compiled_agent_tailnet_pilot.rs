@@ -14,16 +14,15 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    apply_external_boundary_posture, build_benchmark_submission_record_with_payload_ref,
+    build_compiled_agent_external_runtime_receipt_submission_from_fixture,
     build_compiled_agent_learning_receipt_from_source,
     build_compiled_agent_learning_receipt_ledger_from_receipts,
     build_compiled_agent_replay_bundle_from_ledger,
-    build_benchmark_submission_record_with_payload_ref,
-    build_compiled_agent_external_runtime_receipt_submission_from_fixture,
     build_runtime_submission_record_with_payload_ref, build_shadow_assessments,
     compiled_agent_external_contributor_identity_for_profile, repo_relative_path,
     retained_compiled_agent_external_benchmark_kit, run_compiled_agent_external_benchmark_kit,
-    CompiledAgentCorpusSplit,
-    CompiledAgentArtifactContractError,
+    CompiledAgentArtifactContractError, CompiledAgentCorpusSplit,
     CompiledAgentExternalBenchmarkError, CompiledAgentExternalBenchmarkRun,
     CompiledAgentExternalContributorProfile, CompiledAgentExternalIntakeError,
     CompiledAgentExternalQuarantineReport, CompiledAgentExternalReviewState,
@@ -48,16 +47,14 @@ pub const COMPILED_AGENT_TAILNET_GOVERNED_RUN_FIXTURE_PATH: &str =
     "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_governed_run_v1.json";
 pub const COMPILED_AGENT_TAILNET_DOC_PATH: &str = "docs/COMPILED_AGENT_TAILNET_FIRST_PILOT.md";
 
-const COMPILED_AGENT_TAILNET_M5_NODE_BUNDLE_ID: &str =
-    "compiled_agent.tailnet_node_bundle.m5.v1";
+const COMPILED_AGENT_TAILNET_M5_NODE_BUNDLE_ID: &str = "compiled_agent.tailnet_node_bundle.m5.v1";
 const COMPILED_AGENT_TAILNET_ARCHLINUX_NODE_BUNDLE_ID: &str =
     "compiled_agent.tailnet_node_bundle.archlinux.v1";
 const COMPILED_AGENT_TAILNET_STAGING_LEDGER_ID: &str =
     "compiled_agent.tailnet_submission_staging_ledger.v1";
 const COMPILED_AGENT_TAILNET_QUARANTINE_REPORT_ID: &str =
     "compiled_agent.tailnet_quarantine_report.v1";
-const COMPILED_AGENT_TAILNET_GOVERNED_RUN_ID: &str =
-    "compiled_agent.tailnet_governed_run.v1";
+const COMPILED_AGENT_TAILNET_GOVERNED_RUN_ID: &str = "compiled_agent.tailnet_governed_run.v1";
 
 #[derive(Debug, Error)]
 pub enum CompiledAgentTailnetPilotError {
@@ -209,7 +206,10 @@ pub fn build_compiled_agent_tailnet_node_bundle(
         bundle.contributor.contributor_id,
         bundle.runtime_submissions.len()
     );
-    bundle.bundle_digest = stable_digest(b"compiled_agent_tailnet_node_bundle|", &bundle_without_digest(&bundle));
+    bundle.bundle_digest = stable_digest(
+        b"compiled_agent_tailnet_node_bundle|",
+        &bundle_without_digest(&bundle),
+    );
     bundle.validate()?;
     Ok(bundle)
 }
@@ -219,7 +219,9 @@ pub fn write_compiled_agent_tailnet_node_bundle(
     profile: CompiledAgentExternalContributorProfile,
 ) -> Result<CompiledAgentTailnetNodeBundle, CompiledAgentTailnetPilotError> {
     let output_path = output_path.as_ref();
-    write_pretty_json(output_path, || build_compiled_agent_tailnet_node_bundle(profile))
+    write_pretty_json(output_path, || {
+        build_compiled_agent_tailnet_node_bundle(profile)
+    })
 }
 
 pub fn load_compiled_agent_tailnet_node_bundle(
@@ -294,7 +296,11 @@ pub fn build_compiled_agent_tailnet_governed_run(
     submissions.push(remote_benchmark_record);
 
     for (bundle, node_label, bundle_fixture) in [
-        (local_bundle, "m5", COMPILED_AGENT_TAILNET_M5_NODE_BUNDLE_FIXTURE_PATH),
+        (
+            local_bundle,
+            "m5",
+            COMPILED_AGENT_TAILNET_M5_NODE_BUNDLE_FIXTURE_PATH,
+        ),
         (
             remote_bundle,
             "archlinux",
@@ -316,6 +322,7 @@ pub fn build_compiled_agent_tailnet_governed_run(
     }
 
     shadow_assessments.sort_by(|left, right| left.assessment_id.cmp(&right.assessment_id));
+    let contributor_trust_histories = apply_external_boundary_posture(&mut submissions);
     let accepted_submission_count = submissions
         .iter()
         .filter(|record| record.review_state != CompiledAgentExternalReviewState::Rejected)
@@ -332,6 +339,10 @@ pub fn build_compiled_agent_tailnet_governed_run(
         .iter()
         .filter(|record| !record.replay_candidate_receipt_ids.is_empty())
         .count() as u32;
+    let anomaly_submission_count = submissions
+        .iter()
+        .filter(|record| !record.anomaly_flags.is_empty())
+        .count() as u32;
     let mut staging_ledger = CompiledAgentExternalSubmissionStagingLedger {
         schema_version: String::from(
             "psionic.compiled_agent.external_submission_staging_ledger.v1",
@@ -346,16 +357,19 @@ pub fn build_compiled_agent_tailnet_governed_run(
         rejected_submission_count,
         review_required_submission_count,
         replay_candidate_submission_count,
+        anomaly_submission_count,
         submissions,
+        contributor_trust_histories,
         summary: String::new(),
         ledger_digest: String::new(),
     };
     staging_ledger.summary = format!(
-        "Tailnet-first staging ledger retained {} submissions across the M5 and archlinux RTX 4080 nodes: {} accepted into quarantine, {} rejected, {} review-required, and {} replay-candidate submission records.",
+        "Tailnet-first staging ledger retained {} submissions across the M5 and archlinux RTX 4080 nodes: {} accepted into quarantine, {} rejected, {} review-required, {} anomaly-flagged, and {} replay-candidate submission records.",
         staging_ledger.total_submission_count,
         staging_ledger.accepted_submission_count,
         staging_ledger.rejected_submission_count,
         staging_ledger.review_required_submission_count,
+        staging_ledger.anomaly_submission_count,
         staging_ledger.replay_candidate_submission_count
     );
     staging_ledger.ledger_digest = staging_ledger.stable_digest();
@@ -389,6 +403,26 @@ pub fn build_compiled_agent_tailnet_governed_run(
         .iter()
         .flat_map(|record| record.proposed_replay_sample_ids.clone())
         .collect::<Vec<_>>();
+    let anomaly_submission_ids = staging_ledger
+        .submissions
+        .iter()
+        .filter(|record| !record.anomaly_flags.is_empty())
+        .map(|record| record.submission_id.clone())
+        .collect::<Vec<_>>();
+    let trusted_signal_contributor_ids = staging_ledger
+        .contributor_trust_histories
+        .iter()
+        .filter(|history| {
+            history.trust_posture == crate::CompiledAgentExternalTrustPosture::TrustedSignal
+        })
+        .map(|history| history.contributor_id.clone())
+        .collect::<Vec<_>>();
+    let watch_contributor_ids = staging_ledger
+        .contributor_trust_histories
+        .iter()
+        .filter(|history| history.trust_posture == crate::CompiledAgentExternalTrustPosture::Watch)
+        .map(|history| history.contributor_id.clone())
+        .collect::<Vec<_>>();
     let mut quarantine_report = CompiledAgentExternalQuarantineReport {
         schema_version: String::from("psionic.compiled_agent.external_quarantine_report.v1"),
         report_id: String::from(COMPILED_AGENT_TAILNET_QUARANTINE_REPORT_ID),
@@ -401,15 +435,19 @@ pub fn build_compiled_agent_tailnet_governed_run(
         review_required_submission_ids,
         replay_candidate_receipt_ids,
         proposed_replay_sample_ids,
+        anomaly_submission_ids,
+        trusted_signal_contributor_ids,
+        watch_contributor_ids,
         shadow_assessments,
         summary: String::new(),
         report_digest: String::new(),
     };
     quarantine_report.summary = format!(
-        "Tailnet-first quarantine retained {} accepted submissions, {} rejected submissions, {} review-required submissions, and {} shadow assessments while preserving separate contributor identity for the M5 and archlinux nodes.",
+        "Tailnet-first quarantine retained {} accepted submissions, {} rejected submissions, {} review-required submissions, {} anomaly-flagged submissions, and {} shadow assessments while preserving separate contributor identity for the M5 and archlinux nodes.",
         quarantine_report.accepted_submission_ids.len(),
         quarantine_report.rejected_submission_ids.len(),
         quarantine_report.review_required_submission_ids.len(),
+        quarantine_report.anomaly_submission_ids.len(),
         quarantine_report.shadow_assessments.len()
     );
     quarantine_report.report_digest = quarantine_report.stable_digest();
@@ -429,9 +467,16 @@ pub fn build_compiled_agent_tailnet_governed_run(
         accepted_learning_receipts.clone(),
         "compiled_agent.tailnet_external_beta.v1",
     )?;
-    let tailnet_replay_bundle = build_compiled_agent_replay_bundle_from_ledger(&tailnet_learning_ledger)?;
-    let route_preview = build_route_preview_artifact(&accepted_learning_receipts, &tailnet_replay_bundle.bundle_digest);
-    let grounded_preview = build_grounded_preview_artifact(&accepted_learning_receipts, &tailnet_replay_bundle.bundle_digest);
+    let tailnet_replay_bundle =
+        build_compiled_agent_replay_bundle_from_ledger(&tailnet_learning_ledger)?;
+    let route_preview = build_route_preview_artifact(
+        &accepted_learning_receipts,
+        &tailnet_replay_bundle.bundle_digest,
+    );
+    let grounded_preview = build_grounded_preview_artifact(
+        &accepted_learning_receipts,
+        &tailnet_replay_bundle.bundle_digest,
+    );
 
     let mut run = CompiledAgentTailnetGovernedRun {
         schema_version: String::from(COMPILED_AGENT_TAILNET_GOVERNED_RUN_SCHEMA_VERSION),
@@ -462,7 +507,10 @@ pub fn build_compiled_agent_tailnet_governed_run(
         run.route_preview_training_accuracy,
         run.grounded_preview_training_accuracy
     );
-    run.run_digest = stable_digest(b"compiled_agent_tailnet_governed_run|", &run_without_digest(&run));
+    run.run_digest = stable_digest(
+        b"compiled_agent_tailnet_governed_run|",
+        &run_without_digest(&run),
+    );
     run.validate()?;
     Ok((staging_ledger, quarantine_report, run))
 }
@@ -501,7 +549,9 @@ impl CompiledAgentTailnetNodeBundle {
         }
         if self.runtime_submissions.is_empty() {
             return Err(CompiledAgentTailnetPilotError::InvalidNodeBundle {
-                detail: String::from("tailnet node bundle requires at least one runtime submission"),
+                detail: String::from(
+                    "tailnet node bundle requires at least one runtime submission",
+                ),
             });
         }
         if self.bundle_digest
@@ -563,9 +613,9 @@ fn tailnet_runtime_fixture_names(
             "openagents_negated_provider_wallet_heldout_receipt_v1.json",
             "openagents_wallet_address_heldout_receipt_v1.json",
         ],
-        CompiledAgentExternalContributorProfile::ExternalAlpha => &[
-            "openagents_negated_wallet_receipt_v1.json",
-        ],
+        CompiledAgentExternalContributorProfile::ExternalAlpha => {
+            &["openagents_negated_wallet_receipt_v1.json"]
+        }
     }
 }
 
@@ -602,7 +652,9 @@ fn accepted_learning_receipts_from_bundle(
         .benchmark_run
         .row_runs
         .iter()
-        .filter(|row| row.validator_outcome == crate::CompiledAgentExternalValidatorOutcome::Accepted)
+        .filter(|row| {
+            row.validator_outcome == crate::CompiledAgentExternalValidatorOutcome::Accepted
+        })
         .map(|row| {
             build_compiled_agent_learning_receipt_from_source(
                 format!("{bundle_fixture_path}#benchmark_run/{}", row.row_id).as_str(),
@@ -672,7 +724,9 @@ fn build_grounded_preview_artifact(
     )
 }
 
-fn bundle_without_digest(bundle: &CompiledAgentTailnetNodeBundle) -> CompiledAgentTailnetNodeBundle {
+fn bundle_without_digest(
+    bundle: &CompiledAgentTailnetNodeBundle,
+) -> CompiledAgentTailnetNodeBundle {
     let mut clone = bundle.clone();
     clone.bundle_digest.clear();
     clone
@@ -684,7 +738,10 @@ fn run_without_digest(run: &CompiledAgentTailnetGovernedRun) -> CompiledAgentTai
     clone
 }
 
-fn write_pretty_json<T, F>(output_path: &Path, build: F) -> Result<T, CompiledAgentTailnetPilotError>
+fn write_pretty_json<T, F>(
+    output_path: &Path,
+    build: F,
+) -> Result<T, CompiledAgentTailnetPilotError>
 where
     T: Serialize,
     F: FnOnce() -> Result<T, CompiledAgentTailnetPilotError>,

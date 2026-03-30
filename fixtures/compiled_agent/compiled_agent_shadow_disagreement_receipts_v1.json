@@ -3,9 +3,9 @@
   "ledger_id": "compiled_agent.learning_receipt_ledger.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "evidence_class": "learned_lane",
-  "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-  "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
-  "disagreement_count": 28,
+  "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+  "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
+  "disagreement_count": 27,
   "human_review_count": 11,
   "rollback_ready_count": 0,
   "low_confidence_disagreement_count": 2,
@@ -19,7 +19,7 @@
       "source_receipt_digest": "598886673c3e0ae4e4ecfceed02e9d4e7ff3acd05dcf8aa92f25f20ca99e377e",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -52,8 +52,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind ConfidenceFallback, candidate kind GroundedAnswer."
     },
     {
@@ -65,7 +65,7 @@
       "source_receipt_digest": "e490a0bc8f791322e87e0b5890f563cf834b59af4455fd6377e7568ec9c52ee4",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -98,8 +98,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind ConfidenceFallback, candidate kind GroundedAnswer."
     },
     {
@@ -111,7 +111,7 @@
       "source_receipt_digest": "0d815a9bea33e68fe868446296c02e35b1cfccf5c6ffeb6072593ec188cd3ffe",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -144,8 +144,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind ConfidenceFallback, candidate kind GroundedAnswer."
     },
     {
@@ -157,7 +157,7 @@
       "source_receipt_digest": "8f814ed9e61d70e016ef2a33ac91bf43fedb9638cc1ec5bad73c083ffd3237c3",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -190,8 +190,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind ConfidenceFallback, candidate kind GroundedAnswer."
     },
     {
@@ -203,7 +203,7 @@
       "source_receipt_digest": "810975108816627687f4fcbd5396b15c99cfb1de5eacc0a24de2788dfaeb5313",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -236,8 +236,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind ConfidenceFallback, candidate kind GroundedAnswer."
     },
     {
@@ -249,7 +249,7 @@
       "source_receipt_digest": "6f2c816175ad6703cc9e1fc1cc8d5ad0dacee6b52f8f215a07edc907eb02b054",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -257,7 +257,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -269,7 +269,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -282,8 +282,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_recent_earnings_phrase_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -295,7 +295,7 @@
       "source_receipt_digest": "2279b84928defe9c625a58d5dfe74730d8f774071853e2830efe3db195011a9e",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -303,7 +303,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -315,7 +315,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -328,8 +328,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -341,7 +341,7 @@
       "source_receipt_digest": "3703c16f7365c5b767f9a544597926558e602b6067f60aabf1c49ff10fc7d9b9",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -375,8 +375,8 @@
         "grounded_answer:psionic_grounded_model:psionic_candidate:2026-03-29",
         "verify:psionic_grounded_model:psionic_candidate:2026-03-29"
       ],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Runtime grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus shadow candidate `compiled_agent.baseline.rule_v1.grounded_answer` exactly as captured in the admitted-family runtime trace."
     },
     {
@@ -388,7 +388,7 @@
       "source_receipt_digest": "1812cf5442cf5387491bf3b645289139d125c6e3fd2227d15a76cfabfcfd335c",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -396,7 +396,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -408,7 +408,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -425,8 +425,8 @@
         "grounded_answer:psionic_grounded_model:psionic_candidate:2026-03-29",
         "verify:psionic_grounded_model:psionic_candidate:2026-03-29"
       ],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -438,7 +438,7 @@
       "source_receipt_digest": "17835153686ad0691d3ae8fa5ead3b38d147939f979deccb37431d0ccc9f6ec2",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -446,7 +446,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -458,7 +458,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -471,8 +471,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_balance_phrase_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -484,7 +484,7 @@
       "source_receipt_digest": "613bef03fc5a94d1f24d8b319fd526a9506271d02130bb5a7367b1ad432ef52e",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -492,7 +492,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -504,7 +504,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -517,8 +517,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_balance_variant_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -530,7 +530,7 @@
       "source_receipt_digest": "2affd7392768ccc1d1f99bdebe623457ea7abb7e77040ced4a427c970876c993",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -538,7 +538,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -550,7 +550,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -563,8 +563,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_earnings_phrase_heldout_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -576,7 +576,7 @@
       "source_receipt_digest": "82222cd12c7f2a75d1636b419736affd02decde1759a579979d81b7bf63925d1",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -609,8 +609,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind ConfidenceFallback, candidate kind GroundedAnswer."
     },
     {
@@ -622,7 +622,7 @@
       "source_receipt_digest": "4147c53958ce7c6321a9777e1191b2b4035f0896fc7247b7c11c2da744cd11ad",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -630,7 +630,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -642,7 +642,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -655,8 +655,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -668,7 +668,7 @@
       "source_receipt_digest": "4b5259d86a6923a3285fc2aed88c443b5b0741c0b2f940992b90af23898eecb9",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -676,7 +676,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -688,7 +688,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -701,8 +701,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -714,7 +714,7 @@
       "source_receipt_digest": "46e67a0fdffa0a981481829b679c793dde47e54d8602e386ddb6c2a627272705",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -722,7 +722,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
         "fallback_reason": null,
-        "score_margin": 6.712646007537842
+        "score_margin": 7.051003456115723
       },
       "candidate_output": {
         "kind": "grounded_answer",
@@ -734,7 +734,7 @@
         "kind": "grounded_answer",
         "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
       },
-      "promoted_confidence": 0.99779046,
+      "promoted_confidence": 0.99813795,
       "promoted_band": "high",
       "candidate_band": "unavailable",
       "reason": "candidate_regression",
@@ -747,8 +747,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Grounded-answer disagreement for `receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1` retained the promoted artifact `compiled_agent.grounded_answer.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.grounded_answer`. Promoted kind GroundedAnswer, candidate kind GroundedAnswer."
     },
     {
@@ -760,13 +760,13 @@
       "source_receipt_digest": "6dc9de38010599dd784ea68096e0acf6623ea5602c3f5b36adab7beb02700736",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "unsupported",
-        "score_margin": 4.907474040985107
+        "score_margin": 4.032905578613281
       },
       "candidate_output": {
         "route": "provider_status",
@@ -775,7 +775,7 @@
       "expected_output": {
         "route": "unsupported"
       },
-      "promoted_confidence": 0.992618,
+      "promoted_confidence": 0.98245823,
       "candidate_confidence": 0.94,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -789,8 +789,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route Unsupported, candidate route ProviderStatus, expected Unsupported."
     },
     {
@@ -802,13 +802,13 @@
       "source_receipt_digest": "598886673c3e0ae4e4ecfceed02e9d4e7ff3acd05dcf8aa92f25f20ca99e377e",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "wallet_status",
-        "score_margin": 13.418350219726562
+        "score_margin": 9.771489143371582
       },
       "candidate_output": {
         "route": "unsupported",
@@ -817,7 +817,7 @@
       "expected_output": {
         "route": "wallet_status"
       },
-      "promoted_confidence": 0.9999984,
+      "promoted_confidence": 0.99994284,
       "candidate_confidence": 0.86,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -831,8 +831,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_ignore_provider_wallet_training_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route WalletStatus, candidate route Unsupported, expected WalletStatus."
     },
     {
@@ -844,13 +844,13 @@
       "source_receipt_digest": "e490a0bc8f791322e87e0b5890f563cf834b59af4455fd6377e7568ec9c52ee4",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "wallet_status",
-        "score_margin": 3.7338898181915283
+        "score_margin": 4.060628890991211
       },
       "candidate_output": {
         "route": "unsupported",
@@ -859,7 +859,7 @@
       "expected_output": {
         "route": "provider_status"
       },
-      "promoted_confidence": 0.97617346,
+      "promoted_confidence": 0.9717926,
       "candidate_confidence": 0.86,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -873,51 +873,9 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_ignore_wallet_provider_heldout_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route WalletStatus, candidate route Unsupported, expected ProviderStatus."
-    },
-    {
-      "disagreement_id": "disagreement.compiled_agent.route.openagents_negated_provider_receipt_v1",
-      "module": "route",
-      "evidence_class": "learned_lane",
-      "source_receipt_id": "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
-      "source_fixture_ref": "fixtures/compiled_agent/source/openagents_negated_provider_receipt_v1.json",
-      "source_receipt_digest": "36734ee9a8ee2f3661b2b2c5c3e0b106317a98b008b74973f396aaf86580ba25",
-      "corpus_split": "held_out",
-      "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
-      "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
-      "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
-      "candidate_label": "last_known_good",
-      "promoted_output": {
-        "route": "unsupported",
-        "score_margin": 1.8506654500961304
-      },
-      "candidate_output": {
-        "route": "provider_status",
-        "score_margin": null
-      },
-      "expected_output": {
-        "route": "unsupported"
-      },
-      "promoted_confidence": 0.8642045,
-      "candidate_confidence": 0.86,
-      "promoted_band": "high",
-      "candidate_band": "high",
-      "reason": "candidate_regression",
-      "disposition": "shadow_only",
-      "promoted_manifest_ids": [
-        "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
-        "tool_policy:psionic_rule_revision:promoted:2026-03-28",
-        "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
-        "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
-        "verify:psionic_rule_revision:promoted:2026-03-28"
-      ],
-      "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
-      "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route Unsupported, candidate route ProviderStatus, expected Unsupported."
     },
     {
       "disagreement_id": "disagreement.compiled_agent.route.openagents_negated_provider_wallet_heldout_receipt_v1",
@@ -928,13 +886,13 @@
       "source_receipt_digest": "0d815a9bea33e68fe868446296c02e35b1cfccf5c6ffeb6072593ec188cd3ffe",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "wallet_status",
-        "score_margin": 2.853247880935669
+        "score_margin": 0.6905797123908997
       },
       "candidate_output": {
         "route": "unsupported",
@@ -943,9 +901,9 @@
       "expected_output": {
         "route": "wallet_status"
       },
-      "promoted_confidence": 0.94539976,
+      "promoted_confidence": 0.6660649,
       "candidate_confidence": 0.86,
-      "promoted_band": "high",
+      "promoted_band": "watch",
       "candidate_band": "high",
       "reason": "candidate_regression",
       "disposition": "shadow_only",
@@ -957,8 +915,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route WalletStatus, candidate route Unsupported, expected WalletStatus."
     },
     {
@@ -970,13 +928,13 @@
       "source_receipt_digest": "8f814ed9e61d70e016ef2a33ac91bf43fedb9638cc1ec5bad73c083ffd3237c3",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "wallet_status",
-        "score_margin": 2.321478843688965
+        "score_margin": 2.704230546951294
       },
       "candidate_output": {
         "route": "unsupported",
@@ -985,7 +943,7 @@
       "expected_output": {
         "route": "provider_status"
       },
-      "promoted_confidence": 0.8920169,
+      "promoted_confidence": 0.9110189,
       "candidate_confidence": 0.86,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -999,8 +957,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_negated_wallet_provider_heldout_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route WalletStatus, candidate route Unsupported, expected ProviderStatus."
     },
     {
@@ -1012,13 +970,13 @@
       "source_receipt_digest": "e7fafcf6ce175cb9cc1c11dfe862ef99c1dd6e7c186f2628d6670f55c72bb240",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "unsupported",
-        "score_margin": 10.252742767333984
+        "score_margin": 10.906302452087402
       },
       "candidate_output": {
         "route": "wallet_status",
@@ -1027,7 +985,7 @@
       "expected_output": {
         "route": "unsupported"
       },
-      "promoted_confidence": 0.9999647,
+      "promoted_confidence": 0.99998164,
       "candidate_confidence": 0.86,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -1041,8 +999,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route Unsupported, candidate route WalletStatus, expected Unsupported."
     },
     {
@@ -1054,13 +1012,13 @@
       "source_receipt_digest": "810975108816627687f4fcbd5396b15c99cfb1de5eacc0a24de2788dfaeb5313",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "provider_status",
-        "score_margin": 6.630918502807617
+        "score_margin": 6.388198375701904
       },
       "candidate_output": {
         "route": "unsupported",
@@ -1069,7 +1027,7 @@
       "expected_output": {
         "route": "provider_status"
       },
-      "promoted_confidence": 0.99856687,
+      "promoted_confidence": 0.996964,
       "candidate_confidence": 0.86,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -1083,8 +1041,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_provider_exclusion_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route ProviderStatus, candidate route Unsupported, expected ProviderStatus."
     },
     {
@@ -1096,7 +1054,7 @@
       "source_receipt_digest": "3703c16f7365c5b767f9a544597926558e602b6067f60aabf1c49ff10fc7d9b9",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -1127,8 +1085,8 @@
         "grounded_answer:psionic_grounded_model:psionic_candidate:2026-03-29",
         "verify:psionic_grounded_model:psionic_candidate:2026-03-29"
       ],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Runtime route disagreement for `receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus shadow candidate `compiled_agent.baseline.rule_v1.route` exactly as captured in the admitted-family runtime trace."
     },
     {
@@ -1140,13 +1098,13 @@
       "source_receipt_digest": "d1a31e105c5464f78f199ca64407df0bb4149837095c0ae00b321714e629bf2b",
       "corpus_split": "held_out",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "provider_status",
-        "score_margin": 4.20745325088501
+        "score_margin": 3.9647328853607178
       },
       "candidate_output": {
         "route": "wallet_status",
@@ -1155,7 +1113,7 @@
       "expected_output": {
         "route": "unsupported"
       },
-      "promoted_confidence": 0.976953,
+      "promoted_confidence": 0.98013693,
       "candidate_confidence": 0.94,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -1169,8 +1127,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_wallet_address_heldout_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route ProviderStatus, candidate route WalletStatus, expected Unsupported."
     },
     {
@@ -1182,13 +1140,13 @@
       "source_receipt_digest": "dba6d516eddca926fdf84f11a4cfd42b49682a5043a237e53298f311f9605e21",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "unsupported",
-        "score_margin": 4.927646636962891
+        "score_margin": 4.742190361022949
       },
       "candidate_output": {
         "route": "wallet_status",
@@ -1197,7 +1155,7 @@
       "expected_output": {
         "route": "unsupported"
       },
-      "promoted_confidence": 0.9915095,
+      "promoted_confidence": 0.9899878,
       "candidate_confidence": 0.94,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -1211,8 +1169,8 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_wallet_address_unsupported_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route Unsupported, candidate route WalletStatus, expected Unsupported."
     },
     {
@@ -1224,13 +1182,13 @@
       "source_receipt_digest": "82222cd12c7f2a75d1636b419736affd02decde1759a579979d81b7bf63925d1",
       "corpus_split": "training",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
       "promoted_output": {
         "route": "wallet_status",
-        "score_margin": 10.645761489868164
+        "score_margin": 7.692047595977783
       },
       "candidate_output": {
         "route": "unsupported",
@@ -1239,7 +1197,7 @@
       "expected_output": {
         "route": "wallet_status"
       },
-      "promoted_confidence": 0.9999761,
+      "promoted_confidence": 0.9995437,
       "candidate_confidence": 0.86,
       "promoted_band": "high",
       "candidate_band": "high",
@@ -1253,11 +1211,11 @@
         "verify:psionic_rule_revision:promoted:2026-03-28"
       ],
       "candidate_manifest_ids": [],
-      "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-      "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+      "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+      "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
       "detail": "Route disagreement for `receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1` retained the promoted artifact `compiled_agent.route.multinomial_nb_v1` versus candidate `compiled_agent.baseline.rule_v1.route`. Promoted route WalletStatus, candidate route Unsupported, expected WalletStatus."
     }
   ],
-  "summary": "Compiled-agent shadow disagreement receipts retain 28 promoted-versus-candidate disagreements for the current bounded family, including 11 human-review triggers and 0 rollback-ready regressions.",
-  "receipts_digest": "0548cec6c9a09dfc07e6aea3623467763adccf4d308ac5c7ddd369bdfa60e0b8"
+  "summary": "Compiled-agent shadow disagreement receipts retain 27 promoted-versus-candidate disagreements for the current bounded family, including 11 human-review triggers and 0 rollback-ready regressions.",
+  "receipts_digest": "be6c101f629f8c70afa4f293c690fc50af1468f5fa43d3ccb9093ccc1095fe5d"
 }

@@ -3,13 +3,13 @@
   "policy_id": "compiled_agent.confidence_policy.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "evidence_class": "learned_lane",
-  "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
-  "xtrain_cycle_receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45",
+  "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
+  "xtrain_cycle_receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073",
   "policies": [
     {
       "module": "route",
       "promoted_artifact_id": "compiled_agent.route.multinomial_nb_v1",
-      "promoted_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "promoted_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.route",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -24,12 +24,12 @@
         "human_review_on_ambiguous_regression": true
       },
       "metrics": {
-        "disagreement_count": 12,
+        "disagreement_count": 11,
         "runtime_disagreement_count": 1,
         "low_confidence_disagreement_count": 1,
         "human_review_count": 4,
         "rollback_ready_count": 0,
-        "learned_correct_mean_confidence": 0.9013794,
+        "learned_correct_mean_confidence": 0.89200014,
         "learned_incorrect_mean_confidence": 0.8866666,
         "learned_min_confidence": 0.83,
         "learned_max_confidence": 0.94,
@@ -37,7 +37,6 @@
           "disagreement.compiled_agent.route.openagents_best_provider_unsupported_receipt_v1",
           "disagreement.compiled_agent.route.openagents_ignore_provider_wallet_training_receipt_v1",
           "disagreement.compiled_agent.route.openagents_ignore_wallet_provider_heldout_receipt_v1",
-          "disagreement.compiled_agent.route.openagents_negated_provider_receipt_v1",
           "disagreement.compiled_agent.route.openagents_negated_provider_wallet_heldout_receipt_v1",
           "disagreement.compiled_agent.route.openagents_negated_wallet_provider_heldout_receipt_v1",
           "disagreement.compiled_agent.route.openagents_negated_wallet_receipt_v1",
@@ -55,12 +54,12 @@
         ],
         "rollback_ready_receipt_ids": []
       },
-      "detail": "Confidence policy for Route is regenerated from the promoted-artifact contract, learning ledger, and XTRAIN receipt 4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45 so shadow disagreements, low-confidence bands, and rollback-ready regressions remain machine-auditable instead of ad hoc."
+      "detail": "Confidence policy for Route is regenerated from the promoted-artifact contract, learning ledger, and XTRAIN receipt b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073 so shadow disagreements, low-confidence bands, and rollback-ready regressions remain machine-auditable instead of ad hoc."
     },
     {
       "module": "grounded_answer",
       "promoted_artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "promoted_artifact_digest": "fabf4dccd6b8a51b63fb220446803e66fe778ec47067b439bd7566d5e8c9b141",
+      "promoted_artifact_digest": "d991d577bd73f27592152558520f7ca90be974937dc439f8c854fc56976cf9b2",
       "candidate_artifact_id": "compiled_agent.baseline.rule_v1.grounded_answer",
       "candidate_artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
       "candidate_label": "last_known_good",
@@ -80,10 +79,10 @@
         "low_confidence_disagreement_count": 1,
         "human_review_count": 7,
         "rollback_ready_count": 0,
-        "learned_correct_mean_confidence": 0.9630828,
+        "learned_correct_mean_confidence": 0.96985674,
         "learned_incorrect_mean_confidence": 0.0,
         "learned_min_confidence": 0.0,
-        "learned_max_confidence": 0.99779046,
+        "learned_max_confidence": 0.99813795,
         "disagreement_receipt_ids": [
           "disagreement.compiled_agent.grounded_answer.openagents_ignore_provider_wallet_training_receipt_v1",
           "disagreement.compiled_agent.grounded_answer.openagents_ignore_wallet_provider_heldout_receipt_v1",
@@ -113,9 +112,9 @@
         ],
         "rollback_ready_receipt_ids": []
       },
-      "detail": "Confidence policy for GroundedAnswer is regenerated from the promoted-artifact contract, learning ledger, and XTRAIN receipt 4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45 so shadow disagreements, low-confidence bands, and rollback-ready regressions remain machine-auditable instead of ad hoc."
+      "detail": "Confidence policy for GroundedAnswer is regenerated from the promoted-artifact contract, learning ledger, and XTRAIN receipt b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073 so shadow disagreements, low-confidence bands, and rollback-ready regressions remain machine-auditable instead of ad hoc."
     }
   ],
-  "summary": "Compiled-agent confidence policy retains 2 module policies and 28 disagreement receipts. Human review is queued for 11 disagreements and rollback is codified for 0 promoted regressions.",
-  "policy_digest": "51c1182a1e0c699ab878182c72e7ee7ba0eb83c42f41203edce080bde3595fb1"
+  "summary": "Compiled-agent confidence policy retains 2 module policies and 27 disagreement receipts. Human review is queued for 11 disagreements and rollback is codified for 0 promoted regressions.",
+  "policy_digest": "a38c5a52ba39e60d3b9f7d6396f4dacb9e7c641b34b1cdb9fa5d2b03490b317e"
 }

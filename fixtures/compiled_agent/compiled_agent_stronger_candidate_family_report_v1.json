@@ -12,10 +12,10 @@
       "stronger_model_family": "tfidf_centroid",
       "incumbent_eval_passed_cases": 4,
       "stronger_eval_passed_cases": 4,
-      "incumbent_replay_match_count": 25,
-      "stronger_replay_match_count": 25,
-      "incumbent_heldout_match_count": 12,
-      "stronger_heldout_match_count": 13,
+      "incumbent_replay_match_count": 28,
+      "stronger_replay_match_count": 28,
+      "incumbent_heldout_match_count": 14,
+      "stronger_heldout_match_count": 15,
       "decision": "keep_incumbent",
       "reason": "The stronger family did not beat the incumbent cleanly enough on the retained bounded surfaces to justify replacing it."
     },
@@ -27,14 +27,14 @@
       "stronger_model_family": "tfidf_centroid",
       "incumbent_eval_passed_cases": 6,
       "stronger_eval_passed_cases": 6,
-      "incumbent_replay_match_count": 25,
-      "stronger_replay_match_count": 25,
-      "incumbent_heldout_match_count": 13,
-      "stronger_heldout_match_count": 13,
+      "incumbent_replay_match_count": 28,
+      "stronger_replay_match_count": 28,
+      "incumbent_heldout_match_count": 16,
+      "stronger_heldout_match_count": 16,
       "decision": "keep_incumbent",
       "reason": "The stronger family only tied the incumbent on the retained bounded surfaces, so the loop kept the incumbent candidate instead of churning authority on architecture preference."
     }
   ],
   "summary": "Compared the incumbent multinomial Naive Bayes candidates against TF-IDF centroid candidates on the same bounded compiled-agent route and grounded-answer contracts. The stronger family did not clear a strict improvement bar, so the incumbent families remain authoritative candidates.",
-  "report_digest": "04112b458376e968b518c0c1653ed939c2748dd471592c408e2574029bbc8479"
+  "report_digest": "fc1c32a58dbc93aeddab9fb5fcc913b59809d129c44bc8b995fd1036e2375298"
 }

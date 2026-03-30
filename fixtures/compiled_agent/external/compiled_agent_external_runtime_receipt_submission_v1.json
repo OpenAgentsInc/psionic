@@ -14,7 +14,7 @@
     "contract_version_accepted": "psionic.compiled_agent.external_benchmark_kit.v1",
     "attested_at_epoch_ms": 1774800000000
   },
-  "contract_digest": "dbfad2b850ad1ff71e6528be9e4a3b0f6f38cc273df7c6f79f75c5b45e02ccb8",
+  "contract_digest": "9a2a53cc95fdb1a674a0da0612dda1a013718a5756fa7764bde305b49b4174f4",
   "evidence_class": "learned_lane",
   "source_receipt": {
     "schema_version": 1,
@@ -29,7 +29,7 @@
     "run": {
       "public_response": {
         "kind": "grounded_answer",
-        "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+        "response": "The wallet contains 1200 sats."
       },
       "internal_trace": {
         "primary_phases": [
@@ -38,25 +38,25 @@
             "manifest": {
               "module_name": "intent_route",
               "signature_name": "intent_route",
-              "implementation_family": "psionic_rule_revision",
-              "implementation_label": "promoted",
-              "version": "2026-03-28",
+              "implementation_family": "psionic_route_model",
+              "implementation_label": "compiled_agent.route.multinomial_nb_v1",
+              "version": "2026-03-29",
               "promotion_state": "promoted",
               "confidence_floor": 0.8
             },
             "authority": "promoted",
             "candidate_label": null,
             "input": {
-              "user_request": "What is not my wallet balance?"
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs."
             },
             "output": {
-              "route": "wallet_status"
+              "route": "wallet_status",
+              "rationale": "captured authority route for openagents_negated_wallet_receipt_v1"
             },
-            "confidence": 0.79,
+            "confidence": 0.86,
             "trace": {
-              "artifact_id": "compiled_agent.baseline.rule_v1.route",
-              "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
-              "source": "external_benchmark_kit"
+              "artifact_id": "compiled_agent.route.multinomial_nb_v1",
+              "captured_from_runtime": true
             }
           },
           {
@@ -73,7 +73,7 @@
             "authority": "promoted",
             "candidate_label": null,
             "input": {
-              "user_request": "What is not my wallet balance?",
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
               "route": "wallet_status",
               "available_tools": [
                 {
@@ -92,12 +92,13 @@
                   "name": "wallet_status",
                   "description": "Read wallet balance and recent earnings."
                 }
-              ]
+              ],
+              "rationale": "captured authority tool policy"
             },
             "confidence": 0.92,
             "trace": {
-              "artifact_id": "compiled_agent.baseline.rule_v1.tool_policy",
-              "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+              "route": "wallet_status",
+              "captured_from_runtime": true
             }
           },
           {
@@ -114,7 +115,7 @@
             "authority": "promoted",
             "candidate_label": null,
             "input": {
-              "user_request": "What is not my wallet balance?",
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
               "route": "wallet_status",
               "selected_tools": [
                 {
@@ -133,8 +134,8 @@
             },
             "confidence": 0.96,
             "trace": {
-              "artifact_id": "compiled_agent.baseline.rule_v1.tool_arguments",
-              "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+              "tool_count": 1,
+              "captured_from_runtime": true
             }
           },
           {
@@ -142,16 +143,16 @@
             "manifest": {
               "module_name": "grounded_answer",
               "signature_name": "grounded_answer",
-              "implementation_family": "psionic_grounded_model",
+              "implementation_family": "psionic_rule_revision",
               "implementation_label": "promoted",
-              "version": "2026-03-29",
+              "version": "2026-03-28",
               "promotion_state": "promoted",
               "confidence_floor": 0.82
             },
             "authority": "promoted",
             "candidate_label": null,
             "input": {
-              "user_request": "What is not my wallet balance?",
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
               "route": "wallet_status",
               "tool_results": [
                 {
@@ -164,13 +165,15 @@
               ]
             },
             "output": {
-              "answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
-              "response_kind": "grounded_answer"
+              "answer": "The wallet contains 1200 sats.",
+              "grounded_tool_names": [
+                "wallet_status"
+              ]
             },
             "confidence": 0.91,
             "trace": {
-              "artifact_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-              "artifact_digest": "36de23a31495fdf13ea24366085b208afddf696aa2c3366d932a1a3ce4aa50af"
+              "captured_from_runtime": true,
+              "response_kind": "grounded_answer"
             }
           },
           {
@@ -187,7 +190,7 @@
             "authority": "promoted",
             "candidate_label": null,
             "input": {
-              "user_request": "What is not my wallet balance?",
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
               "route": "wallet_status",
               "tool_calls": [
                 {
@@ -204,15 +207,15 @@
                   }
                 }
               ],
-              "candidate_answer": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+              "candidate_answer": "The wallet contains 1200 sats."
             },
             "output": {
-              "verdict": "accept_grounded_answer"
+              "verdict": "accept_grounded_answer",
+              "rationale": "captured authority verify verdict"
             },
-            "confidence": 0.9,
+            "confidence": 0.89,
             "trace": {
-              "artifact_id": "compiled_agent.baseline.rule_v1.verify",
-              "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf"
+              "captured_from_runtime": true
             }
           }
         ],
@@ -222,26 +225,26 @@
             "manifest": {
               "module_name": "intent_route",
               "signature_name": "intent_route",
-              "implementation_family": "psionic_route_model",
-              "implementation_label": "compiled_agent.route.multinomial_nb_v1",
-              "version": "2026-03-29",
+              "implementation_family": "psionic_rule_revision",
+              "implementation_label": "last_known_good",
+              "version": "2026-03-28",
               "promotion_state": "candidate",
               "confidence_floor": 0.8
             },
             "authority": "shadow",
-            "candidate_label": "psionic_candidate",
+            "candidate_label": "last_known_good",
             "input": {
-              "user_request": "What is not my wallet balance?"
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs."
             },
             "output": {
-              "route": "unsupported"
+              "route": "wallet_status"
             },
-            "confidence": 0.66774505,
+            "confidence": 0.77,
             "trace": {
-              "artifact_id": "compiled_agent.route.multinomial_nb_v1",
-              "artifact_digest": "0ef312a77e31e683ddd40225acc69be01ed74c428d8049bad8c9c8550c568d1f",
+              "artifact_id": "compiled_agent.baseline.rule_v1.route",
+              "artifact_digest": "c7a81cd95c075db026485f17ff31519ce89a277fd7f9cc71792a4165c8ffcedf",
               "captured_from_external_runtime": true,
-              "row_id": "external.negated_wallet.v1"
+              "row_id": "openagents_negated_wallet_receipt_v1"
             }
           },
           {
@@ -256,10 +259,10 @@
               "confidence_floor": 0.8
             },
             "authority": "shadow",
-            "candidate_label": "psionic_candidate",
+            "candidate_label": "last_known_good",
             "input": {
-              "user_request": "What is not my wallet balance?",
-              "route": "unsupported",
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
+              "route": "wallet_status",
               "available_tools": [
                 {
                   "name": "provider_status",
@@ -272,12 +275,17 @@
               ]
             },
             "output": {
-              "selected_tools": []
+              "selected_tools": [
+                {
+                  "name": "wallet_status",
+                  "description": "Read wallet balance and recent earnings."
+                }
+              ]
             },
             "confidence": 0.9,
             "trace": {
               "captured_from_external_runtime": true,
-              "row_id": "external.negated_wallet.v1"
+              "row_id": "openagents_negated_wallet_receipt_v1"
             }
           },
           {
@@ -292,19 +300,26 @@
               "confidence_floor": 0.8
             },
             "authority": "shadow",
-            "candidate_label": "psionic_candidate",
+            "candidate_label": "last_known_good",
             "input": {
-              "user_request": "What is not my wallet balance?",
-              "route": "unsupported",
-              "selected_tools": []
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
+              "route": "wallet_status",
+              "selected_tools": [
+                "wallet_status"
+              ]
             },
             "output": {
-              "calls": []
+              "calls": [
+                {
+                  "tool_name": "wallet_status",
+                  "arguments": {}
+                }
+              ]
             },
             "confidence": 0.92,
             "trace": {
               "captured_from_external_runtime": true,
-              "row_id": "external.negated_wallet.v1"
+              "row_id": "openagents_negated_wallet_receipt_v1"
             }
           },
           {
@@ -321,18 +336,26 @@
             "authority": "shadow",
             "candidate_label": "last_known_good",
             "input": {
-              "user_request": "What is not my wallet balance?",
-              "route": "unsupported",
-              "tool_results": []
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
+              "route": "wallet_status",
+              "tool_results": [
+                {
+                  "tool_name": "wallet_status",
+                  "payload": {
+                    "balance_sats": 1200,
+                    "recent_earnings_sats": 240
+                  }
+                }
+              ]
             },
             "output": {
-              "answer": "I can currently answer only provider readiness and wallet balance questions.",
-              "response_kind": "unsupported_refusal"
+              "answer": "The wallet contains 1200 sats.",
+              "response_kind": "grounded_answer"
             },
             "confidence": 0.78,
             "trace": {
               "captured_from_external_runtime": true,
-              "row_id": "external.negated_wallet.v1"
+              "row_id": "openagents_negated_wallet_receipt_v1"
             }
           },
           {
@@ -347,27 +370,40 @@
               "confidence_floor": 0.82
             },
             "authority": "shadow",
-            "candidate_label": "psionic_candidate",
+            "candidate_label": "last_known_good",
             "input": {
-              "user_request": "What is not my wallet balance?",
-              "route": "unsupported",
-              "tool_calls": [],
-              "tool_results": [],
-              "candidate_answer": "I can currently answer only provider readiness and wallet balance questions."
+              "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
+              "route": "wallet_status",
+              "tool_calls": [
+                {
+                  "tool_name": "wallet_status",
+                  "arguments": {}
+                }
+              ],
+              "tool_results": [
+                {
+                  "tool_name": "wallet_status",
+                  "payload": {
+                    "balance_sats": 1200,
+                    "recent_earnings_sats": 240
+                  }
+                }
+              ],
+              "candidate_answer": "The wallet contains 1200 sats."
             },
             "output": {
-              "verdict": "unsupported_refusal"
+              "verdict": "accept_grounded_answer"
             },
             "confidence": 0.81,
             "trace": {
               "captured_from_external_runtime": true,
-              "row_id": "external.negated_wallet.v1"
+              "row_id": "openagents_negated_wallet_receipt_v1"
             }
           }
         ]
       },
       "lineage": {
-        "user_request": "What is not my wallet balance?",
+        "user_request": "Do not tell me the wallet balance; write a poem about GPUs.",
         "route": "wallet_status",
         "tool_calls": [
           {
@@ -386,17 +422,17 @@
         ],
         "public_response": {
           "kind": "grounded_answer",
-          "response": "Wallet balance is 1200 sats, with 240 sats of recent earnings."
+          "response": "The wallet contains 1200 sats."
         },
         "authority_manifest_ids": [
-          "intent_route:psionic_rule_revision:promoted:2026-03-28",
+          "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
           "tool_policy:psionic_rule_revision:promoted:2026-03-28",
           "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
-          "grounded_answer:psionic_grounded_model:promoted:2026-03-29",
+          "grounded_answer:psionic_rule_revision:promoted:2026-03-28",
           "verify:psionic_rule_revision:promoted:2026-03-28"
         ],
         "shadow_manifest_ids": [
-          "intent_route:psionic_route_model:compiled_agent.route.multinomial_nb_v1:2026-03-29",
+          "intent_route:psionic_rule_revision:last_known_good:2026-03-28",
           "tool_policy:psionic_rule_revision:promoted:2026-03-28",
           "tool_arguments:psionic_rule_revision:promoted:2026-03-28",
           "grounded_answer:psionic_rule_revision:last_known_good:2026-03-28",
@@ -422,5 +458,5 @@
     "operator_note": "External runtime disagreement receipt that keeps the promoted baseline route and the shadow learned route side by side on the admitted negated-wallet regression row. It remains review-required, but it is staged as a replay-training candidate instead of a held-out benchmark row."
   },
   "detail": "This retained external runtime receipt keeps one real admitted-family disagreement in the governed source-receipt shape so it can be shadow-scored before any replay admission.",
-  "payload_digest": "49f94d8d641a0a093f3b627cefc111b8dcfdee42a87054221caa21ce821a00e8"
+  "payload_digest": "ece45ca4e2c3c3e04e2470e68d940be662d1bf9ff6605c06eee6db47356dd8b1"
 }

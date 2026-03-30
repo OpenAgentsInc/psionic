@@ -4,12 +4,13 @@
   "row_id": "compiled_agent.tailnet_external_beta.v1",
   "evidence_class": "learned_lane",
   "contributor_contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
-  "promoted_artifact_contract_digest": "80b130858c414d13f2351a2ff3a2b4e7597ad7b20cd467922883c5ce90981720",
+  "promoted_artifact_contract_digest": "5835f484b83deb27ac7a7a96ae909011dd02a0c74582109b11ae04b3dfbeada4",
   "total_submission_count": 6,
   "accepted_submission_count": 6,
   "rejected_submission_count": 0,
   "review_required_submission_count": 6,
   "replay_candidate_submission_count": 2,
+  "anomaly_submission_count": 3,
   "submissions": [
     {
       "submission_id": "submission.compiled_agent.tailnet.m5.benchmark.v1",
@@ -21,7 +22,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json#benchmark_run",
       "payload_schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
-      "payload_digest": "70cbaaeec8a1e7fc63755661b41c47da1a5b17830ad1b933c4b3eb2e7ea12288",
+      "payload_digest": "241c31a903a872c2fed30fdb2ca3edbba7e3ab0b0de2ea416dbf537415a05c7a",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -58,6 +59,8 @@
         "assessment.compiled_agent.external_benchmark.negated_wallet.route.v1",
         "assessment.compiled_agent.external_benchmark.negated_wallet.grounded_answer.v1"
       ],
+      "anomaly_flags": [],
+      "trust_posture": "neutral",
       "failure_classes": [
         "negated_route_false_positive"
       ],
@@ -73,7 +76,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json#benchmark_run",
       "payload_schema_version": "psionic.compiled_agent.external_benchmark_run.v1",
-      "payload_digest": "1bf65ad57ec22c9308af2033ad2cd72a4980377db8343c52227d47cb0a297ee8",
+      "payload_digest": "b2f888697b5eec672c09d1a660b12242958afac4b96029b4e54c766f843e5fde",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -110,6 +113,8 @@
         "assessment.compiled_agent.external_benchmark.negated_wallet.route.v1",
         "assessment.compiled_agent.external_benchmark.negated_wallet.grounded_answer.v1"
       ],
+      "anomaly_flags": [],
+      "trust_posture": "watch",
       "failure_classes": [
         "negated_route_false_positive"
       ],
@@ -125,7 +130,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_1.v1",
       "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
-      "payload_digest": "ebb9e8608f7ac9634d57b5565f935e02701a2c6998f6e673e94b781a4775c31d",
+      "payload_digest": "47bdc26e6c5f0edc64d799b4d7c28c198ad07427ccc895bb0d4f4f3f1dbf002c",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -151,6 +156,8 @@
         "assessment.compiled_agent.external_runtime.route.v1",
         "assessment.compiled_agent.external_runtime.grounded_answer.v1"
       ],
+      "anomaly_flags": [],
+      "trust_posture": "neutral",
       "failure_classes": [],
       "detail": "The external runtime disagreement receipt passed intake validation, was retained in quarantine, and was immediately shadow-scored against the promoted-versus-candidate route and grounded modules before any replay admission."
     },
@@ -164,7 +171,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_m5_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_m5_mlx.runtime_2.v1",
       "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
-      "payload_digest": "1a2904e8bb9d51aec7fe9756070213e3f2bce25f50e7b54378c0fe23af5db662",
+      "payload_digest": "2703ea39cad6c3643b051b2487a4dadb58bdafd230d85a3dca2340237d1cc63f",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -190,6 +197,10 @@
         "assessment.compiled_agent.external_runtime.route.v1",
         "assessment.compiled_agent.external_runtime.grounded_answer.v1"
       ],
+      "anomaly_flags": [
+        "unusual_confidence_pattern"
+      ],
+      "trust_posture": "neutral",
       "failure_classes": [
         "grounded_answer_mismatch",
         "unsafe_final_outcome"
@@ -206,7 +217,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_1.v1",
       "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
-      "payload_digest": "8c63724d163748ea4fb8f753eb030ae7f320d0d970cf4674bfb18c310486463f",
+      "payload_digest": "40632b01cdc6aa5255a298f910eaa3dab403e7e0b30fe9cd52bf9838450c18ba",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -232,6 +243,10 @@
         "assessment.compiled_agent.external_runtime.route.v1",
         "assessment.compiled_agent.external_runtime.grounded_answer.v1"
       ],
+      "anomaly_flags": [
+        "unusual_confidence_pattern"
+      ],
+      "trust_posture": "watch",
       "failure_classes": [
         "grounded_answer_mismatch",
         "route_mismatch",
@@ -251,7 +266,7 @@
       "contract_version": "psionic.compiled_agent.external_benchmark_kit.v1",
       "payload_ref": "fixtures/compiled_agent/tailnet/compiled_agent_tailnet_archlinux_node_bundle_v1.json#submission.compiled_agent.tailnet.tailnet_archlinux_rtx4080_cuda.runtime_2.v1",
       "payload_schema_version": "psionic.compiled_agent.external_runtime_receipt_submission.v1",
-      "payload_digest": "3cf0a1c48242febb504c6b50510a2b1d8556a08eccfe745ff560f765eb056273",
+      "payload_digest": "244a94f042cda22278481f1c03e45ca3ebd8966052adfcc7b6e0886db6c59d5f",
       "evidence_class": "learned_lane",
       "validation_checks": {
         "schema_conformant": true,
@@ -277,6 +292,10 @@
         "assessment.compiled_agent.external_runtime.route.v1",
         "assessment.compiled_agent.external_runtime.grounded_answer.v1"
       ],
+      "anomaly_flags": [
+        "unusual_confidence_pattern"
+      ],
+      "trust_posture": "watch",
       "failure_classes": [
         "grounded_answer_mismatch",
         "route_mismatch",
@@ -287,6 +306,30 @@
       "detail": "The external runtime disagreement receipt passed intake validation, was retained in quarantine, and was immediately shadow-scored against the promoted-versus-candidate route and grounded modules before any replay admission."
     }
   ],
-  "summary": "Tailnet-first staging ledger retained 6 submissions across the M5 and archlinux RTX 4080 nodes: 6 accepted into quarantine, 0 rejected, 6 review-required, and 2 replay-candidate submission records.",
-  "ledger_digest": "5d05f3500e0ca5bdfd8291e1b0ffd3bfd95a4d99b3bc854d03db6636183151b2"
+  "contributor_trust_histories": [
+    {
+      "contributor_id": "contrib.tailnet.archlinux_rtx4080",
+      "source_machine_id": "tailnet.archlinux.rtx4080.cuda",
+      "accepted_submission_count": 3,
+      "rejected_submission_count": 0,
+      "review_required_submission_count": 3,
+      "replay_candidate_submission_count": 1,
+      "anomaly_count": 2,
+      "trust_posture": "watch",
+      "detail": "Contributor `contrib.tailnet.archlinux_rtx4080` triggered 0 rejected submissions and 2 anomaly flags, so the intake path tightens review posture while keeping the same quarantine boundary and no authority expansion."
+    },
+    {
+      "contributor_id": "contrib.tailnet.m5",
+      "source_machine_id": "tailnet.macbook-pro-m5.mlx",
+      "accepted_submission_count": 3,
+      "rejected_submission_count": 0,
+      "review_required_submission_count": 3,
+      "replay_candidate_submission_count": 1,
+      "anomaly_count": 1,
+      "trust_posture": "neutral",
+      "detail": "Contributor `contrib.tailnet.m5` remains neutral while the beta accumulates more accepted bounded evidence."
+    }
+  ],
+  "summary": "Tailnet-first staging ledger retained 6 submissions across the M5 and archlinux RTX 4080 nodes: 6 accepted into quarantine, 0 rejected, 6 review-required, 3 anomaly-flagged, and 2 replay-candidate submission records.",
+  "ledger_digest": "5f4ce9b6126629220a69083eaa62f029bfd4054af38161cee52092489d0dabf8"
 }

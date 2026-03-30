@@ -3,8 +3,8 @@
   "cycle_id": "compiled_agent.xtrain.cycle.v1",
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "evidence_class": "learned_lane",
-  "source_ledger_digest": "6dd2c757e2a4534210899a667edb82b1c819d64592d3b4aca07a2a6cf1864812",
-  "replay_bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c",
+  "source_ledger_digest": "22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e",
+  "replay_bundle_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036",
   "route_outcome": {
     "module": "route",
     "decision": "promote",
@@ -13,9 +13,9 @@
       "module": "route",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.route.multinomial_nb_v1",
-      "replay_bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c",
+      "replay_bundle_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_route_model_v1.json",
-      "candidate_artifact_digest": "cd4d7d6703de508a30a6172baa753ece9b1da1e49b54c541cedb847427d8a2ac",
+      "candidate_artifact_digest": "2b66abacb8647f719f9b9a46a8cef007a5026b18c27af998cf2351e7a7a4560c",
       "targeted_failure_classes": [
         "negated_route_false_positive"
       ],
@@ -29,10 +29,10 @@
         "route_negated_wallet_false_positive"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 19,
-      "candidate_replay_match_count": 25,
-      "baseline_heldout_match_count": 10,
-      "candidate_heldout_match_count": 12,
+      "baseline_replay_match_count": 22,
+      "candidate_replay_match_count": 28,
+      "baseline_heldout_match_count": 13,
+      "candidate_heldout_match_count": 14,
       "replay_improvement_sample_ids": [
         "sample.route.receipt.compiled_agent.learning.openagents_negated_wallet_receipt_v1",
         "sample.route.receipt.compiled_agent.learning.openagents_wallet_exclusion_receipt_v1",
@@ -43,7 +43,6 @@
       ],
       "replay_regression_sample_ids": [],
       "heldout_improvement_receipt_ids": [
-        "receipt.compiled_agent.learning.openagents_negated_provider_receipt_v1",
         "receipt.compiled_agent.learning.openagents_negated_provider_wallet_heldout_receipt_v1"
       ],
       "heldout_regression_receipt_ids": []
@@ -57,9 +56,9 @@
       "module": "grounded_answer",
       "base_revision_id": "compiled_agent.baseline.rule_v1",
       "candidate_revision_id": "compiled_agent.grounded_answer.multinomial_nb_v1",
-      "replay_bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c",
+      "replay_bundle_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036",
       "candidate_artifact_ref": "fixtures/compiled_agent/compiled_agent_grounded_answer_model_v1.json",
-      "candidate_artifact_digest": "5a7bd1af3709dc6c24fb75627c898c37993ee3946f402ce0761fc5adc211a708",
+      "candidate_artifact_digest": "869217d751e61e52f32f1dfdd0f5dc18d3e9c0a1d15dce0f86066356075b2782",
       "targeted_failure_classes": [
         "grounded_answer_mismatch"
       ],
@@ -74,10 +73,10 @@
         "grounded_wallet_conflicting_facts_fallback"
       ],
       "regression_case_ids": [],
-      "baseline_replay_match_count": 18,
-      "candidate_replay_match_count": 25,
-      "baseline_heldout_match_count": 9,
-      "candidate_heldout_match_count": 13,
+      "baseline_replay_match_count": 21,
+      "candidate_replay_match_count": 28,
+      "baseline_heldout_match_count": 12,
+      "candidate_heldout_match_count": 16,
       "replay_improvement_sample_ids": [
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_receipt_v1",
         "sample.grounded_answer.receipt.compiled_agent.learning.openagents_wallet_recent_earnings_receipt_v1",
@@ -97,6 +96,6 @@
       "heldout_regression_receipt_ids": []
     }
   },
-  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle 0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c.",
-  "receipt_digest": "4f7655b1b65931c538c3fbea643452a8a16e1ad7738ae4a9e12896ef722cef45"
+  "summary": "Compiled-agent XTRAIN cycle retained route decision=Promote and grounded_answer decision=Promote on replay bundle 85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036.",
+  "receipt_digest": "b432ca5f00bffae428592411712bcae980262038bd684aa7ad2f6f39b8d49073"
 }

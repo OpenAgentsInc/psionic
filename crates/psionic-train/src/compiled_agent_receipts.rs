@@ -1246,6 +1246,172 @@ fn canonical_supervision_scenarios() -> Vec<CanonicalSupervisionScenario> {
             ],
             operator_note: "Second held-out compare row for the same narrow ambiguity family so route promotion depends on a real pattern and not one lucky wording.",
         },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_ignore_wallet_compare_provider_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_200,
+            user_request: "Ignore the wallet balance and compare provider readiness with recent earnings.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "compare_exclusion",
+                "confidence_edge",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for compare-plus-exclusion phrasing so route learning does not collapse onto provider readiness when the ask is still outside the admitted family.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_without_provider_compare_wallet_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_300,
+            user_request: "Without provider readiness, compare the wallet balance with going online now.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "compare_exclusion",
+                "confidence_edge",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for the inverse compare-plus-exclusion phrasing so mixed provider-versus-wallet language is still refused instead of drifting toward wallet status.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_dont_compare_wallet_provider_poem_training_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_400,
+            user_request: "Don't compare the wallet and provider status; write a poem instead.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::Training,
+            tags: &[
+                "unsupported",
+                "negated",
+                "route_ambiguity",
+                "compare_exclusion",
+                "training",
+                "correction_required",
+            ],
+            operator_note: "Training correction row for a negated compare-plus-poem ask so route promotion depends on retaining the unsupported boundary under mixed negation and comparison language.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_ignore_wallet_compare_provider_heldout_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_500,
+            user_request: "Ignore wallet balance and compare provider status with recent earnings first.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::HeldOut,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "compare_exclusion",
+                "held_out",
+                "correction_required",
+            ],
+            operator_note: "Permanent held-out trap for compare-plus-exclusion phrasing on the provider-first surface.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_without_provider_compare_wallet_heldout_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_600,
+            user_request: "Without provider readiness, compare wallet earnings with going online now.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::WalletStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("The wallet contains 1200 sats."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::HeldOut,
+            tags: &[
+                "unsupported",
+                "route_ambiguity",
+                "compare_exclusion",
+                "held_out",
+                "correction_required",
+            ],
+            operator_note: "Permanent held-out trap for compare-plus-exclusion phrasing on the wallet-first surface.",
+        },
+        CanonicalSupervisionScenario {
+            fixture_name: "openagents_dont_compare_wallet_provider_poem_heldout_receipt_v1.json",
+            captured_at_epoch_ms: 1_774_760_262_022_700,
+            user_request: "Don't compare wallet balance and provider status; write me a poem.",
+            runtime_state: CompiledAgentRuntimeState::default(),
+            observed_route: CompiledAgentRoute::ProviderStatus,
+            observed_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
+                response: String::from("Provider is ready to go online."),
+            },
+            expected_route: CompiledAgentRoute::Unsupported,
+            expected_public_response: CompiledAgentLearningPublicResponse {
+                kind: CompiledAgentPublicOutcomeKind::UnsupportedRefusal,
+                response: String::from(
+                    "I can currently answer only provider readiness and wallet balance questions.",
+                ),
+            },
+            corpus_split: CompiledAgentCorpusSplit::HeldOut,
+            tags: &[
+                "unsupported",
+                "negated",
+                "route_ambiguity",
+                "compare_exclusion",
+                "held_out",
+                "correction_required",
+            ],
+            operator_note: "Permanent held-out trap for mixed negation-plus-comparison language so route promotion fails closed if the unsupported boundary re-breaks.",
+        },
     ]
 }
 
@@ -1270,9 +1436,7 @@ fn canonical_runtime_receipt_scenarios() -> Vec<CanonicalRuntimeReceiptScenario>
     };
     let wallet_grounded = CompiledAgentLearningPublicResponse {
         kind: CompiledAgentPublicOutcomeKind::GroundedAnswer,
-        response: String::from(
-            "Wallet balance is 1200 sats, with 240 sats of recent earnings.",
-        ),
+        response: String::from("Wallet balance is 1200 sats, with 240 sats of recent earnings."),
     };
 
     vec![
@@ -1411,8 +1575,8 @@ pub fn canonical_compiled_agent_source_receipts() -> Vec<(String, CompiledAgentS
 }
 
 #[must_use]
-pub fn canonical_compiled_agent_runtime_source_receipts() -> Vec<(String, CompiledAgentSourceReceipt)>
-{
+pub fn canonical_compiled_agent_runtime_source_receipts(
+) -> Vec<(String, CompiledAgentSourceReceipt)> {
     canonical_runtime_receipt_scenarios()
         .into_iter()
         .map(|scenario| (scenario.fixture_name.to_string(), scenario.source_receipt))
@@ -1879,13 +2043,12 @@ fn build_runtime_source_receipt(
             })
         })
         .collect::<Vec<_>>();
-    let verify_verdict = if observed_public_response.kind
-        == CompiledAgentPublicOutcomeKind::UnsupportedRefusal
-    {
-        "unsupported_refusal"
-    } else {
-        "accept_grounded_answer"
-    };
+    let verify_verdict =
+        if observed_public_response.kind == CompiledAgentPublicOutcomeKind::UnsupportedRefusal {
+            "unsupported_refusal"
+        } else {
+            "accept_grounded_answer"
+        };
 
     let primary_phases = vec![
         CompiledAgentSourcePhaseTraceEntry {
@@ -2736,12 +2899,10 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         canonical_compiled_agent_learning_receipt_ledger, canonical_compiled_agent_replay_bundle,
-        canonical_compiled_agent_runtime_source_receipts,
-        canonical_compiled_agent_source_receipts,
+        canonical_compiled_agent_runtime_source_receipts, canonical_compiled_agent_source_receipts,
         compiled_agent_learning_receipt_ledger_fixture_path,
         compiled_agent_replay_bundle_fixture_path, compiled_agent_runtime_fixture_dir,
-        compiled_agent_source_fixture_dir,
-        verify_compiled_agent_learning_receipt_fixtures,
+        compiled_agent_source_fixture_dir, verify_compiled_agent_learning_receipt_fixtures,
     };
     use psionic_eval::CompiledAgentEvidenceClass;
 
@@ -2765,8 +2926,22 @@ mod tests {
             .source_fixture_refs
             .iter()
             .any(|fixture| fixture.contains("/runtime/")));
-        assert!(ledger.task_family_counts.get("provider").copied().unwrap_or(0) >= 6);
-        assert!(ledger.task_family_counts.get("wallet").copied().unwrap_or(0) >= 10);
+        assert!(
+            ledger
+                .task_family_counts
+                .get("provider")
+                .copied()
+                .unwrap_or(0)
+                >= 6
+        );
+        assert!(
+            ledger
+                .task_family_counts
+                .get("wallet")
+                .copied()
+                .unwrap_or(0)
+                >= 10
+        );
         assert!(
             ledger
                 .task_family_counts

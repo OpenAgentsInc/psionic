@@ -4,7 +4,7 @@
   "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
   "baseline_revision_id": "compiled_agent.baseline.rule_v1",
   "evidence_class": "learned_lane",
-  "source_ledger_digest": "6dd2c757e2a4534210899a667edb82b1c819d64592d3b4aca07a2a6cf1864812",
+  "source_ledger_digest": "22f790143a9da07527548333d4b9d53e811fbecc74b191722a3f4e94fb1d4b9e",
   "training_receipt_ids": [
     "receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
     "receipt.compiled_agent.learning.openagents_provider_blocked_receipt_v1",
@@ -30,6 +30,9 @@
     "receipt.compiled_agent.learning.openagents_best_provider_unsupported_receipt_v1",
     "receipt.compiled_agent.learning.openagents_recent_earnings_short_receipt_v1",
     "receipt.compiled_agent.learning.openagents_go_online_guess_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_training_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_training_receipt_v1",
     "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1"
   ],
   "excluded_held_out_receipt_ids": [
@@ -48,13 +51,16 @@
     "receipt.compiled_agent.learning.openagents_wallet_recent_earnings_short_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_provider_compare_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_wallet_provider_better_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_heldout_receipt_v1",
+    "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_heldout_receipt_v1",
     "receipt.compiled_agent.learning.openagents_runtime_wallet_recent_earnings_receipt_v1"
   ],
   "module_sample_counts": {
-    "grounded_answer": 25,
-    "route": 25
+    "grounded_answer": 28,
+    "route": 28
   },
-  "correction_sample_count": 27,
+  "correction_sample_count": 33,
   "samples": [
     {
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_provider_ready_receipt_v1",
@@ -1532,6 +1538,204 @@
       }
     },
     {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_training_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_training_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "compare_exclusion",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Ignore the wallet balance and compare provider readiness with recent earnings."
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "provider_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_training_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_ignore_wallet_compare_provider_training_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "compare_exclusion",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Ignore the wallet balance and compare provider readiness with recent earnings.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "Provider is ready to go online."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_training_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_training_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "compare_exclusion",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Without provider readiness, compare the wallet balance with going online now."
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "wallet_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_training_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_without_provider_compare_wallet_training_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "unsupported",
+        "route_ambiguity",
+        "compare_exclusion",
+        "confidence_edge",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Without provider readiness, compare the wallet balance with going online now.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      }
+    },
+    {
+      "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_training_receipt_v1",
+      "module": "route",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_training_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "unsupported",
+        "negated",
+        "route_ambiguity",
+        "compare_exclusion",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Don't compare the wallet and provider status; write a poem instead."
+      },
+      "expected_output": {
+        "route": "unsupported"
+      },
+      "observed_output": {
+        "route": "wallet_status"
+      }
+    },
+    {
+      "sample_id": "sample.grounded_answer.receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_training_receipt_v1",
+      "module": "grounded_answer",
+      "source_receipt_id": "receipt.compiled_agent.learning.openagents_dont_compare_wallet_provider_poem_training_receipt_v1",
+      "evidence_class": "learned_lane",
+      "correction_kind": "failure_correction",
+      "tags": [
+        "unsupported",
+        "negated",
+        "route_ambiguity",
+        "compare_exclusion",
+        "training",
+        "correction_required"
+      ],
+      "failure_classes": [
+        "grounded_answer_mismatch",
+        "route_mismatch",
+        "tool_argument_mismatch",
+        "unexpected_tool_exposure",
+        "unsafe_final_outcome"
+      ],
+      "input": {
+        "user_request": "Don't compare the wallet and provider status; write a poem instead.",
+        "route": "unsupported",
+        "tool_results": []
+      },
+      "expected_output": {
+        "kind": "unsupported_refusal",
+        "response": "I can currently answer only provider readiness and wallet balance questions."
+      },
+      "observed_output": {
+        "kind": "grounded_answer",
+        "response": "The wallet contains 1200 sats."
+      }
+    },
+    {
       "sample_id": "sample.route.receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
       "module": "route",
       "source_receipt_id": "receipt.compiled_agent.learning.openagents_runtime_shadow_compare_receipt_v1",
@@ -1602,6 +1806,6 @@
       }
     }
   ],
-  "summary": "Compiled-agent replay bundle retains 25 route samples and 25 grounded-answer samples from 25 training receipts while excluding 16 held-out receipts.",
-  "bundle_digest": "0c818359040ad2ccd3cba75a86e8ac72d8a1a67f3544106fc772c9198db2692c"
+  "summary": "Compiled-agent replay bundle retains 28 route samples and 28 grounded-answer samples from 28 training receipts while excluding 19 held-out receipts.",
+  "bundle_digest": "85d108ecebb9ae71bb005709c8b643c1b7eca86058786c01d7501faa40ca9036"
 }

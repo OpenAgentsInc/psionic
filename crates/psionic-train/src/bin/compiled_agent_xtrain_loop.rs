@@ -4,6 +4,7 @@ use psionic_train::{
     compiled_agent_grounded_model_artifact_fixture_path,
     compiled_agent_grounded_stronger_candidate_report_fixture_path,
     compiled_agent_grounded_stronger_model_artifact_fixture_path,
+    compiled_agent_phase_six_operational_report_fixture_path,
     compiled_agent_promoted_artifact_contract_fixture_path,
     compiled_agent_route_candidate_report_fixture_path,
     compiled_agent_route_model_artifact_fixture_path,
@@ -15,6 +16,7 @@ use psionic_train::{
     write_compiled_agent_grounded_candidate_report, write_compiled_agent_grounded_model_artifact,
     write_compiled_agent_grounded_stronger_candidate_report,
     write_compiled_agent_grounded_stronger_model_artifact,
+    write_compiled_agent_phase_six_operational_report,
     write_compiled_agent_promoted_artifact_contract, write_compiled_agent_route_candidate_report,
     write_compiled_agent_route_model_artifact,
     write_compiled_agent_route_stronger_candidate_report,
@@ -59,6 +61,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let disagreement_receipts_path = compiled_agent_shadow_disagreement_receipts_fixture_path();
     let disagreement_receipts =
         write_compiled_agent_shadow_disagreement_receipts(&disagreement_receipts_path)?;
+    let phase_six_report_path = compiled_agent_phase_six_operational_report_fixture_path();
+    let phase_six_report =
+        write_compiled_agent_phase_six_operational_report(&phase_six_report_path)?;
 
     println!(
         "wrote route model artifact={} digest={}",
@@ -124,6 +129,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "wrote compiled-agent shadow disagreement receipts={} digest={}",
         disagreement_receipts_path.display(),
         disagreement_receipts.receipts_digest
+    );
+    println!(
+        "wrote compiled-agent phase-six operational report={} digest={}",
+        phase_six_report_path.display(),
+        phase_six_report.report_digest
     );
     Ok(())
 }
