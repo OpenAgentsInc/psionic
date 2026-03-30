@@ -1,0 +1,286 @@
+{
+  "schema_version": "psion.executor_formatting_audit.v1",
+  "audit_id": "psion_executor_formatting_audit_v1",
+  "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_digest": "1cbcce5abbae31597533a62e80d5c5e1e4aa622410b883ac5a06c02f0f264784",
+  "entries": [
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_exactness_cases_v0",
+      "suite_class": "exactness_cases",
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "prompt_surface": "article_benchmark_package",
+      "prompt_format_contract": "Use the frozen article benchmark package rows exactly as committed for the admitted executor workload family; no ad hoc prompt wrapper is allowed.",
+      "normalization_posture": "exactness_and_throughput_metrics",
+      "normalization_contract": "Normalize only through evaluator-owned exactness metrics (`final_output_exactness_bps`, `step_exactness_bps`, `halt_exactness_bps`) and explicit decode/fallback facts. Do not trim or rewrite candidate outputs before scoring.",
+      "post_processing_posture": "evaluator_owned_metrics",
+      "post_processing_contract": "Post-processing is limited to evaluator-owned metric aggregation. There is no freeform answer cleanup layer on the exactness suites.",
+      "checked": true,
+      "manual_review_slice_id": null,
+      "support_refs": [
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md"
+      ],
+      "detail": "Exactness suites stay trustworthy because prompt bytes, scoring metrics, and decode identity all remain evaluator-owned and explicit."
+    },
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_held_out_exclusions_v0",
+      "suite_class": "held_out_exclusions",
+      "source_ref": "fixtures/psion/isolation/psion_exclusion_manifest_v1.json",
+      "prompt_surface": "exclusion_boundary_manifest",
+      "prompt_format_contract": "This suite does not run prompts. It freezes exclusion-manifest membership for blocked rows that must never silently re-enter the executor training or replay surface.",
+      "normalization_posture": "boundary_membership_only",
+      "normalization_contract": "Normalize only by explicit manifest membership and lineage status. There is no output-text normalization for excluded rows.",
+      "post_processing_posture": "boundary_audit_only",
+      "post_processing_contract": "Post-processing is boundary review only: confirm the row stays excluded and that no training or replay path absorbed it.",
+      "checked": true,
+      "manual_review_slice_id": "held_out_boundary_review_v0",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md"
+      ],
+      "detail": "Held-out exclusions stay manual because the important truth is boundary membership, not model output."
+    },
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_operator_review_cases_v0",
+      "suite_class": "operator_review_cases",
+      "source_ref": "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+      "prompt_surface": "manual_checklist",
+      "prompt_format_contract": "This suite freezes operator-owned checklist cases rather than prompts: artifact packet completeness, checkpoint restore rehearsal, export smoke, and local-cluster roundtrip.",
+      "normalization_posture": "checklist_status_only",
+      "normalization_contract": "Normalize only through explicit checklist status (`green` / `red`) and retained operator evidence. No benchmark text normalization is involved.",
+      "post_processing_posture": "manual_checklist_review",
+      "post_processing_contract": "Post-processing is manual checklist review against the admitted local-profile contract and shipped operator surfaces.",
+      "checked": true,
+      "manual_review_slice_id": "operator_readiness_review_v0",
+      "support_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md"
+      ],
+      "detail": "Operator-review cases are deliberately manual because they prove artifact, restore, export, and roundtrip posture that scalar metrics cannot replace yet."
+    },
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "suite_id": "frequent_throughput_blockers_v0",
+      "suite_class": "throughput_blockers",
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "prompt_surface": "article_benchmark_package",
+      "prompt_format_contract": "Use the same frozen article benchmark package rows as the frequent exactness suite so throughput comparisons stay on identical admitted prompts.",
+      "normalization_posture": "exactness_and_throughput_metrics",
+      "normalization_contract": "Normalize only through retained throughput metrics (`reference_linear_steps_per_second`, `hull_cache_steps_per_second`, `hull_cache_speedup_over_reference_linear`, `hull_cache_remaining_gap_vs_cpu_reference`) plus explicit fallback identity.",
+      "post_processing_posture": "evaluator_owned_metrics",
+      "post_processing_contract": "Post-processing is limited to evaluator-owned metric aggregation. No smoothing or hidden decode-mode fallback is allowed.",
+      "checked": true,
+      "manual_review_slice_id": null,
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md"
+      ],
+      "detail": "Throughput blockers stay machine-audited because they share the exact same prompt surface and evaluator-owned metrics as the benchmark report."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_exactness_suite_v0",
+      "suite_class": "exactness_cases",
+      "source_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json",
+      "prompt_surface": "article_benchmark_package",
+      "prompt_format_contract": "Use the frozen promotion package-set rows exactly as committed, preserving the admitted executor workload family and evaluator-owned prompt bytes.",
+      "normalization_posture": "exactness_and_throughput_metrics",
+      "normalization_contract": "Normalize only through evaluator-owned exactness metrics (`final_output_exactness_bps`, `step_exactness_bps`, `halt_exactness_bps`) and explicit decode/fallback facts. Do not trim or rewrite candidate outputs before scoring.",
+      "post_processing_posture": "evaluator_owned_metrics",
+      "post_processing_contract": "Post-processing is limited to evaluator-owned metric aggregation. There is no freeform answer cleanup layer on the exactness suites.",
+      "checked": true,
+      "manual_review_slice_id": null,
+      "support_refs": [
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md"
+      ],
+      "detail": "Exactness suites stay trustworthy because prompt bytes, scoring metrics, and decode identity all remain evaluator-owned and explicit."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_held_out_suite_v0",
+      "suite_class": "held_out_suite",
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+      "prompt_surface": "generalization_gate_case_rows",
+      "prompt_format_contract": "Use the frozen generalization-gate case rows exactly as committed, preserving the held-out program payload and requested `reference_linear` decode path.",
+      "normalization_posture": "runtime_exact_mismatch_refusal_classification",
+      "normalization_contract": "Normalize only through runtime classification (`exact`, `mismatch`, `refusal`) and explicit `outputs_equal` / `halt_equal` facts. No answer rewriting is allowed before classification.",
+      "post_processing_posture": "generalization_case_classification",
+      "post_processing_contract": "Post-processing is limited to generalization-case classification. Any mismatch, refusal, or digest drift routes into manual review instead of being normalized away.",
+      "checked": true,
+      "manual_review_slice_id": "generalization_red_case_review_v0",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json"
+      ],
+      "detail": "Held-out suites stay trustworthy because prompt payload, decode identity, and exact/mismatch/refusal classification are all explicit and retained."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_adversarial_suite_v0",
+      "suite_class": "adversarial_suite",
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+      "prompt_surface": "generalization_gate_case_rows",
+      "prompt_format_contract": "Use the frozen adversarial generalization rows exactly as committed. Do not simplify or truncate article-scale hostile variants before evaluation.",
+      "normalization_posture": "runtime_exact_mismatch_refusal_classification",
+      "normalization_contract": "Normalize only through retained runtime classification and explicit `outputs_equal` / `halt_equal` facts under the requested `reference_linear` decode path.",
+      "post_processing_posture": "generalization_case_classification",
+      "post_processing_contract": "Post-processing is limited to adversarial exact/mismatch/refusal classification. Any red result routes into manual review instead of cleanup heuristics.",
+      "checked": true,
+      "manual_review_slice_id": "generalization_red_case_review_v0",
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_transformer_generalization_gate_report.json",
+        "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json"
+      ],
+      "detail": "Adversarial suites stay trustworthy because hostile article-scale prompts are scored through the same explicit generalization classifier instead of any fallback post-processing."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_runtime_blockers_v0",
+      "suite_class": "runtime_blockers",
+      "source_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+      "prompt_surface": "manual_checklist",
+      "prompt_format_contract": "This suite freezes runtime-owned checks rather than prompts: CPU-matrix validation, restore rehearsal, and local-cluster roundtrip truth.",
+      "normalization_posture": "checklist_status_only",
+      "normalization_contract": "Normalize only through explicit checklist status and retained runtime evidence packets. No benchmark-output normalization is involved.",
+      "post_processing_posture": "manual_checklist_review",
+      "post_processing_contract": "Post-processing is manual runtime review against the executor acceptance profile before any promotion attempt.",
+      "checked": true,
+      "manual_review_slice_id": "promotion_runtime_blocker_review_v0",
+      "support_refs": [
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md"
+      ],
+      "detail": "Runtime blockers stay manual because restore and cluster truth still cross device and operator boundaries that the evaluator does not fully own yet."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_serving_blockers_v0",
+      "suite_class": "serving_blockers",
+      "source_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+      "prompt_surface": "manual_checklist",
+      "prompt_format_contract": "This suite freezes consumer-facing checklist cases rather than prompts: export, replacement, promoted-artifact compatibility, and rollback safety.",
+      "normalization_posture": "checklist_status_only",
+      "normalization_contract": "Normalize only through explicit checklist status and retained consumer-seam evidence. No answer-text cleanup or hidden serving fallback is allowed.",
+      "post_processing_posture": "manual_checklist_review",
+      "post_processing_contract": "Post-processing is manual serving review so export, shadow, and rollback posture stay explicit before promotion.",
+      "checked": true,
+      "manual_review_slice_id": "promotion_serving_blocker_review_v0",
+      "support_refs": [
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+        "docs/PSION_EXECUTOR_EVAL_PACKS.md"
+      ],
+      "detail": "Serving blockers stay manual because promoted artifacts must remain compatible with existing consumer seams and rollback rules."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_reference_linear_anchor_checks_v0",
+      "suite_class": "reference_linear_anchor_checks",
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "prompt_surface": "article_benchmark_package",
+      "prompt_format_contract": "Use the frozen article benchmark package rows exactly as committed for the admitted fast-route workload family; anchor checks must stay on the same prompts as fast-route comparisons.",
+      "normalization_posture": "exactness_and_throughput_metrics",
+      "normalization_contract": "Normalize only through the retained `reference_linear` throughput metric and explicit decode-mode identity. There is no hidden route selection cleanup.",
+      "post_processing_posture": "evaluator_owned_metrics",
+      "post_processing_contract": "Post-processing is limited to evaluator-owned metric aggregation so `reference_linear` stays the measured truth anchor.",
+      "checked": true,
+      "manual_review_slice_id": null,
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json"
+      ],
+      "detail": "`reference_linear` anchor checks stay machine-audited and cannot be rewritten into broader fast-route claims."
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+      "suite_class": "hull_cache_fast_route_checks",
+      "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+      "prompt_surface": "article_benchmark_package",
+      "prompt_format_contract": "Use the frozen article benchmark package rows exactly as committed so `hull_cache` fast-route claims stay on the admitted executor workload family only.",
+      "normalization_posture": "exactness_and_throughput_metrics",
+      "normalization_contract": "Normalize only through retained `hull_cache` throughput metrics and explicit fast-route vs anchor comparisons. Hidden fallback is not allowed.",
+      "post_processing_posture": "evaluator_owned_metrics",
+      "post_processing_contract": "Post-processing is limited to evaluator-owned metric aggregation so fast-route wins never override exactness or boundary failures.",
+      "checked": true,
+      "manual_review_slice_id": null,
+      "support_refs": [
+        "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+        "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+        "fixtures/psion/executor/psion_executor_baseline_truth_v1.json"
+      ],
+      "detail": "`hull_cache` fast-route checks stay machine-audited and bounded to the admitted executor workload family."
+    }
+  ],
+  "manual_review_slices": [
+    {
+      "slice_id": "held_out_boundary_review_v0",
+      "covered_suite_ids": [
+        "frequent_held_out_exclusions_v0"
+      ],
+      "trigger_posture": "Run manual review whenever exclusion-manifest membership changes or a blocked row tries to enter training or replay.",
+      "reviewer_role": "psion_executor_owner",
+      "checklist_ref": "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+      "detail": "Boundary rows are not benchmark outputs. They stay trustworthy only if the exclusion manifest and training boundary are reviewed explicitly."
+    },
+    {
+      "slice_id": "operator_readiness_review_v0",
+      "covered_suite_ids": [
+        "frequent_operator_review_cases_v0"
+      ],
+      "trigger_posture": "Run manual review before any decision-grade run exits the checkpoint-time pack.",
+      "reviewer_role": "psion_executor_operator",
+      "checklist_ref": "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+      "detail": "Artifact packet completeness, checkpoint restore rehearsal, export smoke, and local-cluster roundtrip stay manual because they depend on shipped operator surfaces rather than one scalar metric."
+    },
+    {
+      "slice_id": "generalization_red_case_review_v0",
+      "covered_suite_ids": [
+        "promotion_held_out_suite_v0",
+        "promotion_adversarial_suite_v0"
+      ],
+      "trigger_posture": "Route into manual review whenever generalization classification reports mismatch, refusal, or unexpected digest drift.",
+      "reviewer_role": "psion_executor_reviewer",
+      "checklist_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+      "detail": "Held-out and adversarial automation can say exact, mismatch, or refusal. Red rows require manual review instead of silent post-processing."
+    },
+    {
+      "slice_id": "promotion_runtime_blocker_review_v0",
+      "covered_suite_ids": [
+        "promotion_runtime_blockers_v0"
+      ],
+      "trigger_posture": "Run manual review on CPU-matrix validation, restore rehearsal, and local-cluster truth before promotion.",
+      "reviewer_role": "psion_executor_runtime_owner",
+      "checklist_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+      "detail": "Runtime blockers are owned checklists. They are not inferred from benchmark exactness or throughput."
+    },
+    {
+      "slice_id": "promotion_serving_blocker_review_v0",
+      "covered_suite_ids": [
+        "promotion_serving_blockers_v0"
+      ],
+      "trigger_posture": "Run manual review on export, replacement, promoted-artifact compatibility, and rollback safety before promotion.",
+      "reviewer_role": "psion_executor_consumer_owner",
+      "checklist_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+      "detail": "Serving blockers bridge executor artifacts into consumer seams. They stay explicit manual review slices until those seams are fully machine-audited."
+    }
+  ],
+  "unchecked_suite_ids": [],
+  "summary": "Audited prompt formatting, normalization, and post-processing across 11 frozen executor suites; checked_count=11 manual_review_boundaries=6.",
+  "audit_digest": "328076155f7050a1eaab2f0ae10b17bd0c2dcaa4504b3d1359468f6acd1f255d"
+}

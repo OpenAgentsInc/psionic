@@ -85,6 +85,17 @@ Use this profile for:
 No executor-capable promotion issue should define its own gate set without
 pointing back to this profile.
 
+## Formatting And Review Binding
+
+Before a run may count as decision-grade or promotion-ready, the executor lane
+must keep these retained review packets green:
+
+- `docs/PSION_EXECUTOR_BASELINE_TRUTH.md`
+- `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md`
+
+That keeps prompt formatting, normalization, post-processing, and manual review
+boundaries explicit instead of hidden inside benchmark summaries.
+
 ## Frozen Pack Binding
 
 - `tassadar.eval.frequent.v0` is the checkpoint-time decision pack that keeps

@@ -29,6 +29,18 @@ The frozen packs now have one committed baseline-truth overlay:
 That packet reconstructs `trained-v0` truth across all frozen suite ids before
 later variance or promotion-delta work starts arguing from the packs.
 
+## Formatting Audit Binding
+
+The frozen packs now also have one committed formatting and post-processing
+audit:
+
+- `docs/PSION_EXECUTOR_FORMATTING_AUDIT.md`
+- `fixtures/psion/executor/psion_executor_formatting_audit_v1.json`
+
+Decision-grade run admission for the executor lane assumes this audit packet
+stays green, because unchecked prompt formatting, normalization, or
+post-processing would invalidate the packs even if baseline truth stayed green.
+
 ## What Landed
 
 `psionic-train` now owns one typed executor eval-pack catalog with two packs:
