@@ -140,6 +140,10 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md` owns the first canonical
   baseline-vs-current-best-vs-candidate dashboard packet built directly on
   top of the retained local-cluster ledger
+- `docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md` owns the first canonical
+  phase-exit and promotion auto-block report for missing eval, recovery,
+  export, and `reference_linear` anchor facts on the retained local-cluster
+  dashboard/ledger stack
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

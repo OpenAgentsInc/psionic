@@ -87,6 +87,17 @@ That is the point of this packet. It makes the actual local-cluster state
 visible in one place instead of leaving the reviewer to infer it from separate
 registration, ledger, export, and decision-grade documents.
 
+## Follow-On Block Surface
+
+The follow-on canonical auto-block report now lives at:
+
+- `docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md`
+- `fixtures/psion/executor/psion_executor_local_cluster_autoblocks_v1.json`
+
+That report turns missing eval, recovery, export, and `reference_linear`
+anchor facts into explicit phase-exit and promotion blocks on top of this
+dashboard.
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_dashboard_fixtures`
