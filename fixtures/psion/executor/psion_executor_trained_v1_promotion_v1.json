@@ -1,0 +1,163 @@
+{
+  "schema_version": "psion.executor.trained_v1_promotion.v1",
+  "packet_id": "psion_executor_trained_v1_promotion_v1",
+  "base_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v1",
+  "candidate_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "descriptor_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_descriptor.json",
+  "descriptor_digest": "aea4b09a379b09f6f14d08e55e2a419ac19403ff4d0602f37bb7fc0a7dc95d80",
+  "artifact_manifest_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_artifact_manifest.json",
+  "artifact_manifest_digest": "4915d43dc2c999a04afa17b78ef09a2bb15cf5e5b39795225f9e0e43d9bc14e9",
+  "lineage_contract_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_lineage_contract.json",
+  "lineage_contract_digest": "c994e89393760d84816afb5d5f35121c42fa064fcd4fc0e0c0f599e424862bda",
+  "acceptance_profile_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+  "artifact_naming_policy_ref": "docs/PSION_EXECUTOR_ARTIFACT_NAMING.md",
+  "decision_threshold_ref": "fixtures/psion/executor/psion_executor_decision_thresholds_v1.json",
+  "decision_threshold_digest": "01be6e718c71781c82fb2ee7472485c8cafcfa9d2ed265c331988235edca47bc",
+  "selected_input_rows": [
+    {
+      "issue_id": "#776",
+      "packet_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "packet_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "role": "threshold_clearing_ablation",
+      "detail": "The optimizer ablation clears the retained non-saturated thresholds for reference-linear, hull-cache throughput, hull-cache speedup, and remaining CPU gap.",
+      "row_digest": "2f173433f3af205297c1940b61358ae921e9f3acc545da6e3892722017f791e1"
+    },
+    {
+      "issue_id": "#779",
+      "packet_ref": "fixtures/psion/executor/psion_executor_trace_family_weighting_ablation_v1.json",
+      "packet_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d",
+      "role": "exactness_preservation_ablation",
+      "detail": "The trace-family weighting ablation preserves exactness pressure while keeping held-out and adversarial regressions at zero.",
+      "row_digest": "9300c22bd1d8c9c0c70c37b3bc6f16b88d9e9ae47c7af9eec7444eb89631f3d5"
+    },
+    {
+      "issue_id": "#780",
+      "packet_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "packet_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "role": "stability_and_held_out_ablation",
+      "detail": "The supervision-density ablation keeps exactness, held-out, throughput, and stability green together on the admitted same-budget candidate lane.",
+      "row_digest": "db2ebbc4954e46705aeafe73dd52caa8381d095fbacaf42baa6443c40dc85471"
+    },
+    {
+      "issue_id": "#781",
+      "packet_ref": "fixtures/psion/executor/psion_executor_tokenizer_architecture_gate_v1.json",
+      "packet_digest": "16c78e7bb8d7da5caee43da2a793df31b708ac4935a210aec74edce818d06fe0",
+      "role": "evidence_gate",
+      "detail": "The tokenizer and architecture gate records that tokenizer work stayed blocked and the five-run same-baseline tranche now exists for the trained-v1 promotion question.",
+      "row_digest": "fa5d65029923c491d8749ee18cbcca25ec2215852ce16b8cffea335729728836"
+    }
+  ],
+  "gate_rows": [
+    {
+      "gate_id": "exactness_gate_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_trace_family_weighting_ablation_v1.json",
+      "evidence_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d",
+      "status": "green",
+      "detail": "The retained trace-family weighting packet keeps exactness net-positive while preserving the already-green saturated exactness rows.",
+      "row_digest": "e7b44d7e78f63ba183272d35b889d51dbf57d7349eb4400970435e82b586162d"
+    },
+    {
+      "gate_id": "held_out_and_adversarial_gate_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "evidence_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "status": "green",
+      "detail": "Held-out stays net-positive on the retained supervision-density packet, while the retained trace-family packet keeps held-out and adversarial regressions at zero.",
+      "row_digest": "22dd0721f98ad986721039262afaa561ce414388f266e7d0a5e58104ababe8f2"
+    },
+    {
+      "gate_id": "reference_linear_anchor_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "evidence_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "status": "green",
+      "detail": "The retained optimizer packet clears the frozen reference-linear minimum meaningful delta and therefore keeps the measured baseline truth anchor green.",
+      "row_digest": "18e39aa851c97dfe7f58d9b79033ba5f0e1a1f3bdb72e7ef76000816d162f0c3"
+    },
+    {
+      "gate_id": "hull_cache_fast_route_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "evidence_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "status": "green",
+      "detail": "The retained optimizer packet clears the frozen hull-cache throughput and speedup thresholds while preserving the admitted fast-route route id.",
+      "row_digest": "e7f0c2b6e3bed88264ce3dadb8743f69153d7fb745256173d43592fffd087d4a"
+    },
+    {
+      "gate_id": "throughput_floor_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "evidence_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "status": "green",
+      "detail": "The retained supervision-density packet keeps throughput positive without trading away held-out or stability truth.",
+      "row_digest": "37ef8ef3beed9a623dde6990e4d3986ecc59534661e69993c03c0d6ed3510476"
+    },
+    {
+      "gate_id": "cpu_matrix_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+      "evidence_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+      "status": "green",
+      "detail": "The retained Mac export-inspection packet keeps CPU route validation green on host_cpu_aarch64 while preserving the wider reference-linear versus hull-cache claim boundary.",
+      "row_digest": "e1ea4deed01c3ae84c785b04a95660c786c82f10be27b49d13560a8859192193"
+    },
+    {
+      "gate_id": "export_and_replacement_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json",
+      "evidence_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2",
+      "status": "green",
+      "detail": "The retained long-run rehearsal packet keeps export candidate, replacement validation, and review-log truth green on the admitted executor lane.",
+      "row_digest": "8b21cb68605da0381747b5b35026443938997b2e30c6a15f935f17c3d0d5f3ce"
+    },
+    {
+      "gate_id": "local_cluster_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
+      "evidence_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299",
+      "status": "green",
+      "detail": "The retained Mac -> 4080 -> Mac roundtrip closeout packet keeps the local-cluster gate green for the candidate path.",
+      "row_digest": "0dc09b194ddc69aecec08681a9816dfa2b80edca44c2ced4b27273958cf0d9e1"
+    },
+    {
+      "gate_id": "remote_training_visibility_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_4080_decision_grade_run_v1.json",
+      "evidence_digest": "3e406cd85a6bf918fe0e219dc2e77f4801750798bc16aa28ca355457e44ae8f5",
+      "status": "green",
+      "detail": "The retained 4080 decision-grade packet keeps remote-training visualization and run-index visibility green on the shipped operator surface.",
+      "row_digest": "5cf3b69242ab80a824de5a2ab2bc00708e584accaf7039a27a2208cd7b31aa69"
+    },
+    {
+      "gate_id": "promoted_artifact_compatibility_green",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+      "evidence_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+      "status": "green",
+      "detail": "The retained Mac export-inspection packet keeps replacement publication green, which is the current promoted-artifact compatibility seam for the bounded executor lane.",
+      "row_digest": "7e9aafba6b491c5bafafeabf6ba05d8aea1931eebaddd1d87799383c980e12d0"
+    }
+  ],
+  "reference_linear_delta": 73679.40346165793,
+  "reference_linear_minimum_meaningful_delta": 65060.100461467104,
+  "hull_cache_delta": 224815.26180754835,
+  "hull_cache_minimum_meaningful_delta": 209005.1178118226,
+  "hull_cache_speedup_improvement": 0.059403490993948926,
+  "hull_cache_speedup_floor": 0.05,
+  "cpu_gap_reduction": 0.06276315967336421,
+  "cpu_gap_improvement_floor": 0.05,
+  "exactness_net_delta_bps": 8,
+  "held_out_delta_bps": 1,
+  "training_steps_per_second_delta": 5.209403645610266,
+  "saturated_gates_preserved": true,
+  "non_saturated_threshold_cleared": true,
+  "promotion_decision": "promote_trained_v1_candidate",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+    "docs/PSION_EXECUTOR_ARTIFACT_NAMING.md",
+    "docs/PSION_EXECUTOR_OPTIMIZER_ABLATION.md",
+    "docs/PSION_EXECUTOR_TRACE_FAMILY_WEIGHTING_ABLATION.md",
+    "docs/PSION_EXECUTOR_SUPERVISION_DENSITY_ABLATION.md",
+    "docs/PSION_EXECUTOR_TOKENIZER_ARCHITECTURE_GATE.md",
+    "docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md",
+    "docs/PSION_EXECUTOR_PERCEPTA_CLOSEOUT_STATUS.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md",
+    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md"
+  ],
+  "summary": "The executor lane now has one retained trained-v1 promotion packet. The first candidate stays on the frozen tassadar artifact family, cites the retained optimizer, trace-weighting, supervision, and evidence-gate receipts directly, preserves all saturated gates, clears the retained non-saturated thresholds, and keeps export, local-cluster, CPU-matrix, and consumer-seam truth green on the admitted executor workload family.",
+  "packet_digest": "30e39b71c2e3fcc9dc052bf02c12f9a178e1bcdd8fb415bc1200fae033c5cd1d"
+}

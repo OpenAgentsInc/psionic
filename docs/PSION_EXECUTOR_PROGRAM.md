@@ -228,6 +228,11 @@ This doc does not claim:
   long-run rehearsal packet that binds pre-flight admission, transient
   interruption recovery, export, replacement validation, and review logging
   into one retained closeout receipt
+- `docs/PSION_EXECUTOR_TRAINED_V1_PROMOTION.md` owns the first canonical
+  `trained-v1` promotion packet that binds the retained ablation tranche, the
+  long-run rehearsal, the bounded closeout-status packet, the Mac export
+  inspection, and the local-cluster plus consumer-seam receipts into one
+  retained promotion answer
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

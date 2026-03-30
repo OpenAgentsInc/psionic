@@ -1,0 +1,18 @@
+{
+  "schema_version": "psion.executor.trained_v1_artifact_manifest.v1",
+  "manifest_id": "psion_executor_trained_v1_artifact_manifest_v1",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v1",
+  "artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v1/promoted-v1",
+  "artifact_format": "portable_bundle_manifest",
+  "primary_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+  "primary_bundle_sha256": "4a345019512aae63c517c3261439e0dbd3a1a113745c80ae4244250abfff3e91",
+  "accelerator_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors",
+  "accelerator_bundle_sha256": "5e3b708051e6ccb86d9efe5e13f4ab425b3ec1bb74c28f6cc8f2b44a49129f7f",
+  "replacement_publication_ref": "fixtures/tassadar/reports/tassadar_article_transformer_replacement_publication.json",
+  "replacement_publication_digest": "75119558c8435d0e6681c3192acff385943e15b1451eb296bdba478e528b5ea1",
+  "remote_training_visibility_ref": "fixtures/training_visualization/psion_executor_4080_decision_grade_remote_training_visualization_bundle_v2.json",
+  "remote_training_visibility_digest": "969bd18713eae8f2b7ee31aefc0ef842a4a6d7c9e94a4fb71b1a2715baa4cb41",
+  "local_cluster_roundtrip_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
+  "local_cluster_roundtrip_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299",
+  "manifest_digest": "4915d43dc2c999a04afa17b78ef09a2bb15cf5e5b39795225f9e0e43d9bc14e9"
+}

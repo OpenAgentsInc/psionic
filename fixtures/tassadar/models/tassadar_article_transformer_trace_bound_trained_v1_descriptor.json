@@ -1,0 +1,18 @@
+{
+  "schema_version": "psion.executor.trained_v1_descriptor.v1",
+  "descriptor_id": "psion_executor_trained_v1_descriptor_v1",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v1",
+  "family": "tassadar_article_transformer",
+  "revision": "v1",
+  "base_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "acceptance_profile_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+  "artifact_naming_policy_ref": "docs/PSION_EXECUTOR_ARTIFACT_NAMING.md",
+  "selected_receipt_issue_ids": [
+    "#776",
+    "#779",
+    "#780",
+    "#781"
+  ],
+  "descriptor_digest": "aea4b09a379b09f6f14d08e55e2a419ac19403ff4d0602f37bb7fc0a7dc95d80"
+}

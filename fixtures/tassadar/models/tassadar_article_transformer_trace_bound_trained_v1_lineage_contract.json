@@ -1,0 +1,59 @@
+{
+  "schema_version": "psion.executor.trained_v1_lineage_contract.v1",
+  "contract_id": "psion_executor_trained_v1_lineage_contract_v1",
+  "base_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v1",
+  "parent_lineage_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json",
+  "parent_lineage_digest": "88973d5074f7d366e3e71d6cff5835c5e5d3ae3e338001906dec88538a18ad3e",
+  "descriptor_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_descriptor.json",
+  "descriptor_digest": "aea4b09a379b09f6f14d08e55e2a419ac19403ff4d0602f37bb7fc0a7dc95d80",
+  "artifact_manifest_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_artifact_manifest.json",
+  "artifact_manifest_digest": "4915d43dc2c999a04afa17b78ef09a2bb15cf5e5b39795225f9e0e43d9bc14e9",
+  "decision_threshold_ref": "fixtures/psion/executor/psion_executor_decision_thresholds_v1.json",
+  "decision_threshold_digest": "01be6e718c71781c82fb2ee7472485c8cafcfa9d2ed265c331988235edca47bc",
+  "long_run_rehearsal_ref": "fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json",
+  "long_run_rehearsal_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2",
+  "closeout_status_ref": "fixtures/psion/executor/psion_executor_percepta_closeout_status_v1.json",
+  "closeout_status_digest": "9856bfc3735ddc9f89a2a9ce6a49c9aea166133542237a253c8a0644b19c1185",
+  "cluster_roundtrip_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
+  "cluster_roundtrip_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299",
+  "export_inspection_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+  "export_inspection_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+  "selected_input_rows": [
+    {
+      "issue_id": "#776",
+      "role": "threshold_clearing_ablation",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "evidence_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "detail": "The optimizer ablation remains the retained threshold-clearing receipt for the first trained-v1 candidate.",
+      "row_digest": "91ee7acc10ca0e2006054d01f6dcc40f4cf7ac0c4534e570930b83e27bac8146"
+    },
+    {
+      "issue_id": "#779",
+      "role": "exactness_preservation_ablation",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_trace_family_weighting_ablation_v1.json",
+      "evidence_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d",
+      "detail": "The trace-family weighting ablation remains the retained exactness-preservation and route-pressure receipt for the first trained-v1 candidate.",
+      "row_digest": "ac3eef6290ea1619297b15f165f5d08de13722af63a327bd08f09d039449bd2c"
+    },
+    {
+      "issue_id": "#780",
+      "role": "stability_and_held_out_ablation",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "evidence_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "detail": "The supervision-density ablation remains the retained stability and held-out cleanliness receipt for the first trained-v1 candidate.",
+      "row_digest": "4fce891de3cd2bc941059a8283ed22a51c86d9e7343ec6ed238b00ebea89c6ad"
+    },
+    {
+      "issue_id": "#781",
+      "role": "architecture_gate",
+      "evidence_ref": "fixtures/psion/executor/psion_executor_tokenizer_architecture_gate_v1.json",
+      "evidence_digest": "16c78e7bb8d7da5caee43da2a793df31b708ac4935a210aec74edce818d06fe0",
+      "detail": "The tokenizer/architecture gate remains the retained evidence that tokenizer work stayed blocked and the five-run same-baseline tranche is complete.",
+      "row_digest": "5af2902233bb0631202f08d3816c4c87129a0b066d72f680d7d4d2e477cd7c64"
+    }
+  ],
+  "lineage_decision": "derived_from_retained_epic8_candidate_receipts",
+  "claim_boundary": "This lineage contract freezes only the first executor-capable Psion trained-v1 promotion candidate. It binds the retained threshold-clearing ablation, preserved-gate ablations, export path, roundtrip closure, and bounded closeout-green status without widening the executor workload family or weakening the reference-linear truth anchor.",
+  "contract_digest": "c994e89393760d84816afb5d5f35121c42fa064fcd4fc0e0c0f599e424862bda"
+}
