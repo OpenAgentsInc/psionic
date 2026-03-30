@@ -7,9 +7,11 @@ use thiserror::Error;
 use crate::{
     builtin_executor_4080_frequent_eval_attachment_packet, builtin_executor_baseline_truth_record,
     builtin_executor_local_cluster_dashboard_packet, builtin_executor_local_cluster_ledger,
+    builtin_executor_local_cluster_roundtrip_packet,
     PsionExecutor4080FrequentEvalAttachmentError, PsionExecutorBaselineTruthError,
     PsionExecutorLocalClusterCandidateStatus, PsionExecutorLocalClusterDashboardError,
     PsionExecutorLocalClusterDashboardPacket, PsionExecutorLocalClusterLedgerError,
+    PsionExecutorLocalClusterRoundtripError,
     PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT_FIXTURE_PATH,
     PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH,
     PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_FIXTURE_PATH,
@@ -32,6 +34,8 @@ const PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md";
 const PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md";
+const PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_DOC_PATH: &str =
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md";
 const PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md";
 
@@ -67,6 +71,8 @@ pub enum PsionExecutorLocalClusterAutoblocksError {
     #[error(transparent)]
     Ledger(#[from] PsionExecutorLocalClusterLedgerError),
     #[error(transparent)]
+    Roundtrip(#[from] PsionExecutorLocalClusterRoundtripError),
+    #[error(transparent)]
     FrequentEval(#[from] PsionExecutor4080FrequentEvalAttachmentError),
 }
 
@@ -74,6 +80,7 @@ pub enum PsionExecutorLocalClusterAutoblocksError {
 #[serde(rename_all = "snake_case")]
 pub enum PsionExecutorLocalClusterAutoblockScope {
     PhaseExitAndPromotion,
+    PromotionOnly,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +259,7 @@ pub fn builtin_executor_local_cluster_autoblocks_report(
     let ledger = builtin_executor_local_cluster_ledger(workspace_root)?;
     let baseline_truth = builtin_executor_baseline_truth_record(workspace_root)?;
     let frequent_eval = builtin_executor_4080_frequent_eval_attachment_packet(workspace_root)?;
+    let roundtrip = builtin_executor_local_cluster_roundtrip_packet(workspace_root)?;
 
     let current_best_row = ledger
         .rows_for_candidate_status(PsionExecutorLocalClusterCandidateStatus::CurrentBest)
@@ -268,7 +276,7 @@ pub fn builtin_executor_local_cluster_autoblocks_report(
             &frequent_eval,
         )?,
         build_recovery_autoblock_row(&ledger.ledger_digest, current_best_row)?,
-        build_export_autoblock_row(&dashboard.dashboard_digest, &dashboard, current_best_row)?,
+        build_export_autoblock_row(&roundtrip.packet_digest, &roundtrip, current_best_row)?,
         build_reference_linear_autoblock_row(
             &baseline_truth.record_digest,
             &dashboard,
@@ -282,10 +290,14 @@ pub fn builtin_executor_local_cluster_autoblocks_report(
 
     let active_phase_exit_block_ids = block_rows
         .iter()
-        .filter(|row| row_is_blocking(row))
+        .filter(|row| row_blocks_phase_exit(row))
         .map(|row| row.block_id.clone())
         .collect::<Vec<_>>();
-    let active_promotion_block_ids = active_phase_exit_block_ids.clone();
+    let active_promotion_block_ids = block_rows
+        .iter()
+        .filter(|row| row_blocks_promotion(row))
+        .map(|row| row.block_id.clone())
+        .collect::<Vec<_>>();
 
     let mut report = PsionExecutorLocalClusterAutoblocksReport {
         schema_version: String::from(PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS_SCHEMA_VERSION),
@@ -309,10 +321,11 @@ pub fn builtin_executor_local_cluster_autoblocks_report(
             String::from(PSION_EXECUTOR_BASELINE_TRUTH_DOC_PATH),
             String::from(PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_DOC_PATH),
             String::from(PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_DOC_PATH),
+            String::from(PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_DOC_PATH),
             String::from(PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT_DOC_PATH),
         ],
         summary: String::from(
-            "The admitted executor lane now has one canonical auto-block report for local-cluster promotion and phase exits. Missing eval, recovery, export, and `reference_linear` anchor facts are now machine-readable block rows instead of narrative review notes.",
+            "The admitted executor lane now has one canonical auto-block report for local-cluster promotion and phase exits. Missing eval, recovery, export, and `reference_linear` anchor facts are now machine-readable block rows instead of narrative review notes, and promotion-only eval blockers stay distinct from cluster-closure facts.",
         ),
         report_digest: String::new(),
     };
@@ -347,12 +360,12 @@ fn build_eval_autoblock_row(
     };
     Ok(PsionExecutorLocalClusterAutoblockRow {
         block_id: String::from("missing_eval_fact_current_best"),
-        scope: PsionExecutorLocalClusterAutoblockScope::PhaseExitAndPromotion,
+        scope: PsionExecutorLocalClusterAutoblockScope::PromotionOnly,
         status,
         owner_surface_ref: String::from(PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT_FIXTURE_PATH),
         owner_surface_digest: String::from(frequent_eval_digest),
         detail: format!(
-            "The current-best row for run `{}` inherits the retained frequent-eval blocker posture. Missing or unscored frequent-pack coverage still leaves blocker ids [{}] active, so both phase exit and promotion stay blocked until those eval facts turn green.",
+            "The current-best row for run `{}` inherits the retained frequent-eval blocker posture. Missing or unscored frequent-pack coverage still leaves blocker ids [{}] active, so promotion stays blocked until those eval facts turn green even after cluster closure is otherwise complete.",
             run_id,
             frequent_eval
                 .checkpoint_eval_row
@@ -390,8 +403,8 @@ fn build_recovery_autoblock_row(
 }
 
 fn build_export_autoblock_row(
-    dashboard_digest: &str,
-    dashboard: &PsionExecutorLocalClusterDashboardPacket,
+    roundtrip_digest: &str,
+    roundtrip: &crate::PsionExecutorLocalClusterRoundtripPacket,
     current_best_row: &crate::PsionExecutorLocalClusterLedgerRow,
 ) -> Result<PsionExecutorLocalClusterAutoblockRow, PsionExecutorLocalClusterAutoblocksError> {
     Ok(PsionExecutorLocalClusterAutoblockRow {
@@ -402,11 +415,13 @@ fn build_export_autoblock_row(
         } else {
             String::from("blocked_missing_export_fact")
         },
-        owner_surface_ref: String::from(PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD_FIXTURE_PATH),
-        owner_surface_digest: String::from(dashboard_digest),
+        owner_surface_ref: String::from(crate::PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_FIXTURE_PATH),
+        owner_surface_digest: String::from(roundtrip_digest),
         detail: format!(
-            "The dashboard keeps the current-best export posture explicit as `{}` on row `{}`. Until that turns green, the local-cluster phase exit and promotion gates stay blocked instead of relying on review memory.",
-            dashboard.current_best_card.export_status, current_best_row.row_id
+            "The roundtrip closeout packet keeps the current-best export posture explicit as `{}` on row `{}`. Until that turns green, the local-cluster phase exit and promotion gates stay blocked instead of relying on review memory. Current cluster closure status is `{}`.",
+            current_best_row.export_status,
+            current_best_row.row_id,
+            roundtrip.cluster_closure_status
         ),
         block_digest: String::new(),
     })
@@ -444,7 +459,12 @@ fn build_reference_linear_autoblock_row(
     })
 }
 
-fn row_is_blocking(row: &PsionExecutorLocalClusterAutoblockRow) -> bool {
+fn row_blocks_phase_exit(row: &PsionExecutorLocalClusterAutoblockRow) -> bool {
+    row.status != "green"
+        && matches!(row.scope, PsionExecutorLocalClusterAutoblockScope::PhaseExitAndPromotion)
+}
+
+fn row_blocks_promotion(row: &PsionExecutorLocalClusterAutoblockRow) -> bool {
     row.status != "green"
 }
 
@@ -560,18 +580,16 @@ mod tests {
     }
 
     #[test]
-    fn executor_local_cluster_autoblocks_keep_eval_and_export_blocked(
+    fn executor_local_cluster_autoblocks_keep_phase_exit_green_but_promotion_eval_blocked(
     ) -> Result<(), PsionExecutorLocalClusterAutoblocksError> {
         let root = workspace_root();
         let report = builtin_executor_local_cluster_autoblocks_report(root.as_path())?;
-        assert!(report.phase_exit_blocked);
+        assert!(!report.phase_exit_blocked);
         assert!(report.promotion_blocked);
+        assert!(report.active_phase_exit_block_ids.is_empty());
         assert!(report
-            .active_phase_exit_block_ids
+            .active_promotion_block_ids
             .contains(&String::from("missing_eval_fact_current_best")));
-        assert!(report
-            .active_phase_exit_block_ids
-            .contains(&String::from("missing_export_fact_current_best")));
         Ok(())
     }
 

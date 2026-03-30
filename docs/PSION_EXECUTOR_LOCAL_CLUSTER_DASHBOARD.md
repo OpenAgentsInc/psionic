@@ -6,7 +6,8 @@
 
 This document records the first canonical dashboard packet that projects the
 frozen baseline, the retained current-best row, and the retained candidate row
-from one shared local-cluster source of truth.
+from one shared local-cluster source of truth, and now keeps the retained
+roundtrip-green accelerator row visible as the current-best panel.
 
 ## Canonical Fixture
 
@@ -52,15 +53,15 @@ by hand.
 ## Current Retained Truth
 
 - dashboard digest:
-  `06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f`
+  `5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7`
 - baseline panel digest:
   `7463e54f038488aca1032ef48a8a9cea9d1cf44ab9e5e6d5cfd879613df0e3b1`
 - current-best panel digest:
-  `6325d4f1d94980340143a988a64b5d19f4c0f3302dacff01d88f54c5fef03583`
+  `b22ee92059c45e6e87bea21c33c444ac9f169c72f1362c2912aedf6749e6a70a`
 - candidate panel digest:
   `313ce44d8532b23775384f511f544f02c2656df1d7172d5d7342d13dd54b582d`
 - profile-comparison digest:
-  `3c04268ce24085b2f07e66315c6da5178fa243c4e99d51f2285db34d28957bb9`
+  `abda7585ebfe5e123b84df4df68d28c88f3c9786c6ffa65174de7c642e55f23d`
 - baseline suite counts:
   `11` total, `11` green, `4` manual-review-backed
 - retained current-best row:
@@ -76,11 +77,12 @@ by hand.
 
 The dashboard does not relabel the ledger to make the story cleaner.
 
-Today’s retained truth is:
+Today's retained truth is:
 
 - the 4080 row is the retained `current_best` row
 - the MLX row is the retained `candidate` row
-- the 4080 row remains recovery-green but export-pending on the Mac roundtrip
+- the 4080 row now remains both recovery-green and export-green because the
+  Mac -> 4080 -> Mac roundtrip packet is retained directly into the ledger
 - the MLX row remains export-green and same-node recovery-not-required
 
 That is the point of this packet. It makes the actual local-cluster state

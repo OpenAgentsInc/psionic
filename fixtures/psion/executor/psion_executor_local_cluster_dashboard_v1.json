@@ -4,7 +4,7 @@
   "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
   "registration_packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632",
+  "ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "baseline_card": {
@@ -39,7 +39,7 @@
     "metrics": {
       "completed_steps": 47104,
       "final_mean_loss": 0.0,
-      "retained_failure_count": 4,
+      "retained_failure_count": 5,
       "detail": "The `local_4080_cuda_tailnet_x86_64` panel keeps the retained completed-step count, final loss, and failure fact count from the cumulative ledger row instead of recomputing a second metric view."
     },
     "throughput": {
@@ -49,10 +49,10 @@
       "detail": "Throughput on `local_4080_cuda_tailnet_x86_64` stays projected directly from the ledger metric posture so the dashboard side-by-side view never drifts from the retained row facts."
     },
     "budget_burn_ratio": 0.952721666666667,
-    "export_status": "pending_mac_roundtrip_validation",
+    "export_status": "green",
     "recovery_status": "green",
     "detail": "The `local_4080_cuda_tailnet_x86_64` dashboard card keeps metrics, throughput, recovery, export status, and budget burn together for weekly local-cluster review.",
-    "panel_digest": "6325d4f1d94980340143a988a64b5d19f4c0f3302dacff01d88f54c5fef03583"
+    "panel_digest": "b22ee92059c45e6e87bea21c33c444ac9f169c72f1362c2912aedf6749e6a70a"
   },
   "candidate_card": {
     "panel_id": "psion_executor_local_cluster_dashboard_candidate_v1",
@@ -102,7 +102,7 @@
         "final_mean_loss": 0.0,
         "observed_steps_per_second": 82.40252049829174,
         "budget_burn_ratio": 0.952721666666667,
-        "export_status": "pending_mac_roundtrip_validation",
+        "export_status": "green",
         "recovery_status": "green",
         "detail": "The current-best column keeps the retained winner visible inside the shared local-cluster review surface without hiding which admitted profile currently owns the stronger row."
       },
@@ -120,7 +120,7 @@
       }
     ],
     "detail": "The profile comparison keeps the admitted MLX and 4080 rows side-by-side under one shared device-matrix search key so review can compare throughput, export, recovery, and budget burn without reconstructing cross-packet context by hand.",
-    "comparison_digest": "3c04268ce24085b2f07e66315c6da5178fa243c4e99d51f2285db34d28957bb9"
+    "comparison_digest": "abda7585ebfe5e123b84df4df68d28c88f3c9786c6ffa65174de7c642e55f23d"
   },
   "support_refs": [
     "docs/PSION_EXECUTOR_PROGRAM.md",
@@ -129,8 +129,9 @@
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
     "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md",
     "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
-    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md"
+    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md"
   ],
-  "summary": "The admitted executor lane now has one canonical dashboard packet that keeps the frozen baseline, the retained current-best row, and the retained candidate row visible together. Metrics, throughput, recovery, export, and budget burn now project from the same retained ledger instead of separate packet prose.",
-  "dashboard_digest": "06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f"
+  "summary": "The admitted executor lane now has one canonical dashboard packet that keeps the frozen baseline, the retained current-best row, and the retained candidate row visible together. Metrics, throughput, recovery, export, and budget burn now project from the same retained ledger instead of separate packet prose, and the current-best 4080 row now shows the retained roundtrip as export-green.",
+  "dashboard_digest": "5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7"
 }

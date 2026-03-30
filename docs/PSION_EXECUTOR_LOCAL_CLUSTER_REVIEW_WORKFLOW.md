@@ -44,38 +44,37 @@ That means the executor lane now has one durable answer to:
 ## Current Retained Truth
 
 - workflow digest:
-  `920d5cc2b4a4e20bd951c4a2cc0776d3a56ad7dc3191e3aed3baab9ab95a014a`
+  `5b70189bcb3929f68a605307c7afbe330dd9bb8e03db02def44d0d625bb0a7bf`
 - ownership ref:
   `docs/PSION_EXECUTOR_OWNERSHIP.md`
 - dashboard digest:
-  `06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f`
+  `5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7`
 - ledger digest:
-  `1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632`
+  `9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3`
 - baseline-truth digest:
   `43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c`
 - auto-block report digest:
-  `1ea4d6cb038b59550548308513c63727a67f6e82b3f6e59f3573946eaf58d88f`
+  `50ea5e3fcf52d3650437ef038a31a26a0bcc96fdf619b8f566a05d9764363be3`
 - baseline template digest:
-  `042b45e975336f4f0fc5af612c8039a206c52933ff3fca645fdee442c96dfdbc`
+  `2e93b06b083329e0a39a2fa2db8ed36e97347ebce4c7149f8d335bdda0ccd363`
 - ablation template digest:
-  `b20d44cbffa4aa65c863440dc9d74410cb14fbd3710fdb7230eaa7fe8df967d8`
+  `0364307416eed3d1236d8f1c64da4f36611f6335e375a9ba29b2ff7f11e4bc39`
 - baseline decision id:
   `psion_executor_weekly_baseline_review_2026w14_v1`
 - baseline decision:
   `hold_frozen_baseline`
 - baseline status:
-  `blocked_current_best`
+  `promotion_blocked_current_best`
 - ablation decision id:
   `psion_executor_weekly_ablation_review_2026w14_v1`
 - ablation decision:
   `hold_same_budget_follow_on`
 - ablation status:
-  `blocked_current_best`
+  `promotion_blocked_current_best`
 - cited current-best row:
   `psion_executor_local_cluster_ledger_row_4080_v1`
 - cited active block ids:
-  `missing_eval_fact_current_best`,
-  `missing_export_fact_current_best`
+  `missing_eval_fact_current_best`
 
 ## Frozen-Pack Rule
 
@@ -96,14 +95,14 @@ The workflow currently does not celebrate a new winner.
 It does something more useful:
 
 - the baseline review explicitly holds the frozen baseline because the
-  current-best row still carries active block ids
+  current-best row still carries an active promotion block id
 - the ablation review explicitly refuses to bless a same-budget follow-on while
-  those same block ids remain open
+  that same promotion block id remains open
 - both decisions now cite machine-readable ledger and block facts instead of
   operator memory
 
 That is the first point of the workflow: review cadence is now retained even
-when the right answer is "hold."
+when phase exit is green and the right promotion answer is still "hold."
 
 ## Validation
 

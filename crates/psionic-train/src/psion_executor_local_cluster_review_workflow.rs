@@ -425,7 +425,7 @@ fn build_baseline_template() -> PsionExecutorLocalClusterReviewTemplate {
             String::from("reference_linear_anchor_visible"),
         ],
         decision_rule: String::from(
-            "Hold the frozen baseline as the active floor unless the current-best row stays tied to frozen-pack truth and all active auto-block ids clear.",
+            "Hold the frozen baseline as the active floor unless the current-best row stays tied to frozen-pack truth and all active promotion block ids clear.",
         ),
         detail: String::from(
             "The weekly baseline review template keeps the baseline decision anchored to frozen-pack truth, the retained current-best row, and the canonical auto-block report.",
@@ -455,7 +455,7 @@ fn build_ablation_template() -> PsionExecutorLocalClusterReviewTemplate {
             String::from("active_block_ids_visible"),
         ],
         decision_rule: String::from(
-            "Authorize no new same-budget ablation win unless the candidate stays inside frozen-pack truth and the current-best row no longer carries active phase-exit or promotion blocks.",
+            "Authorize no new same-budget ablation win unless the candidate stays inside frozen-pack truth and the current-best row no longer carries active promotion blocks.",
         ),
         detail: String::from(
             "The weekly ablation review template keeps same-budget decisions tied to the retained local-cluster ledger and the canonical auto-block report instead of ad hoc experiment summaries.",
@@ -470,6 +470,8 @@ fn build_baseline_decision(
     current_best_row: &crate::PsionExecutorLocalClusterLedgerRow,
     autoblocks: &crate::PsionExecutorLocalClusterAutoblocksReport,
 ) -> Result<PsionExecutorLocalClusterReviewDecision, PsionExecutorLocalClusterReviewWorkflowError> {
+    let cited_block_ids = autoblocks.active_promotion_block_ids.clone();
+    let blocked = !cited_block_ids.is_empty();
     let mut decision = PsionExecutorLocalClusterReviewDecision {
         review_id: String::from(BASELINE_DECISION_ID),
         review_kind: String::from("baseline_review"),
@@ -478,15 +480,27 @@ fn build_baseline_decision(
         reviewer_identity: String::from("Christopher David"),
         cited_pack_ids: current_best_row.eval_pack_ids.clone(),
         cited_row_ids: vec![current_best_row.row_id.clone()],
-        cited_block_ids: autoblocks.active_phase_exit_block_ids.clone(),
+        cited_block_ids,
         decision: String::from("hold_frozen_baseline"),
-        status: String::from("blocked_current_best"),
-        detail: format!(
-            "The weekly baseline review keeps the frozen baseline in place because current-best row `{}` still carries active blocks [{}]. Only the frozen pack ids {:?} were admitted as review truth.",
-            current_best_row.row_id,
-            autoblocks.active_phase_exit_block_ids.join(", "),
-            current_best_row.eval_pack_ids
-        ),
+        status: if blocked {
+            String::from("promotion_blocked_current_best")
+        } else {
+            String::from("review_ready_current_best")
+        },
+        detail: if blocked {
+            format!(
+                "The weekly baseline review keeps the frozen baseline in place because current-best row `{}` still carries active promotion blocks [{}]. Only the frozen pack ids {:?} were admitted as review truth.",
+                current_best_row.row_id,
+                autoblocks.active_promotion_block_ids.join(", "),
+                current_best_row.eval_pack_ids
+            )
+        } else {
+            format!(
+                "The weekly baseline review keeps the frozen baseline as the comparison floor while current-best row `{}` now clears all retained promotion blocks under frozen pack ids {:?}.",
+                current_best_row.row_id,
+                current_best_row.eval_pack_ids
+            )
+        },
         decision_digest: String::new(),
     };
     decision.decision_digest = stable_decision_digest(&decision);
@@ -497,6 +511,8 @@ fn build_ablation_decision(
     current_best_row: &crate::PsionExecutorLocalClusterLedgerRow,
     autoblocks: &crate::PsionExecutorLocalClusterAutoblocksReport,
 ) -> Result<PsionExecutorLocalClusterReviewDecision, PsionExecutorLocalClusterReviewWorkflowError> {
+    let cited_block_ids = autoblocks.active_promotion_block_ids.clone();
+    let blocked = !cited_block_ids.is_empty();
     let mut decision = PsionExecutorLocalClusterReviewDecision {
         review_id: String::from(ABLATION_DECISION_ID),
         review_kind: String::from("ablation_review"),
@@ -505,15 +521,27 @@ fn build_ablation_decision(
         reviewer_identity: String::from("Christopher David"),
         cited_pack_ids: current_best_row.eval_pack_ids.clone(),
         cited_row_ids: vec![current_best_row.row_id.clone()],
-        cited_block_ids: autoblocks.active_phase_exit_block_ids.clone(),
+        cited_block_ids,
         decision: String::from("hold_same_budget_follow_on"),
-        status: String::from("blocked_current_best"),
-        detail: format!(
-            "The weekly ablation review refuses to authorize a new same-budget winner while current-best row `{}` still carries active blocks [{}]. The cited evidence remains limited to frozen pack ids {:?} plus retained ledger/dashboard/autoblock facts.",
-            current_best_row.row_id,
-            autoblocks.active_phase_exit_block_ids.join(", "),
-            current_best_row.eval_pack_ids
-        ),
+        status: if blocked {
+            String::from("promotion_blocked_current_best")
+        } else {
+            String::from("review_ready_current_best")
+        },
+        detail: if blocked {
+            format!(
+                "The weekly ablation review refuses to authorize a new same-budget winner while current-best row `{}` still carries active promotion blocks [{}]. The cited evidence remains limited to frozen pack ids {:?} plus retained ledger/dashboard/autoblock facts.",
+                current_best_row.row_id,
+                autoblocks.active_promotion_block_ids.join(", "),
+                current_best_row.eval_pack_ids
+            )
+        } else {
+            format!(
+                "The weekly ablation review now sees current-best row `{}` as phase-exit green and free of active promotion blocks; same-budget follow-on decisions can proceed from frozen pack ids {:?} instead of export-side blockers.",
+                current_best_row.row_id,
+                current_best_row.eval_pack_ids
+            )
+        },
         decision_digest: String::new(),
     };
     decision.decision_digest = stable_decision_digest(&decision);

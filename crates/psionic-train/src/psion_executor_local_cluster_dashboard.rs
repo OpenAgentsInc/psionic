@@ -42,6 +42,8 @@ const PSION_EXECUTOR_4080_DECISION_GRADE_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md";
 const PSION_EXECUTOR_MAC_EXPORT_INSPECTION_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md";
+const PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_DOC_PATH: &str =
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md";
 
 #[derive(Debug, Error)]
 pub enum PsionExecutorLocalClusterDashboardError {
@@ -637,9 +639,10 @@ pub fn builtin_executor_local_cluster_dashboard_packet(
             String::from(PSION_EXECUTOR_MLX_DECISION_GRADE_DOC_PATH),
             String::from(PSION_EXECUTOR_MAC_EXPORT_INSPECTION_DOC_PATH),
             String::from(PSION_EXECUTOR_4080_DECISION_GRADE_DOC_PATH),
+            String::from(PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_DOC_PATH),
         ],
         summary: String::from(
-            "The admitted executor lane now has one canonical dashboard packet that keeps the frozen baseline, the retained current-best row, and the retained candidate row visible together. Metrics, throughput, recovery, export, and budget burn now project from the same retained ledger instead of separate packet prose.",
+            "The admitted executor lane now has one canonical dashboard packet that keeps the frozen baseline, the retained current-best row, and the retained candidate row visible together. Metrics, throughput, recovery, export, and budget burn now project from the same retained ledger instead of separate packet prose, and the current-best 4080 row now shows the retained roundtrip as export-green.",
         ),
         dashboard_digest: String::new(),
     };
@@ -997,7 +1000,7 @@ mod tests {
         );
         assert_eq!(
             packet.current_best_card.export_status,
-            "pending_mac_roundtrip_validation"
+            "green"
         );
         assert_eq!(packet.candidate_card.export_status, "green");
         Ok(())

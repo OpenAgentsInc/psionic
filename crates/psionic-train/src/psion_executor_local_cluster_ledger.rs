@@ -9,14 +9,16 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    builtin_executor_4080_decision_grade_run_packet, builtin_executor_4080_interruption_recovery_packet,
-    builtin_executor_4080_smoke_run_packet, builtin_executor_baseline_truth_record,
+    builtin_executor_4080_decision_grade_run_packet,
+    builtin_executor_4080_interruption_recovery_packet, builtin_executor_4080_smoke_run_packet,
+    builtin_executor_baseline_truth_record, builtin_executor_local_cluster_roundtrip_packet,
     builtin_executor_local_cluster_run_registration_packet, builtin_executor_mac_export_inspection_packet,
-    PsionExecutor4080DecisionGradeRunError, PsionExecutor4080InterruptionRecoveryError,
-    PsionExecutor4080SmokeRunError, PsionExecutorBaselineTruthError,
-    PsionExecutorLocalClusterCandidateStatus, PsionExecutorLocalClusterRunRegistrationError,
-    PsionExecutorLocalClusterRunRegistrationPacket, PsionExecutorMacExportInspectionError,
-    PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH,
+    PsionExecutor4080DecisionGradeRunError,
+    PsionExecutor4080InterruptionRecoveryError, PsionExecutor4080SmokeRunError,
+    PsionExecutorBaselineTruthError, PsionExecutorLocalClusterCandidateStatus,
+    PsionExecutorLocalClusterRoundtripError,
+    PsionExecutorLocalClusterRunRegistrationError, PsionExecutorLocalClusterRunRegistrationPacket,
+    PsionExecutorMacExportInspectionError, PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH,
     PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION_FIXTURE_PATH,
 };
 
@@ -41,6 +43,8 @@ const PSION_EXECUTOR_4080_DECISION_GRADE_DOC_PATH: &str =
 const PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY_DOC_PATH: &str =
     "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md";
 const PSION_EXECUTOR_4080_SMOKE_RUN_DOC_PATH: &str = "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md";
+const PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_DOC_PATH: &str =
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md";
 
 #[derive(Debug, Error)]
 pub enum PsionExecutorLocalClusterLedgerError {
@@ -81,6 +85,8 @@ pub enum PsionExecutorLocalClusterLedgerError {
     Recovery4080(#[from] PsionExecutor4080InterruptionRecoveryError),
     #[error(transparent)]
     Smoke4080(#[from] PsionExecutor4080SmokeRunError),
+    #[error(transparent)]
+    Roundtrip(#[from] PsionExecutorLocalClusterRoundtripError),
     #[error(transparent)]
     BaselineTruth(#[from] PsionExecutorBaselineTruthError),
 }
@@ -280,12 +286,18 @@ impl PsionExecutorLocalClusterFailureFact {
 impl PsionExecutorLocalClusterLedgerRow {
     fn validate(&self) -> Result<(), PsionExecutorLocalClusterLedgerError> {
         for (field, value) in [
-            ("psion_executor_local_cluster_ledger.rows[].row_id", self.row_id.as_str()),
+            (
+                "psion_executor_local_cluster_ledger.rows[].row_id",
+                self.row_id.as_str(),
+            ),
             (
                 "psion_executor_local_cluster_ledger.rows[].registration_id",
                 self.registration_id.as_str(),
             ),
-            ("psion_executor_local_cluster_ledger.rows[].run_id", self.run_id.as_str()),
+            (
+                "psion_executor_local_cluster_ledger.rows[].run_id",
+                self.run_id.as_str(),
+            ),
             (
                 "psion_executor_local_cluster_ledger.rows[].admitted_profile_id",
                 self.admitted_profile_id.as_str(),
@@ -306,7 +318,10 @@ impl PsionExecutorLocalClusterLedgerRow {
                 "psion_executor_local_cluster_ledger.rows[].recovery_status",
                 self.recovery_status.as_str(),
             ),
-            ("psion_executor_local_cluster_ledger.rows[].detail", self.detail.as_str()),
+            (
+                "psion_executor_local_cluster_ledger.rows[].detail",
+                self.detail.as_str(),
+            ),
             (
                 "psion_executor_local_cluster_ledger.rows[].row_digest",
                 self.row_digest.as_str(),
@@ -357,7 +372,10 @@ impl PsionExecutorLocalClusterLedgerRow {
 }
 
 impl PsionExecutorLocalClusterLedger {
-    pub fn rows_for_run_id<'a>(&'a self, run_id: &str) -> Vec<&'a PsionExecutorLocalClusterLedgerRow> {
+    pub fn rows_for_run_id<'a>(
+        &'a self,
+        run_id: &str,
+    ) -> Vec<&'a PsionExecutorLocalClusterLedgerRow> {
         self.search_index
             .run_id_to_row_ids
             .get(run_id)
@@ -405,7 +423,10 @@ impl PsionExecutorLocalClusterLedger {
             .map_or_else(Vec::new, |row_ids| self.rows_for_ids(row_ids))
     }
 
-    fn rows_for_ids<'a>(&'a self, row_ids: &[String]) -> Vec<&'a PsionExecutorLocalClusterLedgerRow> {
+    fn rows_for_ids<'a>(
+        &'a self,
+        row_ids: &[String],
+    ) -> Vec<&'a PsionExecutorLocalClusterLedgerRow> {
         let id_set: BTreeSet<&str> = row_ids.iter().map(String::as_str).collect();
         self.rows
             .iter()
@@ -419,13 +440,18 @@ impl PsionExecutorLocalClusterLedger {
             "psion_executor_local_cluster_ledger.schema_version",
         )?;
         if self.schema_version != PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_SCHEMA_VERSION {
-            return Err(PsionExecutorLocalClusterLedgerError::SchemaVersionMismatch {
-                expected: String::from(PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_SCHEMA_VERSION),
-                actual: self.schema_version.clone(),
-            });
+            return Err(
+                PsionExecutorLocalClusterLedgerError::SchemaVersionMismatch {
+                    expected: String::from(PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_SCHEMA_VERSION),
+                    actual: self.schema_version.clone(),
+                },
+            );
         }
         for (field, value) in [
-            ("psion_executor_local_cluster_ledger.ledger_id", self.ledger_id.as_str()),
+            (
+                "psion_executor_local_cluster_ledger.ledger_id",
+                self.ledger_id.as_str(),
+            ),
             (
                 "psion_executor_local_cluster_ledger.registration_packet_ref",
                 self.registration_packet_ref.as_str(),
@@ -450,7 +476,10 @@ impl PsionExecutorLocalClusterLedger {
                 "psion_executor_local_cluster_ledger.baseline_truth_digest",
                 self.baseline_truth_digest.as_str(),
             ),
-            ("psion_executor_local_cluster_ledger.summary", self.summary.as_str()),
+            (
+                "psion_executor_local_cluster_ledger.summary",
+                self.summary.as_str(),
+            ),
             (
                 "psion_executor_local_cluster_ledger.ledger_digest",
                 self.ledger_digest.as_str(),
@@ -577,10 +606,15 @@ pub fn builtin_executor_local_cluster_ledger(
     let cuda_decision = builtin_executor_4080_decision_grade_run_packet(workspace_root)?;
     let cuda_recovery = builtin_executor_4080_interruption_recovery_packet(workspace_root)?;
     let cuda_smoke = builtin_executor_4080_smoke_run_packet(workspace_root)?;
-    let registration_sha256 =
-        hex::encode(Sha256::digest(read_bytes(workspace_root, PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION_FIXTURE_PATH)?));
-    let baseline_truth_sha256 =
-        hex::encode(Sha256::digest(read_bytes(workspace_root, PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH)?));
+    let roundtrip = builtin_executor_local_cluster_roundtrip_packet(workspace_root)?;
+    let registration_sha256 = hex::encode(Sha256::digest(read_bytes(
+        workspace_root,
+        PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION_FIXTURE_PATH,
+    )?));
+    let baseline_truth_sha256 = hex::encode(Sha256::digest(read_bytes(
+        workspace_root,
+        PSION_EXECUTOR_BASELINE_TRUTH_FIXTURE_PATH,
+    )?));
 
     let mlx_registration = find_registration_row(&registration, "local_mac_mlx_aarch64")?;
     let cuda_registration = find_registration_row(&registration, "local_4080_cuda_tailnet_x86_64")?;
@@ -679,10 +713,10 @@ pub fn builtin_executor_local_cluster_ledger(
                 checkpoint_family: cuda_smoke.checkpoint_family.clone(),
                 checkpoint_pointer_digest: Some(cuda_smoke.checkpoint_pointer_digest.clone()),
                 checkpoint_ref: Some(cuda_smoke.checkpoint_ref.clone()),
-                export_bundle_ref: None,
-                export_artifact_digest: None,
+                export_bundle_ref: Some(roundtrip.export_bundle_ref.clone()),
+                export_artifact_digest: Some(roundtrip.export_bundle_sha256.clone()),
                 detail: String::from(
-                    "The 4080 row keeps the supporting Tailnet checkpoint family, pointer digest, and checkpoint ref explicit, but export back onto the Mac remains pending until the roundtrip issue lands.",
+                    "The 4080 row keeps the supporting Tailnet checkpoint family, pointer digest, and checkpoint ref explicit, and now binds the returned Mac-side portable bundle from the retained roundtrip closeout packet.",
                 ),
             },
             cost_posture: PsionExecutorLocalClusterCostPosture {
@@ -741,11 +775,20 @@ pub fn builtin_executor_local_cluster_ledger(
                         cuda_recovery.uneven_worker_speed_observed_skew_ms
                     ),
                 },
+                PsionExecutorLocalClusterFailureFact {
+                    fact_id: String::from("local_cluster_roundtrip_green"),
+                    status: roundtrip.cluster_closure_status.clone(),
+                    detail: roundtrip.cluster_closure_detail.clone(),
+                },
             ],
-            export_status: String::from("pending_mac_roundtrip_validation"),
+            export_status: if roundtrip.phase_exit_green {
+                String::from("green")
+            } else {
+                String::from("pending_mac_roundtrip_validation")
+            },
             recovery_status: String::from("green"),
             detail: String::from(
-                "The 4080 ledger row binds registration, checkpoint lineage, retained failure drills, and explicit export-pending posture into one searchable record so the accelerator lane no longer hides its current gap behind separate packet prose.",
+                "The 4080 ledger row binds registration, checkpoint lineage, retained failure drills, and the green Mac -> 4080 -> Mac roundtrip closeout into one searchable record so the accelerator lane no longer hides cluster closure behind separate packet prose.",
             ),
             row_digest: String::new(),
         },
@@ -774,9 +817,10 @@ pub fn builtin_executor_local_cluster_ledger(
             String::from(PSION_EXECUTOR_4080_SMOKE_RUN_DOC_PATH),
             String::from(PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY_DOC_PATH),
             String::from(PSION_EXECUTOR_4080_DECISION_GRADE_DOC_PATH),
+            String::from(PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP_DOC_PATH),
         ],
         summary: String::from(
-            "The executor lane now has one searchable local-cluster ledger. It joins the canonical MLX and 4080 run registrations with checkpoint lineage, cost, metric, failure, recovery, and export posture so expensive local executor runs stop living as separate packet fragments.",
+            "The executor lane now has one searchable local-cluster ledger. It joins the canonical MLX and 4080 run registrations with checkpoint lineage, cost, metric, failure, recovery, export, and roundtrip-closure posture so expensive local executor runs stop living as separate packet fragments.",
         ),
         ledger_digest: String::new(),
     };
@@ -789,14 +833,21 @@ pub fn write_builtin_executor_local_cluster_ledger(
     workspace_root: &Path,
 ) -> Result<PsionExecutorLocalClusterLedger, PsionExecutorLocalClusterLedgerError> {
     let ledger = builtin_executor_local_cluster_ledger(workspace_root)?;
-    write_json_fixture(workspace_root, PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH, &ledger)?;
+    write_json_fixture(
+        workspace_root,
+        PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH,
+        &ledger,
+    )?;
     Ok(ledger)
 }
 
 fn find_registration_row<'a>(
     registration: &'a PsionExecutorLocalClusterRunRegistrationPacket,
     profile_id: &str,
-) -> Result<&'a crate::PsionExecutorLocalClusterRunRegistrationRow, PsionExecutorLocalClusterLedgerError> {
+) -> Result<
+    &'a crate::PsionExecutorLocalClusterRunRegistrationRow,
+    PsionExecutorLocalClusterLedgerError,
+> {
     registration
         .registration_rows
         .iter()
@@ -806,7 +857,9 @@ fn find_registration_row<'a>(
         })
 }
 
-fn build_search_index(rows: &[PsionExecutorLocalClusterLedgerRow]) -> PsionExecutorLocalClusterSearchIndex {
+fn build_search_index(
+    rows: &[PsionExecutorLocalClusterLedgerRow],
+) -> PsionExecutorLocalClusterSearchIndex {
     let mut run_id_to_row_ids = BTreeMap::new();
     let mut profile_id_to_row_ids = BTreeMap::new();
     let mut eval_pack_id_to_row_ids = BTreeMap::new();
@@ -898,9 +951,11 @@ fn write_json_fixture<T: Serialize>(
 ) -> Result<(), PsionExecutorLocalClusterLedgerError> {
     let path = workspace_root.join(relative_path);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| PsionExecutorLocalClusterLedgerError::CreateDir {
-            path: parent.display().to_string(),
-            error,
+        fs::create_dir_all(parent).map_err(|error| {
+            PsionExecutorLocalClusterLedgerError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            }
         })?;
     }
     let bytes = serde_json::to_vec_pretty(value)?;
@@ -965,8 +1020,10 @@ mod tests {
     fn executor_local_cluster_ledger_fixture_matches_committed_truth(
     ) -> Result<(), PsionExecutorLocalClusterLedgerError> {
         let root = workspace_root();
-        let expected: PsionExecutorLocalClusterLedger =
-            read_json(root.as_path(), PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH)?;
+        let expected: PsionExecutorLocalClusterLedger = read_json(
+            root.as_path(),
+            PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH,
+        )?;
         let actual = builtin_executor_local_cluster_ledger(root.as_path())?;
         if actual != expected {
             return Err(PsionExecutorLocalClusterLedgerError::FixtureDrift {
@@ -981,8 +1038,18 @@ mod tests {
     ) -> Result<(), PsionExecutorLocalClusterLedgerError> {
         let root = workspace_root();
         let ledger = builtin_executor_local_cluster_ledger(root.as_path())?;
-        assert_eq!(ledger.rows_for_run_id("same-node-wallclock-retained-mlx").len(), 1);
-        assert_eq!(ledger.rows_for_run_id("tailrun-home-admitted-20260328k").len(), 1);
+        assert_eq!(
+            ledger
+                .rows_for_run_id("same-node-wallclock-retained-mlx")
+                .len(),
+            1
+        );
+        assert_eq!(
+            ledger
+                .rows_for_run_id("tailrun-home-admitted-20260328k")
+                .len(),
+            1
+        );
         assert_eq!(ledger.rows_for_profile_id("local_mac_mlx_aarch64").len(), 1);
         assert_eq!(
             ledger
@@ -990,7 +1057,12 @@ mod tests {
                 .len(),
             1
         );
-        assert_eq!(ledger.rows_for_eval_pack_id("tassadar.eval.frequent.v0").len(), 2);
+        assert_eq!(
+            ledger
+                .rows_for_eval_pack_id("tassadar.eval.frequent.v0")
+                .len(),
+            2
+        );
         assert_eq!(
             ledger
                 .rows_for_model_id("tassadar-article-transformer-trace-bound-trained-v0")
@@ -1011,8 +1083,10 @@ mod tests {
     ) -> Result<(), PsionExecutorLocalClusterLedgerError> {
         let root = workspace_root();
         let ledger = write_builtin_executor_local_cluster_ledger(root.as_path())?;
-        let committed: PsionExecutorLocalClusterLedger =
-            read_json(root.as_path(), PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH)?;
+        let committed: PsionExecutorLocalClusterLedger = read_json(
+            root.as_path(),
+            PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER_FIXTURE_PATH,
+        )?;
         assert_eq!(ledger, committed);
         Ok(())
     }

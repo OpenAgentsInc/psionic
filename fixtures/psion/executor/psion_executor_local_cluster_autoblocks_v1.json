@@ -3,50 +3,46 @@
   "report_id": "psion_executor_local_cluster_autoblocks_v1",
   "current_best_row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
   "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
-  "dashboard_digest": "06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f",
+  "dashboard_digest": "5c24954ea04b35c07e5e08709f0eecc46a23ef7cb1e62a044dea26f809c4c4d7",
   "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-  "ledger_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632",
+  "ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
   "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
   "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
   "frequent_eval_ref": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
   "frequent_eval_digest": "b61245ffc124b3a8fd9ec3e15bee20782fe4538f30a4595829e735bdbc360fb7",
-  "phase_exit_blocked": true,
+  "phase_exit_blocked": false,
   "promotion_blocked": true,
-  "active_phase_exit_block_ids": [
-    "missing_eval_fact_current_best",
-    "missing_export_fact_current_best"
-  ],
+  "active_phase_exit_block_ids": [],
   "active_promotion_block_ids": [
-    "missing_eval_fact_current_best",
-    "missing_export_fact_current_best"
+    "missing_eval_fact_current_best"
   ],
   "block_rows": [
     {
       "block_id": "missing_eval_fact_current_best",
-      "scope": "phase_exit_and_promotion",
+      "scope": "promotion_only",
       "status": "blocked_missing_eval_fact",
       "owner_surface_ref": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
       "owner_surface_digest": "b61245ffc124b3a8fd9ec3e15bee20782fe4538f30a4595829e735bdbc360fb7",
-      "detail": "The current-best row for run `tailrun-home-admitted-20260328k` inherits the retained frequent-eval blocker posture. Missing or unscored frequent-pack coverage still leaves blocker ids [frequent_exactness_cases_v0, frequent_held_out_exclusions_v0, frequent_throughput_blockers_v0] active, so both phase exit and promotion stay blocked until those eval facts turn green.",
-      "block_digest": "edd80e732c9f67fdde26d8f253f633743dd1e96f209d1c76369adb2193ff11a5"
+      "detail": "The current-best row for run `tailrun-home-admitted-20260328k` inherits the retained frequent-eval blocker posture. Missing or unscored frequent-pack coverage still leaves blocker ids [frequent_exactness_cases_v0, frequent_held_out_exclusions_v0, frequent_throughput_blockers_v0] active, so promotion stays blocked until those eval facts turn green even after cluster closure is otherwise complete.",
+      "block_digest": "81a63ad67b9094e1a5ac53ea65a82021215887e09c4e893fae92250572e65777"
     },
     {
       "block_id": "missing_recovery_fact_current_best",
       "scope": "phase_exit_and_promotion",
       "status": "green",
       "owner_surface_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
-      "owner_surface_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632",
+      "owner_surface_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3",
       "detail": "The current-best row `psion_executor_local_cluster_ledger_row_4080_v1` keeps recovery status `green`. Anything outside `green` or `not_required_same_node` blocks both phase exit and promotion automatically.",
-      "block_digest": "e8e152cbbe0352ce6189e119a22ffda383b2f2c5ba3d20a9f3621e783b46c021"
+      "block_digest": "f345a0fb32a21646789ea5609393589e5e1f5fa43243def2835d9ab88847d730"
     },
     {
       "block_id": "missing_export_fact_current_best",
       "scope": "phase_exit_and_promotion",
-      "status": "blocked_missing_export_fact",
-      "owner_surface_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
-      "owner_surface_digest": "06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f",
-      "detail": "The dashboard keeps the current-best export posture explicit as `pending_mac_roundtrip_validation` on row `psion_executor_local_cluster_ledger_row_4080_v1`. Until that turns green, the local-cluster phase exit and promotion gates stay blocked instead of relying on review memory.",
-      "block_digest": "56064a47b3640c8dfe1bdeea1e39c798f3dc752d5c0d2bab29f2eee5c0934f62"
+      "status": "green",
+      "owner_surface_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
+      "owner_surface_digest": "dc2d4cc82a4b5b952032991ca5786c8c2aadd4bb6155801d85c73c07798a1ef1",
+      "detail": "The roundtrip closeout packet keeps the current-best export posture explicit as `green` on row `psion_executor_local_cluster_ledger_row_4080_v1`. Until that turns green, the local-cluster phase exit and promotion gates stay blocked instead of relying on review memory. Current cluster closure status is `green`.",
+      "block_digest": "75e50ad108c63b0b4b62ad4ebca2fabfaae6a3850042c3cb15aca51799cf9c04"
     },
     {
       "block_id": "missing_reference_linear_anchor",
@@ -63,8 +59,9 @@
     "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
     "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md",
     "docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md"
   ],
-  "summary": "The admitted executor lane now has one canonical auto-block report for local-cluster promotion and phase exits. Missing eval, recovery, export, and `reference_linear` anchor facts are now machine-readable block rows instead of narrative review notes.",
-  "report_digest": "1ea4d6cb038b59550548308513c63727a67f6e82b3f6e59f3573946eaf58d88f"
+  "summary": "The admitted executor lane now has one canonical auto-block report for local-cluster promotion and phase exits. Missing eval, recovery, export, and `reference_linear` anchor facts are now machine-readable block rows instead of narrative review notes, and promotion-only eval blockers stay distinct from cluster-closure facts.",
+  "report_digest": "50ea5e3fcf52d3650437ef038a31a26a0bcc96fdf619b8f566a05d9764363be3"
 }

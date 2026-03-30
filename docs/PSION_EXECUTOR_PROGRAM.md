@@ -147,6 +147,9 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md` owns the first
   canonical weekly baseline and ablation review workflow packet built directly
   on the retained local-cluster dashboard, ledger, and auto-block stack
+- `docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md` owns the first retained
+  Mac -> 4080 -> Mac roundtrip closeout packet and the explicit phase-exit
+  cluster-closure proof for the admitted executor local-cluster lane
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

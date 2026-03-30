@@ -77,7 +77,9 @@
         "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
         "checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
         "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
-        "detail": "The 4080 row keeps the supporting Tailnet checkpoint family, pointer digest, and checkpoint ref explicit, but export back onto the Mac remains pending until the roundtrip issue lands."
+        "export_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors",
+        "export_artifact_digest": "5e3b708051e6ccb86d9efe5e13f4ab425b3ec1bb74c28f6cc8f2b44a49129f7f",
+        "detail": "The 4080 row keeps the supporting Tailnet checkpoint family, pointer digest, and checkpoint ref explicit, and now binds the returned Mac-side portable bundle from the retained roundtrip closeout packet."
       },
       "cost_posture": {
         "wallclock_budget_seconds": 600,
@@ -113,12 +115,17 @@
           "fact_id": "uneven_worker_speed_wait_then_replay",
           "status": "wait_then_replay",
           "detail": "Uneven worker speed remains explicit at 18000 ms observed skew."
+        },
+        {
+          "fact_id": "local_cluster_roundtrip_green",
+          "status": "green",
+          "detail": "The retained current-best registration `psion_executor_local_cluster_registration_4080_v1` now keeps the full Mac -> 4080 -> Mac loop green: controller launch on Mac, accelerator-backed decision run `same-node-wallclock-retained-cuda`, durable checkpoint `checkpoint://swarm/first-swarm-live-plan/policy`, restore rehearsal, returned bundle `fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/archlinux_cuda/portable_bundle.safetensors`, and back-on-Mac validation under `host_cpu_aarch64` all stay explicit in one packet."
         }
       ],
-      "export_status": "pending_mac_roundtrip_validation",
+      "export_status": "green",
       "recovery_status": "green",
-      "detail": "The 4080 ledger row binds registration, checkpoint lineage, retained failure drills, and explicit export-pending posture into one searchable record so the accelerator lane no longer hides its current gap behind separate packet prose.",
-      "row_digest": "78d08622a1daee7e4b4913b59e82a3081354edd6a2ad0dc3242ced2ddd07630e"
+      "detail": "The 4080 ledger row binds registration, checkpoint lineage, retained failure drills, and the green Mac -> 4080 -> Mac roundtrip closeout into one searchable record so the accelerator lane no longer hides cluster closure behind separate packet prose.",
+      "row_digest": "7b334f3a3a13b062453e4d6cc06b0f41b330036e6aac6042e7f88a002e4fcc56"
     }
   ],
   "search_index": {
@@ -177,8 +184,9 @@
     "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
     "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md",
     "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md",
-    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md"
+    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md"
   ],
-  "summary": "The executor lane now has one searchable local-cluster ledger. It joins the canonical MLX and 4080 run registrations with checkpoint lineage, cost, metric, failure, recovery, and export posture so expensive local executor runs stop living as separate packet fragments.",
-  "ledger_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632"
+  "summary": "The executor lane now has one searchable local-cluster ledger. It joins the canonical MLX and 4080 run registrations with checkpoint lineage, cost, metric, failure, recovery, export, and roundtrip-closure posture so expensive local executor runs stop living as separate packet fragments.",
+  "ledger_digest": "9b86949597220f5bb4eb80c2b313fae2416c1908771ea3ae9771ec3084d06dd3"
 }
