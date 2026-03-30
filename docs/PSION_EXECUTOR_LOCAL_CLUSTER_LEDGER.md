@@ -88,6 +88,17 @@ explicitly:
 This is deliberate. The ledger is supposed to show the current state, not hide
 the next missing proof.
 
+## Follow-On Dashboard Surface
+
+The follow-on canonical dashboard packet now lives at:
+
+- `docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md`
+- `fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json`
+
+That packet projects the frozen baseline, the retained current-best row, and
+the retained candidate row from this ledger instead of inventing a separate
+review-only truth source.
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_ledger_fixtures`

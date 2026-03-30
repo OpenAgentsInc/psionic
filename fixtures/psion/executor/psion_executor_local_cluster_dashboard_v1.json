@@ -1,0 +1,136 @@
+{
+  "schema_version": "psion.executor.local_cluster_dashboard.v1",
+  "dashboard_id": "psion_executor_local_cluster_dashboard_v1",
+  "registration_packet_ref": "fixtures/psion/executor/psion_executor_local_cluster_run_registration_v1.json",
+  "registration_packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474",
+  "ledger_ref": "fixtures/psion/executor/psion_executor_local_cluster_ledger_v1.json",
+  "ledger_digest": "1650d362d9ea49099aaad6dc94459eb5530e5f35b19e74492ec47f9b5be0f632",
+  "baseline_truth_ref": "fixtures/psion/executor/psion_executor_baseline_truth_v1.json",
+  "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
+  "baseline_card": {
+    "panel_id": "psion_executor_local_cluster_dashboard_baseline_v1",
+    "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "pack_ids": [
+      "tassadar.eval.frequent.v0",
+      "tassadar.eval.promotion.v0"
+    ],
+    "total_suite_count": 11,
+    "green_suite_count": 11,
+    "manual_review_suite_count": 4,
+    "baseline_truth_digest": "43b7a73e3ebdd17c9aeb692f71c0f261da409f65dded37760a4037226645a45c",
+    "reference_linear_truth_anchor": "`reference_linear` remains the measured baseline truth anchor for the current `trained-v0` executor baseline and stays visible in the dashboard instead of being flattened into a fast-route claim.",
+    "hull_cache_target_posture": "`hull_cache` remains the admitted fast-route target on the executor family, but it stays subordinate to baseline truth and fallback posture outside the admitted workload envelope.",
+    "detail": "The baseline panel keeps the frozen frequent and promotion pack truth visible beside local run cards so weekly review can compare candidate evidence against the current `trained-v0` floor without leaving the local-cluster dashboard surface.",
+    "panel_digest": "7463e54f038488aca1032ef48a8a9cea9d1cf44ab9e5e6d5cfd879613df0e3b1"
+  },
+  "current_best_card": {
+    "panel_id": "psion_executor_local_cluster_dashboard_current_best_v1",
+    "row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+    "registration_id": "psion_executor_local_cluster_registration_4080_v1",
+    "run_id": "tailrun-home-admitted-20260328k",
+    "profile_id": "local_4080_cuda_tailnet_x86_64",
+    "candidate_status": "current_best",
+    "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "eval_pack_ids": [
+      "tassadar.eval.frequent.v0",
+      "tassadar.eval.promotion.v0"
+    ],
+    "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+    "metrics": {
+      "completed_steps": 47104,
+      "final_mean_loss": 0.0,
+      "retained_failure_count": 4,
+      "detail": "The `local_4080_cuda_tailnet_x86_64` panel keeps the retained completed-step count, final loss, and failure fact count from the cumulative ledger row instead of recomputing a second metric view."
+    },
+    "throughput": {
+      "observed_steps_per_second": 82.40252049829174,
+      "observed_samples_per_second": 10547.522623781342,
+      "observed_source_tokens_per_second": 2357371.30641513,
+      "detail": "Throughput on `local_4080_cuda_tailnet_x86_64` stays projected directly from the ledger metric posture so the dashboard side-by-side view never drifts from the retained row facts."
+    },
+    "budget_burn_ratio": 0.952721666666667,
+    "export_status": "pending_mac_roundtrip_validation",
+    "recovery_status": "green",
+    "detail": "The `local_4080_cuda_tailnet_x86_64` dashboard card keeps metrics, throughput, recovery, export status, and budget burn together for weekly local-cluster review.",
+    "panel_digest": "6325d4f1d94980340143a988a64b5d19f4c0f3302dacff01d88f54c5fef03583"
+  },
+  "candidate_card": {
+    "panel_id": "psion_executor_local_cluster_dashboard_candidate_v1",
+    "row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+    "registration_id": "psion_executor_local_cluster_registration_mlx_v1",
+    "run_id": "same-node-wallclock-retained-mlx",
+    "profile_id": "local_mac_mlx_aarch64",
+    "candidate_status": "candidate",
+    "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "eval_pack_ids": [
+      "tassadar.eval.frequent.v0",
+      "tassadar.eval.promotion.v0"
+    ],
+    "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+    "metrics": {
+      "completed_steps": 93184,
+      "final_mean_loss": 0.0,
+      "retained_failure_count": 1,
+      "detail": "The `local_mac_mlx_aarch64` panel keeps the retained completed-step count, final loss, and failure fact count from the cumulative ledger row instead of recomputing a second metric view."
+    },
+    "throughput": {
+      "observed_steps_per_second": 162.53061053630358,
+      "observed_samples_per_second": 20803.91814864686,
+      "observed_source_tokens_per_second": 4649675.706222572,
+      "detail": "Throughput on `local_mac_mlx_aarch64` stays projected directly from the ledger metric posture so the dashboard side-by-side view never drifts from the retained row facts."
+    },
+    "budget_burn_ratio": 0.955553333333333,
+    "export_status": "green",
+    "recovery_status": "not_required_same_node",
+    "detail": "The `local_mac_mlx_aarch64` dashboard card keeps metrics, throughput, recovery, export status, and budget burn together for weekly local-cluster review.",
+    "panel_digest": "313ce44d8532b23775384f511f544f02c2656df1d7172d5d7342d13dd54b582d"
+  },
+  "profile_comparison": {
+    "comparison_id": "psion_executor_local_cluster_dashboard_profile_comparison_v1",
+    "shared_eval_pack_ids": [
+      "tassadar.eval.frequent.v0",
+      "tassadar.eval.promotion.v0"
+    ],
+    "shared_run_search_key": "tailrun-admitted-device-matrix-20260327b",
+    "candidate_to_current_best_steps_ratio": 1.972398532878287,
+    "columns": [
+      {
+        "profile_id": "local_4080_cuda_tailnet_x86_64",
+        "logical_role": "current_best",
+        "run_id": "tailrun-home-admitted-20260328k",
+        "candidate_status": "current_best",
+        "final_mean_loss": 0.0,
+        "observed_steps_per_second": 82.40252049829174,
+        "budget_burn_ratio": 0.952721666666667,
+        "export_status": "pending_mac_roundtrip_validation",
+        "recovery_status": "green",
+        "detail": "The current-best column keeps the retained winner visible inside the shared local-cluster review surface without hiding which admitted profile currently owns the stronger row."
+      },
+      {
+        "profile_id": "local_mac_mlx_aarch64",
+        "logical_role": "candidate",
+        "run_id": "same-node-wallclock-retained-mlx",
+        "candidate_status": "candidate",
+        "final_mean_loss": 0.0,
+        "observed_steps_per_second": 162.53061053630358,
+        "budget_burn_ratio": 0.955553333333333,
+        "export_status": "green",
+        "recovery_status": "not_required_same_node",
+        "detail": "The candidate column keeps the retained challenger visible inside the same side-by-side review surface while preserving its explicit export and recovery posture."
+      }
+    ],
+    "detail": "The profile comparison keeps the admitted MLX and 4080 rows side-by-side under one shared device-matrix search key so review can compare throughput, export, recovery, and budget burn without reconstructing cross-packet context by hand.",
+    "comparison_digest": "3c04268ce24085b2f07e66315c6da5178fa243c4e99d51f2285db34d28957bb9"
+  },
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_LEDGER.md",
+    "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md"
+  ],
+  "summary": "The admitted executor lane now has one canonical dashboard packet that keeps the frozen baseline, the retained current-best row, and the retained candidate row visible together. Metrics, throughput, recovery, export, and budget burn now project from the same retained ledger instead of separate packet prose.",
+  "dashboard_digest": "06d6855974f0f6c5453a874f113e4b521da1ee8967f6a624de99f57e5de24a8f"
+}
