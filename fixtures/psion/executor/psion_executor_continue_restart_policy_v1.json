@@ -1,0 +1,92 @@
+{
+  "schema_version": "psion.executor.continue_restart_policy.v1",
+  "policy_id": "psion_executor_continue_restart_policy_v1",
+  "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
+  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "ownership_ref": "docs/PSION_EXECUTOR_OWNERSHIP.md",
+  "incident_rows": [
+    {
+      "incident_class_id": "launch_drift",
+      "default_action": "restart_after_preflight_recheck",
+      "owner_role": "executor_lane_operator",
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+      ],
+      "review_requirement": "must_be_logged_in_weekly_review",
+      "detail": "Launch drift means the run no longer matches admitted pre-flight truth, so the run must restart only after the pre-flight checklist returns green.",
+      "row_digest": "f6057ad7e9fd3f8f853616fde0f34e12e5563152d67ed1df3f59f80f5d4fc266"
+    },
+    {
+      "incident_class_id": "transient_interruption",
+      "default_action": "continue_from_last_green_checkpoint",
+      "owner_role": "executor_lane_operator",
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+      ],
+      "review_requirement": "must_be_logged_in_weekly_review",
+      "detail": "Transient interruption keeps the run if the last green checkpoint is intact and the recovery path remains within policy.",
+      "row_digest": "df6089425d6ba9c78fc5cc7b2b0dc2ec0f484bec6cfe76136bbf1cd8d5ff8731"
+    },
+    {
+      "incident_class_id": "missing_facts",
+      "default_action": "hold_until_facts_repaired",
+      "owner_role": "review_cadence_owner",
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+      ],
+      "review_requirement": "must_be_logged_in_weekly_review",
+      "detail": "Missing facts do not permit a continue decision; the lane holds until registration, ledger, eval, or export facts are repaired.",
+      "row_digest": "25914808c78dc1bebdb61c945c8ed8aabc6dea14f17fce6c42fa98616b61e961"
+    },
+    {
+      "incident_class_id": "throughput_degradation",
+      "default_action": "continue_under_review_no_promotion",
+      "owner_role": "review_cadence_owner",
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+      ],
+      "review_requirement": "must_be_logged_in_weekly_review",
+      "detail": "Throughput degradation may continue only as a non-promotable run while weekly review tracks the degradation explicitly.",
+      "row_digest": "5d51a02e4f1c4e20eecf70fdf5e1508df5ac699aa8b6169617bd1f91f2f5f107"
+    },
+    {
+      "incident_class_id": "non_finite_loss",
+      "default_action": "restart_from_last_green_checkpoint",
+      "owner_role": "executor_lane_operator",
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+      ],
+      "review_requirement": "must_be_logged_in_weekly_review",
+      "detail": "Non-finite loss invalidates the live training state and forces a restart from the last green checkpoint with the incident preserved for review.",
+      "row_digest": "bc07c5eaffe351209c18a4dadc8b1aaf0d6f8d15d3e7a1b6da95e14f81afeaf8"
+    },
+    {
+      "incident_class_id": "export_failure",
+      "default_action": "stop_and_repair_before_review",
+      "owner_role": "export_validation_owner",
+      "required_evidence_refs": [
+        "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+        "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+      ],
+      "review_requirement": "must_be_logged_in_weekly_review",
+      "detail": "Export failure blocks closeout and must be repaired before the weekly review can count the run as complete.",
+      "row_digest": "62cea99c24aa13ee2e8c2f571cca98156bb02a2db66db6b38cb29216108c3c5c"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_OWNERSHIP.md",
+    "docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_ROUNDTRIP.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md"
+  ],
+  "summary": "The admitted executor lane now has one continue-vs-restart incident policy packet. Launch drift, transient interruption, missing facts, throughput degradation, non-finite loss, and export failure now carry explicit default action, owner role, required evidence, and weekly-review logging requirements.",
+  "packet_digest": "40ef44b2c92651ab7e5ae3c7c039388bf472ca05467fc679054ffe4fb8413186"
+}

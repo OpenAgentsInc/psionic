@@ -129,6 +129,12 @@ The new rollback-policy packet now lives at:
 - `docs/PSION_EXECUTOR_MIXTURE_ROLLBACK_POLICY.md`
 - `fixtures/psion/executor/psion_executor_mixture_rollback_policy_v1.json`
 
+The phase-two incident policy that now governs continue-vs-restart handling
+lives at:
+
+- `docs/PSION_EXECUTOR_CONTINUE_RESTART_POLICY.md`
+- `fixtures/psion/executor/psion_executor_continue_restart_policy_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_review_workflow_fixtures`
