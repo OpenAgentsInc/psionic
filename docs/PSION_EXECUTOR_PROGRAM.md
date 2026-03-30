@@ -91,6 +91,8 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_BASELINE.md` owns the frozen executor baseline record
 - `docs/PSION_EXECUTOR_ARTIFACT_NAMING.md` owns the phase-one executor
   artifact naming policy
+- `docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md` owns the executor-capable
+  acceptance profile
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

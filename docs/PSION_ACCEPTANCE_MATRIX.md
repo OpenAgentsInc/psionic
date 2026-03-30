@@ -9,6 +9,12 @@
 This document freezes `Psion` acceptance-matrix `v1` and the corresponding
 phase-promotion decision contract.
 
+This document is the generic compact-decoder learned-lane acceptance contract.
+
+Executor-capable `Psion` / `Tassadar` promotion and replacement work uses
+`docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md` instead of flattening the executor
+lane into this generic matrix.
+
 It is not a claim that the full `Psion` lane is already green.
 
 It is the machine-readable contract that says what evidence must exist before
