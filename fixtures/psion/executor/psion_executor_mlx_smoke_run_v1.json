@@ -1,0 +1,64 @@
+{
+  "schema_version": "psion.executor.mlx_smoke_run.v1",
+  "packet_id": "psion_executor_mlx_smoke_run_v1",
+  "admitted_profile_id": "local_mac_mlx_aarch64",
+  "smoke_objective_id": "psion.executor.mlx_same_node_smoke_objective.v1",
+  "smoke_objective_kind": "executor_lane_admission_surrogate",
+  "checkpoint_packet_ref": "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
+  "checkpoint_packet_sha256": "ae31831fe9d325e2c91aabc87ab8626f3e76d1e489fe54bb690d6d5abee2a033",
+  "eval_pack_catalog_ref": "fixtures/psion/executor/psion_executor_eval_packs_v1.json",
+  "eval_pack_catalog_sha256": "b6b4683128af9eb7d2eb901bfa4a3cba10247c21858d8f096a01fc593c679d5f",
+  "eval_pack_catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d",
+  "retained_report_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+  "retained_report_sha256": "ba9da70b60669297e03029fdddab5606d80b4cd6c345e1d3eb1f88d537f529f6",
+  "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "logical_device_label": "metal:0",
+  "retained_run_id": "same-node-wallclock-retained-mlx",
+  "completed_steps": 93184,
+  "final_mean_loss": 0.0,
+  "durable_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+  "durable_bundle_sha256": "4a345019512aae63c517c3261439e0dbd3a1a113745c80ae4244250abfff3e91",
+  "final_state_dict_digest": "8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8",
+  "approved_frequent_pack_subset": {
+    "pack_id": "tassadar.eval.frequent.v0",
+    "subset_id": "tassadar.eval.frequent.v0::mlx_smoke_subset_v1",
+    "suite_id": "frequent_operator_review_cases_v0",
+    "included_case_ids": [
+      "artifact_packet_complete",
+      "checkpoint_restore_rehearsal_green",
+      "export_smoke_green"
+    ],
+    "deferred_case_ids": [
+      "local_cluster_roundtrip_green"
+    ],
+    "subset_digest": "660e334475a55b5943e586f7d7c3e74fdba3674f2d31bea1d75d5c72ea92ce50",
+    "detail": "Phase-one MLX smoke uses the operator-review slice of `tassadar.eval.frequent.v0` only: artifact packet completeness, restore rehearsal, and export smoke must be green locally, while `local_cluster_roundtrip_green` is intentionally deferred to EPIC 3."
+  },
+  "checklist_rows": [
+    {
+      "case_id": "artifact_packet_complete",
+      "status": "green",
+      "detail": "The retained smoke packet keeps the report, durable portable bundle, checkpoint packet, and prerequisite MLX parity packet together as one reviewable artifact packet."
+    },
+    {
+      "case_id": "checkpoint_restore_rehearsal_green",
+      "status": "green",
+      "detail": "The prerequisite checkpoint packet already proves deferred import-plan metadata plus eager restore on the retained MLX bundle."
+    },
+    {
+      "case_id": "export_smoke_green",
+      "status": "green",
+      "detail": "The retained same-node report and durable portable bundle prove the Mac MLX smoke lane exports a real artifact through the shipped model-IO surface."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "fixtures/psion/executor/psion_executor_mlx_checkpoint_compatibility_v1.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/report.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors"
+  ],
+  "summary": "The admitted Mac MLX executor profile now has one smoke-run packet tied to the retained MLX same-node training/export lane. The smoke objective remains a bounded executor-lane admission surrogate on `metal:0` through run `same-node-wallclock-retained-mlx` (steps=93184 final_mean_loss=0.000000), and it now binds to the approved subset `tassadar.eval.frequent.v0::mlx_smoke_subset_v1` by keeping `artifact_packet_complete`, `checkpoint_restore_rehearsal_green`, and `export_smoke_green` green while explicitly deferring `local_cluster_roundtrip_green` to EPIC 3.",
+  "packet_digest": "ce626db0c02d4f9ea4ca7f783736b5bdfb45c076feb3113ebacc978f81ed25d8"
+}

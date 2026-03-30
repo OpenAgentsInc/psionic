@@ -91,6 +91,29 @@ It freezes four required surfaces:
 This pack does not decide promotion. It exists so checkpoint-time review uses
 one frozen spine instead of one-off arguments.
 
+### MLX Smoke Subset
+
+Phase-one MLX smoke runs may cite one admitted local subset of
+`tassadar.eval.frequent.v0` while the Mac profile is still proving substrate
+closure rather than full executor-model training:
+
+- subset id: `tassadar.eval.frequent.v0::mlx_smoke_subset_v1`
+- suite id: `frequent_operator_review_cases_v0`
+- included cases:
+  `artifact_packet_complete`,
+  `checkpoint_restore_rehearsal_green`,
+  `export_smoke_green`
+- deferred case:
+  `local_cluster_roundtrip_green`
+
+That keeps the smoke lane honest:
+
+- local artifact packet completeness must be explicit
+- local restore rehearsal must be explicit
+- local export smoke must be explicit
+- Mac -> 4080 -> Mac roundtrip truth remains an EPIC 3 obligation instead of a
+  fake green check on a Mac-only smoke run
+
 ## `tassadar.eval.promotion.v0`
 
 This is the first executor promotion pack.

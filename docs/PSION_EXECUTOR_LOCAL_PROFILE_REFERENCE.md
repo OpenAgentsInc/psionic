@@ -67,13 +67,17 @@ The first executor-lane MLX load/forward boundary is now also explicit:
 
 - `docs/PSION_EXECUTOR_MLX_FORWARD_LOAD_PARITY.md`
 - `docs/PSION_EXECUTOR_MLX_CHECKPOINT_COMPATIBILITY.md`
+- `docs/PSION_EXECUTOR_MLX_SMOKE_RUN.md`
 
 That packet keeps the shipped MLX entrypoint, admitted forward probe, bounded
 converted-equivalent load lane, and explicit parity gaps in one reviewable
 place before smoke-run and checkpoint work starts citing the Mac profile. The
 checkpoint packet then binds the retained same-node MLX bundle back into the
 canonical model-IO import and compatibility contract instead of leaving MLX
-checkpoint claims as a freeform note.
+checkpoint claims as a freeform note. The smoke-run packet then binds the
+retained same-node run to the approved local subset of
+`tassadar.eval.frequent.v0` without claiming the Mac already closes the
+local-cluster roundtrip.
 
 ## Current Admitted 4080 Tailnet Profile
 
