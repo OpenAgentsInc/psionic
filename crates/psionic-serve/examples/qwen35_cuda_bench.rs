@@ -113,6 +113,7 @@ struct BenchReport {
     frequency_penalty: Option<f32>,
     seed: Option<u64>,
     structured_output: BenchStructuredOutputConfigReport,
+    psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
     runs: Vec<BenchRunReport>,
     mean_output_tokens: f64,
     mean_prompt_s: f64,
@@ -178,6 +179,18 @@ struct BenchTerminationReport {
     observed: String,
     classification: String,
     matched_stop_sequence: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct BenchPsionicCudaStartupReport {
+    cublas_handle_scope: String,
+    cublas_stream_binding: String,
+    warmup_status: String,
+    warmup_prompt_s: f64,
+    warmup_decode_s: f64,
+    warmup_total_s: f64,
+    warmup_output_tokens: usize,
+    request_billed_to_user: bool,
 }
 
 impl Default for BenchConfig {
@@ -599,9 +612,34 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         ),
     )
     .with_prefix_cache_control(prefix_cache_bypass.clone());
-    let _ = service
+    let warmup_response = service
         .generate(&warmup)
         .map_err(|error| format!("warmup generation failed: {error}"))?;
+    let startup_report = BenchPsionicCudaStartupReport {
+        cublas_handle_scope: String::from("per_device_runtime_owner"),
+        cublas_stream_binding: String::from("bind_stream_per_submission"),
+        warmup_status: String::from("explicit_warmup_completed"),
+        warmup_prompt_s: nanos_to_seconds(
+            warmup_response.metrics.prompt_eval_duration_ns.unwrap_or(0),
+        ),
+        warmup_decode_s: nanos_to_seconds(warmup_response.metrics.eval_duration_ns.unwrap_or(0)),
+        warmup_total_s: nanos_to_seconds(warmup_response.metrics.total_duration_ns.unwrap_or(0)),
+        warmup_output_tokens: warmup_response
+            .metrics
+            .eval_count
+            .unwrap_or(warmup_response.output.tokens.len()),
+        request_billed_to_user: false,
+    };
+    println!(
+        "backend=psionic startup_warmup_status={} cublas_handle_scope={} cublas_stream_binding={} warmup_prompt_s={:.6} warmup_decode_s={:.6} warmup_total_s={:.6} warmup_output_tokens={}",
+        startup_report.warmup_status,
+        startup_report.cublas_handle_scope,
+        startup_report.cublas_stream_binding,
+        startup_report.warmup_prompt_s,
+        startup_report.warmup_decode_s,
+        startup_report.warmup_total_s,
+        startup_report.warmup_output_tokens,
+    );
 
     let mut runs = Vec::with_capacity(config.repeats);
     for run_index in 0..config.repeats {
@@ -691,7 +729,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         );
     }
 
-    let report = build_bench_report(config, &bench_model.rendered, runs);
+    let report = build_bench_report(config, &bench_model.rendered, Some(startup_report), runs);
     println!(
         "backend=psionic mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -794,7 +832,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
         );
     }
 
-    let report = build_bench_report(config, &bench_model.rendered, runs);
+    let report = build_bench_report(config, &bench_model.rendered, None, runs);
     println!(
         "backend=ollama mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -1064,6 +1102,7 @@ fn current_unix_timestamp_seconds() -> u64 {
 fn build_bench_report(
     config: &BenchConfig,
     rendered: &RenderedPrompt,
+    psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
     runs: Vec<BenchRunReport>,
 ) -> BenchReport {
     let repeats = runs.len().max(1) as f64;
@@ -1073,7 +1112,7 @@ fn build_bench_report(
     let mean_total_s = runs.iter().map(|run| run.total_s).sum::<f64>() / repeats;
     let mean_decode_tok_s = runs.iter().map(|run| run.decode_tok_s).sum::<f64>() / repeats;
     BenchReport {
-        schema_version: 2,
+        schema_version: 3,
         report_kind: String::from("qwen35_cuda_bench"),
         generated_at_unix_s: current_unix_timestamp_seconds(),
         backend: String::from(bench_backend_label(config.backend)),
@@ -1101,6 +1140,7 @@ fn build_bench_report(
         frequency_penalty: config.effective_frequency_penalty_for_backend(config.backend),
         seed: config.effective_seed_for_backend(config.backend),
         structured_output: structured_output_config_report(config.structured_output.as_ref()),
+        psionic_cuda_startup,
         runs,
         mean_output_tokens,
         mean_prompt_s,

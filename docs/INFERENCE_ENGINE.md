@@ -132,6 +132,10 @@ than just run tensor math.
   hits, misses, captures, shape drift, and refusal posture machine-visible
   across both native `qwen35` and native `gpt_oss` decode lanes instead of
   keeping that truth as lane-local benchmark folklore.
+- The same runtime-harvest pass now also exposes one explicit cuBLAS warmup
+  and handle-reuse packet at `docs/PSION_RVLLM_CUBLAS_WARMUP.md`, together
+  with machine-readable `psionic_cuda_startup` startup evidence in
+  `qwen35_cuda_bench --json-out`.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
