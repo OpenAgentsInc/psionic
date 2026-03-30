@@ -29,6 +29,7 @@ The first landed profiles are:
 
 - `local_mac_mlx_aarch64`
 - `local_4080_cuda_tailnet_x86_64`
+- `local_tailnet_cluster_control_plane`
 
 The catalog freezes:
 
@@ -98,16 +99,52 @@ Checkpoint and connectivity expectations are now explicit too:
 - Tailnet SSH reachability to `archlinux` is required before the profile counts
 - coordinator and contributor ports remain operator-selected and bounded
 
+## Current Admitted Tailnet Control-Plane Profile
+
+`local_tailnet_cluster_control_plane` is now the explicit local-first
+Mac-to-4080 roundtrip profile for:
+
+- Tailnet-backed 4080 smoke runs that return a retained bundle
+- decision-grade 4080 runs that need the full Mac -> 4080 -> Mac evidence path
+- confirmation reruns on the same admitted controller/worker workflow
+
+It is grounded in the already-shipped surfaces:
+
+- `fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json`
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json`
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json`
+- `docs/audits/2026-03-27-tailrun-admitted-home-tailnet-run-audit.md`
+- `scripts/run-first-swarm-tailnet-admitted-live.sh`
+- `scripts/check-first-swarm-trusted-lan-real-run.sh`
+- `crates/psionic-train/src/swarm_first_live_runtime.rs`
+- `crates/psionic-train/src/swarm_trusted_lan.rs`
+
+The responsibility split is now explicit:
+
+- controller responsibilities:
+  materialize the operator manifest and bundle root, publish the explicit
+  Tailnet endpoints and ports, and retain the final bundle under
+  `fixtures/swarm/runs/<run_id>/`
+- worker responsibilities:
+  execute only the bounded contributor role, return staged artifacts to the
+  controller-owned bundle path, and avoid any independent validator, publish,
+  or promotion claim
+
+The artifact return rule is now explicit too:
+
+- remote scratch is staging space only
+- the Mac controller-owned run root is the canonical counting artifact home
+- partial remote outputs do not count until the retained bundle exists locally
+
 ## Honest Boundary
 
 This catalog still does not claim:
 
-- the control-plane profile is admitted yet
 - the 4080 worker has independent checkpoint-writer authority
 - the Mac profile alone closes remote launch
 - dense cross-device training closure
 - public-worker or external promotion authority
 
-The current catalog closes the first two local profiles so later EPIC 1 issues
-can add the Mac-to-4080 control-plane profile and the frozen eval packs without
-inventing new profile vocabulary.
+The current catalog closes the first three local profiles so later EPIC 1
+issues can add the frozen eval packs, baseline truth, and variance thresholds
+without inventing new profile vocabulary.

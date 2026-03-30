@@ -29,8 +29,14 @@ const CROSS_PROVIDER_LOCAL_RTX4080_COMPUTE_SOURCE_FIXTURE_PATH: &str =
     "fixtures/training/compute_sources/local_rtx4080_workstation_v1.json";
 const FIRST_SWARM_TAILNET_RUN_SUMMARY_FIXTURE_PATH: &str =
     "fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json";
+const FIRST_SWARM_TAILNET_OPERATOR_MANIFEST_FIXTURE_PATH: &str =
+    "fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json";
+const FIRST_SWARM_TRUSTED_LAN_TOPOLOGY_CONTRACT_FIXTURE_PATH: &str =
+    "fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json";
 const TAILNET_SHORT_RUN_DEVICE_AUDIT_PATH: &str =
     "docs/audits/2026-03-27-tailnet-short-run-device-audit.md";
+const TAILRUN_ADMITTED_HOME_TAILNET_AUDIT_PATH: &str =
+    "docs/audits/2026-03-27-tailrun-admitted-home-tailnet-run-audit.md";
 
 /// Run types admitted by the phase-one executor lane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -91,6 +97,15 @@ pub struct PsionExecutorThroughputBand {
     pub detail: String,
 }
 
+/// Explicit controller/worker split retained for one admitted control-plane profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionExecutorResponsibilitySplit {
+    /// Responsibilities frozen for the controller host.
+    pub controller_responsibilities: Vec<String>,
+    /// Responsibilities frozen for the worker host.
+    pub worker_responsibilities: Vec<String>,
+}
+
 /// One admitted executor profile.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PsionExecutorAdmittedProfile {
@@ -114,6 +129,8 @@ pub struct PsionExecutorAdmittedProfile {
     pub authority_artifacts: Vec<PsionExecutorAuthorityArtifact>,
     /// Retained throughput band when the profile has one.
     pub throughput_band: Option<PsionExecutorThroughputBand>,
+    /// Explicit controller/worker split when the profile admits a control plane.
+    pub responsibility_split: Option<PsionExecutorResponsibilitySplit>,
     /// Explicit claim boundary.
     pub claim_boundary: String,
     /// Stable digest over the profile.
@@ -297,6 +314,36 @@ impl PsionExecutorAdmittedProfile {
                 });
             }
         }
+        if let Some(responsibility_split) = &self.responsibility_split {
+            if responsibility_split.controller_responsibilities.is_empty() {
+                return Err(PsionExecutorAdmittedProfileError::MissingField {
+                    field: format!(
+                        "psion_executor_admitted_profile[{}].responsibility_split.controller_responsibilities",
+                        self.profile_id
+                    ),
+                });
+            }
+            if responsibility_split.worker_responsibilities.is_empty() {
+                return Err(PsionExecutorAdmittedProfileError::MissingField {
+                    field: format!(
+                        "psion_executor_admitted_profile[{}].responsibility_split.worker_responsibilities",
+                        self.profile_id
+                    ),
+                });
+            }
+            for responsibility in &responsibility_split.controller_responsibilities {
+                ensure_nonempty(
+                    responsibility.as_str(),
+                    "psion_executor_admitted_profile.responsibility_split.controller_responsibilities[]",
+                )?;
+            }
+            for responsibility in &responsibility_split.worker_responsibilities {
+                ensure_nonempty(
+                    responsibility.as_str(),
+                    "psion_executor_admitted_profile.responsibility_split.worker_responsibilities[]",
+                )?;
+            }
+        }
         ensure_nonempty(
             self.claim_boundary.as_str(),
             "psion_executor_admitted_profile.claim_boundary",
@@ -345,13 +392,14 @@ pub fn builtin_executor_admitted_profile_catalog(
     let profiles = vec![
         builtin_local_mac_mlx_profile(workspace_root)?,
         builtin_local_4080_cuda_tailnet_profile(workspace_root)?,
+        builtin_local_tailnet_cluster_control_plane_profile(workspace_root)?,
     ];
     let mut catalog = PsionExecutorAdmittedProfileCatalog {
         schema_version: String::from(PSION_EXECUTOR_ADMITTED_PROFILE_CATALOG_SCHEMA_VERSION),
         catalog_id: String::from("psion_executor_admitted_profiles_v1"),
         profiles,
         summary: String::from(
-            "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane and the admitted RTX 4080 Tailnet worker lane before the control-plane profile widens the same catalog.",
+            "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane, the admitted RTX 4080 Tailnet worker lane, and the bounded Mac-to-4080 control-plane roundtrip before later EPICs widen the same catalog.",
         ),
         catalog_digest: String::new(),
     };
@@ -484,6 +532,7 @@ fn builtin_local_mac_mlx_profile(
         ],
         authority_artifacts,
         throughput_band: None,
+        responsibility_split: None,
         claim_boundary: String::from(
             "This profile admits the local Apple Silicon MLX machine as a real roadmap-tracked executor development and eval host. It proves local MLX smoke, short-run, eval, restore, export, and CPU-validation posture. It does not by itself claim remote launch, shared checkpoint authority, or cross-device training closure.",
         ),
@@ -617,8 +666,158 @@ fn builtin_local_4080_cuda_tailnet_profile(
                 "The retained 2026-03-27 short-run audit freezes the honest current 4080 same-node band: 82.4025 steps/s before the retained fix and 122.8920 steps/s after it.",
             ),
         }),
+        responsibility_split: None,
         claim_boundary: String::from(
             "This profile admits one reachable RTX 4080 CUDA Tailnet worker as the real local accelerator lane for bounded smoke, decision-grade, confirmation, and replay-accounted eval work. It does not claim dense CUDA training closure, public-worker authority, shared checkpoint-writer authority, or independent promotion authority.",
+        ),
+        profile_digest: String::new(),
+    };
+    profile.profile_digest = stable_executor_profile_digest(&profile);
+    profile.validate()?;
+    Ok(profile)
+}
+
+fn builtin_local_tailnet_cluster_control_plane_profile(
+    workspace_root: &Path,
+) -> Result<PsionExecutorAdmittedProfile, PsionExecutorAdmittedProfileError> {
+    let authority_artifacts = vec![
+        authority_artifact(
+            workspace_root,
+            FIRST_SWARM_TRUSTED_LAN_TOPOLOGY_CONTRACT_FIXTURE_PATH,
+            "Trusted-LAN topology contract freezing the Mac coordinator, the 4080 contributor, artifact staging roots, and launch sequencing for the bounded mixed-hardware lane.",
+        )?,
+        authority_artifact(
+            workspace_root,
+            FIRST_SWARM_TAILNET_OPERATOR_MANIFEST_FIXTURE_PATH,
+            "Retained operator manifest proving the controller-selected endpoints, bundle root, and exact Tailnet run identity for the admitted Mac-to-4080 roundtrip.",
+        )?,
+        authority_artifact(
+            workspace_root,
+            FIRST_SWARM_TAILNET_RUN_SUMMARY_FIXTURE_PATH,
+            "Retained Tailnet run summary proving both admitted nodes contributed inside one real bounded run.",
+        )?,
+        authority_artifact(
+            workspace_root,
+            TAILRUN_ADMITTED_HOME_TAILNET_AUDIT_PATH,
+            "Retained audit describing the exact controller workflow, contributor workflow, and returned artifact packet for the first admitted home-Tailnet run.",
+        )?,
+    ];
+    let mut profile = PsionExecutorAdmittedProfile {
+        profile_id: String::from("local_tailnet_cluster_control_plane"),
+        purpose: String::from(
+            "Mac-as-controller plus admitted RTX 4080 Tailnet worker roundtrip for bounded mixed-hardware executor runs, retained artifact return, and controller-owned validation inside the local-first lane.",
+        ),
+        runtime_backend_label: None,
+        run_type_admissions: vec![
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::MlxSmoke,
+                posture: PsionExecutorRunTypeAdmissionPosture::NotAdmitted,
+                detail: String::from(
+                    "The control-plane profile is not needed for same-node MLX smoke work.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::MlxDecisionGrade,
+                posture: PsionExecutorRunTypeAdmissionPosture::NotAdmitted,
+                detail: String::from(
+                    "The control-plane profile does not count as the MLX-only decision-grade lane.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::Cuda4080Smoke,
+                posture: PsionExecutorRunTypeAdmissionPosture::Allowed,
+                detail: String::from(
+                    "The control plane is the admitted coordinator surface for Tailnet-backed 4080 smoke work, but the worker-machine authority still lives in the 4080 profile.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::Cuda4080DecisionGrade,
+                posture: PsionExecutorRunTypeAdmissionPosture::Allowed,
+                detail: String::from(
+                    "The control plane is allowed for decision-grade 4080 runs when the full Mac -> 4080 -> Mac bundle path is the evidence carrier.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::Cuda4080Confirmation,
+                posture: PsionExecutorRunTypeAdmissionPosture::Allowed,
+                detail: String::from(
+                    "The control plane is allowed for confirmation reruns when the controller replays the same admitted worker path and bundle return rules.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::CpuValidation,
+                posture: PsionExecutorRunTypeAdmissionPosture::Allowed,
+                detail: String::from(
+                    "The control plane may own bundle collection and review while the Mac profile remains the CPU-validation truth anchor.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::H100Escalation,
+                posture: PsionExecutorRunTypeAdmissionPosture::NotAdmitted,
+                detail: String::from(
+                    "The local Tailnet control plane does not count as the H100 escalation lane.",
+                ),
+            },
+        ],
+        local_requirements: vec![
+            String::from(
+                "Counted control-plane runs require both admitted machine profiles to stay green before launch.",
+            ),
+            String::from(
+                "Use the shipped Tailnet operator script and bounded first-swarm runtime path instead of inventing a second launcher or planner.",
+            ),
+            String::from(
+                "The retained bundle under `fixtures/swarm/runs/<run_id>/` is the evidence carrier; remote scratch alone never counts as the final artifact packet.",
+            ),
+        ],
+        checkpoint_expectations: String::from(
+            "The Mac controller owns the retained artifact packet: it stages the run, launches the remote worker, pulls back contributor outputs, writes the bundle under `fixtures/swarm/runs/<run_id>/`, and only then counts the run. Remote scratch remains staging space, not the canonical final artifact home.",
+        ),
+        connectivity_expectations: vec![
+            String::from(
+                "The controller must resolve both the local and remote Tailnet IPv4 endpoints and bind explicit coordinator and contributor ports before launch.",
+            ),
+            String::from(
+                "The control plane remains trusted-LAN-only with no internet discovery, no elastic membership, and no hidden scheduler above the admitted workflow plan.",
+            ),
+            String::from(
+                "If the worker path drops before the bundle returns to the controller-owned run root, the run stays non-counting regardless of remote partial outputs.",
+            ),
+        ],
+        shipped_entrypoints: vec![
+            String::from("scripts/run-first-swarm-tailnet-admitted-live.sh"),
+            String::from("scripts/check-first-swarm-trusted-lan-real-run.sh"),
+            String::from("crates/psionic-train/src/swarm_first_live_runtime.rs"),
+            String::from("crates/psionic-train/src/swarm_trusted_lan.rs"),
+        ],
+        authority_artifacts,
+        throughput_band: None,
+        responsibility_split: Some(PsionExecutorResponsibilitySplit {
+            controller_responsibilities: vec![
+                String::from(
+                    "Materialize the operator manifest and exact bundle root before either node starts the counted run.",
+                ),
+                String::from(
+                    "Select and publish the explicit Tailnet endpoints plus coordinator and contributor ports for the run.",
+                ),
+                String::from(
+                    "Own validator-visible aggregation, replay-accounted bundle assembly, and final artifact retention under `fixtures/swarm/runs/<run_id>/`.",
+                ),
+            ],
+            worker_responsibilities: vec![
+                String::from(
+                    "Execute only the bounded contributor role on the admitted RTX 4080 worker with the shipped runtime path.",
+                ),
+                String::from(
+                    "Return contributor reports and staged artifacts to the controller-selected bundle path instead of claiming local publish authority.",
+                ),
+                String::from(
+                    "Stay inside the admitted Tailnet lane with no independent scheduler, promotion, or validator authority.",
+                ),
+            ],
+        }),
+        claim_boundary: String::from(
+            "This profile admits the bounded Mac-to-4080 control-plane roundtrip as the real local-first cluster workflow for the executor lane. It proves controller responsibilities, worker responsibilities, and the controller-owned artifact return path. It does not claim elastic cluster management, public-worker orchestration, independent worker publish authority, or a second training control plane beyond the shipped first-swarm runtime surfaces.",
         ),
         profile_digest: String::new(),
     };
@@ -706,11 +905,15 @@ mod tests {
         let root = workspace_root();
         let catalog = builtin_executor_admitted_profile_catalog(&root).expect("catalog");
         catalog.validate().expect("catalog should validate");
-        assert_eq!(catalog.profiles.len(), 2);
+        assert_eq!(catalog.profiles.len(), 3);
         assert_eq!(catalog.profiles[0].profile_id, "local_mac_mlx_aarch64");
         assert_eq!(
             catalog.profiles[1].profile_id,
             "local_4080_cuda_tailnet_x86_64"
+        );
+        assert_eq!(
+            catalog.profiles[2].profile_id,
+            "local_tailnet_cluster_control_plane"
         );
     }
 }

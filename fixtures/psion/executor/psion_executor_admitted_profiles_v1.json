@@ -71,8 +71,9 @@
         }
       ],
       "throughput_band": null,
+      "responsibility_split": null,
       "claim_boundary": "This profile admits the local Apple Silicon MLX machine as a real roadmap-tracked executor development and eval host. It proves local MLX smoke, short-run, eval, restore, export, and CPU-validation posture. It does not by itself claim remote launch, shared checkpoint authority, or cross-device training closure.",
-      "profile_digest": "3e561d7a44bd7f2f1ceec39f8427ecad2fd274f1229f9ea77f7a60284838521f"
+      "profile_digest": "9c84ee49a369ae522d92a102b823415f0944ef112f97c0cedf24e5706efc6d2f"
     },
     {
       "profile_id": "local_4080_cuda_tailnet_x86_64",
@@ -161,10 +162,107 @@
         "maximum_value": 125.0,
         "detail": "The retained 2026-03-27 short-run audit freezes the honest current 4080 same-node band: 82.4025 steps/s before the retained fix and 122.8920 steps/s after it."
       },
+      "responsibility_split": null,
       "claim_boundary": "This profile admits one reachable RTX 4080 CUDA Tailnet worker as the real local accelerator lane for bounded smoke, decision-grade, confirmation, and replay-accounted eval work. It does not claim dense CUDA training closure, public-worker authority, shared checkpoint-writer authority, or independent promotion authority.",
-      "profile_digest": "045a9411b10b2733c0f4c3d2c76ac1ed0d25af9dbe755dcf479996ea3a294ac1"
+      "profile_digest": "01d8151f466fafaa3f269923770989f183e52de63b11b7536f2c25120a063ff7"
+    },
+    {
+      "profile_id": "local_tailnet_cluster_control_plane",
+      "purpose": "Mac-as-controller plus admitted RTX 4080 Tailnet worker roundtrip for bounded mixed-hardware executor runs, retained artifact return, and controller-owned validation inside the local-first lane.",
+      "runtime_backend_label": null,
+      "run_type_admissions": [
+        {
+          "run_type": "mlx_smoke",
+          "posture": "not_admitted",
+          "detail": "The control-plane profile is not needed for same-node MLX smoke work."
+        },
+        {
+          "run_type": "mlx_decision_grade",
+          "posture": "not_admitted",
+          "detail": "The control-plane profile does not count as the MLX-only decision-grade lane."
+        },
+        {
+          "run_type": "cuda4080_smoke",
+          "posture": "allowed",
+          "detail": "The control plane is the admitted coordinator surface for Tailnet-backed 4080 smoke work, but the worker-machine authority still lives in the 4080 profile."
+        },
+        {
+          "run_type": "cuda4080_decision_grade",
+          "posture": "allowed",
+          "detail": "The control plane is allowed for decision-grade 4080 runs when the full Mac -> 4080 -> Mac bundle path is the evidence carrier."
+        },
+        {
+          "run_type": "cuda4080_confirmation",
+          "posture": "allowed",
+          "detail": "The control plane is allowed for confirmation reruns when the controller replays the same admitted worker path and bundle return rules."
+        },
+        {
+          "run_type": "cpu_validation",
+          "posture": "allowed",
+          "detail": "The control plane may own bundle collection and review while the Mac profile remains the CPU-validation truth anchor."
+        },
+        {
+          "run_type": "h100_escalation",
+          "posture": "not_admitted",
+          "detail": "The local Tailnet control plane does not count as the H100 escalation lane."
+        }
+      ],
+      "local_requirements": [
+        "Counted control-plane runs require both admitted machine profiles to stay green before launch.",
+        "Use the shipped Tailnet operator script and bounded first-swarm runtime path instead of inventing a second launcher or planner.",
+        "The retained bundle under `fixtures/swarm/runs/<run_id>/` is the evidence carrier; remote scratch alone never counts as the final artifact packet."
+      ],
+      "checkpoint_expectations": "The Mac controller owns the retained artifact packet: it stages the run, launches the remote worker, pulls back contributor outputs, writes the bundle under `fixtures/swarm/runs/<run_id>/`, and only then counts the run. Remote scratch remains staging space, not the canonical final artifact home.",
+      "connectivity_expectations": [
+        "The controller must resolve both the local and remote Tailnet IPv4 endpoints and bind explicit coordinator and contributor ports before launch.",
+        "The control plane remains trusted-LAN-only with no internet discovery, no elastic membership, and no hidden scheduler above the admitted workflow plan.",
+        "If the worker path drops before the bundle returns to the controller-owned run root, the run stays non-counting regardless of remote partial outputs."
+      ],
+      "shipped_entrypoints": [
+        "scripts/run-first-swarm-tailnet-admitted-live.sh",
+        "scripts/check-first-swarm-trusted-lan-real-run.sh",
+        "crates/psionic-train/src/swarm_first_live_runtime.rs",
+        "crates/psionic-train/src/swarm_trusted_lan.rs"
+      ],
+      "authority_artifacts": [
+        {
+          "path": "fixtures/swarm/first_swarm_trusted_lan_topology_contract_v1.json",
+          "sha256": "eef7fc26b549f790e2b8f612b123c2347679431b50618e62e8559dc7c7a5fe73",
+          "detail": "Trusted-LAN topology contract freezing the Mac coordinator, the 4080 contributor, artifact staging roots, and launch sequencing for the bounded mixed-hardware lane."
+        },
+        {
+          "path": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/operator_manifest.json",
+          "sha256": "a08631ebe784f591c3c6bc1a77a8c43f56a12685db2337d40aeba50009148f05",
+          "detail": "Retained operator manifest proving the controller-selected endpoints, bundle root, and exact Tailnet run identity for the admitted Mac-to-4080 roundtrip."
+        },
+        {
+          "path": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json",
+          "sha256": "de24120cbd09f473aeab79bbd70a792c869179ae7311c5e2d696d662edbc3c4f",
+          "detail": "Retained Tailnet run summary proving both admitted nodes contributed inside one real bounded run."
+        },
+        {
+          "path": "docs/audits/2026-03-27-tailrun-admitted-home-tailnet-run-audit.md",
+          "sha256": "eb60413b1605ebfd344792d986f360d04f4bf8fbbfc5b025a40361b89e216c7b",
+          "detail": "Retained audit describing the exact controller workflow, contributor workflow, and returned artifact packet for the first admitted home-Tailnet run."
+        }
+      ],
+      "throughput_band": null,
+      "responsibility_split": {
+        "controller_responsibilities": [
+          "Materialize the operator manifest and exact bundle root before either node starts the counted run.",
+          "Select and publish the explicit Tailnet endpoints plus coordinator and contributor ports for the run.",
+          "Own validator-visible aggregation, replay-accounted bundle assembly, and final artifact retention under `fixtures/swarm/runs/<run_id>/`."
+        ],
+        "worker_responsibilities": [
+          "Execute only the bounded contributor role on the admitted RTX 4080 worker with the shipped runtime path.",
+          "Return contributor reports and staged artifacts to the controller-selected bundle path instead of claiming local publish authority.",
+          "Stay inside the admitted Tailnet lane with no independent scheduler, promotion, or validator authority."
+        ]
+      },
+      "claim_boundary": "This profile admits the bounded Mac-to-4080 control-plane roundtrip as the real local-first cluster workflow for the executor lane. It proves controller responsibilities, worker responsibilities, and the controller-owned artifact return path. It does not claim elastic cluster management, public-worker orchestration, independent worker publish authority, or a second training control plane beyond the shipped first-swarm runtime surfaces.",
+      "profile_digest": "db7343854cabd474514f060bce78885d0f6b2bde394384a02eb05a79544dc249"
     }
   ],
-  "summary": "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane and the admitted RTX 4080 Tailnet worker lane before the control-plane profile widens the same catalog.",
-  "catalog_digest": "93be7f84bb53af837e2495ae37728ada87801d29d407f6d4f3efca4b84c80a4f"
+  "summary": "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane, the admitted RTX 4080 Tailnet worker lane, and the bounded Mac-to-4080 control-plane roundtrip before later EPICs widen the same catalog.",
+  "catalog_digest": "68b5e45203b1003894391c8693da535207b80dc97baba1a55338db26e2a94b48"
 }
