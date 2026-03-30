@@ -55,15 +55,14 @@ lane has been renamed before the lane itself is stable.
 
 ## Later Migration Decision
 
-Artifact-id migration is allowed only as later explicit work.
+That later decision is now landed in:
 
-It is not part of phase-one critical-path closure.
+- `docs/PSION_ARTIFACT_ID_MIGRATION_DECISION.md`
 
-Any future migration decision must:
+Current verdict:
 
-- evaluate impact on live routes and retained reports
-- keep route replacement and promotion truth intact
-- land as a separate deliberate decision instead of as incidental cleanup
+- `do_not_migrate`
 
-The current roadmap tracks that later decision under the secondary umbrella
-integrity work in `PSION-0903`.
+The repo evaluated impact on live routes, retained reports, and the existing
+consumer seam and decided that an executor artifact-id migration is not worth
+doing right now.
