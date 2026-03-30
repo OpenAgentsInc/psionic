@@ -200,6 +200,9 @@ The current decision-grade closeout is explicit too:
 - that packet carries one retained run-registration row and one retained weekly
   ablation review row so the first 4080 decision-grade run is reviewable now
   instead of waiting for EPIC 4 to invent the vocabulary afterward
+- `docs/PSION_EXECUTOR_LOCAL_CLUSTER_RUN_REGISTRATION.md` now upgrades that
+  seed row into the canonical local-cluster registration schema shared by the
+  retained MLX and 4080 decision-grade runs
 
 ## Honest Boundary
 

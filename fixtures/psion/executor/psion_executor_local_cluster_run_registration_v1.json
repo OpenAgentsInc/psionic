@@ -1,0 +1,107 @@
+{
+  "schema_version": "psion.executor.local_cluster_run_registration.v1",
+  "packet_id": "psion_executor_local_cluster_run_registration_v1",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "registration_rows": [
+    {
+      "registration_id": "psion_executor_local_cluster_registration_mlx_v1",
+      "run_type_id": "mlx_decision_grade",
+      "run_id": "same-node-wallclock-retained-mlx",
+      "search_run_ids": [
+        "same-node-wallclock-retained-mlx",
+        "tailrun-admitted-device-matrix-20260327b"
+      ],
+      "admitted_profile_id": "local_mac_mlx_aarch64",
+      "compute_source_id": "local_mlx_mac_workstation",
+      "machine_class_id": "host_cpu_aarch64",
+      "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "logical_device_label": "metal:0",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "candidate_status": "candidate",
+      "checkpoint_family": "benchmark.open_adapter.same_node.mlx.retained",
+      "eval_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "wallclock_budget_seconds": 600,
+      "observed_duration_ms": 573332,
+      "stop_condition": "Consume the admitted 600 second local MLX decision-grade budget while keeping the frozen frequent and promotion packs bound to the retained same-node run.",
+      "batch_geometry": {
+        "observed_batch_count": 8,
+        "observed_sample_count": 128,
+        "detail": "The retained same-node MLX decision-grade run keeps the observed batch count and sample count explicit as the canonical executor batch geometry for the admitted local Mac profile."
+      },
+      "memory_headroom": {
+        "evidence_mode": "admitted_compute_source_unified_memory",
+        "admitted_memory_bytes": 17179869184,
+        "detail": "The local Mac lane records unified-memory headroom from the admitted compute-source contract because the retained same-node decision-grade packet does not freeze a separate free-bytes probe."
+      },
+      "expected_throughput": {
+        "expected_steps_per_second": 162.53061053630358,
+        "expected_samples_per_second": 20803.91814864686,
+        "expected_source_tokens_per_second": 4649675.706222572,
+        "detail": "Expected throughput stays anchored to the retained same-node MLX report that the admitted-device matrix and MLX decision-grade packet already cite."
+      },
+      "detail": "This canonical registration row binds the retained same-node MLX decision-grade run to the admitted local Mac profile, the frozen executor eval packs, the local-first wallclock budget, and the model id that baseline truth already freezes.",
+      "registration_digest": "37ec1615b4724e087b757b846ac34eb11094b2f953d6e0be2ea8deb41ad17f2f"
+    },
+    {
+      "registration_id": "psion_executor_local_cluster_registration_4080_v1",
+      "run_type_id": "cuda_4080_decision_grade",
+      "run_id": "tailrun-home-admitted-20260328k",
+      "search_run_ids": [
+        "tailrun-home-admitted-20260328k",
+        "same-node-wallclock-retained-cuda",
+        "tailrun-admitted-device-matrix-20260327b"
+      ],
+      "admitted_profile_id": "local_4080_cuda_tailnet_x86_64",
+      "control_plane_profile_id": "local_tailnet_cluster_control_plane",
+      "compute_source_id": "local_rtx4080_workstation",
+      "machine_class_id": "local_rtx4080_workstation",
+      "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "logical_device_label": "cuda:0",
+      "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+      "candidate_status": "current_best",
+      "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+      "eval_pack_ids": [
+        "tassadar.eval.frequent.v0",
+        "tassadar.eval.promotion.v0"
+      ],
+      "wallclock_budget_seconds": 600,
+      "observed_duration_ms": 571633,
+      "stop_condition": "Consume the admitted 600 second 4080 decision-grade budget while keeping the frozen frequent and promotion packs bound to the supporting Tailnet cluster run and its retained same-node CUDA comparison run.",
+      "batch_geometry": {
+        "observed_batch_count": 8,
+        "observed_sample_count": 128,
+        "detail": "The retained same-node CUDA decision-grade report keeps the canonical batch geometry for the admitted 4080 lane, while the smoke packet separately records the smaller contribution window that established checkpoint and failure truth."
+      },
+      "memory_headroom": {
+        "evidence_mode": "admission_probe_plus_compute_source_contract",
+        "admitted_memory_bytes": 17171480576,
+        "observed_free_memory_bytes": 21474836480,
+        "detail": "The 4080 lane records both the admitted per-accelerator memory from the compute-source contract and the explicit free-memory probe retained by the smoke packet."
+      },
+      "expected_throughput": {
+        "expected_steps_per_second": 82.40252049829174,
+        "expected_samples_per_second": 10547.522623781342,
+        "expected_source_tokens_per_second": 2357371.30641513,
+        "detail": "Expected throughput stays anchored to the retained same-node CUDA report that the 4080 decision-grade packet already binds into the admitted local-cluster comparison."
+      },
+      "detail": "This canonical registration row binds the supporting Tailnet cluster run and retained same-node CUDA decision run to the admitted 4080 worker profile, the Tailnet control-plane profile, the frozen executor eval packs, and the retained checkpoint family that later ledger rows will search.",
+      "registration_digest": "cf4327e6f9b3dc714ad156aa7a6aee2888ce72bfde4a273744aa6cbf976b3ba9"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_BASELINE_TRUTH.md",
+    "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md",
+    "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md",
+    "docs/PSION_EXECUTOR_4080_DECISION_GRADE_RUN.md",
+    "fixtures/training/compute_sources/local_mlx_mac_workstation_v1.json",
+    "fixtures/training/compute_sources/local_rtx4080_workstation_v1.json"
+  ],
+  "summary": "The executor lane now has one canonical local-cluster run-registration schema. Both the retained MLX decision-grade run and the retained 4080 decision-grade run register the admitted profile, budget, observed duration, frozen eval packs, stop condition, batch geometry, memory headroom posture, and expected throughput facts in the same machine-readable packet, and missing required fields now block admission by validation instead of staying doc-only.",
+  "packet_digest": "cc500567c6570ae383bf770d9a8d6c732025cc29f4c6ff99741b8cd0aa1e7474"
+}
