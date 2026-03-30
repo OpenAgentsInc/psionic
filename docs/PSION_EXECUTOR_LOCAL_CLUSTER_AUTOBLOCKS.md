@@ -85,6 +85,13 @@ So local-cluster phase exit is now green for real reasons, while promotion
 stays blocked for real reasons. The report keeps those two gate surfaces
 separate instead of forcing them into the same answer.
 
+The follow-on unified throughput packet now extends this block discipline into
+replacement review by keeping serving-throughput regression machine-readable on
+top of the retained dashboard and Mac export packet:
+
+- `docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md`
+- `fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_autoblocks_fixtures`

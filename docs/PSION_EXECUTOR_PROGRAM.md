@@ -178,6 +178,10 @@ This doc does not claim:
   failure-bundle taxonomy packet that freezes long-run incident classes and
   emitted bundle posture on top of the retained live-metrics and weekly-review
   surfaces
+- `docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md` owns the first
+  canonical throughput packet that keeps retained training throughput and
+  admitted fast-route serving throughput together while freezing a replacement
+  blocker for serving-throughput regression
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

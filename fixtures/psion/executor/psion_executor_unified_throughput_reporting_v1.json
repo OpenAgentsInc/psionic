@@ -1,0 +1,65 @@
+{
+  "schema_version": "psion.executor.unified_throughput_reporting.v1",
+  "report_id": "psion_executor_unified_throughput_reporting_v1",
+  "dashboard_ref": "fixtures/psion/executor/psion_executor_local_cluster_dashboard_v1.json",
+  "dashboard_digest": "026da39b01fff5eb4e93025f0a39ad5356c4d8368e603b34b3690e16b140ee28",
+  "export_inspection_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+  "export_inspection_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+  "current_best_training_row": {
+    "panel_id": "psion_executor_local_cluster_dashboard_current_best_v1",
+    "row_id": "psion_executor_local_cluster_ledger_row_4080_v1",
+    "profile_id": "local_4080_cuda_tailnet_x86_64",
+    "candidate_status": "current_best",
+    "observed_steps_per_second": 82.40252049829174,
+    "observed_samples_per_second": 10547.522623781342,
+    "observed_source_tokens_per_second": 2357371.30641513,
+    "detail": "Training throughput for `current_best` remains projected directly from the canonical dashboard card so throughput review does not drift away from the retained local-cluster row.",
+    "row_digest": "ac6b4cf9495b4e9fe823351a1a4997a982d2c17f071f1c1a7cd325ab4523bd88"
+  },
+  "candidate_training_row": {
+    "panel_id": "psion_executor_local_cluster_dashboard_candidate_v1",
+    "row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+    "profile_id": "local_mac_mlx_aarch64",
+    "candidate_status": "candidate",
+    "observed_steps_per_second": 162.53061053630358,
+    "observed_samples_per_second": 20803.91814864686,
+    "observed_source_tokens_per_second": 4649675.706222572,
+    "detail": "Training throughput for `candidate` remains projected directly from the canonical dashboard card so throughput review does not drift away from the retained local-cluster row.",
+    "row_digest": "47ce9dd314cb2f76ae46975895fdf028caba5df6261e471bab530a4cca9de8d5"
+  },
+  "candidate_to_current_best_steps_ratio": 1.972398532878287,
+  "serving_row": {
+    "serving_row_id": "psion_executor_serving_throughput_row_mlx_v1",
+    "local_cpu_machine_class_id": "host_cpu_aarch64",
+    "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+    "reference_linear_metric_id": "tassadar.reference_linear_steps_per_second",
+    "hull_cache_metric_id": "tassadar.hull_cache_steps_per_second",
+    "fast_route_throughput_floor_report_digest": "b500d330f5146399b4b49f054e8ebd45aa584707f8f66b0a3433424ccbfa086d",
+    "hull_cache_closure_report_digest": "582b36210e020462e1d52844d3de28aff0c7beed5b1b73eb856af1a110631c9b",
+    "throughput_floor_green": true,
+    "min_hull_cache_speedup_over_reference_linear": 1.690977509006,
+    "max_hull_cache_remaining_gap_vs_cpu_reference": 2.683604159673,
+    "replacement_publication_digest": "75119558c8435d0e6681c3192acff385943e15b1451eb296bdba478e528b5ea1",
+    "detail": "Serving throughput stays anchored to `tassadar.hull_cache_steps_per_second` on `host_cpu_aarch64` with retained `hull_cache` speedup `1.690977509006` over `reference_linear` and explicit CPU drift-review continuity before replacement claims.",
+    "row_digest": "3ace9394959fa83a8eec315864f7734eafbba753b5e24cc5eaa73007c5174a64"
+  },
+  "replacement_candidate_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+  "replacement_blocked": false,
+  "active_replacement_block_ids": [],
+  "block_rows": [
+    {
+      "block_id": "serving_throughput_regression_candidate",
+      "status": "green_serving_throughput_floor",
+      "detail": "The replacement candidate keeps the admitted serving throughput floor green and still beats the `reference_linear` anchor, so serving throughput does not block replacement.",
+      "block_digest": "fc441e6006e0dcac44f16f209dc36ca205ef46cb7eecf8c38e232dfcfaee5a37"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_DASHBOARD.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_AUTOBLOCKS.md"
+  ],
+  "summary": "The admitted executor lane now has one canonical throughput surface that keeps training throughput and fast-route serving throughput in the same retained packet. The current-best 4080 row, the candidate MLX row, and the admitted `hull_cache` serving floor are now compared together, and replacement stays blocked automatically if serving throughput truth regresses.",
+  "report_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7"
+}

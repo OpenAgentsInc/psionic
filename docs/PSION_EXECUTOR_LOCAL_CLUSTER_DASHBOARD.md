@@ -105,6 +105,12 @@ The follow-on mandatory live-metrics packet now lives at:
 - `docs/PSION_EXECUTOR_MANDATORY_LIVE_METRICS.md`
 - `fixtures/psion/executor/psion_executor_mandatory_live_metrics_v1.json`
 
+The follow-on unified throughput packet that keeps dashboard training
+throughput and Mac serving throughput in one retained surface now lives at:
+
+- `docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md`
+- `fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_dashboard_fixtures`

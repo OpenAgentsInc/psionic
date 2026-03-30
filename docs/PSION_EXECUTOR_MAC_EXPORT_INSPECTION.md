@@ -102,6 +102,12 @@ The retained claim boundary stays explicit:
 - throughput wins do not override exactness, held-out, runtime, or serving
   blockers
 
+The follow-on unified throughput packet that now binds this serving evidence
+back into the canonical training dashboard lives at:
+
+- `docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md`
+- `fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_mac_export_inspection_fixtures`
