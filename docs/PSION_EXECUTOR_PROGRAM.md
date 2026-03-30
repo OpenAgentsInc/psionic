@@ -186,6 +186,10 @@ This doc does not claim:
   once, checks it against the frozen decision-threshold packet, and retains it
   only because the repeat still clears the frozen noise band without exactness,
   held-out, or adversarial regressions
+- `docs/PSION_EXECUTOR_SCHEDULER_ABLATION.md` owns the first canonical
+  same-budget scheduler and warmup ablation packet that keeps the retained
+  4080 result directly comparable to the frozen baseline, logs it for review,
+  and keeps it explicitly below the frozen promotion-noise threshold
 - `docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md` owns the first
   canonical phase-two pre-flight checklist packet that freezes launch blockers
   for the admitted MLX and 4080 decision-grade run types
