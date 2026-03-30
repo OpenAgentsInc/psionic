@@ -233,6 +233,10 @@ This doc does not claim:
   long-run rehearsal, the bounded closeout-status packet, the Mac export
   inspection, and the local-cluster plus consumer-seam receipts into one
   retained promotion answer
+- `docs/PSION_EXECUTOR_TRAINED_V1_REPLACEMENT_REPORT.md` owns the first
+  canonical final replacement report that projects the retained `trained-v1`
+  promotion packet, throughput, long-run recovery, export, and bounded
+  closeout facts into one phase-one replacement verdict
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

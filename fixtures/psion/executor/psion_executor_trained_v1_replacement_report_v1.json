@@ -1,0 +1,211 @@
+{
+  "schema_version": "psion.executor.trained_v1_replacement_report.v1",
+  "report_id": "psion_executor_trained_v1_replacement_report_v1",
+  "base_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "candidate_model_id": "tassadar-article-transformer-trace-bound-trained-v1",
+  "candidate_route_id": "tassadar.article_route.direct_hull_cache_runtime.v1",
+  "promotion_packet_ref": "fixtures/psion/executor/psion_executor_trained_v1_promotion_v1.json",
+  "promotion_packet_digest": "30e39b71c2e3fcc9dc052bf02c12f9a178e1bcdd8fb415bc1200fae033c5cd1d",
+  "descriptor_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_descriptor.json",
+  "descriptor_digest": "aea4b09a379b09f6f14d08e55e2a419ac19403ff4d0602f37bb7fc0a7dc95d80",
+  "artifact_manifest_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_artifact_manifest.json",
+  "artifact_manifest_digest": "4915d43dc2c999a04afa17b78ef09a2bb15cf5e5b39795225f9e0e43d9bc14e9",
+  "lineage_contract_ref": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v1_lineage_contract.json",
+  "lineage_contract_digest": "c994e89393760d84816afb5d5f35121c42fa064fcd4fc0e0c0f599e424862bda",
+  "artifact_naming_policy_ref": "docs/PSION_EXECUTOR_ARTIFACT_NAMING.md",
+  "preserved_gate_rows": [
+    {
+      "gate_id": "exactness_gate_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_trace_family_weighting_ablation_v1.json",
+      "source_digest": "1df209f442f60ee516bb0bc42afd579788dfc7f489eda39e953fe8f1f07aa44d",
+      "status": "green",
+      "detail": "Retained promotion gate `exactness_gate_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "caff5eda6d7fbc4e7075f3934f75cdf831b6d82b8cdc035969f9a42106484694"
+    },
+    {
+      "gate_id": "held_out_and_adversarial_gate_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "source_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "status": "green",
+      "detail": "Retained promotion gate `held_out_and_adversarial_gate_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "53943e9986a7b4c11362584bff06b8095b8cd26f08de36fd7c97dedce7ad31a8"
+    },
+    {
+      "gate_id": "reference_linear_anchor_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "source_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "status": "green",
+      "detail": "Retained promotion gate `reference_linear_anchor_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "aa714eb33cbb7d5ef3beb8766977ab262b88c3ab09e821184319df27bfc5aebb"
+    },
+    {
+      "gate_id": "hull_cache_fast_route_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_optimizer_ablation_v1.json",
+      "source_digest": "15ccd8383a89bb58e7aae003500710ba3d778abcd47a5c7840ccd8c54e6676a7",
+      "status": "green",
+      "detail": "Retained promotion gate `hull_cache_fast_route_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "ac5862d4fc9fdf62fd66079f33b42f82f4a302d70a7e62b4e34502e14cb14418"
+    },
+    {
+      "gate_id": "throughput_floor_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_supervision_density_ablation_v1.json",
+      "source_digest": "dc276e6cbb73657d3a94d3c6d74775f32727cbafa609b794731fbc04302dddbe",
+      "status": "green",
+      "detail": "Retained promotion gate `throughput_floor_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "1d39a5ff7a2ab3284d1211eae39f6b7d3bf0c9c71809785b94c77ca9d609d638"
+    },
+    {
+      "gate_id": "cpu_matrix_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+      "source_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+      "status": "green",
+      "detail": "Retained promotion gate `cpu_matrix_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "5adb2d325cfe42cac7f6c7eb38dbcf7736b312d0794a7a651e35132a435fc98c"
+    },
+    {
+      "gate_id": "export_and_replacement_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json",
+      "source_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2",
+      "status": "green",
+      "detail": "Retained promotion gate `export_and_replacement_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "7707b34fd3fb4a313bbb22b6a0642583394ca45088fb39a51c03ab19ffac9dfe"
+    },
+    {
+      "gate_id": "local_cluster_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_local_cluster_roundtrip_v1.json",
+      "source_digest": "820e605be48dfd4acdef6e1de3e5cd59972c0c7de0894b83f20343a9860f8299",
+      "status": "green",
+      "detail": "Retained promotion gate `local_cluster_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "d9b23dc1b5ec54206e05bf4e034ae9fc7ea5d7e78b8a2f6f074075d793a65a38"
+    },
+    {
+      "gate_id": "remote_training_visibility_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_4080_decision_grade_run_v1.json",
+      "source_digest": "3e406cd85a6bf918fe0e219dc2e77f4801750798bc16aa28ca355457e44ae8f5",
+      "status": "green",
+      "detail": "Retained promotion gate `remote_training_visibility_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "72e50343a9e876ebe7b3be045e7378a1d9022c7659bf34f7b2a147af40620830"
+    },
+    {
+      "gate_id": "promoted_artifact_compatibility_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+      "source_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+      "status": "green",
+      "detail": "Retained promotion gate `promoted_artifact_compatibility_green` stays green on the first bounded `trained-v1` replacement report.",
+      "row_digest": "dd13df4162fb3846f288a9917e8f34c9c2ded44166f9ed3102680fa18e08bfca"
+    }
+  ],
+  "improved_metric_rows": [
+    {
+      "metric_id": "reference_linear_delta",
+      "delta_value": 73679.40346165793,
+      "threshold_value": 65060.100461467104,
+      "status": "green",
+      "detail": "`reference_linear` improvement `73679.403462` still clears the retained non-saturated threshold `65060.100461`.",
+      "row_digest": "dec68fdf7c5983b30e0c8c40e754af3a6549153dcabd581ca40520b9a2ec656c"
+    },
+    {
+      "metric_id": "hull_cache_delta",
+      "delta_value": 224815.26180754835,
+      "threshold_value": 209005.1178118226,
+      "status": "green",
+      "detail": "Admitted `hull_cache` improvement `224815.261808` still clears the retained non-saturated threshold `209005.117812`.",
+      "row_digest": "6e498b340b02de91d00942701a4752d72150d0e87421ccc32e6bf7543ef30f0a"
+    },
+    {
+      "metric_id": "hull_cache_speedup_improvement",
+      "delta_value": 0.059403490993948926,
+      "threshold_value": 0.05,
+      "status": "green",
+      "detail": "Fast-route speedup improvement `0.059403490994` stays above the retained floor `0.050000000000`.",
+      "row_digest": "1ae4da88bbde3720442620e8c92db04221eccfaceadec1380142e48b26b4dff6"
+    },
+    {
+      "metric_id": "cpu_gap_reduction",
+      "delta_value": 0.06276315967336421,
+      "threshold_value": 0.05,
+      "status": "green",
+      "detail": "CPU-gap reduction `0.062763159673` stays above the retained floor `0.050000000000`.",
+      "row_digest": "e27d0a4b8d3f58bf86e3cda1be8f1d0dcc29d9c01dd87b8f9f2bd631d3e565bb"
+    },
+    {
+      "metric_id": "exactness_net_delta_bps",
+      "delta_value": 8.0,
+      "threshold_value": 0.0,
+      "status": "green",
+      "detail": "Exactness net delta `8` bps stays non-negative against `trained-v0`.",
+      "row_digest": "23fcad024b6917758e4dae5e365b0548e5ee3c934894fdff035b50c3c74ba152"
+    },
+    {
+      "metric_id": "held_out_delta_bps",
+      "delta_value": 1.0,
+      "threshold_value": 0.0,
+      "status": "green",
+      "detail": "Held-out delta `1` bps stays non-negative against `trained-v0`.",
+      "row_digest": "e772efc71d906bf647a187c28a5528546e4822cc2cc3581ebabc3cf43e5c7750"
+    },
+    {
+      "metric_id": "training_steps_per_second_delta",
+      "delta_value": 5.209403645610266,
+      "threshold_value": 0.0,
+      "status": "green",
+      "detail": "Training steps-per-second delta `5.209403645610` stays positive against the retained baseline.",
+      "row_digest": "d3856f4f6b8c3d68cb852d1fad131ca05904b9a4b4d9e090241d47a3b9cda6aa"
+    }
+  ],
+  "outcome_rows": [
+    {
+      "outcome_id": "throughput_outcome_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json",
+      "source_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7",
+      "status": "green",
+      "detail": "Unified throughput remains green: candidate/current-best steps ratio `1.972398532878`, current-best steps `82.402520498292`, candidate steps `162.530610536304`, serving floor green `true`.",
+      "row_digest": "c9c5c0ca48ee29ae274146d01b59a91251fc96fb96b6fe1bc4558716a465edb9"
+    },
+    {
+      "outcome_id": "stability_outcome_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json",
+      "source_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2",
+      "status": "green",
+      "detail": "Long-run rehearsal stays green with incident `transient_interruption` and review status `logged_clean_rehearsal`.",
+      "row_digest": "544fa31595b15b8f958df406fe74f7a01b366cef34e0d72fd75376bf2937fc9f"
+    },
+    {
+      "outcome_id": "recovery_outcome_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json",
+      "source_digest": "d07f14dd64ce0f66d8827a9de1c6353dd5f1d001a9c81bc74669bc12e2def2c6",
+      "status": "green",
+      "detail": "Recovery remains explicit through action `continue_from_last_green_checkpoint` from checkpoint step `12`.",
+      "row_digest": "d4c724cf961e5eb64123396e21b7bc20ab61988d459928e5c5f295a7e4ce9e0d"
+    },
+    {
+      "outcome_id": "export_outcome_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+      "source_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+      "status": "green",
+      "detail": "Mac export inspection stays green on machine class `host_cpu_aarch64` with replacement publication digest `75119558c8435d0e6681c3192acff385943e15b1451eb296bdba478e528b5ea1`.",
+      "row_digest": "25b6c15124adb59e3741f0dc6be8a82a0e2c070888f2dbfe4c53d2b4aeaed6eb"
+    },
+    {
+      "outcome_id": "closeout_outcome_green",
+      "source_ref": "fixtures/psion/executor/psion_executor_percepta_closeout_status_v1.json",
+      "source_digest": "9856bfc3735ddc9f89a2a9ce6a49c9aea166133542237a253c8a0644b19c1185",
+      "status": "green",
+      "detail": "Bounded closeout remains `green_bounded` with workload truth `green`, fast-path truth `green`, and route-replacement truth `green`.",
+      "row_digest": "88fd4e3077ce967f037883496023f1aaae6be610dc76b26615d5aa19950c3ace"
+    }
+  ],
+  "bounded_claim_status": "green_bounded_replacement_ready",
+  "replacement_decision": "publish_trained_v1_replacement_report",
+  "support_refs": [
+    "docs/PSION_EXECUTOR_TRAINED_V1_PROMOTION.md",
+    "docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md",
+    "docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_PERCEPTA_CLOSEOUT_STATUS.md",
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_ARTIFACT_NAMING.md"
+  ],
+  "summary": "The executor lane now has one final bounded `trained-v1` replacement report. It projects the retained promotion packet, unified throughput report, long-run rehearsal, Mac export inspection, and bounded closeout status into one replacement verdict without widening the claim boundary beyond the admitted executor workload family.",
+  "report_digest": "4290e73f0a7c818e3ccaecde497ee5c1c3003827f7a31fdc60ca00ff3b9cbdff"
+}
