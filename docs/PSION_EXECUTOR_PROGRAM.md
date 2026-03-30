@@ -124,6 +124,8 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md` owns the retained
   checkpoint-time frequent-pack ledger attachment packet and its hard
   promotion-block rule for the admitted 4080 worker lane
+- `docs/PSION_EXECUTOR_4080_SMOKE_RUN.md` owns the retained accelerator-backed
+  smoke-run packet for the admitted 4080 worker lane
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

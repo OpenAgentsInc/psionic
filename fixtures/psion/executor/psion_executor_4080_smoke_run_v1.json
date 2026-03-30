@@ -1,0 +1,97 @@
+{
+  "schema_version": "psion.executor.4080_smoke_run.v1",
+  "packet_id": "psion_executor_4080_smoke_run_v1",
+  "worker_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "control_plane_profile_id": "local_tailnet_cluster_control_plane",
+  "eval_attachment_packet_ref": "fixtures/psion/executor/psion_executor_4080_frequent_eval_attachment_v1.json",
+  "eval_attachment_packet_sha256": "93db62e514bdb276426fcddea240543e1d42da077dee4756777dd0bea7f89e83",
+  "retained_run_summary_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/tailrun_admitted_home_run_summary.json",
+  "retained_run_summary_sha256": "fe6e0fb07458810923b6f96a7830636216e741ba49ae612d9ba54847696a7dd4",
+  "retained_run_summary_digest": "e37cd022b7082183a5a75014dca3d2512abfa18a5ce4355140c8b4cd9c5ac73b",
+  "coordinator_report_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/coordinator_runtime_report.json",
+  "coordinator_report_sha256": "dca06156d1c590d4343959f375d1572879540fe29071f0426c93eec7171b9c5c",
+  "contributor_report_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/contributor_runtime_report.json",
+  "contributor_report_sha256": "f1ca4595a4b3c77f037b519d62048508a426c38ccf4393054218d1d4039c84bc",
+  "smoke_objective_id": "psion.executor.4080_tailnet_smoke_objective.v1",
+  "smoke_objective_kind": "executor_lane_local_cluster_admission_surrogate",
+  "run_id": "tailrun-home-admitted-20260328k",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "objective_dataset_id": "dataset://openagents/swarm/open_adapter_sft@2026.03.24",
+  "objective_split_name": "train",
+  "objective_slice_ids": [
+    "swarm_mac_mlx_coordinator_validator_contributor-1",
+    "swarm_linux_cuda_rtx4080_contributor-2"
+  ],
+  "result_classification": "bounded_success",
+  "linux_worker_id": "swarm-linux-4080-a",
+  "execution_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+  "worker_endpoint": "100.108.56.85:34101",
+  "free_memory_bytes": 21474836480,
+  "accelerator_count": 1,
+  "observed_wallclock_ms": 2945,
+  "local_execution_wallclock_ms": 3,
+  "executed_steps": 12,
+  "batch_count": 2,
+  "sample_count": 12,
+  "payload_bytes": 1480,
+  "final_mean_loss": 5.364421e-7,
+  "estimated_steps_per_second": 4000.0,
+  "estimated_samples_per_second": 4000.0,
+  "contribution_share": 0.5,
+  "contributor_receipt_digest": "865ef2f86a2b50a6790996a07f53a345068eea2514cc7907c47bdece2c4c6305",
+  "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+  "checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+  "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+  "eval_ledger_row_id": "psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+  "eval_ledger_row_digest": "7b9b1159894d59c216bf4e8c069036a9c2820b9f949a7298d13ba93d4a52eaa4",
+  "operator_review_suite_status": "green",
+  "eval_missing_blocks_promotion": true,
+  "publish_disposition": "refused",
+  "promotion_disposition": "held",
+  "unsupported_precision_refusal": "open adapter backend does not yet support precision policy `Bf16Mixed`",
+  "accepted_contributions": 2,
+  "replay_checked_contributions": 2,
+  "submission_receipt_count": 2,
+  "merge_strategy": "exact_mean_delta_rank_stacking",
+  "merged_lora_rank": 4,
+  "canonical_profile_mean_loss": 1.788139627478813e-7,
+  "deterministic_probe_top_token_id": 2,
+  "checklist_rows": [
+    {
+      "checklist_id": "checkpoint_written_green",
+      "status": "green",
+      "detail": "The retained smoke run now stays tied to checkpoint family `swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k` at pointer digest `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` instead of relying on an implicit scratch path."
+    },
+    {
+      "checklist_id": "throughput_recorded_green",
+      "status": "green",
+      "detail": "The Linux 4080 contribution row records observed wallclock 2945 ms, local execution 3 ms, 12 steps, and 4000.0 estimated steps/s."
+    },
+    {
+      "checklist_id": "memory_fact_green",
+      "status": "green",
+      "detail": "The coordinator membership receipt records 21474836480 free bytes and 1 accelerator for the admitted Linux 4080 worker before the smoke run counts."
+    },
+    {
+      "checklist_id": "eval_attachment_green",
+      "status": "green",
+      "detail": "The smoke run now cites frequent-eval ledger row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` with operator-review suite status `green` and keeps missing or unscored suites as hard blockers instead of silent gaps."
+    },
+    {
+      "checklist_id": "failure_facts_green",
+      "status": "green",
+      "detail": "The retained smoke run keeps unsupported-precision refusal `open adapter backend does not yet support precision policy `Bf16Mixed`` plus publish disposition `refused` and promotion disposition `held` explicit."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260328k/tailrun_admitted_home_run_summary.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260328k/coordinator_runtime_report.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260328k/contributor_runtime_report.json"
+  ],
+  "summary": "The admitted 4080 lane now has one real smoke-run packet tied to retained run `tailrun-home-admitted-20260328k`. The smoke objective remains an executor-lane local-cluster admission surrogate on dataset `dataset://openagents/swarm/open_adapter_sft@2026.03.24` through the Linux 4080 contribution row (steps=12 observed_wallclock_ms=2945 estimated_steps_per_second=4000.0), while checkpoint pointer `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` and frequent-eval ledger row `psion.executor.4080.frequent_eval_row:tailrun-home-admitted-20260328k:dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8` keep checkpoint, eval, and blocker facts explicit instead of relying on launch-only infrastructure claims.",
+  "packet_digest": "2f13de7c485046bb3f478fcfff4711f4e0b033e01d1df1ff3950af55f61b128c"
+}
