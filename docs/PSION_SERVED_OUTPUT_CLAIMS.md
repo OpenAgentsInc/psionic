@@ -31,6 +31,9 @@ shown, and what published context or latency envelope is in force.
   posture but no verification widening.
 - `fixtures/psion/serve/psion_served_output_claim_refusal_v1.json`
   demonstrates a typed refusal posture with zero unsupported claim flags.
+- `docs/PSION_GENERIC_LOAD_AND_GENERATE.md` records the first retained generic
+  learned-lane runtime packet that reuses this claim-posture contract on a real
+  artifact-backed load-and-generate seam.
 
 The stable schema version is `psion.served_output_claim_posture.v1`.
 

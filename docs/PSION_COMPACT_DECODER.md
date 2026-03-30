@@ -20,6 +20,9 @@ substrate instead of introducing a separate trainer-owned model stack.
 - `docs/PSION_PLUGIN_CONDITIONED_COMPACT_DECODER_REFERENCE.md` is the first
   lane-specific child config built on top of this shared compact-decoder
   family for the host-native plugin-conditioned reference lane.
+- `docs/PSION_GENERIC_LOAD_AND_GENERATE.md` is the first retained generic
+  learned-lane serve packet built on top of the current artifact-backed decoder
+  runtime.
 
 The stable schema version is `psion.compact_decoder_descriptor.v1`.
 
@@ -39,6 +42,11 @@ The descriptor now carries:
 
 That keeps pilot and first internal model descriptors challengeable before the
 pretrain stage starts emitting checkpoints.
+
+The new generic load-and-generate packet matters here because it proves the
+current compact-decoder substrate can close one honest artifact-backed
+load-to-serve loop without pretending that descriptor closure already implies
+full pilot-anchor serving parity.
 
 ## Size Anchors
 

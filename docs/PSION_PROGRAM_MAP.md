@@ -35,6 +35,11 @@ It is not:
 Exact executor closure remains separate work under the `Tassadar` lane and its
 canonical docs, including `docs/PSION_EXECUTOR_PROGRAM.md`.
 
+The generic learned lane now also has one retained operator-facing serve
+closure in `docs/PSION_GENERIC_LOAD_AND_GENERATE.md`. That packet proves
+artifact-backed load-to-serve integrity on the current generic runtime without
+claiming executor-lane replacement or exactness.
+
 The current reference pilot is also a CPU-reference lane. It remains a valid
 bounded operator, receipt, checkpoint, and promotion fixture, but it is not a
 valid GPU training proof target. Future Google GPU audits must name the exact
@@ -44,6 +49,11 @@ GPU-hosted reference runs as accelerator-backed training proof.
 The canonical bounded accelerator-backed trainer is now the dedicated
 `psion_accelerated_reference_pilot` lane, not the CPU reference pilot or the
 plugin reference bundle paths.
+
+The generic learned family also has one canonical serve packet on the current
+artifact-backed runtime. That packet is a family-integrity proof, not a second
+serve stack and not a claim that the generic family has already closed the full
+compact-decoder-anchor runtime gap.
 
 ## Dependency Order
 
