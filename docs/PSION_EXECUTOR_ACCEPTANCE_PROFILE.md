@@ -84,3 +84,12 @@ Use this profile for:
 
 No executor-capable promotion issue should define its own gate set without
 pointing back to this profile.
+
+## Frozen Pack Binding
+
+- `tassadar.eval.frequent.v0` is the checkpoint-time decision pack that keeps
+  exactness, held-out exclusions, operator review cases, and throughput
+  blockers frozen between serious runs
+- `tassadar.eval.promotion.v0` is the promotion pack that binds the exactness,
+  held-out, adversarial, runtime, serving, `reference_linear`, `hull_cache`,
+  and throughput-threshold surfaces back to this profile

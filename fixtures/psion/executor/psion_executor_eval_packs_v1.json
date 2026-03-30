@@ -1,0 +1,277 @@
+{
+  "schema_version": "psion.executor_eval_pack_catalog.v1",
+  "catalog_id": "psion_executor_eval_packs_v1",
+  "packs": [
+    {
+      "pack_id": "tassadar.eval.frequent.v0",
+      "pack_kind": "frequent",
+      "admitted_profile_ids": [
+        "local_mac_mlx_aarch64",
+        "local_4080_cuda_tailnet_x86_64",
+        "local_tailnet_cluster_control_plane"
+      ],
+      "authority_artifacts": [
+        {
+          "path": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+          "sha256": "f371e3cd3e065e4efecd7217f907224a054b9f42fa2ab1cb7ea3644956f93674",
+          "detail": "Retained article benchmark report carrying the admitted workload targets, exactness hooks, reference_linear anchor posture, and future hull_cache throughput metrics."
+        },
+        {
+          "path": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json",
+          "sha256": "69fb1da6e0c0ea5a8a5db1e39f779d2a9503206553e702795602021b237902a6",
+          "detail": "Retained benchmark-package summary carrying the public case-family vocabulary used by the executor workload family."
+        },
+        {
+          "path": "fixtures/psion/isolation/psion_exclusion_manifest_v1.json",
+          "sha256": "8f7ce3eb5909326280fd0edd6995665ea009fea2d4256003770b66b73267244d",
+          "detail": "Retained held-out isolation manifest proving later executor decisions stay tied to the same exclusion and near-duplicate review boundary."
+        },
+        {
+          "path": "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+          "sha256": "392005dc09dc73a972c4bb727ff97c9fe43bbf2dfe72db30265cde1228c7a303",
+          "detail": "Retained local-profile reference proving the operator review packet still depends on admitted machine and control-plane profiles instead of a second launcher story."
+        }
+      ],
+      "suite_refs": [
+        {
+          "suite_id": "frequent_exactness_cases_v0",
+          "suite_class": "exactness_cases",
+          "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+          "case_ids": [
+            "micro_wasm_kernel",
+            "branch_heavy_kernel",
+            "memory_heavy_kernel",
+            "long_loop_kernel",
+            "sudoku_v0_test_a",
+            "hungarian_matching"
+          ],
+          "metric_ids": [
+            "final_output_exactness_bps",
+            "step_exactness_bps",
+            "halt_exactness_bps"
+          ],
+          "required_for_green": true,
+          "detail": "Checkpoint-time exactness pack covering the currently admitted executor workloads before a longer promotion review is even considered."
+        },
+        {
+          "suite_id": "frequent_held_out_exclusions_v0",
+          "suite_class": "held_out_exclusions",
+          "source_ref": "fixtures/psion/isolation/psion_exclusion_manifest_v1.json",
+          "case_ids": [
+            "spec_quiz_eval_pack_v1",
+            "vendor_manual_private_scan_v1",
+            "forum_scrape_misc_001"
+          ],
+          "metric_ids": [],
+          "required_for_green": true,
+          "detail": "Frequent decisions stay tied to the same held-out and training-excluded source boundary so checkpoint-time review cannot silently widen the corpus."
+        },
+        {
+          "suite_id": "frequent_operator_review_cases_v0",
+          "suite_class": "operator_review_cases",
+          "source_ref": "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+          "case_ids": [
+            "artifact_packet_complete",
+            "checkpoint_restore_rehearsal_green",
+            "export_smoke_green",
+            "local_cluster_roundtrip_green"
+          ],
+          "metric_ids": [],
+          "required_for_green": true,
+          "detail": "Checkpoint-time review remains explicit about artifact packet completeness, restore rehearsal, export smoke, and the local-cluster roundtrip instead of reducing the pack to pure task accuracy."
+        },
+        {
+          "suite_id": "frequent_throughput_blockers_v0",
+          "suite_class": "throughput_blockers",
+          "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+          "case_ids": [
+            "micro_wasm_kernel",
+            "branch_heavy_kernel",
+            "memory_heavy_kernel",
+            "hungarian_matching"
+          ],
+          "metric_ids": [
+            "tassadar.reference_linear_steps_per_second",
+            "tassadar.hull_cache_steps_per_second",
+            "tassadar.hull_cache_speedup_over_reference_linear",
+            "tassadar.hull_cache_remaining_gap_vs_cpu_reference"
+          ],
+          "required_for_green": true,
+          "detail": "Frequent review treats throughput regressions as blockers when the fast route or anchor path falls far enough that later promotion claims would become misleading."
+        }
+      ],
+      "thresholds": [],
+      "acceptance_profile_ref": null,
+      "claim_boundary": "This pack freezes the checkpoint-time executor review surface only: admitted exactness cases, the held-out exclusion boundary, explicit operator review cases, and throughput blockers. It does not by itself decide promotion.",
+      "pack_digest": "aa61897f9b4731421865a9cb38f2633ccbbd2fc60dcb140fb567ae21d14c73e8"
+    },
+    {
+      "pack_id": "tassadar.eval.promotion.v0",
+      "pack_kind": "promotion",
+      "admitted_profile_ids": [
+        "local_mac_mlx_aarch64",
+        "local_4080_cuda_tailnet_x86_64",
+        "local_tailnet_cluster_control_plane"
+      ],
+      "authority_artifacts": [
+        {
+          "path": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+          "sha256": "f371e3cd3e065e4efecd7217f907224a054b9f42fa2ab1cb7ea3644956f93674",
+          "detail": "Retained article benchmark report carrying exactness, reference_linear, hull_cache, and throughput evidence on the admitted workload family."
+        },
+        {
+          "path": "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+          "sha256": "4ce8949f82e803675c62ec3a6c804329fd72d8ba3f820b5aaab6342033cdc6ca",
+          "detail": "Retained evaluation-independence audit carrying the frozen held-out and adversarial executor rows."
+        },
+        {
+          "path": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+          "sha256": "b8d6120147af32505cfee8b76dd334b89da7bbceb0176a16864f7cfd9dc663e7",
+          "detail": "Retained acceptance profile defining the executor promotion gates that this pack must satisfy."
+        },
+        {
+          "path": "docs/TASSADAR_ARTICLE_TRANSFORMER_STACK_BOUNDARY.md",
+          "sha256": "ede7c03feb4c55f7cb7f9553809a72d263b3ff9b5802e5e60f3f031c7e73d50c",
+          "detail": "Retained stack-boundary doc proving runtime, export, and article-route ownership stay explicit during promotion review."
+        }
+      ],
+      "suite_refs": [
+        {
+          "suite_id": "promotion_exactness_suite_v0",
+          "suite_class": "exactness_cases",
+          "source_ref": "fixtures/tassadar/reports/tassadar_benchmark_package_set_summary.json",
+          "case_ids": [
+            "micro_wasm_kernel",
+            "branch_heavy_kernel",
+            "memory_heavy_kernel",
+            "long_loop_kernel",
+            "sudoku_v0_test_a",
+            "sudoku_v0_test_b",
+            "hungarian_matching"
+          ],
+          "metric_ids": [
+            "final_output_exactness_bps",
+            "step_exactness_bps",
+            "halt_exactness_bps"
+          ],
+          "required_for_green": true,
+          "detail": "Promotion exactness suite spans the admitted executor workload family and keeps exactness green as the first non-negotiable gate."
+        },
+        {
+          "suite_id": "promotion_held_out_suite_v0",
+          "suite_class": "held_out_suite",
+          "source_ref": "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+          "case_ids": [
+            "micro_wasm_kernel",
+            "branch_heavy_kernel",
+            "memory_heavy_kernel",
+            "randomized_sudoku_v0_holdout_a",
+            "randomized_hungarian_v0_holdout_a"
+          ],
+          "metric_ids": [
+            "held_out_exactness_bps",
+            "held_out_regression_count"
+          ],
+          "required_for_green": true,
+          "detail": "Promotion held-out suite keeps the learned lane honest on non-train rows before any executor candidate can move forward."
+        },
+        {
+          "suite_id": "promotion_adversarial_suite_v0",
+          "suite_class": "adversarial_suite",
+          "source_ref": "fixtures/tassadar/reports/tassadar_article_evaluation_independence_audit_report.json",
+          "case_ids": [
+            "adversarial_sudoku_9x9_clustered_a",
+            "adversarial_hungarian_10x10_permuted_a"
+          ],
+          "metric_ids": [
+            "adversarial_regression_count"
+          ],
+          "required_for_green": true,
+          "detail": "Promotion adversarial suite keeps article-scale hostile variants explicit instead of letting smaller exactness wins override them."
+        },
+        {
+          "suite_id": "promotion_runtime_blockers_v0",
+          "suite_class": "runtime_blockers",
+          "source_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+          "case_ids": [
+            "cpu_matrix_green",
+            "checkpoint_restore_green",
+            "local_cluster_roundtrip_green"
+          ],
+          "metric_ids": [],
+          "required_for_green": true,
+          "detail": "Promotion runtime blockers keep CPU validation, restore rehearsal, and the Mac -> 4080 -> Mac roundtrip green before promotion is even reviewable."
+        },
+        {
+          "suite_id": "promotion_serving_blockers_v0",
+          "suite_class": "serving_blockers",
+          "source_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+          "case_ids": [
+            "export_packet_green",
+            "replacement_packet_green",
+            "promoted_artifact_compatible",
+            "shadow_rollback_safe"
+          ],
+          "metric_ids": [],
+          "required_for_green": true,
+          "detail": "Promotion serving blockers keep export, replacement, promoted-artifact compatibility, and rollback safety explicit instead of treating runtime quality as enough by itself."
+        },
+        {
+          "suite_id": "promotion_reference_linear_anchor_checks_v0",
+          "suite_class": "reference_linear_anchor_checks",
+          "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+          "case_ids": [
+            "micro_wasm_kernel",
+            "branch_heavy_kernel",
+            "memory_heavy_kernel",
+            "hungarian_matching"
+          ],
+          "metric_ids": [
+            "tassadar.reference_linear_steps_per_second"
+          ],
+          "required_for_green": true,
+          "detail": "Promotion still requires `reference_linear` as the measured baseline truth anchor instead of letting fast-route wins erase the floor."
+        },
+        {
+          "suite_id": "promotion_hull_cache_fast_route_checks_v0",
+          "suite_class": "hull_cache_fast_route_checks",
+          "source_ref": "fixtures/tassadar/reports/tassadar_article_class_benchmark_report.json",
+          "case_ids": [
+            "micro_wasm_kernel",
+            "branch_heavy_kernel",
+            "memory_heavy_kernel",
+            "hungarian_matching"
+          ],
+          "metric_ids": [
+            "tassadar.hull_cache_steps_per_second",
+            "tassadar.hull_cache_speedup_over_reference_linear",
+            "tassadar.hull_cache_remaining_gap_vs_cpu_reference"
+          ],
+          "required_for_green": true,
+          "detail": "Promotion fast-route checks keep admitted-workload `hull_cache` explicit as the fast-route target while preserving the `reference_linear` anchor."
+        }
+      ],
+      "thresholds": [
+        {
+          "threshold_id": "promotion_hull_cache_speedup_floor_v0",
+          "metric_id": "tassadar.hull_cache_speedup_over_reference_linear",
+          "direction": "minimum",
+          "value": 1.5,
+          "detail": "Promotion requires the admitted fast route to stay materially faster than `reference_linear`; this floor stays below the weakest retained current workload result instead of overfitting to one case."
+        },
+        {
+          "threshold_id": "promotion_hull_cache_cpu_gap_ceiling_v0",
+          "metric_id": "tassadar.hull_cache_remaining_gap_vs_cpu_reference",
+          "direction": "maximum",
+          "value": 3.0,
+          "detail": "Promotion keeps the admitted fast route within one frozen remaining-gap ceiling against the CPU reference so throughput wins do not hide a degraded execution surface."
+        }
+      ],
+      "acceptance_profile_ref": "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+      "claim_boundary": "This pack freezes the first executor promotion review surface: exactness, held-out and adversarial suites, runtime and serving blockers, `reference_linear` anchor truth, admitted-workload `hull_cache` fast-route checks, and the first frozen throughput thresholds. It does not widen the workload family beyond the retained executor lane.",
+      "pack_digest": "2ba64d8486bc1c051a54e3da0518ec41ca9b33d16d49871256411e61ac3ffc94"
+    }
+  ],
+  "summary": "Phase-one executor eval-pack catalog freezing the checkpoint-time frequent pack and the promotion pack on top of the retained article benchmark, isolation, and acceptance surfaces.",
+  "catalog_digest": "d0f7e608b7be0e39fc319e12033a230dbb6953ccd550978c93193e895508ad2d"
+}

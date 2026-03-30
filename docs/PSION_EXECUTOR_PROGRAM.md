@@ -93,6 +93,8 @@ This doc does not claim:
   artifact naming policy
 - `docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md` owns the executor-capable
   acceptance profile
+- `docs/PSION_EXECUTOR_EVAL_PACKS.md` owns the frozen frequent and promotion
+  eval packs
 - `docs/PSION_EXECUTOR_OWNERSHIP.md` owns named owners and review cadence
 - `docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md` owns the admitted local
   executor profile catalog
