@@ -153,6 +153,11 @@ than just run tensor math.
   `docs/PSION_RVLLM_PAGED_KV_MANAGER.md`, making logical page layout,
   owner-bound growth accounting, spill policy, residency movement, and refusal
   posture explicit instead of leaving the block-manager contract implicit.
+- The same pass now also retains one explicit prefill/decode scheduler packet
+  at `docs/PSION_RVLLM_PREFILL_DECODE_SCHEDULER.md`, making the admitted
+  continuous-batch policy, realized scheduling classes, TTFT/ITL exposure, and
+  response-header contract machine-visible instead of leaving that split buried
+  across runtime receipts and HTTP glue.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
