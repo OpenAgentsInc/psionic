@@ -1,0 +1,79 @@
+{
+  "schema_version": "psion.executor_admitted_profile_catalog.v1",
+  "catalog_id": "psion_executor_admitted_profiles_v1",
+  "profiles": [
+    {
+      "profile_id": "local_mac_mlx_aarch64",
+      "purpose": "Local Apple Silicon MLX machine for executor smoke training, short training runs, eval-pack execution, checkpoint restore rehearsal, export inspection, and CPU-validation ownership.",
+      "runtime_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+      "run_type_admissions": [
+        {
+          "run_type": "mlx_smoke",
+          "posture": "primary",
+          "detail": "This is the primary admitted machine for MLX smoke runs and local bring-up validation."
+        },
+        {
+          "run_type": "mlx_decision_grade",
+          "posture": "allowed",
+          "detail": "Decision-grade MLX runs are allowed only when the question is explicitly MLX-local and the frozen pack or subset is declared before launch."
+        },
+        {
+          "run_type": "cuda4080_smoke",
+          "posture": "not_admitted",
+          "detail": "The Mac profile does not count as the CUDA smoke lane."
+        },
+        {
+          "run_type": "cuda4080_decision_grade",
+          "posture": "not_admitted",
+          "detail": "The Mac profile does not count as the 4080 decision-grade lane."
+        },
+        {
+          "run_type": "cuda4080_confirmation",
+          "posture": "not_admitted",
+          "detail": "The Mac profile does not count as the 4080 confirmation lane."
+        },
+        {
+          "run_type": "cpu_validation",
+          "posture": "primary",
+          "detail": "The Mac profile is a primary owner for CPU-matrix replacement validation, export inspection, and restore rehearsal."
+        },
+        {
+          "run_type": "h100_escalation",
+          "posture": "not_admitted",
+          "detail": "The local Mac profile does not count as the H100 escalation lane."
+        }
+      ],
+      "local_requirements": [
+        "Run the retained MLX bring-up gate before roadmap-tracked smoke or decision-grade work.",
+        "Keep the run local-first: this profile does not claim remote checkpoint-writer or remote cluster-port authority by itself.",
+        "Use only shipped Psionic entrypoints when the profile is cited in roadmap-tracked evidence."
+      ],
+      "checkpoint_expectations": "Checkpoint restore rehearsal and export inspection must stay inside the local operator-owned workspace; this profile does not claim shared checkpoint-writer authority by itself.",
+      "connectivity_expectations": [
+        "No remote launch or cluster-port claim is inherited from the Mac profile alone.",
+        "The profile remains valid for local eval and control-plane ownership even when the later Tailnet worker is offline."
+      ],
+      "shipped_entrypoints": [
+        "scripts/check-swarm-mac-mlx-bringup.sh",
+        "crates/psionic-train/src/swarm_mlx_bringup.rs",
+        "crates/psionic-train/src/bin/swarm_mac_mlx_bringup.rs"
+      ],
+      "authority_artifacts": [
+        {
+          "path": "fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json",
+          "sha256": "9d21f4ad23e56c02a5b7e1c220f5fe412a9df389c38041be8600f490747a00a8",
+          "detail": "Retained MLX bring-up report proving the bounded Mac Metal backend, machine envelope, and same-node bring-up gate."
+        },
+        {
+          "path": "fixtures/training/compute_sources/local_mlx_mac_workstation_v1.json",
+          "sha256": "11aab6329d9eea8a2bc049791b3f734572ccb1e4f92701efd4ae58e126807839",
+          "detail": "Shared compute-source contract proving the Mac can be admitted under the existing cross-provider train substrate without inventing a second launcher or machine vocabulary."
+        }
+      ],
+      "claim_boundary": "This profile admits the local Apple Silicon MLX machine as a real roadmap-tracked executor development and eval host. It proves local MLX smoke, short-run, eval, restore, export, and CPU-validation posture. It does not by itself claim remote launch, shared checkpoint authority, or cross-device training closure.",
+      "profile_digest": "882490ecbeca124a1c6a1bfd672a2c3f3c66e277723349722982957f86f310e9"
+    }
+  ],
+  "summary": "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane before 4080 and control-plane profiles widen the same catalog.",
+  "catalog_digest": "ab3a8ef9d9be5e1fd0b8390fe50ba516f4221e76b30754f3854675fe33ef6071"
+}
