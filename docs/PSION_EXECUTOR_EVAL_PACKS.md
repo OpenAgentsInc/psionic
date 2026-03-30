@@ -178,6 +178,11 @@ The promotion pack now repeats the current claim boundary explicitly:
 - fast-route wins never override exactness, held-out, adversarial, runtime, or
   serving blockers
 
+That claim boundary is now also rechecked by
+`docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md`, which keeps local Mac export
+inspection from silently collapsing the `reference_linear` anchor into the
+`hull_cache` fast path before promotion or replacement review.
+
 ## Honest Boundary
 
 These packs do not create a second eval spine and they do not widen the

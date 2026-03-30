@@ -61,6 +61,9 @@ Every executor-capable candidate must keep all of the following green:
 - candidate exports cleanly into the canonical executor artifact flow
 - replacement packet carries descriptor, artifact, lineage, and replacement
   report truth
+- the admitted Mac profile keeps
+  `docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md` green as the local
+  pre-promotion export inspection and CPU-route validation receipt
 
 ### Local-cluster gate
 
@@ -76,6 +79,8 @@ Every executor-capable candidate must keep all of the following green:
 - remote-training visibility is green where applicable
 - promoted-artifact compatibility is green where applicable
 - compiled-agent shadow and rollback safety stay green where applicable
+- no executor-capable promotion packet may skip the local Mac export
+  inspection receipt and still claim consumer-safe replacement readiness
 
 ## Promotion Use Rule
 

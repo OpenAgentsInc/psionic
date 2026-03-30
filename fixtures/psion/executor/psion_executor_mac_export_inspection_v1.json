@@ -1,0 +1,77 @@
+{
+  "schema_version": "psion.executor.mac_export_inspection.v1",
+  "packet_id": "psion_executor_mac_export_inspection_v1",
+  "admitted_profile_id": "local_mac_mlx_aarch64",
+  "local_cpu_machine_class_id": "host_cpu_aarch64",
+  "decision_grade_packet_ref": "fixtures/psion/executor/psion_executor_mlx_decision_grade_run_v1.json",
+  "decision_grade_packet_sha256": "4d48cfa95de64cd6f148825da97508d8cd7bd55e991088dad8cafac49d228eb3",
+  "portable_bundle_ref": "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+  "portable_bundle_sha256": "4a345019512aae63c517c3261439e0dbd3a1a113745c80ae4244250abfff3e91",
+  "deferred_import_plan_digest": "8932fc2305dd3cf091902e163bb70a74c0e380f707af56a3c53718ad43cb2ccd",
+  "imported_state_dict_digest": "8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8",
+  "compatibility_contract_digest": "fba40c5402d57ca5efbaad21f8b93b663328377e1d6c5bad5fef2449376ee6d1",
+  "torch_state_dict_artifact_digest": "88006c8f787eb0e031a9e413778659e701689a7f217b669b6525d129ec45f6b1",
+  "torch_state_dict_state_dict_digest": "8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8",
+  "torch_state_dict_tensor_count": 6,
+  "cpu_reproducibility_report_ref": "fixtures/tassadar/reports/tassadar_article_cpu_reproducibility_report.json",
+  "cpu_reproducibility_report_digest": "7d1122039677a89f2d7e1079e78cd895212105f3e12b0af8a27ab6921a09663f",
+  "fast_route_implementation_report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_implementation_report.json",
+  "fast_route_implementation_report_digest": "c6303163853b87aae3c00109afdbf93dfa69af46af2d133cb74fb9b3b9a7d8ad",
+  "fast_route_throughput_floor_report_ref": "fixtures/tassadar/reports/tassadar_article_fast_route_throughput_floor_report.json",
+  "fast_route_throughput_floor_report_digest": "b500d330f5146399b4b49f054e8ebd45aa584707f8f66b0a3433424ccbfa086d",
+  "hull_cache_closure_report_ref": "fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json",
+  "hull_cache_closure_report_digest": "582b36210e020462e1d52844d3de28aff0c7beed5b1b73eb856af1a110631c9b",
+  "replacement_publication_ref": "fixtures/tassadar/reports/tassadar_article_transformer_replacement_publication.json",
+  "replacement_publication_digest": "75119558c8435d0e6681c3192acff385943e15b1451eb296bdba478e528b5ea1",
+  "transformer_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "reference_linear_metric_id": "tassadar.reference_linear_steps_per_second",
+  "hull_cache_metric_id": "tassadar.hull_cache_steps_per_second",
+  "min_hull_cache_speedup_over_reference_linear": 1.690977509006,
+  "max_hull_cache_remaining_gap_vs_cpu_reference": 2.683604159673,
+  "checklist_rows": [
+    {
+      "checklist_id": "portable_bundle_import_plan_green",
+      "status": "green",
+      "detail": "The Mac can plan deferred inspection for the retained MLX portable bundle with plan digest `8932fc2305dd3cf091902e163bb70a74c0e380f707af56a3c53718ad43cb2ccd` and 6 deferred tensors before eager materialization is required."
+    },
+    {
+      "checklist_id": "portable_bundle_roundtrip_green",
+      "status": "green",
+      "detail": "The imported bundle exports one torch-style compatibility artifact digest `88006c8f787eb0e031a9e413778659e701689a7f217b669b6525d129ec45f6b1` and roundtrips back into the same state-dict digest `8e4bdfd3cd6c7a99cc574725a53b3e4e30a7b43e9813139be06e0b516b3065e8` on the Mac."
+    },
+    {
+      "checklist_id": "cpu_aarch64_route_green",
+      "status": "green",
+      "detail": "The retained CPU reproducibility report keeps `host_cpu_aarch64` as `status=supported_declared_class` with runtime backend `cpu` and throughput floor 250000 steps/second."
+    },
+    {
+      "checklist_id": "reference_linear_anchor_green",
+      "status": "green",
+      "detail": "The fast-route implementation report still advertises `reference_linear` alongside `hull_cache`, so local export inspection keeps the baseline truth anchor explicit instead of letting the fast path erase it."
+    },
+    {
+      "checklist_id": "hull_cache_fast_route_green",
+      "status": "green",
+      "detail": "The retained hull_cache closure report keeps min_speedup_over_reference_linear=1.690978 and max_remaining_gap_vs_cpu_reference=2.683604 across exact fallback-free workloads, which stays inside the frozen promotion floors."
+    },
+    {
+      "checklist_id": "replacement_publication_green",
+      "status": "green",
+      "detail": "The replacement publication remains certified for transformer model `tassadar-article-transformer-trace-bound-trained-v0` and the throughput-floor report keeps `host_cpu_aarch64` inside the declared CPU drift-review set."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_ACCEPTANCE_PROFILE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md",
+    "fixtures/psion/executor/psion_executor_mlx_decision_grade_run_v1.json",
+    "fixtures/apple_adapter/runs/tailrun_admitted_device_matrix_20260327b/m5_mlx/portable_bundle.safetensors",
+    "fixtures/tassadar/reports/tassadar_article_cpu_reproducibility_report.json",
+    "fixtures/tassadar/reports/tassadar_article_fast_route_implementation_report.json",
+    "fixtures/tassadar/reports/tassadar_article_fast_route_throughput_floor_report.json",
+    "fixtures/tassadar/reports/tassadar_hull_cache_closure_report.json"
+  ],
+  "summary": "The admitted Mac profile now owns one explicit export-inspection packet. It imports the retained MLX portable bundle locally, emits a torch-style compatibility export roundtrip, keeps `host_cpu_aarch64` inside the admitted CPU route-validation set, and rechecks the current claim boundary that `reference_linear` stays the truth anchor while `hull_cache` stays the fast-route target (min speedup 1.690978, max CPU gap 2.683604) before any broader promotion story is told.",
+  "packet_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a"
+}

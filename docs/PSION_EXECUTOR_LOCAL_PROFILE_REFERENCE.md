@@ -69,6 +69,7 @@ The first executor-lane MLX load/forward boundary is now also explicit:
 - `docs/PSION_EXECUTOR_MLX_CHECKPOINT_COMPATIBILITY.md`
 - `docs/PSION_EXECUTOR_MLX_SMOKE_RUN.md`
 - `docs/PSION_EXECUTOR_MLX_DECISION_GRADE_RUN.md`
+- `docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md`
 
 That packet keeps the shipped MLX entrypoint, admitted forward probe, bounded
 converted-equivalent load lane, and explicit parity gaps in one reviewable
@@ -82,7 +83,11 @@ local-cluster roundtrip. The decision-grade packet then upgrades that same run
 into one explicit MLX-local decision packet by binding the retained same-node
 report, the admitted-device matrix report, and one executor-specific
 remote-training `v2` bundle plus run-index entry together without pretending
-the Mac already owns the cross-device lane.
+the Mac already owns the cross-device lane. The Mac export-inspection packet
+then imports that retained MLX bundle locally, emits one torch-style
+compatibility artifact, keeps `host_cpu_aarch64` explicit as the admitted CPU
+validation class, and rechecks the `reference_linear` versus `hull_cache`
+claim boundary before later replacement packets can cite the Mac profile.
 
 ## Current Admitted 4080 Tailnet Profile
 
