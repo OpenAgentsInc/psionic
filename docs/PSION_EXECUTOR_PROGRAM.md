@@ -88,6 +88,7 @@ This doc does not claim:
 
 ## Canonical Follow-On Docs
 
+- `docs/PSION_EXECUTOR_BASELINE.md` owns the frozen executor baseline record
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge
