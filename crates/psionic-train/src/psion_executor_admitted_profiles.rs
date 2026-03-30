@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL, SWARM_MAC_MLX_BRINGUP_FIXTURE_PATH};
+use crate::{
+    OPEN_ADAPTER_CUDA_BACKEND_LABEL, OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL,
+    SWARM_LINUX_4080_BRINGUP_FIXTURE_PATH, SWARM_MAC_MLX_BRINGUP_FIXTURE_PATH,
+};
 
 /// Stable schema version for the executor admitted-profile catalog.
 pub const PSION_EXECUTOR_ADMITTED_PROFILE_CATALOG_SCHEMA_VERSION: &str =
@@ -22,6 +25,12 @@ pub const PSION_EXECUTOR_LOCAL_PROFILE_DOC_PATH: &str =
 
 const CROSS_PROVIDER_LOCAL_MLX_MAC_COMPUTE_SOURCE_FIXTURE_PATH: &str =
     "fixtures/training/compute_sources/local_mlx_mac_workstation_v1.json";
+const CROSS_PROVIDER_LOCAL_RTX4080_COMPUTE_SOURCE_FIXTURE_PATH: &str =
+    "fixtures/training/compute_sources/local_rtx4080_workstation_v1.json";
+const FIRST_SWARM_TAILNET_RUN_SUMMARY_FIXTURE_PATH: &str =
+    "fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json";
+const TAILNET_SHORT_RUN_DEVICE_AUDIT_PATH: &str =
+    "docs/audits/2026-03-27-tailnet-short-run-device-audit.md";
 
 /// Run types admitted by the phase-one executor lane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -67,8 +76,23 @@ pub struct PsionExecutorAuthorityArtifact {
     pub detail: String,
 }
 
+/// Expected same-lane throughput band retained for one admitted profile.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PsionExecutorThroughputBand {
+    /// Stable metric id.
+    pub metric_id: String,
+    /// Minimum retained value still considered admitted.
+    pub minimum_value: f64,
+    /// Expected current retained value.
+    pub expected_value: f64,
+    /// Maximum retained value used for the band description.
+    pub maximum_value: f64,
+    /// Short operator-facing detail.
+    pub detail: String,
+}
+
 /// One admitted executor profile.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PsionExecutorAdmittedProfile {
     /// Stable profile id.
     pub profile_id: String,
@@ -88,6 +112,8 @@ pub struct PsionExecutorAdmittedProfile {
     pub shipped_entrypoints: Vec<String>,
     /// Authority artifacts proving the profile boundary.
     pub authority_artifacts: Vec<PsionExecutorAuthorityArtifact>,
+    /// Retained throughput band when the profile has one.
+    pub throughput_band: Option<PsionExecutorThroughputBand>,
     /// Explicit claim boundary.
     pub claim_boundary: String,
     /// Stable digest over the profile.
@@ -95,7 +121,7 @@ pub struct PsionExecutorAdmittedProfile {
 }
 
 /// Catalog of admitted phase-one executor profiles.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PsionExecutorAdmittedProfileCatalog {
     /// Stable schema version.
     pub schema_version: String,
@@ -254,6 +280,23 @@ impl PsionExecutorAdmittedProfile {
                 "psion_executor_admitted_profile.authority_artifacts[].detail",
             )?;
         }
+        if let Some(throughput_band) = &self.throughput_band {
+            ensure_nonempty(
+                throughput_band.metric_id.as_str(),
+                "psion_executor_admitted_profile.throughput_band.metric_id",
+            )?;
+            ensure_nonempty(
+                throughput_band.detail.as_str(),
+                "psion_executor_admitted_profile.throughput_band.detail",
+            )?;
+            if !(throughput_band.minimum_value <= throughput_band.expected_value
+                && throughput_band.expected_value <= throughput_band.maximum_value)
+            {
+                return Err(PsionExecutorAdmittedProfileError::InvalidThroughputBand {
+                    profile_id: self.profile_id.clone(),
+                });
+            }
+        }
         ensure_nonempty(
             self.claim_boundary.as_str(),
             "psion_executor_admitted_profile.claim_boundary",
@@ -289,6 +332,8 @@ pub enum PsionExecutorAdmittedProfileError {
         profile_id: String,
         run_type: String,
     },
+    #[error("invalid throughput band in profile `{profile_id}`")]
+    InvalidThroughputBand { profile_id: String },
     #[error("digest mismatch for `{kind}`")]
     DigestMismatch { kind: String },
 }
@@ -297,13 +342,16 @@ pub enum PsionExecutorAdmittedProfileError {
 pub fn builtin_executor_admitted_profile_catalog(
     workspace_root: &Path,
 ) -> Result<PsionExecutorAdmittedProfileCatalog, PsionExecutorAdmittedProfileError> {
-    let profiles = vec![builtin_local_mac_mlx_profile(workspace_root)?];
+    let profiles = vec![
+        builtin_local_mac_mlx_profile(workspace_root)?,
+        builtin_local_4080_cuda_tailnet_profile(workspace_root)?,
+    ];
     let mut catalog = PsionExecutorAdmittedProfileCatalog {
         schema_version: String::from(PSION_EXECUTOR_ADMITTED_PROFILE_CATALOG_SCHEMA_VERSION),
         catalog_id: String::from("psion_executor_admitted_profiles_v1"),
         profiles,
         summary: String::from(
-            "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane before 4080 and control-plane profiles widen the same catalog.",
+            "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane and the admitted RTX 4080 Tailnet worker lane before the control-plane profile widens the same catalog.",
         ),
         catalog_digest: String::new(),
     };
@@ -435,8 +483,142 @@ fn builtin_local_mac_mlx_profile(
             String::from("crates/psionic-train/src/bin/swarm_mac_mlx_bringup.rs"),
         ],
         authority_artifacts,
+        throughput_band: None,
         claim_boundary: String::from(
             "This profile admits the local Apple Silicon MLX machine as a real roadmap-tracked executor development and eval host. It proves local MLX smoke, short-run, eval, restore, export, and CPU-validation posture. It does not by itself claim remote launch, shared checkpoint authority, or cross-device training closure.",
+        ),
+        profile_digest: String::new(),
+    };
+    profile.profile_digest = stable_executor_profile_digest(&profile);
+    profile.validate()?;
+    Ok(profile)
+}
+
+fn builtin_local_4080_cuda_tailnet_profile(
+    workspace_root: &Path,
+) -> Result<PsionExecutorAdmittedProfile, PsionExecutorAdmittedProfileError> {
+    let authority_artifacts = vec![
+        authority_artifact(
+            workspace_root,
+            SWARM_LINUX_4080_BRINGUP_FIXTURE_PATH,
+            "Retained Linux RTX 4080 bring-up report proving the CUDA-labeled worker contract, inventory, and bounded contributor harness.",
+        )?,
+        authority_artifact(
+            workspace_root,
+            CROSS_PROVIDER_LOCAL_RTX4080_COMPUTE_SOURCE_FIXTURE_PATH,
+            "Shared compute-source contract freezing the admitted RTX 4080 workstation under the existing cross-provider train substrate.",
+        )?,
+        authority_artifact(
+            workspace_root,
+            FIRST_SWARM_TAILNET_RUN_SUMMARY_FIXTURE_PATH,
+            "Retained Tailnet admitted-run summary proving the Mac-plus-4080 device set and the current worker contribution path.",
+        )?,
+        authority_artifact(
+            workspace_root,
+            TAILNET_SHORT_RUN_DEVICE_AUDIT_PATH,
+            "Retained short-run device audit recording the current honest 4080 same-node throughput band and its current comparison against the local M5 lane.",
+        )?,
+    ];
+    let mut profile = PsionExecutorAdmittedProfile {
+        profile_id: String::from("local_4080_cuda_tailnet_x86_64"),
+        purpose: String::from(
+            "Operator-selected RTX 4080 CUDA Tailnet worker for bounded smoke, decision-grade, confirmation, eval, and replay-accounted accelerator work inside the admitted local-first executor lane.",
+        ),
+        runtime_backend_label: Some(String::from(OPEN_ADAPTER_CUDA_BACKEND_LABEL)),
+        run_type_admissions: vec![
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::MlxSmoke,
+                posture: PsionExecutorRunTypeAdmissionPosture::NotAdmitted,
+                detail: String::from(
+                    "The 4080 profile does not count as the MLX smoke lane.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::MlxDecisionGrade,
+                posture: PsionExecutorRunTypeAdmissionPosture::NotAdmitted,
+                detail: String::from(
+                    "The 4080 profile does not count as the MLX decision-grade lane.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::Cuda4080Smoke,
+                posture: PsionExecutorRunTypeAdmissionPosture::Primary,
+                detail: String::from(
+                    "This is the primary admitted accelerator for 4080 smoke runs.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::Cuda4080DecisionGrade,
+                posture: PsionExecutorRunTypeAdmissionPosture::Primary,
+                detail: String::from(
+                    "This is the primary admitted accelerator for 4080 decision-grade runs once the frozen pack and artifact packet are declared before launch.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::Cuda4080Confirmation,
+                posture: PsionExecutorRunTypeAdmissionPosture::Primary,
+                detail: String::from(
+                    "This is the primary admitted accelerator for 4080 confirmation reruns after a decision-grade candidate already clears.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::CpuValidation,
+                posture: PsionExecutorRunTypeAdmissionPosture::Allowed,
+                detail: String::from(
+                    "The 4080 lane can participate in cross-check validation, but CPU-matrix ownership still sits with the Mac profile.",
+                ),
+            },
+            PsionExecutorRunTypeAdmission {
+                run_type: PsionExecutorRunType::H100Escalation,
+                posture: PsionExecutorRunTypeAdmissionPosture::NotAdmitted,
+                detail: String::from(
+                    "The admitted 4080 worker does not count as the H100 escalation lane.",
+                ),
+            },
+        ],
+        local_requirements: vec![
+            String::from(
+                "Run the retained RTX 4080 bring-up gate before roadmap-tracked smoke, decision-grade, or confirmation work counts.",
+            ),
+            String::from(
+                "Use only the admitted Tailnet operator path and shipped Psionic entrypoints; no ad hoc remote wrapper or elastic membership path counts.",
+            ),
+            String::from(
+                "Keep the work inside the bounded Rust-only same-node and admitted Tailnet lane; this profile does not widen into dense distributed training.",
+            ),
+        ],
+        checkpoint_expectations: String::from(
+            "Worker-local scratch may live under the staged remote bundle root such as `$HOME/code/psionic-tailrun/<run_id>/linux`, but retained checkpoints and any roadmap-counting artifact packet must return through the controller-owned bundle under `fixtures/swarm/runs/<run_id>/`.",
+        ),
+        connectivity_expectations: vec![
+            String::from(
+                "Tailnet SSH reachability to `archlinux` is required before the 4080 worker profile is considered admitted for a counted run.",
+            ),
+            String::from(
+                "The controller-selected coordinator and contributor ports must remain explicit and operator-owned; this profile does not claim wider-network discovery or autonomous launch authority.",
+            ),
+            String::from(
+                "If the Tailnet worker is offline, the profile remains documented but does not count for smoke, decision-grade, or confirmation evidence until the admitted path is reachable again.",
+            ),
+        ],
+        shipped_entrypoints: vec![
+            String::from("scripts/check-swarm-linux-4080-bringup.sh"),
+            String::from("scripts/run-first-swarm-tailnet-admitted-live.sh"),
+            String::from("crates/psionic-train/src/swarm_cuda_bringup.rs"),
+            String::from("crates/psionic-train/src/bin/swarm_linux_cuda_bringup.rs"),
+        ],
+        authority_artifacts,
+        throughput_band: Some(PsionExecutorThroughputBand {
+            metric_id: String::from("same_node_open_adapter_steps_per_second"),
+            minimum_value: 80.0,
+            expected_value: 122.8920,
+            maximum_value: 125.0,
+            detail: String::from(
+                "The retained 2026-03-27 short-run audit freezes the honest current 4080 same-node band: 82.4025 steps/s before the retained fix and 122.8920 steps/s after it.",
+            ),
+        }),
+        claim_boundary: String::from(
+            "This profile admits one reachable RTX 4080 CUDA Tailnet worker as the real local accelerator lane for bounded smoke, decision-grade, confirmation, and replay-accounted eval work. It does not claim dense CUDA training closure, public-worker authority, shared checkpoint-writer authority, or independent promotion authority.",
         ),
         profile_digest: String::new(),
     };
@@ -524,7 +706,11 @@ mod tests {
         let root = workspace_root();
         let catalog = builtin_executor_admitted_profile_catalog(&root).expect("catalog");
         catalog.validate().expect("catalog should validate");
-        assert_eq!(catalog.profiles.len(), 1);
+        assert_eq!(catalog.profiles.len(), 2);
         assert_eq!(catalog.profiles[0].profile_id, "local_mac_mlx_aarch64");
+        assert_eq!(
+            catalog.profiles[1].profile_id,
+            "local_4080_cuda_tailnet_x86_64"
+        );
     }
 }

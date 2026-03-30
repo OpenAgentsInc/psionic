@@ -1,7 +1,8 @@
 # Psion Executor Local Profile Reference
 
-> Status: canonical `PSION-0101` / `#706` record, updated 2026-03-30 after
-> landing the first typed executor admitted-profile catalog in
+> Status: canonical `PSION-0101` / `#706` and `PSION-0102` / `#707` record,
+> updated 2026-03-30 after landing the first typed executor admitted-profile
+> catalog in
 > `crates/psionic-train/src/psion_executor_admitted_profiles.rs`.
 
 This document records the local-first executor profile authority that now sits
@@ -24,9 +25,10 @@ cargo run -q -p psionic-train --example psion_executor_admitted_profile_fixtures
 `psionic-train` now owns one typed admitted-profile catalog for the executor
 lane.
 
-The first landed profile is:
+The first landed profiles are:
 
 - `local_mac_mlx_aarch64`
+- `local_4080_cuda_tailnet_x86_64`
 
 The catalog freezes:
 
@@ -59,15 +61,53 @@ It is grounded in the already-shipped surfaces:
 - `crates/psionic-train/src/swarm_mlx_bringup.rs`
 - `crates/psionic-train/src/bin/swarm_mac_mlx_bringup.rs`
 
+## Current Admitted 4080 Tailnet Profile
+
+`local_4080_cuda_tailnet_x86_64` is now the explicit local accelerator profile
+for:
+
+- 4080 smoke runs
+- 4080 decision-grade runs
+- 4080 confirmation reruns
+- replay-accounted eval participation inside the admitted Tailnet lane
+
+It is grounded in the already-shipped surfaces:
+
+- `fixtures/swarm/reports/swarm_linux_rtx4080_bringup_v1.json`
+- `fixtures/training/compute_sources/local_rtx4080_workstation_v1.json`
+- `fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json`
+- `docs/audits/2026-03-27-tailnet-short-run-device-audit.md`
+- `scripts/check-swarm-linux-4080-bringup.sh`
+- `scripts/run-first-swarm-tailnet-admitted-live.sh`
+- `crates/psionic-train/src/swarm_cuda_bringup.rs`
+- `crates/psionic-train/src/bin/swarm_linux_cuda_bringup.rs`
+
+The retained throughput band is now explicit:
+
+- metric: `same_node_open_adapter_steps_per_second`
+- minimum admitted value: `80.0`
+- expected retained value: `122.8920`
+- declared band ceiling: `125.0`
+
+Checkpoint and connectivity expectations are now explicit too:
+
+- worker-local scratch can live under staged remote bundle roots such as
+  `$HOME/code/psionic-tailrun/<run_id>/linux`
+- counted checkpoints and retained artifact packets still have to come back
+  through the controller-owned bundle under `fixtures/swarm/runs/<run_id>/`
+- Tailnet SSH reachability to `archlinux` is required before the profile counts
+- coordinator and contributor ports remain operator-selected and bounded
+
 ## Honest Boundary
 
-This issue does not claim:
+This catalog still does not claim:
 
-- the 4080 Tailnet worker is admitted yet
+- the control-plane profile is admitted yet
+- the 4080 worker has independent checkpoint-writer authority
 - the Mac profile alone closes remote launch
-- shared checkpoint-writer authority on the Mac
-- cross-device training closure
+- dense cross-device training closure
+- public-worker or external promotion authority
 
-This issue closes only the first local profile so later EPIC 1 issues can add
-the 4080 worker and the Mac-to-4080 control plane without inventing new
-profile vocabulary.
+The current catalog closes the first two local profiles so later EPIC 1 issues
+can add the Mac-to-4080 control-plane profile and the frozen eval packs without
+inventing new profile vocabulary.

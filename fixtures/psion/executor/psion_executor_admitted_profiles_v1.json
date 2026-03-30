@@ -70,10 +70,101 @@
           "detail": "Shared compute-source contract proving the Mac can be admitted under the existing cross-provider train substrate without inventing a second launcher or machine vocabulary."
         }
       ],
+      "throughput_band": null,
       "claim_boundary": "This profile admits the local Apple Silicon MLX machine as a real roadmap-tracked executor development and eval host. It proves local MLX smoke, short-run, eval, restore, export, and CPU-validation posture. It does not by itself claim remote launch, shared checkpoint authority, or cross-device training closure.",
-      "profile_digest": "882490ecbeca124a1c6a1bfd672a2c3f3c66e277723349722982957f86f310e9"
+      "profile_digest": "3e561d7a44bd7f2f1ceec39f8427ecad2fd274f1229f9ea77f7a60284838521f"
+    },
+    {
+      "profile_id": "local_4080_cuda_tailnet_x86_64",
+      "purpose": "Operator-selected RTX 4080 CUDA Tailnet worker for bounded smoke, decision-grade, confirmation, eval, and replay-accounted accelerator work inside the admitted local-first executor lane.",
+      "runtime_backend_label": "open_adapter_backend.cuda.gpt_oss_lm_head",
+      "run_type_admissions": [
+        {
+          "run_type": "mlx_smoke",
+          "posture": "not_admitted",
+          "detail": "The 4080 profile does not count as the MLX smoke lane."
+        },
+        {
+          "run_type": "mlx_decision_grade",
+          "posture": "not_admitted",
+          "detail": "The 4080 profile does not count as the MLX decision-grade lane."
+        },
+        {
+          "run_type": "cuda4080_smoke",
+          "posture": "primary",
+          "detail": "This is the primary admitted accelerator for 4080 smoke runs."
+        },
+        {
+          "run_type": "cuda4080_decision_grade",
+          "posture": "primary",
+          "detail": "This is the primary admitted accelerator for 4080 decision-grade runs once the frozen pack and artifact packet are declared before launch."
+        },
+        {
+          "run_type": "cuda4080_confirmation",
+          "posture": "primary",
+          "detail": "This is the primary admitted accelerator for 4080 confirmation reruns after a decision-grade candidate already clears."
+        },
+        {
+          "run_type": "cpu_validation",
+          "posture": "allowed",
+          "detail": "The 4080 lane can participate in cross-check validation, but CPU-matrix ownership still sits with the Mac profile."
+        },
+        {
+          "run_type": "h100_escalation",
+          "posture": "not_admitted",
+          "detail": "The admitted 4080 worker does not count as the H100 escalation lane."
+        }
+      ],
+      "local_requirements": [
+        "Run the retained RTX 4080 bring-up gate before roadmap-tracked smoke, decision-grade, or confirmation work counts.",
+        "Use only the admitted Tailnet operator path and shipped Psionic entrypoints; no ad hoc remote wrapper or elastic membership path counts.",
+        "Keep the work inside the bounded Rust-only same-node and admitted Tailnet lane; this profile does not widen into dense distributed training."
+      ],
+      "checkpoint_expectations": "Worker-local scratch may live under the staged remote bundle root such as `$HOME/code/psionic-tailrun/<run_id>/linux`, but retained checkpoints and any roadmap-counting artifact packet must return through the controller-owned bundle under `fixtures/swarm/runs/<run_id>/`.",
+      "connectivity_expectations": [
+        "Tailnet SSH reachability to `archlinux` is required before the 4080 worker profile is considered admitted for a counted run.",
+        "The controller-selected coordinator and contributor ports must remain explicit and operator-owned; this profile does not claim wider-network discovery or autonomous launch authority.",
+        "If the Tailnet worker is offline, the profile remains documented but does not count for smoke, decision-grade, or confirmation evidence until the admitted path is reachable again."
+      ],
+      "shipped_entrypoints": [
+        "scripts/check-swarm-linux-4080-bringup.sh",
+        "scripts/run-first-swarm-tailnet-admitted-live.sh",
+        "crates/psionic-train/src/swarm_cuda_bringup.rs",
+        "crates/psionic-train/src/bin/swarm_linux_cuda_bringup.rs"
+      ],
+      "authority_artifacts": [
+        {
+          "path": "fixtures/swarm/reports/swarm_linux_rtx4080_bringup_v1.json",
+          "sha256": "6c1ab4bc82d8d0c96f9a0754ae7a80a59f1e385bd21f9732d2147b1d09e770b7",
+          "detail": "Retained Linux RTX 4080 bring-up report proving the CUDA-labeled worker contract, inventory, and bounded contributor harness."
+        },
+        {
+          "path": "fixtures/training/compute_sources/local_rtx4080_workstation_v1.json",
+          "sha256": "cc8c3849766c0b6666bee0c7140cf329aaa0c64b7acb1a5e3e958f4fcea73848",
+          "detail": "Shared compute-source contract freezing the admitted RTX 4080 workstation under the existing cross-provider train substrate."
+        },
+        {
+          "path": "fixtures/swarm/runs/tailrun-home-admitted-20260327e/tailrun_admitted_home_run_summary.json",
+          "sha256": "de24120cbd09f473aeab79bbd70a792c869179ae7311c5e2d696d662edbc3c4f",
+          "detail": "Retained Tailnet admitted-run summary proving the Mac-plus-4080 device set and the current worker contribution path."
+        },
+        {
+          "path": "docs/audits/2026-03-27-tailnet-short-run-device-audit.md",
+          "sha256": "ccc4dfcc4988fb52ad1cad0324a03da4896fa99376582e3b0e286d157882b9e9",
+          "detail": "Retained short-run device audit recording the current honest 4080 same-node throughput band and its current comparison against the local M5 lane."
+        }
+      ],
+      "throughput_band": {
+        "metric_id": "same_node_open_adapter_steps_per_second",
+        "minimum_value": 80.0,
+        "expected_value": 122.892,
+        "maximum_value": 125.0,
+        "detail": "The retained 2026-03-27 short-run audit freezes the honest current 4080 same-node band: 82.4025 steps/s before the retained fix and 122.8920 steps/s after it."
+      },
+      "claim_boundary": "This profile admits one reachable RTX 4080 CUDA Tailnet worker as the real local accelerator lane for bounded smoke, decision-grade, confirmation, and replay-accounted eval work. It does not claim dense CUDA training closure, public-worker authority, shared checkpoint-writer authority, or independent promotion authority.",
+      "profile_digest": "045a9411b10b2733c0f4c3d2c76ac1ed0d25af9dbe755dcf479996ea3a294ac1"
     }
   ],
-  "summary": "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane before 4080 and control-plane profiles widen the same catalog.",
-  "catalog_digest": "ab3a8ef9d9be5e1fd0b8390fe50ba516f4221e76b30754f3854675fe33ef6071"
+  "summary": "Phase-one executor admitted-profile catalog freezing the local Mac MLX lane and the admitted RTX 4080 Tailnet worker lane before the control-plane profile widens the same catalog.",
+  "catalog_digest": "93be7f84bb53af837e2495ae37728ada87801d29d407f6d4f3efca4b84c80a4f"
 }
