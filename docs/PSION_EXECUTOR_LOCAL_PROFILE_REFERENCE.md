@@ -132,6 +132,7 @@ The first admitted remote-launch packet for this profile is now explicit too:
 - `docs/PSION_EXECUTOR_4080_DURABLE_CHECKPOINT.md`
 - `docs/PSION_EXECUTOR_4080_FREQUENT_EVAL_ATTACHMENT.md`
 - `docs/PSION_EXECUTOR_4080_SMOKE_RUN.md`
+- `docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md`
 
 That packet binds the shipped Tailnet operator script, the retained operator
 manifest, the retained admitted run bundle, and the Linux RTX 4080
@@ -148,7 +149,11 @@ coverage a hard blocker instead of a silent omission. The smoke-run packet then
 binds the retained Linux 4080 contribution row, the admitted dataset slices,
 the checkpoint pointer, the frequent-eval ledger row, and the retained failure
 facts into one narrow accelerator-backed smoke packet without pretending the
-lane is already decision-grade or publishable.
+lane is already decision-grade or publishable. The interruption-recovery packet
+then binds that same smoke checkpoint to the frozen trusted-LAN failure drills,
+the Linux heartbeat receipts, the strict replay policy, and the restore
+evidence digests so worker loss stays machine-legible instead of becoming an
+operator-memory story.
 
 ## Current Admitted Tailnet Control-Plane Profile
 

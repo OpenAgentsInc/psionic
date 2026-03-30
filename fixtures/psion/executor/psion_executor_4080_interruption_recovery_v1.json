@@ -1,0 +1,88 @@
+{
+  "schema_version": "psion.executor.4080_interruption_recovery.v1",
+  "packet_id": "psion_executor_4080_interruption_recovery_v1",
+  "worker_profile_id": "local_4080_cuda_tailnet_x86_64",
+  "control_plane_profile_id": "local_tailnet_cluster_control_plane",
+  "smoke_packet_ref": "fixtures/psion/executor/psion_executor_4080_smoke_run_v1.json",
+  "smoke_packet_sha256": "d32483674a6e1b35f1e1efaa8c88c3a3d2c3930ecefc423af4245b6aeded41ac",
+  "failure_drill_bundle_ref": "fixtures/swarm/reports/first_swarm_trusted_lan_failure_drills_v1.json",
+  "failure_drill_bundle_sha256": "38a163a309134e3438b7ea437dacc24f217bd8f605642eff1c813104c9bd3dde",
+  "failure_drill_bundle_digest": "ad84b1d34b232ac2562a75b0afad1e60085f146bcbacbd9bf59780807ea2a08f",
+  "coordinator_report_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/coordinator_runtime_report.json",
+  "coordinator_report_sha256": "dca06156d1c590d4343959f375d1572879540fe29071f0426c93eec7171b9c5c",
+  "contributor_report_ref": "fixtures/swarm/runs/tailrun-home-admitted-20260328k/contributor_runtime_report.json",
+  "contributor_report_sha256": "f1ca4595a4b3c77f037b519d62048508a426c38ccf4393054218d1d4039c84bc",
+  "run_id": "tailrun-home-admitted-20260328k",
+  "run_family_id": "swarm.local.mlx_metal_plus_rtx4080.open_adapter.v1",
+  "worker_id": "swarm-linux-4080-a",
+  "worker_session_id": "swarm-linux-4080-a-session-tailrun-home-admitted-20260328k",
+  "worker_role_id": "swarm.linux.cuda.rtx4080.contributor",
+  "dataset_id": "dataset://openagents/swarm/open_adapter_sft@2026.03.24",
+  "dataset_split_name": "train",
+  "worker_slice_id": "swarm_linux_cuda_rtx4080_contributor-2",
+  "replay_policy_id": "replay.open_adapter.strict",
+  "shared_replay_identity_digest": "05f957065eaa2d1cf2a8bc90b9726722cb1d223728113e09d492d024a028af2c",
+  "checkpoint_family": "swarm.local.open_adapter.policy:tailrun-home-admitted-20260328k",
+  "checkpoint_pointer_digest": "dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8",
+  "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+  "checkpoint_step": 12,
+  "stale_worker_drill_digest": "4dc50cc8ae92acabfc00ce4a975fe28b3e641195e37fbee3e7ccd2f8134472fc",
+  "stale_worker_timeout_ms": 5000,
+  "stale_worker_validator_disposition": "replay_required",
+  "stale_worker_aggregation_blocked": true,
+  "stale_worker_replay_required": true,
+  "contributor_loss_drill_digest": "71911a4a940c0f327abc4348e53aa66c758d987877a72255db3ed15abc220a10",
+  "contributor_loss_validator_disposition": "replay_required",
+  "upload_disagreement_drill_digest": "19ce581aac299f0ba51797c1671483722852db18398e77640e9f760fb65035f2",
+  "upload_disagreement_validator_disposition": "rejected",
+  "upload_disagreement_expected_manifest_digest": "6cef06e5424ac08c86e1644eac1e3e6d73a9dc859416f8888af9b6605ada5965",
+  "upload_disagreement_observed_manifest_digest": "7bd0f1cf536dd0cd53b575360649d91d4866d1f2bac7449f672c42aab99ac711",
+  "uneven_worker_speed_drill_digest": "6f25dde0e461f47f69aca573ee592cc9c0a7a91b4d4f80de963f262f47303d12",
+  "uneven_worker_speed_disposition": "wait_then_replay",
+  "uneven_worker_speed_observed_skew_ms": 18000,
+  "live_linux_upload_manifest_digest": "c251d7336b6401d02e310723466946a286497f614a03ec3a0c759ba914812593",
+  "max_unreported_progress_steps": 4,
+  "max_unreported_progress_samples": 4,
+  "max_replay_loss_steps": 12,
+  "max_replay_loss_samples": 12,
+  "linux_progress_heartbeat_receipt_digests": [
+    "4350af732b0fd8e650c5be097f0fbe9cef4839faa2182a76ed043bf25c122d8c",
+    "38f47ace2b9b73dc691026173e228e51475c441b41b39fd87443103f6b3ffdbc"
+  ],
+  "linux_submission_receipt_digest": "2ac5b5f344d8dd640bbcd0ce50a5c6b35e603049f21472161dc19c27135e2267",
+  "linux_contributor_receipt_digest": "865ef2f86a2b50a6790996a07f53a345068eea2514cc7907c47bdece2c4c6305",
+  "validator_summary_digest": "a47d1c38e65537b1ac576bffb5fe66082a4cdaca20f14e074f14458777548534",
+  "replay_receipt_digests": [
+    "3382217759f7af9e85eae71b2462d4cb51561685d28c39e2e0e13087553db6a4",
+    "633590d3e581862b8214cf7158f0207932dc959cb7234990735c62182f47b23d"
+  ],
+  "coordinator_report_digest": "eff0788c3f7f1d459b4eba3dffa1a118096d6577912fcf211e1707764f647ea5",
+  "contributor_report_digest": "6ea6d11a125487435a7a1e08ab9e15605c94768ee0ec86d17478b48f21a27fe2",
+  "checklist_rows": [
+    {
+      "checklist_id": "stale_worker_sla_green",
+      "status": "green",
+      "detail": "The admitted stale-worker drill freezes a 5000 ms timeout with validator disposition `replay_required` and replay-required aggregation block truth instead of letting worker loss disappear into a partial merge."
+    },
+    {
+      "checklist_id": "lost_work_policy_green",
+      "status": "green",
+      "detail": "The retained Linux worker stays on replay policy `replay.open_adapter.strict` for one admitted slice `swarm_linux_cuda_rtx4080_contributor-2`. Worst-case recovery loss is bounded to one contribution window (12 steps / 12 samples), while unreported progress between heartbeat checkpoints stays bounded to 4 steps / 4 samples."
+    },
+    {
+      "checklist_id": "restore_evidence_green",
+      "status": "green",
+      "detail": "Restore evidence now stays explicit through checkpoint pointer `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8`, Linux progress heartbeat receipts [\"4350af732b0fd8e650c5be097f0fbe9cef4839faa2182a76ed043bf25c122d8c\", \"38f47ace2b9b73dc691026173e228e51475c441b41b39fd87443103f6b3ffdbc\"], submission receipt `2ac5b5f344d8dd640bbcd0ce50a5c6b35e603049f21472161dc19c27135e2267`, contributor receipt `865ef2f86a2b50a6790996a07f53a345068eea2514cc7907c47bdece2c4c6305`, and replay receipt digests [\"3382217759f7af9e85eae71b2462d4cb51561685d28c39e2e0e13087553db6a4\", \"633590d3e581862b8214cf7158f0207932dc959cb7234990735c62182f47b23d\"]."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "docs/PSION_EXECUTOR_4080_SMOKE_RUN.md",
+    "fixtures/swarm/reports/first_swarm_trusted_lan_failure_drills_v1.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260328k/coordinator_runtime_report.json",
+    "fixtures/swarm/runs/tailrun-home-admitted-20260328k/contributor_runtime_report.json"
+  ],
+  "summary": "The admitted 4080 lane now has one interruption-recovery packet tied to smoke run `tailrun-home-admitted-20260328k`. It freezes the stale-worker timeout at 5000 ms, keeps replay-required and aggregation-blocked truth explicit for worker loss, bounds lost work to one admitted Linux slice `swarm_linux_cuda_rtx4080_contributor-2` (12 steps / 12 samples), and records restore evidence through checkpoint pointer `dd1aa85c355eb43934a20afe7e4204b3ed82bb85f4fe392dfde45229f4e434f8`, Linux heartbeat receipts, submission receipt `2ac5b5f344d8dd640bbcd0ce50a5c6b35e603049f21472161dc19c27135e2267`, and replay receipt digests [\"3382217759f7af9e85eae71b2462d4cb51561685d28c39e2e0e13087553db6a4\", \"633590d3e581862b8214cf7158f0207932dc959cb7234990735c62182f47b23d\"].",
+  "packet_digest": "d07f14dd64ce0f66d8827a9de1c6353dd5f1d001a9c81bc74669bc12e2def2c6"
+}
