@@ -450,6 +450,10 @@ The same March 27, 2026 benchmark also shows the current boundary clearly:
   the `22` prompt tokens
 - local Ollama still leads on end-to-end prompt-plus-decode throughput on the
   same prompt
+- `qwen35_cuda_bench` now also publishes explicit graph-pool evidence through
+  `qwen35_graph_hits`, `qwen35_graph_misses`, `qwen35_graph_captures`, and
+  `qwen35_graph_shape_drifts`, so the captured-graph path is retained runtime
+  truth instead of benchmark-only lore
 
 ## Current Bottlenecks
 

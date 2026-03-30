@@ -127,6 +127,11 @@ than just run tensor math.
   greedy path, fused q/k and activation kernels, and the MMVQ-backed greedy
   output-head fast path that materially raised local greedy throughput on the
   Psionic side.
+- On March 30, 2026, the repo added the first retained shared RVLLM runtime
+  harvest packet at `docs/PSION_RVLLM_CUDA_GRAPH_POOL.md`, making CUDA-graph
+  hits, misses, captures, shape drift, and refusal posture machine-visible
+  across both native `qwen35` and native `gpt_oss` decode lanes instead of
+  keeping that truth as lane-local benchmark folklore.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of

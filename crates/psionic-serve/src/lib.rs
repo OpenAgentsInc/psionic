@@ -25,6 +25,7 @@ mod psion_capability_matrix;
 mod psion_capability_withdrawal;
 mod psion_generic_load_and_generate;
 mod psion_family_serve_vocabulary;
+mod psion_rvllm_cuda_graph_pool;
 mod psion_served_evidence;
 mod psion_served_output_claim_posture;
 mod qwen35;
@@ -68,6 +69,7 @@ pub use psion_capability_matrix::*;
 pub use psion_capability_withdrawal::*;
 pub use psion_generic_load_and_generate::*;
 pub use psion_family_serve_vocabulary::*;
+pub use psion_rvllm_cuda_graph_pool::*;
 pub use psion_served_evidence::*;
 pub use psion_served_output_claim_posture::*;
 pub use psionic_adapters::*;
@@ -1916,6 +1918,9 @@ pub struct Qwen35CudaDecodeOutputMetrics {
     pub readback_bytes: u64,
     /// Whether any step materialized dense raw logits on the host.
     pub raw_logits_materialized: bool,
+    /// CUDA graph replay metrics accumulated across admitted decode steps.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graph_replay: Option<CudaGraphReplayMetrics>,
 }
 
 impl Qwen35CudaDecodeOutputMetrics {
@@ -1926,6 +1931,18 @@ impl Qwen35CudaDecodeOutputMetrics {
         self.output_modes.extend(other.output_modes.iter().cloned());
         self.output_modes.sort();
         self.output_modes.dedup();
+        if let Some(other_graph_replay) = &other.graph_replay {
+            self.graph_replay
+                .get_or_insert_with(CudaGraphReplayMetrics::default)
+                .accumulate(other_graph_replay);
+            if self
+                .graph_replay
+                .as_ref()
+                .map_or(false, CudaGraphReplayMetrics::is_zero)
+            {
+                self.graph_replay = None;
+            }
+        }
     }
 
     fn is_zero(&self) -> bool {
@@ -1933,6 +1950,80 @@ impl Qwen35CudaDecodeOutputMetrics {
             && self.output_modes.is_empty()
             && self.readback_bytes == 0
             && !self.raw_logits_materialized
+            && self
+                .graph_replay
+                .as_ref()
+                .map_or(true, CudaGraphReplayMetrics::is_zero)
+    }
+}
+
+/// Admitted decode-output mode attached to CUDA graph replay evidence.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CudaGraphReplayMode {
+    /// No explicit decode output is materialized from the captured graph body.
+    NoOutput,
+    /// The graph returns only the selected token id.
+    ArgmaxOnly,
+    /// The graph returns a bounded top-k candidate set.
+    TopKCandidates { top_k: usize },
+    /// The graph returns dense raw logits.
+    RawLogits,
+}
+
+/// Request-level CUDA graph replay evidence for one admitted decode path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct CudaGraphReplayMetrics {
+    /// Number of steps that recorded graph replay evidence.
+    pub step_count: usize,
+    /// Number of successful graph replay hits.
+    pub replay_hit_count: usize,
+    /// Number of graph misses that fell back to capture or uncaptured replay preparation.
+    pub replay_miss_count: usize,
+    /// Number of graph captures performed on the hot path.
+    pub capture_count: usize,
+    /// Number of misses triggered by shape or cache identity drift.
+    pub shape_drift_count: usize,
+    /// Number of steps that stayed on the explicit non-graph fallback path.
+    pub refusal_count: usize,
+    /// Total nanoseconds spent instantiating captured graphs.
+    pub capture_latency_ns: u64,
+    /// Unique output modes observed across graph-tracked steps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub output_modes: Vec<CudaGraphReplayMode>,
+}
+
+impl CudaGraphReplayMetrics {
+    fn accumulate(&mut self, other: &Self) {
+        self.step_count = self.step_count.saturating_add(other.step_count);
+        self.replay_hit_count = self
+            .replay_hit_count
+            .saturating_add(other.replay_hit_count);
+        self.replay_miss_count = self
+            .replay_miss_count
+            .saturating_add(other.replay_miss_count);
+        self.capture_count = self.capture_count.saturating_add(other.capture_count);
+        self.shape_drift_count = self
+            .shape_drift_count
+            .saturating_add(other.shape_drift_count);
+        self.refusal_count = self.refusal_count.saturating_add(other.refusal_count);
+        self.capture_latency_ns = self
+            .capture_latency_ns
+            .saturating_add(other.capture_latency_ns);
+        self.output_modes.extend(other.output_modes.iter().cloned());
+        self.output_modes.sort();
+        self.output_modes.dedup();
+    }
+
+    fn is_zero(&self) -> bool {
+        self.step_count == 0
+            && self.replay_hit_count == 0
+            && self.replay_miss_count == 0
+            && self.capture_count == 0
+            && self.shape_drift_count == 0
+            && self.refusal_count == 0
+            && self.capture_latency_ns == 0
+            && self.output_modes.is_empty()
     }
 }
 
@@ -1953,6 +2044,9 @@ pub struct GptOssPerformanceMetrics {
     pub cuda: GptOssCudaRuntimeMetrics,
     /// Accumulated Metal transfer and synchronization counters.
     pub metal: GptOssMetalRuntimeMetrics,
+    /// Decode-step CUDA graph replay evidence for admitted GPT-OSS decode paths.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cuda_graph_replay: Option<CudaGraphReplayMetrics>,
     /// Decode-step logits-selection evidence for Metal GPT-OSS requests.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metal_decode_logits: Option<GptOssMetalDecodeLogitsMetrics>,
@@ -1971,6 +2065,18 @@ impl GptOssPerformanceMetrics {
         self.stage_timings.accumulate(&other.stage_timings);
         self.cuda.accumulate(&other.cuda);
         self.metal.accumulate(&other.metal);
+        if let Some(other_cuda_graph_replay) = &other.cuda_graph_replay {
+            self.cuda_graph_replay
+                .get_or_insert_with(CudaGraphReplayMetrics::default)
+                .accumulate(other_cuda_graph_replay);
+            if self
+                .cuda_graph_replay
+                .as_ref()
+                .map_or(false, CudaGraphReplayMetrics::is_zero)
+            {
+                self.cuda_graph_replay = None;
+            }
+        }
         if let Some(other_metal_decode_logits) = &other.metal_decode_logits {
             self.metal_decode_logits
                 .get_or_insert_with(GptOssMetalDecodeLogitsMetrics::default)
@@ -1991,6 +2097,10 @@ impl GptOssPerformanceMetrics {
             && self.graph_node_count == 0
             && self.graph_layer_node_count == 0
             && self.metal == GptOssMetalRuntimeMetrics::default()
+            && self
+                .cuda_graph_replay
+                .as_ref()
+                .map_or(true, CudaGraphReplayMetrics::is_zero)
             && self
                 .metal_decode_logits
                 .as_ref()

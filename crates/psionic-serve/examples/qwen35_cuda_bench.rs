@@ -134,6 +134,10 @@ struct BenchRunReport {
     qwen35_output_modes: Vec<String>,
     qwen35_readback_bytes: u64,
     qwen35_raw_logits: bool,
+    qwen35_graph_hits: usize,
+    qwen35_graph_misses: usize,
+    qwen35_graph_captures: usize,
+    qwen35_graph_shape_drifts: usize,
     termination: BenchTerminationReport,
     structured_output_mode: String,
     structured_output_parser: String,
@@ -163,6 +167,10 @@ struct BenchQwen35OutputMetricsReport {
     output_modes: Vec<String>,
     readback_bytes: u64,
     raw_logits: bool,
+    graph_hits: usize,
+    graph_misses: usize,
+    graph_captures: usize,
+    graph_shape_drifts: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -649,6 +657,10 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_output_modes: output_metrics.output_modes.clone(),
             qwen35_readback_bytes: output_metrics.readback_bytes,
             qwen35_raw_logits: output_metrics.raw_logits,
+            qwen35_graph_hits: output_metrics.graph_hits,
+            qwen35_graph_misses: output_metrics.graph_misses,
+            qwen35_graph_captures: output_metrics.graph_captures,
+            qwen35_graph_shape_drifts: output_metrics.graph_shape_drifts,
             termination: termination.clone(),
             structured_output_mode: structured_output.mode.clone(),
             structured_output_parser: structured_output.parser.clone(),
@@ -750,6 +762,10 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_output_modes: Vec::new(),
             qwen35_readback_bytes: 0,
             qwen35_raw_logits: false,
+            qwen35_graph_hits: 0,
+            qwen35_graph_misses: 0,
+            qwen35_graph_captures: 0,
+            qwen35_graph_shape_drifts: 0,
             termination: termination.clone(),
             structured_output_mode: String::from("none"),
             structured_output_parser: String::from("none"),
@@ -858,6 +874,10 @@ fn qwen35_output_metrics_report(
             output_modes: Vec::new(),
             readback_bytes: 0,
             raw_logits: false,
+            graph_hits: 0,
+            graph_misses: 0,
+            graph_captures: 0,
+            graph_shape_drifts: 0,
         };
     };
     let output_modes = metrics
@@ -878,15 +898,35 @@ fn qwen35_output_metrics_report(
         output_modes,
         readback_bytes: metrics.readback_bytes,
         raw_logits: metrics.raw_logits_materialized,
+        graph_hits: metrics
+            .graph_replay
+            .as_ref()
+            .map_or(0, |graph| graph.replay_hit_count),
+        graph_misses: metrics
+            .graph_replay
+            .as_ref()
+            .map_or(0, |graph| graph.replay_miss_count),
+        graph_captures: metrics
+            .graph_replay
+            .as_ref()
+            .map_or(0, |graph| graph.capture_count),
+        graph_shape_drifts: metrics
+            .graph_replay
+            .as_ref()
+            .map_or(0, |graph| graph.shape_drift_count),
     }
 }
 
 fn format_qwen35_output_metrics(report: &BenchQwen35OutputMetricsReport) -> String {
     format!(
-        "qwen35_output_modes=[{}] qwen35_readback_bytes={} qwen35_raw_logits={}",
+        "qwen35_output_modes=[{}] qwen35_readback_bytes={} qwen35_raw_logits={} qwen35_graph_hits={} qwen35_graph_misses={} qwen35_graph_captures={} qwen35_graph_shape_drifts={}",
         report.output_modes.join(","),
         report.readback_bytes,
-        report.raw_logits
+        report.raw_logits,
+        report.graph_hits,
+        report.graph_misses,
+        report.graph_captures,
+        report.graph_shape_drifts,
     )
 }
 

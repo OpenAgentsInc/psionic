@@ -20,6 +20,7 @@ use psionic_runtime::{
 use sha2::{Digest, Sha256};
 
 use crate::{
+    CudaGraphReplayMetrics, CudaGraphReplayMode,
     ContinuousBatchGenerationResult, GenerationEventStream, GenerationInput, GenerationMetrics,
     GenerationOptions, GenerationProvenance, GenerationRequest, GenerationResponse,
     GenerationStreamChunk, GenerationStreamEvent, GenerationStreamStatus, GenerationStreamTerminal,
@@ -1464,6 +1465,34 @@ fn qwen35_decode_output_metrics(
         output_modes: vec![output_mode],
         readback_bytes,
         raw_logits_materialized,
+        graph_replay: None,
+    }
+}
+
+fn qwen35_cuda_graph_replay_metrics(
+    output_mode: CudaGraphReplayMode,
+    reused_graph_exec: bool,
+    capture_latency_ns: u64,
+    shape_drift: bool,
+) -> CudaGraphReplayMetrics {
+    CudaGraphReplayMetrics {
+        step_count: 1,
+        replay_hit_count: usize::from(reused_graph_exec),
+        replay_miss_count: usize::from(!reused_graph_exec),
+        capture_count: usize::from(!reused_graph_exec),
+        shape_drift_count: usize::from(shape_drift),
+        refusal_count: 0,
+        capture_latency_ns,
+        output_modes: vec![output_mode],
+    }
+}
+
+fn attach_qwen35_graph_replay_metrics(
+    output_metrics: &mut Option<Qwen35CudaDecodeOutputMetrics>,
+    graph_replay: CudaGraphReplayMetrics,
+) {
+    if let Some(output_metrics) = output_metrics.as_mut() {
+        output_metrics.graph_replay = Some(graph_replay);
     }
 }
 
@@ -2423,6 +2452,8 @@ impl CudaQwen35Model {
                 .saturating_add(logits_bytes);
             let full_logits_graph_cache_identity = qwen35_decode_graph_cache_identity(state);
             let mut reused_graph_exec = false;
+            let mut shape_drift = false;
+            let mut capture_latency_ns = 0_u64;
             let report = if plan.full_logits_graph_cache_identity.as_ref()
                 == Some(&full_logits_graph_cache_identity)
             {
@@ -2432,6 +2463,7 @@ impl CudaQwen35Model {
                         .launch(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?
                 } else {
+                    let capture_started = Instant::now();
                     let mut submission = backend
                         .begin_captured_submission()
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -2557,13 +2589,20 @@ impl CudaQwen35Model {
                     let (report, graph_exec) = submission
                         .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?;
+                    capture_latency_ns = capture_started
+                        .elapsed()
+                        .as_nanos()
+                        .try_into()
+                        .unwrap_or(u64::MAX);
                     plan.full_logits_graph_exec = Some(graph_exec);
                     plan.full_logits_graph_cache_identity = Some(full_logits_graph_cache_identity);
                     report
                 }
             } else {
+                shape_drift = true;
                 plan.full_logits_graph_exec = None;
                 plan.full_logits_graph_cache_identity = None;
+                let capture_started = Instant::now();
                 let mut submission = backend
                     .begin_captured_submission()
                     .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -2686,6 +2725,11 @@ impl CudaQwen35Model {
                 let (report, graph_exec) = submission
                     .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                     .map_err(ReferenceTextGenerationError::Runtime)?;
+                capture_latency_ns = capture_started
+                    .elapsed()
+                    .as_nanos()
+                    .try_into()
+                    .unwrap_or(u64::MAX);
                 plan.full_logits_graph_exec = Some(graph_exec);
                 plan.full_logits_graph_cache_identity = Some(full_logits_graph_cache_identity);
                 report
@@ -2702,7 +2746,7 @@ impl CudaQwen35Model {
             let logits =
                 cuda_f32_vec_from_host_buffer(&plan.logits_host_buffer, self.output.host.rows)
                     .map_err(ReferenceTextGenerationError::Runtime)?;
-            return Ok(Qwen35ForwardStep {
+            let mut step = Qwen35ForwardStep {
                 logits,
                 selected_token: None,
                 candidates: None,
@@ -2713,7 +2757,17 @@ impl CudaQwen35Model {
                     logits_bytes,
                     true,
                 )),
-            });
+            };
+            attach_qwen35_graph_replay_metrics(
+                &mut step.output_metrics,
+                qwen35_cuda_graph_replay_metrics(
+                    CudaGraphReplayMode::RawLogits,
+                    reused_graph_exec,
+                    capture_latency_ns,
+                    shape_drift,
+                ),
+            );
+            return Ok(step);
         }
 
         if let CudaStepOutputMode::TopKCandidates(top_k) = output_mode {
@@ -2764,6 +2818,8 @@ impl CudaQwen35Model {
                     .saturating_add(top_k_bytes);
                 let top_k_graph_cache_identity = (top_k, qwen35_decode_graph_cache_identity(state));
                 let mut reused_graph_exec = false;
+                let mut shape_drift = false;
+                let mut capture_latency_ns = 0_u64;
                 let report = if plan.top_k_graph_cache_identity.as_ref()
                     == Some(&top_k_graph_cache_identity)
                 {
@@ -2773,6 +2829,7 @@ impl CudaQwen35Model {
                             .launch(psionic_backend_cuda::CudaCommandWait::Completed)
                             .map_err(ReferenceTextGenerationError::Runtime)?
                     } else {
+                        let capture_started = Instant::now();
                         let mut submission = backend
                             .begin_captured_submission()
                             .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -2913,13 +2970,20 @@ impl CudaQwen35Model {
                         let (report, graph_exec) = submission
                             .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                             .map_err(ReferenceTextGenerationError::Runtime)?;
+                        capture_latency_ns = capture_started
+                            .elapsed()
+                            .as_nanos()
+                            .try_into()
+                            .unwrap_or(u64::MAX);
                         plan.top_k_graph_exec = Some(graph_exec);
                         plan.top_k_graph_cache_identity = Some(top_k_graph_cache_identity);
                         report
                     }
                 } else {
+                    shape_drift = true;
                     plan.top_k_graph_exec = None;
                     plan.top_k_graph_cache_identity = None;
+                    let capture_started = Instant::now();
                     let mut submission = backend
                         .begin_captured_submission()
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -3057,6 +3121,11 @@ impl CudaQwen35Model {
                     let (report, graph_exec) = submission
                         .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?;
+                    capture_latency_ns = capture_started
+                        .elapsed()
+                        .as_nanos()
+                        .try_into()
+                        .unwrap_or(u64::MAX);
                     plan.top_k_graph_exec = Some(graph_exec);
                     plan.top_k_graph_cache_identity = Some(top_k_graph_cache_identity);
                     report
@@ -3084,7 +3153,7 @@ impl CudaQwen35Model {
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?
                 };
-                return Ok(Qwen35ForwardStep {
+                let mut step = Qwen35ForwardStep {
                     logits: Vec::new(),
                     selected_token: None,
                     candidates: Some(candidates),
@@ -3095,7 +3164,17 @@ impl CudaQwen35Model {
                         top_k_bytes,
                         false,
                     )),
-                });
+                };
+                attach_qwen35_graph_replay_metrics(
+                    &mut step.output_metrics,
+                    qwen35_cuda_graph_replay_metrics(
+                        CudaGraphReplayMode::TopKCandidates { top_k },
+                        reused_graph_exec,
+                        capture_latency_ns,
+                        shape_drift,
+                    ),
+                );
+                return Ok(step);
             }
         }
 
@@ -3143,6 +3222,8 @@ impl CudaQwen35Model {
             }
             let decode_graph_cache_identity = qwen35_decode_graph_cache_identity(state);
             let mut reused_graph_exec = false;
+            let mut shape_drift = false;
+            let mut capture_latency_ns = 0_u64;
             let report = if plan.decode_graph_cache_identity.as_ref()
                 == Some(&decode_graph_cache_identity)
             {
@@ -3152,6 +3233,7 @@ impl CudaQwen35Model {
                         .launch(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?
                 } else {
+                    let capture_started = Instant::now();
                     let mut submission = backend
                         .begin_captured_submission()
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -3281,13 +3363,20 @@ impl CudaQwen35Model {
                     let (report, graph_exec) = submission
                         .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                         .map_err(ReferenceTextGenerationError::Runtime)?;
+                    capture_latency_ns = capture_started
+                        .elapsed()
+                        .as_nanos()
+                        .try_into()
+                        .unwrap_or(u64::MAX);
                     plan.decode_graph_exec = Some(graph_exec);
                     plan.decode_graph_cache_identity = Some(decode_graph_cache_identity);
                     report
                 }
             } else {
+                shape_drift = true;
                 plan.decode_graph_exec = None;
                 plan.decode_graph_cache_identity = None;
+                let capture_started = Instant::now();
                 let mut submission = backend
                     .begin_captured_submission()
                     .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -3411,6 +3500,11 @@ impl CudaQwen35Model {
                 let (report, graph_exec) = submission
                     .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)
                     .map_err(ReferenceTextGenerationError::Runtime)?;
+                capture_latency_ns = capture_started
+                    .elapsed()
+                    .as_nanos()
+                    .try_into()
+                    .unwrap_or(u64::MAX);
                 plan.decode_graph_exec = Some(graph_exec);
                 plan.decode_graph_cache_identity = Some(decode_graph_cache_identity);
                 report
@@ -3433,7 +3527,7 @@ impl CudaQwen35Model {
                         .map_err(ReferenceTextGenerationError::Runtime)?,
                 )?
             };
-            return Ok(Qwen35ForwardStep {
+            let mut step = Qwen35ForwardStep {
                 logits: Vec::new(),
                 selected_token: Some(selected_token),
                 candidates: None,
@@ -3448,7 +3542,17 @@ impl CudaQwen35Model {
                     },
                     false,
                 )),
-            });
+            };
+            attach_qwen35_graph_replay_metrics(
+                &mut step.output_metrics,
+                qwen35_cuda_graph_replay_metrics(
+                    CudaGraphReplayMode::ArgmaxOnly,
+                    reused_graph_exec,
+                    capture_latency_ns,
+                    shape_drift,
+                ),
+            );
+            return Ok(step);
         }
 
         if std::env::var_os("PSIONIC_QWEN35_DEBUG_FUSED_LAYERS").is_some() {

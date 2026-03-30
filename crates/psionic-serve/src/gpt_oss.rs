@@ -57,6 +57,7 @@ use sha2::{Digest, Sha256};
 
 use super::{
     BackendHealthTracker, CompiledWordGenerationModel, ContinuousBatchGenerationResult,
+    CudaGraphReplayMetrics, CudaGraphReplayMode,
     DecodeStrategy, DecoderModelDescriptor, GenerationEventStream, GenerationModelHandle,
     GenerationOptions, GenerationResponse, GenerationStreamEvent, GenerationStreamStatus,
     GenerationStreamTerminal, GgufDecoderAdapterLoader, GgufDecoderFamily,
@@ -148,6 +149,32 @@ struct CudaKvCacheEncodingSelection {
 
 fn duration_ns(start: Instant) -> u64 {
     start.elapsed().as_nanos().try_into().unwrap_or(u64::MAX)
+}
+
+fn gpt_oss_cuda_graph_replay_mode(output_mode: CudaStepOutputMode) -> CudaGraphReplayMode {
+    match output_mode {
+        CudaStepOutputMode::FullLogits => CudaGraphReplayMode::RawLogits,
+        CudaStepOutputMode::DeviceArgmax => CudaGraphReplayMode::ArgmaxOnly,
+    }
+}
+
+fn gpt_oss_cuda_graph_replay_metrics(
+    output_mode: CudaStepOutputMode,
+    reused_graph_exec: bool,
+    capture_latency_ns: u64,
+    shape_drift: bool,
+    refusal: bool,
+) -> CudaGraphReplayMetrics {
+    CudaGraphReplayMetrics {
+        step_count: 1,
+        replay_hit_count: usize::from(reused_graph_exec),
+        replay_miss_count: usize::from(!reused_graph_exec && !refusal),
+        capture_count: usize::from(!reused_graph_exec && !refusal),
+        shape_drift_count: usize::from(shape_drift),
+        refusal_count: usize::from(refusal),
+        capture_latency_ns,
+        output_modes: vec![gpt_oss_cuda_graph_replay_mode(output_mode)],
+    }
 }
 
 fn initial_cuda_argmax_pair_bytes() -> [u8; std::mem::size_of::<u64>()] {
@@ -6225,11 +6252,16 @@ impl GptOssCudaModelInner {
             cuda_cache.value_buffer.allocation_identity(),
             cuda_cache.encoding,
         ));
+        let mut reused_graph_exec = false;
+        let mut shape_drift = false;
+        let mut capture_latency_ns = 0_u64;
         let submission_report = if use_decode_graph_fast_path {
             if plan.decode_graph_cache_identity == decode_graph_cache_identity {
                 if let Some(graph_exec) = plan.decode_graph_exec.as_ref() {
+                    reused_graph_exec = true;
                     graph_exec.launch(psionic_backend_cuda::CudaCommandWait::Completed)?
                 } else {
+                    let capture_started = Instant::now();
                     let mut submission = backend.begin_captured_submission()?;
                     self.encode_cuda_forward_step_submission(
                         &mut submission,
@@ -6244,13 +6276,16 @@ impl GptOssCudaModelInner {
                     )?;
                     let (report, graph_exec) = submission
                         .commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)?;
+                    capture_latency_ns = duration_ns(capture_started);
                     plan.decode_graph_exec = Some(graph_exec);
                     plan.decode_graph_cache_identity = decode_graph_cache_identity;
                     report
                 }
             } else {
+                shape_drift = true;
                 plan.decode_graph_exec = None;
                 plan.decode_graph_cache_identity = None;
+                let capture_started = Instant::now();
                 let mut submission = backend.begin_captured_submission()?;
                 self.encode_cuda_forward_step_submission(
                     &mut submission,
@@ -6265,6 +6300,7 @@ impl GptOssCudaModelInner {
                 )?;
                 let (report, graph_exec) =
                     submission.commit_captured(psionic_backend_cuda::CudaCommandWait::Completed)?;
+                capture_latency_ns = duration_ns(capture_started);
                 plan.decode_graph_exec = Some(graph_exec);
                 plan.decode_graph_cache_identity = decode_graph_cache_identity;
                 report
@@ -6284,6 +6320,13 @@ impl GptOssCudaModelInner {
             )?;
             submission.commit(psionic_backend_cuda::CudaCommandWait::Completed)?
         };
+        perf.cuda_graph_replay = Some(gpt_oss_cuda_graph_replay_metrics(
+            output_mode,
+            reused_graph_exec,
+            capture_latency_ns,
+            shape_drift,
+            !use_decode_graph_fast_path,
+        ));
         let (logits_values, selected_token, logits_readback_bytes) = match output_mode {
             CudaStepOutputMode::FullLogits => (
                 plan.logits_buffer.read_f32()?,
