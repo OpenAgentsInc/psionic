@@ -1,0 +1,113 @@
+{
+  "schema_version": "psion.executor.canonical_mixture.v0",
+  "mixture_id": "psion_executor_canonical_mixture_v0",
+  "corpus_id": "tassadar.executor.local_cluster.canonical_mixture_v0",
+  "model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "task_family_id": "tassadar.executor.admitted_workload_family.v0",
+  "stage_anchor_id": "executor_boundary_anchor_32.v0",
+  "max_target_window_tokens": 32,
+  "frozen_pack_ids": [
+    "tassadar.eval.frequent.v0",
+    "tassadar.eval.promotion.v0"
+  ],
+  "source_families": [
+    {
+      "source_family_id": "executor.boundary_prefix_traces",
+      "role": "stage_anchor",
+      "initial_weight_bps": 2200,
+      "detail": "Boundary-prefix traces stay overweighted at the start because the executor lane is still anchored to the first `MAX_TARGET_WINDOW_TOKENS=32` target-window closure rather than broad long-trace fluency.",
+      "row_digest": "944b5d9df27538f8c1c610e9523f63866689787dcd66a0cae094cce91aa74bae"
+    },
+    {
+      "source_family_id": "executor.article_route_direct_traces",
+      "role": "route_exactness",
+      "initial_weight_bps": 1800,
+      "detail": "Direct article-route traces keep the current bounded executor route visible inside the same mixture instead of treating route behavior as an external prompt-only artifact.",
+      "row_digest": "fab17dbf611bd02e9250da5cf6d2e57fc1fd17c633d1bb029f94a2796c9cf14d"
+    },
+    {
+      "source_family_id": "executor.long_loop_kernel_traces",
+      "role": "admitted_workload_exactness",
+      "initial_weight_bps": 2000,
+      "detail": "Long-loop kernel traces preserve the admitted exactness family that currently anchors the executor lane baseline.",
+      "row_digest": "70e265cc21874e7978e6f92d0f1674245251ebd365f1349b51d47c7c356cd2fa"
+    },
+    {
+      "source_family_id": "executor.sudoku_v0_traces",
+      "role": "admitted_workload_exactness",
+      "initial_weight_bps": 1600,
+      "detail": "Sudoku traces keep one combinatorial solver family inside the canonical mixture so later same-budget mixture changes remain tied to certified packs.",
+      "row_digest": "59f8dd7c686021d10141818d8f1b04870d5292dbecec382dc2a873e16d122894"
+    },
+    {
+      "source_family_id": "executor.hungarian_matching_traces",
+      "role": "admitted_workload_exactness",
+      "initial_weight_bps": 1600,
+      "detail": "Hungarian matching traces preserve the second structured solver family used by the frozen promotion surface.",
+      "row_digest": "0240bc1fbebb62c5640cf344ea30591002b02a7ddd13a19baf42650afd1bca3f"
+    },
+    {
+      "source_family_id": "executor.refusal_negative_traces",
+      "role": "bounded_refusal",
+      "initial_weight_bps": 800,
+      "detail": "Negative and refusal traces remain explicit so route-local train wins do not silently degrade refusal posture on unsupported executor asks.",
+      "row_digest": "f623e7b82f1a68cf03b4913edc7a93530544ba109f148e7ed07db163ce661826"
+    }
+  ],
+  "seed_suite": [
+    {
+      "seed_id": "long_loop_kernel",
+      "workload_family_id": "admitted_exactness_family",
+      "usage_role": "seed_exactness_anchor",
+      "detail": "Keeps the long-loop executor family inside the first canonical mixture seed suite.",
+      "row_digest": "20c244ce97bbcd4745371bc69c1fa354a3f148f434266e837e85e0dce57ac413"
+    },
+    {
+      "seed_id": "sudoku_v0_test_a",
+      "workload_family_id": "admitted_exactness_family",
+      "usage_role": "seed_exactness_anchor",
+      "detail": "Keeps the bounded Sudoku solver family visible inside the same canonical seed suite.",
+      "row_digest": "9ce99cffdd8cacaef34c21174cb02e061a900bfe957d064ee9b870fd2e1d1db4"
+    },
+    {
+      "seed_id": "hungarian_matching",
+      "workload_family_id": "admitted_exactness_family",
+      "usage_role": "seed_exactness_anchor",
+      "detail": "Keeps the bounded Hungarian matching family visible inside the same canonical seed suite.",
+      "row_digest": "bc91533fa4a6cb6cd9b17f524f8cc1583c87070a51e7956df3a05841760b71e9"
+    },
+    {
+      "seed_id": "article_route_direct_refusal_cluster",
+      "workload_family_id": "bounded_route_and_refusal_family",
+      "usage_role": "seed_route_anchor",
+      "detail": "Keeps direct route and bounded refusal traces visible so the executor mixture does not drift away from the current served route envelope.",
+      "row_digest": "4c56346b2ad605acc4c7960ac005b5fea8f17657f280ed1eef086413db92e08f"
+    }
+  ],
+  "held_out_exclusion_ids": [
+    "frequent_held_out_exclusions_v0",
+    "promotion_held_out_suite_v0",
+    "promotion_adversarial_suite_v0"
+  ],
+  "evaluation_exclusion_ids": [
+    "frequent_exactness_cases_v0",
+    "frequent_held_out_exclusions_v0",
+    "frequent_operator_review_cases_v0",
+    "frequent_throughput_blockers_v0",
+    "promotion_exactness_suite_v0",
+    "promotion_held_out_suite_v0",
+    "promotion_adversarial_suite_v0",
+    "promotion_runtime_blockers_v0",
+    "promotion_serving_blockers_v0",
+    "promotion_reference_linear_anchor_checks_v0",
+    "promotion_hull_cache_fast_route_checks_v0"
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_BASELINE.md",
+    "docs/PSION_EXECUTOR_EVAL_PACKS.md",
+    "docs/PSION_EXECUTOR_BASELINE_TRUTH.md"
+  ],
+  "summary": "The executor lane now has one canonical mixture manifest. It keeps the admitted executor family anchored to `MAX_TARGET_WINDOW_TOKENS=32`, explicit route/refusal traces, explicit solver-family weights, and explicit held-out/evaluation exclusions before any mixture-search or curriculum change is reviewed.",
+  "packet_digest": "09e45bad390178531cb0154756fbcd6da0a9a28e9c07c14cbe2900651095a044"
+}
