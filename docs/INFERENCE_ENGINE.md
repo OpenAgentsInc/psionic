@@ -158,6 +158,10 @@ than just run tensor math.
   continuous-batch policy, realized scheduling classes, TTFT/ITL exposure, and
   response-header contract machine-visible instead of leaving that split buried
   across runtime receipts and HTTP glue.
+- The same pass now also retains one explicit attention-backend packet at
+  `docs/PSION_RVLLM_ATTENTION_BACKEND.md`, making the current CUDA attention
+  backend selector explicit so dense f16 KV remains the default while
+  turboquant KV and q8_1 output fusion stay capability-gated alternates.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of

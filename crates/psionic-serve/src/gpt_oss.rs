@@ -57,18 +57,17 @@ use sha2::{Digest, Sha256};
 
 use super::{
     BackendHealthTracker, CompiledWordGenerationModel, ContinuousBatchGenerationResult,
-    CudaGraphReplayMetrics, CudaGraphReplayMode,
-    DecodeStrategy, DecoderModelDescriptor, GenerationEventStream, GenerationModelHandle,
-    GenerationOptions, GenerationResponse, GenerationStreamEvent, GenerationStreamStatus,
-    GenerationStreamTerminal, GgufDecoderAdapterLoader, GgufDecoderFamily,
-    GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GptOssMetalDecodeLogitsMetrics,
-    GptOssMetalLogitsOutputMode, GptOssPerformanceMetrics, InMemoryGenerationModelRegistry,
-    InMemoryGenerationSessionStore, LoadedModelRegistryError, LoadedModelView,
-    LocalRuntimeObservability, ManagedTextGenerationRuntime, ModelLoadError, PrefixCacheMode,
-    PrefixCacheRefusalReason, QuantizationMode, ReferenceTextGenerationError, SharedPrefixStore,
-    TextGenerationExecutor, TokenId, TokenSequence, TokenizerBoundary,
-    continuous_batch_text_generation_execution_profile, current_time_millis,
-    default_generation_scheduler_policy, default_prefix_cache_policy,
+    CudaGraphReplayMetrics, CudaGraphReplayMode, DecodeStrategy, DecoderModelDescriptor,
+    GenerationEventStream, GenerationModelHandle, GenerationOptions, GenerationResponse,
+    GenerationStreamEvent, GenerationStreamStatus, GenerationStreamTerminal,
+    GgufDecoderAdapterLoader, GgufDecoderFamily, GgufDecoderFamilyMetadata,
+    GgufDecoderLayerTensorLayout, GptOssMetalDecodeLogitsMetrics, GptOssMetalLogitsOutputMode,
+    GptOssPerformanceMetrics, InMemoryGenerationModelRegistry, InMemoryGenerationSessionStore,
+    LoadedModelRegistryError, LoadedModelView, LocalRuntimeObservability,
+    ManagedTextGenerationRuntime, ModelLoadError, PrefixCacheMode, PrefixCacheRefusalReason,
+    QuantizationMode, ReferenceTextGenerationError, SharedPrefixStore, TextGenerationExecutor,
+    TokenId, TokenSequence, TokenizerBoundary, continuous_batch_text_generation_execution_profile,
+    current_time_millis, default_generation_scheduler_policy, default_prefix_cache_policy,
     generation_runtime_observability, run_continuous_batch_generation_requests,
     run_generation_request,
 };
@@ -5330,6 +5329,10 @@ impl GptOssCudaModelInner {
                     head_count,
                     head_dim,
                 );
+            let attention_backend = super::select_psion_rvllm_attention_backend(
+                use_turboquant_kv,
+                use_q8_1_attention_output_fusion,
+            );
             if let Some(transposed_f16) = layer.attention_qkv_weight.transposed_f16.as_ref() {
                 submission.rms_norm(
                     current_hidden,
@@ -5475,149 +5478,157 @@ impl GptOssCudaModelInner {
                 )?;
             }
             if use_graph_attention {
-                if use_turboquant_kv {
-                    submission.attention_decode_rope_cache_turboquant_kv_graph(
-                        &layer_plan.qkv_buffer,
-                        0,
-                        q_rows,
-                        q_rows.saturating_add(k_rows),
-                        &cuda_cache.key_buffer,
-                        &cuda_cache.value_buffer,
-                        cuda_cache.width,
-                        layer_offset,
-                        &plan.decode_params_buffer,
-                        self.family_metadata.sliding_window.unwrap_or(0),
-                        head_count,
-                        kv_head_count,
-                        head_dim,
-                        rotary_dim,
-                        freq_scale,
-                        ext_factor,
-                        corr_dims,
-                        theta_scale,
-                        layer.attention_sinks_device.as_ref(),
-                        &layer_plan.attention_buffer,
-                    )?;
-                } else if use_q8_1_attention_output_fusion {
-                    submission.attention_decode_rope_cache_f16_kv_graph_q8_1(
-                        &layer_plan.qkv_buffer,
-                        0,
-                        q_rows,
-                        q_rows.saturating_add(k_rows),
-                        &cuda_cache.key_buffer,
-                        &cuda_cache.value_buffer,
-                        cuda_cache.width,
-                        layer_offset,
-                        &plan.decode_params_buffer,
-                        self.family_metadata.sliding_window.unwrap_or(0),
-                        head_count,
-                        kv_head_count,
-                        head_dim,
-                        rotary_dim,
-                        freq_scale,
-                        ext_factor,
-                        corr_dims,
-                        theta_scale,
-                        layer.attention_sinks_device.as_ref(),
-                        &plan.vector_q8_1_buffer,
-                    )?;
-                } else {
-                    submission.attention_decode_rope_cache_f16_kv_graph(
-                        &layer_plan.qkv_buffer,
-                        0,
-                        q_rows,
-                        q_rows.saturating_add(k_rows),
-                        &cuda_cache.key_buffer,
-                        &cuda_cache.value_buffer,
-                        cuda_cache.width,
-                        layer_offset,
-                        &plan.decode_params_buffer,
-                        self.family_metadata.sliding_window.unwrap_or(0),
-                        head_count,
-                        kv_head_count,
-                        head_dim,
-                        rotary_dim,
-                        freq_scale,
-                        ext_factor,
-                        corr_dims,
-                        theta_scale,
-                        layer.attention_sinks_device.as_ref(),
-                        &layer_plan.attention_buffer,
-                    )?;
+                match attention_backend {
+                    super::PsionRvllmAttentionBackend::TurboquantKv => {
+                        submission.attention_decode_rope_cache_turboquant_kv_graph(
+                            &layer_plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            layer_offset,
+                            &plan.decode_params_buffer,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &layer_plan.attention_buffer,
+                        )?;
+                    }
+                    super::PsionRvllmAttentionBackend::DenseF16KvQ81OutputFusion => {
+                        submission.attention_decode_rope_cache_f16_kv_graph_q8_1(
+                            &layer_plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            layer_offset,
+                            &plan.decode_params_buffer,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &plan.vector_q8_1_buffer,
+                        )?;
+                    }
+                    super::PsionRvllmAttentionBackend::DenseF16Kv => {
+                        submission.attention_decode_rope_cache_f16_kv_graph(
+                            &layer_plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            layer_offset,
+                            &plan.decode_params_buffer,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &layer_plan.attention_buffer,
+                        )?;
+                    }
                 }
             } else {
-                if use_turboquant_kv {
-                    submission.attention_decode_rope_cache_turboquant_kv(
-                        &layer_plan.qkv_buffer,
-                        0,
-                        q_rows,
-                        q_rows.saturating_add(k_rows),
-                        &cuda_cache.key_buffer,
-                        &cuda_cache.value_buffer,
-                        cuda_cache.width,
-                        layer_offset,
-                        cache_write_index,
-                        self.family_metadata.sliding_window.unwrap_or(0),
-                        head_count,
-                        kv_head_count,
-                        head_dim,
-                        rotary_dim,
-                        position,
-                        freq_scale,
-                        ext_factor,
-                        corr_dims,
-                        theta_scale,
-                        layer.attention_sinks_device.as_ref(),
-                        &layer_plan.attention_buffer,
-                    )?;
-                } else if use_q8_1_attention_output_fusion {
-                    submission.attention_decode_rope_cache_f16_kv_q8_1(
-                        &layer_plan.qkv_buffer,
-                        0,
-                        q_rows,
-                        q_rows.saturating_add(k_rows),
-                        &cuda_cache.key_buffer,
-                        &cuda_cache.value_buffer,
-                        cuda_cache.width,
-                        layer_offset,
-                        cache_write_index,
-                        self.family_metadata.sliding_window.unwrap_or(0),
-                        head_count,
-                        kv_head_count,
-                        head_dim,
-                        rotary_dim,
-                        position,
-                        freq_scale,
-                        ext_factor,
-                        corr_dims,
-                        theta_scale,
-                        layer.attention_sinks_device.as_ref(),
-                        &plan.vector_q8_1_buffer,
-                    )?;
-                } else {
-                    submission.attention_decode_rope_cache_f16_kv(
-                        &layer_plan.qkv_buffer,
-                        0,
-                        q_rows,
-                        q_rows.saturating_add(k_rows),
-                        &cuda_cache.key_buffer,
-                        &cuda_cache.value_buffer,
-                        cuda_cache.width,
-                        layer_offset,
-                        cache_write_index,
-                        self.family_metadata.sliding_window.unwrap_or(0),
-                        head_count,
-                        kv_head_count,
-                        head_dim,
-                        rotary_dim,
-                        position,
-                        freq_scale,
-                        ext_factor,
-                        corr_dims,
-                        theta_scale,
-                        layer.attention_sinks_device.as_ref(),
-                        &layer_plan.attention_buffer,
-                    )?;
+                match attention_backend {
+                    super::PsionRvllmAttentionBackend::TurboquantKv => {
+                        submission.attention_decode_rope_cache_turboquant_kv(
+                            &layer_plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            layer_offset,
+                            cache_write_index,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            position,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &layer_plan.attention_buffer,
+                        )?;
+                    }
+                    super::PsionRvllmAttentionBackend::DenseF16KvQ81OutputFusion => {
+                        submission.attention_decode_rope_cache_f16_kv_q8_1(
+                            &layer_plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            layer_offset,
+                            cache_write_index,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            position,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &plan.vector_q8_1_buffer,
+                        )?;
+                    }
+                    super::PsionRvllmAttentionBackend::DenseF16Kv => {
+                        submission.attention_decode_rope_cache_f16_kv(
+                            &layer_plan.qkv_buffer,
+                            0,
+                            q_rows,
+                            q_rows.saturating_add(k_rows),
+                            &cuda_cache.key_buffer,
+                            &cuda_cache.value_buffer,
+                            cuda_cache.width,
+                            layer_offset,
+                            cache_write_index,
+                            self.family_metadata.sliding_window.unwrap_or(0),
+                            head_count,
+                            kv_head_count,
+                            head_dim,
+                            rotary_dim,
+                            position,
+                            freq_scale,
+                            ext_factor,
+                            corr_dims,
+                            theta_scale,
+                            layer.attention_sinks_device.as_ref(),
+                            &layer_plan.attention_buffer,
+                        )?;
+                    }
                 }
             }
             if let Some(transposed_f16) = layer.attention_output_weight.transposed_f16.as_ref() {
@@ -6520,6 +6531,10 @@ impl GptOssCudaModelInner {
                             head_count,
                             head_dim,
                         );
+                    let attention_backend = super::select_psion_rvllm_attention_backend(
+                        use_turboquant_kv,
+                        use_q8_1_attention_output_fusion,
+                    );
                     let layer_start = Instant::now();
                     let dense_start = Instant::now();
                     let mut dense_submission = backend.begin_submission()?;
@@ -6593,35 +6608,90 @@ impl GptOssCudaModelInner {
                             layer.attention_qkv_weight.total_rows(),
                         )?;
                     }
-                    if use_turboquant_kv {
-                        dense_submission.attention_decode_rope_cache_turboquant_kv(
-                            &plan.qkv_buffer,
-                            0,
-                            q_rows,
-                            q_rows.saturating_add(k_rows),
-                            &cuda_cache.key_buffer,
-                            &cuda_cache.value_buffer,
-                            cuda_cache.width,
-                            cache_offset,
-                            cache_write_index,
-                            self.family_metadata.sliding_window.unwrap_or(0),
-                            head_count,
-                            kv_head_count,
-                            head_dim,
-                            rotary_dim,
-                            position,
-                            freq_scale,
-                            ext_factor,
-                            corr_dims,
-                            theta_scale,
-                            layer.attention_sinks_device.as_ref(),
-                            &plan.attention_input_buffer,
-                        )?;
-                        if can_use_q8_1_mmvq(layer.attention_output_weight.mode) {
-                            dense_submission.quantize_f32_to_q8_1(
+                    match attention_backend {
+                        super::PsionRvllmAttentionBackend::TurboquantKv => {
+                            dense_submission.attention_decode_rope_cache_turboquant_kv(
+                                &plan.qkv_buffer,
+                                0,
+                                q_rows,
+                                q_rows.saturating_add(k_rows),
+                                &cuda_cache.key_buffer,
+                                &cuda_cache.value_buffer,
+                                cuda_cache.width,
+                                cache_offset,
+                                cache_write_index,
+                                self.family_metadata.sliding_window.unwrap_or(0),
+                                head_count,
+                                kv_head_count,
+                                head_dim,
+                                rotary_dim,
+                                position,
+                                freq_scale,
+                                ext_factor,
+                                corr_dims,
+                                theta_scale,
+                                layer.attention_sinks_device.as_ref(),
                                 &plan.attention_input_buffer,
-                                1,
-                                layer.attention_output_weight.columns,
+                            )?;
+                            if can_use_q8_1_mmvq(layer.attention_output_weight.mode) {
+                                dense_submission.quantize_f32_to_q8_1(
+                                    &plan.attention_input_buffer,
+                                    1,
+                                    layer.attention_output_weight.columns,
+                                    &plan.hidden_input_q8_1_buffer,
+                                )?;
+                                dense_submission.quantized_matvec_q8_1(
+                                    layer
+                                        .attention_output_weight
+                                        .storage
+                                        .as_ref()
+                                        .expect("checked above"),
+                                    0,
+                                    layer.attention_output_weight.mode,
+                                    layer.attention_output_weight.rows,
+                                    layer.attention_output_weight.columns,
+                                    &plan.hidden_input_q8_1_buffer,
+                                    None,
+                                    &plan.output_buffer,
+                                )?;
+                            } else {
+                                dense_submission.quantized_matvec(
+                                    layer
+                                        .attention_output_weight
+                                        .storage
+                                        .as_ref()
+                                        .expect("checked above"),
+                                    0,
+                                    layer.attention_output_weight.mode,
+                                    layer.attention_output_weight.rows,
+                                    layer.attention_output_weight.columns,
+                                    &plan.attention_input_buffer,
+                                    &plan.output_buffer,
+                                )?;
+                            }
+                        }
+                        super::PsionRvllmAttentionBackend::DenseF16KvQ81OutputFusion => {
+                            dense_submission.attention_decode_rope_cache_f16_kv_q8_1(
+                                &plan.qkv_buffer,
+                                0,
+                                q_rows,
+                                q_rows.saturating_add(k_rows),
+                                &cuda_cache.key_buffer,
+                                &cuda_cache.value_buffer,
+                                cuda_cache.width,
+                                cache_offset,
+                                cache_write_index,
+                                self.family_metadata.sliding_window.unwrap_or(0),
+                                head_count,
+                                kv_head_count,
+                                head_dim,
+                                rotary_dim,
+                                position,
+                                freq_scale,
+                                ext_factor,
+                                corr_dims,
+                                theta_scale,
+                                layer.attention_sinks_device.as_ref(),
                                 &plan.hidden_input_q8_1_buffer,
                             )?;
                             dense_submission.quantized_matvec_q8_1(
@@ -6636,120 +6706,69 @@ impl GptOssCudaModelInner {
                                 layer.attention_output_weight.columns,
                                 &plan.hidden_input_q8_1_buffer,
                                 None,
-                                &plan.output_buffer,
-                            )?;
-                        } else {
-                            dense_submission.quantized_matvec(
-                                layer
-                                    .attention_output_weight
-                                    .storage
-                                    .as_ref()
-                                    .expect("checked above"),
-                                0,
-                                layer.attention_output_weight.mode,
-                                layer.attention_output_weight.rows,
-                                layer.attention_output_weight.columns,
-                                &plan.attention_input_buffer,
                                 &plan.output_buffer,
                             )?;
                         }
-                    } else if use_q8_1_attention_output_fusion {
-                        dense_submission.attention_decode_rope_cache_f16_kv_q8_1(
-                            &plan.qkv_buffer,
-                            0,
-                            q_rows,
-                            q_rows.saturating_add(k_rows),
-                            &cuda_cache.key_buffer,
-                            &cuda_cache.value_buffer,
-                            cuda_cache.width,
-                            cache_offset,
-                            cache_write_index,
-                            self.family_metadata.sliding_window.unwrap_or(0),
-                            head_count,
-                            kv_head_count,
-                            head_dim,
-                            rotary_dim,
-                            position,
-                            freq_scale,
-                            ext_factor,
-                            corr_dims,
-                            theta_scale,
-                            layer.attention_sinks_device.as_ref(),
-                            &plan.hidden_input_q8_1_buffer,
-                        )?;
-                        dense_submission.quantized_matvec_q8_1(
-                            layer
-                                .attention_output_weight
-                                .storage
-                                .as_ref()
-                                .expect("checked above"),
-                            0,
-                            layer.attention_output_weight.mode,
-                            layer.attention_output_weight.rows,
-                            layer.attention_output_weight.columns,
-                            &plan.hidden_input_q8_1_buffer,
-                            None,
-                            &plan.output_buffer,
-                        )?;
-                    } else {
-                        dense_submission.attention_decode_rope_cache_f16_kv(
-                            &plan.qkv_buffer,
-                            0,
-                            q_rows,
-                            q_rows.saturating_add(k_rows),
-                            &cuda_cache.key_buffer,
-                            &cuda_cache.value_buffer,
-                            cuda_cache.width,
-                            cache_offset,
-                            cache_write_index,
-                            self.family_metadata.sliding_window.unwrap_or(0),
-                            head_count,
-                            kv_head_count,
-                            head_dim,
-                            rotary_dim,
-                            position,
-                            freq_scale,
-                            ext_factor,
-                            corr_dims,
-                            theta_scale,
-                            layer.attention_sinks_device.as_ref(),
-                            &plan.attention_input_buffer,
-                        )?;
-                        if can_use_q8_1_mmvq(layer.attention_output_weight.mode) {
-                            dense_submission.quantize_f32_to_q8_1(
-                                &plan.attention_input_buffer,
-                                1,
-                                layer.attention_output_weight.columns,
-                                &plan.hidden_input_q8_1_buffer,
-                            )?;
-                            dense_submission.quantized_matvec_q8_1(
-                                layer
-                                    .attention_output_weight
-                                    .storage
-                                    .as_ref()
-                                    .expect("checked above"),
+                        super::PsionRvllmAttentionBackend::DenseF16Kv => {
+                            dense_submission.attention_decode_rope_cache_f16_kv(
+                                &plan.qkv_buffer,
                                 0,
-                                layer.attention_output_weight.mode,
-                                layer.attention_output_weight.rows,
-                                layer.attention_output_weight.columns,
-                                &plan.hidden_input_q8_1_buffer,
-                                None,
-                                &plan.output_buffer,
-                            )?;
-                        } else {
-                            dense_submission.quantized_matvec(
-                                layer
-                                    .attention_output_weight
-                                    .storage
-                                    .as_ref()
-                                    .expect("checked above"),
-                                0,
-                                layer.attention_output_weight.mode,
-                                layer.attention_output_weight.rows,
-                                layer.attention_output_weight.columns,
+                                q_rows,
+                                q_rows.saturating_add(k_rows),
+                                &cuda_cache.key_buffer,
+                                &cuda_cache.value_buffer,
+                                cuda_cache.width,
+                                cache_offset,
+                                cache_write_index,
+                                self.family_metadata.sliding_window.unwrap_or(0),
+                                head_count,
+                                kv_head_count,
+                                head_dim,
+                                rotary_dim,
+                                position,
+                                freq_scale,
+                                ext_factor,
+                                corr_dims,
+                                theta_scale,
+                                layer.attention_sinks_device.as_ref(),
                                 &plan.attention_input_buffer,
-                                &plan.output_buffer,
                             )?;
+                            if can_use_q8_1_mmvq(layer.attention_output_weight.mode) {
+                                dense_submission.quantize_f32_to_q8_1(
+                                    &plan.attention_input_buffer,
+                                    1,
+                                    layer.attention_output_weight.columns,
+                                    &plan.hidden_input_q8_1_buffer,
+                                )?;
+                                dense_submission.quantized_matvec_q8_1(
+                                    layer
+                                        .attention_output_weight
+                                        .storage
+                                        .as_ref()
+                                        .expect("checked above"),
+                                    0,
+                                    layer.attention_output_weight.mode,
+                                    layer.attention_output_weight.rows,
+                                    layer.attention_output_weight.columns,
+                                    &plan.hidden_input_q8_1_buffer,
+                                    None,
+                                    &plan.output_buffer,
+                                )?;
+                            } else {
+                                dense_submission.quantized_matvec(
+                                    layer
+                                        .attention_output_weight
+                                        .storage
+                                        .as_ref()
+                                        .expect("checked above"),
+                                    0,
+                                    layer.attention_output_weight.mode,
+                                    layer.attention_output_weight.rows,
+                                    layer.attention_output_weight.columns,
+                                    &plan.attention_input_buffer,
+                                    &plan.output_buffer,
+                                )?;
+                            }
                         }
                     }
                     dense_submission.add_residual_rms_norm_q8_1(
