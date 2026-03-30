@@ -104,6 +104,8 @@ This doc does not claim:
 - `docs/PSION_EXECUTOR_OWNERSHIP.md` owns named owners and review cadence
 - `docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md` owns the admitted local
   executor profile catalog
+- `docs/PSION_EXECUTOR_MLX_FORWARD_LOAD_PARITY.md` owns the retained MLX
+  forward/load parity packet for the admitted Mac profile
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

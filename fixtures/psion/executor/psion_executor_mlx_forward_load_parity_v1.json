@@ -1,0 +1,52 @@
+{
+  "schema_version": "psion.executor.mlx_forward_load_parity.v1",
+  "packet_id": "psion_executor_mlx_forward_load_parity_v1",
+  "admitted_profile_id": "local_mac_mlx_aarch64",
+  "retained_scope_window": "swarm_mac_mlx_bringup_v1",
+  "shipped_entrypoint_command": "cargo run -q -p psionic-train --bin swarm_mac_mlx_bringup -- fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json",
+  "shipped_entrypoint_source": "crates/psionic-train/src/bin/swarm_mac_mlx_bringup.rs",
+  "bringup_report_ref": "fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json",
+  "bringup_report_sha256": "9d21f4ad23e56c02a5b7e1c220f5fe412a9df389c38041be8600f490747a00a8",
+  "bringup_report_digest": "b7f20eca5c4aa228e927d62c9544ac0dcc8a31777d66395c5e26a19bfbd48db5",
+  "execution_backend_label": "open_adapter_backend.mlx.metal.gpt_oss_lm_head",
+  "logical_device_kind": "metal",
+  "logical_device_label": "metal:0",
+  "adapter_family": "gpt_oss.decoder_lm_head_lora",
+  "checkpoint_family": "swarm.open_adapter.mlx.same_node",
+  "adapter_artifact_digest": "44a868bbf20e5b80cbe52f620a0aa5f94b117a7bbd66906d3bff25dd59228631",
+  "final_state_dict_digest": "41da59536abb36b188cc3c26eeeb909e05d1f842db74e02080cbdb45ca836354",
+  "forward_probe": {
+    "admitted_ops": [
+      "constant_f32",
+      "matmul",
+      "add"
+    ],
+    "device_id": "metal:0",
+    "stream_id": 1,
+    "output": [
+      1.5,
+      2.5
+    ],
+    "eval_receipt_digest": "099382fb32f89db515c66f3c18cae22d1a01a14d24d875ec99d9a68a215572eb",
+    "detail": "The shipped `swarm_mac_mlx_bringup` entrypoint now proves one bounded MLX forward surface (`constant -> matmul -> add`) and one bounded converted-equivalent load path through the open-adapter MLX backend on `metal:0`."
+  },
+  "explicit_parity_gaps": [
+    {
+      "gap_id": "reshape_out_of_slice_refusal",
+      "gap_kind": "forward_surface_gap",
+      "detail": "cannot materialize tensor t6 for op `reshape`: bounded Metal eval currently materializes only constant, add, matmul graphs on the public array surface"
+    },
+    {
+      "gap_id": "bf16_precision_refusal",
+      "gap_kind": "precision_gap",
+      "detail": "open adapter backend does not yet support precision policy `Bf16Mixed`"
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_LOCAL_PROFILE_REFERENCE.md",
+    "fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json"
+  ],
+  "summary": "The admitted Mac MLX executor profile now has one retained forward/load parity packet grounded in `fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json`. The concrete shipped entrypoint is `cargo run -q -p psionic-train --bin swarm_mac_mlx_bringup -- fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json`; it exercised admitted ops [\"constant_f32\", \"matmul\", \"add\"], loaded the bounded converted-equivalent `gpt_oss.decoder_lm_head_lora` adapter family on `metal:0`, and kept explicit parity gaps for reshape-backed graphs and bf16 mixed precision instead of hiding them.",
+  "packet_digest": "45b99ef96eab00077ec3ede7023ea20757c0435827f1e80ce79ef3db1b67d0ba"
+}

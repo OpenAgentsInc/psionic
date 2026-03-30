@@ -57,10 +57,19 @@ profile for:
 It is grounded in the already-shipped surfaces:
 
 - `fixtures/swarm/reports/swarm_mac_mlx_bringup_v1.json`
+- `fixtures/psion/executor/psion_executor_mlx_forward_load_parity_v1.json`
 - `fixtures/training/compute_sources/local_mlx_mac_workstation_v1.json`
 - `scripts/check-swarm-mac-mlx-bringup.sh`
 - `crates/psionic-train/src/swarm_mlx_bringup.rs`
 - `crates/psionic-train/src/bin/swarm_mac_mlx_bringup.rs`
+
+The first executor-lane MLX load/forward boundary is now also explicit:
+
+- `docs/PSION_EXECUTOR_MLX_FORWARD_LOAD_PARITY.md`
+
+That packet keeps the shipped MLX entrypoint, admitted forward probe, bounded
+converted-equivalent load lane, and explicit parity gaps in one reviewable
+place before smoke-run and checkpoint work starts citing the Mac profile.
 
 ## Current Admitted 4080 Tailnet Profile
 
