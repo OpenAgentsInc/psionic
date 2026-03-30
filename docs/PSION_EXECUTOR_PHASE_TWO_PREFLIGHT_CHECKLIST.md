@@ -67,6 +67,12 @@ It does make launch discipline non-optional:
 That is the point of this issue. Launch readiness is no longer an operator note
 or a remembered ritual.
 
+The follow-on retained long-run rehearsal packet that now proves the admitted
+4080 decision-grade lane actually entered the run under this contract lives at:
+
+- `docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md`
+- `fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_phase_two_preflight_checklist_fixtures`

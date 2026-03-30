@@ -141,6 +141,12 @@ and current emitted bundle posture lives at:
 - `docs/PSION_EXECUTOR_FAILURE_BUNDLE_TAXONOMY.md`
 - `fixtures/psion/executor/psion_executor_failure_bundle_taxonomy_v1.json`
 
+The follow-on long-run rehearsal packet that now logs one clean rehearsal
+result back into this canonical review path lives at:
+
+- `docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md`
+- `fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_local_cluster_review_workflow_fixtures`

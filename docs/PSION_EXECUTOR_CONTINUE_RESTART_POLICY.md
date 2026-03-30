@@ -75,6 +75,13 @@ It does make the handling discipline explicit:
 The review surface is now explicit too. Every incident class in the packet
 requires logging in the weekly local-cluster review path.
 
+The follow-on retained long-run rehearsal packet that now uses the
+`transient_interruption -> continue_from_last_green_checkpoint` policy row as
+real closeout evidence lives at:
+
+- `docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md`
+- `fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_continue_restart_policy_fixtures`

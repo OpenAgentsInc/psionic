@@ -128,6 +128,13 @@ Instead it binds the real smoke-run checkpoint and heartbeat evidence to the
 frozen recovery drills so stale-worker timeout, replay posture, lost-work
 bounds, and restore evidence are all reviewable in one retained packet.
 
+The follow-on retained long-run rehearsal packet that now carries this
+interruption-recovery truth through export, replacement validation, and review
+logging lives at:
+
+- `docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md`
+- `fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json`
+
 ## Validation
 
 - `cargo run -q -p psionic-train --example psion_executor_4080_interruption_recovery_fixtures`

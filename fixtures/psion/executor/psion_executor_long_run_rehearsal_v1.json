@@ -1,0 +1,94 @@
+{
+  "schema_version": "psion.executor.long_run_rehearsal.v1",
+  "rehearsal_id": "psion_executor_long_run_rehearsal_v1",
+  "run_type_id": "cuda_4080_decision_grade",
+  "run_id": "tailrun-home-admitted-20260328k",
+  "preflight_ref": "fixtures/psion/executor/psion_executor_phase_two_preflight_checklist_v1.json",
+  "preflight_digest": "5c8f4c8448b396b5bc1b7def7e6216cf6e03f4e2ad61e363c0d83b68faec7068",
+  "incident_policy_ref": "fixtures/psion/executor/psion_executor_continue_restart_policy_v1.json",
+  "incident_policy_digest": "40ef44b2c92651ab7e5ae3c7c039388bf472ca05467fc679054ffe4fb8413186",
+  "interruption_recovery_ref": "fixtures/psion/executor/psion_executor_4080_interruption_recovery_v1.json",
+  "interruption_recovery_digest": "d07f14dd64ce0f66d8827a9de1c6353dd5f1d001a9c81bc74669bc12e2def2c6",
+  "export_inspection_ref": "fixtures/psion/executor/psion_executor_mac_export_inspection_v1.json",
+  "export_inspection_digest": "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+  "unified_throughput_ref": "fixtures/psion/executor/psion_executor_unified_throughput_reporting_v1.json",
+  "unified_throughput_digest": "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7",
+  "review_workflow_ref": "fixtures/psion/executor/psion_executor_local_cluster_review_workflow_v1.json",
+  "review_workflow_digest": "c11b48bb9cb4381ccba810b5c154ffad6014c3b130c539a32b43dff4298078bf",
+  "checkpoint_ref": "checkpoint://swarm/first-swarm-live-plan/policy",
+  "checkpoint_step": 12,
+  "incident_class_id": "transient_interruption",
+  "recovery_action": "continue_from_last_green_checkpoint",
+  "replacement_candidate_row_id": "psion_executor_local_cluster_ledger_row_mlx_v1",
+  "rehearsal_green": true,
+  "checklist_rows": [
+    {
+      "checklist_id": "preflight_contract_green",
+      "status": "green",
+      "detail": "The rehearsal stays inside the admitted `cuda_4080_decision_grade` pre-flight contract on run `tailrun-home-admitted-20260328k` with blocking rule `any_red_item_blocks_launch` and required export-plan evidence frozen before launch.",
+      "row_digest": "fc31690d0629ea495110bfd0123a4252754e14c61a66766c1fce7b99bd43b184"
+    },
+    {
+      "checklist_id": "interruption_survival_green",
+      "status": "green",
+      "detail": "The retained 4080 run survives interruption with checkpoint `checkpoint://swarm/first-swarm-live-plan/policy` at step `12` and bounded replay loss of 12 steps / 12 samples.",
+      "row_digest": "fcf92f120ff71b4d49f8c2ce3391f4ae388ba5e3e1a07652388a0ed877d03369"
+    },
+    {
+      "checklist_id": "recovery_policy_green",
+      "status": "green",
+      "detail": "The rehearsal uses incident class `transient_interruption` with default action `continue_from_last_green_checkpoint` under review rule `must_be_logged_in_weekly_review` while the retained recovery packet keeps stale-worker disposition `replay_required`.",
+      "row_digest": "360eed03b5398e02ab0c3ed41ccf25fed3738d53bb694b2ebb61c206e46f05bf"
+    },
+    {
+      "checklist_id": "export_candidate_green",
+      "status": "green",
+      "detail": "The retained export packet keeps transformer model `tassadar-article-transformer-trace-bound-trained-v0` export-ready with checklist rows `portable_bundle_import_plan_green, portable_bundle_roundtrip_green, cpu_aarch64_route_green, reference_linear_anchor_green, hull_cache_fast_route_green, replacement_publication_green`.",
+      "row_digest": "a0cad8c1e995241d27b9bd4f69ea2ac34d72ddd621c79b1eedc64b8919df1e0e"
+    },
+    {
+      "checklist_id": "replacement_validation_green",
+      "status": "green",
+      "detail": "Replacement validation stays green because row `psion_executor_local_cluster_ledger_row_mlx_v1` is not blocked by unified throughput review and serving floor row `serving_throughput_regression_candidate` stays `green_serving_throughput_floor`.",
+      "row_digest": "7847b32d9c0ad75528e8bf7cd3764406b86ac76f7c9e05c7857b02242de54949"
+    },
+    {
+      "checklist_id": "review_log_green",
+      "status": "green",
+      "detail": "The rehearsal result is logged against workflow `psion_executor_local_cluster_review_workflow_v1` so interruption, recovery, export, and replacement stay visible in the canonical review path.",
+      "row_digest": "397b8d36b0e00e7c3c13d7f8ad853e0e07cd4fbde43f66f441e7100524ef6caf"
+    }
+  ],
+  "review_log": {
+    "review_id": "psion_executor_long_run_rehearsal_review_2026w14_v1",
+    "workflow_id": "psion_executor_local_cluster_review_workflow_v1",
+    "review_kind": "long_run_rehearsal",
+    "reviewer_role": "review_cadence_owner",
+    "cited_run_id": "tailrun-home-admitted-20260328k",
+    "cited_row_ids": [
+      "psion_executor_local_cluster_ledger_row_4080_v1",
+      "psion_executor_local_cluster_ledger_row_mlx_v1"
+    ],
+    "cited_packet_digests": [
+      "5c8f4c8448b396b5bc1b7def7e6216cf6e03f4e2ad61e363c0d83b68faec7068",
+      "40ef44b2c92651ab7e5ae3c7c039388bf472ca05467fc679054ffe4fb8413186",
+      "d07f14dd64ce0f66d8827a9de1c6353dd5f1d001a9c81bc74669bc12e2def2c6",
+      "9d6a39d78400f4a0c6c86398b677b9880080e8351653b3f68ccadb6e4a06aa8a",
+      "ff12ece15c7917e2c430cb139d81c36c2d9e2964f9ee8197275664314fc037a7"
+    ],
+    "status": "logged_clean_rehearsal",
+    "detail": "The canonical review workflow `psion_executor_local_cluster_review_workflow_v1` now has one retained rehearsal log for run `tailrun-home-admitted-20260328k` covering pre-flight admission, transient-interruption recovery, export inspection, and replacement validation without any active replacement block ids.",
+    "review_digest": "93269d0509298070e11059238c8995bee8b7151ef8c5811ec8de5f4abc8a307a"
+  },
+  "support_refs": [
+    "docs/PSION_EXECUTOR_PROGRAM.md",
+    "docs/PSION_EXECUTOR_PHASE_TWO_PREFLIGHT_CHECKLIST.md",
+    "docs/PSION_EXECUTOR_CONTINUE_RESTART_POLICY.md",
+    "docs/PSION_EXECUTOR_4080_INTERRUPTION_RECOVERY.md",
+    "docs/PSION_EXECUTOR_MAC_EXPORT_INSPECTION.md",
+    "docs/PSION_EXECUTOR_UNIFIED_THROUGHPUT_REPORTING.md",
+    "docs/PSION_EXECUTOR_LOCAL_CLUSTER_REVIEW_WORKFLOW.md"
+  ],
+  "summary": "The admitted executor lane now has one canonical long-run rehearsal packet. It binds the 4080 transient-interruption recovery contract, the phase-two pre-flight contract, the export and replacement-validation receipts, and the canonical review workflow into one machine-readable rehearsal result before broader long-run claims are trusted.",
+  "packet_digest": "50ebd9cad8abd98704488103686b6c21aa78f5278e85b8bb6dc19ee5666238d2"
+}

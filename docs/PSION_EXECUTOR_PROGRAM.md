@@ -182,6 +182,10 @@ This doc does not claim:
   canonical throughput packet that keeps retained training throughput and
   admitted fast-route serving throughput together while freezing a replacement
   blocker for serving-throughput regression
+- `docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md` owns the first canonical
+  long-run rehearsal packet that binds pre-flight admission, transient
+  interruption recovery, export, replacement validation, and review logging
+  into one retained closeout receipt
 - `docs/PSION_PROGRAM_MAP.md` owns the generic learned `Psion` family map
 - `docs/PSION_ACCEPTANCE_MATRIX.md` owns generic compact-decoder acceptance
 - `docs/ROADMAP_TASSADAR.md` remains the repo-local executor-lane bridge

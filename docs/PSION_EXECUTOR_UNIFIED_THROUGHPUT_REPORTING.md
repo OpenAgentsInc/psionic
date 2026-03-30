@@ -105,6 +105,12 @@ replacement.
 That is the actual closeout: replacement is no longer allowed to ignore
 serving-throughput truth.
 
+The follow-on retained long-run rehearsal packet that now uses this green
+replacement gate inside one full interruption-to-review rehearsal lives at:
+
+- `docs/PSION_EXECUTOR_LONG_RUN_REHEARSAL.md`
+- `fixtures/psion/executor/psion_executor_long_run_rehearsal_v1.json`
+
 ## Follow-On Surfaces
 
 The dashboard packet that now feeds the training side of this report lives at:
