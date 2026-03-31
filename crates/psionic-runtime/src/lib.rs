@@ -9013,6 +9013,9 @@ pub struct KvCacheOwnershipAccounting {
     /// Pages reclaimed during the observed window.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reclaimed_pages: Vec<KvCachePageSpan>,
+    /// Previously reclaimed pages reused during the observed window.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reused_pages: Vec<KvCachePageSpan>,
 }
 
 impl KvCacheOwnershipAccounting {
@@ -9024,6 +9027,7 @@ impl KvCacheOwnershipAccounting {
         current: KvCacheState,
         allocated_pages: Vec<KvCachePageSpan>,
         reclaimed_pages: Vec<KvCachePageSpan>,
+        reused_pages: Vec<KvCachePageSpan>,
     ) -> Self {
         Self {
             growth: KvCacheGrowth {
@@ -9036,6 +9040,7 @@ impl KvCacheOwnershipAccounting {
             current,
             allocated_pages,
             reclaimed_pages,
+            reused_pages,
         }
     }
 }

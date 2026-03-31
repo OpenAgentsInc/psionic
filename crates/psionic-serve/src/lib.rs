@@ -30,6 +30,7 @@ mod psion_rvllm_cublas_warmup;
 mod psion_rvllm_cuda_graph_pool;
 mod psion_rvllm_fused_kernels;
 mod psion_rvllm_gpu_logits_selection;
+mod psion_rvllm_kv_eviction_reuse;
 mod psion_rvllm_memory_pool;
 mod psion_rvllm_paged_kv_manager;
 mod psion_rvllm_prefill_decode_scheduler;
@@ -83,6 +84,7 @@ pub use psion_rvllm_cublas_warmup::*;
 pub use psion_rvllm_cuda_graph_pool::*;
 pub use psion_rvllm_fused_kernels::*;
 pub use psion_rvllm_gpu_logits_selection::*;
+pub use psion_rvllm_kv_eviction_reuse::*;
 pub use psion_rvllm_memory_pool::*;
 pub use psion_rvllm_paged_kv_manager::*;
 pub use psion_rvllm_prefill_decode_scheduler::*;
@@ -3273,8 +3275,10 @@ pub struct InMemoryKvCache {
     owner: Option<KvCacheOwnerBinding>,
     pages: Vec<KvCacheLogicalPage>,
     next_page_index: usize,
+    reusable_page_indices: VecDeque<usize>,
     allocation_events: Vec<KvCachePageSpan>,
     reclaim_events: Vec<KvCachePageSpan>,
+    reuse_events: Vec<KvCachePageSpan>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -3300,6 +3304,7 @@ struct KvCacheLedgerCheckpoint {
     previous_state: KvCacheState,
     allocation_cursor: usize,
     reclaim_cursor: usize,
+    reuse_cursor: usize,
 }
 
 impl InMemoryKvCache {
@@ -3324,8 +3329,10 @@ impl InMemoryKvCache {
             owner: None,
             pages: Vec::new(),
             next_page_index: 0,
+            reusable_page_indices: VecDeque::new(),
             allocation_events: Vec::new(),
             reclaim_events: Vec::new(),
+            reuse_events: Vec::new(),
         }
     }
 
@@ -3391,6 +3398,18 @@ impl InMemoryKvCache {
             .collect()
     }
 
+    /// Returns reusable logical page indices currently retained by the cache.
+    #[must_use]
+    pub fn reusable_page_indices(&self) -> Vec<usize> {
+        self.reusable_page_indices.iter().copied().collect()
+    }
+
+    /// Returns page-reuse events already observed by the cache.
+    #[must_use]
+    pub fn page_reuse_events(&self) -> &[KvCachePageSpan] {
+        &self.reuse_events
+    }
+
     fn checkpoint(&self) -> KvCacheLedgerCheckpoint {
         self.checkpoint_with_state(self.state())
     }
@@ -3400,6 +3419,7 @@ impl InMemoryKvCache {
             previous_state,
             allocation_cursor: self.allocation_events.len(),
             reclaim_cursor: self.reclaim_events.len(),
+            reuse_cursor: self.reuse_events.len(),
         }
     }
 
@@ -3422,6 +3442,7 @@ impl InMemoryKvCache {
                 current_state,
                 self.allocation_events[checkpoint.allocation_cursor..].to_vec(),
                 self.reclaim_events[checkpoint.reclaim_cursor..].to_vec(),
+                self.reuse_events[checkpoint.reuse_cursor..].to_vec(),
             )
         })
     }
@@ -3435,43 +3456,60 @@ impl InMemoryKvCache {
         if current_tokens <= self.len() {
             return self.ownership_since_with_current_state(checkpoint, current_state);
         }
+        let (allocated_pages, reused_pages) =
+            self.predicted_page_growth_for_device_tokens(current_tokens);
         self.owner.clone().map(|owner| {
             KvCacheOwnershipAccounting::new(
                 owner,
                 checkpoint.previous_state.clone(),
                 current_state,
-                self.predicted_allocated_pages_for_device_tokens(current_tokens),
+                allocated_pages,
                 self.reclaim_events[checkpoint.reclaim_cursor..].to_vec(),
+                reused_pages,
             )
         })
     }
 
-    fn predicted_allocated_pages_for_device_tokens(
+    fn predicted_page_growth_for_device_tokens(
         &self,
         current_tokens: usize,
-    ) -> Vec<KvCachePageSpan> {
+    ) -> (Vec<KvCachePageSpan>, Vec<KvCachePageSpan>) {
         if current_tokens <= self.len() {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         }
 
         let mut pages = self.pages.clone();
         let mut next_page_index = self.next_page_index;
+        let mut reusable_page_indices = self.reusable_page_indices.clone();
         let mut logical_position = self.len();
         let mut remaining = current_tokens.saturating_sub(self.len());
         let mut allocated_pages = Vec::new();
+        let mut reused_pages = Vec::new();
 
         while remaining > 0 {
             let needs_new_page = pages
                 .last()
                 .is_none_or(|page| page.token_count >= self.page_layout().tokens_per_page);
             if needs_new_page {
+                let (page_index, reused_page) =
+                    if let Some(page_index) = reusable_page_indices.pop_front() {
+                        (page_index, true)
+                    } else {
+                        let page_index = next_page_index;
+                        next_page_index = next_page_index.saturating_add(1);
+                        (page_index, false)
+                    };
                 let page = KvCacheLogicalPage {
-                    page_index: next_page_index,
+                    page_index,
                     start_position: logical_position,
                     token_count: 0,
                 };
-                next_page_index = next_page_index.saturating_add(1);
-                allocated_pages.push(page.span(self.page_layout()));
+                let span = page.span(self.page_layout());
+                if reused_page {
+                    reused_pages.push(span);
+                } else {
+                    allocated_pages.push(span);
+                }
                 pages.push(page);
             }
 
@@ -3488,7 +3526,7 @@ impl InMemoryKvCache {
             remaining = remaining.saturating_sub(appended);
         }
 
-        allocated_pages
+        (allocated_pages, reused_pages)
     }
 
     /// Returns the current paged-KV snapshot for the cache.
@@ -3564,15 +3602,30 @@ impl InMemoryKvCache {
                 spill_policy: self.policy.spill_policy,
             });
         }
+        let (page_index, reused_page) = self.take_page_index();
         let page = KvCacheLogicalPage {
-            page_index: self.next_page_index,
+            page_index,
             start_position: self.entries.len(),
             token_count: 0,
         };
-        self.next_page_index = self.next_page_index.saturating_add(1);
-        self.allocation_events.push(page.span(self.page_layout()));
+        let span = page.span(self.page_layout());
+        if reused_page {
+            self.reuse_events.push(span);
+        } else {
+            self.allocation_events.push(span);
+        }
         self.pages.push(page);
         Ok(())
+    }
+
+    fn take_page_index(&mut self) -> (usize, bool) {
+        if let Some(page_index) = self.reusable_page_indices.pop_front() {
+            (page_index, true)
+        } else {
+            let page_index = self.next_page_index;
+            self.next_page_index = self.next_page_index.saturating_add(1);
+            (page_index, false)
+        }
     }
 
     fn tail_page_full(&self) -> bool {
@@ -3591,7 +3644,7 @@ impl InMemoryKvCache {
             });
         };
         let removed_tokens = page.token_count;
-        self.reclaim_events.push(page.span(self.page_layout()));
+        self.record_reclaimed_page(page);
         self.pages.remove(0);
         self.entries.drain(..removed_tokens);
         for (position, entry) in self.entries.iter_mut().enumerate() {
@@ -3616,7 +3669,7 @@ impl InMemoryKvCache {
             .is_some_and(|page| page.start_position >= token_count)
         {
             if let Some(page) = self.pages.pop() {
-                self.reclaim_events.push(page.span(&page_layout));
+                self.record_reclaimed_page(page);
             }
         }
         if let Some(page) = self.pages.last_mut() {
@@ -3639,6 +3692,23 @@ impl InMemoryKvCache {
                 }
             }
         }
+    }
+
+    fn record_reclaimed_page(&mut self, page: KvCacheLogicalPage) {
+        self.reclaim_events.push(page.span(self.page_layout()));
+        self.insert_reusable_page_index(page.page_index);
+    }
+
+    fn insert_reusable_page_index(&mut self, page_index: usize) {
+        if self.reusable_page_indices.contains(&page_index) {
+            return;
+        }
+        let insert_at = self
+            .reusable_page_indices
+            .iter()
+            .position(|existing| *existing > page_index)
+            .unwrap_or(self.reusable_page_indices.len());
+        self.reusable_page_indices.insert(insert_at, page_index);
     }
 
     /// Clears all cached slots.
@@ -11946,9 +12016,11 @@ mod tests {
         assert_eq!(ownership.owner.owner_id, "req-1");
         assert_eq!(ownership.current.tokens, 3);
         assert_eq!(ownership.current.pages, 2);
-        assert_eq!(ownership.allocated_pages.len(), 3);
+        assert_eq!(ownership.allocated_pages.len(), 2);
         assert_eq!(ownership.reclaimed_pages.len(), 1);
+        assert_eq!(ownership.reused_pages.len(), 1);
         assert_eq!(ownership.reclaimed_pages[0].page_index, 0);
+        assert_eq!(ownership.reused_pages[0].page_index, 0);
 
         let reclaim_checkpoint = cache.checkpoint();
         cache.truncate(1);
@@ -11958,12 +12030,14 @@ mod tests {
         assert_eq!(reclaim.current.tokens, 1);
         assert_eq!(reclaim.current.pages, 1);
         assert_eq!(reclaim.reclaimed_pages.len(), 2);
+        assert!(reclaim.reused_pages.is_empty());
         assert!(
             reclaim
                 .reclaimed_pages
                 .iter()
                 .any(|page| page.token_count == 1)
         );
+        assert_eq!(cache.reusable_page_indices(), vec![0]);
         Ok(())
     }
 
@@ -12034,6 +12108,70 @@ mod tests {
         assert_eq!(ownership.growth.tokens, 3);
         assert_eq!(ownership.allocated_pages.len(), 1);
         assert_eq!(ownership.allocated_pages[0].page_index, 1);
+        assert!(ownership.reused_pages.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn paged_kv_cache_reuses_reclaimed_page_indices_under_long_context_stress()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let policy = KvCachePolicy {
+            device_scope: KvCacheDeviceScope::SameDeviceOnly,
+            spill_policy: KvCacheSpillPolicy::EvictOldestPages,
+            page_layout: KvCachePageLayout::new(6, 2, 32),
+        };
+        let mut cache = InMemoryKvCache::with_policy(6, 2, policy);
+
+        for token in 1..=18 {
+            cache.append(TokenId(token), vec![0.0; 2], vec![1.0; 2])?;
+        }
+
+        assert_eq!(cache.state().tokens, 6);
+        assert_eq!(cache.state().pages, 3);
+        assert_eq!(cache.reusable_page_indices(), Vec::<usize>::new());
+        assert_eq!(cache.page_reuse_events().len(), 6);
+        assert_eq!(
+            cache.page_spans().iter().map(|page| page.page_index).max(),
+            Some(2)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn paged_kv_cache_predicts_reused_page_growth_from_existing_reclaim()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let policy = KvCachePolicy {
+            device_scope: KvCacheDeviceScope::SameDeviceOnly,
+            spill_policy: KvCacheSpillPolicy::EvictOldestPages,
+            page_layout: KvCachePageLayout::new(6, 2, 32),
+        };
+        let mut cache = InMemoryKvCache::with_policy(6, 2, policy);
+        cache.bind_owner(request_kv_owner(
+            &GenerationRequest::new_text(
+                "req-device-reuse",
+                sample_named_decoder_descriptor("device-reuse"),
+                None,
+                "hello",
+                GenerationOptions::greedy(1),
+            ),
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        for token in 1..=4 {
+            cache.append(TokenId(token), vec![0.0; 2], vec![1.0; 2])?;
+        }
+        cache.truncate(2);
+        assert_eq!(cache.reusable_page_indices(), vec![1]);
+        let checkpoint = cache.checkpoint();
+
+        let ownership = cache
+            .ownership_since_with_device_tokens(&checkpoint, 4)
+            .expect("device-resident growth accounting with reuse");
+        assert_eq!(ownership.previous.tokens, 2);
+        assert_eq!(ownership.current.tokens, 4);
+        assert!(ownership.allocated_pages.is_empty());
+        assert_eq!(ownership.reused_pages.len(), 1);
+        assert_eq!(ownership.reused_pages[0].page_index, 1);
         Ok(())
     }
 

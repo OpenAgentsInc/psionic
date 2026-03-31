@@ -171,6 +171,10 @@ than just run tensor math.
   `docs/PSION_RVLLM_FUSED_KERNELS.md`, making the admitted qwen35 QKV/RMSNorm
   and gpt-oss selected4 MoE kernels explicit together with their env-gated
   disable paths instead of leaving fused-kernel ownership as broad folklore.
+- The same pass now also retains one explicit KV eviction-and-reuse packet at
+  `docs/PSION_RVLLM_KV_EVICTION_REUSE.md`, making oldest-page eviction,
+  reclaimed-page reuse, predictive reuse reporting, and long-context stress
+  truth explicit instead of leaving that policy as implicit page churn.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
