@@ -73,6 +73,17 @@ Default result:
 - local run root:
   `~/scratch/psion_train_runs/<run_id>`
 
+The accelerated claim is still narrow:
+
+- control plane: the local host that launched `./TRAIN`
+- worker count: `1`
+- worker host: the admitted remote CUDA host
+- execution classification:
+  `local_control_plane_single_remote_worker`
+
+That means a successful accelerated run is a real remote single-worker CUDA
+pilot, not mixed-device Mac + CUDA training and not a broader cluster proof.
+
 ## Useful Options
 
 ### Dry run
@@ -113,6 +124,17 @@ Every run writes:
 - `operator_summary.json`
 - `train.log`
 
+`operator_summary.json` is the canonical operator-side topology and cost
+surface. It now records at least:
+
+- `control_plane_host`
+- `worker_host`
+- `worker_count`
+- `execution_location`
+- `execution_topology_classification`
+- `delivered_backend`
+- `total_cost_microusd`
+
 Every completed run also writes:
 
 - `artifacts/`
@@ -142,6 +164,22 @@ For local reference runs, `artifacts/` should contain:
 
 That is deliberate. The command should fail loudly instead of pretending that a
 different lane counted as the same thing.
+
+If staging or launch fails, `train.log` is also the canonical failure trace. It
+records the selected staging strategy and the last completed launcher step so a
+wrapper failure can be retained honestly instead of reconstructed from memory.
+
+## Staging Behavior
+
+In accelerated mode, `./TRAIN` now prefers the fastest honest staging path:
+
+- use a remote detached git worktree when the admitted remote seed clone
+  already contains the requested committed ref
+- fall back to a copied tar archive when the committed ref exists only on the
+  local machine
+
+Both paths preserve the same claim boundary. The first is faster. The second is
+the escape hatch for a committed local ref that has not been published yet.
 
 ## Claim Boundary
 

@@ -10,6 +10,7 @@ run_id=""
 output_root=""
 remote_worktree_dir=""
 remote_output_dir=""
+remote_seed_repo_dir='$HOME/code/psionic'
 remote_target_dir='$HOME/.cache/psionic-target/psion-local-first'
 remote_tmp_dir='$HOME/.cache/psionic-tmp/psion-local-first'
 git_ref=""
@@ -19,8 +20,16 @@ dry_run="0"
 cleanup_remote="0"
 local_tailnet_ip=""
 remote_tailnet_ip=""
+control_plane_host=""
+worker_host=""
+worker_tailnet_ip=""
+worker_count="0"
+execution_location=""
+execution_topology_classification=""
+remote_stage_strategy="not_applicable"
+remote_stage_reason=""
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=5)
-scp_opts=(-o BatchMode=yes -o ConnectTimeout=5)
+scp_opts=(-O -o BatchMode=yes -o ConnectTimeout=5)
 
 usage() {
   cat <<'EOF' >&2
@@ -175,6 +184,10 @@ detect_local_tailnet_ip() {
   tailscale ip -4 2>/dev/null | awk 'NF { print; exit }'
 }
 
+detect_local_hostname() {
+  hostname -s 2>/dev/null || hostname
+}
+
 detect_remote_tailnet_ip() {
   ssh "${ssh_opts[@]}" "${remote_host}" "tailscale ip -4 2>/dev/null | awk 'NF { print; exit }'"
 }
@@ -199,6 +212,33 @@ remote_accelerated_preflight() {
     return 1
   fi
   return 0
+}
+
+detect_remote_stage_strategy() {
+  remote_stage_strategy="archive_tarball"
+  remote_stage_reason="remote_seed_repo_missing_git_ref"
+  if [[ "${selected_mode}" != "accelerated_reference" ]]; then
+    remote_stage_strategy="not_applicable"
+    remote_stage_reason="local_reference_mode"
+    return 0
+  fi
+  if ssh "${ssh_opts[@]}" "${remote_host}" "
+    set -euo pipefail
+    if [[ ! -d \"${remote_seed_repo_dir}/.git\" ]]; then
+      exit 11
+    fi
+    git -C \"${remote_seed_repo_dir}\" fetch --quiet origin main >/dev/null 2>&1 || true
+    git -C \"${remote_seed_repo_dir}\" cat-file -e \"${git_ref}^{commit}\"
+  " >/dev/null 2>&1; then
+    remote_stage_strategy="remote_git_worktree"
+    remote_stage_reason="remote_seed_repo_contains_git_ref"
+    return 0
+  fi
+  if ssh "${ssh_opts[@]}" "${remote_host}" "test -d \"${remote_seed_repo_dir}/.git\"" >/dev/null 2>&1; then
+    remote_stage_reason="remote_seed_repo_missing_git_ref"
+  else
+    remote_stage_reason="remote_seed_repo_missing"
+  fi
 }
 
 selected_mode="${mode}"
@@ -228,6 +268,27 @@ if [[ "${selected_mode}" == "accelerated_reference" ]] && [[ -z "${remote_tailne
   remote_tailnet_ip="$(detect_remote_tailnet_ip || true)"
 fi
 
+control_plane_host="$(detect_local_hostname || true)"
+if [[ -z "${control_plane_host}" ]]; then
+  control_plane_host="unknown"
+fi
+
+if [[ "${selected_mode}" == "accelerated_reference" ]]; then
+  worker_host="${remote_host}"
+  worker_tailnet_ip="${remote_tailnet_ip}"
+  worker_count="1"
+  execution_location="remote"
+  execution_topology_classification="local_control_plane_single_remote_worker"
+else
+  worker_host="${control_plane_host}"
+  worker_tailnet_ip="${local_tailnet_ip}"
+  worker_count="1"
+  execution_location="local"
+  execution_topology_classification="single_local_control_plane_worker"
+fi
+
+detect_remote_stage_strategy
+
 operator_manifest_path="${output_root}/operator_manifest.json"
 summary_path="${output_root}/operator_summary.json"
 local_log_path="${output_root}/train.log"
@@ -237,7 +298,10 @@ python3 - <<'PY' \
   "${operator_manifest_path}" "${run_id}" "${selected_mode}" "${git_ref}" \
   "${remote_host}" "${output_root}" "${remote_worktree_dir}" "${remote_output_dir}" \
   "${local_tailnet_ip}" "${remote_tailnet_ip}" "${local_dirty}" "${local_status_branch}" \
-  "${remote_gpu_name}" "${remote_preflight_reason}"
+  "${remote_gpu_name}" "${remote_preflight_reason}" "${control_plane_host}" \
+  "${worker_host}" "${worker_tailnet_ip}" "${worker_count}" \
+  "${execution_location}" "${execution_topology_classification}" \
+  "${remote_stage_strategy}" "${remote_stage_reason}"
 import json
 import sys
 from datetime import datetime
@@ -257,6 +321,14 @@ from datetime import datetime
     local_status_branch,
     remote_gpu_name,
     remote_preflight_reason,
+    control_plane_host,
+    worker_host,
+    worker_tailnet_ip,
+    worker_count,
+    execution_location,
+    execution_topology_classification,
+    remote_stage_strategy,
+    remote_stage_reason,
 ) = sys.argv[1:]
 
 doc = {
@@ -268,11 +340,20 @@ doc = {
     "local_output_root": output_root,
     "local_repo_dirty": local_dirty == "1",
     "local_status_branch": local_status_branch,
+    "control_plane_host": control_plane_host or None,
+    "control_plane_tailnet_ip": local_tailnet_ip or None,
     "local_tailnet_ip": local_tailnet_ip or None,
+    "worker_host": worker_host or None,
+    "worker_tailnet_ip": worker_tailnet_ip or None,
+    "worker_count": int(worker_count),
+    "execution_location": execution_location,
+    "execution_topology_classification": execution_topology_classification,
     "remote_host": remote_host,
     "remote_tailnet_ip": remote_tailnet_ip or None,
     "remote_gpu_name": remote_gpu_name or None,
     "remote_preflight_reason": remote_preflight_reason or None,
+    "remote_stage_strategy": remote_stage_strategy,
+    "remote_stage_reason": remote_stage_reason or None,
     "remote_worktree_dir": remote_worktree_dir,
     "remote_output_dir": remote_output_dir,
     "claim_boundary": "This manifest records one local-first Psion operator run. The accelerator-backed mode targets the canonical accelerated reference pilot on the admitted Tailnet CUDA host. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
@@ -289,11 +370,16 @@ if [[ "${dry_run}" == "1" ]]; then
   echo "selected_mode=${selected_mode}"
   echo "git_ref=${git_ref}"
   echo "output_root=${output_root}"
+  echo "control_plane_host=${control_plane_host}"
+  echo "worker_host=${worker_host}"
+  echo "worker_count=${worker_count}"
+  echo "execution_location=${execution_location}"
   echo "operator_manifest=${operator_manifest_path}"
   if [[ "${selected_mode}" == "accelerated_reference" ]]; then
     echo "remote_host=${remote_host}"
     echo "remote_tailnet_ip=${remote_tailnet_ip}"
     echo "remote_gpu_name=${remote_gpu_name}"
+    echo "remote_stage_strategy=${remote_stage_strategy}"
   fi
   exit 0
 fi
@@ -325,6 +411,11 @@ def sha256_file(path):
             h.update(chunk)
     return h.hexdigest()
 
+manifest = {}
+if os.path.exists(manifest_path):
+    with open(manifest_path, "r", encoding="utf-8") as handle:
+        manifest = json.load(handle)
+
 summary = {
     "schema_version": "psionic.psion_local_first_train_summary.v1",
     "recorded_at_utc": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
@@ -336,6 +427,25 @@ summary = {
     "log_path": os.path.abspath(log_path) if log_path else None,
     "artifact_dir": os.path.abspath(artifact_dir) if artifact_dir else None,
 }
+
+for key in [
+    "run_id",
+    "git_ref",
+    "control_plane_host",
+    "control_plane_tailnet_ip",
+    "worker_host",
+    "worker_tailnet_ip",
+    "worker_count",
+    "execution_location",
+    "execution_topology_classification",
+    "remote_host",
+    "remote_tailnet_ip",
+    "remote_gpu_name",
+    "remote_stage_strategy",
+    "remote_stage_reason",
+]:
+    if key in manifest:
+        summary[key] = manifest[key]
 
 if mode == "accelerated_reference" and status == "completed":
     stage_path = os.path.join(artifact_dir, "psion_accelerated_reference_pilot_stage_receipt.json")
@@ -350,17 +460,22 @@ if mode == "accelerated_reference" and status == "completed":
         if os.path.exists(path):
             summary[f"{key}_sha256"] = sha256_file(path)
     if os.path.exists(stage_path):
-        stage = json.load(open(stage_path, "r", encoding="utf-8"))
+        with open(stage_path, "r", encoding="utf-8") as handle:
+            stage = json.load(handle)
         delivered = stage.get("delivered_execution") or {}
         summary["delivered_backend"] = delivered.get("runtime_backend")
-        summary["delivered_device_names"] = delivered.get("selected_devices")
+        summary["delivered_devices"] = delivered.get("selected_devices")
         summary["stage_receipt_digest"] = stage.get("receipt_digest")
     if os.path.exists(observability_path):
-        observability = json.load(open(observability_path, "r", encoding="utf-8"))
+        with open(observability_path, "r", encoding="utf-8") as handle:
+            observability = json.load(handle)
+        cost = observability.get("cost") or {}
         summary["observability_receipt_digest"] = observability.get("observability_digest")
-        summary["total_cost_micro_usd"] = observability.get("total_cost_micro_usd")
+        summary["cost"] = cost
+        summary["total_cost_microusd"] = cost.get("total_cost_microusd")
     if os.path.exists(checkpoint_path):
-        checkpoint = json.load(open(checkpoint_path, "r", encoding="utf-8"))
+        with open(checkpoint_path, "r", encoding="utf-8") as handle:
+            checkpoint = json.load(handle)
         summary["checkpoint_ref"] = checkpoint.get("checkpoint_ref")
         summary["checkpoint_parameter_state_digest"] = checkpoint.get("parameter_state_digest")
 elif mode == "local_reference" and status == "completed":
@@ -376,13 +491,22 @@ elif mode == "local_reference" and status == "completed":
         if os.path.exists(path):
             summary[f"{key}_sha256"] = sha256_file(path)
     if os.path.exists(stage_path):
-        stage = json.load(open(stage_path, "r", encoding="utf-8"))
+        with open(stage_path, "r", encoding="utf-8") as handle:
+            stage = json.load(handle)
+        delivered = stage.get("delivered_execution") or {}
+        summary["delivered_backend"] = delivered.get("runtime_backend")
+        summary["delivered_devices"] = delivered.get("selected_devices")
         summary["stage_receipt_digest"] = stage.get("receipt_digest")
     if os.path.exists(observability_path):
-        observability = json.load(open(observability_path, "r", encoding="utf-8"))
+        with open(observability_path, "r", encoding="utf-8") as handle:
+            observability = json.load(handle)
+        cost = observability.get("cost") or {}
         summary["observability_receipt_digest"] = observability.get("observability_digest")
+        summary["cost"] = cost
+        summary["total_cost_microusd"] = cost.get("total_cost_microusd")
     if os.path.exists(checkpoint_path):
-        checkpoint = json.load(open(checkpoint_path, "r", encoding="utf-8"))
+        with open(checkpoint_path, "r", encoding="utf-8") as handle:
+            checkpoint = json.load(handle)
         summary["checkpoint_ref"] = checkpoint.get("checkpoint_ref")
         summary["checkpoint_parameter_state_digest"] = checkpoint.get("parameter_state_digest")
 
@@ -393,6 +517,47 @@ PY
 }
 
 mkdir -p "${local_artifact_dir}"
+: > "${local_log_path}"
+
+log_note() {
+  printf '[%s] %s\n' "$(now_utc)" "$*" >>"${local_log_path}"
+}
+
+stage_remote_repo() {
+  if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
+    log_note "staging_strategy=remote_git_worktree git_ref=${git_ref} remote_seed_repo_dir=${remote_seed_repo_dir}"
+    ssh "${ssh_opts[@]}" "${remote_host}" "
+      set -euo pipefail
+      rm -rf \"${remote_output_dir}\"
+      mkdir -p \"\$(dirname \"${remote_worktree_dir}\")\" \"${remote_output_dir}\"
+      git -C \"${remote_seed_repo_dir}\" fetch --quiet origin main >/dev/null 2>&1 || true
+      if git -C \"${remote_seed_repo_dir}\" worktree list --porcelain | grep -Fqx \"worktree ${remote_worktree_dir}\"; then
+        git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${remote_worktree_dir}\"
+      else
+        rm -rf \"${remote_worktree_dir}\"
+      fi
+      git -C \"${remote_seed_repo_dir}\" worktree add --detach --force \"${remote_worktree_dir}\" \"${git_ref}\"
+    " >>"${local_log_path}" 2>&1
+    return 0
+  fi
+
+  local local_stage_archive remote_stage_archive
+  local_stage_archive="$(mktemp "${output_root}/stage-${run_id}.XXXXXX.tar")"
+  remote_stage_archive="${remote_worktree_dir}.tar"
+  log_note "staging_strategy=archive_tarball git_ref=${git_ref} local_stage_archive=${local_stage_archive}"
+  git -C "${repo_root}" archive --format=tar -o "${local_stage_archive}" "${git_ref}" \
+    >>"${local_log_path}" 2>&1
+  scp "${scp_opts[@]}" "${local_stage_archive}" "${remote_host}:${remote_stage_archive}" \
+    >>"${local_log_path}" 2>&1
+  ssh "${ssh_opts[@]}" "${remote_host}" "
+    set -euo pipefail
+    rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
+    mkdir -p \"${remote_worktree_dir}\" \"${remote_output_dir}\"
+    tar -xf \"${remote_stage_archive}\" -C \"${remote_worktree_dir}\"
+    rm -f \"${remote_stage_archive}\"
+  " >>"${local_log_path}" 2>&1
+  rm -f "${local_stage_archive}"
+}
 
 on_exit() {
   local exit_code="$1"
@@ -403,8 +568,9 @@ on_exit() {
 trap 'on_exit $?' EXIT
 
 if [[ "${selected_mode}" == "local_reference" ]]; then
+  log_note "launching local_reference control_plane_host=${control_plane_host}"
   cargo run -q -p psionic-train --example psion_reference_pilot -- "${local_artifact_dir}" \
-    >"${local_log_path}" 2>&1
+    >>"${local_log_path}" 2>&1
   write_summary "${selected_mode}" "completed" "${output_root}" "${local_log_path}" "${local_artifact_dir}"
   echo "status=completed"
   echo "mode=${selected_mode}"
@@ -417,23 +583,34 @@ if [[ "${selected_mode}" == "local_reference" ]]; then
   exit 0
 fi
 
-echo "Staging ${git_ref} to ${remote_host}:${remote_worktree_dir}"
-git -C "${repo_root}" archive "${git_ref}" | ssh "${ssh_opts[@]}" "${remote_host}" "
-  set -euo pipefail
-  rm -rf \"${remote_worktree_dir}\"
-  mkdir -p \"${remote_worktree_dir}\" \"${remote_output_dir}\"
-  tar -xf - -C \"${remote_worktree_dir}\"
-"
+log_note "launching accelerated_reference control_plane_host=${control_plane_host} worker_host=${worker_host} worker_count=${worker_count}"
+stage_remote_repo
 
 remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
-ssh "${ssh_opts[@]}" "${remote_host}" "${remote_command}" >"${local_log_path}" 2>&1
+ssh "${ssh_opts[@]}" "${remote_host}" "${remote_command}" >>"${local_log_path}" 2>&1
 
 rm -rf "${local_artifact_dir}"
 mkdir -p "${local_artifact_dir}"
-scp "${scp_opts[@]}" -r "${remote_host}:${remote_output_dir}/." "${local_artifact_dir}/" >/dev/null
+log_note "copying_retained_artifacts remote_output_dir=${remote_output_dir}"
+ssh "${ssh_opts[@]}" "${remote_host}" "
+  set -euo pipefail
+  tar -cf - -C \"${remote_output_dir}\" .
+" 2>>"${local_log_path}" | tar -xf - -C "${local_artifact_dir}" >>"${local_log_path}" 2>&1
 
 if [[ "${cleanup_remote}" == "1" ]]; then
-  ssh "${ssh_opts[@]}" "${remote_host}" "rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"" >/dev/null
+  log_note "cleanup_remote=1 remote_stage_strategy=${remote_stage_strategy}"
+  if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
+    ssh "${ssh_opts[@]}" "${remote_host}" "
+      set -euo pipefail
+      git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${remote_worktree_dir}\"
+      rm -rf \"${remote_output_dir}\"
+    " >>"${local_log_path}" 2>&1
+  else
+    ssh "${ssh_opts[@]}" "${remote_host}" "
+      set -euo pipefail
+      rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
+    " >>"${local_log_path}" 2>&1
+  fi
 fi
 
 write_summary "${selected_mode}" "completed" "${output_root}" "${local_log_path}" "${local_artifact_dir}"
