@@ -218,6 +218,7 @@ Start with:
 
 ### Binaries
 
+- `./TRAIN`
 - `cargo run -p psionic-serve --bin psionic-gpt-oss-server -- --help`
 - `cargo run -p psionic-train --bin parameter_golf_single_h100_train -- --help`
 - `cargo run -p psionic-train --bin psion_google_two_node_configured_peer_open_adapter_swarm -- --help`

@@ -30,6 +30,13 @@ separately at:
 
 - `crates/psionic-train/examples/psion_accelerated_reference_pilot.rs`
 
+The canonical local-first operator entrypoint for that accelerated lane now
+also exists at:
+
+- `TRAIN`
+- `scripts/train-psion-local-first.sh`
+- `docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md`
+
 That accelerated lane reuses the same bounded corpus, decoder, checkpoint, and
 receipt contract, but binds the training step path to CUDA instead of the CPU
 reference optimizer lane.
@@ -43,6 +50,9 @@ reference optimizer lane.
   CPU-reference trainer entrypoint for bounded receipt and checkpoint truth.
 - `crates/psionic-train/examples/psion_accelerated_reference_pilot.rs` is the
   canonical bounded CUDA-backed single-node trainer entrypoint.
+- `TRAIN` is the canonical repo-root local-first operator entrypoint for the
+  accelerated lane, with explicit bounded fallback to the CPU reference lane
+  only when requested.
 - `crates/psionic-train/examples/psion_pilot_pretraining_run_fixtures.rs`
   regenerates the canonical pilot fixtures.
 - `fixtures/psion/pilot/psion_pilot_held_out_loss_receipt_v1.json` is the

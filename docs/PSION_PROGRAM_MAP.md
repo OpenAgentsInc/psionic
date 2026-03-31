@@ -50,6 +50,11 @@ The canonical bounded accelerator-backed trainer is now the dedicated
 `psion_accelerated_reference_pilot` lane, not the CPU reference pilot or the
 plugin reference bundle paths.
 
+The canonical local-first operator entrypoint for that lane is now:
+
+- `TRAIN`
+- `docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md`
+
 The generic learned family also has one canonical serve packet on the current
 artifact-backed runtime. That packet is a family-integrity proof, not a second
 serve stack and not a claim that the generic family has already closed the full
@@ -135,6 +140,10 @@ Every later `Psion` artifact must preserve the following:
   GPU training claims
 - future GPU audits must state the trainer path and delivered execution backend
   explicitly
+
+The `TRAIN` entrypoint preserves that rule by defaulting to the accelerated
+reference lane and refusing explicitly when the admitted CUDA host is
+unavailable, busy, or missing required tooling.
 
 No part of this map authorizes widening the learned lane into hidden executor
 claims or using decentralized participation as a shortcut around evaluation,
