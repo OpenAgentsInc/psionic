@@ -167,6 +167,10 @@ than just run tensor math.
   real for the admitted decode lane and binding before/after allocation count,
   steady-state memory, and long-run leak posture into one explicit runtime
   packet instead of leaving allocator reuse as an unimplemented contract.
+- The same pass now also retains one explicit fused-kernel shortlist packet at
+  `docs/PSION_RVLLM_FUSED_KERNELS.md`, making the admitted qwen35 QKV/RMSNorm
+  and gpt-oss selected4 MoE kernels explicit together with their env-gated
+  disable paths instead of leaving fused-kernel ownership as broad folklore.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
