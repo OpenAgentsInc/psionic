@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{CudaGraphReplayMetrics, CudaGraphReplayMode, Qwen35CudaDecodeOutputMetrics, Qwen35CudaDecodeOutputMode};
+use crate::{
+    CudaGraphReplayMetrics, CudaGraphReplayMode, Qwen35CudaDecodeOutputMetrics,
+    Qwen35CudaDecodeOutputMode,
+};
 
 pub const PSION_RVLLM_CUDA_GRAPH_POOL_SCHEMA_VERSION: &str = "psion.rvllm_cuda_graph_pool.v1";
 pub const PSION_RVLLM_CUDA_GRAPH_POOL_FIXTURE_PATH: &str =
     "fixtures/psion/serve/psion_rvllm_cuda_graph_pool_v1.json";
-pub const PSION_RVLLM_CUDA_GRAPH_POOL_DOC_PATH: &str =
-    "docs/PSION_RVLLM_CUDA_GRAPH_POOL.md";
+pub const PSION_RVLLM_CUDA_GRAPH_POOL_DOC_PATH: &str = "docs/PSION_RVLLM_CUDA_GRAPH_POOL.md";
 
 const PACKET_ID: &str = "psion_rvllm_cuda_graph_pool_v1";
 
@@ -80,6 +82,7 @@ pub fn builtin_psion_rvllm_cuda_graph_pool_packet() -> PsionRvllmCudaGraphPoolPa
                     CudaGraphReplayMode::RawLogits,
                 ],
             }),
+            attention_backend: None,
         },
         gpt_oss_cuda_graph_metrics: CudaGraphReplayMetrics {
             step_count: 3,

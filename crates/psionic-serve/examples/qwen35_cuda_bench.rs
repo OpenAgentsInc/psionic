@@ -152,6 +152,8 @@ struct BenchRunReport {
     qwen35_graph_misses: usize,
     qwen35_graph_captures: usize,
     qwen35_graph_shape_drifts: usize,
+    qwen35_attention_layer_invocations: usize,
+    qwen35_attention_backends: Vec<psionic_serve::Qwen35CudaAttentionBackendExecution>,
     qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport,
     termination: BenchTerminationReport,
     structured_output_mode: String,
@@ -186,6 +188,8 @@ struct BenchQwen35OutputMetricsReport {
     graph_misses: usize,
     graph_captures: usize,
     graph_shape_drifts: usize,
+    attention_layer_invocations: usize,
+    attention_backends: Vec<psionic_serve::Qwen35CudaAttentionBackendExecution>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -875,6 +879,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_misses: output_metrics.graph_misses,
             qwen35_graph_captures: output_metrics.graph_captures,
             qwen35_graph_shape_drifts: output_metrics.graph_shape_drifts,
+            qwen35_attention_layer_invocations: output_metrics.attention_layer_invocations,
+            qwen35_attention_backends: output_metrics.attention_backends.clone(),
             qwen35_host_fallback_evidence: fallback_evidence.clone(),
             termination: termination.clone(),
             structured_output_mode: structured_output.mode.clone(),
@@ -1017,6 +1023,8 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_misses: 0,
             qwen35_graph_captures: 0,
             qwen35_graph_shape_drifts: 0,
+            qwen35_attention_layer_invocations: 0,
+            qwen35_attention_backends: Vec::new(),
             qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport::default(),
             termination: termination.clone(),
             structured_output_mode: String::from("none"),
@@ -1139,6 +1147,8 @@ fn qwen35_output_metrics_report(
             graph_misses: 0,
             graph_captures: 0,
             graph_shape_drifts: 0,
+            attention_layer_invocations: 0,
+            attention_backends: Vec::new(),
         };
     };
     let output_modes = metrics
@@ -1175,12 +1185,41 @@ fn qwen35_output_metrics_report(
             .graph_replay
             .as_ref()
             .map_or(0, |graph| graph.shape_drift_count),
+        attention_layer_invocations: metrics
+            .attention_backend
+            .as_ref()
+            .map_or(0, |backend| backend.layer_invocation_count),
+        attention_backends: metrics
+            .attention_backend
+            .as_ref()
+            .map_or_else(Vec::new, |backend| backend.executions.clone()),
     }
 }
 
 fn format_qwen35_output_metrics(report: &BenchQwen35OutputMetricsReport) -> String {
+    let attention_backends = if report.attention_backends.is_empty() {
+        String::from("none")
+    } else {
+        report
+            .attention_backends
+            .iter()
+            .map(|backend| {
+                let split = backend
+                    .split_count
+                    .map(|count| format!("split{count}"))
+                    .unwrap_or_else(|| String::from("nosplit"));
+                let fallback = backend
+                    .fallback_reason
+                    .as_deref()
+                    .map(|reason| format!(":{reason}"))
+                    .unwrap_or_default();
+                format!("{}@{}{}", backend.executed_backend, split, fallback)
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    };
     format!(
-        "qwen35_output_modes=[{}] qwen35_readback_bytes={} qwen35_raw_logits={} qwen35_graph_hits={} qwen35_graph_misses={} qwen35_graph_captures={} qwen35_graph_shape_drifts={}",
+        "qwen35_output_modes=[{}] qwen35_readback_bytes={} qwen35_raw_logits={} qwen35_graph_hits={} qwen35_graph_misses={} qwen35_graph_captures={} qwen35_graph_shape_drifts={} qwen35_attention_layer_invocations={} qwen35_attention_backends=[{}]",
         report.output_modes.join(","),
         report.readback_bytes,
         report.raw_logits,
@@ -1188,6 +1227,8 @@ fn format_qwen35_output_metrics(report: &BenchQwen35OutputMetricsReport) -> Stri
         report.graph_misses,
         report.graph_captures,
         report.graph_shape_drifts,
+        report.attention_layer_invocations,
+        attention_backends,
     )
 }
 
@@ -1549,6 +1590,24 @@ fn validate_qwen35_fast_path_metrics(
         return Err(format!(
             "fallback-free cuda benchmark lane refused steady-state graph miss count={}",
             output_metrics.graph_misses
+        ));
+    }
+    if output_metrics.attention_layer_invocations == 0
+        || output_metrics.attention_backends.is_empty()
+    {
+        return Err(String::from(
+            "fallback-free cuda benchmark lane requires explicit attention-backend evidence",
+        ));
+    }
+    if let Some(backend) = output_metrics.attention_backends.iter().find(|backend| {
+        backend.executed_backend != psionic_serve::PSION_RVLLM_FA3_DECODE_ATTENTION_BACKEND_NAME
+            || backend.fallback_reason.is_some()
+    }) {
+        return Err(format!(
+            "fallback-free cuda benchmark lane requires `{}` with no fallback, actual backend={} fallback_reason={}",
+            psionic_serve::PSION_RVLLM_FA3_DECODE_ATTENTION_BACKEND_NAME,
+            backend.executed_backend,
+            backend.fallback_reason.as_deref().unwrap_or("none"),
         ));
     }
     Ok(())

@@ -24,6 +24,10 @@ constexpr int kQ81BlockBytes = 36;
 constexpr int kQ4KBlockBytes = 144;
 constexpr int kQ6KBlockBytes = 210;
 constexpr int kAttentionMaxPositions = 1024;
+constexpr int kAttentionFa3MaxSplits = 8;
+constexpr int kAttentionFa3MaxHeadsPerGroup = 8;
+constexpr int kAttentionFa3MaxHeadDim = 256;
+constexpr int kAttentionFa3MaxDimsPerLane = kAttentionFa3MaxHeadDim / kWarpSize;
 constexpr int kMoeMaxExperts = 128;
 constexpr int kMoeMaxSelected = 32;
 constexpr int kLogitsMaxSelected = 128;
@@ -4038,6 +4042,280 @@ __global__ void attention_decode_rope_cache_f16_kv_graph_kernel(
         }
         sum += current_value_head[threadIdx.x] * weights[window_tokens];
         output[head_index * head_dim + threadIdx.x] = sum;
+    }
+}
+
+__device__ __forceinline__ int attention_fa3_active_splits(int context_tokens) {
+    if (context_tokens <= 512) {
+        return 1;
+    }
+    if (context_tokens <= 2048) {
+        return 2;
+    }
+    if (context_tokens <= 8192) {
+        return 4;
+    }
+    return kAttentionFa3MaxSplits;
+}
+
+__global__ void attention_decode_rope_cache_f16_kv_graph_fa3_split_kernel(
+    const float *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    __half *cache_keys,
+    __half *cache_values,
+    int cache_width,
+    int layer_offset,
+    const int *decode_params,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const float *attention_sinks,
+    float *partial_output,
+    float *partial_max,
+    float *partial_sum
+) {
+    const int kv_head = blockIdx.x;
+    const int split_idx = blockIdx.y;
+    const int tid = static_cast<int>(threadIdx.x);
+    const int warp_id = tid / kWarpSize;
+    const int lane_id = tid % kWarpSize;
+    const int past_tokens = decode_params[0];
+    const int position = decode_params[1];
+
+    if (kv_head >= kv_head_count || head_count <= 0 || kv_head_count <= 0 || head_dim <= 0 ||
+        head_dim > kAttentionFa3MaxHeadDim || head_count % kv_head_count != 0) {
+        return;
+    }
+
+    const int heads_per_group = head_count / kv_head_count;
+    if (heads_per_group <= 0 || heads_per_group > kAttentionFa3MaxHeadsPerGroup) {
+        return;
+    }
+
+    int window_tokens = past_tokens;
+    if (sliding_window > 0 && window_tokens > sliding_window) {
+        window_tokens = sliding_window;
+    }
+    const int context_tokens = window_tokens + 1;
+    const int active_splits = attention_fa3_active_splits(context_tokens);
+
+    const int group_head = kv_head * heads_per_group + warp_id;
+    const bool active_warp = warp_id < heads_per_group && group_head < head_count;
+    const int workspace_index = active_warp ? (split_idx * head_count) + group_head : 0;
+    const int output_base = workspace_index * head_dim;
+    const int dims_per_lane = (head_dim + kWarpSize - 1) / kWarpSize;
+    float output_acc[kAttentionFa3MaxDimsPerLane];
+    #pragma unroll
+    for (int index = 0; index < kAttentionFa3MaxDimsPerLane; ++index) {
+        output_acc[index] = 0.0f;
+    }
+
+    if (split_idx >= active_splits) {
+        if (active_warp && lane_id == 0) {
+            partial_max[workspace_index] = -FLT_MAX;
+            partial_sum[workspace_index] = 0.0f;
+        }
+        if (active_warp) {
+            for (int lane_offset = 0; lane_offset < dims_per_lane; ++lane_offset) {
+                const int dim = lane_id + lane_offset * kWarpSize;
+                if (dim < head_dim) {
+                    partial_output[output_base + dim] = 0.0f;
+                }
+            }
+        }
+        return;
+    }
+
+    extern __shared__ float fa3_shared[];
+    float *query_rotated = fa3_shared;
+    float *current_key_rotated = query_rotated + heads_per_group * head_dim;
+
+    const float *query_head = qkv + query_offset + group_head * head_dim;
+    const float *current_key_head = qkv + key_offset + kv_head * head_dim;
+    const float *current_value_head = qkv + value_offset + kv_head * head_dim;
+    const int cache_token_offset = past_tokens * cache_width + layer_offset + kv_head * head_dim;
+
+    if (active_warp) {
+        for (int dim = lane_id; dim < head_dim; dim += kWarpSize) {
+            query_rotated[warp_id * head_dim + dim] = rope_neox_component(
+                query_head,
+                dim,
+                head_dim,
+                rotary_dim,
+                position,
+                freq_scale,
+                ext_factor,
+                corr_low,
+                corr_high,
+                theta_scale
+            );
+        }
+    }
+    if (warp_id == 0) {
+        for (int dim = lane_id; dim < head_dim; dim += kWarpSize) {
+            const float rotated_key = rope_neox_component(
+                current_key_head,
+                dim,
+                head_dim,
+                rotary_dim,
+                position,
+                freq_scale,
+                ext_factor,
+                corr_low,
+                corr_high,
+                theta_scale
+            );
+            current_key_rotated[dim] = rotated_key;
+            if (split_idx == 0) {
+                cache_keys[cache_token_offset + dim] = __float2half_rn(rotated_key);
+                cache_values[cache_token_offset + dim] = __float2half_rn(current_value_head[dim]);
+            }
+        }
+    }
+    __syncthreads();
+
+    if (!active_warp) {
+        return;
+    }
+
+    const float *query_rotated_head = query_rotated + warp_id * head_dim;
+    const float scale = rsqrtf(static_cast<float>(head_dim));
+    const int start = past_tokens - window_tokens;
+    const int tokens_per_split = (window_tokens + active_splits - 1) / active_splits;
+    const int split_start = start + split_idx * tokens_per_split;
+    const int split_end = min(start + window_tokens, split_start + tokens_per_split);
+    float row_max = -FLT_MAX;
+    float row_sum = 0.0f;
+
+    for (int token = split_start; token < split_end; ++token) {
+        const __half *key_head = cache_keys + token * cache_width + layer_offset + kv_head * head_dim;
+        float dot = 0.0f;
+        for (int dim = lane_id; dim < head_dim; dim += kWarpSize) {
+            dot += query_rotated_head[dim] * __half2float(key_head[dim]);
+        }
+        dot = warp_reduce_sum(dot) * scale;
+        dot = __shfl_sync(0xffffffffu, dot, 0, kWarpSize);
+        const float next_row_max = fmaxf(row_max, dot);
+        const float alpha = row_max == -FLT_MAX ? 0.0f : expf(row_max - next_row_max);
+        const float beta = expf(dot - next_row_max);
+        #pragma unroll
+        for (int lane_offset = 0; lane_offset < kAttentionFa3MaxDimsPerLane; ++lane_offset) {
+            const int dim = lane_id + lane_offset * kWarpSize;
+            if (dim < head_dim) {
+                const __half *value_head =
+                    cache_values + token * cache_width + layer_offset + kv_head * head_dim;
+                output_acc[lane_offset] =
+                    output_acc[lane_offset] * alpha + beta * __half2float(value_head[dim]);
+            }
+        }
+        row_sum = row_sum * alpha + beta;
+        row_max = next_row_max;
+    }
+
+    if (split_idx == 0) {
+        float dot = 0.0f;
+        for (int dim = lane_id; dim < head_dim; dim += kWarpSize) {
+            dot += query_rotated_head[dim] * current_key_rotated[dim];
+        }
+        dot = warp_reduce_sum(dot) * scale;
+        dot = __shfl_sync(0xffffffffu, dot, 0, kWarpSize);
+        float next_row_max = fmaxf(row_max, dot);
+        float alpha = row_max == -FLT_MAX ? 0.0f : expf(row_max - next_row_max);
+        float beta = expf(dot - next_row_max);
+        #pragma unroll
+        for (int lane_offset = 0; lane_offset < kAttentionFa3MaxDimsPerLane; ++lane_offset) {
+            const int dim = lane_id + lane_offset * kWarpSize;
+            if (dim < head_dim) {
+                output_acc[lane_offset] =
+                    output_acc[lane_offset] * alpha + beta * current_value_head[dim];
+            }
+        }
+        row_sum = row_sum * alpha + beta;
+        row_max = next_row_max;
+        if (attention_sinks != nullptr) {
+            const float sink_value = attention_sinks[group_head];
+            next_row_max = fmaxf(row_max, sink_value);
+            alpha = row_max == -FLT_MAX ? 0.0f : expf(row_max - next_row_max);
+            beta = expf(sink_value - next_row_max);
+            #pragma unroll
+            for (int lane_offset = 0; lane_offset < kAttentionFa3MaxDimsPerLane; ++lane_offset) {
+                const int dim = lane_id + lane_offset * kWarpSize;
+                if (dim < head_dim) {
+                    output_acc[lane_offset] *= alpha;
+                }
+            }
+            row_sum = row_sum * alpha + beta;
+            row_max = next_row_max;
+        }
+    }
+
+    if (lane_id == 0) {
+        partial_max[workspace_index] = row_max;
+        partial_sum[workspace_index] = row_sum;
+    }
+    #pragma unroll
+    for (int lane_offset = 0; lane_offset < kAttentionFa3MaxDimsPerLane; ++lane_offset) {
+        const int dim = lane_id + lane_offset * kWarpSize;
+        if (dim < head_dim) {
+            partial_output[output_base + dim] = output_acc[lane_offset];
+        }
+    }
+}
+
+__global__ void attention_decode_rope_cache_f16_kv_graph_fa3_combine_kernel(
+    const float *partial_output,
+    const float *partial_max,
+    const float *partial_sum,
+    int head_count,
+    int head_dim,
+    float *output
+) {
+    const int head_index = blockIdx.x;
+    if (head_index >= head_count) {
+        return;
+    }
+
+    __shared__ float max_value;
+    __shared__ float denom;
+
+    if (threadIdx.x == 0) {
+        float local_max = -FLT_MAX;
+        for (int split_idx = 0; split_idx < kAttentionFa3MaxSplits; ++split_idx) {
+            local_max = fmaxf(local_max, partial_max[split_idx * head_count + head_index]);
+        }
+        float local_denom = 0.0f;
+        for (int split_idx = 0; split_idx < kAttentionFa3MaxSplits; ++split_idx) {
+            const int workspace_index = split_idx * head_count + head_index;
+            const float split_sum = partial_sum[workspace_index];
+            if (split_sum > 0.0f) {
+                local_denom += expf(partial_max[workspace_index] - local_max) * split_sum;
+            }
+        }
+        max_value = local_max;
+        denom = local_denom;
+    }
+    __syncthreads();
+
+    for (int dim = static_cast<int>(threadIdx.x); dim < head_dim; dim += blockDim.x) {
+        float sum = 0.0f;
+        for (int split_idx = 0; split_idx < kAttentionFa3MaxSplits; ++split_idx) {
+            const int workspace_index = split_idx * head_count + head_index;
+            const float split_sum = partial_sum[workspace_index];
+            if (split_sum > 0.0f) {
+                sum += expf(partial_max[workspace_index] - max_value) *
+                    partial_output[(workspace_index * head_dim) + dim];
+            }
+        }
+        output[head_index * head_dim + dim] = denom > 0.0f ? sum / denom : 0.0f;
     }
 }
 
@@ -8440,6 +8718,95 @@ extern "C" int psionic_cuda_attention_decode_rope_cache_f16_kv_graph(
         corr_high,
         theta_scale,
         static_cast<const float *>(attention_sinks),
+        static_cast<float *>(output)
+    );
+    return static_cast<int>(cudaGetLastError());
+}
+
+extern "C" int psionic_cuda_attention_decode_rope_cache_f16_kv_graph_fa3(
+    const void *qkv,
+    int query_offset,
+    int key_offset,
+    int value_offset,
+    void *cache_keys,
+    void *cache_values,
+    int cache_width,
+    int layer_offset,
+    const void *decode_params,
+    int sliding_window,
+    int head_count,
+    int kv_head_count,
+    int head_dim,
+    int rotary_dim,
+    float freq_scale,
+    float ext_factor,
+    float corr_low,
+    float corr_high,
+    float theta_scale,
+    const void *attention_sinks,
+    void *partial_output,
+    void *partial_max,
+    void *partial_sum,
+    void *output,
+    void *stream
+) {
+    if (head_count <= 0 || kv_head_count <= 0 || head_dim <= 0 || head_dim > kAttentionFa3MaxHeadDim ||
+        head_count % kv_head_count != 0 ||
+        head_count / kv_head_count > kAttentionFa3MaxHeadsPerGroup) {
+        return 1;
+    }
+    dim3 split_grid(
+        static_cast<unsigned int>(kv_head_count),
+        static_cast<unsigned int>(kAttentionFa3MaxSplits),
+        1u
+    );
+    const size_t shared_bytes = static_cast<size_t>(head_dim) *
+        static_cast<size_t>((head_count / kv_head_count) + 1) * sizeof(float);
+    attention_decode_rope_cache_f16_kv_graph_fa3_split_kernel<<<
+        split_grid,
+        kAttentionBlockSize,
+        shared_bytes,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(qkv),
+        query_offset,
+        key_offset,
+        value_offset,
+        static_cast<__half *>(cache_keys),
+        static_cast<__half *>(cache_values),
+        cache_width,
+        layer_offset,
+        static_cast<const int *>(decode_params),
+        sliding_window,
+        head_count,
+        kv_head_count,
+        head_dim,
+        rotary_dim,
+        freq_scale,
+        ext_factor,
+        corr_low,
+        corr_high,
+        theta_scale,
+        static_cast<const float *>(attention_sinks),
+        static_cast<float *>(partial_output),
+        static_cast<float *>(partial_max),
+        static_cast<float *>(partial_sum)
+    );
+    const cudaError_t split_status = cudaGetLastError();
+    if (split_status != cudaSuccess) {
+        return static_cast<int>(split_status);
+    }
+    attention_decode_rope_cache_f16_kv_graph_fa3_combine_kernel<<<
+        head_count,
+        kAttentionBlockSize,
+        0,
+        static_cast<cudaStream_t>(stream)
+    >>>(
+        static_cast<const float *>(partial_output),
+        static_cast<const float *>(partial_max),
+        static_cast<const float *>(partial_sum),
+        head_count,
+        head_dim,
         static_cast<float *>(output)
     );
     return static_cast<int>(cudaGetLastError());

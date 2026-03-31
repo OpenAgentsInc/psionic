@@ -26,9 +26,12 @@ use crate::{
     GenerationStreamEvent, GenerationStreamStatus, GenerationStreamTerminal,
     GenerationStreamingPolicy, GenerationTerminationDetail, LoadedModelView,
     LoadedModelsObservation, LocalRuntimeDiagnostic, ManagedTextGenerationRuntime,
+    PsionRvllmCudaDeviceSurface, PsionRvllmFa3DecodeAttentionBackendKind,
+    PsionRvllmFa3DecodeAttentionShape, Qwen35CudaAttentionBackendMetrics,
     Qwen35CudaDecodeOutputMetrics, Qwen35CudaDecodeOutputMode, ReferenceTextGenerationError,
     StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor,
     current_time_millis, default_generation_streaming_policy,
+    select_psion_rvllm_fa3_decode_attention_backend,
 };
 
 pub struct CudaGgufQwen35TextGenerationService {
@@ -557,6 +560,7 @@ impl CudaGgufQwen35TextGenerationService {
                                         },
                                         sparse_readback_bytes,
                                         false,
+                                        None,
                                     )),
                                 );
                                 match sampler.select_next_token_from_exact_candidates(
@@ -668,6 +672,7 @@ impl CudaGgufQwen35TextGenerationService {
                                         },
                                         sparse_readback_bytes,
                                         false,
+                                        None,
                                     )),
                                 );
                                 match sampler.select_next_token_from_exact_candidates(
@@ -789,6 +794,7 @@ impl CudaGgufQwen35TextGenerationService {
                                     },
                                     sparse_readback_bytes,
                                     false,
+                                    None,
                                 )),
                             );
                             match sampler.select_next_token_from_exact_candidates(
@@ -896,6 +902,7 @@ impl CudaGgufQwen35TextGenerationService {
                                     },
                                     sparse_readback_bytes,
                                     false,
+                                    None,
                                 )),
                             );
                             match sampler.select_next_token_from_exact_candidates(
@@ -1403,6 +1410,8 @@ fn qwen35_fused_qkv_rms_norm_enabled() -> bool {
     std::env::var_os("PSIONIC_QWEN35_DISABLE_FUSED_QKV_RMS_NORM").is_none()
 }
 
+const QWEN35_CUDA_FA3_MAX_SPLITS: usize = crate::PSION_RVLLM_FA3_DECODE_ATTENTION_MAX_SPLITS;
+
 #[allow(clippy::too_many_arguments)]
 fn encode_qwen35_full_attention_qkv_post_matvec(
     submission: &mut CudaSubmission,
@@ -1603,10 +1612,24 @@ fn qwen35_sampling_penalty_counts(
     counts
 }
 
+fn qwen35_attention_device_surface(backend: &CudaBackend) -> PsionRvllmCudaDeviceSurface {
+    let (architecture, compute_capability) = backend
+        .selected_device()
+        .and_then(|descriptor| descriptor.nvidia_metadata.as_ref())
+        .map_or((None, None), |metadata| {
+            (
+                metadata.topology.architecture.clone(),
+                metadata.topology.compute_capability.clone(),
+            )
+        });
+    PsionRvllmCudaDeviceSurface::new(architecture, compute_capability)
+}
+
 fn qwen35_decode_output_metrics(
     output_mode: Qwen35CudaDecodeOutputMode,
     readback_bytes: u64,
     raw_logits_materialized: bool,
+    attention_backend: Option<Qwen35CudaAttentionBackendMetrics>,
 ) -> Qwen35CudaDecodeOutputMetrics {
     Qwen35CudaDecodeOutputMetrics {
         step_count: 1,
@@ -1614,6 +1637,7 @@ fn qwen35_decode_output_metrics(
         readback_bytes,
         raw_logits_materialized,
         graph_replay: None,
+        attention_backend,
     }
 }
 
@@ -2062,6 +2086,7 @@ impl CudaQwen35Model {
         Qwen35CudaStepPlan::new(
             backend,
             self.descriptor.config.hidden_size,
+            self.descriptor.config.block.attention.head_count,
             self.max_projection_input_columns(),
             self.max_projection_output_rows(),
             self.descriptor.config.vocab_size,
@@ -2082,6 +2107,56 @@ impl CudaQwen35Model {
             .map(Qwen35Layer::max_matvec_output_rows)
             .max()
             .unwrap_or(self.descriptor.config.hidden_size)
+    }
+
+    fn full_attention_backend_selection(
+        &self,
+        backend: &CudaBackend,
+        full_attention: &Qwen35FullAttentionLayer,
+        state: &Qwen35FullAttentionState,
+        use_graph_attention: bool,
+    ) -> crate::PsionRvllmFa3DecodeAttentionSelection {
+        let head_dim = self.descriptor.config.block.attention.head_dim;
+        let kv_head_count = full_attention.kv_width / head_dim.max(1);
+        select_psion_rvllm_fa3_decode_attention_backend(
+            &qwen35_attention_device_surface(backend),
+            PsionRvllmFa3DecodeAttentionShape {
+                use_graph_attention,
+                head_count: self.descriptor.config.block.attention.head_count,
+                kv_head_count,
+                head_dim,
+                sliding_window: self.family_metadata.sliding_window.unwrap_or(0),
+                past_tokens: state.len,
+            },
+        )
+    }
+
+    fn attention_backend_metrics(
+        &self,
+        backend: &CudaBackend,
+        state: &Qwen35State,
+        use_graph_attention: bool,
+    ) -> Option<Qwen35CudaAttentionBackendMetrics> {
+        let mut metrics = Qwen35CudaAttentionBackendMetrics::default();
+        for (layer, layer_state) in self.layers.iter().zip(state.layers.iter()) {
+            let (
+                Qwen35LayerKind::FullAttention(full_attention),
+                Qwen35LayerState::FullAttention(full_attention_state),
+            ) = (&layer.kind, layer_state)
+            else {
+                continue;
+            };
+            metrics.push(
+                self.full_attention_backend_selection(
+                    backend,
+                    full_attention,
+                    full_attention_state,
+                    use_graph_attention,
+                )
+                .execution(),
+            );
+        }
+        (!metrics.is_zero()).then_some(metrics)
     }
 
     fn encode_token_embedding_lookup(
@@ -2160,6 +2235,7 @@ impl CudaQwen35Model {
             );
         }
         let sampling_policy = request_options.sampling_policy();
+        let attention_backend_metrics = self.attention_backend_metrics(backend, state, false);
         let mut bytes_moved = 0u64;
         let mut kernel_count = 0usize;
         let position = state.position;
@@ -2258,6 +2334,7 @@ impl CudaQwen35Model {
                         Qwen35CudaDecodeOutputMode::RawLogits,
                         readback_bytes,
                         true,
+                        attention_backend_metrics.clone(),
                     )),
                 )
             }
@@ -2286,6 +2363,7 @@ impl CudaQwen35Model {
                         Qwen35CudaDecodeOutputMode::ArgmaxOnly,
                         readback_bytes,
                         false,
+                        attention_backend_metrics.clone(),
                     )),
                 )
             }
@@ -2339,6 +2417,7 @@ impl CudaQwen35Model {
                         Qwen35CudaDecodeOutputMode::TopKCandidates { top_k },
                         readback_bytes,
                         false,
+                        attention_backend_metrics.clone(),
                     )),
                 )
             }
@@ -2370,6 +2449,9 @@ impl CudaQwen35Model {
         let mut kernel_count = 0usize;
         let position = state.position;
         let sampling_policy = request_options.sampling_policy();
+        let graph_attention_backend_metrics = self.attention_backend_metrics(backend, state, true);
+        let legacy_attention_backend_metrics =
+            self.attention_backend_metrics(backend, state, false);
         if self.token_embedding_f16.is_none() {
             let hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
             plan.current_hidden_buffer
@@ -2904,6 +2986,7 @@ impl CudaQwen35Model {
                     Qwen35CudaDecodeOutputMode::RawLogits,
                     logits_bytes,
                     true,
+                    graph_attention_backend_metrics.clone(),
                 )),
             };
             attach_qwen35_graph_replay_metrics(
@@ -3311,6 +3394,7 @@ impl CudaQwen35Model {
                         Qwen35CudaDecodeOutputMode::TopKCandidates { top_k },
                         top_k_bytes,
                         false,
+                        graph_attention_backend_metrics.clone(),
                     )),
                 };
                 attach_qwen35_graph_replay_metrics(
@@ -3689,6 +3773,7 @@ impl CudaQwen35Model {
                         std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX)
                     },
                     false,
+                    graph_attention_backend_metrics.clone(),
                 )),
             };
             attach_qwen35_graph_replay_metrics(
@@ -3812,6 +3897,7 @@ impl CudaQwen35Model {
                                 Qwen35CudaDecodeOutputMode::RawLogits,
                                 readback_bytes,
                                 true,
+                                legacy_attention_backend_metrics.clone(),
                             )),
                         )
                     }
@@ -3840,6 +3926,7 @@ impl CudaQwen35Model {
                                 Qwen35CudaDecodeOutputMode::ArgmaxOnly,
                                 readback_bytes,
                                 false,
+                                legacy_attention_backend_metrics.clone(),
                             )),
                         )
                     }
@@ -3893,6 +3980,7 @@ impl CudaQwen35Model {
                                 Qwen35CudaDecodeOutputMode::TopKCandidates { top_k },
                                 readback_bytes,
                                 false,
+                                legacy_attention_backend_metrics.clone(),
                             )),
                         )
                     }
@@ -4282,6 +4370,7 @@ impl CudaQwen35Model {
                     .try_into()
                     .unwrap_or(u64::MAX),
                 true,
+                legacy_attention_backend_metrics.clone(),
             )),
             CudaStepOutputMode::ArgmaxOnly => Some(qwen35_decode_output_metrics(
                 Qwen35CudaDecodeOutputMode::ArgmaxOnly,
@@ -4291,6 +4380,7 @@ impl CudaQwen35Model {
                     std::mem::size_of::<i32>().try_into().unwrap_or(u64::MAX)
                 },
                 false,
+                legacy_attention_backend_metrics.clone(),
             )),
             CudaStepOutputMode::TopKCandidates(top_k) => Some(qwen35_decode_output_metrics(
                 Qwen35CudaDecodeOutputMode::TopKCandidates { top_k },
@@ -4306,6 +4396,7 @@ impl CudaQwen35Model {
                     .try_into()
                     .unwrap_or(u64::MAX),
                 false,
+                legacy_attention_backend_metrics.clone(),
             )),
         };
         Ok(Qwen35ForwardStep {
@@ -4818,29 +4909,67 @@ impl Qwen35Layer {
                 full_attention.kv_width,
             )?;
         }
+        let attention_backend_selection = model.full_attention_backend_selection(
+            backend,
+            full_attention,
+            state,
+            use_graph_attention,
+        );
         if use_graph_attention {
-            submission.attention_decode_rope_cache_f16_kv_graph(
-                &plan.qkv_norm_buffer,
-                0,
-                query_width,
-                query_width.saturating_add(full_attention.kv_width),
-                &state.key_cache,
-                &state.value_cache,
-                state.width,
-                0,
-                &plan.decode_params_buffer,
-                model.family_metadata.sliding_window.unwrap_or(0),
-                head_count,
-                kv_head_count,
-                head_dim,
-                rotary_dim,
-                freq_scale,
-                ext_factor,
-                corr_dims,
-                theta_scale,
-                None,
-                &plan.gated_delta_buffer,
-            )?;
+            match attention_backend_selection.executed_backend {
+                PsionRvllmFa3DecodeAttentionBackendKind::Fa3SplitKvF16KvGraph => {
+                    submission.attention_decode_rope_cache_f16_kv_graph_fa3(
+                        &plan.qkv_norm_buffer,
+                        0,
+                        query_width,
+                        query_width.saturating_add(full_attention.kv_width),
+                        &state.key_cache,
+                        &state.value_cache,
+                        state.width,
+                        0,
+                        &plan.decode_params_buffer,
+                        model.family_metadata.sliding_window.unwrap_or(0),
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims,
+                        theta_scale,
+                        None,
+                        &plan.attention_fa3_partial_output_buffer,
+                        &plan.attention_fa3_partial_max_buffer,
+                        &plan.attention_fa3_partial_sum_buffer,
+                        &plan.gated_delta_buffer,
+                    )?;
+                }
+                PsionRvllmFa3DecodeAttentionBackendKind::DenseF16KvGraphLegacy
+                | PsionRvllmFa3DecodeAttentionBackendKind::DenseF16KvLegacy => {
+                    submission.attention_decode_rope_cache_f16_kv_graph(
+                        &plan.qkv_norm_buffer,
+                        0,
+                        query_width,
+                        query_width.saturating_add(full_attention.kv_width),
+                        &state.key_cache,
+                        &state.value_cache,
+                        state.width,
+                        0,
+                        &plan.decode_params_buffer,
+                        model.family_metadata.sliding_window.unwrap_or(0),
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims,
+                        theta_scale,
+                        None,
+                        &plan.gated_delta_buffer,
+                    )?;
+                }
+            }
         } else {
             submission.attention_decode_rope_cache_f16_kv(
                 &plan.qkv_norm_buffer,
@@ -7646,6 +7775,9 @@ struct Qwen35CudaStepPlan {
     activated_q8_1_buffer: CudaBuffer,
     decay_buffer: CudaBuffer,
     beta_buffer: CudaBuffer,
+    attention_fa3_partial_output_buffer: CudaBuffer,
+    attention_fa3_partial_max_buffer: CudaBuffer,
+    attention_fa3_partial_sum_buffer: CudaBuffer,
     logits_buffer: CudaBuffer,
     logits_host_buffer: CudaHostBuffer,
     sparse_logits_buffer: CudaBuffer,
@@ -7681,6 +7813,7 @@ impl Qwen35CudaStepPlan {
     fn new(
         backend: &mut CudaBackend,
         hidden_size: usize,
+        attention_head_count: usize,
         max_input_columns: usize,
         max_output_rows: usize,
         vocab_size: usize,
@@ -7755,6 +7888,15 @@ impl Qwen35CudaStepPlan {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             beta_buffer: backend
                 .f32_buffer(max_output_rows)
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            attention_fa3_partial_output_buffer: backend
+                .f32_buffer(hidden_size.saturating_mul(QWEN35_CUDA_FA3_MAX_SPLITS))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            attention_fa3_partial_max_buffer: backend
+                .f32_buffer(attention_head_count.saturating_mul(QWEN35_CUDA_FA3_MAX_SPLITS))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            attention_fa3_partial_sum_buffer: backend
+                .f32_buffer(attention_head_count.saturating_mul(QWEN35_CUDA_FA3_MAX_SPLITS))
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             logits_buffer: backend
                 .f32_buffer(vocab_size)

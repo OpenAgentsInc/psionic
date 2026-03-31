@@ -179,6 +179,11 @@ than just run tensor math.
   `docs/PSION_RVLLM_ATTENTION_BACKEND.md`, making the current CUDA attention
   backend selector explicit so dense f16 KV remains the default while
   turboquant KV and q8_1 output fusion stay capability-gated alternates.
+- The same pass now also retains one explicit FA3-class decode-attention
+  packet at `docs/PSION_RVLLM_FA3_DECODE_ATTENTION_BACKEND.md`, making the
+  admitted qwen35 CUDA graph backend, split-KV heuristic, SM gate, and
+  downgrade evidence machine-visible instead of leaving the graph decode kernel
+  identity implicit.
 - The same pass now also retains one explicit memory-pool packet at
   `docs/PSION_RVLLM_MEMORY_POOL.md`, making the exact-spec CUDA allocator pool
   real for the admitted decode lane and binding before/after allocation count,

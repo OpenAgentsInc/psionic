@@ -338,6 +338,8 @@ pub fn ggml_q8_1_storage_bytes(rows: usize, cols: usize) -> Result<usize, Runtim
         .saturating_mul(GGML_Q8_1_BLOCK_BYTES))
 }
 
+const ATTENTION_FA3_MAX_SPLITS: usize = 8;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NvidiaInventoryRow {
     ordinal: u16,
@@ -3070,6 +3072,107 @@ impl CudaSubmission {
                 corr_dims,
                 theta_scale,
                 attention_sinks.map(|buffer| &buffer.platform),
+                &output.platform,
+            )?;
+        self.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// FA3-class graph-capture-friendly decode attention with split-KV
+    /// partial-workspace reduction and explicit final combine.
+    #[allow(clippy::too_many_arguments)]
+    pub fn attention_decode_rope_cache_f16_kv_graph_fa3(
+        &mut self,
+        qkv: &CudaBuffer,
+        query_offset: usize,
+        key_offset: usize,
+        value_offset: usize,
+        cache_keys: &CudaBuffer,
+        cache_values: &CudaBuffer,
+        cache_width: usize,
+        layer_offset: usize,
+        decode_params: &CudaBuffer,
+        sliding_window: usize,
+        head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        rotary_dim: usize,
+        freq_scale: f32,
+        ext_factor: f32,
+        corr_dims: [f32; 2],
+        theta_scale: f32,
+        attention_sinks: Option<&CudaBuffer>,
+        partial_output: &CudaBuffer,
+        partial_max: &CudaBuffer,
+        partial_sum: &CudaBuffer,
+        output: &CudaBuffer,
+    ) -> Result<(), RuntimeError> {
+        let required_output_elements = ATTENTION_FA3_MAX_SPLITS
+            .checked_mul(head_count)
+            .and_then(|value| value.checked_mul(head_dim))
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention partial output element count overflow",
+                ))
+            })?;
+        let required_head_elements = ATTENTION_FA3_MAX_SPLITS
+            .checked_mul(head_count)
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention partial head element count overflow",
+                ))
+            })?;
+        if partial_output.spec().dtype() != DType::F32
+            || partial_output.spec().storage_size() < required_output_elements
+        {
+            return Err(RuntimeError::Backend(format!(
+                "cuda fa3 attention partial output buffer too small: need at least {required_output_elements} f32 elements, have {} {:?}",
+                partial_output.spec().storage_size(),
+                partial_output.spec().dtype(),
+            )));
+        }
+        if partial_max.spec().dtype() != DType::F32
+            || partial_max.spec().storage_size() < required_head_elements
+        {
+            return Err(RuntimeError::Backend(format!(
+                "cuda fa3 attention partial max buffer too small: need at least {required_head_elements} f32 elements, have {} {:?}",
+                partial_max.spec().storage_size(),
+                partial_max.spec().dtype(),
+            )));
+        }
+        if partial_sum.spec().dtype() != DType::F32
+            || partial_sum.spec().storage_size() < required_head_elements
+        {
+            return Err(RuntimeError::Backend(format!(
+                "cuda fa3 attention partial sum buffer too small: need at least {required_head_elements} f32 elements, have {} {:?}",
+                partial_sum.spec().storage_size(),
+                partial_sum.spec().dtype(),
+            )));
+        }
+        self.platform
+            .encode_attention_decode_rope_cache_f16_kv_graph_fa3(
+                &qkv.platform,
+                query_offset,
+                key_offset,
+                value_offset,
+                &cache_keys.platform,
+                &cache_values.platform,
+                cache_width,
+                layer_offset,
+                &decode_params.platform,
+                sliding_window,
+                head_count,
+                kv_head_count,
+                head_dim,
+                rotary_dim,
+                freq_scale,
+                ext_factor,
+                corr_dims,
+                theta_scale,
+                attention_sinks.map(|buffer| &buffer.platform),
+                &partial_output.platform,
+                &partial_max.platform,
+                &partial_sum.platform,
                 &output.platform,
             )?;
         self.encoded_operations += 1;
@@ -10107,6 +10210,33 @@ mod platform {
             output: *mut c_void,
             stream: CudaStream,
         ) -> CudaError;
+        fn psionic_cuda_attention_decode_rope_cache_f16_kv_graph_fa3(
+            qkv: *const c_void,
+            query_offset: c_int,
+            key_offset: c_int,
+            value_offset: c_int,
+            cache_keys: *mut c_void,
+            cache_values: *mut c_void,
+            cache_width: c_int,
+            layer_offset: c_int,
+            decode_params: *const c_void,
+            sliding_window: c_int,
+            head_count: c_int,
+            kv_head_count: c_int,
+            head_dim: c_int,
+            rotary_dim: c_int,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_low: f32,
+            corr_high: f32,
+            theta_scale: f32,
+            attention_sinks: *const c_void,
+            partial_output: *mut c_void,
+            partial_max: *mut c_void,
+            partial_sum: *mut c_void,
+            output: *mut c_void,
+            stream: CudaStream,
+        ) -> CudaError;
         fn psionic_cuda_attention_decode_rope_cache_turboquant_kv_graph(
             qkv: *const c_void,
             query_offset: c_int,
@@ -13895,6 +14025,120 @@ mod platform {
         }
 
         #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_rope_cache_f16_kv_graph_fa3(
+            &mut self,
+            qkv: &PlatformBuffer,
+            query_offset: usize,
+            key_offset: usize,
+            value_offset: usize,
+            cache_keys: &PlatformBuffer,
+            cache_values: &PlatformBuffer,
+            cache_width: usize,
+            layer_offset: usize,
+            decode_params: &PlatformBuffer,
+            sliding_window: usize,
+            head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_dim: usize,
+            freq_scale: f32,
+            ext_factor: f32,
+            corr_dims: [f32; 2],
+            theta_scale: f32,
+            attention_sinks: Option<&PlatformBuffer>,
+            partial_output: &PlatformBuffer,
+            partial_max: &PlatformBuffer,
+            partial_sum: &PlatformBuffer,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let query_offset = c_int::try_from(query_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) query offset exceeds c_int",
+                ))
+            })?;
+            let key_offset = c_int::try_from(key_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) key offset exceeds c_int",
+                ))
+            })?;
+            let value_offset = c_int::try_from(value_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) value offset exceeds c_int",
+                ))
+            })?;
+            let cache_width = c_int::try_from(cache_width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) cache width exceeds c_int",
+                ))
+            })?;
+            let layer_offset = c_int::try_from(layer_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) layer offset exceeds c_int",
+                ))
+            })?;
+            let sliding_window = c_int::try_from(sliding_window).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) sliding window exceeds c_int",
+                ))
+            })?;
+            let head_count = c_int::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) head count exceeds c_int",
+                ))
+            })?;
+            let kv_head_count = c_int::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) kv head count exceeds c_int",
+                ))
+            })?;
+            let head_dim = c_int::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) head dim exceeds c_int",
+                ))
+            })?;
+            let rotary_dim = c_int::try_from(rotary_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "cuda fa3 attention(graph, f16 kv) rotary dim exceeds c_int",
+                ))
+            })?;
+            self.runtime.set_device()?;
+            self.runtime.check(
+                unsafe {
+                    psionic_cuda_attention_decode_rope_cache_f16_kv_graph_fa3(
+                        qkv.inner.device_ptr.cast(),
+                        query_offset,
+                        key_offset,
+                        value_offset,
+                        cache_keys.inner.device_ptr.cast(),
+                        cache_values.inner.device_ptr.cast(),
+                        cache_width,
+                        layer_offset,
+                        decode_params.inner.device_ptr.cast(),
+                        sliding_window,
+                        head_count,
+                        kv_head_count,
+                        head_dim,
+                        rotary_dim,
+                        freq_scale,
+                        ext_factor,
+                        corr_dims[0],
+                        corr_dims[1],
+                        theta_scale,
+                        attention_sinks
+                            .map(|buffer| buffer.inner.device_ptr.cast())
+                            .unwrap_or(std::ptr::null_mut()),
+                        partial_output.inner.device_ptr.cast(),
+                        partial_max.inner.device_ptr.cast(),
+                        partial_sum.inner.device_ptr.cast(),
+                        output.inner.device_ptr.cast(),
+                        self.stream,
+                    )
+                },
+                "psionic_cuda_attention_decode_rope_cache_f16_kv_graph_fa3",
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
         pub(super) fn encode_attention_decode_rope_cache_turboquant_kv_graph(
             &mut self,
             qkv: &PlatformBuffer,
@@ -16669,6 +16913,38 @@ mod platform {
             _corr_dims: [f32; 2],
             _theta_scale: f32,
             _attention_sinks: Option<&PlatformBuffer>,
+            _output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "cuda quantized text-generation kernels require Linux CUDA support",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_attention_decode_rope_cache_f16_kv_graph_fa3(
+            &mut self,
+            _qkv: &PlatformBuffer,
+            _query_offset: usize,
+            _key_offset: usize,
+            _value_offset: usize,
+            _cache_keys: &PlatformBuffer,
+            _cache_values: &PlatformBuffer,
+            _cache_width: usize,
+            _layer_offset: usize,
+            _decode_params: &PlatformBuffer,
+            _sliding_window: usize,
+            _head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_dim: usize,
+            _freq_scale: f32,
+            _ext_factor: f32,
+            _corr_dims: [f32; 2],
+            _theta_scale: f32,
+            _attention_sinks: Option<&PlatformBuffer>,
+            _partial_output: &PlatformBuffer,
+            _partial_max: &PlatformBuffer,
+            _partial_sum: &PlatformBuffer,
             _output: &PlatformBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
@@ -21357,6 +21633,155 @@ mod tests {
         assert_eq!(
             cache_values_fused.read_bytes()?,
             cache_values_separate.read_bytes()?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cuda_submission_fused_attention_graph_fa3_f16_kv_matches_legacy_reference_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut backend = CudaBackend::new();
+        let Some(selected) = backend.selected_device().cloned() else {
+            assert_eq!(backend.health().status, HealthStatus::Offline);
+            return Ok(());
+        };
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+        let supports_fa3 = selected
+            .nvidia_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.topology.compute_capability.as_deref())
+            .and_then(|compute_capability| compute_capability.split('.').next())
+            .and_then(|major| major.parse::<u32>().ok())
+            .map_or_else(
+                || {
+                    matches!(
+                        selected
+                            .nvidia_metadata
+                            .as_ref()
+                            .and_then(|metadata| metadata.topology.architecture.as_deref()),
+                        Some("Ada Lovelace" | "Hopper" | "Blackwell")
+                    )
+                },
+                |major| major >= 8,
+            );
+        if !supports_fa3 {
+            return Ok(());
+        }
+
+        let head_count = 4usize;
+        let kv_head_count = 2usize;
+        let head_dim = 128usize;
+        let rotary_dim = 64usize;
+        let q_rows = head_count * head_dim;
+        let k_rows = kv_head_count * head_dim;
+        let v_rows = kv_head_count * head_dim;
+        let past_tokens = 640usize;
+        let cache_token_capacity = past_tokens + 1;
+        let qkv = (0..(q_rows + k_rows + v_rows))
+            .map(|index| (((index % 67) as f32) - 33.0) * 0.03125)
+            .collect::<Vec<_>>();
+        let previous_keys = (0..(past_tokens * k_rows))
+            .map(|index| {
+                ((((index / k_rows) % 29) as f32) - 14.0) * 0.015625
+                    + (((index % 17) as f32) - 8.0) * 0.0078125
+            })
+            .collect::<Vec<_>>();
+        let previous_values = (0..(past_tokens * v_rows))
+            .map(|index| {
+                ((((index / v_rows) % 19) as f32) - 9.0) * 0.0234375
+                    - (((index % 13) as f32) - 6.0) * 0.00390625
+            })
+            .collect::<Vec<_>>();
+        let mut cache_keys_bytes =
+            vec![0_u8; cache_token_capacity * k_rows * std::mem::size_of::<u16>()];
+        let mut cache_values_bytes =
+            vec![0_u8; cache_token_capacity * v_rows * std::mem::size_of::<u16>()];
+        let previous_key_bytes = f32_slice_to_f16_le_bytes(&previous_keys);
+        let previous_value_bytes = f32_slice_to_f16_le_bytes(&previous_values);
+        cache_keys_bytes[..previous_key_bytes.len()].copy_from_slice(&previous_key_bytes);
+        cache_values_bytes[..previous_value_bytes.len()].copy_from_slice(&previous_value_bytes);
+
+        let qkv_buffer = backend.input_buffer(Shape::new(vec![qkv.len()]), qkv)?;
+        let cache_keys_dense = backend.byte_buffer(&cache_keys_bytes)?;
+        let cache_values_dense = backend.byte_buffer(&cache_values_bytes)?;
+        let cache_keys_fa3 = backend.byte_buffer(&cache_keys_bytes)?;
+        let cache_values_fa3 = backend.byte_buffer(&cache_values_bytes)?;
+        let decode_params = backend.byte_buffer(&i32_slice_to_bytes(&[
+            i32::try_from(past_tokens)?,
+            i32::try_from(past_tokens + 3)?,
+        ]))?;
+        let output_dense = backend.f32_buffer(q_rows)?;
+        let output_fa3 = backend.f32_buffer(q_rows)?;
+        let partial_output = backend.f32_buffer(crate::ATTENTION_FA3_MAX_SPLITS * q_rows)?;
+        let partial_max = backend.f32_buffer(crate::ATTENTION_FA3_MAX_SPLITS * head_count)?;
+        let partial_sum = backend.f32_buffer(crate::ATTENTION_FA3_MAX_SPLITS * head_count)?;
+        let freq_scale = 1.0_f32;
+        let ext_factor = 0.0_f32;
+        let corr_dims = [0.0_f32, 0.0_f32];
+        let theta_scale = 0.5_f32;
+
+        let mut dense = backend.begin_submission()?;
+        dense.attention_decode_rope_cache_f16_kv_graph(
+            &qkv_buffer,
+            0,
+            q_rows,
+            q_rows + k_rows,
+            &cache_keys_dense,
+            &cache_values_dense,
+            k_rows,
+            0,
+            &decode_params,
+            0,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            None,
+            &output_dense,
+        )?;
+        let dense_report = dense.commit(CudaCommandWait::Completed)?;
+        assert_eq!(dense_report.encoded_operations, 1);
+
+        let mut fa3 = backend.begin_submission()?;
+        fa3.attention_decode_rope_cache_f16_kv_graph_fa3(
+            &qkv_buffer,
+            0,
+            q_rows,
+            q_rows + k_rows,
+            &cache_keys_fa3,
+            &cache_values_fa3,
+            k_rows,
+            0,
+            &decode_params,
+            0,
+            head_count,
+            kv_head_count,
+            head_dim,
+            rotary_dim,
+            freq_scale,
+            ext_factor,
+            corr_dims,
+            theta_scale,
+            None,
+            &partial_output,
+            &partial_max,
+            &partial_sum,
+            &output_fa3,
+        )?;
+        let fa3_report = fa3.commit(CudaCommandWait::Completed)?;
+        assert_eq!(fa3_report.encoded_operations, 1);
+
+        assert_close(&output_fa3.read_f32()?, &output_dense.read_f32()?, 1e-3);
+        assert_eq!(cache_keys_fa3.read_bytes()?, cache_keys_dense.read_bytes()?);
+        assert_eq!(
+            cache_values_fa3.read_bytes()?,
+            cache_values_dense.read_bytes()?
         );
         Ok(())
     }

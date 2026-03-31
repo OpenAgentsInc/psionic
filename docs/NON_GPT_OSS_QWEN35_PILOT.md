@@ -470,6 +470,11 @@ The same March 27, 2026 benchmark also shows the current boundary clearly:
   `run_status`, `refusal_reason`, `psionic_cuda_fast_path`, warmup host-
   fallback evidence, and per-run host-fallback evidence, so degraded native
   rows fail closed instead of getting published as if they were hot-path wins
+- the admitted greedy CUDA graph lane now also records
+  `qwen35_attention_backends`, `qwen35_attention_layer_invocations`, backend
+  fallback reasons, split counts, and device capability evidence, so the FA3-
+  class decode backend either proves that it executed or stays visible as a
+  legacy-kernel downgrade
 
 ## Current Bottlenecks
 
@@ -484,8 +489,9 @@ kernel or fusion claims about the next bottleneck.
   device-native route than it should
 - the output-head full-logit path still does not reuse the faster MMVQ argmax
   kernel shape that now serves greedy decode
-- the full-attention path still enters the attention kernel through a separate
-  q/gate normalization pass instead of a more integrated decode kernel
+- the admitted greedy CUDA graph lane now has an FA3-class split-KV decode
+  backend, but the q/gate preparation still happens outside that kernel and
+  the wider non-graph lane still uses the legacy dense attention kernel
 - the host-seeded hidden vector still reaches the device outside the captured
   qwen35 prompt and decode graphs
 - the lane still refuses KV-session reuse, prefix caching, and adapter serving

@@ -29,6 +29,7 @@ mod psion_rvllm_attention_backend;
 mod psion_rvllm_cublas_warmup;
 mod psion_rvllm_cuda_graph_pool;
 mod psion_rvllm_direct_engine_comparator;
+mod psion_rvllm_fa3_decode_attention_backend;
 mod psion_rvllm_fallback_free_cuda_gate;
 mod psion_rvllm_fused_kernels;
 mod psion_rvllm_gpu_logits_selection;
@@ -85,6 +86,7 @@ pub use psion_rvllm_attention_backend::*;
 pub use psion_rvllm_cublas_warmup::*;
 pub use psion_rvllm_cuda_graph_pool::*;
 pub use psion_rvllm_direct_engine_comparator::*;
+pub use psion_rvllm_fa3_decode_attention_backend::*;
 pub use psion_rvllm_fallback_free_cuda_gate::*;
 pub use psion_rvllm_fused_kernels::*;
 pub use psion_rvllm_gpu_logits_selection::*;
@@ -1945,6 +1947,9 @@ pub struct Qwen35CudaDecodeOutputMetrics {
     /// CUDA graph replay metrics accumulated across admitted decode steps.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub graph_replay: Option<CudaGraphReplayMetrics>,
+    /// Explicit attention-backend execution evidence accumulated across full-attention layers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attention_backend: Option<Qwen35CudaAttentionBackendMetrics>,
 }
 
 impl Qwen35CudaDecodeOutputMetrics {
@@ -1967,6 +1972,18 @@ impl Qwen35CudaDecodeOutputMetrics {
                 self.graph_replay = None;
             }
         }
+        if let Some(other_attention_backend) = &other.attention_backend {
+            self.attention_backend
+                .get_or_insert_with(Qwen35CudaAttentionBackendMetrics::default)
+                .accumulate(other_attention_backend);
+            if self
+                .attention_backend
+                .as_ref()
+                .map_or(false, Qwen35CudaAttentionBackendMetrics::is_zero)
+            {
+                self.attention_backend = None;
+            }
+        }
     }
 
     fn is_zero(&self) -> bool {
@@ -1978,6 +1995,10 @@ impl Qwen35CudaDecodeOutputMetrics {
                 .graph_replay
                 .as_ref()
                 .map_or(true, CudaGraphReplayMetrics::is_zero)
+            && self
+                .attention_backend
+                .as_ref()
+                .map_or(true, Qwen35CudaAttentionBackendMetrics::is_zero)
     }
 }
 
