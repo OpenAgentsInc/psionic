@@ -1,6 +1,6 @@
 # PSION RVLLM Pre-Flight Bundle
 
-> Status: landed on 2026-03-30 as the fifth retained RVLLM runtime-harvest
+> Status: updated on 2026-03-31 to include the retained `cublasLt` plan-cache
 > packet.
 
 This document records the admitted GPU-serving pre-flight bundle for native
@@ -17,19 +17,27 @@ Canonical packet:
 
 Current retained truth:
 
-* packet digest `23293fcb1b694686bfd95ad8ee095a2466aec3e6ab6f24f883a08114e8a528f1`
+* packet digest `a17262a58a4a9e84600e424f1ec37556d9fafe2158a34aba9ff2511604044e91`
 * admitted serving paths:
   - `qwen35.native_cuda_decode`
   - `gpt_oss.native_cuda_decode`
 * pre-flight steps:
   - runtime owner ready
   - allocator pool primed
+  - bounded `cublasLt` plan-cache ready
   - explicit cuBLAS warmup request
   - CUDA graph capture or refusal
   - kernel-cache posture exported
 * startup report fields:
   - `cublas_handle_scope`
   - `cublas_stream_binding`
+  - `cublas_lt_tuning_status`
+  - `cublas_lt_plan_cache_scope`
+  - `cublas_lt_selected_plan_count`
+  - `cublas_lt_tuned_shape_count`
+  - `cublas_lt_fallback_shape_count`
+  - `cublas_lt_max_workspace_bytes`
+  - `cublas_lt_selected_plans`
   - `warmup_status`
   - `warmup_prompt_s`
   - `warmup_decode_s`
@@ -43,6 +51,10 @@ Current retained truth:
 * kernel-cache posture:
   - exported as machine-visible runtime evidence
   - remains disabled on the admitted lane unless explicitly enabled later
+* referenced retained packets now include:
+  - CUDA graph pool
+  - `cublasLt` plan cache
+  - cuBLAS warmup
 
 Claim boundary:
 
@@ -50,4 +62,4 @@ Claim boundary:
 * It does claim the admitted runtime now records cold versus warm posture in
   one machine-readable bundle instead of hiding it inside the first user
   request.
-* Warmup success or refusal remains explicit.
+* Warmup success, `cublasLt` tuning status, and fallback counts remain explicit.

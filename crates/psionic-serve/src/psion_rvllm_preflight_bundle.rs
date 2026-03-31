@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::psion_rvllm_cublaslt_plan_cache::builtin_psion_rvllm_cublaslt_plan_cache_packet;
+
 pub const PSION_RVLLM_PREFLIGHT_BUNDLE_SCHEMA_VERSION: &str = "psion.rvllm_preflight_bundle.v1";
 pub const PSION_RVLLM_PREFLIGHT_BUNDLE_FIXTURE_PATH: &str =
     "fixtures/psion/serve/psion_rvllm_preflight_bundle_v1.json";
@@ -64,6 +66,7 @@ impl PsionRvllmPreflightBundlePacket {
 
 #[must_use]
 pub fn builtin_psion_rvllm_preflight_bundle_packet() -> PsionRvllmPreflightBundlePacket {
+    let cublaslt_plan_cache = builtin_psion_rvllm_cublaslt_plan_cache_packet();
     let mut packet = PsionRvllmPreflightBundlePacket {
         schema_version: String::from(PSION_RVLLM_PREFLIGHT_BUNDLE_SCHEMA_VERSION),
         packet_id: String::from(PACKET_ID),
@@ -85,6 +88,13 @@ pub fn builtin_psion_rvllm_preflight_bundle_packet() -> PsionRvllmPreflightBundl
                 purpose: String::from("graph capture, replay, and refusal posture"),
             },
             PsionRvllmPreflightReference {
+                packet_id: cublaslt_plan_cache.packet_id.clone(),
+                packet_digest: cublaslt_plan_cache.packet_digest.clone(),
+                purpose: String::from(
+                    "startup autotune, selected-plan receipts, and bounded cublasLt fallback posture",
+                ),
+            },
+            PsionRvllmPreflightReference {
                 packet_id: String::from("psion_rvllm_cublas_warmup_v1"),
                 packet_digest: String::from(
                     "ab8ec999b8e80605744171d3adab152b6ffaecda22877b321ec4c65bb084ea36",
@@ -103,6 +113,12 @@ pub fn builtin_psion_rvllm_preflight_bundle_packet() -> PsionRvllmPreflightBundl
                 step_id: String::from("allocator_pool_primed"),
                 stage: String::from("allocation reuse posture"),
                 success_signal: String::from("allocator_pool policy exported"),
+                cold_start_cost_billed_to_user: false,
+            },
+            PsionRvllmPreflightStep {
+                step_id: String::from("cublaslt_plan_cache_ready"),
+                stage: String::from("bounded startup autotune and GEMM-plan selection"),
+                success_signal: String::from("psionic_cuda_startup.cublas_lt_tuning_status"),
                 cold_start_cost_billed_to_user: false,
             },
             PsionRvllmPreflightStep {
@@ -127,6 +143,13 @@ pub fn builtin_psion_rvllm_preflight_bundle_packet() -> PsionRvllmPreflightBundl
         startup_report_fields: vec![
             String::from("cublas_handle_scope"),
             String::from("cublas_stream_binding"),
+            String::from("cublas_lt_tuning_status"),
+            String::from("cublas_lt_plan_cache_scope"),
+            String::from("cublas_lt_selected_plan_count"),
+            String::from("cublas_lt_tuned_shape_count"),
+            String::from("cublas_lt_fallback_shape_count"),
+            String::from("cublas_lt_max_workspace_bytes"),
+            String::from("cublas_lt_selected_plans"),
             String::from("warmup_status"),
             String::from("warmup_prompt_s"),
             String::from("warmup_decode_s"),
@@ -147,7 +170,7 @@ pub fn builtin_psion_rvllm_preflight_bundle_packet() -> PsionRvllmPreflightBundl
             ),
         },
         cold_vs_warm_posture: String::from(
-            "The admitted CUDA serving lane now has one explicit pre-flight bundle: startup warmup is not billed to the user, cold-start cost is logged separately from steady-state timings, graph capture or refusal stays explicit, and allocator-pool / kernel-cache posture is exported through runtime resources instead of being implied by folklore.",
+            "The admitted CUDA serving lane now has one explicit pre-flight bundle: cublasLt plan selection and startup warmup are both logged outside the user-billed request path, cold-start cost stays separate from steady-state timings, graph capture or refusal remains explicit, and allocator-pool / kernel-cache posture is exported through runtime resources instead of being implied by folklore.",
         ),
         benchmark_paths: vec![
             String::from("crates/psionic-serve/examples/qwen35_cuda_bench.rs"),

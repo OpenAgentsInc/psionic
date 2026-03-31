@@ -21,6 +21,7 @@
 
 use std::{
     cmp::Ordering,
+    collections::BTreeMap,
     env,
     path::Path,
     sync::{Arc, Mutex},
@@ -31,10 +32,10 @@ use psionic_backend_cpu::{
     CpuBackend, decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot,
 };
 use psionic_backend_cuda::{
-    CudaBackend, CudaBuffer, CudaGraphExec, CudaHostBuffer, CudaQuantizedMatvecResult,
-    CudaQuantizedMatvecStats, CudaSubmission, CudaSubmissionReport, GGML_Q8_1_BLOCK_BYTES,
-    GGML_Q8_1_BLOCK_ELEMENTS, TEXT_GENERATION_SUPPORTED_OPS as CUDA_TEXT_GENERATION_SUPPORTED_OPS,
-    ggml_q8_1_storage_bytes,
+    CudaBackend, CudaBuffer, CudaGemmTuningReport, CudaGemmTuningScope, CudaGraphExec,
+    CudaHostBuffer, CudaQuantizedMatvecResult, CudaQuantizedMatvecStats, CudaSubmission,
+    CudaSubmissionReport, GGML_Q8_1_BLOCK_BYTES, GGML_Q8_1_BLOCK_ELEMENTS,
+    TEXT_GENERATION_SUPPORTED_OPS as CUDA_TEXT_GENERATION_SUPPORTED_OPS, ggml_q8_1_storage_bytes,
 };
 use psionic_backend_metal::{
     MetalAttentionGraphReserve, MetalAttentionGraphRuntime, MetalBackend, MetalBuffer,
@@ -81,6 +82,15 @@ const GPT_OSS_CPU_BACKEND: &str = "cpu";
 const GPT_OSS_CUDA_BACKEND: &str = "cuda";
 const GPT_OSS_CUDA_HYBRID_MOE_BACKEND: &str = "cuda+host-moe";
 const GPT_OSS_METAL_BACKEND: &str = "metal";
+const GPT_OSS_CUBLASLT_MODEL_FAMILY: &str = "gpt_oss.native_cuda_decode";
+const GPT_OSS_CUBLASLT_ROW_LADDER: [usize; 3] = [1, 8, 32];
+
+#[derive(Clone)]
+struct GptOssCublasLtRepresentative {
+    weight: CudaBuffer,
+    inner: usize,
+    cols: usize,
+}
 
 fn gpt_oss_local_blob_open_options() -> LocalBlobOpenOptions {
     LocalBlobOpenOptions::default().with_integrity_policy(BlobIntegrityPolicy::LocalUnverifiedLabel)
@@ -108,6 +118,25 @@ fn experimental_metal_turboquant_kv_enabled() -> bool {
     env::var("PSIONIC_GPT_OSS_EXPERIMENTAL_METAL_TURBOQUANT_KV")
         .map(|value| value == "1")
         .unwrap_or(false)
+}
+
+fn register_gpt_oss_cublaslt_scope(
+    backend: &CudaBackend,
+    representatives: &mut std::collections::BTreeMap<&'static str, GptOssCublasLtRepresentative>,
+    op_kind: &'static str,
+    weight: &CudaBuffer,
+    inner: usize,
+    cols: usize,
+) {
+    let scope = CudaGemmTuningScope::new(GPT_OSS_CUBLASLT_MODEL_FAMILY, op_kind);
+    backend.register_cublaslt_weight_scope(weight, scope);
+    representatives
+        .entry(op_kind)
+        .or_insert_with(|| GptOssCublasLtRepresentative {
+            weight: weight.clone(),
+            inner,
+            cols,
+        });
 }
 
 const HYBRID_SELECTED4_LAYER_CACHE_SLOTS: usize = 5;
@@ -1541,6 +1570,7 @@ impl CudaGgufGptOssTextGenerationService {
                 message: error.to_string(),
             })?;
         let model = CudaGgufGptOssGenerationModel::from_gguf_path(path, &mut backend)?;
+        let _ = model.autotune_cublaslt_plans(&mut backend);
         let model_descriptor = model.descriptor().clone();
         let mut models = InMemoryGenerationModelRegistry::new();
         models.warm_with_metadata(
@@ -1577,6 +1607,11 @@ impl CudaGgufGptOssTextGenerationService {
     #[must_use]
     pub fn runtime_resources(&self) -> Option<BackendRuntimeResources> {
         self.backend.runtime_resources()
+    }
+
+    #[must_use]
+    pub fn cuda_gemm_tuning_report(&self) -> Option<CudaGemmTuningReport> {
+        self.backend.cuda_gemm_tuning_report()
     }
 
     #[must_use]
@@ -3962,6 +3997,7 @@ impl CpuGgufGptOssGenerationModel {
     pub fn plan_digest(&self) -> &str {
         self.inner.plan_digest.as_str()
     }
+
 }
 
 impl GenerationModelHandle for CpuGgufGptOssGenerationModel {
@@ -4134,6 +4170,7 @@ impl MetalGgufGptOssGenerationModel {
     pub fn plan_digest(&self) -> &str {
         self.inner.plan_digest.as_str()
     }
+
 }
 
 impl GenerationModelHandle for MetalGgufGptOssGenerationModel {
@@ -4539,6 +4576,57 @@ impl CudaGgufGptOssGenerationModel {
     #[must_use]
     pub fn plan_digest(&self) -> &str {
         self.inner.plan_digest.as_str()
+    }
+
+    fn autotune_cublaslt_plans(
+        &self,
+        backend: &mut CudaBackend,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let mut representatives = BTreeMap::new();
+        if let Some(weight) = self.inner.output.transposed_f16.as_ref() {
+            register_gpt_oss_cublaslt_scope(
+                backend,
+                &mut representatives,
+                "output_logits",
+                weight,
+                self.inner.output.columns,
+                self.inner.output.rows,
+            );
+        }
+        for layer in &self.inner.layers {
+            if let Some(weight) = layer.attention_qkv_weight.transposed_f16.as_ref() {
+                register_gpt_oss_cublaslt_scope(
+                    backend,
+                    &mut representatives,
+                    "attention_qkv",
+                    weight,
+                    layer.attention_qkv_weight.columns,
+                    layer.attention_qkv_weight.total_rows(),
+                );
+            }
+            if let Some(weight) = layer.attention_output_weight.transposed_f16.as_ref() {
+                register_gpt_oss_cublaslt_scope(
+                    backend,
+                    &mut representatives,
+                    "attention_output",
+                    weight,
+                    layer.attention_output_weight.columns,
+                    layer.attention_output_weight.rows,
+                );
+            }
+        }
+        for (op_kind, representative) in representatives {
+            backend
+                .autotune_cublaslt_f16_to_f32_weight_rows(
+                    &representative.weight,
+                    CudaGemmTuningScope::new(GPT_OSS_CUBLASLT_MODEL_FAMILY, op_kind),
+                    representative.inner,
+                    representative.cols,
+                    &GPT_OSS_CUBLASLT_ROW_LADDER,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        Ok(())
     }
 }
 

@@ -148,6 +148,11 @@ than just run tensor math.
   and handle-reuse packet at `docs/PSION_RVLLM_CUBLAS_WARMUP.md`, together
   with machine-readable `psionic_cuda_startup` startup evidence in
   `qwen35_cuda_bench --json-out`.
+- On March 31, 2026, the same runtime-harvest line gained one explicit
+  `cublasLt` plan-cache packet at `docs/PSION_RVLLM_CUBLASLT_PLAN_CACHE.md`,
+  making admitted startup autotune status, selected-plan receipts, fallback
+  shape counts, and workspace posture machine-visible for native `qwen35` and
+  native `gpt_oss` CUDA decode.
 - The same pass now also retains one explicit GPU logits-selection packet at
   `docs/PSION_RVLLM_GPU_LOGITS_SELECTION.md`, binding the already-shipped
   qwen35 and gpt-oss device-argmax / bounded-candidate lanes to explicit

@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, path::Path, sync::Arc, time::Instant};
 
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len};
 use psionic_backend_cuda::{
-    CudaBackend, CudaBuffer, CudaGraphExec, CudaHostBuffer, CudaQuantizedMatvecStats,
-    CudaSubmission, ggml_q8_1_storage_bytes,
+    CudaBackend, CudaBuffer, CudaGemmTuningReport, CudaGemmTuningScope, CudaGraphExec,
+    CudaHostBuffer, CudaQuantizedMatvecStats, CudaSubmission, ggml_q8_1_storage_bytes,
 };
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::QuantizationMode;
@@ -65,6 +65,7 @@ impl CudaGgufQwen35TextGenerationService {
             })?;
         let model = Arc::new(CudaQwen35Model::from_gguf_path(path, &mut backend)?);
         let step_plan = model.build_step_plan(&mut backend)?;
+        let _ = model.autotune_cublaslt_plans(&mut backend);
         let mut backend_health = BackendHealthTracker::default();
         let now_millis = current_time_millis();
         backend_health.observe("cuda", backend.health(), now_millis);
@@ -117,6 +118,11 @@ impl CudaGgufQwen35TextGenerationService {
     pub fn plan_digest(&self, model_id: &str) -> Option<&str> {
         (model_id == self.model.descriptor.model.model_id)
             .then_some(self.model.plan_digest.as_str())
+    }
+
+    #[must_use]
+    pub fn cuda_gemm_tuning_report(&self) -> Option<CudaGemmTuningReport> {
+        self.backend.cuda_gemm_tuning_report()
     }
 
     #[must_use]
@@ -1411,6 +1417,15 @@ fn qwen35_fused_qkv_rms_norm_enabled() -> bool {
 }
 
 const QWEN35_CUDA_FA3_MAX_SPLITS: usize = crate::PSION_RVLLM_FA3_DECODE_ATTENTION_MAX_SPLITS;
+const QWEN35_CUBLASLT_MODEL_FAMILY: &str = "qwen35.native_cuda_decode";
+const QWEN35_CUBLASLT_ROW_LADDER: [usize; 3] = [1, 8, 32];
+
+#[derive(Clone)]
+struct Qwen35CublasLtRepresentative {
+    weight: CudaBuffer,
+    inner: usize,
+    cols: usize,
+}
 
 #[allow(clippy::too_many_arguments)]
 fn encode_qwen35_full_attention_qkv_post_matvec(
@@ -1623,6 +1638,25 @@ fn qwen35_attention_device_surface(backend: &CudaBackend) -> PsionRvllmCudaDevic
             )
         });
     PsionRvllmCudaDeviceSurface::new(architecture, compute_capability)
+}
+
+fn register_qwen35_cublaslt_scope(
+    backend: &CudaBackend,
+    representatives: &mut BTreeMap<&'static str, Qwen35CublasLtRepresentative>,
+    op_kind: &'static str,
+    weight: &CudaBuffer,
+    inner: usize,
+    cols: usize,
+) {
+    let scope = CudaGemmTuningScope::new(QWEN35_CUBLASLT_MODEL_FAMILY, op_kind);
+    backend.register_cublaslt_weight_scope(weight, scope);
+    representatives
+        .entry(op_kind)
+        .or_insert_with(|| Qwen35CublasLtRepresentative {
+            weight: weight.clone(),
+            inner,
+            cols,
+        });
 }
 
 fn qwen35_decode_output_metrics(
@@ -2092,6 +2126,103 @@ impl CudaQwen35Model {
             self.descriptor.config.vocab_size,
             self.descriptor.config.max_context,
         )
+    }
+
+    fn autotune_cublaslt_plans(
+        &self,
+        backend: &mut CudaBackend,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let mut representatives = BTreeMap::new();
+        if let Some(weight) = self.output.transposed_f16.as_ref() {
+            register_qwen35_cublaslt_scope(
+                backend,
+                &mut representatives,
+                "output_logits",
+                weight,
+                self.output.host.columns,
+                self.output.host.rows,
+            );
+        }
+        for layer in &self.layers {
+            if let Some(weight) = layer.ffn_gate_up.transposed_f16.as_ref() {
+                register_qwen35_cublaslt_scope(
+                    backend,
+                    &mut representatives,
+                    "ffn_gate_up",
+                    weight,
+                    layer.ffn_gate_up.columns,
+                    layer.ffn_gate_up.total_rows(),
+                );
+            }
+            if let Some(weight) = layer.ffn_down.transposed_f16.as_ref() {
+                register_qwen35_cublaslt_scope(
+                    backend,
+                    &mut representatives,
+                    "ffn_down",
+                    weight,
+                    layer.ffn_down.host.columns,
+                    layer.ffn_down.host.rows,
+                );
+            }
+            match &layer.kind {
+                Qwen35LayerKind::Hybrid(hybrid) => {
+                    if let Some(weight) = hybrid.qkv_gate_alpha_beta.transposed_f16.as_ref() {
+                        register_qwen35_cublaslt_scope(
+                            backend,
+                            &mut representatives,
+                            "hybrid_qkv_gate_alpha_beta",
+                            weight,
+                            hybrid.qkv_gate_alpha_beta.columns,
+                            hybrid.qkv_gate_alpha_beta.total_rows(),
+                        );
+                    }
+                    if let Some(weight) = hybrid.ssm_out.transposed_f16.as_ref() {
+                        register_qwen35_cublaslt_scope(
+                            backend,
+                            &mut representatives,
+                            "hybrid_ssm_out",
+                            weight,
+                            hybrid.ssm_out.host.columns,
+                            hybrid.ssm_out.host.rows,
+                        );
+                    }
+                }
+                Qwen35LayerKind::FullAttention(full_attention) => {
+                    if let Some(weight) = full_attention.qkv.transposed_f16.as_ref() {
+                        register_qwen35_cublaslt_scope(
+                            backend,
+                            &mut representatives,
+                            "attention_qkv",
+                            weight,
+                            full_attention.qkv.columns,
+                            full_attention.qkv.total_rows(),
+                        );
+                    }
+                    if let Some(weight) = full_attention.output.transposed_f16.as_ref() {
+                        register_qwen35_cublaslt_scope(
+                            backend,
+                            &mut representatives,
+                            "attention_output",
+                            weight,
+                            full_attention.output.host.columns,
+                            full_attention.output.host.rows,
+                        );
+                    }
+                }
+            }
+        }
+        for (op_kind, representative) in representatives {
+            backend
+                .autotune_cublaslt_f16_to_f32_weight_rows(
+                    &representative.weight,
+                    CudaGemmTuningScope::new(QWEN35_CUBLASLT_MODEL_FAMILY, op_kind),
+                    representative.inner,
+                    representative.cols,
+                    &QWEN35_CUBLASLT_ROW_LADDER,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        Ok(())
     }
 
     fn max_projection_input_columns(&self) -> usize {

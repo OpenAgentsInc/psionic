@@ -18,7 +18,7 @@
 )]
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env, fmt,
     fs::OpenOptions,
     io::{ErrorKind, Write},
@@ -26,7 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use half::bf16;
+use half::{bf16, f16};
 use psionic_compiler::compile_graph;
 use psionic_core::{
     BackendExtensionKind, BackendExtensionOp, DType, Device, DeviceKind, QuantizationMode, Shape,
@@ -61,6 +61,7 @@ const CUDA_EXECUTION_PLAN_CACHE_MAX_ENTRIES: usize = 64;
 const CUDA_EXECUTION_PLAN_CACHE_MAX_CACHED_BYTES: u64 = 1024 * 1024;
 const HOST_FALLBACK_PARALLEL_MIN_ELEMENTS: usize = 16 * 1024;
 const HOST_FALLBACK_PARALLEL_MIN_CHUNK_ELEMENTS: usize = 1024;
+const CUDA_CUBLASLT_F16_TO_F32_MAX_ROWS: usize = 32;
 
 /// Exact plan surface currently covered by the first CUDA-backed served-product
 /// milestone.
@@ -118,6 +119,62 @@ pub struct CudaAllocatorPoolTelemetry {
     pub returned_buffers: u64,
     /// Number of returned buffers evicted instead of cached.
     pub evicted_returns: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CudaGemmTuningScope {
+    pub model_family: String,
+    pub op_kind: String,
+}
+
+impl CudaGemmTuningScope {
+    #[must_use]
+    pub fn new(model_family: impl Into<String>, op_kind: impl Into<String>) -> Self {
+        Self {
+            model_family: model_family.into(),
+            op_kind: op_kind.into(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CudaGemmTuningShape {
+    pub rows: usize,
+    pub inner: usize,
+    pub cols: usize,
+}
+
+impl CudaGemmTuningShape {
+    #[must_use]
+    pub const fn new(rows: usize, inner: usize, cols: usize) -> Self {
+        Self { rows, inner, cols }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CudaGemmTuningPlanReport {
+    pub model_family: String,
+    pub op_kind: String,
+    pub rows: usize,
+    pub inner: usize,
+    pub cols: usize,
+    pub input_dtype: String,
+    pub output_dtype: String,
+    pub backend_route: String,
+    pub workspace_bytes: u64,
+    pub mean_time_us: u64,
+    pub algorithm_fingerprint: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CudaGemmTuningReport {
+    pub tuning_status: String,
+    pub plan_cache_scope: String,
+    pub selected_plan_count: usize,
+    pub tuned_shape_count: usize,
+    pub fallback_shape_count: usize,
+    pub max_workspace_bytes: u64,
+    pub selected_plans: Vec<CudaGemmTuningPlanReport>,
 }
 
 #[derive(Debug)]
@@ -767,6 +824,29 @@ impl CudaBuffer {
         let mut bytes = Vec::with_capacity(self.byte_len);
         for value in values {
             bytes.extend_from_slice(&bf16::from_f32(*value).to_bits().to_ne_bytes());
+        }
+        self.write_bytes(bytes.as_slice())
+    }
+
+    /// Writes contiguous `f32` values into an `f16` buffer with explicit
+    /// round-to-f16 conversion on the host staging path.
+    pub fn write_f16_from_f32(&mut self, values: &[f32]) -> Result<(), RuntimeError> {
+        if self.spec.dtype() != DType::F16 {
+            return Err(RuntimeError::Backend(format!(
+                "write_f16_from_f32 requires F16 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        if values.len() != self.spec.storage_size() {
+            return Err(RuntimeError::Backend(format!(
+                "cuda f16 buffer write length mismatch: expected {} values, actual {}",
+                self.spec.storage_size(),
+                values.len()
+            )));
+        }
+        let mut bytes = Vec::with_capacity(self.byte_len);
+        for value in values {
+            bytes.extend_from_slice(&f16::from_f32(*value).to_bits().to_ne_bytes());
         }
         self.write_bytes(bytes.as_slice())
     }
@@ -3931,6 +4011,78 @@ impl CudaBackend {
             }
             CudaBackendState::Unavailable(_) => None,
         }
+    }
+
+    /// Returns explicit cuBLASLt GEMM tuning evidence for the selected CUDA device.
+    #[must_use]
+    pub fn cuda_gemm_tuning_report(&self) -> Option<CudaGemmTuningReport> {
+        match &self.state {
+            CudaBackendState::Available(backend) => Some(backend.platform.cuda_gemm_tuning_report()),
+            CudaBackendState::Unavailable(_) => None,
+        }
+    }
+
+    /// Registers one transposed-f16 weight buffer with an explicit serving scope
+    /// so the runtime can use scope-keyed cuBLASLt plans instead of a generic
+    /// shape-only fallback.
+    pub fn register_cublaslt_weight_scope(
+        &self,
+        weight: &CudaBuffer,
+        scope: CudaGemmTuningScope,
+    ) {
+        if let CudaBackendState::Available(backend) = &self.state {
+            backend
+                .platform
+                .register_cublaslt_weight_scope(weight.allocation_identity(), scope);
+        }
+    }
+
+    /// Bounded startup tuning for one hot `f16 -> f32` GEMM weight on the
+    /// admitted CUDA serving lane.
+    pub fn autotune_cublaslt_f16_to_f32_weight_rows(
+        &mut self,
+        weight: &CudaBuffer,
+        scope: CudaGemmTuningScope,
+        inner: usize,
+        cols: usize,
+        row_ladder: &[usize],
+    ) -> Result<(), RuntimeError> {
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Ok(());
+        };
+        self.register_cublaslt_weight_scope(weight, scope);
+        let mut unique_rows = BTreeSet::new();
+        for rows in row_ladder.iter().copied() {
+            if rows == 0 || rows > CUDA_CUBLASLT_F16_TO_F32_MAX_ROWS {
+                continue;
+            }
+            unique_rows.insert(rows);
+        }
+        for rows in unique_rows {
+            let left_elements = rows.checked_mul(inner).ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda cuBLASLt startup tune left-buffer size overflow",
+                ))
+            })?;
+            let left_spec = TensorSpec::new(Shape::new(vec![left_elements]), DType::F16, device.clone());
+            let mut left = self.allocate(&left_spec)?;
+            let left_values = (0..left_elements)
+                .map(|index| (((index % 17) as f32) - 8.0) * 0.0625)
+                .collect::<Vec<_>>();
+            left.write_f16_from_f32(left_values.as_slice())?;
+            let output = self.f32_buffer(rows.checked_mul(cols).ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "cuda cuBLASLt startup tune output-buffer size overflow",
+                ))
+            })?)?;
+            let mut submission = self.begin_submission()?;
+            submission.matmul_f16_to_f32(&left, weight, &output, rows, inner, cols)?;
+            submission.commit(CudaCommandWait::Completed)?;
+        }
+        Ok(())
     }
 
     /// Creates a dense `f32` input buffer on the selected CUDA device.
@@ -9164,6 +9316,7 @@ fn parse_memory_bytes(value: &str) -> Option<u64> {
 #[cfg(target_os = "linux")]
 mod platform {
     use std::{
+        collections::{BTreeMap, BTreeSet},
         ffi::{CStr, c_char, c_int, c_longlong, c_void},
         sync::{Arc, Mutex},
     };
@@ -9181,8 +9334,13 @@ mod platform {
     type CudaStream = *mut c_void;
     type CudaGraph = *mut c_void;
     type CudaGraphExec = *mut c_void;
+    type CudaEvent = *mut c_void;
     type CublasStatus = i32;
     type CublasHandle = *mut c_void;
+    type CublasLtHandle = *mut c_void;
+    type CublasLtMatmulDesc = *mut c_void;
+    type CublasLtMatrixLayout = *mut c_void;
+    type CublasLtMatmulPreference = *mut c_void;
 
     const CUDA_SUCCESS: CudaError = 0;
     const CUBLAS_STATUS_SUCCESS: CublasStatus = 0;
@@ -9195,9 +9353,18 @@ mod platform {
     const CUDA_R_16F: c_int = 2;
     const CUDA_R_16BF: c_int = 14;
     const CUDA_STREAM_CAPTURE_MODE_RELAXED: c_int = 2;
+    const CUBLASLT_MATMUL_DESC_TRANSA: u32 = 0;
+    const CUBLASLT_MATMUL_DESC_TRANSB: u32 = 1;
+    const CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES: u32 = 1;
     const CUBLAS_COMPUTE_32F: c_int = 68;
     const CUBLAS_COMPUTE_32F_FAST_16F: c_int = 74;
     const CUBLAS_GEMM_DEFAULT_TENSOR_OP: c_int = 99;
+    const CUBLASLT_DEFAULT_MAX_WORKSPACE_BYTES: usize = 4 * 1024 * 1024;
+    const CUBLASLT_MAX_CANDIDATES: usize = 6;
+    const CUBLASLT_WARMUP_ITERS: usize = 1;
+    const CUBLASLT_BENCH_ITERS: usize = 2;
+    const CUBLASLT_PLAN_CACHE_SCOPE: &str = "per_device_runtime_owner";
+    const CUBLASLT_F16_TO_F32_BACKEND_ROUTE: &str = "cublaslt_matmul_f16_to_f32";
 
     type CudaGetErrorString = unsafe extern "C" fn(CudaError) -> *const c_char;
     type CudaSetDevice = unsafe extern "C" fn(c_int) -> CudaError;
@@ -9219,6 +9386,11 @@ mod platform {
     type CudaGraphLaunch = unsafe extern "C" fn(CudaGraphExec, CudaStream) -> CudaError;
     type CudaGraphExecDestroy = unsafe extern "C" fn(CudaGraphExec) -> CudaError;
     type CudaGraphDestroy = unsafe extern "C" fn(CudaGraph) -> CudaError;
+    type CudaEventCreate = unsafe extern "C" fn(*mut CudaEvent) -> CudaError;
+    type CudaEventDestroy = unsafe extern "C" fn(CudaEvent) -> CudaError;
+    type CudaEventRecord = unsafe extern "C" fn(CudaEvent, CudaStream) -> CudaError;
+    type CudaEventSynchronize = unsafe extern "C" fn(CudaEvent) -> CudaError;
+    type CudaEventElapsedTime = unsafe extern "C" fn(*mut f32, CudaEvent, CudaEvent) -> CudaError;
     type CublasCreate = unsafe extern "C" fn(*mut CublasHandle) -> CublasStatus;
     type CublasDestroy = unsafe extern "C" fn(CublasHandle) -> CublasStatus;
     type CublasSetStream = unsafe extern "C" fn(CublasHandle, CudaStream) -> CublasStatus;
@@ -9299,9 +9471,266 @@ mod platform {
         c_int,
         c_int,
     ) -> CublasStatus;
+    type CublasLtCreate = unsafe extern "C" fn(*mut CublasLtHandle) -> CublasStatus;
+    type CublasLtDestroy = unsafe extern "C" fn(CublasLtHandle) -> CublasStatus;
+    type CublasLtMatmulDescCreate =
+        unsafe extern "C" fn(*mut CublasLtMatmulDesc, c_int, c_int) -> CublasStatus;
+    type CublasLtMatmulDescDestroy = unsafe extern "C" fn(CublasLtMatmulDesc) -> CublasStatus;
+    type CublasLtMatmulDescSetAttribute =
+        unsafe extern "C" fn(CublasLtMatmulDesc, u32, *const c_void, usize) -> CublasStatus;
+    type CublasLtMatrixLayoutCreate = unsafe extern "C" fn(
+        *mut CublasLtMatrixLayout,
+        c_int,
+        u64,
+        u64,
+        i64,
+    ) -> CublasStatus;
+    type CublasLtMatrixLayoutDestroy =
+        unsafe extern "C" fn(CublasLtMatrixLayout) -> CublasStatus;
+    type CublasLtMatmulPreferenceCreate =
+        unsafe extern "C" fn(*mut CublasLtMatmulPreference) -> CublasStatus;
+    type CublasLtMatmulPreferenceDestroy =
+        unsafe extern "C" fn(CublasLtMatmulPreference) -> CublasStatus;
+    type CublasLtMatmulPreferenceSetAttribute = unsafe extern "C" fn(
+        CublasLtMatmulPreference,
+        u32,
+        *const c_void,
+        usize,
+    ) -> CublasStatus;
+    type CublasLtMatmulAlgoGetHeuristic = unsafe extern "C" fn(
+        CublasLtHandle,
+        CublasLtMatmulDesc,
+        CublasLtMatrixLayout,
+        CublasLtMatrixLayout,
+        CublasLtMatrixLayout,
+        CublasLtMatrixLayout,
+        CublasLtMatmulPreference,
+        c_int,
+        *mut CublasLtMatmulHeuristicResult,
+        *mut c_int,
+    ) -> CublasStatus;
+    type CublasLtMatmul = unsafe extern "C" fn(
+        CublasLtHandle,
+        CublasLtMatmulDesc,
+        *const c_void,
+        *const c_void,
+        CublasLtMatrixLayout,
+        *const c_void,
+        CublasLtMatrixLayout,
+        *const c_void,
+        *mut c_void,
+        CublasLtMatrixLayout,
+        *mut c_void,
+        CublasLtMatrixLayout,
+        *const CublasLtMatmulAlgo,
+        *mut c_void,
+        usize,
+        CudaStream,
+    ) -> CublasStatus;
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    struct CublasLtMatmulAlgo {
+        data: [u64; 8],
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct CublasLtMatmulHeuristicResult {
+        algo: CublasLtMatmulAlgo,
+        workspace_size: usize,
+        state: CublasStatus,
+        waves_count: f32,
+        reserved: [c_int; 4],
+    }
 
     fn cublas_row_major_op(transpose: bool) -> c_int {
         if transpose { CUBLAS_OP_T } else { CUBLAS_OP_N }
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    struct CublasLtPlanKey {
+        scope: super::CudaGemmTuningScope,
+        rows: usize,
+        inner: usize,
+        cols: usize,
+    }
+
+    struct CublasLtPlan {
+        key: CublasLtPlanKey,
+        desc: CublasLtMatmulDesc,
+        right_layout: CublasLtMatrixLayout,
+        left_layout: CublasLtMatrixLayout,
+        output_layout: CublasLtMatrixLayout,
+        algo: CublasLtMatmulAlgo,
+        workspace_size: usize,
+        mean_time_us: u64,
+    }
+
+    struct CublasLtContext {
+        _library: Library,
+        handle: CublasLtHandle,
+        destroy: CublasLtDestroy,
+        matmul_desc_create: CublasLtMatmulDescCreate,
+        matmul_desc_destroy: CublasLtMatmulDescDestroy,
+        matmul_desc_set_attribute: CublasLtMatmulDescSetAttribute,
+        matrix_layout_create: CublasLtMatrixLayoutCreate,
+        matrix_layout_destroy: CublasLtMatrixLayoutDestroy,
+        matmul_preference_create: CublasLtMatmulPreferenceCreate,
+        matmul_preference_destroy: CublasLtMatmulPreferenceDestroy,
+        matmul_preference_set_attribute: CublasLtMatmulPreferenceSetAttribute,
+        matmul_algo_get_heuristic: CublasLtMatmulAlgoGetHeuristic,
+        matmul: CublasLtMatmul,
+        workspace_ptr: *mut c_void,
+        workspace_size: usize,
+        weight_scopes: BTreeMap<usize, super::CudaGemmTuningScope>,
+        plans: BTreeMap<CublasLtPlanKey, CublasLtPlan>,
+        fallback_shapes: BTreeSet<CublasLtPlanKey>,
+        unavailable_reason: Option<String>,
+    }
+
+    struct CublasLtMatmulDescGuard {
+        raw: CublasLtMatmulDesc,
+        destroy: CublasLtMatmulDescDestroy,
+    }
+
+    impl CublasLtMatmulDescGuard {
+        fn into_raw(self) -> CublasLtMatmulDesc {
+            let raw = self.raw;
+            std::mem::forget(self);
+            raw
+        }
+    }
+
+    impl Drop for CublasLtMatmulDescGuard {
+        fn drop(&mut self) {
+            if !self.raw.is_null() {
+                let _ = unsafe { (self.destroy)(self.raw) };
+                self.raw = std::ptr::null_mut();
+            }
+        }
+    }
+
+    struct CublasLtMatrixLayoutGuard {
+        raw: CublasLtMatrixLayout,
+        destroy: CublasLtMatrixLayoutDestroy,
+    }
+
+    impl CublasLtMatrixLayoutGuard {
+        fn into_raw(self) -> CublasLtMatrixLayout {
+            let raw = self.raw;
+            std::mem::forget(self);
+            raw
+        }
+    }
+
+    impl Drop for CublasLtMatrixLayoutGuard {
+        fn drop(&mut self) {
+            if !self.raw.is_null() {
+                let _ = unsafe { (self.destroy)(self.raw) };
+                self.raw = std::ptr::null_mut();
+            }
+        }
+    }
+
+    struct CublasLtMatmulPreferenceGuard {
+        raw: CublasLtMatmulPreference,
+        destroy: CublasLtMatmulPreferenceDestroy,
+    }
+
+    impl Drop for CublasLtMatmulPreferenceGuard {
+        fn drop(&mut self) {
+            if !self.raw.is_null() {
+                let _ = unsafe { (self.destroy)(self.raw) };
+                self.raw = std::ptr::null_mut();
+            }
+        }
+    }
+
+    struct CudaEventGuard<'a> {
+        runtime: &'a CudaRuntime,
+        raw: CudaEvent,
+    }
+
+    impl<'a> CudaEventGuard<'a> {
+        fn new(runtime: &'a CudaRuntime) -> Result<Self, RuntimeError> {
+            let mut raw = std::ptr::null_mut();
+            runtime.check(
+                unsafe { (runtime.cuda_event_create)(&mut raw) },
+                "cudaEventCreate",
+            )?;
+            Ok(Self { runtime, raw })
+        }
+
+        fn record(&self, stream: CudaStream) -> Result<(), RuntimeError> {
+            self.runtime.check(
+                unsafe { (self.runtime.cuda_event_record)(self.raw, stream) },
+                "cudaEventRecord",
+            )
+        }
+
+        fn synchronize(&self) -> Result<(), RuntimeError> {
+            self.runtime.check(
+                unsafe { (self.runtime.cuda_event_synchronize)(self.raw) },
+                "cudaEventSynchronize",
+            )
+        }
+
+        fn elapsed_ms(&self, start: &Self) -> Result<f32, RuntimeError> {
+            let mut elapsed_ms = 0.0_f32;
+            self.runtime.check(
+                unsafe {
+                    (self.runtime.cuda_event_elapsed_time)(&mut elapsed_ms, start.raw, self.raw)
+                },
+                "cudaEventElapsedTime",
+            )?;
+            Ok(elapsed_ms)
+        }
+    }
+
+    impl Drop for CudaEventGuard<'_> {
+        fn drop(&mut self) {
+            if !self.raw.is_null() {
+                let _ = self.runtime.set_device();
+                let _ = self
+                    .runtime
+                    .check(unsafe { (self.runtime.cuda_event_destroy)(self.raw) }, "cudaEventDestroy");
+                self.raw = std::ptr::null_mut();
+            }
+        }
+    }
+
+    impl Drop for CublasLtContext {
+        fn drop(&mut self) {
+            for plan in self.plans.values_mut() {
+                if !plan.desc.is_null() {
+                    let _ = unsafe { (self.matmul_desc_destroy)(plan.desc) };
+                    plan.desc = std::ptr::null_mut();
+                }
+                if !plan.right_layout.is_null() {
+                    let _ = unsafe { (self.matrix_layout_destroy)(plan.right_layout) };
+                    plan.right_layout = std::ptr::null_mut();
+                }
+                if !plan.left_layout.is_null() {
+                    let _ = unsafe { (self.matrix_layout_destroy)(plan.left_layout) };
+                    plan.left_layout = std::ptr::null_mut();
+                }
+                if !plan.output_layout.is_null() {
+                    let _ = unsafe { (self.matrix_layout_destroy)(plan.output_layout) };
+                    plan.output_layout = std::ptr::null_mut();
+                }
+            }
+            if !self.workspace_ptr.is_null() {
+                // The owning CUDA runtime frees this pointer before dropping the
+                // context library handles.
+                self.workspace_ptr = std::ptr::null_mut();
+                self.workspace_size = 0;
+            }
+            if !self.handle.is_null() {
+                let _ = unsafe { (self.destroy)(self.handle) };
+                self.handle = std::ptr::null_mut();
+            }
+        }
     }
 
     type QuantizedMatvecKernel = unsafe extern "C" fn(
@@ -10493,6 +10922,11 @@ mod platform {
         cuda_graph_launch: CudaGraphLaunch,
         cuda_graph_exec_destroy: CudaGraphExecDestroy,
         cuda_graph_destroy: CudaGraphDestroy,
+        cuda_event_create: CudaEventCreate,
+        cuda_event_destroy: CudaEventDestroy,
+        cuda_event_record: CudaEventRecord,
+        cuda_event_synchronize: CudaEventSynchronize,
+        cuda_event_elapsed_time: CudaEventElapsedTime,
         cublas_handle: CublasHandle,
         cublas_create: CublasCreate,
         cublas_destroy: CublasDestroy,
@@ -10501,6 +10935,7 @@ mod platform {
         cublas_sgeam: CublasSgeam,
         cublas_gemm_ex: CublasGemmEx,
         cublas_gemm_strided_batched_ex: CublasGemmStridedBatchedEx,
+        cublaslt: Option<Mutex<CublasLtContext>>,
     }
 
     impl ConfiguredBackend {
@@ -10516,6 +10951,19 @@ mod platform {
                 .lock()
                 .expect("cuda allocator pool mutex should not be poisoned")
                 .telemetry()
+        }
+
+        pub(super) fn cuda_gemm_tuning_report(&self) -> super::CudaGemmTuningReport {
+            self.runtime.cuda_gemm_tuning_report()
+        }
+
+        pub(super) fn register_cublaslt_weight_scope(
+            &self,
+            allocation_identity: usize,
+            scope: super::CudaGemmTuningScope,
+        ) {
+            self.runtime
+                .register_cublaslt_weight_scope(allocation_identity, scope);
         }
 
         pub(super) fn allocate(
@@ -11100,6 +11548,18 @@ mod platform {
             let alpha = 1.0_f32;
             let beta = 0.0_f32;
             self.runtime.bind_stream(self.stream)?;
+            if self.runtime.maybe_execute_cublaslt_f16_to_f32(
+                self.stream,
+                self.capturing,
+                left,
+                right,
+                output,
+                rows,
+                inner,
+                cols,
+            )? {
+                return Ok(());
+            }
             self.runtime.check_cublas(
                 unsafe {
                     (self.runtime.cublas_gemm_ex)(
@@ -15550,6 +16010,17 @@ mod platform {
                     load_symbol(&cudart_library, b"cudaGraphExecDestroy\0")?
                 },
                 cuda_graph_destroy: unsafe { load_symbol(&cudart_library, b"cudaGraphDestroy\0")? },
+                cuda_event_create: unsafe { load_symbol(&cudart_library, b"cudaEventCreate\0")? },
+                cuda_event_destroy: unsafe {
+                    load_symbol(&cudart_library, b"cudaEventDestroy\0")?
+                },
+                cuda_event_record: unsafe { load_symbol(&cudart_library, b"cudaEventRecord\0")? },
+                cuda_event_synchronize: unsafe {
+                    load_symbol(&cudart_library, b"cudaEventSynchronize\0")?
+                },
+                cuda_event_elapsed_time: unsafe {
+                    load_symbol(&cudart_library, b"cudaEventElapsedTime\0")?
+                },
                 cublas_handle: std::ptr::null_mut(),
                 cublas_create: unsafe { load_symbol(&cublas_library, b"cublasCreate_v2\0")? },
                 cublas_destroy: unsafe { load_symbol(&cublas_library, b"cublasDestroy_v2\0")? },
@@ -15562,6 +16033,7 @@ mod platform {
                 cublas_gemm_strided_batched_ex: unsafe {
                     load_symbol(&cublas_library, b"cublasGemmStridedBatchedEx\0")?
                 },
+                cublaslt: load_cublaslt_context()?,
                 _cudart_library: cudart_library,
                 _cublas_library: cublas_library,
             };
@@ -15587,6 +16059,468 @@ mod platform {
             self.check_cublas(
                 unsafe { (self.cublas_set_stream)(self.cublas_handle, stream) },
                 "cublasSetStream_v2",
+            )
+        }
+
+        fn register_cublaslt_weight_scope(
+            &self,
+            allocation_identity: usize,
+            scope: super::CudaGemmTuningScope,
+        ) {
+            let Some(context) = self.cublaslt.as_ref() else {
+                return;
+            };
+            let mut context = context
+                .lock()
+                .expect("cuda cublasLt context mutex should not be poisoned");
+            context.weight_scopes.insert(allocation_identity, scope);
+        }
+
+        fn cuda_gemm_tuning_report(&self) -> super::CudaGemmTuningReport {
+            let Some(context) = self.cublaslt.as_ref() else {
+                return super::CudaGemmTuningReport {
+                    tuning_status: String::from("unavailable"),
+                    plan_cache_scope: String::from(CUBLASLT_PLAN_CACHE_SCOPE),
+                    selected_plan_count: 0,
+                    tuned_shape_count: 0,
+                    fallback_shape_count: 0,
+                    max_workspace_bytes: 0,
+                    selected_plans: Vec::new(),
+                };
+            };
+            let context = context
+                .lock()
+                .expect("cuda cublasLt context mutex should not be poisoned");
+            let tuning_status = if let Some(reason) = context.unavailable_reason.as_ref() {
+                format!("unavailable:{reason}")
+            } else if !context.plans.is_empty() && context.fallback_shapes.is_empty() {
+                String::from("tuning_complete")
+            } else if !context.plans.is_empty() {
+                String::from("partial_tuning_with_fallbacks")
+            } else if !context.fallback_shapes.is_empty() {
+                String::from("fallback_only")
+            } else {
+                String::from("ready_no_plans")
+            };
+            super::CudaGemmTuningReport {
+                tuning_status,
+                plan_cache_scope: String::from(CUBLASLT_PLAN_CACHE_SCOPE),
+                selected_plan_count: context.plans.len(),
+                tuned_shape_count: context.plans.len(),
+                fallback_shape_count: context.fallback_shapes.len(),
+                max_workspace_bytes: context.workspace_size as u64,
+                selected_plans: context
+                    .plans
+                    .values()
+                    .map(|plan| super::CudaGemmTuningPlanReport {
+                        model_family: plan.key.scope.model_family.clone(),
+                        op_kind: plan.key.scope.op_kind.clone(),
+                        rows: plan.key.rows,
+                        inner: plan.key.inner,
+                        cols: plan.key.cols,
+                        input_dtype: String::from("f16"),
+                        output_dtype: String::from("f32"),
+                        backend_route: String::from(CUBLASLT_F16_TO_F32_BACKEND_ROUTE),
+                        workspace_bytes: plan.workspace_size as u64,
+                        mean_time_us: plan.mean_time_us,
+                        algorithm_fingerprint: cublaslt_algo_fingerprint(plan.algo),
+                    })
+                    .collect(),
+            }
+        }
+
+        fn maybe_execute_cublaslt_f16_to_f32(
+            &self,
+            stream: CudaStream,
+            capturing: bool,
+            left: &PlatformBuffer,
+            right: &PlatformBuffer,
+            output: &PlatformBuffer,
+            rows: usize,
+            inner: usize,
+            cols: usize,
+        ) -> Result<bool, RuntimeError> {
+            if rows == 0
+                || inner == 0
+                || cols == 0
+                || rows > super::CUDA_CUBLASLT_F16_TO_F32_MAX_ROWS
+            {
+                return Ok(false);
+            }
+            let Some(context_mutex) = self.cublaslt.as_ref() else {
+                return Ok(false);
+            };
+            let mut context = context_mutex
+                .lock()
+                .expect("cuda cublasLt context mutex should not be poisoned");
+            if context.unavailable_reason.is_some() {
+                return Ok(false);
+            }
+            let Some(scope) = context
+                .weight_scopes
+                .get(&right.allocation_identity())
+                .cloned()
+            else {
+                return Ok(false);
+            };
+            let key = CublasLtPlanKey {
+                scope,
+                rows,
+                inner,
+                cols,
+            };
+            if !context.plans.contains_key(&key) {
+                if capturing {
+                    return Ok(false);
+                }
+                match self.tune_cublaslt_f16_to_f32_plan(
+                    &mut context,
+                    key.clone(),
+                    stream,
+                    left,
+                    right,
+                    output,
+                ) {
+                    Ok(plan) => {
+                        context.plans.insert(key.clone(), plan);
+                    }
+                    Err(_) => {
+                        context.fallback_shapes.insert(key);
+                        return Ok(false);
+                    }
+                }
+            }
+            let execute_result = {
+                let Some(plan) = context.plans.get(&key) else {
+                    return Ok(false);
+                };
+                self.execute_cublaslt_f16_to_f32_plan(&context, plan, stream, left, right, output)
+            };
+            if execute_result.is_err() {
+                context.fallback_shapes.insert(key);
+                return Ok(false);
+            }
+            Ok(true)
+        }
+
+        fn tune_cublaslt_f16_to_f32_plan(
+            &self,
+            context: &mut CublasLtContext,
+            key: CublasLtPlanKey,
+            stream: CudaStream,
+            left: &PlatformBuffer,
+            right: &PlatformBuffer,
+            output: &PlatformBuffer,
+        ) -> Result<CublasLtPlan, RuntimeError> {
+            self.set_device()?;
+
+            let mut desc = std::ptr::null_mut();
+            self.check_cublas(
+                unsafe {
+                    (context.matmul_desc_create)(&mut desc, CUBLAS_COMPUTE_32F_FAST_16F, CUDA_R_32F)
+                },
+                "cublasLtMatmulDescCreate",
+            )?;
+            let desc = CublasLtMatmulDescGuard {
+                raw: desc,
+                destroy: context.matmul_desc_destroy,
+            };
+            let trans_a = CUBLAS_OP_T;
+            let trans_b = CUBLAS_OP_N;
+            self.check_cublas(
+                unsafe {
+                    (context.matmul_desc_set_attribute)(
+                        desc.raw,
+                        CUBLASLT_MATMUL_DESC_TRANSA,
+                        (&trans_a as *const c_int).cast(),
+                        std::mem::size_of_val(&trans_a),
+                    )
+                },
+                "cublasLtMatmulDescSetAttribute(transa)",
+            )?;
+            self.check_cublas(
+                unsafe {
+                    (context.matmul_desc_set_attribute)(
+                        desc.raw,
+                        CUBLASLT_MATMUL_DESC_TRANSB,
+                        (&trans_b as *const c_int).cast(),
+                        std::mem::size_of_val(&trans_b),
+                    )
+                },
+                "cublasLtMatmulDescSetAttribute(transb)",
+            )?;
+
+            let mut right_layout = std::ptr::null_mut();
+            self.check_cublas(
+                unsafe {
+                    (context.matrix_layout_create)(
+                        &mut right_layout,
+                        CUDA_R_16F,
+                        key.inner as u64,
+                        key.cols as u64,
+                        key.inner as i64,
+                    )
+                },
+                "cublasLtMatrixLayoutCreate(right)",
+            )?;
+            let right_layout = CublasLtMatrixLayoutGuard {
+                raw: right_layout,
+                destroy: context.matrix_layout_destroy,
+            };
+
+            let mut left_layout = std::ptr::null_mut();
+            self.check_cublas(
+                unsafe {
+                    (context.matrix_layout_create)(
+                        &mut left_layout,
+                        CUDA_R_16F,
+                        key.inner as u64,
+                        key.rows as u64,
+                        key.inner as i64,
+                    )
+                },
+                "cublasLtMatrixLayoutCreate(left)",
+            )?;
+            let left_layout = CublasLtMatrixLayoutGuard {
+                raw: left_layout,
+                destroy: context.matrix_layout_destroy,
+            };
+
+            let mut output_layout = std::ptr::null_mut();
+            self.check_cublas(
+                unsafe {
+                    (context.matrix_layout_create)(
+                        &mut output_layout,
+                        CUDA_R_32F,
+                        key.cols as u64,
+                        key.rows as u64,
+                        key.cols as i64,
+                    )
+                },
+                "cublasLtMatrixLayoutCreate(output)",
+            )?;
+            let output_layout = CublasLtMatrixLayoutGuard {
+                raw: output_layout,
+                destroy: context.matrix_layout_destroy,
+            };
+
+            let mut preference = std::ptr::null_mut();
+            self.check_cublas(
+                unsafe { (context.matmul_preference_create)(&mut preference) },
+                "cublasLtMatmulPreferenceCreate",
+            )?;
+            let preference = CublasLtMatmulPreferenceGuard {
+                raw: preference,
+                destroy: context.matmul_preference_destroy,
+            };
+            let workspace_limit = CUBLASLT_DEFAULT_MAX_WORKSPACE_BYTES;
+            self.check_cublas(
+                unsafe {
+                    (context.matmul_preference_set_attribute)(
+                        preference.raw,
+                        CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                        (&workspace_limit as *const usize).cast(),
+                        std::mem::size_of_val(&workspace_limit),
+                    )
+                },
+                "cublasLtMatmulPreferenceSetAttribute(max_workspace)",
+            )?;
+
+            let mut heuristics =
+                vec![std::mem::zeroed::<CublasLtMatmulHeuristicResult>(); CUBLASLT_MAX_CANDIDATES];
+            let mut returned = 0_i32;
+            self.check_cublas(
+                unsafe {
+                    (context.matmul_algo_get_heuristic)(
+                        context.handle,
+                        desc.raw,
+                        right_layout.raw,
+                        left_layout.raw,
+                        output_layout.raw,
+                        output_layout.raw,
+                        preference.raw,
+                        c_int::try_from(CUBLASLT_MAX_CANDIDATES).unwrap_or(c_int::MAX),
+                        heuristics.as_mut_ptr(),
+                        &mut returned,
+                    )
+                },
+                "cublasLtMatmulAlgoGetHeuristic",
+            )?;
+            if returned <= 0 {
+                return Err(RuntimeError::Backend(String::from(
+                    "cublasLt returned no admitted heuristic algorithms",
+                )));
+            }
+
+            let alpha = 1.0_f32;
+            let beta = 0.0_f32;
+            let alpha_ptr = (&alpha as *const f32).cast::<c_void>();
+            let beta_ptr = (&beta as *const f32).cast::<c_void>();
+            let mut best: Option<(CublasLtMatmulAlgo, usize, u64)> = None;
+            for heuristic in heuristics
+                .into_iter()
+                .take(returned.max(0) as usize)
+                .filter(|heuristic| heuristic.state == CUBLAS_STATUS_SUCCESS)
+                .filter(|heuristic| heuristic.workspace_size <= CUBLASLT_DEFAULT_MAX_WORKSPACE_BYTES)
+            {
+                self.ensure_cublaslt_workspace(context, heuristic.workspace_size)?;
+                let workspace_ptr = if heuristic.workspace_size == 0 {
+                    std::ptr::null_mut()
+                } else {
+                    context.workspace_ptr
+                };
+                let mut admitted = true;
+                for _ in 0..CUBLASLT_WARMUP_ITERS {
+                    if unsafe {
+                        (context.matmul)(
+                            context.handle,
+                            desc.raw,
+                            alpha_ptr,
+                            right.inner.device_ptr,
+                            right_layout.raw,
+                            left.inner.device_ptr,
+                            left_layout.raw,
+                            beta_ptr,
+                            output.inner.device_ptr,
+                            output_layout.raw,
+                            output.inner.device_ptr,
+                            output_layout.raw,
+                            &heuristic.algo,
+                            workspace_ptr,
+                            heuristic.workspace_size,
+                            stream,
+                        )
+                    } != CUBLAS_STATUS_SUCCESS
+                    {
+                        admitted = false;
+                        break;
+                    }
+                }
+                if !admitted {
+                    continue;
+                }
+                let start = CudaEventGuard::new(self)?;
+                let stop = CudaEventGuard::new(self)?;
+                start.record(stream)?;
+                for _ in 0..CUBLASLT_BENCH_ITERS {
+                    self.check_cublas(
+                        unsafe {
+                            (context.matmul)(
+                                context.handle,
+                                desc.raw,
+                                alpha_ptr,
+                                right.inner.device_ptr,
+                                right_layout.raw,
+                                left.inner.device_ptr,
+                                left_layout.raw,
+                                beta_ptr,
+                                output.inner.device_ptr,
+                                output_layout.raw,
+                                output.inner.device_ptr,
+                                output_layout.raw,
+                                &heuristic.algo,
+                                workspace_ptr,
+                                heuristic.workspace_size,
+                                stream,
+                            )
+                        },
+                        "cublasLtMatmul(benchmark)",
+                    )?;
+                }
+                stop.record(stream)?;
+                stop.synchronize()?;
+                let mean_time_us =
+                    ((stop.elapsed_ms(&start)? * 1000.0) / CUBLASLT_BENCH_ITERS as f32).round()
+                        as u64;
+                if best
+                    .as_ref()
+                    .map(|(_, _, current)| mean_time_us < *current)
+                    .unwrap_or(true)
+                {
+                    best = Some((heuristic.algo, heuristic.workspace_size, mean_time_us));
+                }
+            }
+
+            let Some((algo, workspace_size, mean_time_us)) = best else {
+                return Err(RuntimeError::Backend(String::from(
+                    "cublasLt admitted no benchmark-stable algorithms for the requested shape",
+                )));
+            };
+            Ok(CublasLtPlan {
+                key,
+                desc: desc.into_raw(),
+                right_layout: right_layout.into_raw(),
+                left_layout: left_layout.into_raw(),
+                output_layout: output_layout.into_raw(),
+                algo,
+                workspace_size,
+                mean_time_us,
+            })
+        }
+
+        fn ensure_cublaslt_workspace(
+            &self,
+            context: &mut CublasLtContext,
+            workspace_size: usize,
+        ) -> Result<(), RuntimeError> {
+            if workspace_size <= context.workspace_size {
+                return Ok(());
+            }
+            if !context.workspace_ptr.is_null() {
+                self.check(unsafe { (self.cuda_free)(context.workspace_ptr) }, "cudaFree")?;
+                context.workspace_ptr = std::ptr::null_mut();
+                context.workspace_size = 0;
+            }
+            let mut workspace_ptr = std::ptr::null_mut();
+            self.check(
+                unsafe { (self.cuda_malloc)(&mut workspace_ptr, workspace_size.max(1)) },
+                "cudaMalloc",
+            )?;
+            context.workspace_ptr = workspace_ptr;
+            context.workspace_size = workspace_size;
+            Ok(())
+        }
+
+        fn execute_cublaslt_f16_to_f32_plan(
+            &self,
+            context: &CublasLtContext,
+            plan: &CublasLtPlan,
+            stream: CudaStream,
+            left: &PlatformBuffer,
+            right: &PlatformBuffer,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let alpha = 1.0_f32;
+            let beta = 0.0_f32;
+            let alpha_ptr = (&alpha as *const f32).cast::<c_void>();
+            let beta_ptr = (&beta as *const f32).cast::<c_void>();
+            let workspace_ptr = if plan.workspace_size == 0 {
+                std::ptr::null_mut()
+            } else {
+                context.workspace_ptr
+            };
+            self.check_cublas(
+                unsafe {
+                    (context.matmul)(
+                        context.handle,
+                        plan.desc,
+                        alpha_ptr,
+                        right.inner.device_ptr,
+                        plan.right_layout,
+                        left.inner.device_ptr,
+                        plan.left_layout,
+                        beta_ptr,
+                        output.inner.device_ptr,
+                        plan.output_layout,
+                        output.inner.device_ptr,
+                        plan.output_layout,
+                        &plan.algo,
+                        workspace_ptr,
+                        plan.workspace_size,
+                        stream,
+                    )
+                },
+                "cublasLtMatmul",
             )
         }
 
@@ -15620,6 +16554,19 @@ mod platform {
 
     impl Drop for CudaRuntime {
         fn drop(&mut self) {
+            if let Some(context) = self.cublaslt.as_ref() {
+                if let Ok(mut context) = context.lock() {
+                    if !context.workspace_ptr.is_null() {
+                        let _ = self.set_device();
+                        let _ = self.check(
+                            unsafe { (self.cuda_free)(context.workspace_ptr) },
+                            "cudaFree",
+                        );
+                        context.workspace_ptr = std::ptr::null_mut();
+                        context.workspace_size = 0;
+                    }
+                }
+            }
             if !self.cublas_handle.is_null() {
                 let _ = self.set_device();
                 let _ = self.check_cublas(
@@ -15671,6 +16618,108 @@ mod platform {
                     String::from_utf8_lossy(name).trim_end_matches('\0')
                 ))
             })
+    }
+
+    fn load_cublaslt_context() -> Result<Option<Mutex<CublasLtContext>>, RuntimeError> {
+        let library = match load_library(
+            &["libcublasLt.so.13", "libcublasLt.so"],
+            "failed to load libcublasLt.so.13 or libcublasLt.so",
+        ) {
+            Ok(library) => library,
+            Err(_) => return Ok(None),
+        };
+        let create: CublasLtCreate = match unsafe { load_symbol(&library, b"cublasLtCreate\0") } {
+            Ok(symbol) => symbol,
+            Err(_) => return Ok(None),
+        };
+        let destroy: CublasLtDestroy =
+            match unsafe { load_symbol(&library, b"cublasLtDestroy\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_desc_create: CublasLtMatmulDescCreate =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulDescCreate\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_desc_destroy: CublasLtMatmulDescDestroy =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulDescDestroy\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_desc_set_attribute: CublasLtMatmulDescSetAttribute =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulDescSetAttribute\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matrix_layout_create: CublasLtMatrixLayoutCreate =
+            match unsafe { load_symbol(&library, b"cublasLtMatrixLayoutCreate\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matrix_layout_destroy: CublasLtMatrixLayoutDestroy =
+            match unsafe { load_symbol(&library, b"cublasLtMatrixLayoutDestroy\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_preference_create: CublasLtMatmulPreferenceCreate =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulPreferenceCreate\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_preference_destroy: CublasLtMatmulPreferenceDestroy =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulPreferenceDestroy\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_preference_set_attribute: CublasLtMatmulPreferenceSetAttribute =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulPreferenceSetAttribute\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul_algo_get_heuristic: CublasLtMatmulAlgoGetHeuristic =
+            match unsafe { load_symbol(&library, b"cublasLtMatmulAlgoGetHeuristic\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let matmul: CublasLtMatmul =
+            match unsafe { load_symbol(&library, b"cublasLtMatmul\0") } {
+                Ok(symbol) => symbol,
+                Err(_) => return Ok(None),
+            };
+        let mut handle = std::ptr::null_mut();
+        if unsafe { (create)(&mut handle) } != CUBLAS_STATUS_SUCCESS {
+            return Ok(None);
+        }
+        Ok(Some(Mutex::new(CublasLtContext {
+            _library: library,
+            handle,
+            destroy,
+            matmul_desc_create,
+            matmul_desc_destroy,
+            matmul_desc_set_attribute,
+            matrix_layout_create,
+            matrix_layout_destroy,
+            matmul_preference_create,
+            matmul_preference_destroy,
+            matmul_preference_set_attribute,
+            matmul_algo_get_heuristic,
+            matmul,
+            workspace_ptr: std::ptr::null_mut(),
+            workspace_size: 0,
+            weight_scopes: BTreeMap::new(),
+            plans: BTreeMap::new(),
+            fallback_shapes: BTreeSet::new(),
+            unavailable_reason: None,
+        })))
+    }
+
+    fn cublaslt_algo_fingerprint(algo: CublasLtMatmulAlgo) -> String {
+        algo.data
+            .iter()
+            .map(|word| format!("{word:016x}"))
+            .collect::<Vec<_>>()
+            .join("")
     }
 
     fn load_cudart_library() -> Result<Library, RuntimeError> {
@@ -15726,6 +16775,25 @@ mod platform {
 
         pub(super) fn allocator_pool_telemetry(&self) -> CudaAllocatorPoolTelemetry {
             CudaAllocatorPoolTelemetry::default()
+        }
+
+        pub(super) fn cuda_gemm_tuning_report(&self) -> super::CudaGemmTuningReport {
+            super::CudaGemmTuningReport {
+                tuning_status: String::from("unavailable"),
+                plan_cache_scope: String::from("per_device_runtime_owner"),
+                selected_plan_count: 0,
+                tuned_shape_count: 0,
+                fallback_shape_count: 0,
+                max_workspace_bytes: 0,
+                selected_plans: Vec::new(),
+            }
+        }
+
+        pub(super) fn register_cublaslt_weight_scope(
+            &self,
+            _allocation_identity: usize,
+            _scope: super::CudaGemmTuningScope,
+        ) {
         }
 
         pub(super) fn allocate(
