@@ -153,6 +153,22 @@ than just run tensor math.
   making admitted startup autotune status, selected-plan receipts, fallback
   shape counts, and workspace posture machine-visible for native `qwen35` and
   native `gpt_oss` CUDA decode.
+- Later on March 31, 2026, the admitted native `qwen35` CUDA decode lane
+  moved the device token-embedding mirror, request decode params, and
+  initial-token seed inside the request-local captured graph for the argmax,
+  top-k, and raw-logit output branches, and the repo added captured-lane T>1
+  parity tests for those same branches against the debug-attention reference
+  path in `crates/psionic-serve/src/openai_http.rs`.
+- The same issue-805 pass also published one explicit before/after receipt
+  pair at
+  `fixtures/qwen35/benchmarks/qwen35_cuda_issue_805_20260331_archlinux_nongated.json`
+  and `fixtures/qwen35/benchmarks/qwen35_cuda_issue_805_20260331_archlinux.json`.
+  The compatibility receipt measured about `492.08 tok/s` with one graph shape
+  drift per request; the admitted rerun measured about `502.39 tok/s` with
+  `qwen35_graph_hits=27`, one initial graph capture plus one matching miss,
+  `qwen35_graph_shape_drifts=0`, `qwen35_readback_bytes=224`, zero host
+  fallback evidence, and
+  `qwen35_attention_backends=[fa3_split_kv_f16_kv_graph@split1]`.
 - The same pass now also retains one explicit GPU logits-selection packet at
   `docs/PSION_RVLLM_GPU_LOGITS_SELECTION.md`, binding the already-shipped
   qwen35 and gpt-oss device-argmax / bounded-candidate lanes to explicit

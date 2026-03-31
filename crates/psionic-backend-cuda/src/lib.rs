@@ -4017,7 +4017,9 @@ impl CudaBackend {
     #[must_use]
     pub fn cuda_gemm_tuning_report(&self) -> Option<CudaGemmTuningReport> {
         match &self.state {
-            CudaBackendState::Available(backend) => Some(backend.platform.cuda_gemm_tuning_report()),
+            CudaBackendState::Available(backend) => {
+                Some(backend.platform.cuda_gemm_tuning_report())
+            }
             CudaBackendState::Unavailable(_) => None,
         }
     }
@@ -4025,11 +4027,7 @@ impl CudaBackend {
     /// Registers one transposed-f16 weight buffer with an explicit serving scope
     /// so the runtime can use scope-keyed cuBLASLt plans instead of a generic
     /// shape-only fallback.
-    pub fn register_cublaslt_weight_scope(
-        &self,
-        weight: &CudaBuffer,
-        scope: CudaGemmTuningScope,
-    ) {
+    pub fn register_cublaslt_weight_scope(&self, weight: &CudaBuffer, scope: CudaGemmTuningScope) {
         if let CudaBackendState::Available(backend) = &self.state {
             backend
                 .platform
@@ -4067,7 +4065,8 @@ impl CudaBackend {
                     "cuda cuBLASLt startup tune left-buffer size overflow",
                 ))
             })?;
-            let left_spec = TensorSpec::new(Shape::new(vec![left_elements]), DType::F16, device.clone());
+            let left_spec =
+                TensorSpec::new(Shape::new(vec![left_elements]), DType::F16, device.clone());
             let mut left = self.allocate(&left_spec)?;
             let left_values = (0..left_elements)
                 .map(|index| (((index % 17) as f32) - 8.0) * 0.0625)
@@ -9478,25 +9477,15 @@ mod platform {
     type CublasLtMatmulDescDestroy = unsafe extern "C" fn(CublasLtMatmulDesc) -> CublasStatus;
     type CublasLtMatmulDescSetAttribute =
         unsafe extern "C" fn(CublasLtMatmulDesc, u32, *const c_void, usize) -> CublasStatus;
-    type CublasLtMatrixLayoutCreate = unsafe extern "C" fn(
-        *mut CublasLtMatrixLayout,
-        c_int,
-        u64,
-        u64,
-        i64,
-    ) -> CublasStatus;
-    type CublasLtMatrixLayoutDestroy =
-        unsafe extern "C" fn(CublasLtMatrixLayout) -> CublasStatus;
+    type CublasLtMatrixLayoutCreate =
+        unsafe extern "C" fn(*mut CublasLtMatrixLayout, c_int, u64, u64, i64) -> CublasStatus;
+    type CublasLtMatrixLayoutDestroy = unsafe extern "C" fn(CublasLtMatrixLayout) -> CublasStatus;
     type CublasLtMatmulPreferenceCreate =
         unsafe extern "C" fn(*mut CublasLtMatmulPreference) -> CublasStatus;
     type CublasLtMatmulPreferenceDestroy =
         unsafe extern "C" fn(CublasLtMatmulPreference) -> CublasStatus;
-    type CublasLtMatmulPreferenceSetAttribute = unsafe extern "C" fn(
-        CublasLtMatmulPreference,
-        u32,
-        *const c_void,
-        usize,
-    ) -> CublasStatus;
+    type CublasLtMatmulPreferenceSetAttribute =
+        unsafe extern "C" fn(CublasLtMatmulPreference, u32, *const c_void, usize) -> CublasStatus;
     type CublasLtMatmulAlgoGetHeuristic = unsafe extern "C" fn(
         CublasLtHandle,
         CublasLtMatmulDesc,
@@ -9692,9 +9681,10 @@ mod platform {
         fn drop(&mut self) {
             if !self.raw.is_null() {
                 let _ = self.runtime.set_device();
-                let _ = self
-                    .runtime
-                    .check(unsafe { (self.runtime.cuda_event_destroy)(self.raw) }, "cudaEventDestroy");
+                let _ = self.runtime.check(
+                    unsafe { (self.runtime.cuda_event_destroy)(self.raw) },
+                    "cudaEventDestroy",
+                );
                 self.raw = std::ptr::null_mut();
             }
         }
@@ -16011,9 +16001,7 @@ mod platform {
                 },
                 cuda_graph_destroy: unsafe { load_symbol(&cudart_library, b"cudaGraphDestroy\0")? },
                 cuda_event_create: unsafe { load_symbol(&cudart_library, b"cudaEventCreate\0")? },
-                cuda_event_destroy: unsafe {
-                    load_symbol(&cudart_library, b"cudaEventDestroy\0")?
-                },
+                cuda_event_destroy: unsafe { load_symbol(&cudart_library, b"cudaEventDestroy\0")? },
                 cuda_event_record: unsafe { load_symbol(&cudart_library, b"cudaEventRecord\0")? },
                 cuda_event_synchronize: unsafe {
                     load_symbol(&cudart_library, b"cudaEventSynchronize\0")?
@@ -16326,8 +16314,12 @@ mod platform {
                 "cublasLtMatmulPreferenceSetAttribute(max_workspace)",
             )?;
 
-            let mut heuristics =
-                vec![std::mem::zeroed::<CublasLtMatmulHeuristicResult>(); CUBLASLT_MAX_CANDIDATES];
+            let mut heuristics = vec![
+                // Safety: `cublasLtMatmulAlgoGetHeuristic` writes the returned entries before
+                // Psionic reads them, and we only inspect the prefix reported through `returned`.
+                unsafe { std::mem::zeroed::<CublasLtMatmulHeuristicResult>() };
+                CUBLASLT_MAX_CANDIDATES
+            ];
             let mut returned = 0_i32;
             self.check_cublas(
                 unsafe {
@@ -16361,7 +16353,9 @@ mod platform {
                 .into_iter()
                 .take(returned.max(0) as usize)
                 .filter(|heuristic| heuristic.state == CUBLAS_STATUS_SUCCESS)
-                .filter(|heuristic| heuristic.workspace_size <= CUBLASLT_DEFAULT_MAX_WORKSPACE_BYTES)
+                .filter(|heuristic| {
+                    heuristic.workspace_size <= CUBLASLT_DEFAULT_MAX_WORKSPACE_BYTES
+                })
             {
                 self.ensure_cublaslt_workspace(context, heuristic.workspace_size)?;
                 let workspace_ptr = if heuristic.workspace_size == 0 {
@@ -16429,9 +16423,9 @@ mod platform {
                 }
                 stop.record(stream)?;
                 stop.synchronize()?;
-                let mean_time_us =
-                    ((stop.elapsed_ms(&start)? * 1000.0) / CUBLASLT_BENCH_ITERS as f32).round()
-                        as u64;
+                let mean_time_us = ((stop.elapsed_ms(&start)? * 1000.0)
+                    / CUBLASLT_BENCH_ITERS as f32)
+                    .round() as u64;
                 if best
                     .as_ref()
                     .map(|(_, _, current)| mean_time_us < *current)
@@ -16467,7 +16461,10 @@ mod platform {
                 return Ok(());
             }
             if !context.workspace_ptr.is_null() {
-                self.check(unsafe { (self.cuda_free)(context.workspace_ptr) }, "cudaFree")?;
+                self.check(
+                    unsafe { (self.cuda_free)(context.workspace_ptr) },
+                    "cudaFree",
+                )?;
                 context.workspace_ptr = std::ptr::null_mut();
                 context.workspace_size = 0;
             }
@@ -16632,11 +16629,11 @@ mod platform {
             Ok(symbol) => symbol,
             Err(_) => return Ok(None),
         };
-        let destroy: CublasLtDestroy =
-            match unsafe { load_symbol(&library, b"cublasLtDestroy\0") } {
-                Ok(symbol) => symbol,
-                Err(_) => return Ok(None),
-            };
+        let destroy: CublasLtDestroy = match unsafe { load_symbol(&library, b"cublasLtDestroy\0") }
+        {
+            Ok(symbol) => symbol,
+            Err(_) => return Ok(None),
+        };
         let matmul_desc_create: CublasLtMatmulDescCreate =
             match unsafe { load_symbol(&library, b"cublasLtMatmulDescCreate\0") } {
                 Ok(symbol) => symbol,
@@ -16682,11 +16679,10 @@ mod platform {
                 Ok(symbol) => symbol,
                 Err(_) => return Ok(None),
             };
-        let matmul: CublasLtMatmul =
-            match unsafe { load_symbol(&library, b"cublasLtMatmul\0") } {
-                Ok(symbol) => symbol,
-                Err(_) => return Ok(None),
-            };
+        let matmul: CublasLtMatmul = match unsafe { load_symbol(&library, b"cublasLtMatmul\0") } {
+            Ok(symbol) => symbol,
+            Err(_) => return Ok(None),
+        };
         let mut handle = std::ptr::null_mut();
         if unsafe { (create)(&mut handle) } != CUBLAS_STATUS_SUCCESS {
             return Ok(None);

@@ -50,10 +50,21 @@ Operator surface:
   - output modes other than `argmax_only`
   - graph shape drift
   - missing graph capture readiness
-  - missing steady-state graph hits after warmup
+  - missing steady-state graph hits after the initial capture
+  - repeated graph recapture beyond the one initial per-request capture that
+    the current request-local graph model requires
 * `scripts/release/qwen35_direct_vs_http_compare.py` now requires this direct
   benchmark gate by default and only relaxes it when
   `--allow-direct-fallbacks` is set explicitly
+
+On March 31, 2026, issue `#805` aligned this gate with the current request-
+local graph model. One initial graph capture plus one matching miss is now
+admitted when the same request also proves steady-state graph hits, zero graph
+shape drift, zero host fallback evidence, and the expected FA3 backend
+execution. The before/after evidence for that change lives in:
+
+* `fixtures/qwen35/benchmarks/qwen35_cuda_issue_805_20260331_archlinux_nongated.json`
+* `fixtures/qwen35/benchmarks/qwen35_cuda_issue_805_20260331_archlinux.json`
 
 Claim boundary:
 

@@ -1670,10 +1670,16 @@ fn validate_qwen35_fast_path_metrics(
             "fallback-free cuda benchmark lane requires steady-state graph hits after warmup",
         ));
     }
-    if require_graph_hit && output_metrics.graph_misses > 0 {
+    if require_graph_hit && output_metrics.graph_misses > output_metrics.graph_captures {
         return Err(format!(
-            "fallback-free cuda benchmark lane refused steady-state graph miss count={}",
-            output_metrics.graph_misses
+            "fallback-free cuda benchmark lane refused unexpected graph misses outside initial capture count: misses={} captures={}",
+            output_metrics.graph_misses, output_metrics.graph_captures
+        ));
+    }
+    if require_graph_hit && output_metrics.graph_captures > 1 {
+        return Err(format!(
+            "fallback-free cuda benchmark lane refused repeated graph recapture count={}",
+            output_metrics.graph_captures
         ));
     }
     if output_metrics.attention_layer_invocations == 0
@@ -1695,6 +1701,57 @@ fn validate_qwen35_fast_path_metrics(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn graph_ready_output_metrics(
+        graph_hits: usize,
+        graph_misses: usize,
+        graph_captures: usize,
+    ) -> BenchQwen35OutputMetricsReport {
+        BenchQwen35OutputMetricsReport {
+            output_modes: vec![String::from("argmax_only")],
+            readback_bytes: 4,
+            raw_logits: false,
+            graph_hits,
+            graph_misses,
+            graph_captures,
+            graph_shape_drifts: 0,
+            attention_layer_invocations: 27,
+            attention_backends: vec![psionic_serve::Qwen35CudaAttentionBackendExecution {
+                requested_backend: String::from(
+                    psionic_serve::PSION_RVLLM_FA3_DECODE_ATTENTION_BACKEND_NAME,
+                ),
+                executed_backend: String::from(
+                    psionic_serve::PSION_RVLLM_FA3_DECODE_ATTENTION_BACKEND_NAME,
+                ),
+                fallback_reason: None,
+                graph_capture_compatible: true,
+                split_count: Some(1),
+                architecture: Some(String::from("ada")),
+                compute_capability: Some(String::from("8.9")),
+            }],
+        }
+    }
+
+    #[test]
+    fn fallback_free_cuda_gate_allows_single_initial_graph_capture() {
+        let metrics = graph_ready_output_metrics(27, 1, 1);
+        let fallback_evidence = BenchCudaHostFallbackEvidenceReport::default();
+        assert!(validate_qwen35_fast_path_metrics(&metrics, &fallback_evidence, true).is_ok());
+    }
+
+    #[test]
+    fn fallback_free_cuda_gate_rejects_repeated_graph_recapture() {
+        let metrics = graph_ready_output_metrics(27, 2, 2);
+        let fallback_evidence = BenchCudaHostFallbackEvidenceReport::default();
+        let error = validate_qwen35_fast_path_metrics(&metrics, &fallback_evidence, true)
+            .expect_err("repeated graph recapture should be refused");
+        assert!(error.contains("repeated graph recapture"));
+    }
 }
 
 fn mark_fast_path_refused(report: &mut BenchPsionicCudaFastPathReport, reason: String) {

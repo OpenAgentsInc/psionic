@@ -5928,8 +5928,8 @@ mod tests {
         tool_loop_tool_call_from_resolved, tool_prompt_message, tool_result_prompt_message,
     };
     use crate::{
-        DecodeStrategy, GenerationMetrics, GenerationOutput, GenerationRequest, GenerationResponse,
-        GenerationUsage, OpenAiCompatBackend, TerminationReason,
+        DecodeStrategy, GenerationMetrics, GenerationOptions, GenerationOutput, GenerationRequest,
+        GenerationResponse, GenerationUsage, OpenAiCompatBackend, TerminationReason,
     };
     use axum::{
         Json,
@@ -5957,7 +5957,10 @@ mod tests {
         StructuredGrammarSyntax, StructuredOutputRequest, StructuredOutputValue,
         StructuredTaggedVariant,
     };
-    use std::collections::BTreeMap;
+    use std::{
+        collections::BTreeMap,
+        sync::{Mutex, OnceLock},
+    };
 
     #[test]
     fn chat_messages_map_to_prompt_messages() {
@@ -7419,6 +7422,218 @@ mod tests {
                 "value": "world"
             })
         );
+        Ok(())
+    }
+
+    fn qwen35_cuda_debug_env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn run_native_qwen35_cuda_generation(
+        request_id: &str,
+        prompt: &str,
+        options: GenerationOptions,
+        debug_attention: bool,
+    ) -> Result<GenerationResponse, Box<dyn std::error::Error>> {
+        let _env_lock = qwen35_cuda_debug_env_lock()
+            .lock()
+            .expect("qwen35 cuda env lock should not be poisoned");
+        let _debug_guard = ScopedEnvVar::set_optional(
+            "PSIONIC_QWEN35_DEBUG_ATTENTION",
+            debug_attention.then_some("1"),
+        );
+
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join(format!("{request_id}.gguf"));
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_native_full_attention_decoder_metadata("tiny native qwen35 parity").as_slice(),
+            qwen35_native_full_attention_decoder_tensors().as_slice(),
+        )?;
+
+        let mut service = crate::CudaGgufQwen35TextGenerationService::from_gguf_path(&qwen35_path)?;
+        let request = GenerationRequest::new_text(
+            String::from(request_id),
+            service.model_descriptor().clone(),
+            None,
+            String::from(prompt),
+            options,
+        );
+        Ok(crate::TextGenerationExecutor::generate(
+            &mut service,
+            &request,
+        )?)
+    }
+
+    fn qwen35_cuda_metrics(response: &GenerationResponse) -> &crate::Qwen35CudaDecodeOutputMetrics {
+        response
+            .metrics
+            .qwen35_cuda_decode
+            .as_ref()
+            .expect("native qwen35 response should expose cuda decode metrics")
+    }
+
+    fn qwen35_cuda_graph_metrics(response: &GenerationResponse) -> &crate::CudaGraphReplayMetrics {
+        qwen35_cuda_metrics(response)
+            .graph_replay
+            .as_ref()
+            .expect("fused qwen35 response should expose graph replay metrics")
+    }
+
+    #[test]
+    fn native_qwen35_cuda_argmax_graph_fast_path_matches_debug_attention_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let options = GenerationOptions::greedy(3);
+        let fused = run_native_qwen35_cuda_generation(
+            "qwen35-cuda-argmax-fused",
+            "hello",
+            options.clone(),
+            false,
+        )?;
+        let debug =
+            run_native_qwen35_cuda_generation("qwen35-cuda-argmax-debug", "hello", options, true)?;
+
+        assert_eq!(fused.output.tokens, debug.output.tokens);
+        assert_eq!(fused.output.text, debug.output.text);
+        assert_eq!(fused.termination, debug.termination);
+
+        let fused_metrics = qwen35_cuda_metrics(&fused);
+        let debug_metrics = qwen35_cuda_metrics(&debug);
+        assert_eq!(fused_metrics.output_modes, debug_metrics.output_modes);
+        assert_eq!(fused_metrics.readback_bytes, debug_metrics.readback_bytes);
+        assert_eq!(
+            fused_metrics.raw_logits_materialized,
+            debug_metrics.raw_logits_materialized
+        );
+        assert!(debug_metrics.graph_replay.is_none());
+        assert!(
+            fused_metrics
+                .output_modes
+                .contains(&crate::Qwen35CudaDecodeOutputMode::ArgmaxOnly)
+        );
+        assert!(!fused_metrics.raw_logits_materialized);
+        assert!(fused_metrics.readback_bytes > 0);
+
+        let graph_metrics = qwen35_cuda_graph_metrics(&fused);
+        assert!(
+            graph_metrics
+                .output_modes
+                .contains(&crate::CudaGraphReplayMode::ArgmaxOnly)
+        );
+        assert!(graph_metrics.step_count >= 2);
+        assert!(graph_metrics.capture_count >= 1);
+        assert!(graph_metrics.replay_hit_count >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn native_qwen35_cuda_top_k_graph_fast_path_matches_debug_attention_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let mut options = GenerationOptions::sample(3);
+        options.temperature = Some(0.8);
+        options.top_k = Some(4);
+        options.seed = Some(7);
+        let fused = run_native_qwen35_cuda_generation(
+            "qwen35-cuda-top-k-fused",
+            "hello",
+            options.clone(),
+            false,
+        )?;
+        let debug =
+            run_native_qwen35_cuda_generation("qwen35-cuda-top-k-debug", "hello", options, true)?;
+
+        assert_eq!(fused.output.tokens, debug.output.tokens);
+        assert_eq!(fused.output.text, debug.output.text);
+        assert_eq!(fused.termination, debug.termination);
+
+        let expected_mode = crate::Qwen35CudaDecodeOutputMode::TopKCandidates { top_k: 4 };
+        let expected_graph_mode = crate::CudaGraphReplayMode::TopKCandidates { top_k: 4 };
+        let fused_metrics = qwen35_cuda_metrics(&fused);
+        let debug_metrics = qwen35_cuda_metrics(&debug);
+        assert_eq!(fused_metrics.output_modes, debug_metrics.output_modes);
+        assert_eq!(fused_metrics.readback_bytes, debug_metrics.readback_bytes);
+        assert_eq!(
+            fused_metrics.raw_logits_materialized,
+            debug_metrics.raw_logits_materialized
+        );
+        assert!(debug_metrics.graph_replay.is_none());
+        assert!(fused_metrics.output_modes.contains(&expected_mode));
+        assert!(!fused_metrics.raw_logits_materialized);
+        assert!(fused_metrics.readback_bytes > 0);
+
+        let graph_metrics = qwen35_cuda_graph_metrics(&fused);
+        assert!(graph_metrics.output_modes.contains(&expected_graph_mode));
+        assert!(graph_metrics.step_count >= 2);
+        assert!(graph_metrics.capture_count >= 1);
+        assert!(graph_metrics.replay_hit_count >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn native_qwen35_cuda_full_logits_graph_fast_path_matches_debug_attention_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let mut options = GenerationOptions::sample(3);
+        options.temperature = Some(0.8);
+        options.seed = Some(11);
+        let fused = run_native_qwen35_cuda_generation(
+            "qwen35-cuda-full-logits-fused",
+            "hello",
+            options.clone(),
+            false,
+        )?;
+        let debug = run_native_qwen35_cuda_generation(
+            "qwen35-cuda-full-logits-debug",
+            "hello",
+            options,
+            true,
+        )?;
+
+        assert_eq!(fused.output.tokens, debug.output.tokens);
+        assert_eq!(fused.output.text, debug.output.text);
+        assert_eq!(fused.termination, debug.termination);
+
+        let fused_metrics = qwen35_cuda_metrics(&fused);
+        let debug_metrics = qwen35_cuda_metrics(&debug);
+        assert_eq!(fused_metrics.output_modes, debug_metrics.output_modes);
+        assert_eq!(fused_metrics.readback_bytes, debug_metrics.readback_bytes);
+        assert_eq!(
+            fused_metrics.raw_logits_materialized,
+            debug_metrics.raw_logits_materialized
+        );
+        assert!(debug_metrics.graph_replay.is_none());
+        assert!(
+            fused_metrics
+                .output_modes
+                .contains(&crate::Qwen35CudaDecodeOutputMode::RawLogits)
+        );
+        assert!(fused_metrics.raw_logits_materialized);
+        assert!(fused_metrics.readback_bytes > 0);
+
+        let graph_metrics = qwen35_cuda_graph_metrics(&fused);
+        assert!(
+            graph_metrics
+                .output_modes
+                .contains(&crate::CudaGraphReplayMode::RawLogits)
+        );
+        assert!(graph_metrics.step_count >= 2);
+        assert!(graph_metrics.capture_count >= 1);
+        assert!(graph_metrics.replay_hit_count >= 1);
         Ok(())
     }
 
@@ -11069,11 +11284,19 @@ mod tests {
 
     impl ScopedEnvVar {
         fn set(key: &'static str, value: &str) -> Self {
+            Self::set_optional(key, Some(value))
+        }
+
+        fn set_optional(key: &'static str, value: Option<&str>) -> Self {
             let previous = std::env::var(key).ok();
-            // Safety: qwen35 proxy tests serialize process-wide env mutation behind
-            // `qwen35_proxy_test_lock`, and the value is restored before releasing that lock.
+            // Safety: test env overrides are serialized behind a per-suite mutex and restored
+            // before that lock is released.
             unsafe {
-                std::env::set_var(key, value);
+                if let Some(value) = value {
+                    std::env::set_var(key, value);
+                } else {
+                    std::env::remove_var(key);
+                }
             }
             Self { key, previous }
         }

@@ -476,6 +476,29 @@ The same March 27, 2026 benchmark also shows the current boundary clearly:
   class decode backend either proves that it executed or stays visible as a
   legacy-kernel downgrade
 
+Issue `#805` closed the remaining admitted-lane integration gap on March 31,
+2026 with two explicit RTX 4080 receipts on the same prompt contract:
+
+- `fixtures/qwen35/benchmarks/qwen35_cuda_issue_805_20260331_archlinux_nongated.json`
+  records the compatibility-only before-state at about `492.08 tok/s`, with
+  `qwen35_graph_hits=27`, `qwen35_graph_misses=1`,
+  `qwen35_graph_captures=1`, `qwen35_graph_shape_drifts=1`,
+  `qwen35_readback_bytes=224`, `qwen35_raw_logits=false`,
+  `qwen35_attention_backends=[fa3_split_kv_f16_kv_graph@split1]`, and zero
+  host fallback evidence
+- `fixtures/qwen35/benchmarks/qwen35_cuda_issue_805_20260331_archlinux.json`
+  records the admitted fallback-free after-state at about `502.39 tok/s`, with
+  the same `224`-byte argmax readback, the same FA3 backend, one initial
+  graph capture plus one matching miss per request, `qwen35_graph_hits=27`,
+  `qwen35_graph_shape_drifts=0`, and zero host fallback evidence
+
+That pass moved the device token-embedding mirror, decode params, and
+initial-token seed inside the request-local captured decode graph for the
+admitted argmax, top-k, and full-logit branches. The same change also added
+captured-lane parity tests for those three branches against the debug-
+attention reference path, so fused-path publication is now tied to explicit
+layout and weight-flow checks instead of benchmark-only throughput lore.
+
 ## Current Bottlenecks
 
 The remaining optimization headroom is still inside Psionic's native qwen35
@@ -485,16 +508,15 @@ The new direct-versus-HTTP comparator closes one measurement gap here: the
 repo can now separate native runtime timing from server timing before making
 kernel or fusion claims about the next bottleneck.
 
-- token embedding gather still enters the decode path through a less
-  device-native route than it should
-- the output-head full-logit path still does not reuse the faster MMVQ argmax
-  kernel shape that now serves greedy decode
+- the output-head full-logit path still materializes dense logits instead of
+  reusing the faster MMVQ argmax shape that now serves greedy decode
 - the admitted greedy CUDA graph lane now has an FA3-class split-KV decode
-  backend, but the q/gate preparation still happens outside that kernel and
-  the wider non-graph lane still uses the legacy dense attention kernel
-- the host-seeded hidden vector still reaches the device outside the captured
-  qwen35 prompt and decode graphs
-- the lane still refuses KV-session reuse, prefix caching, and adapter serving
+  backend and request-local graph seeding, but the q/gate preparation still
+  happens outside that kernel and the wider non-graph lane still uses the
+  legacy dense attention kernel
+- captured-lane parity now covers T>1 argmax, top-k, and full-logit decode on
+  the admitted single-request path, but the lane still refuses KV-session
+  reuse, prefix caching, adapter serving, and broader batch concurrency claims
 - the lane has not yet proven a wider batch, longer context, or concurrent
   throughput lead over Ollama-class runtimes
 
