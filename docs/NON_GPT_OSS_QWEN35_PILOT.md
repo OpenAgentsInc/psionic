@@ -408,7 +408,16 @@ controls on both `/v1/chat/completions` and `/v1/responses`, and the proxy
 test harness verifies that those fields reach the qwen35 backend request body.
 The local `qwen35_cuda_bench` harness now also reproduces native-versus-Ollama
 JSON object and JSON schema requests through `--json-object` and
-`--json-schema-file`.
+`--json-schema-file`. The same direct receipt now also keeps
+`benchmark_class`, `load_s`, per-run `ttft_s`, per-run `itl_s`, and mean
+TTFT / ITL fields explicit for the native CUDA row.
+
+The repo-owned native qwen35 direct-versus-HTTP comparator now lives at
+`scripts/release/qwen35_direct_vs_http_compare.py`. It runs the direct
+`qwen35_cuda_bench` lane plus `psionic-openai-server` on one explicit prompt
+contract, preserves the HTTP concurrency ladder as a separate benchmark class,
+and can optionally add one direct `vllm` reference row when the local Python
+environment exposes `vllm`.
 `repeat_last_n` follows the Ollama-compatible local contract:
 
 - default `64`
@@ -459,6 +468,10 @@ The same March 27, 2026 benchmark also shows the current boundary clearly:
 
 The remaining optimization headroom is still inside Psionic's native qwen35
 runtime:
+
+The new direct-versus-HTTP comparator closes one measurement gap here: the
+repo can now separate native runtime timing from server timing before making
+kernel or fusion claims about the next bottleneck.
 
 - token embedding gather still enters the decode path through a less
   device-native route than it should

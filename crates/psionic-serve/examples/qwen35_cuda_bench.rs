@@ -2,6 +2,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::ExitCode,
+    time::Instant,
 };
 
 use psionic_models::{
@@ -88,6 +89,7 @@ enum BenchStructuredOutput {
 struct BenchReport {
     schema_version: u32,
     report_kind: String,
+    benchmark_class: String,
     generated_at_unix_s: u64,
     backend: String,
     model_path: String,
@@ -99,6 +101,8 @@ struct BenchReport {
     decode_mode: String,
     max_output_tokens: usize,
     repeats: usize,
+    steady_state_concurrency: usize,
+    load_s: Option<f64>,
     temperature: Option<f32>,
     top_k: Option<usize>,
     top_p: Option<f32>,
@@ -119,6 +123,8 @@ struct BenchReport {
     mean_prompt_s: f64,
     mean_decode_s: f64,
     mean_total_s: f64,
+    mean_ttft_s: Option<f64>,
+    mean_itl_s: Option<f64>,
     mean_decode_tok_s: f64,
 }
 
@@ -131,6 +137,8 @@ struct BenchRunReport {
     prompt_s: f64,
     decode_s: f64,
     total_s: f64,
+    ttft_s: Option<f64>,
+    itl_s: Option<f64>,
     decode_tok_s: f64,
     qwen35_output_modes: Vec<String>,
     qwen35_readback_bytes: u64,
@@ -183,6 +191,7 @@ struct BenchTerminationReport {
 
 #[derive(Clone, Debug, Serialize)]
 struct BenchPsionicCudaStartupReport {
+    load_s: f64,
     cublas_handle_scope: String,
     cublas_stream_binding: String,
     warmup_status: String,
@@ -592,8 +601,10 @@ impl BenchConfig {
 
 fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
     let bench_model = load_bench_model(&config.model_path, &config.prompt)?;
+    let load_started_at = Instant::now();
     let mut service = CudaGgufQwen35TextGenerationService::from_gguf_path(&config.model_path)
         .map_err(|error| format!("failed to load qwen35 cuda service: {error}"))?;
+    let load_s = load_started_at.elapsed().as_secs_f64();
     let descriptor = service.model_descriptor().clone();
     let prefix_cache_bypass = PrefixCacheControl {
         mode: PrefixCacheMode::Bypass,
@@ -616,6 +627,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         .generate(&warmup)
         .map_err(|error| format!("warmup generation failed: {error}"))?;
     let startup_report = BenchPsionicCudaStartupReport {
+        load_s,
         cublas_handle_scope: String::from("per_device_runtime_owner"),
         cublas_stream_binding: String::from("bind_stream_per_submission"),
         warmup_status: String::from("explicit_warmup_completed"),
@@ -631,7 +643,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         request_billed_to_user: false,
     };
     println!(
-        "backend=psionic startup_warmup_status={} cublas_handle_scope={} cublas_stream_binding={} warmup_prompt_s={:.6} warmup_decode_s={:.6} warmup_total_s={:.6} warmup_output_tokens={}",
+        "backend=psionic load_s={:.6} startup_warmup_status={} cublas_handle_scope={} cublas_stream_binding={} warmup_prompt_s={:.6} warmup_decode_s={:.6} warmup_total_s={:.6} warmup_output_tokens={}",
+        startup_report.load_s,
         startup_report.warmup_status,
         startup_report.cublas_handle_scope,
         startup_report.cublas_stream_binding,
@@ -681,6 +694,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         let prompt_s = nanos_to_seconds(prompt_ns);
         let decode_s = nanos_to_seconds(decode_ns);
         let total_s = nanos_to_seconds(total_ns);
+        let ttft_s = response.metrics.time_to_first_token_ns.map(nanos_to_seconds);
+        let itl_s = response.metrics.inter_token_latency_ns.map(nanos_to_seconds);
         let output_text = response.output.text;
         let printable_output_text = output_text.replace('\n', "\\n");
         runs.push(BenchRunReport {
@@ -691,6 +706,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             prompt_s,
             decode_s,
             total_s,
+            ttft_s,
+            itl_s,
             decode_tok_s,
             qwen35_output_modes: output_metrics.output_modes.clone(),
             qwen35_readback_bytes: output_metrics.readback_bytes,
@@ -708,7 +725,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             output_text: output_text.clone(),
         });
         println!(
-            "backend=psionic run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} {} {} output={}",
+            "backend=psionic run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} ttft_s={} itl_s={} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} {} {} output={}",
             run_index + 1,
             bench_decode_mode_label(config.decode_mode),
             response.metrics.prompt_eval_count.unwrap_or(0),
@@ -716,6 +733,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             prompt_s,
             decode_s,
             total_s,
+            format_optional_seconds(ttft_s),
+            format_optional_seconds(itl_s),
             decode_tok_s,
             termination.observed,
             termination.classification,
@@ -729,7 +748,13 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         );
     }
 
-    let report = build_bench_report(config, &bench_model.rendered, Some(startup_report), runs);
+    let report = build_bench_report(
+        config,
+        &bench_model.rendered,
+        Some(startup_report.clone()),
+        Some(startup_report.load_s),
+        runs,
+    );
     println!(
         "backend=psionic mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -796,6 +821,8 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             prompt_s,
             decode_s,
             total_s,
+            ttft_s: None,
+            itl_s: None,
             decode_tok_s,
             qwen35_output_modes: Vec::new(),
             qwen35_readback_bytes: 0,
@@ -832,7 +859,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
         );
     }
 
-    let report = build_bench_report(config, &bench_model.rendered, None, runs);
+    let report = build_bench_report(config, &bench_model.rendered, None, None, runs);
     println!(
         "backend=ollama mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -1103,6 +1130,7 @@ fn build_bench_report(
     config: &BenchConfig,
     rendered: &RenderedPrompt,
     psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
+    load_s: Option<f64>,
     runs: Vec<BenchRunReport>,
 ) -> BenchReport {
     let repeats = runs.len().max(1) as f64;
@@ -1110,10 +1138,13 @@ fn build_bench_report(
     let mean_prompt_s = runs.iter().map(|run| run.prompt_s).sum::<f64>() / repeats;
     let mean_decode_s = runs.iter().map(|run| run.decode_s).sum::<f64>() / repeats;
     let mean_total_s = runs.iter().map(|run| run.total_s).sum::<f64>() / repeats;
+    let mean_ttft_s = mean_optional_seconds(runs.iter().filter_map(|run| run.ttft_s));
+    let mean_itl_s = mean_optional_seconds(runs.iter().filter_map(|run| run.itl_s));
     let mean_decode_tok_s = runs.iter().map(|run| run.decode_tok_s).sum::<f64>() / repeats;
     BenchReport {
-        schema_version: 3,
+        schema_version: 4,
         report_kind: String::from("qwen35_cuda_bench"),
+        benchmark_class: String::from(bench_report_class(config.backend)),
         generated_at_unix_s: current_unix_timestamp_seconds(),
         backend: String::from(bench_backend_label(config.backend)),
         model_path: config.model_path.display().to_string(),
@@ -1126,6 +1157,8 @@ fn build_bench_report(
         decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
         max_output_tokens: config.max_output_tokens,
         repeats: runs.len(),
+        steady_state_concurrency: 1,
+        load_s,
         temperature: config.effective_temperature_for_backend(config.backend),
         top_k: config.effective_top_k_for_backend(config.backend),
         top_p: config.effective_top_p_for_backend(config.backend),
@@ -1146,6 +1179,8 @@ fn build_bench_report(
         mean_prompt_s,
         mean_decode_s,
         mean_total_s,
+        mean_ttft_s,
+        mean_itl_s,
         mean_decode_tok_s,
     }
 }
@@ -1179,6 +1214,24 @@ fn bench_backend_label(backend: BenchBackend) -> &'static str {
         BenchBackend::Psionic => "psionic",
         BenchBackend::Ollama => "ollama",
     }
+}
+
+fn bench_report_class(backend: BenchBackend) -> &'static str {
+    match backend {
+        BenchBackend::Psionic => "direct_engine",
+        BenchBackend::Ollama => "http",
+    }
+}
+
+fn mean_optional_seconds(values: impl Iterator<Item = f64>) -> Option<f64> {
+    let values = values.collect::<Vec<_>>();
+    (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+}
+
+fn format_optional_seconds(value: Option<f64>) -> String {
+    value
+        .map(|value| format!("{value:.6}"))
+        .unwrap_or_else(|| String::from("none"))
 }
 
 fn write_json_output<T: Serialize>(value: &T, output: Option<&PathBuf>) -> Result<(), String> {

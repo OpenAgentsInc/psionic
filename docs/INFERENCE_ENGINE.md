@@ -86,7 +86,17 @@ than just run tensor math.
 - The local `qwen35_cuda_bench` harness now reproduces native-versus-Ollama
   JSON object and JSON schema requests too through `--json-object` and
   `--json-schema-file`, and it now writes machine-readable per-run evidence
-  through `--json-out`.
+  through `--json-out`. The native direct row now also keeps
+  `benchmark_class`, `load_s`, per-run `ttft_s`, per-run `itl_s`, and mean
+  TTFT / ITL fields explicit in the direct receipt instead of leaving those
+  timings trapped inside the runtime metrics lane.
+- The repo-owned direct-versus-HTTP collector for the admitted native qwen35
+  CUDA lane now lives at `scripts/release/qwen35_direct_vs_http_compare.py`.
+  It runs the native direct-engine receipt and the native
+  `psionic-openai-server` receipt on one explicit prompt contract, keeps the
+  two benchmark classes separate in the published JSON, records HTTP startup
+  and warmup timing, and writes one explicit concurrency ladder instead of
+  folding runtime and server overhead into one number.
 - The repo-owned sequential collector for the canonical qwen35 versus Ollama
   matrix now lives at `scripts/release/run-qwen35-ollama-matrix.sh`. It writes
   a combined manifest plus row reports that preserve output-token arrays,
@@ -175,6 +185,11 @@ than just run tensor math.
   `docs/PSION_RVLLM_KV_EVICTION_REUSE.md`, making oldest-page eviction,
   reclaimed-page reuse, predictive reuse reporting, and long-context stress
   truth explicit instead of leaving that policy as implicit page churn.
+- The same pass now also retains one explicit direct-engine comparator packet
+  at `docs/PSION_RVLLM_DIRECT_ENGINE_COMPARATOR.md`, making the admitted
+  native direct row, native HTTP row, and optional direct `vllm` reference row
+  explicit as separate benchmark classes instead of leaving runtime-versus-
+  server attribution to ad hoc local notes.
 - The older March 27 greedy qwen35-versus-Ollama numbers on this checkout are
   now historical only. The older harness omitted explicit Ollama greedy
   settings and therefore let Ollama use its default sampler surface instead of
