@@ -1,38 +1,74 @@
-# OpenAgents NIP-TRN Implementation Audit
+# OpenAgents + Psionic NIP-TRN Implementation Audit
 
 Date: 2026-03-30
 
-This audit reviews the current `openagents` app and kernel surfaces to answer one question:
+This revision inspects actual `psionic` code, not just `psionic/docs/TRAIN_SYSTEM.md`.
 
-What has to change to fully implement `NIP-TRN`, meaning a real Nostr-facing AI model training coordination layer rather than the current mix of authority objects, mirrored JSON bundles, and operator-local training state?
+The earlier version of this audit was too app-heavy. It described the `openagents` desktop and kernel situation correctly, but it undercounted how much `psionic` already models the training-coordination problem in code.
+
+The real question is not "does Psionic have the concepts needed for `TRN`?"
+
+It does.
+
+The real question is:
+
+How much of that existing Psionic vocabulary should be projected into a Nostr training profile, and what still has to change to turn those Rust-native contracts and artifact builders into a live relay-visible coordination layer?
 
 This is a concept and architecture audit. It does not cover tests.
 
 ## Executive Summary
 
-The current app does not implement `TRN` yet.
+`openagents` still does not implement `TRN`.
 
-In the checkout under audit:
+In the current `openagents` checkout:
 
-- `openagents/crates/nostr/nips/README.md` only lists `DS`, `SA`, `SKL`, and `AC`.
-- `openagents/crates/nostr/core/src/lib.rs` exports `nip_ac`, `nip_ds`, `nip_sa`, and `nip_skl`, but no `nip_trn`.
-- `apps/autopilot-desktop` already has major training surfaces, but they are split across three different data planes:
-  - kernel-authority projected training state
-  - `psionic` JSON mirror state for remote training dashboards
-  - local operator state for Apple adapter training
+- there is no `TRN` draft in `crates/nostr/nips`
+- there is no `nip_trn` module in `crates/nostr/core`
+- there is no `TRN` client helper layer
+- there is no `TRN` runtime lane in `apps/autopilot-desktop`
 
-That means the main missing piece is not a new pane. The main missing piece is one shared Nostr training record layer and one first-class app lane that publishes and consumes it.
+That part is unchanged.
 
-The good news is that the kernel already carries most of the typed object model that `TRN` needs. `ComputeTrainingRun`, `ComputeAdapterTrainingWindow`, `ComputeAdapterContributionOutcome`, `ComputeAdapterCheckpointPointer`, and `ComputeAcceptedOutcome` are already close to the core records needed for training coordination. The missing work is publication, subscription, projection, and public recovery or fork semantics.
+What changed after inspecting actual `psionic` code is the conclusion about readiness.
 
-The right target is:
+`psionic` already has most of the semantic surface that `TRN` would need:
 
-- `psionic` owns training execution, checkpoint production, proof files, artifact storage, and heavy telemetry.
-- `openagents-kernel-core` and `apps/nexus-control` own canonical authority objects and policy enforcement.
-- `TRN` becomes the shared Nostr coordination layer above that substrate.
-- `apps/autopilot-desktop` consumes `TRN` through one explicit lane instead of stitching together authority snapshots and mirrored JSON files.
+- run, participant, topology, contributor-set, and window state
+- assignment, execution, upload, validation, aggregation, and promotion receipts
+- checkpoint manifests, checkpoint pointers, restore receipts, and storage locators
+- network, node, registry, assignment, validator, consensus, slashing, reward, settlement, and explorer contracts
+- provider-neutral evidence bundles, remote-training run bundles, and explorer artifacts
+
+The main gap is not missing nouns. The main gap is missing live publication.
+
+Today these `psionic` surfaces are mostly expressed as:
+
+- runtime structs
+- canonical contract modules
+- fixture-producing reference builders
+- derived artifact builders
+
+They are not yet a live Nostr event family.
+
+That means the shortest path to `TRN` is not inventing a brand-new protocol from scratch. The shortest path is:
+
+1. pick the existing `psionic` vocabulary that should become public coordination records
+2. map it cleanly onto one `TRN` event family
+3. bridge `openagents` kernel authority and `psionic` runtime truth into those events
+4. make the desktop consume those events instead of mirror files
+
+The architectural risk is duplication. Right now the same training system is described in four overlapping vocabularies:
+
+- `psionic` runtime and contract types
+- `openagents` kernel authority types
+- remote-training and explorer artifact families
+- desktop-local operator state
+
+`TRN` should collapse those into one public coordination projection. It should not become a fifth competing vocabulary.
 
 ## Sources Reviewed
+
+### OpenAgents
 
 - `openagents/docs/OWNERSHIP.md`
 - `openagents/docs/MVP.md`
@@ -50,493 +86,505 @@ The right target is:
 - `openagents/apps/autopilot-desktop/src/runtime_lanes.rs`
 - `openagents/apps/autopilot-desktop/src/render.rs`
 - `openagents/apps/autopilot-desktop/src/pane_registry.rs`
-- `psionic/docs/TRAIN_SYSTEM.md`
 
-## What Exists Today
+### Psionic
 
-### 1. The app already has training UX, but not one training truth
+- `crates/psionic-train/src/lib.rs`
+- `crates/psionic-train/src/run_graph.rs`
+- `crates/psionic-train/src/orchestrator.rs`
+- `crates/psionic-train/src/adapter_window.rs`
+- `crates/psionic-train/src/artifact_storage.rs`
+- `crates/psionic-train/src/checkpoint_recovery.rs`
+- `crates/psionic-train/src/distributed_checkpoint_contract.rs`
+- `crates/psionic-train/src/cross_provider_program_run_graph.rs`
+- `crates/psionic-train/src/contributor_program_lineage.rs`
+- `crates/psionic-train/src/decentralized_network_contract.rs`
+- `crates/psionic-train/src/signed_node_identity_contract.rs`
+- `crates/psionic-train/src/public_network_registry_contract.rs`
+- `crates/psionic-train/src/public_work_assignment_contract.rs`
+- `crates/psionic-train/src/validator_challenge_scoring_contract.rs`
+- `crates/psionic-train/src/multi_validator_consensus_contract.rs`
+- `crates/psionic-train/src/fraud_quarantine_slashing_contract.rs`
+- `crates/psionic-train/src/reward_ledger_contract.rs`
+- `crates/psionic-train/src/settlement_publication_contract.rs`
+- `crates/psionic-train/src/public_run_explorer_contract.rs`
+- `crates/psionic-train/src/training_execution_evidence_bundle.rs`
+- `crates/psionic-train/src/remote_training_visualization_v2.rs`
+- `crates/psionic-train/src/xtrain_explorer_artifacts.rs`
+- `docs/TRAIN_SYSTEM.md`
 
-`apps/autopilot-desktop` already exposes four distinct training surfaces or regimes:
+## What Psionic Already Has
 
-- authority-projected training status through `desktop_control` and `autopilotctl`
-- `Training Runs`, which is the mirror-backed remote training dashboard
-- `XTRAIN Explorer`, which is a file-backed snapshot explorer
-- `Apple Adapter Training`, which is an operator flow for launching and monitoring local training
+## 1. Live training substrate objects
 
-The pane split is visible in the pane registry:
+The `psionic-train` crate already has real runtime-facing training structures, not just vague roadmap language.
 
-- `pane.psionic_remote_training` is described as a shared training dashboard in `openagents/apps/autopilot-desktop/src/pane_registry.rs:438`.
-- `pane.xtrain_explorer` is a separate decentralized explorer in `openagents/apps/autopilot-desktop/src/pane_registry.rs:451`.
-- `pane.apple_adapter_training` is a separate operator pane in `openagents/apps/autopilot-desktop/src/pane_registry.rs:556`.
+`run_graph.rs` defines the core lifecycle vocabulary:
 
-The authority-projected training status is separate from those panes and is built in `desktop_control_training_status` in `openagents/apps/autopilot-desktop/src/desktop_control.rs:7129`.
+- `TrainingRunStatus`
+- `TrainingParticipantRole`
+- `TrainingParticipantAdmissionState`
+- `TrainingParticipantReadinessState`
+- `TrainingParticipantContributionState`
+- `TrainingWindowStatus`
+- `TrainingLifecycleEventKind`
 
-At the state level, the app also keeps separate training-related state buckets in `RenderState`, including `desktop_control`, `xtrain_explorer`, `apple_adapter_training`, and Nostr runtime lanes for `SA`, `SKL`, and `AC`, but nothing parallel for `TRN` in `openagents/apps/autopilot-desktop/src/app_state.rs:15975` and `openagents/apps/autopilot-desktop/src/app_state.rs:16020`.
+That is already close to the `TRN` idea of network, node, window, and run state.
 
-### 2. The authority path already has a strong typed training object model
+`orchestrator.rs` adds explicit control-plane behavior on top of that:
 
-The kernel training proto already defines major records that are close to `TRN`:
+- off-policy admission budgets
+- rollout-admission signals
+- typed rollout receipts
+- window planning and sealing constraints
 
-- `ComputeTrainingRun` in `openagents/proto/openagents/compute/v1/compute_training.proto:164`
-- `ComputeAcceptedOutcome` in `openagents/proto/openagents/compute/v1/compute_training.proto:190`
-- `ComputeAdapterCheckpointPointer` in `openagents/proto/openagents/compute/v1/compute_training.proto:213`
-- `ComputeAdapterTrainingWindow` in `openagents/proto/openagents/compute/v1/compute_training.proto:230`
-- `ComputeAdapterContributionOutcome` in `openagents/proto/openagents/compute/v1/compute_training.proto:266`
+This matters because `TRN` should not invent its own freshness and replay language when `psionic` already has one.
 
-The authority client already supports create, finalize, record, list, and fetch operations for those records in `openagents/crates/openagents-kernel-core/src/authority.rs:78`, `openagents/crates/openagents-kernel-core/src/authority.rs:212`, `openagents/crates/openagents-kernel-core/src/authority.rs:1606`, and `openagents/crates/openagents-kernel-core/src/authority.rs:2131`.
+`adapter_window.rs` is even closer to a public receipt vocabulary. It already models:
 
-`apps/nexus-control` already exposes those records over HTTP in `openagents/apps/nexus-control/src/lib.rs:3421`, `openagents/apps/nexus-control/src/lib.rs:3463`, `openagents/apps/nexus-control/src/lib.rs:3497`, `openagents/apps/nexus-control/src/lib.rs:3542`, `openagents/apps/nexus-control/src/lib.rs:3626`, and `openagents/apps/nexus-control/src/lib.rs:3694`.
+- contribution assignment receipts
+- execution summaries
+- upload receipts
+- validator receipts
+- aggregation-eligibility receipts
+- promotion requirements
+- source checkpoint pointers and policy revisions
 
-The in-memory kernel already stores and filters the same records in `openagents/apps/nexus-control/src/kernel.rs:2552`, `openagents/apps/nexus-control/src/kernel.rs:2583`, `openagents/apps/nexus-control/src/kernel.rs:2614`, `openagents/apps/nexus-control/src/kernel.rs:2648`, `openagents/apps/nexus-control/src/kernel.rs:4702`, and `openagents/apps/nexus-control/src/kernel.rs:4856`.
+That file is basically a training receipt language already. What it does not have is a Nostr event form.
 
-That means the kernel is not the blocker. The kernel already has the shapes. The missing layer is Nostr publication and Nostr-native read models.
+## 2. Strong artifact and recovery semantics
 
-### 3. The desktop app already projects authority-backed training status
+`artifact_storage.rs` and `checkpoint_recovery.rs` are the clearest evidence that `psionic` already knows how to support recovery and forkability.
 
-`DesktopControlTrainingStatus` in `openagents/apps/autopilot-desktop/src/desktop_control.rs:944` is already a substantial training read model.
+`artifact_storage.rs` already defines:
 
-The app refreshes compute history from the remote authority in `load_compute_history_from_authority` at `openagents/apps/autopilot-desktop/src/desktop_control.rs:6464`. That path loads:
+- artifact classes
+- storage tiers
+- lifecycle states
+- retention profiles
+- explicit artifact locators for checkpoints, adapter contributions, promoted window checkpoints, rollout artifacts, eval artifacts, metrics bundles, and final evidence bundles
 
-- delivery proofs
-- capacity instruments
-- validator challenges
-- training runs
-- adapter windows
-- contribution outcomes
-- accepted outcomes
+`checkpoint_recovery.rs` already defines:
 
-The app then derives a training dashboard from that cache in `desktop_control_training_status` at `openagents/apps/autopilot-desktop/src/desktop_control.rs:7129`.
+- scope bindings for run, stage, and window
+- checkpoint manifests
+- checkpoint pointers
+- restore attempts
+- restore receipts
+- uploader assignments
 
-This is important because it shows the app already knows how to present training coordination state. It just does it through one authority-specific projection instead of a `TRN` lane.
+`distributed_checkpoint_contract.rs` builds on that with:
 
-### 4. The remote training dashboard is file-mirror based, not relay based
+- shard placements
+- upload receipts
+- restore assignments
+- restore plans
 
-The current remote training surface is not Nostr-backed.
+That means the "someone else can resume or fork the run if the original coordinator disappears" idea is already present in `psionic` as typed data. It is just not published as relay-native public history yet.
 
-`apps/autopilot-desktop/src/remote_training_sync.rs` reads a `psionic` fixture path, environment overrides, and a local cache:
+## 3. Whole-program and contributor-lineage state
 
-- `OPENAGENTS_REMOTE_TRAINING_SOURCE_ROOT`
-- `OPENAGENTS_REMOTE_TRAINING_INDEX_PATH`
-- `OPENAGENTS_REMOTE_TRAINING_CACHE_ROOT`
+`cross_provider_program_run_graph.rs` models whole-program training state under one shared run id:
 
-Those entry points are defined in `openagents/apps/autopilot-desktop/src/remote_training_sync.rs:13` through `openagents/apps/autopilot-desktop/src/remote_training_sync.rs:22`.
+- participants
+- role windows
+- transition log
+- evidence bindings
 
-The refresh path reads `RemoteTrainingRunIndexV2` and `RemoteTrainingVisualizationBundleV2` from disk in `openagents/apps/autopilot-desktop/src/remote_training_sync.rs:189` through `openagents/apps/autopilot-desktop/src/remote_training_sync.rs:260`.
+`contributor_program_lineage.rs` binds contributor windows back to:
 
-The resulting `DesktopControlRemoteTrainingStatus` in `openagents/apps/autopilot-desktop/src/desktop_control.rs:1119` explicitly carries mirror-oriented fields like:
+- dataset family
+- dataset slice
+- checkpoint family
+- input policy revision
+- candidate policy revision
+- candidate checkpoint
 
-- `source_root`
-- `source_index_path`
-- `cache_root`
-- `sync_state`
+This is the exact kind of lineage `TRN` needs if resumed or forked runs are supposed to be machine-readable instead of hand-waved in a dashboard.
 
-The projection even labels the source as `live_psionic_mirror` or `local_cache_mirror` in `openagents/apps/autopilot-desktop/src/desktop_control.rs:7505`.
+## 4. Public-network contracts
 
-This is useful for visualization, but it is not `TRN`.
+`psionic` already has an explicit public-network contract family.
 
-### 5. The XTRAIN explorer is also file-backed, not relay-backed
+`decentralized_network_contract.rs` defines:
 
-`apps/autopilot-desktop/src/xtrain_explorer_control.rs` reads:
+- `network_id`
+- governance revision
+- epoch cadence
+- settlement backend posture
+- checkpoint authority policy
+- public role bindings
 
-- `OPENAGENTS_XTRAIN_EXPLORER_SOURCE_ROOT`
-- `OPENAGENTS_XTRAIN_EXPLORER_INDEX_PATH`
+That is already a strong candidate for the `TRN` network record.
 
-Those paths are defined in `openagents/apps/autopilot-desktop/src/xtrain_explorer_control.rs:9` through `openagents/apps/autopilot-desktop/src/xtrain_explorer_control.rs:15`.
+`signed_node_identity_contract.rs` defines signed node records with:
 
-The explorer loads `XtrainExplorerIndex` and `XtrainExplorerSnapshot` from files in `openagents/apps/autopilot-desktop/src/xtrain_explorer_control.rs:124` through `openagents/apps/autopilot-desktop/src/xtrain_explorer_control.rs:223`.
+- wallet binding
+- software attestation
+- capability projection
+- benchmark evidence
+- admitted roles
+- admitted execution classes
+- revocation status
+- detached signatures
 
-This means the current XTRAIN view is a static or mirrored artifact explorer, not a live Nostr coordination surface.
+That is already a strong candidate for the `TRN` node record.
 
-### 6. The Apple adapter operator flow is authority-backed and local-runtime backed
+`public_network_registry_contract.rs` adds:
 
-The Apple adapter training path is a real operator workflow in `openagents/apps/autopilot-desktop/src/apple_adapter_training_control.rs:1`.
+- availability status
+- relay posture
+- endpoints
+- compatibility policy
+- discovery examples
+- matchmaking offers
 
-It already integrates:
+That is already a strong candidate for the `TRN` discovery profile.
 
-- `HttpKernelAuthorityClient`
-- `CreateComputeTrainingRunRequest`
-- `FinalizeComputeTrainingRunRequest`
-- `AcceptComputeOutcomeRequest`
+`public_work_assignment_contract.rs` adds:
+
+- public windows
+- assignment ids
+- assignment receipts
+- late-window refusals
+- explicit `public_validator_challenge` work kinds
+
+That is already most of the `TRN` window and receipt story.
+
+## 5. Validator, consensus, fraud, and settlement contracts
+
+`validator_challenge_scoring_contract.rs` already models:
+
+- replay rules
+- score receipts
+- challenge refusals
+- shared validator dispositions
+
+`multi_validator_consensus_contract.rs` already models:
+
+- validator votes
+- promotion decisions
+- disagreement receipts
+
+`fraud_quarantine_slashing_contract.rs` already models:
+
+- fraud signals
+- quarantine decisions
+- slashing decisions
+- appeal windows
+
+`reward_ledger_contract.rs` already models:
+
+- accounting periods
+- contribution entries
+- penalty entries
+- final allocations
+
+`settlement_publication_contract.rs` already models:
+
+- validator-weight publications
+- settlement records
+- payout exports
+- settlement refusals
+
+`public_run_explorer_contract.rs` already models the public summary surface above those feeds:
+
+- explorer panes
+- explorer snapshot
+- score rows
+- stale-data policies
+
+So the earlier conclusion that verdict, reputation, and settlement were mostly missing was wrong for `psionic`. They are not missing conceptually. They are present as structured contracts. The missing piece is live Nostr publication and app consumption.
+
+## 6. Derived evidence and visualization artifacts
+
+`training_execution_evidence_bundle.rs` ties retained evidence together and already links:
+
+- launch facts
+- runtime facts
+- checkpoint facts
+- metric facts
+- visualization references
+- validator results
+- final artifacts
+- after-action refs
+
+It also explicitly understands:
+
+- run bundles
+- run indexes
+- explorer snapshots
+- explorer indexes
+
+`remote_training_visualization_v2.rs` defines the track-aware provider-neutral remote-training bundle and run index. It is already rich enough for public score and comparison surfaces, but it is still a derived artifact family.
+
+`xtrain_explorer_artifacts.rs` defines the XTRAIN snapshot and index artifacts, again as explorer-ready derived state.
+
+These should not become the core `TRN` records. They should sit behind `TRN` artifact-pointer records.
+
+## 7. The key Psionic limitation
+
+The strongest limitation after reading the code is this:
+
+Most of these `psionic` modules are contract and fixture surfaces, not live relay publishers.
+
+That is visible across the files:
+
+- stable `*_FIXTURE_PATH` constants
+- stable `*_CHECK_SCRIPT_PATH` constants
+- stable `*_DOC_PATH` constants
+- `canonical_*` constructors
+- `write_*` helpers that emit committed JSON artifacts
+
+That is not a criticism. It means `psionic` has already done the hard work of naming and typing the training-coordination surface.
+
+But it also means `psionic` does not yet implement a live public coordination plane. It implements the canonical shapes that such a coordination plane should publish.
+
+## What OpenAgents Already Has
+
+`openagents` is still the weak side of the `TRN` story.
+
+In the checked-out `openagents` tree:
+
+- `crates/nostr/nips/README.md` lists only `DS`, `SA`, `SKL`, and `AC`
+- `crates/nostr/core/src/lib.rs` exports only `nip_ds`, `nip_sa`, `nip_skl`, and `nip_ac`
+- `crates/nostr/client` has no `TRN`-specific helpers
+- `apps/autopilot-desktop` has no `TRN` lane
+
+The desktop already has training surfaces, but they are split:
+
+- authority-projected training status via `desktop_control`
+- mirror-backed remote training via `remote_training_sync.rs`
+- file-backed XTRAIN explorer snapshots via `xtrain_explorer_control.rs`
+- local operator state for Apple adapter training via `apple_adapter_training_control.rs`
+
+The kernel authority already exposes strong typed objects:
+
 - `ComputeTrainingRun`
+- `ComputeAdapterTrainingWindow`
+- `ComputeAdapterContributionOutcome`
+- `ComputeAdapterCheckpointPointer`
 - `ComputeAcceptedOutcome`
-- `psionic_train` execution and export helpers
 
-That is strong substrate for a real `TRN` publisher, but today it is not publishing public training coordination records. It is talking to authority endpoints and local execution helpers.
+So `openagents` does not lack training truth entirely. It lacks a Nostr-native public projection of that truth.
 
-### 7. The app already has custom Nostr lanes, but none for training
+## Revised TRN Coverage
 
-The app already spins up Nostr-backed runtime workers for `SA`, `SKL`, and `AC`:
+The earlier version of this audit treated too many `TRN` surfaces as "missing." After reading actual `psionic` code, the honest picture is:
 
-- `SaLaneWorker::spawn()`
-- `SklLaneWorker::spawn()`
-- `AcLaneWorker::spawn()`
-
-This happens in `openagents/apps/autopilot-desktop/src/render.rs:608` through `openagents/apps/autopilot-desktop/src/render.rs:611`.
-
-The runtime lane state and command model live in `openagents/apps/autopilot-desktop/src/runtime_lanes.rs:1`.
-
-There is no `TrnLaneWorker`, `TrnLaneSnapshot`, or training-specific Nostr command set.
-
-This matters because the cleanest app implementation path is obvious:
-
-Add `TRN` as one more first-class lane instead of hiding it in the mirror sync path or bolting it into the authority cache.
-
-### 8. The Nostr crate does not expose `TRN` yet
-
-The current in-repo Nostr draft index only lists:
-
-- `DS`
-- `SA`
-- `SKL`
-- `AC`
-
-That is the entire list in `openagents/crates/nostr/nips/README.md:1`.
-
-The Nostr core crate exports:
-
-- `nip_ac`
-- `nip_ds`
-- `nip_sa`
-- `nip_skl`
-
-That is the export surface in `openagents/crates/nostr/core/src/lib.rs:48`.
-
-There is no checked-in `TRN` draft or `nip_trn` module in this checkout.
-
-## Coverage Against TRN
-
-The proposed `TRN` shape is one umbrella training coordination profile with core records for:
-
-- network
-- node
-- window
-- receipt
-- verdict
-- artifact pointer
-- closeout
-
-And optional profiles for:
-
-- discovery
-- private coordination
-- challenge jobs
-- reputation
-
-Here is the current coverage.
-
-| TRN Surface | Current Status | Current Source | What Is Missing |
+| TRN Surface | Psionic Reality | OpenAgents Reality | What Is Still Missing |
 | --- | --- | --- | --- |
-| Network record | Missing | No explicit public network or run-root record | Shared public network or program identity, governance revision, relay stance, recovery or fork lineage |
-| Node record | Missing | Cluster members exist locally in desktop projections, but not as signed public training node records | Signed node capability publication, admitted roles, build digest, benchmark evidence, revocation or replacement semantics |
-| Window record | Partial | `ComputeAdapterTrainingWindow` | Public event form, event ids, Nostr subscription model, resume or fork links, relay-visible sequencing |
-| Receipt record | Partial | `ComputeAdapterContributionOutcome` | Separate public receipt event instead of only outcome object, clearer assignment and submission publication |
-| Verdict record | Partial | Contribution disposition plus validator challenge state | Standalone public validator verdict record and challenge or replay references |
-| Artifact pointer | Partial | `ComputeAdapterCheckpointPointer`, `final_checkpoint_ref`, `promotion_checkpoint_ref` | Public locator records for accepted checkpoints, final weights, optimizer state, manifest bundles, and fork or resume anchors |
-| Closeout record | Partial | `ComputeAcceptedOutcome` | Public closeout event with reusable references, settlement or reputation linkage, explicit forkable accepted state |
-| Discovery profile | Partial | General Nostr provider presence plus local desktop state | Training-specific network discovery, run discovery, and node discovery filters |
-| Private coordination profile | Missing | None training-specific | NIP-44 or NIP-59 usage for assignments, validator coordination, or sensitive control messages |
-| Challenge jobs profile | Partial | Kernel validator challenges | Public challenge task or replay coordination semantics |
-| Reputation profile | Missing | No TRN-facing training reputation surface | NIP-32 labels or equivalent training-specific labels tied to verdicts or closeouts |
+| Network record | Strong typed contract already exists in `decentralized_network_contract.rs` | No `TRN` network record | Nostr event kind, live publisher, and one chosen bridge from runtime or authority state |
+| Node record | Strong typed signed node identity and registry records already exist in `signed_node_identity_contract.rs` and `public_network_registry_contract.rs` | No `TRN` node record | Nostr mapping, refresh cadence, and revocation publication |
+| Window record | Strong typed runtime and public forms already exist in `run_graph.rs`, `adapter_window.rs`, and `public_work_assignment_contract.rs` | Kernel windows exist, but no `TRN` view | One unified public identity across psionic runtime, kernel authority, and relay history |
+| Receipt record | Strong typed assignment, execution, upload, validator, aggregation, restore, and assignment receipts already exist | Contribution outcomes partly overlap | Decide which receipts become public core `TRN` records and which stay internal |
+| Verdict record | Strong typed scoring, consensus, disagreement, slashing, and appeals already exist | Validator challenges and counters exist | Relay publication and stable public record linking between challenge, verdict, and closeout |
+| Artifact pointer | Very strong in `artifact_storage.rs`, `checkpoint_recovery.rs`, and `distributed_checkpoint_contract.rs` | Kernel checkpoint pointer is partial | Standard `TRN` locator event family and explicit fork or resume parent links |
+| Closeout record | Strong typed reward, settlement, payout, and explorer surfaces already exist | Accepted outcome is partial | Map final authority and public settlement state into one public closeout story |
+| Discovery profile | Strong typed registry and matchmaking already exist | No training-specific Nostr discovery | Publish it as relay-native records instead of only fixture contracts |
+| Private coordination profile | No Nostr implementation yet | No Nostr implementation yet | Encrypted assignment and validator coordination over `NIP-44` or `NIP-59` when needed |
+| Challenge jobs profile | Strong typed public-validator challenge model already exists | Partial kernel validator challenges | Bind challenge work to actual Nostr request/result flow when needed |
+| Reputation profile | Strong typed fraud, quarantine, slashing, and allocation surfaces already exist | No public reputation layer | Decide whether `TRN` carries this directly or references `NIP-32` labels and settlement feeds |
+| Explorer and score surfaces | Strong derived artifact families already exist | Desktop consumes local files | Make them secondary artifacts behind `TRN` pointers rather than primary truth |
 
-## The Main Conceptual Problem
+## The Main Architectural Problem
 
-The current training experience is built from three different truths:
+The core problem is not that the system lacks training concepts.
 
-1. Authority truth for runs, windows, contributions, and accepted outcomes.
-2. Mirror truth for remote training bundles and explorer snapshots.
-3. Local operator truth for running training, exporting artifacts, and accepting results.
+The core problem is that the same system is described in multiple incompatible vocabularies:
 
-That is why the app can show a lot of training information today while still not being close to real `TRN`.
+1. `psionic` runtime and contract types
+2. `openagents` kernel authority types
+3. remote-training and explorer artifact families
+4. desktop-local operator state
 
-`TRN` requires one public coordination language. Right now the app has three partial languages:
+`TRN` should not become a fifth independent vocabulary.
 
-- kernel objects
-- visualization bundles
-- local operator stage state
+It should be a projection layer over the existing system.
 
-Those need to stop competing.
+That means the design bar is:
 
-The correct unification is:
+- do not invent new names when `psionic` already has a typed concept
+- do not treat run bundles or explorer snapshots as the primary source of truth
+- do not duplicate node, window, checkpoint, or validator language in `openagents` if `psionic` already has a stronger version
 
-- kernel objects remain canonical internal market or authority truth
-- `TRN` becomes the shared public coordination and discovery truth
-- visualization bundles become optional derived artifacts behind public pointers
-- operator-local stage state becomes one local producer of future `TRN` records, not its own separate training protocol
+## What Should Map Into TRN Directly
 
-## Required Changes By Owner
+The clean mapping is:
 
-## 1. `openagents/crates/nostr/core`
+- `TRN` network record
+  - derived from `decentralized_network_contract.rs`
+  - augmented by current epoch and active discovery data from `public_network_registry_contract.rs`
 
-This crate needs a real `nip_trn` module before the app can honestly claim `TRN` support.
+- `TRN` node record
+  - derived from `signed_node_identity_contract.rs`
+  - optionally split into identity and live registry status if needed
 
-Required work:
+- `TRN` window record
+  - derived from `run_graph.rs`, `adapter_window.rs`, and `public_work_assignment_contract.rs`
+  - must preserve assignment seed, policy revision, source checkpoint pointer, and lifecycle state
 
-- Add `nip_trn.rs` or `nip_trn/mod.rs`.
-- Export it from `crates/nostr/core/src/lib.rs`.
-- Define kind constants for the core `TRN` records:
-  - network
-  - node
-  - window
-  - receipt
-  - verdict
-  - artifact pointer
-  - closeout
-- Define the canonical tag vocabulary for:
-  - network id
-  - run id
-  - window id
-  - node id
-  - policy refs
-  - parent or source run
-  - resume or fork source
-  - artifact role
-  - manifest digest
-  - weight pointer
-  - verdict
-  - replay requirement
-  - closeout disposition
-- Add typed parser and builder structs in the same style as `nip_ds`.
-- Validate required references and reject invalid event shapes early.
+- `TRN` receipt record
+  - derived from adapter-window receipts, public assignment receipts, and checkpoint restore receipts
+  - must stay lightweight and pointer-based
 
-This is the minimum protocol layer. Without it, the rest of the app has no stable `TRN` contract to target.
+- `TRN` verdict record
+  - derived from validator score receipts, consensus votes, disagreement receipts, and fraud or slashing decisions
 
-## 2. `openagents/crates/nostr/client`
+- `TRN` artifact-pointer record
+  - derived from `artifact_storage.rs`, `checkpoint_recovery.rs`, and `distributed_checkpoint_contract.rs`
+  - should point to manifests, checkpoint pointers, final evidence bundles, and explorer artifacts
 
-The client crate is intentionally minimal today. That is fine, but full `TRN` support still needs client-side helpers.
+- `TRN` closeout record
+  - derived from reward-ledger, settlement-publication, and final authority acceptance state
 
-Required work:
+## What Should Not Map Into TRN
 
-- Add `TRN`-specific subscription helpers for:
-  - one training network
-  - one run
-  - one window
-  - one node
-  - artifact-pointer history
-  - closeout history
-- Add typed publish helpers so the app and authority services do not hand-roll raw events everywhere.
-- Add projection utilities for ordering and deduping multiple relay views of the same training records.
-- Add gap-recovery rules for `TRN` streams so the desktop can reconnect and rebuild state.
+Do not turn `TRN` into a transport for heavy runtime data.
 
-The client does not need to become a heavy training engine. It just needs enough typed support that `TRN` events can be published and consumed safely.
-
-## 3. `openagents/crates/openagents-kernel-core` and proto contracts
-
-The kernel object model is already close to `TRN`, but not identical.
-
-Required work:
-
-- Decide the authoritative mapping from kernel objects to `TRN` records.
-- Add the missing public identifiers and lineage fields that `TRN` needs but the current kernel model does not expose cleanly.
-- Normalize resume or fork semantics into typed fields instead of leaving them to ad hoc metadata blobs.
-- Expose public artifact-locator fields for:
-  - accepted checkpoint
-  - final checkpoint
-  - promotion checkpoint
-  - model weight bundle
-  - optimizer snapshot
-  - config or manifest bundle
-- Split "submission receipt", "validator verdict", and "closeout" more cleanly where the current object model collapses them into one contribution or outcome record.
-
-The biggest gap here is not training windows. The biggest gap is public lineage:
-
-- where did this run come from
-- what accepted state can it resume from
-- what accepted state can it fork from
-- what exact artifact pointer is the public recovery anchor
-
-That has to be explicit if `TRN` is supposed to support recovery and forking after operator or coordinator failure.
-
-## 4. `apps/nexus-control`
-
-`apps/nexus-control` is the natural place to publish `TRN` from canonical authority state.
-
-Required work:
-
-- Add a `TRN` publisher or projector beside the current HTTP authority routes.
-- Publish `TRN` records when the kernel mutates training state:
-  - training run created
-  - training run finalized
-  - adapter window recorded
-  - contribution recorded or finalized
-  - accepted outcome recorded
-  - checkpoint pointer promoted
-- Backfill existing kernel training history into `TRN` for relay-based recovery.
-- Keep a mapping from kernel record ids to Nostr event ids if later projections need it.
-- Decide what is public by default and what must move through optional encrypted coordination.
-
-`nexus-control` should not become the place that stores checkpoint bytes or runs training. It should become the bridge between canonical authority truth and public coordination truth.
-
-## 5. `apps/autopilot-desktop`
-
-This is where the visible product change has to happen.
-
-Required work:
-
-- Add a first-class `TRN` runtime lane, parallel to the current `SA`, `SKL`, and `AC` lanes.
-- Add `TrnLaneSnapshot`, `TrnLaneWorker`, command types, and reducer wiring.
-- Subscribe to `TRN` records for the networks, runs, and nodes the user cares about.
-- Build the training pane read model from `TRN` projections first, not from file mirrors.
-- Keep the existing remote training bundles and explorer snapshots as optional detail artifacts, loaded only when a `TRN` artifact pointer says they exist.
-- Teach `autopilotctl` to query and print `TRN` state, not only authority projections and mirror status.
-- Add operator actions for:
-  - publish node record
-  - join or advertise a run
-  - publish a receipt
-  - inspect a verdict
-  - open an artifact pointer
-  - resume from accepted state
-  - fork from accepted state
-
-The current split between `training`, `remote_training`, `xtrain_explorer`, and `apple_adapter_training` should eventually collapse into one shared training coordination model:
-
-- `training` becomes authority plus `TRN` status
-- `remote_training` becomes a derived artifact and visualization view
-- `xtrain_explorer` becomes a network or run explorer backed by `TRN`
-- `apple_adapter_training` becomes one local operator path that publishes into the same training record system
-
-Without that unification, the app will keep showing users multiple incompatible definitions of what "the training run" is.
-
-## 6. `psionic`
-
-`psionic` should stay out of the Nostr product plane except where it provides durable machine-readable artifact metadata.
-
-Required work in `psionic`:
-
-- Keep producing checkpoint manifests, proof files, and training visualization bundles.
-- Make those artifacts easy to reference through stable digests and locators.
-- Ensure accepted checkpoints, final weights, optimizer state, and config bundles have durable pointer metadata that `TRN` can publish.
-- Keep heavy artifact transfer and live execution coordination outside `TRN`.
-
-`TRN` should point to `psionic` artifacts. It should not carry them.
-
-## What Should Stay Out Of TRN
-
-To fully implement `TRN`, the team should be strict about what does not belong in it.
-
-Do not move these into `TRN` events:
+Keep these out:
 
 - checkpoint bytes
 - model weights
 - optimizer tensors
-- step-by-step live gradient exchange
+- shard payloads
 - high-frequency telemetry streams
-- sandbox workspace files
-- private credentials
-- provider-local temporary file paths
-- heavy visualization payloads when a stable artifact pointer is enough
+- raw rollout artifacts
+- large explorer snapshots when a pointer is enough
+- sandbox-local workspace state
 
-`TRN` should standardize the public coordination records. It should not become a transport for the heavy training runtime.
+`TRN` should carry identities, references, dispositions, and locators.
 
-## The Most Important Missing TRN Features
+`psionic` should keep carrying the heavy runtime and artifact plane.
 
-If the goal is not just "publish some training events" but "support recovery, self-healing, and forking," then these are the highest-value gaps:
+## What Is Still Missing Even After the Psionic Deep Dive
 
-### 1. Public recovery anchors
+Even with the stronger `psionic` picture, the implementation gaps are still real.
 
-Another operator must be able to read the relay history and answer:
+## 1. No live Nostr publication path
 
-- what run is active
-- what the current or last sealed window is
-- what validator policy applies
-- what artifact pointer is the accepted resume point
-- what checkpoint or weight pointer is the best known public continuation state
+The contracts are strong, but they are not live relay records.
 
-Today the app does not expose that as one Nostr-readable chain of records.
+There is no code today that takes the existing `psionic` network, node, window, receipt, verdict, artifact, and settlement surfaces and emits them as Nostr events.
 
-### 2. Public fork lineage
+## 2. No single bridge between Psionic and kernel authority
 
-If a run forks, the public record needs explicit lineage:
+`psionic` and `openagents` both model training state, but they do not yet share one public projection contract.
 
-- source network or run
-- source accepted checkpoint or weight pointer
-- source window or closeout
-- new policy revision or governance terms
+That is the seam that will produce duplication unless it is made explicit.
 
-Today the app and kernel have checkpoint references, but not a public fork model.
+The clean rule is:
 
-### 3. Public node capability publication
+- `psionic` should own execution facts, artifact facts, checkpoint facts, assignment facts, and recovery facts
+- `openagents` kernel should own acceptance, adjudication, and payout authority
+- `TRN` should publish both, but with a clear split between execution record and authority closeout
 
-The desktop currently knows cluster members and provider status, but it does not publish signed training-node records that a third party can reuse for scheduling, trust, or audit.
+## 3. No explicit fork or resume parent record in the public plane
 
-That makes open training coordination impossible. A training network needs public node claims with at least:
+`psionic` already has checkpoint pointers, manifests, restore receipts, and contributor lineage.
 
-- node id
-- admitted roles
-- software or build digest
-- benchmark evidence
-- supported artifact or format capabilities
+What is still missing is one end-to-end public continuation record that says:
 
-### 4. Public validator verdict publication
+- this run resumes from this accepted pointer
+- this run forks from this prior run or window
+- this new policy revision supersedes that prior accepted state
 
-Today validator state is partly visible through authority records and counters, but not through a dedicated relay-native verdict surface.
+The ingredients exist. The public projection does not.
 
-That means third parties cannot independently reconstruct which contribution was accepted, quarantined, rejected, or marked for replay without depending on private authority access.
+## 4. No `TRN` lane in the desktop
 
-## Recommended Target Architecture
+The desktop still treats mirrored JSON and file-backed explorer artifacts as the training UI substrate.
 
-The clean target is:
+That has to be inverted.
 
-1. `psionic` produces artifacts and runtime evidence.
-2. `apps/nexus-control` or another authority bridge writes canonical training truth.
-3. The authority bridge publishes `TRN` records to relays.
-4. `apps/autopilot-desktop` subscribes to `TRN`, builds a local training projection, and only fetches heavy artifacts when the user drills down.
-5. Recovery or fork flows start from `TRN` lineage plus artifact locators, not from private dashboards or local cache directories.
+The desktop should subscribe to `TRN` records first, then optionally fetch:
 
-That keeps the ownership split honest with `openagents/docs/OWNERSHIP.md`:
+- remote-training run bundles
+- remote-training indexes
+- XTRAIN explorer snapshots
+- XTRAIN explorer indexes
 
-- `psionic` owns training execution substrate
-- kernel and Nexus own authority and policy
-- `openagents` app owns the UX and Nostr-facing product composition
+from artifact pointers.
 
-## Implementation Sequence
+## 5. No training-specific Nostr client support
 
-## Phase 1: Freeze the TRN record model
+The minimal Nostr client in `openagents` does not yet expose:
 
-- Add the in-repo `TRN` draft and index entry.
-- Add `nip_trn` to `crates/nostr/core`.
-- Freeze event kinds, tags, and validation rules.
+- training subscriptions
+- typed training publish helpers
+- gap recovery for training feeds
+- encrypted assignment or validator coordination helpers
 
-## Phase 2: Map kernel training objects to TRN
+## Required Changes By Owner
 
-- Define the mapping from current kernel objects to core `TRN` records.
-- Add any missing fields needed for recovery, fork lineage, and public artifact locators.
+## 1. Psionic
 
-## Phase 3: Publish TRN from authority state
+`psionic` should be treated as the source of most `TRN` semantics.
 
-- Add a `TRN` projector or publisher in `apps/nexus-control`.
-- Backfill existing training history.
-- Ensure the relay history is enough to reconstruct the public coordination state of a run.
+Required changes:
 
-## Phase 4: Add a TRN lane to the desktop
+- expose one projection layer from live runtime state into public record shapes
+- stop relying only on canonical fixture writers for public training records
+- define explicit public continuation or fork records above checkpoint pointers and contributor lineage
+- keep artifact locators stable and small enough for relay publication
+- keep heavy bytes and runtime transport out of the public plane
 
-- Add `TrnLaneWorker`.
-- Subscribe to training records.
-- Build a local projection and expose it in `desktop_control`.
-- Add `autopilotctl` support.
+## 2. OpenAgents Nostr crates
 
-## Phase 5: Rebuild the panes around TRN
+Required changes:
 
-- Rebase `Training Runs` on `TRN`.
-- Convert `XTRAIN Explorer` into a `TRN` explorer with optional artifact drill-down.
-- Keep remote training visualization bundles as derived artifacts, not primary truth.
-- Wire Apple adapter operator actions to publish or update `TRN` state.
+- add a checked-in `TRN` draft in `crates/nostr/nips`
+- add `nip_trn` in `crates/nostr/core`
+- define kinds and tags by reusing `psionic` vocabulary, not inventing new one-off desktop names
+- add typed publish and subscribe helpers in `crates/nostr/client`
 
-## Phase 6: Add recovery and fork UX
+## 3. Nexus and kernel authority
 
-- Publish accepted artifact pointers and closeouts as public continuation anchors.
-- Add UI and CLI flows for resume and fork from accepted public state.
+Required changes:
+
+- define the exact bridge between kernel authority records and `psionic` execution records
+- publish authority-owned closeout facts into `TRN`
+- avoid creating a second public training schema beside the one derived from `psionic`
+
+## 4. Desktop app
+
+Required changes:
+
+- add `TrnLaneWorker` and `TrnLaneSnapshot`
+- move training panes to a `TRN`-first read model
+- treat remote-training bundles and XTRAIN snapshots as drill-down artifacts
+- let `autopilotctl` query live `TRN` state
+
+## Recommended Implementation Order
+
+1. Freeze the `TRN` event family around existing `psionic` concepts.
+2. Build a projection layer from `psionic` runtime and contract state into `TRN` records.
+3. Define the kernel-authority closeout bridge onto that same record family.
+4. Add `TRN` publish and subscribe support in the Nostr crates.
+5. Add a `TRN` lane in the desktop.
+6. Rebase remote training and XTRAIN explorer onto artifact pointers instead of local file paths.
 
 ## Bottom Line
 
-OpenAgents is not starting from zero.
+After reading actual `psionic` code, the honest conclusion is:
 
-The kernel already has most of the typed records that `TRN` needs, and the desktop already knows how to present training state. What is missing is the shared Nostr coordination layer and the decision to stop treating training as three separate protocols.
+`TRN` is not blocked by missing training semantics.
 
-If the team wants full `TRN` support, the real job is:
+It is blocked by missing projection and publication.
 
-- standardize the training records in `nostr/core`
-- publish them from the authority path
-- add one `TRN` lane in the desktop
-- demote mirror bundles and local operator state from primary truth to supporting artifacts
+`psionic` already has a strong native vocabulary for:
 
-That is the shortest path to real training coordination, public recovery, and forkable runs without turning `TRN` into a transport for heavy training runtime data.
+- public network identity
+- signed node identity
+- discovery and matchmaking
+- work windows and assignments
+- validator challenge scoring
+- multi-validator consensus
+- fraud, quarantine, and slashing
+- reward and settlement
+- checkpoint pointers and restore plans
+- evidence bundles and explorer artifacts
+
+That means `TRN` should be built as a thin public event layer over that vocabulary, plus a clean bridge to `openagents` authority truth.
+
+The work ahead is real, but it is more contained than the earlier audit implied. The team does not need to guess at the training nouns. It needs to standardize the publication of nouns it already owns.
