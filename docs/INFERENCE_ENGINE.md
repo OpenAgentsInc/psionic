@@ -95,8 +95,10 @@ than just run tensor math.
   It runs the native direct-engine receipt and the native
   `psionic-openai-server` receipt on one explicit prompt contract, keeps the
   two benchmark classes separate in the published JSON, records HTTP startup
-  and warmup timing, and writes one explicit concurrency ladder instead of
-  folding runtime and server overhead into one number.
+  and warmup timing, writes one explicit concurrency ladder instead of
+  folding runtime and server overhead into one number, and now requires the
+  native direct row to pass the fallback-free CUDA publication gate unless an
+  operator opts into compatibility receipts explicitly.
 - The repo-owned sequential collector for the canonical qwen35 versus Ollama
   matrix now lives at `scripts/release/run-qwen35-ollama-matrix.sh`. It writes
   a combined manifest plus row reports that preserve output-token arrays,
@@ -159,6 +161,11 @@ than just run tensor math.
   `docs/PSION_RVLLM_PREFLIGHT_BUNDLE.md`, tying together graph capture,
   cuBLAS warmup, allocator-pool posture, kernel-cache posture, and cold-versus-
   warm startup evidence for the admitted CUDA serving lane.
+- The same pass now also retains one explicit fallback-free CUDA benchmark
+  gate packet at `docs/PSION_RVLLM_FALLBACK_FREE_CUDA_GATE.md`, making host
+  fallback evidence, raw-logit materialization, graph-stability checks, and
+  refusal posture machine-visible for the admitted native qwen35 greedy lane
+  instead of silently publishing degraded direct-engine rows.
 - The same pass now also retains one explicit paged-KV manager packet at
   `docs/PSION_RVLLM_PAGED_KV_MANAGER.md`, making logical page layout,
   owner-bound growth accounting, spill policy, residency movement, and refusal

@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     env, fs,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -59,6 +60,7 @@ struct BenchConfig {
     ollama_model: Option<String>,
     ollama_base_url: String,
     json_out: Option<PathBuf>,
+    require_fallback_free_cuda: bool,
     prompt: String,
     max_output_tokens: usize,
     repeats: usize,
@@ -89,6 +91,8 @@ enum BenchStructuredOutput {
 struct BenchReport {
     schema_version: u32,
     report_kind: String,
+    run_status: String,
+    refusal_reason: Option<String>,
     benchmark_class: String,
     generated_at_unix_s: u64,
     backend: String,
@@ -118,6 +122,7 @@ struct BenchReport {
     seed: Option<u64>,
     structured_output: BenchStructuredOutputConfigReport,
     psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
+    psionic_cuda_fast_path: Option<BenchPsionicCudaFastPathReport>,
     runs: Vec<BenchRunReport>,
     mean_output_tokens: f64,
     mean_prompt_s: f64,
@@ -147,6 +152,7 @@ struct BenchRunReport {
     qwen35_graph_misses: usize,
     qwen35_graph_captures: usize,
     qwen35_graph_shape_drifts: usize,
+    qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport,
     termination: BenchTerminationReport,
     structured_output_mode: String,
     structured_output_parser: String,
@@ -199,7 +205,90 @@ struct BenchPsionicCudaStartupReport {
     warmup_decode_s: f64,
     warmup_total_s: f64,
     warmup_output_tokens: usize,
+    warmup_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport,
     request_billed_to_user: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct BenchPsionicCudaFastPathReport {
+    lane: String,
+    status: String,
+    refusal_reason: Option<String>,
+    required_output_modes: Vec<String>,
+    raw_logits_forbidden: bool,
+    host_fallback_forbidden: bool,
+    graph_capture_required: bool,
+    env_guards: Vec<BenchEnvGuardReport>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct BenchEnvGuardReport {
+    name: String,
+    required_state: String,
+    actual_state: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct BenchCudaHostFallbackEvidenceReport {
+    report_count: usize,
+    op_count: usize,
+    case_count: usize,
+    fallback_invocations: u64,
+    total_host_fallback_ms: u64,
+    op_labels: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CudaHostFallbackProfileReport {
+    #[serde(default)]
+    total_host_fallback_ms: u64,
+    #[serde(default)]
+    ops: Vec<CudaHostFallbackOpReport>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CudaHostFallbackOpReport {
+    label: String,
+    #[serde(default)]
+    count: u64,
+    #[serde(default)]
+    cases: Vec<CudaHostFallbackCaseReport>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CudaHostFallbackCaseReport {}
+
+struct ScopedEnvVar {
+    key: &'static str,
+    previous: Option<String>,
+}
+
+impl ScopedEnvVar {
+    fn set(key: &'static str, value: &str) -> Self {
+        let previous = env::var(key).ok();
+        // Safety: this benchmark example mutates one process-local env var before
+        // constructing the CUDA service and restores it before returning.
+        unsafe {
+            env::set_var(key, value);
+        }
+        Self { key, previous }
+    }
+}
+
+impl Drop for ScopedEnvVar {
+    fn drop(&mut self) {
+        if let Some(previous) = self.previous.as_deref() {
+            // Safety: this restores the process-local override established in `set`.
+            unsafe {
+                env::set_var(self.key, previous);
+            }
+        } else {
+            // Safety: this clears the process-local override established in `set`.
+            unsafe {
+                env::remove_var(self.key);
+            }
+        }
+    }
 }
 
 impl Default for BenchConfig {
@@ -210,6 +299,7 @@ impl Default for BenchConfig {
             ollama_model: None,
             ollama_base_url: String::from("http://127.0.0.1:11434"),
             json_out: None,
+            require_fallback_free_cuda: false,
             prompt: String::from("Explain what Psionic is in one sentence."),
             max_output_tokens: 256,
             repeats: 3,
@@ -276,6 +366,9 @@ impl BenchConfig {
                         &mut index,
                         "--json-out",
                     )?));
+                }
+                "--require-fallback-free-cuda" => {
+                    config.require_fallback_free_cuda = true;
                 }
                 "--prompt" => {
                     config.prompt = next_arg(&raw_args, &mut index, "--prompt")?;
@@ -442,6 +535,11 @@ impl BenchConfig {
                 "missing --ollama-model for `--backend ollama`",
             ));
         }
+        if self.require_fallback_free_cuda && !matches!(self.backend, BenchBackend::Psionic) {
+            return Err(String::from(
+                "`--require-fallback-free-cuda` is only available for `--backend psionic`",
+            ));
+        }
         Ok(())
     }
 
@@ -601,6 +699,26 @@ impl BenchConfig {
 
 fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
     let bench_model = load_bench_model(&config.model_path, &config.prompt)?;
+    let mut fast_path_report = psionic_cuda_fast_path_report(config);
+    if let Err(reason) = validate_psionic_cuda_fast_path_contract(config, &mut fast_path_report) {
+        let report = build_bench_report(
+            config,
+            &bench_model.rendered,
+            None,
+            None,
+            Some(fast_path_report),
+            String::from("refused"),
+            Some(reason.clone()),
+            Vec::new(),
+        );
+        write_json_output(&report, config.json_out.as_ref())?;
+        return Err(reason);
+    }
+    let fallback_profile_path = fallback_profile_capture_path();
+    let _fallback_profile_env = ScopedEnvVar::set(
+        "PSIONIC_CUDA_HOST_FALLBACK_PROFILE_PATH",
+        &fallback_profile_path.display().to_string(),
+    );
     let load_started_at = Instant::now();
     let mut service = CudaGgufQwen35TextGenerationService::from_gguf_path(&config.model_path)
         .map_err(|error| format!("failed to load qwen35 cuda service: {error}"))?;
@@ -626,6 +744,13 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
     let warmup_response = service
         .generate(&warmup)
         .map_err(|error| format!("warmup generation failed: {error}"))?;
+    let mut fallback_record_count = 0;
+    let warmup_fallback_evidence = read_host_fallback_evidence_delta(
+        fallback_profile_path.as_path(),
+        &mut fallback_record_count,
+    )?;
+    let warmup_output_metrics =
+        qwen35_output_metrics_report(warmup_response.metrics.qwen35_cuda_decode.as_ref());
     let startup_report = BenchPsionicCudaStartupReport {
         load_s,
         cublas_handle_scope: String::from("per_device_runtime_owner"),
@@ -640,10 +765,30 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             .metrics
             .eval_count
             .unwrap_or(warmup_response.output.tokens.len()),
+        warmup_host_fallback_evidence: warmup_fallback_evidence.clone(),
         request_billed_to_user: false,
     };
+    if let Err(reason) = validate_psionic_cuda_fast_path_warmup(
+        config,
+        &warmup_output_metrics,
+        &warmup_fallback_evidence,
+        &mut fast_path_report,
+    ) {
+        let report = build_bench_report(
+            config,
+            &bench_model.rendered,
+            Some(startup_report),
+            Some(load_s),
+            Some(fast_path_report),
+            String::from("refused"),
+            Some(reason.clone()),
+            Vec::new(),
+        );
+        write_json_output(&report, config.json_out.as_ref())?;
+        return Err(reason);
+    }
     println!(
-        "backend=psionic load_s={:.6} startup_warmup_status={} cublas_handle_scope={} cublas_stream_binding={} warmup_prompt_s={:.6} warmup_decode_s={:.6} warmup_total_s={:.6} warmup_output_tokens={}",
+        "backend=psionic load_s={:.6} startup_warmup_status={} cublas_handle_scope={} cublas_stream_binding={} warmup_prompt_s={:.6} warmup_decode_s={:.6} warmup_total_s={:.6} warmup_output_tokens={} warmup_host_fallback_ops={} warmup_host_fallback_total_ms={}",
         startup_report.load_s,
         startup_report.warmup_status,
         startup_report.cublas_handle_scope,
@@ -652,6 +797,10 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         startup_report.warmup_decode_s,
         startup_report.warmup_total_s,
         startup_report.warmup_output_tokens,
+        startup_report.warmup_host_fallback_evidence.op_count,
+        startup_report
+            .warmup_host_fallback_evidence
+            .total_host_fallback_ms,
     );
 
     let mut runs = Vec::with_capacity(config.repeats);
@@ -681,6 +830,10 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         let decode_tok_s = tokens_per_second(output_tokens, decode_ns);
         let output_metrics =
             qwen35_output_metrics_report(response.metrics.qwen35_cuda_decode.as_ref());
+        let fallback_evidence = read_host_fallback_evidence_delta(
+            fallback_profile_path.as_path(),
+            &mut fallback_record_count,
+        )?;
         let structured_output = structured_output_runtime_report(
             response.provenance.as_ref(),
             response.output.structured.as_ref(),
@@ -694,11 +847,17 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         let prompt_s = nanos_to_seconds(prompt_ns);
         let decode_s = nanos_to_seconds(decode_ns);
         let total_s = nanos_to_seconds(total_ns);
-        let ttft_s = response.metrics.time_to_first_token_ns.map(nanos_to_seconds);
-        let itl_s = response.metrics.inter_token_latency_ns.map(nanos_to_seconds);
+        let ttft_s = response
+            .metrics
+            .time_to_first_token_ns
+            .map(nanos_to_seconds);
+        let itl_s = response
+            .metrics
+            .inter_token_latency_ns
+            .map(nanos_to_seconds);
         let output_text = response.output.text;
         let printable_output_text = output_text.replace('\n', "\\n");
-        runs.push(BenchRunReport {
+        let run_report = BenchRunReport {
             run_index: run_index + 1,
             decode_mode: String::from(bench_decode_mode_label(config.decode_mode)),
             prompt_tokens: response.metrics.prompt_eval_count.unwrap_or(0),
@@ -716,6 +875,7 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_misses: output_metrics.graph_misses,
             qwen35_graph_captures: output_metrics.graph_captures,
             qwen35_graph_shape_drifts: output_metrics.graph_shape_drifts,
+            qwen35_host_fallback_evidence: fallback_evidence.clone(),
             termination: termination.clone(),
             structured_output_mode: structured_output.mode.clone(),
             structured_output_parser: structured_output.parser.clone(),
@@ -723,9 +883,30 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
             structured_output_value: structured_output.value.clone(),
             output_token_ids,
             output_text: output_text.clone(),
-        });
+        };
+        if let Err(reason) = validate_psionic_cuda_fast_path_run(
+            config,
+            &output_metrics,
+            &fallback_evidence,
+            &mut fast_path_report,
+        ) {
+            runs.push(run_report);
+            let report = build_bench_report(
+                config,
+                &bench_model.rendered,
+                Some(startup_report.clone()),
+                Some(load_s),
+                Some(fast_path_report),
+                String::from("refused"),
+                Some(reason.clone()),
+                runs,
+            );
+            write_json_output(&report, config.json_out.as_ref())?;
+            return Err(reason);
+        }
+        runs.push(run_report);
         println!(
-            "backend=psionic run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} ttft_s={} itl_s={} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} {} {} output={}",
+            "backend=psionic run={} decode_mode={} prompt_tokens={} output_tokens={} prompt_s={:.6} decode_s={:.6} total_s={:.6} ttft_s={} itl_s={} decode_tok_s={:.2} termination_observed={} termination_classification={} matched_stop_sequence={} qwen35_host_fallback_ops={} qwen35_host_fallback_total_ms={} {} {} output={}",
             run_index + 1,
             bench_decode_mode_label(config.decode_mode),
             response.metrics.prompt_eval_count.unwrap_or(0),
@@ -742,6 +923,8 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
                 .matched_stop_sequence
                 .as_deref()
                 .unwrap_or("none"),
+            fallback_evidence.op_count,
+            fallback_evidence.total_host_fallback_ms,
             format_qwen35_output_metrics(&output_metrics),
             format_structured_output_report(&structured_output),
             printable_output_text,
@@ -753,6 +936,9 @@ fn run_psionic_benchmark(config: &BenchConfig) -> Result<(), String> {
         &bench_model.rendered,
         Some(startup_report.clone()),
         Some(startup_report.load_s),
+        Some(fast_path_report),
+        String::from("ok"),
+        None,
         runs,
     );
     println!(
@@ -831,6 +1017,7 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
             qwen35_graph_misses: 0,
             qwen35_graph_captures: 0,
             qwen35_graph_shape_drifts: 0,
+            qwen35_host_fallback_evidence: BenchCudaHostFallbackEvidenceReport::default(),
             termination: termination.clone(),
             structured_output_mode: String::from("none"),
             structured_output_parser: String::from("none"),
@@ -859,7 +1046,16 @@ fn run_ollama_benchmark(config: &BenchConfig) -> Result<(), String> {
         );
     }
 
-    let report = build_bench_report(config, &bench_model.rendered, None, None, runs);
+    let report = build_bench_report(
+        config,
+        &bench_model.rendered,
+        None,
+        None,
+        None,
+        String::from("ok"),
+        None,
+        runs,
+    );
     println!(
         "backend=ollama mean_decode_tok_s={:.2}",
         report.mean_decode_tok_s
@@ -1131,6 +1327,9 @@ fn build_bench_report(
     rendered: &RenderedPrompt,
     psionic_cuda_startup: Option<BenchPsionicCudaStartupReport>,
     load_s: Option<f64>,
+    psionic_cuda_fast_path: Option<BenchPsionicCudaFastPathReport>,
+    run_status: String,
+    refusal_reason: Option<String>,
     runs: Vec<BenchRunReport>,
 ) -> BenchReport {
     let repeats = runs.len().max(1) as f64;
@@ -1142,8 +1341,10 @@ fn build_bench_report(
     let mean_itl_s = mean_optional_seconds(runs.iter().filter_map(|run| run.itl_s));
     let mean_decode_tok_s = runs.iter().map(|run| run.decode_tok_s).sum::<f64>() / repeats;
     BenchReport {
-        schema_version: 4,
+        schema_version: 5,
         report_kind: String::from("qwen35_cuda_bench"),
+        run_status,
+        refusal_reason,
         benchmark_class: String::from(bench_report_class(config.backend)),
         generated_at_unix_s: current_unix_timestamp_seconds(),
         backend: String::from(bench_backend_label(config.backend)),
@@ -1174,6 +1375,7 @@ fn build_bench_report(
         seed: config.effective_seed_for_backend(config.backend),
         structured_output: structured_output_config_report(config.structured_output.as_ref()),
         psionic_cuda_startup,
+        psionic_cuda_fast_path,
         runs,
         mean_output_tokens,
         mean_prompt_s,
@@ -1182,6 +1384,245 @@ fn build_bench_report(
         mean_ttft_s,
         mean_itl_s,
         mean_decode_tok_s,
+    }
+}
+
+fn psionic_cuda_fast_path_report(config: &BenchConfig) -> BenchPsionicCudaFastPathReport {
+    BenchPsionicCudaFastPathReport {
+        lane: String::from(if config.require_fallback_free_cuda {
+            "fallback_free_fast_path"
+        } else {
+            "explicit_fallback_path"
+        }),
+        status: String::from(if config.require_fallback_free_cuda {
+            "validated"
+        } else {
+            "compatibility_fallback_allowed"
+        }),
+        refusal_reason: None,
+        required_output_modes: vec![String::from("argmax_only")],
+        raw_logits_forbidden: true,
+        host_fallback_forbidden: true,
+        graph_capture_required: true,
+        env_guards: qwen35_fast_path_env_guards(),
+    }
+}
+
+fn qwen35_fast_path_env_guards() -> Vec<BenchEnvGuardReport> {
+    [
+        "PSIONIC_QWEN35_DISABLE_FAST_GREEDY",
+        "PSIONIC_QWEN35_DISABLE_FUSED_QKV_RMS_NORM",
+        "PSIONIC_QWEN35_DEBUG_ATTENTION",
+        "PSIONIC_QWEN35_DEBUG_FUSED_LAYERS",
+    ]
+    .into_iter()
+    .map(|name| BenchEnvGuardReport {
+        name: String::from(name),
+        required_state: String::from("unset"),
+        actual_state: env::var(name).unwrap_or_else(|_| String::from("unset")),
+    })
+    .collect()
+}
+
+fn validate_psionic_cuda_fast_path_contract(
+    config: &BenchConfig,
+    report: &mut BenchPsionicCudaFastPathReport,
+) -> Result<(), String> {
+    if !config.require_fallback_free_cuda {
+        return Ok(());
+    }
+    let refusal = if !matches!(config.backend, BenchBackend::Psionic) {
+        Some(String::from(
+            "fallback-free cuda benchmark lane is only admitted on `--backend psionic`",
+        ))
+    } else if !matches!(config.decode_mode, BenchDecodeMode::Greedy) {
+        Some(String::from(
+            "fallback-free cuda benchmark lane is currently admitted only for greedy decode",
+        ))
+    } else if config.structured_output.is_some() {
+        Some(String::from(
+            "fallback-free cuda benchmark lane refuses structured-output contracts",
+        ))
+    } else if config.temperature.is_some()
+        || config.top_k.is_some()
+        || config.top_p.is_some()
+        || config.min_p.is_some()
+        || config.typical_p.is_some()
+        || config.mirostat.is_some()
+        || config.repeat_penalty.is_some()
+        || config.repeat_last_n.is_some()
+        || config.presence_penalty.is_some()
+        || config.frequency_penalty.is_some()
+    {
+        Some(String::from(
+            "fallback-free cuda benchmark lane refuses decode knobs outside the admitted greedy fast path",
+        ))
+    } else {
+        report
+            .env_guards
+            .iter()
+            .find(|guard| guard.actual_state != "unset")
+            .map(|guard| {
+                format!(
+                    "fallback-free cuda benchmark lane refused because env guard `{}` is `{}`",
+                    guard.name, guard.actual_state
+                )
+            })
+    };
+    if let Some(reason) = refusal {
+        mark_fast_path_refused(report, reason.clone());
+        return Err(reason);
+    }
+    Ok(())
+}
+
+fn validate_psionic_cuda_fast_path_warmup(
+    config: &BenchConfig,
+    output_metrics: &BenchQwen35OutputMetricsReport,
+    fallback_evidence: &BenchCudaHostFallbackEvidenceReport,
+    report: &mut BenchPsionicCudaFastPathReport,
+) -> Result<(), String> {
+    if !config.require_fallback_free_cuda {
+        return Ok(());
+    }
+    validate_qwen35_fast_path_metrics(output_metrics, fallback_evidence, false).map_err(|reason| {
+        mark_fast_path_refused(report, reason.clone());
+        reason
+    })
+}
+
+fn validate_psionic_cuda_fast_path_run(
+    config: &BenchConfig,
+    output_metrics: &BenchQwen35OutputMetricsReport,
+    fallback_evidence: &BenchCudaHostFallbackEvidenceReport,
+    report: &mut BenchPsionicCudaFastPathReport,
+) -> Result<(), String> {
+    if !config.require_fallback_free_cuda {
+        return Ok(());
+    }
+    validate_qwen35_fast_path_metrics(output_metrics, fallback_evidence, true).map_err(|reason| {
+        mark_fast_path_refused(report, reason.clone());
+        reason
+    })
+}
+
+fn validate_qwen35_fast_path_metrics(
+    output_metrics: &BenchQwen35OutputMetricsReport,
+    fallback_evidence: &BenchCudaHostFallbackEvidenceReport,
+    require_graph_hit: bool,
+) -> Result<(), String> {
+    if fallback_evidence.fallback_invocations > 0 {
+        return Err(format!(
+            "fallback-free cuda benchmark lane recorded host fallback evidence: labels={} invocations={}",
+            fallback_evidence.op_labels.join(","),
+            fallback_evidence.fallback_invocations
+        ));
+    }
+    if output_metrics.raw_logits {
+        return Err(String::from(
+            "fallback-free cuda benchmark lane refused raw logits materialization",
+        ));
+    }
+    if output_metrics.output_modes.as_slice() != [String::from("argmax_only")] {
+        return Err(format!(
+            "fallback-free cuda benchmark lane requires `argmax_only`, actual modes={}",
+            output_metrics.output_modes.join(",")
+        ));
+    }
+    if output_metrics.graph_shape_drifts > 0 {
+        return Err(format!(
+            "fallback-free cuda benchmark lane refused graph shape drift count={}",
+            output_metrics.graph_shape_drifts
+        ));
+    }
+    if output_metrics.graph_captures + output_metrics.graph_hits == 0 {
+        return Err(String::from(
+            "fallback-free cuda benchmark lane requires graph capture-ready output posture",
+        ));
+    }
+    if require_graph_hit && output_metrics.graph_hits == 0 {
+        return Err(String::from(
+            "fallback-free cuda benchmark lane requires steady-state graph hits after warmup",
+        ));
+    }
+    if require_graph_hit && output_metrics.graph_misses > 0 {
+        return Err(format!(
+            "fallback-free cuda benchmark lane refused steady-state graph miss count={}",
+            output_metrics.graph_misses
+        ));
+    }
+    Ok(())
+}
+
+fn mark_fast_path_refused(report: &mut BenchPsionicCudaFastPathReport, reason: String) {
+    report.lane = String::from("unsupported_or_refused");
+    report.status = String::from("refused");
+    report.refusal_reason = Some(reason);
+}
+
+fn fallback_profile_capture_path() -> PathBuf {
+    let mut path = env::temp_dir();
+    path.push(format!(
+        "psionic_qwen35_cuda_host_fallback_{}_{}.jsonl",
+        std::process::id(),
+        current_unix_timestamp_seconds()
+    ));
+    path
+}
+
+fn read_host_fallback_evidence_delta(
+    path: &Path,
+    previous_record_count: &mut usize,
+) -> Result<BenchCudaHostFallbackEvidenceReport, String> {
+    let records = read_host_fallback_records(path)?;
+    let start = (*previous_record_count).min(records.len());
+    let evidence = host_fallback_evidence_from_records(&records[start..]);
+    *previous_record_count = records.len();
+    Ok(evidence)
+}
+
+fn read_host_fallback_records(path: &Path) -> Result<Vec<CudaHostFallbackProfileReport>, String> {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return Ok(Vec::new());
+    };
+    raw.lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str::<CudaHostFallbackProfileReport>(line).map_err(|error| {
+                format!(
+                    "failed to parse cuda host fallback profile `{}`: {error}",
+                    path.display()
+                )
+            })
+        })
+        .collect()
+}
+
+fn host_fallback_evidence_from_records(
+    records: &[CudaHostFallbackProfileReport],
+) -> BenchCudaHostFallbackEvidenceReport {
+    let mut labels = BTreeSet::new();
+    let mut op_count = 0_usize;
+    let mut case_count = 0_usize;
+    let mut fallback_invocations = 0_u64;
+    let mut total_host_fallback_ms = 0_u64;
+    for record in records {
+        total_host_fallback_ms =
+            total_host_fallback_ms.saturating_add(record.total_host_fallback_ms);
+        for op in &record.ops {
+            labels.insert(op.label.clone());
+            op_count = op_count.saturating_add(1);
+            case_count = case_count.saturating_add(op.cases.len());
+            fallback_invocations = fallback_invocations.saturating_add(op.count);
+        }
+    }
+    BenchCudaHostFallbackEvidenceReport {
+        report_count: records.len(),
+        op_count,
+        case_count,
+        fallback_invocations,
+        total_host_fallback_ms,
+        op_labels: labels.into_iter().collect(),
     }
 }
 
@@ -1246,7 +1687,7 @@ fn write_json_output<T: Serialize>(value: &T, output: Option<&PathBuf>) -> Resul
 
 fn usage() -> String {
     String::from(
-        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--ollama-base-url http://127.0.0.1:11434] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--max-output-tokens 128] [--repeats 3]",
+        "usage:\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- <model.gguf> [prompt] [max_output_tokens] [repeats]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend psionic --model-path <model.gguf> [--require-fallback-free-cuda] [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--max-output-tokens 128] [--repeats 3]\n  cargo run -p psionic-serve --example qwen35_cuda_bench -- --backend ollama --model-path <model.gguf> --ollama-model qwen3.5:0.8b [--decode greedy|sample] [--temperature 0.8] [--top-k 40] [--top-p 0.9] [--min-p 0.05] [--typical-p 0.5] [--mirostat 1|2] [--mirostat-tau 5.0] [--mirostat-eta 0.1] [--repeat-penalty 1.0] [--repeat-last-n 64] [--presence-penalty 0.0] [--frequency-penalty 0.0] [--seed 42] [--json-object | --json-schema-file schema.json [--json-schema-name summary]] [--json-out report.json] [--prompt <text>] [--max-output-tokens 128] [--repeats 3]",
     )
 }
 

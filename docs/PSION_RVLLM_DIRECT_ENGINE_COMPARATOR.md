@@ -45,6 +45,8 @@ Operator surface:
   - the native `psionic-openai-server` HTTP row
   - the explicit HTTP concurrency ladder
   - an optional direct `vllm` reference row when `--vllm-model` is supplied
+  - the fallback-free direct publication gate by default, unless
+    `--allow-direct-fallbacks` is set deliberately
 * the HTTP row reuses the existing stable response-header contract from
   `openai_http.rs`:
   - `x-psionic-ttft-ns`
@@ -60,3 +62,6 @@ Claim boundary:
 * It does keep runtime load, warmup, TTFT, ITL, total latency, and throughput
   visible enough to tell whether a remaining gap lives in the runtime or in
   the server surface.
+* The default direct row is now bounded by
+  `docs/PSION_RVLLM_FALLBACK_FREE_CUDA_GATE.md` instead of publishing any
+  compatibility receipt as if it were the admitted hot path.

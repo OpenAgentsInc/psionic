@@ -416,7 +416,10 @@ The repo-owned native qwen35 direct-versus-HTTP comparator now lives at
 `scripts/release/qwen35_direct_vs_http_compare.py`. It runs the direct
 `qwen35_cuda_bench` lane plus `psionic-openai-server` on one explicit prompt
 contract, preserves the HTTP concurrency ladder as a separate benchmark class,
-and can optionally add one direct `vllm` reference row when the local Python
+and now requires the direct native receipt to satisfy the fallback-free CUDA
+publication gate by default. Operators can still collect compatibility rows,
+but only by opting into `--allow-direct-fallbacks` explicitly. The same helper
+can optionally add one direct `vllm` reference row when the local Python
 environment exposes `vllm`.
 `repeat_last_n` follows the Ollama-compatible local contract:
 
@@ -463,6 +466,10 @@ The same March 27, 2026 benchmark also shows the current boundary clearly:
   `qwen35_graph_hits`, `qwen35_graph_misses`, `qwen35_graph_captures`, and
   `qwen35_graph_shape_drifts`, so the captured-graph path is retained runtime
   truth instead of benchmark-only lore
+- the admitted greedy publication lane now also records
+  `run_status`, `refusal_reason`, `psionic_cuda_fast_path`, warmup host-
+  fallback evidence, and per-run host-fallback evidence, so degraded native
+  rows fail closed instead of getting published as if they were hot-path wins
 
 ## Current Bottlenecks
 

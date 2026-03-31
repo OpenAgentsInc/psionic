@@ -48,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-seconds", type=float, default=300.0)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0)
+    parser.add_argument("--allow-direct-fallbacks", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--server-bin", default="")
     parser.add_argument("--bench-bin", default="")
@@ -394,6 +395,7 @@ def run_direct_engine(
     model_path: Path,
     contract: dict[str, Any],
     direct_repeats: int,
+    allow_direct_fallbacks: bool,
     report_path: Path,
 ) -> dict[str, Any]:
     args = [
@@ -412,6 +414,8 @@ def run_direct_engine(
         str(report_path),
         *contract["direct_example_args"],
     ]
+    if not allow_direct_fallbacks:
+        args.append("--require-fallback-free-cuda")
     completed = subprocess.run(
         args,
         cwd=str(repo_root),
@@ -617,6 +621,7 @@ def main() -> int:
         model_path=model_path,
         contract=contract,
         direct_repeats=args.direct_repeats,
+        allow_direct_fallbacks=args.allow_direct_fallbacks,
         report_path=direct_report_path,
     )
 
@@ -652,6 +657,9 @@ def main() -> int:
         "prompt_contract": {
             **contract,
             "http_concurrency_ladder": concurrency_ladder,
+        },
+        "publication_gate": {
+            "direct_engine_fallback_free_required": not args.allow_direct_fallbacks,
         },
         "artifacts": {
             "combined_report_path": repo_relative_path(repo_root, report_path),
