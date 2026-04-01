@@ -87,6 +87,7 @@ const LOCAL_SERVER_WARM_CONTROL: &str = "not_implemented";
 const LOCAL_SERVER_UNLOAD_CONTROL: &str = "not_implemented";
 const LOCAL_SERVER_MEMORY_PRESSURE_REPORTING: &str = "not_implemented";
 const OPENAI_COMPAT_WORKER_ID: &str = "local_cpu_0";
+const STREAMING_TEXT_DELTA_MAX_CHARS: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct LocalServingTruth {
@@ -3094,6 +3095,17 @@ fn tool_call_outcome_from_response(
     }
 
     let Some(structured) = response.output.structured.clone() else {
+        if matches!(contract.mode, ToolChoiceMode::Auto) {
+            if response.output.text.is_empty() {
+                return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                    "tool auto-mode response omitted both a machine-readable tool envelope and assistant text",
+                )));
+            }
+            return Ok(Some(ToolCallOutcome {
+                content: Some(response.output.text.clone()),
+                tool_calls: Vec::new(),
+            }));
+        }
         return Err(OpenAiCompatHttpError::BadRequest(String::from(
             "tool-calling request completed without a machine-readable tool envelope",
         )));
@@ -3613,18 +3625,22 @@ async fn handle_generic_chat_completions(
             Some(choice.finish_reason),
             unix_timestamp_secs(),
         );
-        let delta_chunk = serialize_event_data(&completion_delta_chunk_for_choice(
+        let delta_chunks = completion_delta_chunks_for_choice(
             request_id.as_str(),
             response_model_name.as_str(),
             &choice,
             unix_timestamp_secs(),
-        ))?;
+        )
+        .into_iter()
+        .map(|chunk| serialize_event_data(&chunk))
+        .collect::<Result<Vec<_>, _>>()?;
         let terminal_chunk = serialize_event_data(&terminal_chunk)?;
-        let events = vec![
-            Ok::<_, Infallible>(Event::default().data(delta_chunk)),
-            Ok::<_, Infallible>(Event::default().data(terminal_chunk)),
-            Ok::<_, Infallible>(Event::default().data("[DONE]")),
-        ];
+        let mut events = delta_chunks
+            .into_iter()
+            .map(|chunk| Ok::<_, Infallible>(Event::default().data(chunk)))
+            .collect::<Vec<_>>();
+        events.push(Ok::<_, Infallible>(Event::default().data(terminal_chunk)));
+        events.push(Ok::<_, Infallible>(Event::default().data("[DONE]")));
         let mut response = Sse::new(iter(events)).into_response();
         insert_generic_execution_headers(
             response.headers_mut(),
@@ -4577,6 +4593,7 @@ fn completion_stream_tool_calls(
 fn completion_delta_chunk(
     request_id: &str,
     model: &str,
+    role: Option<&'static str>,
     content: Option<String>,
     reasoning_content: Option<String>,
     tool_calls: Option<Vec<ChatCompletionChunkToolCall>>,
@@ -4590,7 +4607,7 @@ fn completion_delta_chunk(
         choices: vec![ChatCompletionChunkChoice {
             index: 0,
             delta: ChatCompletionChunkDelta {
-                role: Some("assistant"),
+                role,
                 content,
                 reasoning_content,
                 tool_calls,
@@ -4609,12 +4626,101 @@ fn completion_delta_chunk_for_choice(
     completion_delta_chunk(
         request_id,
         model,
+        Some("assistant"),
         choice.content.clone(),
         choice.reasoning_content.clone(),
         (!choice.tool_calls.is_empty())
             .then(|| completion_stream_tool_calls(choice.tool_calls.as_slice())),
         created,
     )
+}
+
+fn split_streaming_text_segments(text: &str, max_chars: usize) -> Vec<String> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let mut segments = Vec::new();
+    let mut start = 0usize;
+    while start < text.len() {
+        let mut char_count = 0usize;
+        let mut end = text.len();
+        let mut last_break = None;
+        for (offset, ch) in text[start..].char_indices() {
+            char_count = char_count.saturating_add(1);
+            let next = start + offset + ch.len_utf8();
+            if ch.is_whitespace() {
+                last_break = Some(next);
+            }
+            if char_count >= max_chars {
+                end = last_break.filter(|value| *value > start).unwrap_or(next);
+                break;
+            }
+        }
+        if char_count < max_chars {
+            end = text.len();
+        }
+        if end == start {
+            end = text[start..]
+                .chars()
+                .next()
+                .map(|ch| start + ch.len_utf8())
+                .unwrap_or(text.len());
+        }
+        segments.push(text[start..end].to_string());
+        start = end;
+    }
+    segments
+}
+
+fn completion_delta_chunks_for_choice(
+    request_id: &str,
+    model: &str,
+    choice: &ParsedCompletionChoice,
+    created: u64,
+) -> Vec<ChatCompletionChunk> {
+    let mut chunks = Vec::new();
+    let mut next_role = Some("assistant");
+    let mut push_chunk =
+        |chunks: &mut Vec<ChatCompletionChunk>,
+         content: Option<String>,
+         reasoning_content: Option<String>,
+         tool_calls: Option<Vec<ChatCompletionChunkToolCall>>| {
+            chunks.push(completion_delta_chunk(
+                request_id,
+                model,
+                next_role.take(),
+                content,
+                reasoning_content,
+                tool_calls,
+                created,
+            ));
+        };
+
+    for segment in split_streaming_text_segments(
+        choice.reasoning_content.as_deref().unwrap_or_default(),
+        STREAMING_TEXT_DELTA_MAX_CHARS,
+    ) {
+        push_chunk(&mut chunks, None, Some(segment), None);
+    }
+    if !choice.tool_calls.is_empty() {
+        push_chunk(
+            &mut chunks,
+            None,
+            None,
+            Some(completion_stream_tool_calls(choice.tool_calls.as_slice())),
+        );
+        return chunks;
+    }
+    for segment in split_streaming_text_segments(
+        choice.content.as_deref().unwrap_or_default(),
+        STREAMING_TEXT_DELTA_MAX_CHARS,
+    ) {
+        push_chunk(&mut chunks, Some(segment), None, None);
+    }
+    if chunks.is_empty() {
+        push_chunk(&mut chunks, None, None, None);
+    }
+    chunks
 }
 
 fn responses_output_items(
@@ -7094,6 +7200,67 @@ mod tests {
                     .as_str()
                     .is_some_and(|prompt| prompt.contains("sample with controls"))
         }));
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen35_proxy_streaming_plain_text_emits_multiple_delta_chunks()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = qwen35_proxy_test_lock()
+            .lock()
+            .expect("qwen35 proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35-streaming.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 proxy stream").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
+        drop(_proxy_env);
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35-streaming")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(2),
+                stop: None,
+                stream: true,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let body = runtime.block_on(response_text(response))?;
+        let events = sse_json_events(body.as_str())?;
+
+        assert_eq!(events.len(), 3);
+        assert_eq!(
+            events[0]["choices"][0]["delta"]["content"],
+            serde_json::json!("proxy ")
+        );
+        assert_eq!(
+            events[1]["choices"][0]["delta"]["content"],
+            serde_json::json!("world")
+        );
+        assert_eq!(
+            events[2]["choices"][0]["finish_reason"],
+            serde_json::json!("stop")
+        );
+        assert!(body.contains("[DONE]"));
 
         let _ = shutdown_tx.send(());
         Ok(())
@@ -11578,6 +11745,30 @@ mod tests {
         assert_eq!(outcome.tool_calls[1].name, "get_time");
         assert_eq!(outcome.tool_calls[0].id, "req-test-tool-0");
         assert_eq!(outcome.tool_calls[1].id, "req-test-tool-1");
+    }
+
+    #[test]
+    fn auto_tool_outcome_accepts_plain_text_when_structured_output_is_missing() {
+        let mut tools = BTreeMap::new();
+        tools.insert(
+            String::from("get_weather"),
+            weather_tool_definition().function,
+        );
+        let contract = ToolCallingContract {
+            tools,
+            mode: ToolChoiceMode::Auto,
+            named_tool: None,
+            parallel_tool_calls: false,
+            minimum_required_tool_calls: 0,
+        };
+        let response = test_generation_response("plain assistant answer");
+
+        let outcome = tool_call_outcome_from_response("req-test", &response, Some(&contract))
+            .expect("auto tool mode should accept plain assistant text")
+            .expect("tool outcome should exist");
+
+        assert_eq!(outcome.content.as_deref(), Some("plain assistant answer"));
+        assert!(outcome.tool_calls.is_empty());
     }
 
     fn weather_tool_definition() -> ToolDefinitionEnvelope {

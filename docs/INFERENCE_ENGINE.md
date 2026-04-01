@@ -133,6 +133,15 @@ than just run tensor math.
     turns and replayed `role = tool` results
   - JSON-schema-subset argument validation
   - proxy `qwen35` still fails closed for tool calling
+- On March 31, 2026, the generic OpenAI-compatible `/v1/chat/completions`
+  stream path stopped collapsing plain-text responses into one final SSE delta
+  and now emits incremental content chunks instead. The same pass also stopped
+  rejecting auto tool-mode turns when the model returned plain assistant text
+  without a machine-readable tool envelope.
+- That stream improvement is still bounded on native `qwen35`: the server now
+  emits incremental SSE content deltas, but the native `qwen35` backend does
+  not yet publish true decoder-time token events. The current lane still
+  materializes the response before chunk emission at the server surface.
 - The first `qwen35` lane must still fail closed for system-message image and
   video parts to stay aligned with the real template semantics.
 - On March 27, 2026, the native qwen35 CUDA lane gained the captured-graph
