@@ -15,6 +15,8 @@ Read these first:
   - canonical Psionic-wide system spec
 - `docs/INFERENCE_ENGINE.md`
   - canonical inference and serving completion bar
+- `docs/OPTIMIZER_SUBSTRATE.md`
+  - canonical optimizer substrate spec for bounded offline search artifacts
 - `docs/TRAIN_SYSTEM.md`
   - canonical training-system spec
 - `docs/ROADMAP.md`
@@ -114,11 +116,13 @@ execution evidence:
 - `crates/psionic-data`
 - `crates/psionic-eval`
 - `crates/psionic-adapters`
+- `crates/psionic-optimize`
 - `crates/psionic-nn-optimizers`
 
 Reference:
 
 - `docs/TRAIN_SYSTEM.md`
+- `docs/OPTIMIZER_SUBSTRATE.md`
 - `docs/ROADMAP_PARAMETERGOLF.md`
 - `docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md`
 - `docs/TRAIN_PROGRAM_MANIFEST_REFERENCE.md`

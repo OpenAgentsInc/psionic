@@ -13,6 +13,7 @@ evidence.
 - System architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Detailed workspace map: [docs/WORKSPACE_MAP.md](docs/WORKSPACE_MAP.md)
 - Inference and serving: [docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)
+- Optimizer substrate: [docs/OPTIMIZER_SUBSTRATE.md](docs/OPTIMIZER_SUBSTRATE.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)
 - Repo-local library roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
@@ -166,7 +167,7 @@ The main crate families are:
 - backends: `psionic-backend-cpu`, `psionic-backend-cuda`, `psionic-backend-metal`
 - serving and provider surfaces: `psionic-serve`, `psionic-provider`, `psionic-router`
 - cluster and distributed execution: `psionic-cluster`, `psionic-collectives`, `psionic-distributed`, `psionic-net`
-- training and eval: `psionic-train`, `psionic-data`, `psionic-eval`, `psionic-adapters`
+- training, eval, and optimizer substrate: `psionic-train`, `psionic-data`, `psionic-eval`, `psionic-adapters`, `psionic-optimize`
 
 Use [docs/WORKSPACE_MAP.md](docs/WORKSPACE_MAP.md) for the full doc index,
 crate map, and subsystem entrypoints.
