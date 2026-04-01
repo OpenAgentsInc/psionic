@@ -20,6 +20,8 @@ const LINEAGE_STATE_PREFIX: &[u8] = b"psionic_optimize_lineage_state|";
 const CASE_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_case_receipt|";
 const BATCH_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_batch_receipt|";
 const FRONTIER_SNAPSHOT_PREFIX: &[u8] = b"psionic_optimize_frontier_snapshot|";
+const ITERATION_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_iteration_receipt|";
+const SEARCH_STATE_PREFIX: &[u8] = b"psionic_optimize_search_state|";
 const RUN_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_run_receipt|";
 
 /// Stable frontier mode identifier declared by one optimization run spec.
@@ -42,6 +44,8 @@ pub enum OptimizationStopReason {
     IterationBudgetReached,
     /// The run reached its configured candidate budget.
     CandidateBudgetReached,
+    /// The proposer or sampler could not produce another honest search step.
+    ProposalExhausted,
     /// The run completed without entering a proposal loop.
     NoSearchRequired,
 }
@@ -709,6 +713,498 @@ impl OptimizationFrontierSnapshot {
     }
 }
 
+/// Evaluator contract for one optimizer candidate family.
+pub trait OptimizationEvaluator {
+    /// Evaluates one candidate across the supplied retained cases.
+    fn evaluate_candidate(
+        &mut self,
+        run_id: &str,
+        candidate: &OptimizationCandidateManifest,
+        cases: &[OptimizationCaseManifest],
+        cache: &mut OptimizationEvaluationCache,
+    ) -> OptimizationBatchEvaluationReceipt;
+}
+
+/// Proposer contract for one optimizer candidate family.
+pub trait OptimizationCandidateProposer {
+    /// Returns the next candidate proposal when one exists.
+    fn propose_candidate(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+    ) -> Option<OptimizationCandidateManifest>;
+}
+
+/// Minibatch sampler for train-time proposal gating.
+pub trait OptimizationMinibatchSampler {
+    /// Samples one minibatch from the retained train cases.
+    fn sample_minibatch(
+        &mut self,
+        iteration_index: u32,
+        train_cases: &[OptimizationCaseManifest],
+    ) -> Vec<OptimizationCaseManifest>;
+}
+
+/// Deterministic sequential minibatch sampler over retained train cases.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationSequentialMinibatchSampler {
+    /// Number of cases to include in each minibatch.
+    pub minibatch_size: usize,
+}
+
+impl OptimizationSequentialMinibatchSampler {
+    /// Creates a sequential sampler with the given minibatch size.
+    #[must_use]
+    pub fn new(minibatch_size: usize) -> Self {
+        Self {
+            minibatch_size: minibatch_size.max(1),
+        }
+    }
+}
+
+impl OptimizationMinibatchSampler for OptimizationSequentialMinibatchSampler {
+    fn sample_minibatch(
+        &mut self,
+        iteration_index: u32,
+        train_cases: &[OptimizationCaseManifest],
+    ) -> Vec<OptimizationCaseManifest> {
+        if train_cases.is_empty() {
+            return Vec::new();
+        }
+        let start = iteration_index as usize % train_cases.len();
+        (0..self.minibatch_size)
+            .map(|offset| train_cases[(start + offset) % train_cases.len()].clone())
+            .collect()
+    }
+}
+
+/// Iteration receipt emitted by the cheap-first optimization engine.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationIterationReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Zero-based iteration index.
+    pub iteration_index: u32,
+    /// Baseline candidate under consideration.
+    pub current_candidate_id: String,
+    /// Proposed candidate id.
+    pub proposed_candidate_id: String,
+    /// Ordered minibatch case ids.
+    pub minibatch_case_ids: Vec<String>,
+    /// Baseline minibatch scalar score.
+    pub current_minibatch_score: i64,
+    /// Proposed minibatch scalar score.
+    pub proposed_minibatch_score: i64,
+    /// Whether the proposal survived cheap-first gating.
+    pub accepted: bool,
+    /// Candidate id retained after the iteration.
+    pub retained_candidate_id: String,
+    /// Full validation scalar score for the retained candidate when re-evaluated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retained_validation_score: Option<i64>,
+    /// Latest frontier snapshot digest after the iteration when one exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frontier_snapshot_digest: Option<String>,
+    /// Total cache hits observed during the iteration.
+    pub cache_hit_count: u32,
+    /// Total cache misses observed during the iteration.
+    pub cache_miss_count: u32,
+    /// Stable digest over the iteration receipt payload.
+    pub receipt_digest: String,
+}
+
+impl OptimizationIterationReceipt {
+    /// Returns the stable digest over the iteration receipt payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.receipt_digest.clear();
+        stable_digest(ITERATION_RECEIPT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.receipt_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Persisted optimizer search state.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationSearchState {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Bound run spec for the search.
+    pub run_spec: OptimizationRunSpec,
+    /// Lineage state for all materialized candidates.
+    pub lineage_state: OptimizationLineageState,
+    /// Candidate currently driving proposal generation.
+    pub current_candidate_id: String,
+    /// Retained train cases for cheap-first gating.
+    pub train_cases: Vec<OptimizationCaseManifest>,
+    /// Retained validation cases for full evaluation.
+    pub validation_cases: Vec<OptimizationCaseManifest>,
+    /// Unified optimizer cache across minibatch and validation evaluation.
+    pub evaluation_cache: OptimizationEvaluationCache,
+    /// Full validation batches for accepted candidates keyed by candidate id.
+    pub accepted_validation_batches: BTreeMap<String, OptimizationBatchEvaluationReceipt>,
+    /// Latest frontier snapshot when one exists.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_frontier_snapshot: Option<OptimizationFrontierSnapshot>,
+    /// Ordered iteration receipts emitted so far.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub iteration_receipts: Vec<OptimizationIterationReceipt>,
+    /// Current zero-based iteration count.
+    pub current_iteration: u32,
+    /// Total case evaluations across all batch receipts.
+    pub total_case_evaluations: u32,
+    /// Accepted proposal count.
+    pub accepted_proposal_count: u32,
+    /// Rejected proposal count.
+    pub rejected_proposal_count: u32,
+    /// Stable digest over the persisted search state.
+    pub state_digest: String,
+}
+
+impl OptimizationSearchState {
+    /// Returns the stable digest over the search state payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.state_digest.clear();
+        stable_digest(SEARCH_STATE_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.state_digest = self.stable_digest();
+        self
+    }
+
+    /// Writes the search state as pretty JSON.
+    pub fn write_json(&self, output_path: impl AsRef<Path>) -> Result<(), OptimizationIoError> {
+        let output_path = output_path.as_ref();
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| OptimizationIoError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            })?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        fs::write(output_path, format!("{json}\n")).map_err(|error| OptimizationIoError::Write {
+            path: output_path.display().to_string(),
+            error,
+        })
+    }
+
+    /// Loads the search state from one JSON artifact.
+    pub fn read_json(input_path: impl AsRef<Path>) -> Result<Self, OptimizationIoError> {
+        let input_path = input_path.as_ref();
+        let body = fs::read_to_string(input_path).map_err(|error| OptimizationIoError::Read {
+            path: input_path.display().to_string(),
+            error,
+        })?;
+        let state: Self =
+            serde_json::from_str(&body).map_err(|error| OptimizationIoError::Deserialize {
+                path: input_path.display().to_string(),
+                error,
+            })?;
+        Ok(state)
+    }
+}
+
+/// Final outcome for one optimizer engine run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationEngineRunOutcome {
+    /// Final persisted search state.
+    pub state: OptimizationSearchState,
+    /// Final top-level run receipt.
+    pub run_receipt: OptimizationRunReceipt,
+}
+
+/// Cheap-first optimizer engine over manifest-backed candidates and retained cases.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OptimizationEngine;
+
+impl OptimizationEngine {
+    /// Initializes one search state from a seed candidate and retained cases.
+    pub fn initialize<E>(
+        run_spec: OptimizationRunSpec,
+        seed_candidate: OptimizationCandidateManifest,
+        train_cases: Vec<OptimizationCaseManifest>,
+        validation_cases: Vec<OptimizationCaseManifest>,
+        evaluator: &mut E,
+    ) -> Result<OptimizationSearchState, OptimizationEngineError>
+    where
+        E: OptimizationEvaluator,
+    {
+        if train_cases.is_empty() {
+            return Err(OptimizationEngineError::MissingTrainCases {
+                run_id: run_spec.run_id.clone(),
+            });
+        }
+        if validation_cases.is_empty() {
+            return Err(OptimizationEngineError::MissingValidationCases {
+                run_id: run_spec.run_id.clone(),
+            });
+        }
+        let validation_case_count = validation_cases.len() as u32;
+
+        let mut lineage_state = OptimizationLineageState::new(run_spec.clone());
+        lineage_state.register_candidate(seed_candidate.clone())?;
+
+        let mut evaluation_cache = OptimizationEvaluationCache::default();
+        let validation_batch = evaluator.evaluate_candidate(
+            run_spec.run_id.as_str(),
+            &seed_candidate,
+            &validation_cases,
+            &mut evaluation_cache,
+        );
+        let frontier_snapshot = OptimizationFrontierSnapshot::from_batches(
+            run_spec.run_id.as_str(),
+            run_spec.frontier_mode,
+            std::slice::from_ref(&validation_batch),
+        );
+        lineage_state.set_retained_candidates(frontier_snapshot.hybrid_candidate_ids.clone())?;
+
+        Ok(OptimizationSearchState {
+            schema_version: 1,
+            run_spec,
+            lineage_state,
+            current_candidate_id: seed_candidate.candidate_id.clone(),
+            train_cases,
+            validation_cases,
+            evaluation_cache,
+            accepted_validation_batches: BTreeMap::from([(
+                seed_candidate.candidate_id,
+                validation_batch,
+            )]),
+            latest_frontier_snapshot: Some(frontier_snapshot),
+            iteration_receipts: Vec::new(),
+            current_iteration: 0,
+            total_case_evaluations: validation_case_count,
+            accepted_proposal_count: 0,
+            rejected_proposal_count: 0,
+            state_digest: String::new(),
+        }
+        .with_stable_digest())
+    }
+
+    /// Runs the engine until a stop reason is reached or the optional iteration cap is hit.
+    pub fn run<E, P, S>(
+        mut state: OptimizationSearchState,
+        evaluator: &mut E,
+        proposer: &mut P,
+        sampler: &mut S,
+        max_additional_iterations: Option<u32>,
+    ) -> Result<OptimizationEngineRunOutcome, OptimizationEngineError>
+    where
+        E: OptimizationEvaluator,
+        P: OptimizationCandidateProposer,
+        S: OptimizationMinibatchSampler,
+    {
+        let mut executed_iterations = 0_u32;
+
+        let stop_reason = loop {
+            if let Some(iteration_budget) = state.run_spec.iteration_budget {
+                if state.current_iteration >= iteration_budget {
+                    break OptimizationStopReason::IterationBudgetReached;
+                }
+            }
+            if let Some(candidate_budget) = state.run_spec.candidate_budget {
+                if state.lineage_state.candidates.len() as u32 >= candidate_budget {
+                    break OptimizationStopReason::CandidateBudgetReached;
+                }
+            }
+            if max_additional_iterations.is_some_and(|limit| executed_iterations >= limit) {
+                break OptimizationStopReason::Manual;
+            }
+
+            let current_candidate = state
+                .lineage_state
+                .candidate(state.current_candidate_id.as_str())
+                .cloned()
+                .ok_or_else(|| OptimizationEngineError::UnknownCurrentCandidate {
+                    run_id: state.run_spec.run_id.clone(),
+                    candidate_id: state.current_candidate_id.clone(),
+                })?;
+            let minibatch_cases =
+                sampler.sample_minibatch(state.current_iteration, state.train_cases.as_slice());
+            if minibatch_cases.is_empty() {
+                break OptimizationStopReason::ProposalExhausted;
+            }
+
+            let current_batch = evaluator.evaluate_candidate(
+                state.run_spec.run_id.as_str(),
+                &current_candidate,
+                minibatch_cases.as_slice(),
+                &mut state.evaluation_cache,
+            );
+            let Some(proposed_candidate) =
+                proposer.propose_candidate(&state, &current_candidate, &current_batch)
+            else {
+                break OptimizationStopReason::ProposalExhausted;
+            };
+
+            state
+                .lineage_state
+                .register_candidate(proposed_candidate.clone())?;
+            let proposed_batch = evaluator.evaluate_candidate(
+                state.run_spec.run_id.as_str(),
+                &proposed_candidate,
+                minibatch_cases.as_slice(),
+                &mut state.evaluation_cache,
+            );
+
+            state.total_case_evaluations +=
+                (current_batch.case_receipts.len() + proposed_batch.case_receipts.len()) as u32;
+
+            let accepted =
+                proposed_batch.aggregated_scalar_score > current_batch.aggregated_scalar_score;
+            let mut retained_candidate_id = current_candidate.candidate_id.clone();
+            let mut retained_validation_score = None;
+            let mut frontier_snapshot_digest = state
+                .latest_frontier_snapshot
+                .as_ref()
+                .map(|snapshot| snapshot.snapshot_digest.clone());
+            if accepted {
+                let validation_batch = evaluator.evaluate_candidate(
+                    state.run_spec.run_id.as_str(),
+                    &proposed_candidate,
+                    state.validation_cases.as_slice(),
+                    &mut state.evaluation_cache,
+                );
+                state.total_case_evaluations += validation_batch.case_receipts.len() as u32;
+                retained_validation_score = Some(validation_batch.aggregated_scalar_score);
+                retained_candidate_id = proposed_candidate.candidate_id.clone();
+                state.current_candidate_id = proposed_candidate.candidate_id.clone();
+                state
+                    .accepted_validation_batches
+                    .insert(proposed_candidate.candidate_id.clone(), validation_batch);
+                let frontier_batches = state
+                    .accepted_validation_batches
+                    .values()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let frontier_snapshot = OptimizationFrontierSnapshot::from_batches(
+                    state.run_spec.run_id.as_str(),
+                    state.run_spec.frontier_mode,
+                    frontier_batches.as_slice(),
+                );
+                frontier_snapshot_digest = Some(frontier_snapshot.snapshot_digest.clone());
+                state
+                    .lineage_state
+                    .set_retained_candidates(frontier_snapshot.hybrid_candidate_ids.clone())?;
+                state.latest_frontier_snapshot = Some(frontier_snapshot);
+                state.accepted_proposal_count += 1;
+            } else {
+                state.rejected_proposal_count += 1;
+            }
+
+            let cache_hit_count = current_batch.cache_hit_count
+                + proposed_batch.cache_hit_count
+                + if accepted {
+                    state
+                        .accepted_validation_batches
+                        .get(retained_candidate_id.as_str())
+                        .map_or(0, |batch| batch.cache_hit_count)
+                } else {
+                    0
+                };
+            let cache_miss_count = current_batch.cache_miss_count
+                + proposed_batch.cache_miss_count
+                + if accepted {
+                    state
+                        .accepted_validation_batches
+                        .get(retained_candidate_id.as_str())
+                        .map_or(0, |batch| batch.cache_miss_count)
+                } else {
+                    0
+                };
+
+            state.iteration_receipts.push(
+                OptimizationIterationReceipt {
+                    schema_version: 1,
+                    report_id: String::from("psionic.optimize.iteration_receipt.v1"),
+                    run_id: state.run_spec.run_id.clone(),
+                    iteration_index: state.current_iteration,
+                    current_candidate_id: current_candidate.candidate_id.clone(),
+                    proposed_candidate_id: proposed_candidate.candidate_id.clone(),
+                    minibatch_case_ids: minibatch_cases
+                        .iter()
+                        .map(|case| case.case_id.clone())
+                        .collect(),
+                    current_minibatch_score: current_batch.aggregated_scalar_score,
+                    proposed_minibatch_score: proposed_batch.aggregated_scalar_score,
+                    accepted,
+                    retained_candidate_id,
+                    retained_validation_score,
+                    frontier_snapshot_digest,
+                    cache_hit_count,
+                    cache_miss_count,
+                    receipt_digest: String::new(),
+                }
+                .with_stable_digest(),
+            );
+            state.current_iteration += 1;
+            executed_iterations += 1;
+            state.state_digest = state.stable_digest();
+        };
+
+        let frontier_snapshot_refs = state
+            .latest_frontier_snapshot
+            .as_ref()
+            .map(|snapshot| {
+                vec![format!(
+                    "frontier_snapshot_digest:{}",
+                    snapshot.snapshot_digest
+                )]
+            })
+            .unwrap_or_default();
+        let run_receipt = OptimizationRunReceipt::from_state(
+            &state.lineage_state,
+            frontier_snapshot_refs,
+            stop_reason,
+        );
+        Ok(OptimizationEngineRunOutcome { state, run_receipt })
+    }
+}
+
+/// Engine-level failures for the cheap-first optimizer loop.
+#[derive(Debug, Error)]
+pub enum OptimizationEngineError {
+    /// The run had no train cases for minibatch gating.
+    #[error("optimization run `{run_id}` requires at least one train case")]
+    MissingTrainCases {
+        /// Stable run identifier.
+        run_id: String,
+    },
+    /// The run had no validation cases for retained evaluation.
+    #[error("optimization run `{run_id}` requires at least one validation case")]
+    MissingValidationCases {
+        /// Stable run identifier.
+        run_id: String,
+    },
+    /// The current candidate id was not present in lineage state.
+    #[error("optimization run `{run_id}` does not know current candidate `{candidate_id}`")]
+    UnknownCurrentCandidate {
+        /// Stable run identifier.
+        run_id: String,
+        /// Missing candidate id.
+        candidate_id: String,
+    },
+    /// Lineage state validation failed.
+    #[error(transparent)]
+    Lineage(#[from] OptimizationLineageStateError),
+}
+
 /// Ordered lineage state for one optimization run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OptimizationLineageState {
@@ -1045,10 +1541,13 @@ mod tests {
 
     use super::{
         OptimizationBatchEvaluationReceipt, OptimizationCandidateManifest,
-        OptimizationCaseManifest, OptimizationCaseSplit, OptimizationComponentFeedback,
-        OptimizationEvaluationCache, OptimizationFrontierMode, OptimizationFrontierSnapshot,
-        OptimizationLineageState, OptimizationLineageStateError, OptimizationRunReceipt,
-        OptimizationRunSpec, OptimizationSharedFeedback, OptimizationStopReason,
+        OptimizationCandidateProposer, OptimizationCaseEvaluationReceipt, OptimizationCaseManifest,
+        OptimizationCaseSplit, OptimizationComponentFeedback, OptimizationEngine,
+        OptimizationEngineRunOutcome, OptimizationEvaluationCache, OptimizationEvaluator,
+        OptimizationFrontierMode, OptimizationFrontierSnapshot, OptimizationLineageState,
+        OptimizationLineageStateError, OptimizationRunReceipt, OptimizationRunSpec,
+        OptimizationSearchState, OptimizationSequentialMinibatchSampler,
+        OptimizationSharedFeedback, OptimizationStopReason,
     };
 
     fn route_components(route_name: &str) -> BTreeMap<String, String> {
@@ -1068,6 +1567,126 @@ mod tests {
                 String::from("decision_family"),
                 String::from("tool_route"),
             )]))
+    }
+
+    fn train_route_case(case_id: &str, label: &str) -> OptimizationCaseManifest {
+        OptimizationCaseManifest::new(case_id, OptimizationCaseSplit::Train)
+            .with_label(label)
+            .with_metadata(BTreeMap::from([(
+                String::from("decision_family"),
+                String::from("tool_route"),
+            )]))
+    }
+
+    fn route_candidate(
+        candidate_id: &str,
+        route_name: &str,
+        parent_candidate_ids: Vec<String>,
+    ) -> OptimizationCandidateManifest {
+        OptimizationCandidateManifest::new(
+            candidate_id,
+            "probe.tool_route",
+            "run_a",
+            route_components(route_name),
+        )
+        .with_parent_candidate_ids(parent_candidate_ids)
+    }
+
+    #[derive(Debug, Default)]
+    struct DeterministicRouteEvaluator;
+
+    impl OptimizationEvaluator for DeterministicRouteEvaluator {
+        fn evaluate_candidate(
+            &mut self,
+            run_id: &str,
+            candidate: &OptimizationCandidateManifest,
+            cases: &[OptimizationCaseManifest],
+            cache: &mut OptimizationEvaluationCache,
+        ) -> OptimizationBatchEvaluationReceipt {
+            let selected_tool = candidate
+                .components
+                .get("selected_tool")
+                .cloned()
+                .expect("selected_tool component");
+            let mut case_receipts = Vec::new();
+            let mut cache_hit_count = 0_u32;
+            let mut cache_miss_count = 0_u32;
+
+            for case in cases {
+                if let Some(cached) = cache.lookup(candidate, case).cloned() {
+                    cache_hit_count += 1;
+                    case_receipts.push(cached);
+                    continue;
+                }
+
+                cache_miss_count += 1;
+                let expected_route = case.label.clone().expect("case label");
+                let matched = selected_tool == expected_route;
+                let scalar_score = if matched { 10_000 } else { 0 };
+                let receipt = OptimizationCaseEvaluationReceipt::new(
+                    candidate,
+                    case,
+                    scalar_score,
+                    BTreeMap::from([(String::from("correctness_bps"), scalar_score)]),
+                    if matched {
+                        OptimizationSharedFeedback::new("candidate matched expected route")
+                    } else {
+                        OptimizationSharedFeedback::new("candidate missed expected route")
+                    }
+                    .with_details(vec![format!(
+                        "expected `{expected_route}` and observed `{selected_tool}`"
+                    )]),
+                    BTreeMap::from([(
+                        String::from("selected_tool"),
+                        if matched {
+                            OptimizationComponentFeedback::new(
+                                "selected tool matched retained route label",
+                            )
+                        } else {
+                            OptimizationComponentFeedback::new(
+                                "selected tool diverged from retained route label",
+                            )
+                        },
+                    )]),
+                );
+                cache.insert(candidate, case, receipt.clone());
+                case_receipts.push(receipt);
+            }
+
+            OptimizationBatchEvaluationReceipt::new(
+                run_id,
+                candidate,
+                case_receipts,
+                cache_hit_count,
+                cache_miss_count,
+            )
+        }
+    }
+
+    #[derive(Debug)]
+    struct SequenceProposer {
+        queued_candidates: Vec<OptimizationCandidateManifest>,
+    }
+
+    impl SequenceProposer {
+        fn new(queued_candidates: Vec<OptimizationCandidateManifest>) -> Self {
+            Self { queued_candidates }
+        }
+    }
+
+    impl OptimizationCandidateProposer for SequenceProposer {
+        fn propose_candidate(
+            &mut self,
+            _state: &OptimizationSearchState,
+            _current_candidate: &OptimizationCandidateManifest,
+            _minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+        ) -> Option<OptimizationCandidateManifest> {
+            if self.queued_candidates.is_empty() {
+                None
+            } else {
+                Some(self.queued_candidates.remove(0))
+            }
+        }
     }
 
     #[test]
@@ -1359,23 +1978,181 @@ mod tests {
         );
         assert_eq!(frontier.case_frontier.len(), 2);
         assert_eq!(frontier.objective_frontier.len(), 2);
-        assert!(frontier
-            .case_frontier
-            .iter()
-            .any(|row| row.case_id == "case_a" && row.winning_candidate_id == "baseline"));
-        assert!(frontier
-            .case_frontier
-            .iter()
-            .any(|row| row.case_id == "case_b" && row.winning_candidate_id == "candidate"));
-        assert!(frontier
-            .objective_frontier
-            .iter()
-            .any(|row| row.objective_name == "latency_budget_bps"
-                && row.winning_candidate_id == "candidate"));
+        assert!(
+            frontier
+                .case_frontier
+                .iter()
+                .any(|row| row.case_id == "case_a" && row.winning_candidate_id == "baseline")
+        );
+        assert!(
+            frontier
+                .case_frontier
+                .iter()
+                .any(|row| row.case_id == "case_b" && row.winning_candidate_id == "candidate")
+        );
+        assert!(
+            frontier
+                .objective_frontier
+                .iter()
+                .any(|row| row.objective_name == "latency_budget_bps"
+                    && row.winning_candidate_id == "candidate")
+        );
         assert_eq!(
             frontier.hybrid_candidate_ids,
             vec![String::from("baseline"), String::from("candidate")]
         );
         assert!(!frontier.snapshot_digest.is_empty());
+    }
+
+    #[test]
+    fn optimizer_engine_accepts_better_candidate_from_minibatch() {
+        let run_spec = OptimizationRunSpec::new("run_a", "probe.tool_route")
+            .with_iteration_budget(4)
+            .with_candidate_budget(4);
+        let seed_candidate = route_candidate("baseline", "read_file", Vec::new());
+        let train_cases = vec![train_route_case("train_apply_patch", "apply_patch")];
+        let validation_cases = vec![route_case("val_apply_patch", "apply_patch")];
+        let mut evaluator = DeterministicRouteEvaluator;
+        let state = OptimizationEngine::initialize(
+            run_spec,
+            seed_candidate,
+            train_cases,
+            validation_cases,
+            &mut evaluator,
+        )
+        .expect("initialize search state");
+        let mut proposer = SequenceProposer::new(vec![route_candidate(
+            "candidate_apply_patch",
+            "apply_patch",
+            vec![String::from("baseline")],
+        )]);
+        let mut sampler = OptimizationSequentialMinibatchSampler::new(1);
+
+        let outcome =
+            OptimizationEngine::run(state, &mut evaluator, &mut proposer, &mut sampler, Some(1))
+                .expect("run optimizer");
+
+        assert_eq!(outcome.state.current_candidate_id, "candidate_apply_patch");
+        assert_eq!(outcome.state.accepted_proposal_count, 1);
+        assert_eq!(outcome.state.rejected_proposal_count, 0);
+        assert_eq!(outcome.state.current_iteration, 1);
+        assert_eq!(outcome.state.iteration_receipts.len(), 1);
+        assert_eq!(
+            outcome.state.lineage_state.retained_candidate_ids,
+            vec![String::from("candidate_apply_patch")]
+        );
+
+        let receipt = &outcome.state.iteration_receipts[0];
+        assert!(receipt.accepted);
+        assert_eq!(receipt.current_minibatch_score, 0);
+        assert_eq!(receipt.proposed_minibatch_score, 10_000);
+        assert_eq!(receipt.retained_validation_score, Some(10_000));
+
+        assert_eq!(
+            outcome.run_receipt.stop_reason,
+            OptimizationStopReason::Manual
+        );
+        assert_eq!(
+            outcome.run_receipt.retained_candidate_ids,
+            vec![String::from("candidate_apply_patch")]
+        );
+        assert_eq!(outcome.run_receipt.candidate_count, 2);
+        assert_eq!(outcome.state.total_case_evaluations, 4);
+    }
+
+    #[test]
+    fn optimizer_search_state_round_trips_and_resumes() {
+        let run_spec = OptimizationRunSpec::new("run_a", "probe.tool_route")
+            .with_frontier_mode(OptimizationFrontierMode::Scalar)
+            .with_iteration_budget(4)
+            .with_candidate_budget(8);
+        let seed_candidate = route_candidate("baseline", "read_file", Vec::new());
+        let train_cases = vec![
+            train_route_case("train_apply_patch", "apply_patch"),
+            train_route_case("train_shell", "shell"),
+        ];
+        let validation_cases = vec![
+            route_case("val_apply_patch", "apply_patch"),
+            route_case("val_shell", "shell"),
+        ];
+        let mut evaluator = DeterministicRouteEvaluator;
+        let state = OptimizationEngine::initialize(
+            run_spec,
+            seed_candidate,
+            train_cases,
+            validation_cases,
+            &mut evaluator,
+        )
+        .expect("initialize search state");
+        let mut first_proposer = SequenceProposer::new(vec![route_candidate(
+            "candidate_apply_patch",
+            "apply_patch",
+            vec![String::from("baseline")],
+        )]);
+        let mut sampler = OptimizationSequentialMinibatchSampler::new(1);
+
+        let first_outcome = OptimizationEngine::run(
+            state,
+            &mut evaluator,
+            &mut first_proposer,
+            &mut sampler,
+            Some(1),
+        )
+        .expect("run first optimizer step");
+        assert_eq!(first_outcome.state.current_iteration, 1);
+        assert_eq!(
+            first_outcome.state.current_candidate_id,
+            "candidate_apply_patch"
+        );
+        assert_eq!(first_outcome.state.accepted_proposal_count, 1);
+        assert_eq!(first_outcome.state.iteration_receipts.len(), 1);
+
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("optimizer_search_state.json");
+        first_outcome
+            .state
+            .write_json(&path)
+            .expect("write search state");
+        let resumed_state = OptimizationSearchState::read_json(&path).expect("reload search state");
+        assert_eq!(resumed_state, first_outcome.state);
+
+        let mut second_proposer = SequenceProposer::new(vec![route_candidate(
+            "candidate_shell",
+            "shell",
+            vec![String::from("candidate_apply_patch")],
+        )]);
+        let OptimizationEngineRunOutcome { state, run_receipt } = OptimizationEngine::run(
+            resumed_state,
+            &mut evaluator,
+            &mut second_proposer,
+            &mut sampler,
+            Some(1),
+        )
+        .expect("resume optimizer");
+
+        assert_eq!(state.current_iteration, 2);
+        assert_eq!(state.current_candidate_id, "candidate_shell");
+        assert_eq!(state.accepted_proposal_count, 2);
+        assert_eq!(state.rejected_proposal_count, 0);
+        assert_eq!(state.iteration_receipts.len(), 2);
+        assert_eq!(
+            state.lineage_state.retained_candidate_ids,
+            vec![
+                String::from("candidate_apply_patch"),
+                String::from("candidate_shell"),
+            ]
+        );
+        assert!(
+            state
+                .accepted_validation_batches
+                .contains_key("candidate_apply_patch")
+        );
+        assert!(
+            state
+                .accepted_validation_batches
+                .contains_key("candidate_shell")
+        );
+        assert_eq!(run_receipt.stop_reason, OptimizationStopReason::Manual);
+        assert_eq!(run_receipt.candidate_count, 3);
     }
 }

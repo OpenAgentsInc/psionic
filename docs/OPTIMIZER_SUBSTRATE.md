@@ -2,8 +2,8 @@
 
 > Status: `implemented_early` for run specs, candidate manifests, lineage
 > state, case and batch evaluation contracts, unified case-eval cache, frontier
-> snapshots, and top-level run receipts. Search, reflection, and merge land in
-> follow-on issues.
+> snapshots, persisted search state, cheap-first iteration receipts, and
+> top-level run receipts. Reflection and merge land in follow-on issues.
 
 ## Purpose
 
@@ -53,6 +53,13 @@ The current explicit artifact contracts are:
     duplicated adapter and engine caches
 - `OptimizationFrontierSnapshot`
   - per-case winners, per-objective winners, and hybrid retained candidate ids
+- `OptimizationSearchState`
+  - current candidate, accepted validation batches, unified cache, iteration
+    receipts, persisted JSON state, and stable digest
+- `OptimizationEngine`
+  - deterministic cheap-first loop that minibatch-evaluates the current and
+    proposed candidates, full-evaluates only accepted proposals on validation,
+    and emits iteration receipts plus a final run receipt
 - `OptimizationLineageState`
   - materialized candidates, discovery order, retained candidates, persisted
     JSON state, and stable digest
@@ -80,7 +87,6 @@ Probe owns:
 
 Follow-on optimizer issues extend this substrate with:
 
-- cheap-first search loop
 - component-aware reflection
 - lineage-aware merge
 - proof reports over bounded module families
