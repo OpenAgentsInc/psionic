@@ -15,7 +15,11 @@ use thiserror::Error;
 
 const RUN_SPEC_PREFIX: &[u8] = b"psionic_optimize_run_spec|";
 const CANDIDATE_MANIFEST_PREFIX: &[u8] = b"psionic_optimize_candidate_manifest|";
+const CASE_MANIFEST_PREFIX: &[u8] = b"psionic_optimize_case_manifest|";
 const LINEAGE_STATE_PREFIX: &[u8] = b"psionic_optimize_lineage_state|";
+const CASE_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_case_receipt|";
+const BATCH_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_batch_receipt|";
+const FRONTIER_SNAPSHOT_PREFIX: &[u8] = b"psionic_optimize_frontier_snapshot|";
 const RUN_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_run_receipt|";
 
 /// Stable frontier mode identifier declared by one optimization run spec.
@@ -220,6 +224,487 @@ impl OptimizationCandidateManifest {
     #[must_use]
     pub fn with_stable_digest(mut self) -> Self {
         self.manifest_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Split membership for one retained evaluation case.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OptimizationCaseSplit {
+    /// Train-time batch sampling surface.
+    Train,
+    /// Held-out retained validation surface.
+    Validation,
+    /// Test-only surface.
+    Test,
+    /// Shadow-only comparison surface.
+    Shadow,
+}
+
+/// Stable manifest for one retained evaluation case.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCaseManifest {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Split membership for the case.
+    pub split: OptimizationCaseSplit,
+    /// Optional label or expected outcome identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Structured string metadata for the case.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+    /// Ordered evidence refs that justify the case.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_refs: Vec<String>,
+    /// Stable digest over the case manifest payload.
+    pub case_digest: String,
+}
+
+impl OptimizationCaseManifest {
+    /// Creates a case manifest with stable digest metadata.
+    #[must_use]
+    pub fn new(case_id: impl Into<String>, split: OptimizationCaseSplit) -> Self {
+        Self {
+            schema_version: 1,
+            case_id: case_id.into(),
+            split,
+            label: None,
+            metadata: BTreeMap::new(),
+            evidence_refs: Vec::new(),
+            case_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+
+    /// Returns a copy with the given label.
+    #[must_use]
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self.with_stable_digest()
+    }
+
+    /// Returns a copy with the given metadata.
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: BTreeMap<String, String>) -> Self {
+        self.metadata = metadata;
+        self.with_stable_digest()
+    }
+
+    /// Returns a copy with the given evidence refs.
+    #[must_use]
+    pub fn with_evidence_refs(mut self, evidence_refs: Vec<String>) -> Self {
+        self.evidence_refs = evidence_refs;
+        self.with_stable_digest()
+    }
+
+    /// Returns the stable digest over the case manifest payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.case_digest.clear();
+        stable_digest(CASE_MANIFEST_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.case_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Shared typed evaluator feedback for one case.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationSharedFeedback {
+    /// Short summary of the evaluation result.
+    pub summary: String,
+    /// Ordered detail rows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub details: Vec<String>,
+}
+
+impl OptimizationSharedFeedback {
+    /// Creates one shared feedback record.
+    #[must_use]
+    pub fn new(summary: impl Into<String>) -> Self {
+        Self {
+            summary: summary.into(),
+            details: Vec::new(),
+        }
+    }
+
+    /// Returns a copy with the given detail rows.
+    #[must_use]
+    pub fn with_details(mut self, details: Vec<String>) -> Self {
+        self.details = details;
+        self
+    }
+}
+
+/// Typed evaluator feedback scoped to one candidate component.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationComponentFeedback {
+    /// Short summary of the component-local feedback.
+    pub summary: String,
+    /// Ordered detail rows for the component.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub details: Vec<String>,
+}
+
+impl OptimizationComponentFeedback {
+    /// Creates one component feedback record.
+    #[must_use]
+    pub fn new(summary: impl Into<String>) -> Self {
+        Self {
+            summary: summary.into(),
+            details: Vec::new(),
+        }
+    }
+
+    /// Returns a copy with the given detail rows.
+    #[must_use]
+    pub fn with_details(mut self, details: Vec<String>) -> Self {
+        self.details = details;
+        self
+    }
+}
+
+/// Case-level evaluation receipt for one candidate against one retained case.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCaseEvaluationReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Candidate identifier under evaluation.
+    pub candidate_id: String,
+    /// Candidate manifest digest under evaluation.
+    pub candidate_manifest_digest: String,
+    /// Retained case identifier.
+    pub case_id: String,
+    /// Retained case digest.
+    pub case_digest: String,
+    /// Scalar score for the case.
+    pub scalar_score: i64,
+    /// Named objective scores for the case.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub objective_scores: BTreeMap<String, i64>,
+    /// Shared evaluator feedback.
+    pub shared_feedback: OptimizationSharedFeedback,
+    /// Per-component feedback map.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub component_feedback: BTreeMap<String, OptimizationComponentFeedback>,
+    /// Unified cache key used by the optimizer substrate.
+    pub cache_key: String,
+    /// Stable digest over the case receipt payload.
+    pub receipt_digest: String,
+}
+
+impl OptimizationCaseEvaluationReceipt {
+    /// Creates one case receipt with a stable cache key and digest.
+    #[must_use]
+    pub fn new(
+        candidate: &OptimizationCandidateManifest,
+        case: &OptimizationCaseManifest,
+        scalar_score: i64,
+        objective_scores: BTreeMap<String, i64>,
+        shared_feedback: OptimizationSharedFeedback,
+        component_feedback: BTreeMap<String, OptimizationComponentFeedback>,
+    ) -> Self {
+        Self {
+            schema_version: 1,
+            candidate_id: candidate.candidate_id.clone(),
+            candidate_manifest_digest: candidate.manifest_digest.clone(),
+            case_id: case.case_id.clone(),
+            case_digest: case.case_digest.clone(),
+            scalar_score,
+            objective_scores,
+            shared_feedback,
+            component_feedback,
+            cache_key: OptimizationEvaluationCache::cache_key(candidate, case),
+            receipt_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+
+    /// Returns the stable digest over the case receipt payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.receipt_digest.clear();
+        stable_digest(CASE_RECEIPT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.receipt_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Unified case-evaluation cache for the optimizer substrate.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationEvaluationCache {
+    /// Cached case receipts keyed by candidate-manifest digest plus case digest.
+    pub entries: BTreeMap<String, OptimizationCaseEvaluationReceipt>,
+}
+
+impl OptimizationEvaluationCache {
+    /// Builds the stable cache key for one candidate-plus-case pair.
+    #[must_use]
+    pub fn cache_key(
+        candidate: &OptimizationCandidateManifest,
+        case: &OptimizationCaseManifest,
+    ) -> String {
+        format!("{}:{}", candidate.manifest_digest, case.case_digest)
+    }
+
+    /// Returns one cached receipt when present.
+    #[must_use]
+    pub fn lookup(
+        &self,
+        candidate: &OptimizationCandidateManifest,
+        case: &OptimizationCaseManifest,
+    ) -> Option<&OptimizationCaseEvaluationReceipt> {
+        self.entries.get(&Self::cache_key(candidate, case))
+    }
+
+    /// Inserts or replaces one cached case receipt.
+    pub fn insert(
+        &mut self,
+        candidate: &OptimizationCandidateManifest,
+        case: &OptimizationCaseManifest,
+        receipt: OptimizationCaseEvaluationReceipt,
+    ) {
+        self.entries
+            .insert(Self::cache_key(candidate, case), receipt);
+    }
+}
+
+/// Aggregated batch receipt for one candidate across a retained case batch.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationBatchEvaluationReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable run id.
+    pub run_id: String,
+    /// Candidate identifier under evaluation.
+    pub candidate_id: String,
+    /// Candidate manifest digest under evaluation.
+    pub candidate_manifest_digest: String,
+    /// Ordered case receipts for the batch.
+    pub case_receipts: Vec<OptimizationCaseEvaluationReceipt>,
+    /// Sum of scalar case scores for the batch.
+    pub aggregated_scalar_score: i64,
+    /// Sum of objective scores for the batch.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub aggregated_objective_scores: BTreeMap<String, i64>,
+    /// Number of cache hits for the batch.
+    pub cache_hit_count: u32,
+    /// Number of cache misses for the batch.
+    pub cache_miss_count: u32,
+    /// Stable digest over the batch receipt payload.
+    pub receipt_digest: String,
+}
+
+impl OptimizationBatchEvaluationReceipt {
+    /// Creates one batch receipt and aggregates objective totals from the cases.
+    #[must_use]
+    pub fn new(
+        run_id: impl Into<String>,
+        candidate: &OptimizationCandidateManifest,
+        case_receipts: Vec<OptimizationCaseEvaluationReceipt>,
+        cache_hit_count: u32,
+        cache_miss_count: u32,
+    ) -> Self {
+        let aggregated_scalar_score = case_receipts.iter().map(|case| case.scalar_score).sum();
+        let mut aggregated_objective_scores = BTreeMap::new();
+        for case_receipt in &case_receipts {
+            for (objective_name, objective_score) in &case_receipt.objective_scores {
+                *aggregated_objective_scores
+                    .entry(objective_name.clone())
+                    .or_insert(0) += objective_score;
+            }
+        }
+        Self {
+            schema_version: 1,
+            report_id: String::from("psionic.optimize.batch_evaluation_receipt.v1"),
+            run_id: run_id.into(),
+            candidate_id: candidate.candidate_id.clone(),
+            candidate_manifest_digest: candidate.manifest_digest.clone(),
+            case_receipts,
+            aggregated_scalar_score,
+            aggregated_objective_scores,
+            cache_hit_count,
+            cache_miss_count,
+            receipt_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+
+    /// Returns the stable digest over the batch receipt payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.receipt_digest.clear();
+        stable_digest(BATCH_RECEIPT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.receipt_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Winner row for one retained case in the frontier snapshot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCaseFrontierRow {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Winning candidate identifier.
+    pub winning_candidate_id: String,
+    /// Winning scalar score for the case.
+    pub winning_scalar_score: i64,
+}
+
+/// Winner row for one named objective in the frontier snapshot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationObjectiveFrontierRow {
+    /// Named objective identifier.
+    pub objective_name: String,
+    /// Winning candidate identifier.
+    pub winning_candidate_id: String,
+    /// Winning aggregated objective score.
+    pub winning_score: i64,
+}
+
+/// Snapshot of the retained frontier for one optimizer run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationFrontierSnapshot {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Frontier mode used to interpret the snapshot.
+    pub frontier_mode: OptimizationFrontierMode,
+    /// Source candidates considered for the frontier.
+    pub source_candidate_ids: Vec<String>,
+    /// Ordered per-case frontier rows.
+    pub case_frontier: Vec<OptimizationCaseFrontierRow>,
+    /// Ordered per-objective frontier rows.
+    pub objective_frontier: Vec<OptimizationObjectiveFrontierRow>,
+    /// Deduplicated candidate ids retained by the hybrid frontier.
+    pub hybrid_candidate_ids: Vec<String>,
+    /// Stable digest over the frontier snapshot payload.
+    pub snapshot_digest: String,
+}
+
+impl OptimizationFrontierSnapshot {
+    /// Builds a frontier snapshot from candidate batch receipts.
+    #[must_use]
+    pub fn from_batches(
+        run_id: impl Into<String>,
+        frontier_mode: OptimizationFrontierMode,
+        batches: &[OptimizationBatchEvaluationReceipt],
+    ) -> Self {
+        let run_id = run_id.into();
+        let mut case_winners = BTreeMap::<String, (String, i64)>::new();
+        let mut objective_winners = BTreeMap::<String, (String, i64)>::new();
+        let mut source_candidate_ids = Vec::new();
+
+        for batch in batches {
+            push_unique(&mut source_candidate_ids, batch.candidate_id.clone());
+            for case_receipt in &batch.case_receipts {
+                let candidate_score = case_receipt.scalar_score;
+                let candidate_id = case_receipt.candidate_id.clone();
+                case_winners
+                    .entry(case_receipt.case_id.clone())
+                    .and_modify(|winner| {
+                        if candidate_score > winner.1 {
+                            *winner = (candidate_id.clone(), candidate_score);
+                        }
+                    })
+                    .or_insert((candidate_id, candidate_score));
+            }
+            for (objective_name, objective_score) in &batch.aggregated_objective_scores {
+                let candidate_id = batch.candidate_id.clone();
+                objective_winners
+                    .entry(objective_name.clone())
+                    .and_modify(|winner| {
+                        if *objective_score > winner.1 {
+                            *winner = (candidate_id.clone(), *objective_score);
+                        }
+                    })
+                    .or_insert((candidate_id, *objective_score));
+            }
+        }
+
+        let case_frontier = case_winners
+            .into_iter()
+            .map(|(case_id, (winning_candidate_id, winning_scalar_score))| {
+                OptimizationCaseFrontierRow {
+                    case_id,
+                    winning_candidate_id,
+                    winning_scalar_score,
+                }
+            })
+            .collect::<Vec<_>>();
+        let objective_frontier = objective_winners
+            .into_iter()
+            .map(|(objective_name, (winning_candidate_id, winning_score))| {
+                OptimizationObjectiveFrontierRow {
+                    objective_name,
+                    winning_candidate_id,
+                    winning_score,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let mut hybrid_candidate_ids = Vec::new();
+        for row in &case_frontier {
+            push_unique(&mut hybrid_candidate_ids, row.winning_candidate_id.clone());
+        }
+        if frontier_mode == OptimizationFrontierMode::Hybrid {
+            for row in &objective_frontier {
+                push_unique(&mut hybrid_candidate_ids, row.winning_candidate_id.clone());
+            }
+        }
+
+        Self {
+            schema_version: 1,
+            report_id: String::from("psionic.optimize.frontier_snapshot.v1"),
+            run_id,
+            frontier_mode,
+            source_candidate_ids,
+            case_frontier,
+            objective_frontier,
+            hybrid_candidate_ids,
+            snapshot_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+
+    /// Returns the stable digest over the frontier snapshot payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.snapshot_digest.clear();
+        stable_digest(FRONTIER_SNAPSHOT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.snapshot_digest = self.stable_digest();
         self
     }
 }
@@ -559,9 +1044,11 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        OptimizationCandidateManifest, OptimizationFrontierMode, OptimizationLineageState,
-        OptimizationLineageStateError, OptimizationRunReceipt, OptimizationRunSpec,
-        OptimizationStopReason,
+        OptimizationBatchEvaluationReceipt, OptimizationCandidateManifest,
+        OptimizationCaseManifest, OptimizationCaseSplit, OptimizationComponentFeedback,
+        OptimizationEvaluationCache, OptimizationFrontierMode, OptimizationFrontierSnapshot,
+        OptimizationLineageState, OptimizationLineageStateError, OptimizationRunReceipt,
+        OptimizationRunSpec, OptimizationSharedFeedback, OptimizationStopReason,
     };
 
     fn route_components(route_name: &str) -> BTreeMap<String, String> {
@@ -572,6 +1059,15 @@ mod tests {
                 String::from("route decision evidence goes here"),
             ),
         ])
+    }
+
+    fn route_case(case_id: &str, label: &str) -> OptimizationCaseManifest {
+        OptimizationCaseManifest::new(case_id, OptimizationCaseSplit::Validation)
+            .with_label(label)
+            .with_metadata(BTreeMap::from([(
+                String::from("decision_family"),
+                String::from("tool_route"),
+            )]))
     }
 
     #[test]
@@ -694,5 +1190,192 @@ mod tests {
             vec![String::from("baseline")]
         );
         assert!(!receipt.receipt_digest.is_empty());
+    }
+
+    #[test]
+    fn evaluation_cache_round_trips_case_receipts_by_unified_key() {
+        let candidate = OptimizationCandidateManifest::new(
+            "baseline",
+            "probe.tool_route",
+            "run_a",
+            route_components("read_file"),
+        );
+        let case = route_case("case_a", "read_file");
+        let receipt = super::OptimizationCaseEvaluationReceipt::new(
+            &candidate,
+            &case,
+            8200,
+            BTreeMap::from([(String::from("correctness_bps"), 8200)]),
+            OptimizationSharedFeedback::new("baseline route was correct")
+                .with_details(vec![String::from("selected_tool matched retained label")]),
+            BTreeMap::from([(
+                String::from("selected_tool"),
+                OptimizationComponentFeedback::new("route component matched retained label"),
+            )]),
+        );
+        let mut cache = OptimizationEvaluationCache::default();
+        cache.insert(&candidate, &case, receipt.clone());
+
+        let cached = cache.lookup(&candidate, &case).expect("cache hit");
+        assert_eq!(
+            cached.cache_key,
+            OptimizationEvaluationCache::cache_key(&candidate, &case)
+        );
+        assert_eq!(cached, &receipt);
+    }
+
+    #[test]
+    fn batch_receipt_aggregates_scalar_and_objective_scores() {
+        let candidate = OptimizationCandidateManifest::new(
+            "baseline",
+            "probe.tool_route",
+            "run_a",
+            route_components("read_file"),
+        );
+        let case_a = route_case("case_a", "read_file");
+        let case_b = route_case("case_b", "apply_patch");
+        let receipt_a = super::OptimizationCaseEvaluationReceipt::new(
+            &candidate,
+            &case_a,
+            5000,
+            BTreeMap::from([(String::from("correctness_bps"), 5000)]),
+            OptimizationSharedFeedback::new("first case"),
+            BTreeMap::new(),
+        );
+        let receipt_b = super::OptimizationCaseEvaluationReceipt::new(
+            &candidate,
+            &case_b,
+            4200,
+            BTreeMap::from([
+                (String::from("correctness_bps"), 4200),
+                (String::from("latency_budget_bps"), 9700),
+            ]),
+            OptimizationSharedFeedback::new("second case"),
+            BTreeMap::new(),
+        );
+        let batch = OptimizationBatchEvaluationReceipt::new(
+            "run_a",
+            &candidate,
+            vec![receipt_a, receipt_b],
+            1,
+            1,
+        );
+        assert_eq!(batch.aggregated_scalar_score, 9200);
+        assert_eq!(
+            batch.aggregated_objective_scores.get("correctness_bps"),
+            Some(&9200)
+        );
+        assert_eq!(
+            batch.aggregated_objective_scores.get("latency_budget_bps"),
+            Some(&9700)
+        );
+        assert_eq!(batch.cache_hit_count, 1);
+        assert_eq!(batch.cache_miss_count, 1);
+        assert!(!batch.receipt_digest.is_empty());
+    }
+
+    #[test]
+    fn frontier_snapshot_keeps_case_and_objective_winners_explicit() {
+        let baseline = OptimizationCandidateManifest::new(
+            "baseline",
+            "probe.tool_route",
+            "run_a",
+            route_components("read_file"),
+        );
+        let candidate = OptimizationCandidateManifest::new(
+            "candidate",
+            "probe.tool_route",
+            "run_a",
+            route_components("apply_patch"),
+        )
+        .with_parent_candidate_ids(vec![String::from("baseline")]);
+        let case_a = route_case("case_a", "read_file");
+        let case_b = route_case("case_b", "apply_patch");
+        let baseline_batch = OptimizationBatchEvaluationReceipt::new(
+            "run_a",
+            &baseline,
+            vec![
+                super::OptimizationCaseEvaluationReceipt::new(
+                    &baseline,
+                    &case_a,
+                    8000,
+                    BTreeMap::from([
+                        (String::from("correctness_bps"), 8000),
+                        (String::from("latency_budget_bps"), 9600),
+                    ]),
+                    OptimizationSharedFeedback::new("baseline case a"),
+                    BTreeMap::new(),
+                ),
+                super::OptimizationCaseEvaluationReceipt::new(
+                    &baseline,
+                    &case_b,
+                    4000,
+                    BTreeMap::from([
+                        (String::from("correctness_bps"), 4000),
+                        (String::from("latency_budget_bps"), 9600),
+                    ]),
+                    OptimizationSharedFeedback::new("baseline case b"),
+                    BTreeMap::new(),
+                ),
+            ],
+            0,
+            2,
+        );
+        let candidate_batch = OptimizationBatchEvaluationReceipt::new(
+            "run_a",
+            &candidate,
+            vec![
+                super::OptimizationCaseEvaluationReceipt::new(
+                    &candidate,
+                    &case_a,
+                    7800,
+                    BTreeMap::from([
+                        (String::from("correctness_bps"), 7800),
+                        (String::from("latency_budget_bps"), 9900),
+                    ]),
+                    OptimizationSharedFeedback::new("candidate case a"),
+                    BTreeMap::new(),
+                ),
+                super::OptimizationCaseEvaluationReceipt::new(
+                    &candidate,
+                    &case_b,
+                    9100,
+                    BTreeMap::from([
+                        (String::from("correctness_bps"), 9100),
+                        (String::from("latency_budget_bps"), 9900),
+                    ]),
+                    OptimizationSharedFeedback::new("candidate case b"),
+                    BTreeMap::new(),
+                ),
+            ],
+            0,
+            2,
+        );
+
+        let frontier = OptimizationFrontierSnapshot::from_batches(
+            "run_a",
+            OptimizationFrontierMode::Hybrid,
+            &[baseline_batch, candidate_batch],
+        );
+        assert_eq!(frontier.case_frontier.len(), 2);
+        assert_eq!(frontier.objective_frontier.len(), 2);
+        assert!(frontier
+            .case_frontier
+            .iter()
+            .any(|row| row.case_id == "case_a" && row.winning_candidate_id == "baseline"));
+        assert!(frontier
+            .case_frontier
+            .iter()
+            .any(|row| row.case_id == "case_b" && row.winning_candidate_id == "candidate"));
+        assert!(frontier
+            .objective_frontier
+            .iter()
+            .any(|row| row.objective_name == "latency_budget_bps"
+                && row.winning_candidate_id == "candidate"));
+        assert_eq!(
+            frontier.hybrid_candidate_ids,
+            vec![String::from("baseline"), String::from("candidate")]
+        );
+        assert!(!frontier.snapshot_digest.is_empty());
     }
 }

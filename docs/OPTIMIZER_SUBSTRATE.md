@@ -1,8 +1,9 @@
 # Optimizer Substrate
 
 > Status: `implemented_early` for run specs, candidate manifests, lineage
-> state, and top-level run receipts. Search, evaluation, reflection, and merge
-> land in follow-on issues.
+> state, case and batch evaluation contracts, unified case-eval cache, frontier
+> snapshots, and top-level run receipts. Search, reflection, and merge land in
+> follow-on issues.
 
 ## Purpose
 
@@ -38,6 +39,20 @@ The current explicit artifact contracts are:
 - `OptimizationCandidateManifest`
   - candidate id, family id, component map, parent ids, provenance refs, and
     stable digest
+- `OptimizationCaseManifest`
+  - retained case identity, split membership, optional label, metadata,
+    evidence refs, and stable digest
+- `OptimizationCaseEvaluationReceipt`
+  - scalar score, named objective scores, shared feedback, per-component
+    feedback, unified cache key, and stable digest
+- `OptimizationBatchEvaluationReceipt`
+  - case receipts, aggregate scalar and objective totals, cache hit or miss
+    accounting, and stable digest
+- `OptimizationEvaluationCache`
+  - one cache keyed by candidate-manifest digest plus case digest instead of
+    duplicated adapter and engine caches
+- `OptimizationFrontierSnapshot`
+  - per-case winners, per-objective winners, and hybrid retained candidate ids
 - `OptimizationLineageState`
   - materialized candidates, discovery order, retained candidates, persisted
     JSON state, and stable digest
@@ -65,9 +80,6 @@ Probe owns:
 
 Follow-on optimizer issues extend this substrate with:
 
-- typed evaluation contracts and feedback
-- one unified optimizer cache
-- frontier snapshots across cases and objectives
 - cheap-first search loop
 - component-aware reflection
 - lineage-aware merge
