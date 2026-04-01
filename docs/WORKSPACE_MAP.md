@@ -117,8 +117,8 @@ execution evidence:
 - `crates/psionic-eval`
 - `crates/psionic-adapters`
 - `crates/psionic-optimize`
-  - manifest-backed optimizer substrate, cheap-first search engine, and
-    reflection or proposer receipts for bounded offline optimization lanes
+  - manifest-backed optimizer substrate, cheap-first search engine, reflection
+    and merge receipts, and bounded offline optimization lanes
 - `crates/psionic-nn-optimizers`
 
 Reference:

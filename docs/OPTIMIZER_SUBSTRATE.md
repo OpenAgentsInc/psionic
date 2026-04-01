@@ -3,8 +3,8 @@
 > Status: `implemented_early` for run specs, candidate manifests, lineage
 > state, case and batch evaluation contracts, unified case-eval cache, frontier
 > snapshots, persisted search state, cheap-first iteration receipts, reflection
-> datasets and prompt builders, proposer receipts, and top-level run receipts.
-> Merge and proof lanes land in follow-on issues.
+> datasets and prompt builders, proposer receipts, lineage-aware merge receipts,
+> and top-level run receipts. Proof lanes land in follow-on issues.
 
 ## Purpose
 
@@ -53,7 +53,8 @@ The current explicit artifact contracts are:
   - one cache keyed by candidate-manifest digest plus case digest instead of
     duplicated adapter and engine caches
 - `OptimizationFrontierSnapshot`
-  - per-case winners, per-objective winners, and hybrid retained candidate ids
+  - per-case winners, per-objective winners, optional cartesian winners, and
+    hybrid retained candidate ids
 - `OptimizationSearchState`
   - current candidate, accepted validation batches, unified cache, iteration
     receipts, persisted JSON state, and stable digest
@@ -72,6 +73,13 @@ The current explicit artifact contracts are:
 - `OptimizationReflectiveMutationProposer`
   - generic reflection pipeline over component selection, typed-feedback
     dataset building, prompt rendering, and bounded mutation strategies
+- `OptimizationMergeReceipt`
+  - merge attempt, accept, and reject receipts with explicit parent ids,
+    ancestor ids, component-source maps, and gating score floors
+- `OptimizationLineageAwareMergeProposer`
+  - shared-ancestor merge pipeline that recombines compatible retained
+    candidates and forces merged candidates to beat both parents on the same
+    minibatch
 - `OptimizationLineageState`
   - materialized candidates, discovery order, retained candidates, persisted
     JSON state, and stable digest
@@ -99,5 +107,4 @@ Probe owns:
 
 Follow-on optimizer issues extend this substrate with:
 
-- lineage-aware merge
 - proof reports over bounded module families

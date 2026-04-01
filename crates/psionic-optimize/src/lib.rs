@@ -25,6 +25,7 @@ const SEARCH_STATE_PREFIX: &[u8] = b"psionic_optimize_search_state|";
 const REFLECTIVE_DATASET_PREFIX: &[u8] = b"psionic_optimize_reflective_dataset|";
 const REFLECTION_PROMPT_PREFIX: &[u8] = b"psionic_optimize_reflection_prompt|";
 const PROPOSER_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_proposer_receipt|";
+const MERGE_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_merge_receipt|";
 const RUN_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_run_receipt|";
 
 /// Stable frontier mode identifier declared by one optimization run spec.
@@ -35,6 +36,8 @@ pub enum OptimizationFrontierMode {
     Scalar,
     /// Multiple named objectives will later produce a hybrid frontier.
     Hybrid,
+    /// Retain winners for each case-by-objective pair in addition to hybrid rows.
+    Cartesian,
 }
 
 /// Final stop reason recorded by one optimization run receipt.
@@ -592,6 +595,19 @@ pub struct OptimizationObjectiveFrontierRow {
     pub winning_score: i64,
 }
 
+/// Winner row for one case-by-objective pair in the frontier snapshot.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCartesianFrontierRow {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Named objective identifier.
+    pub objective_name: String,
+    /// Winning candidate identifier.
+    pub winning_candidate_id: String,
+    /// Winning objective score for the case-objective pair.
+    pub winning_score: i64,
+}
+
 /// Snapshot of the retained frontier for one optimizer run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OptimizationFrontierSnapshot {
@@ -609,6 +625,9 @@ pub struct OptimizationFrontierSnapshot {
     pub case_frontier: Vec<OptimizationCaseFrontierRow>,
     /// Ordered per-objective frontier rows.
     pub objective_frontier: Vec<OptimizationObjectiveFrontierRow>,
+    /// Ordered per-case-by-objective frontier rows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cartesian_frontier: Vec<OptimizationCartesianFrontierRow>,
     /// Deduplicated candidate ids retained by the hybrid frontier.
     pub hybrid_candidate_ids: Vec<String>,
     /// Stable digest over the frontier snapshot payload.
@@ -626,6 +645,7 @@ impl OptimizationFrontierSnapshot {
         let run_id = run_id.into();
         let mut case_winners = BTreeMap::<String, (String, i64)>::new();
         let mut objective_winners = BTreeMap::<String, (String, i64)>::new();
+        let mut cartesian_winners = BTreeMap::<(String, String), (String, i64)>::new();
         let mut source_candidate_ids = Vec::new();
 
         for batch in batches {
@@ -641,6 +661,20 @@ impl OptimizationFrontierSnapshot {
                         }
                     })
                     .or_insert((candidate_id, candidate_score));
+                if frontier_mode == OptimizationFrontierMode::Cartesian {
+                    for (objective_name, objective_score) in &case_receipt.objective_scores {
+                        let key = (case_receipt.case_id.clone(), objective_name.clone());
+                        let candidate_id = case_receipt.candidate_id.clone();
+                        cartesian_winners
+                            .entry(key)
+                            .and_modify(|winner| {
+                                if *objective_score > winner.1 {
+                                    *winner = (candidate_id.clone(), *objective_score);
+                                }
+                            })
+                            .or_insert((candidate_id, *objective_score));
+                    }
+                }
             }
             for (objective_name, objective_score) in &batch.aggregated_objective_scores {
                 let candidate_id = batch.candidate_id.clone();
@@ -675,13 +709,33 @@ impl OptimizationFrontierSnapshot {
                 }
             })
             .collect::<Vec<_>>();
+        let cartesian_frontier = cartesian_winners
+            .into_iter()
+            .map(
+                |((case_id, objective_name), (winning_candidate_id, winning_score))| {
+                    OptimizationCartesianFrontierRow {
+                        case_id,
+                        objective_name,
+                        winning_candidate_id,
+                        winning_score,
+                    }
+                },
+            )
+            .collect::<Vec<_>>();
 
         let mut hybrid_candidate_ids = Vec::new();
         for row in &case_frontier {
             push_unique(&mut hybrid_candidate_ids, row.winning_candidate_id.clone());
         }
-        if frontier_mode == OptimizationFrontierMode::Hybrid {
+        if frontier_mode == OptimizationFrontierMode::Hybrid
+            || frontier_mode == OptimizationFrontierMode::Cartesian
+        {
             for row in &objective_frontier {
+                push_unique(&mut hybrid_candidate_ids, row.winning_candidate_id.clone());
+            }
+        }
+        if frontier_mode == OptimizationFrontierMode::Cartesian {
+            for row in &cartesian_frontier {
                 push_unique(&mut hybrid_candidate_ids, row.winning_candidate_id.clone());
             }
         }
@@ -694,6 +748,7 @@ impl OptimizationFrontierSnapshot {
             source_candidate_ids,
             case_frontier,
             objective_frontier,
+            cartesian_frontier,
             hybrid_candidate_ids,
             snapshot_digest: String::new(),
         }
@@ -874,6 +929,86 @@ impl OptimizationProposerReceipt {
     }
 }
 
+/// Merge context attached to one proposed candidate.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationMergeContext {
+    /// Shared ancestor candidate identifier that justified the merge.
+    pub ancestor_candidate_id: String,
+    /// Component-to-source-parent map for the merged candidate.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub component_source_candidate_ids: BTreeMap<String, String>,
+}
+
+/// Merge receipt outcome kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OptimizationMergeOutcome {
+    /// A merge candidate was materialized and scheduled for gating.
+    Attempted,
+    /// The merge candidate beat the parent score floor and was retained.
+    Accepted,
+    /// The merge candidate did not beat the parent score floor.
+    Rejected,
+}
+
+/// Receipt for one lineage-aware merge attempt or outcome.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationMergeReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Proposer receipt digest that materialized the merge candidate.
+    pub proposer_receipt_digest: String,
+    /// Merged candidate identifier.
+    pub merged_candidate_id: String,
+    /// Parent candidate identifiers used by the merge.
+    pub parent_candidate_ids: Vec<String>,
+    /// Shared ancestor candidate identifier.
+    pub ancestor_candidate_id: String,
+    /// Component-to-source-parent map.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub component_source_candidate_ids: BTreeMap<String, String>,
+    /// Candidate ids used as the gating score floor.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gating_candidate_ids: Vec<String>,
+    /// Merge receipt outcome kind.
+    pub outcome: OptimizationMergeOutcome,
+    /// Proposed minibatch scalar score when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merged_minibatch_score: Option<i64>,
+    /// Parent gating floor when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gating_score_floor: Option<i64>,
+    /// Frontier snapshot digest after accepting the merge when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frontier_snapshot_digest: Option<String>,
+    /// Optional plain-language reason for the outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Stable digest over the merge receipt payload.
+    pub receipt_digest: String,
+}
+
+impl OptimizationMergeReceipt {
+    /// Returns the stable digest over the merge receipt payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.receipt_digest.clear();
+        stable_digest(MERGE_RECEIPT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.receipt_digest = self.stable_digest();
+        self
+    }
+}
+
 /// Candidate proposal plus the receipt that explains how it was materialized.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OptimizationCandidateProposal {
@@ -881,6 +1016,12 @@ pub struct OptimizationCandidateProposal {
     pub candidate: OptimizationCandidateManifest,
     /// Proposer receipt for this mutation attempt.
     pub proposer_receipt: OptimizationProposerReceipt,
+    /// Additional candidate ids the proposal must beat on the same minibatch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gating_candidate_ids: Vec<String>,
+    /// Optional merge context for lineage-aware recombination proposals.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_context: Option<OptimizationMergeContext>,
 }
 
 /// Evaluator contract for one optimizer candidate family.
@@ -1370,8 +1511,300 @@ where
         Some(OptimizationCandidateProposal {
             candidate,
             proposer_receipt,
+            gating_candidate_ids: Vec::new(),
+            merge_context: None,
         })
     }
+}
+
+/// Merge proposer that recombines compatible retained candidates through a shared ancestor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OptimizationLineageAwareMergeProposer {
+    /// Stable proposer identifier.
+    pub proposer_kind: String,
+    /// Candidate id prefix for merged variants.
+    pub candidate_id_prefix: String,
+    /// Extra provenance refs copied into merged candidates.
+    pub provenance_refs: Vec<String>,
+}
+
+impl OptimizationLineageAwareMergeProposer {
+    /// Creates a lineage-aware merge proposer.
+    #[must_use]
+    pub fn new(proposer_kind: impl Into<String>, candidate_id_prefix: impl Into<String>) -> Self {
+        Self {
+            proposer_kind: proposer_kind.into(),
+            candidate_id_prefix: candidate_id_prefix.into(),
+            provenance_refs: Vec::new(),
+        }
+    }
+
+    /// Returns a copy with extra provenance refs.
+    #[must_use]
+    pub fn with_provenance_refs(mut self, provenance_refs: Vec<String>) -> Self {
+        self.provenance_refs = provenance_refs;
+        self
+    }
+}
+
+impl OptimizationCandidateProposer for OptimizationLineageAwareMergeProposer {
+    fn propose_candidate(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+    ) -> Option<OptimizationCandidateProposal> {
+        let current_score = state
+            .accepted_validation_batches
+            .get(current_candidate.candidate_id.as_str())
+            .map_or(i64::MIN, |batch| batch.aggregated_scalar_score);
+        let mut sibling_candidate_ids = state
+            .latest_frontier_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.hybrid_candidate_ids.clone())
+            .unwrap_or_else(|| state.lineage_state.retained_candidate_ids.clone())
+            .into_iter()
+            .filter(|candidate_id| candidate_id != &current_candidate.candidate_id)
+            .collect::<Vec<_>>();
+        sibling_candidate_ids.sort_by_key(|candidate_id| {
+            std::cmp::Reverse(
+                state
+                    .accepted_validation_batches
+                    .get(candidate_id.as_str())
+                    .map_or(i64::MIN, |batch| batch.aggregated_scalar_score),
+            )
+        });
+
+        for sibling_candidate_id in sibling_candidate_ids {
+            let Some(sibling_candidate) =
+                state.lineage_state.candidate(sibling_candidate_id.as_str())
+            else {
+                continue;
+            };
+            let sibling_score = state
+                .accepted_validation_batches
+                .get(sibling_candidate_id.as_str())
+                .map_or(i64::MIN, |batch| batch.aggregated_scalar_score);
+            let Some(ancestor_candidate_id) = latest_common_ancestor(
+                &state.lineage_state,
+                current_candidate.candidate_id.as_str(),
+                sibling_candidate.candidate_id.as_str(),
+            ) else {
+                continue;
+            };
+            let Some(ancestor_candidate) = state
+                .lineage_state
+                .candidate(ancestor_candidate_id.as_str())
+            else {
+                continue;
+            };
+            let component_ids = current_candidate
+                .components
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            if component_ids
+                != sibling_candidate
+                    .components
+                    .keys()
+                    .cloned()
+                    .collect::<BTreeSet<_>>()
+                || component_ids
+                    != ancestor_candidate
+                        .components
+                        .keys()
+                        .cloned()
+                        .collect::<BTreeSet<_>>()
+            {
+                continue;
+            }
+
+            let mut merged_components = BTreeMap::new();
+            let mut component_source_candidate_ids = BTreeMap::new();
+            let mut component_diffs = Vec::new();
+            let mut used_sibling = false;
+            for component_id in component_ids {
+                let ancestor_value = match ancestor_candidate.components.get(component_id.as_str())
+                {
+                    Some(value) => value,
+                    None => continue,
+                };
+                let current_value = match current_candidate.components.get(component_id.as_str()) {
+                    Some(value) => value,
+                    None => continue,
+                };
+                let sibling_value = match sibling_candidate.components.get(component_id.as_str()) {
+                    Some(value) => value,
+                    None => continue,
+                };
+                let (chosen_source_id, chosen_value) = if current_value == sibling_value {
+                    (
+                        current_candidate.candidate_id.clone(),
+                        current_value.clone(),
+                    )
+                } else if current_value == ancestor_value && sibling_value != ancestor_value {
+                    used_sibling = true;
+                    (
+                        sibling_candidate.candidate_id.clone(),
+                        sibling_value.clone(),
+                    )
+                } else if sibling_value == ancestor_value && current_value != ancestor_value {
+                    (
+                        current_candidate.candidate_id.clone(),
+                        current_value.clone(),
+                    )
+                } else if current_value != ancestor_value && sibling_value != ancestor_value {
+                    if sibling_score > current_score {
+                        used_sibling = true;
+                        (
+                            sibling_candidate.candidate_id.clone(),
+                            sibling_value.clone(),
+                        )
+                    } else {
+                        (
+                            current_candidate.candidate_id.clone(),
+                            current_value.clone(),
+                        )
+                    }
+                } else {
+                    continue;
+                };
+                if chosen_value != *current_value {
+                    component_diffs.push(OptimizationComponentDiff {
+                        component_id: component_id.clone(),
+                        previous_value: current_value.clone(),
+                        proposed_value: chosen_value.clone(),
+                    });
+                }
+                component_source_candidate_ids.insert(component_id.clone(), chosen_source_id);
+                merged_components.insert(component_id, chosen_value);
+            }
+
+            if !used_sibling
+                || component_diffs.is_empty()
+                || merged_components == current_candidate.components
+                || merged_components == sibling_candidate.components
+            {
+                continue;
+            }
+
+            let next_candidate_id = format!(
+                "{}_{:04}",
+                self.candidate_id_prefix,
+                state.lineage_state.discovery_order.len() + 1
+            );
+            let mut provenance_refs = self.provenance_refs.clone();
+            provenance_refs.push(format!(
+                "merge_ancestor_candidate_id:{}",
+                ancestor_candidate_id
+            ));
+            provenance_refs.push(format!(
+                "source_batch_receipt_digest:{}",
+                minibatch_receipt.receipt_digest
+            ));
+            provenance_refs.push(format!(
+                "secondary_parent_candidate_id:{}",
+                sibling_candidate.candidate_id
+            ));
+            let candidate = OptimizationCandidateManifest::new(
+                next_candidate_id.clone(),
+                current_candidate.family_id.clone(),
+                current_candidate.originating_run_id.clone(),
+                merged_components,
+            )
+            .with_parent_candidate_ids(vec![
+                current_candidate.candidate_id.clone(),
+                sibling_candidate.candidate_id.clone(),
+            ])
+            .with_provenance_refs(provenance_refs);
+            let proposer_receipt = OptimizationProposerReceipt {
+                schema_version: 1,
+                report_id: String::from("psionic.optimize.proposer_receipt.v1"),
+                run_id: state.run_spec.run_id.clone(),
+                proposer_kind: self.proposer_kind.clone(),
+                parent_candidate_id: current_candidate.candidate_id.clone(),
+                proposed_candidate_id: next_candidate_id,
+                source_batch_receipt_digest: minibatch_receipt.receipt_digest.clone(),
+                reflective_dataset_digest: None,
+                selected_component_ids: component_diffs
+                    .iter()
+                    .map(|diff| diff.component_id.clone())
+                    .collect(),
+                component_diffs,
+                prompts: Vec::new(),
+                metadata: BTreeMap::from([
+                    (
+                        String::from("ancestor_candidate_id"),
+                        ancestor_candidate_id.clone(),
+                    ),
+                    (
+                        String::from("secondary_parent_candidate_id"),
+                        sibling_candidate.candidate_id.clone(),
+                    ),
+                ]),
+                receipt_digest: String::new(),
+            }
+            .with_stable_digest();
+
+            return Some(OptimizationCandidateProposal {
+                candidate,
+                proposer_receipt,
+                gating_candidate_ids: vec![
+                    current_candidate.candidate_id.clone(),
+                    sibling_candidate.candidate_id.clone(),
+                ],
+                merge_context: Some(OptimizationMergeContext {
+                    ancestor_candidate_id,
+                    component_source_candidate_ids,
+                }),
+            });
+        }
+
+        None
+    }
+}
+
+fn latest_common_ancestor(
+    lineage_state: &OptimizationLineageState,
+    left_candidate_id: &str,
+    right_candidate_id: &str,
+) -> Option<String> {
+    let left_ancestors = ancestor_candidate_ids(lineage_state, left_candidate_id);
+    let right_ancestors = ancestor_candidate_ids(lineage_state, right_candidate_id);
+    let discovery_order = lineage_state
+        .discovery_order
+        .iter()
+        .enumerate()
+        .map(|(index, candidate_id)| (candidate_id.clone(), index))
+        .collect::<BTreeMap<_, _>>();
+    left_ancestors
+        .intersection(&right_ancestors)
+        .max_by_key(|candidate_id| discovery_order.get(*candidate_id).copied().unwrap_or(0))
+        .cloned()
+}
+
+fn ancestor_candidate_ids(
+    lineage_state: &OptimizationLineageState,
+    candidate_id: &str,
+) -> BTreeSet<String> {
+    fn visit(
+        lineage_state: &OptimizationLineageState,
+        candidate_id: &str,
+        seen: &mut BTreeSet<String>,
+    ) {
+        let Some(candidate) = lineage_state.candidate(candidate_id) else {
+            return;
+        };
+        for parent_candidate_id in &candidate.parent_candidate_ids {
+            if seen.insert(parent_candidate_id.clone()) {
+                visit(lineage_state, parent_candidate_id.as_str(), seen);
+            }
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    visit(lineage_state, candidate_id, &mut seen);
+    seen
 }
 
 /// Minibatch sampler for train-time proposal gating.
@@ -1503,6 +1936,9 @@ pub struct OptimizationSearchState {
     /// Ordered proposer receipts emitted so far.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub proposer_receipts: Vec<OptimizationProposerReceipt>,
+    /// Ordered merge attempt and outcome receipts emitted so far.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub merge_receipts: Vec<OptimizationMergeReceipt>,
     /// Current zero-based iteration count.
     pub current_iteration: u32,
     /// Total case evaluations across all batch receipts.
@@ -1632,6 +2068,7 @@ impl OptimizationEngine {
             latest_frontier_snapshot: Some(frontier_snapshot),
             iteration_receipts: Vec::new(),
             proposer_receipts: Vec::new(),
+            merge_receipts: Vec::new(),
             current_iteration: 0,
             total_case_evaluations: validation_case_count,
             accepted_proposal_count: 0,
@@ -1698,23 +2135,75 @@ impl OptimizationEngine {
             };
             let proposed_candidate = proposal.candidate;
             let proposer_receipt = proposal.proposer_receipt;
+            let gating_candidate_ids = proposal.gating_candidate_ids;
+            let merge_context = proposal.merge_context;
 
             state
                 .lineage_state
                 .register_candidate(proposed_candidate.clone())?;
             state.proposer_receipts.push(proposer_receipt.clone());
+            if let Some(merge_context) = &merge_context {
+                state.merge_receipts.push(
+                    OptimizationMergeReceipt {
+                        schema_version: 1,
+                        report_id: String::from("psionic.optimize.merge_receipt.v1"),
+                        run_id: state.run_spec.run_id.clone(),
+                        proposer_receipt_digest: proposer_receipt.receipt_digest.clone(),
+                        merged_candidate_id: proposed_candidate.candidate_id.clone(),
+                        parent_candidate_ids: proposed_candidate.parent_candidate_ids.clone(),
+                        ancestor_candidate_id: merge_context.ancestor_candidate_id.clone(),
+                        component_source_candidate_ids: merge_context
+                            .component_source_candidate_ids
+                            .clone(),
+                        gating_candidate_ids: gating_candidate_ids.clone(),
+                        outcome: OptimizationMergeOutcome::Attempted,
+                        merged_minibatch_score: None,
+                        gating_score_floor: None,
+                        frontier_snapshot_digest: None,
+                        reason: None,
+                        receipt_digest: String::new(),
+                    }
+                    .with_stable_digest(),
+                );
+            }
             let proposed_batch = evaluator.evaluate_candidate(
                 state.run_spec.run_id.as_str(),
                 &proposed_candidate,
                 minibatch_cases.as_slice(),
                 &mut state.evaluation_cache,
             );
+            let mut gating_score_floor = current_batch.aggregated_scalar_score;
+            let mut additional_gating_batches = Vec::new();
+            for gating_candidate_id in gating_candidate_ids
+                .iter()
+                .filter(|candidate_id| candidate_id.as_str() != current_candidate.candidate_id)
+            {
+                let gating_candidate = state
+                    .lineage_state
+                    .candidate(gating_candidate_id.as_str())
+                    .cloned()
+                    .ok_or_else(|| OptimizationEngineError::UnknownGatingCandidate {
+                        run_id: state.run_spec.run_id.clone(),
+                        candidate_id: gating_candidate_id.clone(),
+                    })?;
+                let gating_batch = evaluator.evaluate_candidate(
+                    state.run_spec.run_id.as_str(),
+                    &gating_candidate,
+                    minibatch_cases.as_slice(),
+                    &mut state.evaluation_cache,
+                );
+                gating_score_floor = gating_score_floor.max(gating_batch.aggregated_scalar_score);
+                additional_gating_batches.push(gating_batch);
+            }
 
-            state.total_case_evaluations +=
-                (current_batch.case_receipts.len() + proposed_batch.case_receipts.len()) as u32;
+            state.total_case_evaluations += (current_batch.case_receipts.len()
+                + proposed_batch.case_receipts.len()
+                + additional_gating_batches
+                    .iter()
+                    .map(|batch| batch.case_receipts.len())
+                    .sum::<usize>()) as u32;
 
-            let accepted =
-                proposed_batch.aggregated_scalar_score > current_batch.aggregated_scalar_score;
+            let accepted = proposed_batch.aggregated_scalar_score > gating_score_floor;
             let mut retained_candidate_id = current_candidate.candidate_id.clone();
             let mut retained_validation_score = None;
             let mut frontier_snapshot_digest = state
@@ -1754,9 +2243,48 @@ impl OptimizationEngine {
             } else {
                 state.rejected_proposal_count += 1;
             }
+            if let Some(merge_context) = &merge_context {
+                state.merge_receipts.push(
+                    OptimizationMergeReceipt {
+                        schema_version: 1,
+                        report_id: String::from("psionic.optimize.merge_receipt.v1"),
+                        run_id: state.run_spec.run_id.clone(),
+                        proposer_receipt_digest: proposer_receipt.receipt_digest.clone(),
+                        merged_candidate_id: proposed_candidate.candidate_id.clone(),
+                        parent_candidate_ids: proposed_candidate.parent_candidate_ids.clone(),
+                        ancestor_candidate_id: merge_context.ancestor_candidate_id.clone(),
+                        component_source_candidate_ids: merge_context
+                            .component_source_candidate_ids
+                            .clone(),
+                        gating_candidate_ids: gating_candidate_ids.clone(),
+                        outcome: if accepted {
+                            OptimizationMergeOutcome::Accepted
+                        } else {
+                            OptimizationMergeOutcome::Rejected
+                        },
+                        merged_minibatch_score: Some(proposed_batch.aggregated_scalar_score),
+                        gating_score_floor: Some(gating_score_floor),
+                        frontier_snapshot_digest: frontier_snapshot_digest.clone(),
+                        reason: if accepted {
+                            None
+                        } else {
+                            Some(format!(
+                                "merged candidate score {} did not beat gating floor {}",
+                                proposed_batch.aggregated_scalar_score, gating_score_floor
+                            ))
+                        },
+                        receipt_digest: String::new(),
+                    }
+                    .with_stable_digest(),
+                );
+            }
 
             let cache_hit_count = current_batch.cache_hit_count
                 + proposed_batch.cache_hit_count
+                + additional_gating_batches
+                    .iter()
+                    .map(|batch| batch.cache_hit_count)
+                    .sum::<u32>()
                 + if accepted {
                     state
                         .accepted_validation_batches
@@ -1767,6 +2295,10 @@ impl OptimizationEngine {
                 };
             let cache_miss_count = current_batch.cache_miss_count
                 + proposed_batch.cache_miss_count
+                + additional_gating_batches
+                    .iter()
+                    .map(|batch| batch.cache_miss_count)
+                    .sum::<u32>()
                 + if accepted {
                     state
                         .accepted_validation_batches
@@ -1843,6 +2375,14 @@ pub enum OptimizationEngineError {
     /// The current candidate id was not present in lineage state.
     #[error("optimization run `{run_id}` does not know current candidate `{candidate_id}`")]
     UnknownCurrentCandidate {
+        /// Stable run identifier.
+        run_id: String,
+        /// Missing candidate id.
+        candidate_id: String,
+    },
+    /// One configured gating candidate id was not present in lineage state.
+    #[error("optimization run `{run_id}` does not know gating candidate `{candidate_id}`")]
+    UnknownGatingCandidate {
         /// Stable run identifier.
         run_id: String,
         /// Missing candidate id.
@@ -2195,21 +2735,23 @@ mod tests {
         OptimizationDefaultReflectionPromptBuilder, OptimizationEngine,
         OptimizationEngineRunOutcome, OptimizationEvaluationCache, OptimizationEvaluator,
         OptimizationFeedbackComponentSelector, OptimizationFrontierMode,
-        OptimizationFrontierSnapshot, OptimizationLineageState, OptimizationLineageStateError,
-        OptimizationProposerReceipt, OptimizationReflectiveMutationProposer,
-        OptimizationRunReceipt, OptimizationRunSpec, OptimizationSearchState,
-        OptimizationSequentialMinibatchSampler, OptimizationSharedFeedback, OptimizationStopReason,
+        OptimizationFrontierSnapshot, OptimizationLineageAwareMergeProposer,
+        OptimizationLineageState, OptimizationLineageStateError, OptimizationProposerReceipt,
+        OptimizationReflectiveMutationProposer, OptimizationRunReceipt, OptimizationRunSpec,
+        OptimizationSearchState, OptimizationSequentialMinibatchSampler,
+        OptimizationSharedFeedback, OptimizationStopReason,
         OptimizationTypedFeedbackDatasetBuilder,
     };
 
-    fn route_components(route_name: &str) -> BTreeMap<String, String> {
+    fn candidate_components(selected_tool: &str, reason: &str) -> BTreeMap<String, String> {
         BTreeMap::from([
-            (String::from("selected_tool"), String::from(route_name)),
-            (
-                String::from("reason"),
-                String::from("route decision evidence goes here"),
-            ),
+            (String::from("selected_tool"), String::from(selected_tool)),
+            (String::from("reason"), String::from(reason)),
         ])
+    }
+
+    fn route_components(route_name: &str) -> BTreeMap<String, String> {
+        candidate_components(route_name, "route decision evidence goes here")
     }
 
     fn route_case(case_id: &str, label: &str) -> OptimizationCaseManifest {
@@ -2240,6 +2782,21 @@ mod tests {
             "probe.tool_route",
             "run_a",
             route_components(route_name),
+        )
+        .with_parent_candidate_ids(parent_candidate_ids)
+    }
+
+    fn policy_candidate(
+        candidate_id: &str,
+        selected_tool: &str,
+        reason: &str,
+        parent_candidate_ids: Vec<String>,
+    ) -> OptimizationCandidateManifest {
+        OptimizationCandidateManifest::new(
+            candidate_id,
+            "probe.tool_route",
+            "run_a",
+            candidate_components(selected_tool, reason),
         )
         .with_parent_candidate_ids(parent_candidate_ids)
     }
@@ -2315,6 +2872,138 @@ mod tests {
         }
     }
 
+    fn component_case(
+        case_id: &str,
+        split: OptimizationCaseSplit,
+        active_component: &str,
+        expected_tool: &str,
+        expected_reason: &str,
+    ) -> OptimizationCaseManifest {
+        OptimizationCaseManifest::new(case_id, split)
+            .with_label(expected_tool)
+            .with_metadata(BTreeMap::from([
+                (String::from("decision_family"), String::from("tool_route")),
+                (
+                    String::from("active_component"),
+                    String::from(active_component),
+                ),
+                (
+                    String::from("expected_reason"),
+                    String::from(expected_reason),
+                ),
+            ]))
+    }
+
+    #[derive(Debug, Default)]
+    struct DeterministicMergeEvaluator;
+
+    impl OptimizationEvaluator for DeterministicMergeEvaluator {
+        fn evaluate_candidate(
+            &mut self,
+            run_id: &str,
+            candidate: &OptimizationCandidateManifest,
+            cases: &[OptimizationCaseManifest],
+            cache: &mut OptimizationEvaluationCache,
+        ) -> OptimizationBatchEvaluationReceipt {
+            let selected_tool = candidate
+                .components
+                .get("selected_tool")
+                .cloned()
+                .expect("selected_tool component");
+            let reason = candidate
+                .components
+                .get("reason")
+                .cloned()
+                .expect("reason component");
+            let mut case_receipts = Vec::new();
+            let mut cache_hit_count = 0_u32;
+            let mut cache_miss_count = 0_u32;
+
+            for case in cases {
+                if let Some(cached) = cache.lookup(candidate, case).cloned() {
+                    cache_hit_count += 1;
+                    case_receipts.push(cached);
+                    continue;
+                }
+
+                cache_miss_count += 1;
+                let expected_tool = case.label.clone().expect("case label");
+                let expected_reason = case
+                    .metadata
+                    .get("expected_reason")
+                    .cloned()
+                    .expect("expected_reason metadata");
+                let active_component = case
+                    .metadata
+                    .get("active_component")
+                    .cloned()
+                    .expect("active_component metadata");
+                let tool_score =
+                    if active_component == "selected_tool" && selected_tool == expected_tool {
+                        10_000
+                    } else {
+                        0
+                    };
+                let reason_score = if active_component == "reason" && reason == expected_reason {
+                    10_000
+                } else {
+                    0
+                };
+                let scalar_score = tool_score + reason_score;
+                let receipt = OptimizationCaseEvaluationReceipt::new(
+                    candidate,
+                    case,
+                    scalar_score,
+                    BTreeMap::from([
+                        (String::from("tool_bps"), tool_score),
+                        (String::from("reason_bps"), reason_score),
+                    ]),
+                    OptimizationSharedFeedback::new("component-policy evaluation").with_details(
+                        vec![format!(
+                            "expected tool `{expected_tool}` and reason `{expected_reason}`"
+                        )],
+                    ),
+                    BTreeMap::from([
+                        (
+                            String::from("selected_tool"),
+                            if tool_score > 0 {
+                                OptimizationComponentFeedback::new(
+                                    "selected tool matched retained label",
+                                )
+                            } else {
+                                OptimizationComponentFeedback::new(
+                                    "selected tool missed retained label",
+                                )
+                            },
+                        ),
+                        (
+                            String::from("reason"),
+                            if reason_score > 0 {
+                                OptimizationComponentFeedback::new(
+                                    "reason matched retained policy label",
+                                )
+                            } else {
+                                OptimizationComponentFeedback::new(
+                                    "reason missed retained policy label",
+                                )
+                            },
+                        ),
+                    ]),
+                );
+                cache.insert(candidate, case, receipt.clone());
+                case_receipts.push(receipt);
+            }
+
+            OptimizationBatchEvaluationReceipt::new(
+                run_id,
+                candidate,
+                case_receipts,
+                cache_hit_count,
+                cache_miss_count,
+            )
+        }
+    }
+
     #[derive(Debug)]
     struct SequenceProposer {
         queued_candidates: Vec<OptimizationCandidateManifest>,
@@ -2370,6 +3059,8 @@ mod tests {
             Some(OptimizationCandidateProposal {
                 candidate,
                 proposer_receipt,
+                gating_candidate_ids: Vec::new(),
+                merge_context: None,
             })
         }
     }
@@ -2690,6 +3381,106 @@ mod tests {
     }
 
     #[test]
+    fn frontier_snapshot_materializes_cartesian_winners() {
+        let candidate_a = OptimizationCandidateManifest::new(
+            "candidate_a",
+            "probe.tool_route",
+            "run_a",
+            route_components("read_file"),
+        );
+        let candidate_b = OptimizationCandidateManifest::new(
+            "candidate_b",
+            "probe.tool_route",
+            "run_a",
+            route_components("apply_patch"),
+        );
+        let case_a = route_case("case_a", "read_file");
+        let case_b = route_case("case_b", "apply_patch");
+        let batch_a = OptimizationBatchEvaluationReceipt::new(
+            "run_a",
+            &candidate_a,
+            vec![
+                OptimizationCaseEvaluationReceipt::new(
+                    &candidate_a,
+                    &case_a,
+                    7_000,
+                    BTreeMap::from([
+                        (String::from("tool_bps"), 7_000),
+                        (String::from("reason_bps"), 3_000),
+                    ]),
+                    OptimizationSharedFeedback::new("candidate a case a"),
+                    BTreeMap::new(),
+                ),
+                OptimizationCaseEvaluationReceipt::new(
+                    &candidate_a,
+                    &case_b,
+                    5_000,
+                    BTreeMap::from([
+                        (String::from("tool_bps"), 2_000),
+                        (String::from("reason_bps"), 8_000),
+                    ]),
+                    OptimizationSharedFeedback::new("candidate a case b"),
+                    BTreeMap::new(),
+                ),
+            ],
+            0,
+            2,
+        );
+        let batch_b = OptimizationBatchEvaluationReceipt::new(
+            "run_a",
+            &candidate_b,
+            vec![
+                OptimizationCaseEvaluationReceipt::new(
+                    &candidate_b,
+                    &case_a,
+                    6_000,
+                    BTreeMap::from([
+                        (String::from("tool_bps"), 6_000),
+                        (String::from("reason_bps"), 9_000),
+                    ]),
+                    OptimizationSharedFeedback::new("candidate b case a"),
+                    BTreeMap::new(),
+                ),
+                OptimizationCaseEvaluationReceipt::new(
+                    &candidate_b,
+                    &case_b,
+                    9_000,
+                    BTreeMap::from([
+                        (String::from("tool_bps"), 9_000),
+                        (String::from("reason_bps"), 4_000),
+                    ]),
+                    OptimizationSharedFeedback::new("candidate b case b"),
+                    BTreeMap::new(),
+                ),
+            ],
+            0,
+            2,
+        );
+
+        let frontier = OptimizationFrontierSnapshot::from_batches(
+            "run_a",
+            OptimizationFrontierMode::Cartesian,
+            &[batch_a, batch_b],
+        );
+
+        assert_eq!(frontier.cartesian_frontier.len(), 4);
+        assert!(frontier.cartesian_frontier.iter().any(|row| {
+            row.case_id == "case_a"
+                && row.objective_name == "reason_bps"
+                && row.winning_candidate_id == "candidate_b"
+        }));
+        assert!(frontier.cartesian_frontier.iter().any(|row| {
+            row.case_id == "case_b"
+                && row.objective_name == "tool_bps"
+                && row.winning_candidate_id == "candidate_b"
+        }));
+        assert_eq!(
+            frontier.hybrid_candidate_ids,
+            vec![String::from("candidate_a"), String::from("candidate_b")]
+        );
+    }
+
+    #[test]
     fn optimizer_engine_accepts_better_candidate_from_minibatch() {
         let run_spec = OptimizationRunSpec::new("run_a", "probe.tool_route")
             .with_iteration_budget(4)
@@ -2927,6 +3718,168 @@ mod tests {
                 .provenance_refs
                 .iter()
                 .any(|entry| entry.starts_with("reflective_dataset_digest:"))
+        );
+    }
+
+    #[test]
+    fn lineage_merge_proposer_recombines_related_candidates_and_records_receipts() {
+        let run_spec = OptimizationRunSpec::new("run_a", "probe.tool_route")
+            .with_frontier_mode(OptimizationFrontierMode::Cartesian)
+            .with_iteration_budget(4)
+            .with_candidate_budget(8);
+        let train_cases = vec![
+            component_case(
+                "train_tool",
+                OptimizationCaseSplit::Train,
+                "selected_tool",
+                "apply_patch",
+                "cautious",
+            ),
+            component_case(
+                "train_reason",
+                OptimizationCaseSplit::Train,
+                "reason",
+                "read_file",
+                "aggressive",
+            ),
+        ];
+        let validation_cases = vec![
+            component_case(
+                "val_tool",
+                OptimizationCaseSplit::Validation,
+                "selected_tool",
+                "apply_patch",
+                "cautious",
+            ),
+            component_case(
+                "val_reason",
+                OptimizationCaseSplit::Validation,
+                "reason",
+                "read_file",
+                "aggressive",
+            ),
+        ];
+        let baseline = policy_candidate("baseline", "read_file", "cautious", Vec::new());
+        let candidate_tool = policy_candidate(
+            "candidate_tool",
+            "apply_patch",
+            "cautious",
+            vec![String::from("baseline")],
+        );
+        let candidate_reason = policy_candidate(
+            "candidate_reason",
+            "read_file",
+            "aggressive",
+            vec![String::from("baseline")],
+        );
+        let mut evaluator = DeterministicMergeEvaluator;
+        let mut state = OptimizationEngine::initialize(
+            run_spec,
+            baseline.clone(),
+            train_cases.clone(),
+            validation_cases.clone(),
+            &mut evaluator,
+        )
+        .expect("initialize search state");
+        state
+            .lineage_state
+            .register_candidate(candidate_tool.clone())
+            .expect("register tool candidate");
+        state
+            .lineage_state
+            .register_candidate(candidate_reason.clone())
+            .expect("register reason candidate");
+
+        let tool_batch = evaluator.evaluate_candidate(
+            "run_a",
+            &candidate_tool,
+            validation_cases.as_slice(),
+            &mut state.evaluation_cache,
+        );
+        let reason_batch = evaluator.evaluate_candidate(
+            "run_a",
+            &candidate_reason,
+            validation_cases.as_slice(),
+            &mut state.evaluation_cache,
+        );
+        state
+            .accepted_validation_batches
+            .insert(candidate_tool.candidate_id.clone(), tool_batch);
+        state
+            .accepted_validation_batches
+            .insert(candidate_reason.candidate_id.clone(), reason_batch);
+        let frontier_batches = state
+            .accepted_validation_batches
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let frontier = OptimizationFrontierSnapshot::from_batches(
+            "run_a",
+            OptimizationFrontierMode::Cartesian,
+            frontier_batches.as_slice(),
+        );
+        state.current_candidate_id = String::from("candidate_tool");
+        state
+            .lineage_state
+            .set_retained_candidates(frontier.hybrid_candidate_ids.clone())
+            .expect("set retained frontier");
+        state.latest_frontier_snapshot = Some(frontier);
+        state.accepted_proposal_count = 2;
+        state.state_digest = state.stable_digest();
+
+        let mut proposer =
+            OptimizationLineageAwareMergeProposer::new("lineage_merge_v1", "merged_candidate")
+                .with_provenance_refs(vec![String::from("issue:psionic#811")]);
+        let mut sampler = OptimizationSequentialMinibatchSampler::new(2);
+
+        let outcome =
+            OptimizationEngine::run(state, &mut evaluator, &mut proposer, &mut sampler, Some(1))
+                .expect("run merge optimizer");
+
+        assert_eq!(outcome.state.current_candidate_id, "merged_candidate_0004");
+        let merged_candidate = outcome
+            .state
+            .lineage_state
+            .candidate("merged_candidate_0004")
+            .expect("merged candidate in lineage");
+        assert_eq!(
+            merged_candidate.parent_candidate_ids,
+            vec![
+                String::from("candidate_tool"),
+                String::from("candidate_reason"),
+            ]
+        );
+        assert_eq!(
+            merged_candidate.components,
+            candidate_components("apply_patch", "aggressive")
+        );
+        assert_eq!(outcome.state.proposer_receipts.len(), 1);
+        assert_eq!(outcome.state.merge_receipts.len(), 2);
+        assert_eq!(
+            outcome.state.merge_receipts[0].outcome,
+            super::OptimizationMergeOutcome::Attempted
+        );
+        assert_eq!(
+            outcome.state.merge_receipts[1].outcome,
+            super::OptimizationMergeOutcome::Accepted
+        );
+        assert_eq!(
+            outcome.state.merge_receipts[1].gating_score_floor,
+            Some(10_000)
+        );
+        assert_eq!(
+            outcome.state.merge_receipts[1].merged_minibatch_score,
+            Some(20_000)
+        );
+        assert_eq!(
+            outcome.state.merge_receipts[1].component_source_candidate_ids,
+            BTreeMap::from([
+                (String::from("reason"), String::from("candidate_reason"),),
+                (
+                    String::from("selected_tool"),
+                    String::from("candidate_tool"),
+                ),
+            ])
         );
     }
 }
