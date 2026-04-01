@@ -125,6 +125,7 @@ Reference:
 
 - `docs/TRAIN_SYSTEM.md`
 - `docs/OPTIMIZER_SUBSTRATE.md`
+- `fixtures/compiled_agent/compiled_agent_module_optimization_proof_report_v1.json`
 - `docs/ROADMAP_PARAMETERGOLF.md`
 - `docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md`
 - `docs/TRAIN_PROGRAM_MANIFEST_REFERENCE.md`

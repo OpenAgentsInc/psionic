@@ -4,7 +4,7 @@
 > state, case and batch evaluation contracts, unified case-eval cache, frontier
 > snapshots, persisted search state, cheap-first iteration receipts, reflection
 > datasets and prompt builders, proposer receipts, lineage-aware merge receipts,
-> and top-level run receipts. Proof lanes land in follow-on issues.
+> top-level run receipts, and one committed compiled-agent module proof lane.
 
 ## Purpose
 
@@ -103,8 +103,19 @@ Probe owns:
 - candidate family definitions for Probe behavior
 - final promotion and runtime adoption
 
+## Native Proof Lane
+
+Psionic now has one committed native proof lane above the raw substrate:
+
+- `crates/psionic-eval/src/compiled_agent_module_optimization_proof.rs`
+  - runs separate optimizer jobs over bounded route, tool-policy,
+    tool-argument, grounded-answer, and verify families
+- `fixtures/compiled_agent/compiled_agent_module_optimization_proof_report_v1.json`
+  - committed proof report with baseline versus optimized case reports, module
+    summaries, candidate manifests, and optimizer run receipts
+
 ## Next Work
 
-Follow-on optimizer issues extend this substrate with:
+Follow-on work moves outside the substrate itself:
 
-- proof reports over bounded module families
+- Probe-side optimizer job handoff and promotion

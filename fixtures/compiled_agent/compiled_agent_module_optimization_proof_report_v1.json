@@ -1,0 +1,1190 @@
+{
+  "schema_version": 1,
+  "report_id": "compiled_agent.module_optimization_proof_report.v1",
+  "row_id": "compiled_agent.qwen35_9b_q4km.archlinux.consumer_gpu.v1",
+  "baseline_revision_id": "compiled_agent.baseline.rule_v1",
+  "baseline_eval_report_digest": "32a97e243a51a9087c6280b7e3658892c4e0ee9140e6759719c56ebab32a492f",
+  "family_proofs": [
+    {
+      "schema_version": 1,
+      "module": "route",
+      "family_id": "compiled_agent.route",
+      "run_spec": {
+        "schema_version": 1,
+        "run_id": "compiled_agent.route.proof_run_v1",
+        "family_id": "compiled_agent.route",
+        "dataset_refs": [
+          "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json"
+        ],
+        "issue_ref": "OpenAgentsInc/psionic#812",
+        "frontier_mode": "scalar",
+        "iteration_budget": 1,
+        "candidate_budget": 3,
+        "spec_digest": "6eaea8facfbb9e4ab9f61cfedf276c8c58222166218251798ff0aff22afbcd43"
+      },
+      "run_receipt": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.run_receipt.v1",
+        "run_id": "compiled_agent.route.proof_run_v1",
+        "family_id": "compiled_agent.route",
+        "run_spec_digest": "6eaea8facfbb9e4ab9f61cfedf276c8c58222166218251798ff0aff22afbcd43",
+        "lineage_state_digest": "648d6ce97bb63c98f1a8e5c7d1f958091fb19e0be5e44800944030a44e3e6e6a",
+        "candidate_count": 2,
+        "retained_candidate_ids": [
+          "route_negation_guard"
+        ],
+        "frontier_snapshot_refs": [
+          "frontier_snapshot_digest:bcd2521d881101b5bff202fd7bbce799bf6a9e3661a094cb2f5d78389c3624f3"
+        ],
+        "stop_reason": "iteration_budget_reached",
+        "claim_boundary": "This receipt records optimizer run identity, retained candidates, and frontier refs for one bounded offline optimization run. It does not claim evaluation quality, search validity, or runtime promotion by itself.",
+        "receipt_digest": "e8e180bcc17367b70cbada86fa2d1ab335008aff287da904681cb0e96db798e1"
+      },
+      "frontier_snapshot": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.frontier_snapshot.v1",
+        "run_id": "compiled_agent.route.proof_run_v1",
+        "frontier_mode": "scalar",
+        "source_candidate_ids": [
+          "route_negation_guard",
+          "route_seed"
+        ],
+        "case_frontier": [
+          {
+            "case_id": "route_negated_wallet_false_positive",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "route_provider_ready",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "route_unsupported_poem",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "route_wallet_balance",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_scalar_score": 10000
+          }
+        ],
+        "objective_frontier": [
+          {
+            "objective_name": "module_pass_bps",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_score": 40000
+          },
+          {
+            "objective_name": "negated_bps",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_score": 10000
+          },
+          {
+            "objective_name": "unsupported_bps",
+            "winning_candidate_id": "route_negation_guard",
+            "winning_score": 20000
+          }
+        ],
+        "hybrid_candidate_ids": [
+          "route_negation_guard"
+        ],
+        "snapshot_digest": "bcd2521d881101b5bff202fd7bbce799bf6a9e3661a094cb2f5d78389c3624f3"
+      },
+      "seed_candidate_id": "route_seed",
+      "selected_candidate_id": "route_negation_guard",
+      "candidate_manifests": [
+        {
+          "schema_version": 1,
+          "candidate_id": "route_seed",
+          "family_id": "compiled_agent.route",
+          "originating_run_id": "compiled_agent.route.proof_run_v1",
+          "components": {
+            "negation_keywords_json": "[]",
+            "provider_route_keywords_json": "[\"provider\",\"online\",\"ready\",\"readiness\"]",
+            "unsupported_route_keywords_json": "[]",
+            "wallet_route_keywords_json": "[\"wallet\",\"balance\",\"sats\"]"
+          },
+          "manifest_digest": "b1242425f12584544ec83b0221d7a3467294d75487806fe8d002dfedf5d7dee6"
+        },
+        {
+          "schema_version": 1,
+          "candidate_id": "route_negation_guard",
+          "family_id": "compiled_agent.route",
+          "originating_run_id": "compiled_agent.route.proof_run_v1",
+          "components": {
+            "negation_keywords_json": "[\"not\",\"dont\",\"don't\"]",
+            "provider_route_keywords_json": "[\"provider\",\"online\",\"ready\",\"readiness\"]",
+            "unsupported_route_keywords_json": "[\"poem\",\"gpus\"]",
+            "wallet_route_keywords_json": "[\"wallet\",\"balance\",\"sats\"]"
+          },
+          "parent_candidate_ids": [
+            "route_seed"
+          ],
+          "manifest_digest": "2bb020e007fdbcc4266cc88c778af5e400c8ff462b15d0b0c7b3615ba73835c2"
+        }
+      ],
+      "baseline_case_reports": [
+        {
+          "case_id": "route_provider_ready",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "ProviderStatus",
+          "observed_summary": "ProviderStatus",
+          "detail": "Explicit provider readiness route should stay on the provider lane."
+        },
+        {
+          "case_id": "route_wallet_balance",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "WalletStatus",
+          "observed_summary": "WalletStatus",
+          "detail": "Explicit wallet-balance route should stay on the wallet lane."
+        },
+        {
+          "case_id": "route_unsupported_poem",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "Unsupported",
+          "observed_summary": "Unsupported",
+          "detail": "Out-of-scope prompt should route to unsupported."
+        },
+        {
+          "case_id": "route_negated_wallet_false_positive",
+          "module": "route",
+          "pass": false,
+          "tags": [
+            "unsupported",
+            "negated",
+            "known_gap"
+          ],
+          "expected_summary": "Unsupported",
+          "observed_summary": "WalletStatus",
+          "failure_class": "negated_route_false_positive",
+          "detail": "Negated wallet mention should not silently become a wallet route, but the baseline revision still false-positives here."
+        }
+      ],
+      "optimized_case_reports": [
+        {
+          "case_id": "route_negated_wallet_false_positive",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "unsupported",
+            "negated",
+            "known_gap"
+          ],
+          "expected_summary": "Unsupported",
+          "observed_summary": "Unsupported",
+          "detail": "Negated wallet mention should not silently become a wallet route, but the baseline revision still false-positives here."
+        },
+        {
+          "case_id": "route_provider_ready",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "ProviderStatus",
+          "observed_summary": "ProviderStatus",
+          "detail": "Explicit provider readiness route should stay on the provider lane."
+        },
+        {
+          "case_id": "route_unsupported_poem",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "Unsupported",
+          "observed_summary": "Unsupported",
+          "detail": "Out-of-scope prompt should route to unsupported."
+        },
+        {
+          "case_id": "route_wallet_balance",
+          "module": "route",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "WalletStatus",
+          "observed_summary": "WalletStatus",
+          "detail": "Explicit wallet-balance route should stay on the wallet lane."
+        }
+      ],
+      "baseline_summary": {
+        "module": "route",
+        "total_cases": 4,
+        "passed_cases": 3,
+        "failed_case_ids": [
+          "route_negated_wallet_false_positive"
+        ],
+        "failure_classes": {
+          "negated_route_false_positive": 1
+        }
+      },
+      "optimized_summary": {
+        "module": "route",
+        "total_cases": 4,
+        "passed_cases": 4,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "generated_from_refs": [
+        "crates/psionic-eval/src/compiled_agent_module_eval.rs"
+      ],
+      "detail": "Module family `route` runs on the fixed compiled-agent corpus with seed_pass=3/4 and selected_pass=4/4.",
+      "proof_digest": "c561f31ffafd8bfbcffeb0abc56fdc54b2d6c3057a9081a2b5047aee48e0fe67"
+    },
+    {
+      "schema_version": 1,
+      "module": "tool_policy",
+      "family_id": "compiled_agent.tool_policy",
+      "run_spec": {
+        "schema_version": 1,
+        "run_id": "compiled_agent.tool_policy.proof_run_v1",
+        "family_id": "compiled_agent.tool_policy",
+        "dataset_refs": [
+          "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json"
+        ],
+        "issue_ref": "OpenAgentsInc/psionic#812",
+        "frontier_mode": "scalar",
+        "iteration_budget": 1,
+        "candidate_budget": 2,
+        "spec_digest": "79b9403174149a390fdd976cf44e01c60fde3ca4b62d37786f8a8ea6035c8ca9"
+      },
+      "run_receipt": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.run_receipt.v1",
+        "run_id": "compiled_agent.tool_policy.proof_run_v1",
+        "family_id": "compiled_agent.tool_policy",
+        "run_spec_digest": "79b9403174149a390fdd976cf44e01c60fde3ca4b62d37786f8a8ea6035c8ca9",
+        "lineage_state_digest": "fc0a0cafd8531ab08b06500a40e9886555ecb87fc540fba05db4c0e93df35b9d",
+        "candidate_count": 1,
+        "retained_candidate_ids": [
+          "tool_policy_seed"
+        ],
+        "frontier_snapshot_refs": [
+          "frontier_snapshot_digest:375834e73506e08a6210d0db8abb8da8173f770601cb4094a36b639973a82017"
+        ],
+        "stop_reason": "no_search_required",
+        "claim_boundary": "This receipt records optimizer run identity, retained candidates, and frontier refs for one bounded offline optimization run. It does not claim evaluation quality, search validity, or runtime promotion by itself.",
+        "receipt_digest": "a23d4cb1a0986fb7d81a30367b8ea52594726b68a09cc42bd2db3493194b39cc"
+      },
+      "frontier_snapshot": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.frontier_snapshot.v1",
+        "run_id": "compiled_agent.tool_policy.proof_run_v1",
+        "frontier_mode": "scalar",
+        "source_candidate_ids": [
+          "tool_policy_seed"
+        ],
+        "case_frontier": [
+          {
+            "case_id": "tool_policy_provider_only",
+            "winning_candidate_id": "tool_policy_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "tool_policy_unsupported_no_tools",
+            "winning_candidate_id": "tool_policy_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "tool_policy_wallet_only",
+            "winning_candidate_id": "tool_policy_seed",
+            "winning_scalar_score": 10000
+          }
+        ],
+        "objective_frontier": [
+          {
+            "objective_name": "module_pass_bps",
+            "winning_candidate_id": "tool_policy_seed",
+            "winning_score": 30000
+          },
+          {
+            "objective_name": "unsupported_bps",
+            "winning_candidate_id": "tool_policy_seed",
+            "winning_score": 10000
+          }
+        ],
+        "hybrid_candidate_ids": [
+          "tool_policy_seed"
+        ],
+        "snapshot_digest": "375834e73506e08a6210d0db8abb8da8173f770601cb4094a36b639973a82017"
+      },
+      "seed_candidate_id": "tool_policy_seed",
+      "selected_candidate_id": "tool_policy_seed",
+      "candidate_manifests": [
+        {
+          "schema_version": 1,
+          "candidate_id": "tool_policy_seed",
+          "family_id": "compiled_agent.tool_policy",
+          "originating_run_id": "compiled_agent.tool_policy.proof_run_v1",
+          "components": {
+            "provider_tool_names_json": "[\"provider_status\"]",
+            "unsupported_tool_names_json": "[]",
+            "wallet_tool_names_json": "[\"wallet_status\"]"
+          },
+          "manifest_digest": "b60bf1bbfedf15133e52c1275a16c37bf8a61e0e2fdbf6a4bad184ef9aec1393"
+        }
+      ],
+      "baseline_case_reports": [
+        {
+          "case_id": "tool_policy_provider_only",
+          "module": "tool_policy",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "provider_status",
+          "observed_summary": "provider_status",
+          "detail": "Provider route should expose only the provider-status tool."
+        },
+        {
+          "case_id": "tool_policy_wallet_only",
+          "module": "tool_policy",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "wallet_status",
+          "observed_summary": "wallet_status",
+          "detail": "Wallet route should expose only the wallet-status tool."
+        },
+        {
+          "case_id": "tool_policy_unsupported_no_tools",
+          "module": "tool_policy",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "",
+          "observed_summary": "",
+          "detail": "Unsupported route should expose no tools."
+        }
+      ],
+      "optimized_case_reports": [
+        {
+          "case_id": "tool_policy_provider_only",
+          "module": "tool_policy",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "provider_status",
+          "observed_summary": "provider_status",
+          "detail": "Provider route should expose only the provider-status tool."
+        },
+        {
+          "case_id": "tool_policy_unsupported_no_tools",
+          "module": "tool_policy",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "",
+          "observed_summary": "",
+          "detail": "Unsupported route should expose no tools."
+        },
+        {
+          "case_id": "tool_policy_wallet_only",
+          "module": "tool_policy",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "wallet_status",
+          "observed_summary": "wallet_status",
+          "detail": "Wallet route should expose only the wallet-status tool."
+        }
+      ],
+      "baseline_summary": {
+        "module": "tool_policy",
+        "total_cases": 3,
+        "passed_cases": 3,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "optimized_summary": {
+        "module": "tool_policy",
+        "total_cases": 3,
+        "passed_cases": 3,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "generated_from_refs": [
+        "crates/psionic-eval/src/compiled_agent_module_eval.rs"
+      ],
+      "detail": "Module family `tool_policy` runs on the fixed compiled-agent corpus with seed_pass=3/3 and selected_pass=3/3.",
+      "proof_digest": "5e8185dc9bff7200550d0febe2b23ce2431fd49d2d3e648c0e5057e462a2c79a"
+    },
+    {
+      "schema_version": 1,
+      "module": "tool_arguments",
+      "family_id": "compiled_agent.tool_arguments",
+      "run_spec": {
+        "schema_version": 1,
+        "run_id": "compiled_agent.tool_arguments.proof_run_v1",
+        "family_id": "compiled_agent.tool_arguments",
+        "dataset_refs": [
+          "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json"
+        ],
+        "issue_ref": "OpenAgentsInc/psionic#812",
+        "frontier_mode": "scalar",
+        "iteration_budget": 1,
+        "candidate_budget": 2,
+        "spec_digest": "7f89adafe24c2797db25a001949aaaf7d6e88addd54c5ed27bf767c819a0322c"
+      },
+      "run_receipt": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.run_receipt.v1",
+        "run_id": "compiled_agent.tool_arguments.proof_run_v1",
+        "family_id": "compiled_agent.tool_arguments",
+        "run_spec_digest": "7f89adafe24c2797db25a001949aaaf7d6e88addd54c5ed27bf767c819a0322c",
+        "lineage_state_digest": "f661e03deb52a9d6f54082caf9e185b27a029172503d05e715bad8e2967d296b",
+        "candidate_count": 1,
+        "retained_candidate_ids": [
+          "tool_arguments_seed"
+        ],
+        "frontier_snapshot_refs": [
+          "frontier_snapshot_digest:8cb03256cc70493bc7e3e0addf749fc19b9706323bcae50526dcf25ef230220b"
+        ],
+        "stop_reason": "no_search_required",
+        "claim_boundary": "This receipt records optimizer run identity, retained candidates, and frontier refs for one bounded offline optimization run. It does not claim evaluation quality, search validity, or runtime promotion by itself.",
+        "receipt_digest": "59bee4b110cd4f59e61131e251805b8256df06a69bc95d5eba6743f9b936660c"
+      },
+      "frontier_snapshot": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.frontier_snapshot.v1",
+        "run_id": "compiled_agent.tool_arguments.proof_run_v1",
+        "frontier_mode": "scalar",
+        "source_candidate_ids": [
+          "tool_arguments_seed"
+        ],
+        "case_frontier": [
+          {
+            "case_id": "tool_arguments_provider_empty_object",
+            "winning_candidate_id": "tool_arguments_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "tool_arguments_unsupported_emits_nothing",
+            "winning_candidate_id": "tool_arguments_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "tool_arguments_wallet_empty_object",
+            "winning_candidate_id": "tool_arguments_seed",
+            "winning_scalar_score": 10000
+          }
+        ],
+        "objective_frontier": [
+          {
+            "objective_name": "module_pass_bps",
+            "winning_candidate_id": "tool_arguments_seed",
+            "winning_score": 30000
+          },
+          {
+            "objective_name": "unsupported_bps",
+            "winning_candidate_id": "tool_arguments_seed",
+            "winning_score": 10000
+          }
+        ],
+        "hybrid_candidate_ids": [
+          "tool_arguments_seed"
+        ],
+        "snapshot_digest": "8cb03256cc70493bc7e3e0addf749fc19b9706323bcae50526dcf25ef230220b"
+      },
+      "seed_candidate_id": "tool_arguments_seed",
+      "selected_candidate_id": "tool_arguments_seed",
+      "candidate_manifests": [
+        {
+          "schema_version": 1,
+          "candidate_id": "tool_arguments_seed",
+          "family_id": "compiled_agent.tool_arguments",
+          "originating_run_id": "compiled_agent.tool_arguments.proof_run_v1",
+          "components": {
+            "default_arguments_json": "{}"
+          },
+          "manifest_digest": "4d9f4500cc7e324c140a850b86e254ad5d29506003b88fb9935c6c180adb82cb"
+        }
+      ],
+      "baseline_case_reports": [
+        {
+          "case_id": "tool_arguments_provider_empty_object",
+          "module": "tool_arguments",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "[{\"tool_name\":\"provider_status\",\"arguments\":{}}]",
+          "observed_summary": "[{\"tool_name\":\"provider_status\",\"arguments\":{}}]",
+          "detail": "No-arg provider tool should emit an empty argument object only."
+        },
+        {
+          "case_id": "tool_arguments_wallet_empty_object",
+          "module": "tool_arguments",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "[{\"tool_name\":\"wallet_status\",\"arguments\":{}}]",
+          "observed_summary": "[{\"tool_name\":\"wallet_status\",\"arguments\":{}}]",
+          "detail": "No-arg wallet tool should emit an empty argument object only."
+        },
+        {
+          "case_id": "tool_arguments_unsupported_emits_nothing",
+          "module": "tool_arguments",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "[]",
+          "observed_summary": "[]",
+          "detail": "No selected tools means no tool calls should be emitted."
+        }
+      ],
+      "optimized_case_reports": [
+        {
+          "case_id": "tool_arguments_provider_empty_object",
+          "module": "tool_arguments",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "[{\"tool_name\":\"provider_status\",\"arguments\":{}}]",
+          "observed_summary": "[{\"tool_name\":\"provider_status\",\"arguments\":{}}]",
+          "detail": "No-arg provider tool should emit an empty argument object only."
+        },
+        {
+          "case_id": "tool_arguments_unsupported_emits_nothing",
+          "module": "tool_arguments",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "[]",
+          "observed_summary": "[]",
+          "detail": "No selected tools means no tool calls should be emitted."
+        },
+        {
+          "case_id": "tool_arguments_wallet_empty_object",
+          "module": "tool_arguments",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "[{\"tool_name\":\"wallet_status\",\"arguments\":{}}]",
+          "observed_summary": "[{\"tool_name\":\"wallet_status\",\"arguments\":{}}]",
+          "detail": "No-arg wallet tool should emit an empty argument object only."
+        }
+      ],
+      "baseline_summary": {
+        "module": "tool_arguments",
+        "total_cases": 3,
+        "passed_cases": 3,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "optimized_summary": {
+        "module": "tool_arguments",
+        "total_cases": 3,
+        "passed_cases": 3,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "generated_from_refs": [
+        "crates/psionic-eval/src/compiled_agent_module_eval.rs"
+      ],
+      "detail": "Module family `tool_arguments` runs on the fixed compiled-agent corpus with seed_pass=3/3 and selected_pass=3/3.",
+      "proof_digest": "7e30c0217588dd7a33cd2cb4ef1cfd188b17db1352729024397cfc28dfce146d"
+    },
+    {
+      "schema_version": 1,
+      "module": "grounded_answer",
+      "family_id": "compiled_agent.grounded_answer",
+      "run_spec": {
+        "schema_version": 1,
+        "run_id": "compiled_agent.grounded_answer.proof_run_v1",
+        "family_id": "compiled_agent.grounded_answer",
+        "dataset_refs": [
+          "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json"
+        ],
+        "issue_ref": "OpenAgentsInc/psionic#812",
+        "frontier_mode": "scalar",
+        "iteration_budget": 1,
+        "candidate_budget": 3,
+        "spec_digest": "0afea09cf1692633683c3b4f29e1f80a73c31e4b2739a955c49e9169b0a8edba"
+      },
+      "run_receipt": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.run_receipt.v1",
+        "run_id": "compiled_agent.grounded_answer.proof_run_v1",
+        "family_id": "compiled_agent.grounded_answer",
+        "run_spec_digest": "0afea09cf1692633683c3b4f29e1f80a73c31e4b2739a955c49e9169b0a8edba",
+        "lineage_state_digest": "3d53044fa087d739549a47d55b691f1b92f7b4a98bcb4726f0436258f1c84b00",
+        "candidate_count": 2,
+        "retained_candidate_ids": [
+          "grounded_answer_fact_fallback"
+        ],
+        "frontier_snapshot_refs": [
+          "frontier_snapshot_digest:039daeba5bbfcfc2bd9ebcbcfe0f80a8b5269f9dc4569e722a60494346354a4a"
+        ],
+        "stop_reason": "iteration_budget_reached",
+        "claim_boundary": "This receipt records optimizer run identity, retained candidates, and frontier refs for one bounded offline optimization run. It does not claim evaluation quality, search validity, or runtime promotion by itself.",
+        "receipt_digest": "38ded9e6b01f1f20f81ea3bc183282ec02c866c848a19ead692d225fa2b23444"
+      },
+      "frontier_snapshot": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.frontier_snapshot.v1",
+        "run_id": "compiled_agent.grounded_answer.proof_run_v1",
+        "frontier_mode": "scalar",
+        "source_candidate_ids": [
+          "grounded_answer_fact_fallback",
+          "grounded_answer_seed"
+        ],
+        "case_frontier": [
+          {
+            "case_id": "grounded_provider_blocked",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "grounded_provider_missing_facts_fallback",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "grounded_provider_ready",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "grounded_unsupported_refusal",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "grounded_wallet_balance",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "grounded_wallet_conflicting_facts_fallback",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_scalar_score": 10000
+          }
+        ],
+        "objective_frontier": [
+          {
+            "objective_name": "module_pass_bps",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_score": 60000
+          },
+          {
+            "objective_name": "unsupported_bps",
+            "winning_candidate_id": "grounded_answer_fact_fallback",
+            "winning_score": 10000
+          }
+        ],
+        "hybrid_candidate_ids": [
+          "grounded_answer_fact_fallback"
+        ],
+        "snapshot_digest": "039daeba5bbfcfc2bd9ebcbcfe0f80a8b5269f9dc4569e722a60494346354a4a"
+      },
+      "seed_candidate_id": "grounded_answer_seed",
+      "selected_candidate_id": "grounded_answer_fact_fallback",
+      "candidate_manifests": [
+        {
+          "schema_version": 1,
+          "candidate_id": "grounded_answer_seed",
+          "family_id": "compiled_agent.grounded_answer",
+          "originating_run_id": "compiled_agent.grounded_answer.proof_run_v1",
+          "components": {
+            "conflicting_facts_template": "Grounded facts were conflicting.",
+            "include_provider_blockers": "false",
+            "include_recent_earnings": "false",
+            "missing_facts_template": "Grounded facts were unavailable.",
+            "strict_fact_fallback": "false",
+            "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+          },
+          "manifest_digest": "36c8bf30267bba5d198ebce314672faf6ecb53401aa7830a3b03f01bb572b839"
+        },
+        {
+          "schema_version": 1,
+          "candidate_id": "grounded_answer_fact_fallback",
+          "family_id": "compiled_agent.grounded_answer",
+          "originating_run_id": "compiled_agent.grounded_answer.proof_run_v1",
+          "components": {
+            "conflicting_facts_template": "Grounded facts were conflicting.",
+            "include_provider_blockers": "true",
+            "include_recent_earnings": "false",
+            "missing_facts_template": "Grounded facts were unavailable.",
+            "strict_fact_fallback": "true",
+            "unsupported_template": "I can currently answer only provider readiness and wallet balance questions."
+          },
+          "parent_candidate_ids": [
+            "grounded_answer_seed"
+          ],
+          "manifest_digest": "e43a21ebcdfbf1ec0c8f319957857bf8cff9922f5df2cf6f2dfdb42a5ead2d6c"
+        }
+      ],
+      "baseline_case_reports": [
+        {
+          "case_id": "grounded_provider_ready",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "ready, online",
+          "observed_summary": "Provider is ready to go online.",
+          "detail": "Provider grounded answer should reflect readiness from the returned facts."
+        },
+        {
+          "case_id": "grounded_provider_blocked",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "not ready",
+          "observed_summary": "Provider is not ready to go online.",
+          "detail": "Provider grounded answer should reflect blocked readiness even on the narrow baseline."
+        },
+        {
+          "case_id": "grounded_wallet_balance",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "1200, sats",
+          "observed_summary": "The wallet contains 1200 sats.",
+          "detail": "Wallet grounded answer should include the returned balance on the narrow baseline."
+        },
+        {
+          "case_id": "grounded_unsupported_refusal",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "provider, wallet",
+          "observed_summary": "I can currently answer only provider readiness and wallet balance questions.",
+          "detail": "Unsupported grounded-answer row should stay inside the narrow refusal template."
+        },
+        {
+          "case_id": "grounded_provider_missing_facts_fallback",
+          "module": "grounded_answer",
+          "pass": false,
+          "tags": [
+            "supported",
+            "provider",
+            "insufficient_facts"
+          ],
+          "expected_summary": "unavailable, facts",
+          "observed_summary": "Provider is not ready to go online.",
+          "failure_class": "grounding_miss",
+          "detail": "Grounded-answer candidate should fall back when provider facts are missing instead of silently converting missing facts into a blocked answer."
+        },
+        {
+          "case_id": "grounded_wallet_conflicting_facts_fallback",
+          "module": "grounded_answer",
+          "pass": false,
+          "tags": [
+            "supported",
+            "wallet",
+            "conflicting_facts"
+          ],
+          "expected_summary": "conflicting, facts",
+          "observed_summary": "The wallet contains 1200 sats.",
+          "failure_class": "grounding_miss",
+          "detail": "Grounded-answer candidate should fall back when wallet facts conflict instead of choosing one arbitrarily."
+        }
+      ],
+      "optimized_case_reports": [
+        {
+          "case_id": "grounded_provider_blocked",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "not ready",
+          "observed_summary": "Provider is not ready to go online. Blockers: identity_verification.",
+          "detail": "Provider grounded answer should reflect blocked readiness even on the narrow baseline."
+        },
+        {
+          "case_id": "grounded_provider_missing_facts_fallback",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider",
+            "insufficient_facts"
+          ],
+          "expected_summary": "unavailable, facts",
+          "observed_summary": "Grounded facts were unavailable.",
+          "detail": "Grounded-answer candidate should fall back when provider facts are missing instead of silently converting missing facts into a blocked answer."
+        },
+        {
+          "case_id": "grounded_provider_ready",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "ready, online",
+          "observed_summary": "Provider is ready to go online.",
+          "detail": "Provider grounded answer should reflect readiness from the returned facts."
+        },
+        {
+          "case_id": "grounded_unsupported_refusal",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "provider, wallet",
+          "observed_summary": "I can currently answer only provider readiness and wallet balance questions.",
+          "detail": "Unsupported grounded-answer row should stay inside the narrow refusal template."
+        },
+        {
+          "case_id": "grounded_wallet_balance",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "1200, sats",
+          "observed_summary": "The wallet contains 1200 sats.",
+          "detail": "Wallet grounded answer should include the returned balance on the narrow baseline."
+        },
+        {
+          "case_id": "grounded_wallet_conflicting_facts_fallback",
+          "module": "grounded_answer",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet",
+            "conflicting_facts"
+          ],
+          "expected_summary": "conflicting, facts",
+          "observed_summary": "Grounded facts were conflicting.",
+          "detail": "Grounded-answer candidate should fall back when wallet facts conflict instead of choosing one arbitrarily."
+        }
+      ],
+      "baseline_summary": {
+        "module": "grounded_answer",
+        "total_cases": 6,
+        "passed_cases": 4,
+        "failed_case_ids": [
+          "grounded_provider_missing_facts_fallback",
+          "grounded_wallet_conflicting_facts_fallback"
+        ],
+        "failure_classes": {
+          "grounding_miss": 2
+        }
+      },
+      "optimized_summary": {
+        "module": "grounded_answer",
+        "total_cases": 6,
+        "passed_cases": 6,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "generated_from_refs": [
+        "crates/psionic-eval/src/compiled_agent_module_eval.rs",
+        "crates/psionic-eval/src/compiled_agent_grounded_model.rs"
+      ],
+      "detail": "Module family `grounded_answer` runs on the fixed compiled-agent corpus with seed_pass=4/6 and selected_pass=6/6.",
+      "proof_digest": "aa251a79bda2838b107f6f9f73f038f6e325b9d8cf78c0292f8e29d063f474f8"
+    },
+    {
+      "schema_version": 1,
+      "module": "verify",
+      "family_id": "compiled_agent.verify",
+      "run_spec": {
+        "schema_version": 1,
+        "run_id": "compiled_agent.verify.proof_run_v1",
+        "family_id": "compiled_agent.verify",
+        "dataset_refs": [
+          "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json"
+        ],
+        "issue_ref": "OpenAgentsInc/psionic#812",
+        "frontier_mode": "scalar",
+        "iteration_budget": 1,
+        "candidate_budget": 2,
+        "spec_digest": "6dfb5f8a7661566113fc289e0deb3276b0487ca9baf97c55a91c4cd00ceedcfa"
+      },
+      "run_receipt": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.run_receipt.v1",
+        "run_id": "compiled_agent.verify.proof_run_v1",
+        "family_id": "compiled_agent.verify",
+        "run_spec_digest": "6dfb5f8a7661566113fc289e0deb3276b0487ca9baf97c55a91c4cd00ceedcfa",
+        "lineage_state_digest": "102d8618dc5680d777d791b442f6ce90b8e609b7696247289db94962eb3a0603",
+        "candidate_count": 1,
+        "retained_candidate_ids": [
+          "verify_seed"
+        ],
+        "frontier_snapshot_refs": [
+          "frontier_snapshot_digest:d21ffc4dd96e23ed6693c9acb2d9c39c950a7fd9cf40950a60e26db0a0827f8f"
+        ],
+        "stop_reason": "no_search_required",
+        "claim_boundary": "This receipt records optimizer run identity, retained candidates, and frontier refs for one bounded offline optimization run. It does not claim evaluation quality, search validity, or runtime promotion by itself.",
+        "receipt_digest": "45f0d6c64d4b0af2ad9bd816689dbf058d8054af201fc8273cedb031b355246a"
+      },
+      "frontier_snapshot": {
+        "schema_version": 1,
+        "report_id": "psionic.optimize.frontier_snapshot.v1",
+        "run_id": "compiled_agent.verify.proof_run_v1",
+        "frontier_mode": "scalar",
+        "source_candidate_ids": [
+          "verify_seed"
+        ],
+        "case_frontier": [
+          {
+            "case_id": "verify_provider_accept",
+            "winning_candidate_id": "verify_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "verify_unsupported_refusal_clean",
+            "winning_candidate_id": "verify_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "verify_unsupported_tool_leak",
+            "winning_candidate_id": "verify_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "verify_wallet_accept",
+            "winning_candidate_id": "verify_seed",
+            "winning_scalar_score": 10000
+          },
+          {
+            "case_id": "verify_wallet_missing_balance",
+            "winning_candidate_id": "verify_seed",
+            "winning_scalar_score": 10000
+          }
+        ],
+        "objective_frontier": [
+          {
+            "objective_name": "module_pass_bps",
+            "winning_candidate_id": "verify_seed",
+            "winning_score": 50000
+          },
+          {
+            "objective_name": "unsupported_bps",
+            "winning_candidate_id": "verify_seed",
+            "winning_score": 20000
+          }
+        ],
+        "hybrid_candidate_ids": [
+          "verify_seed"
+        ],
+        "snapshot_digest": "d21ffc4dd96e23ed6693c9acb2d9c39c950a7fd9cf40950a60e26db0a0827f8f"
+      },
+      "seed_candidate_id": "verify_seed",
+      "selected_candidate_id": "verify_seed",
+      "candidate_manifests": [
+        {
+          "schema_version": 1,
+          "candidate_id": "verify_seed",
+          "family_id": "compiled_agent.verify",
+          "originating_run_id": "compiled_agent.verify.proof_run_v1",
+          "components": {
+            "unsupported_template": "I can currently answer only provider readiness and wallet balance questions.",
+            "verify_require_recent_earnings": "false"
+          },
+          "manifest_digest": "47ea1c2257de63322980db2cd8026dcd4365b0c29157860acb64d656a2d21d56"
+        }
+      ],
+      "baseline_case_reports": [
+        {
+          "case_id": "verify_provider_accept",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "AcceptGroundedAnswer",
+          "observed_summary": "AcceptGroundedAnswer",
+          "detail": "Verify should accept a provider answer that reflects returned readiness."
+        },
+        {
+          "case_id": "verify_wallet_accept",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "AcceptGroundedAnswer",
+          "observed_summary": "AcceptGroundedAnswer",
+          "detail": "Verify should accept a wallet answer that reflects the returned balance."
+        },
+        {
+          "case_id": "verify_wallet_missing_balance",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet",
+            "failure"
+          ],
+          "expected_summary": "NeedsFallback",
+          "observed_summary": "NeedsFallback",
+          "detail": "Verify should reject wallet prose that omits the returned balance."
+        },
+        {
+          "case_id": "verify_unsupported_refusal_clean",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "UnsupportedRefusal",
+          "observed_summary": "UnsupportedRefusal",
+          "detail": "Verify should accept a clean unsupported refusal with no tool emission."
+        },
+        {
+          "case_id": "verify_unsupported_tool_leak",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "unsupported",
+            "tool_emission_is_not_success"
+          ],
+          "expected_summary": "NeedsFallback",
+          "observed_summary": "NeedsFallback",
+          "detail": "Tool emission alone is not success; unsupported route with tool leakage must still fail verification."
+        }
+      ],
+      "optimized_case_reports": [
+        {
+          "case_id": "verify_provider_accept",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "supported",
+            "provider"
+          ],
+          "expected_summary": "AcceptGroundedAnswer",
+          "observed_summary": "AcceptGroundedAnswer",
+          "detail": "Verify should accept a provider answer that reflects returned readiness."
+        },
+        {
+          "case_id": "verify_unsupported_refusal_clean",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "unsupported"
+          ],
+          "expected_summary": "UnsupportedRefusal",
+          "observed_summary": "UnsupportedRefusal",
+          "detail": "Verify should accept a clean unsupported refusal with no tool emission."
+        },
+        {
+          "case_id": "verify_unsupported_tool_leak",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "unsupported",
+            "tool_emission_is_not_success"
+          ],
+          "expected_summary": "NeedsFallback",
+          "observed_summary": "NeedsFallback",
+          "detail": "Tool emission alone is not success; unsupported route with tool leakage must still fail verification."
+        },
+        {
+          "case_id": "verify_wallet_accept",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet"
+          ],
+          "expected_summary": "AcceptGroundedAnswer",
+          "observed_summary": "AcceptGroundedAnswer",
+          "detail": "Verify should accept a wallet answer that reflects the returned balance."
+        },
+        {
+          "case_id": "verify_wallet_missing_balance",
+          "module": "verify",
+          "pass": true,
+          "tags": [
+            "supported",
+            "wallet",
+            "failure"
+          ],
+          "expected_summary": "NeedsFallback",
+          "observed_summary": "NeedsFallback",
+          "detail": "Verify should reject wallet prose that omits the returned balance."
+        }
+      ],
+      "baseline_summary": {
+        "module": "verify",
+        "total_cases": 5,
+        "passed_cases": 5,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "optimized_summary": {
+        "module": "verify",
+        "total_cases": 5,
+        "passed_cases": 5,
+        "failed_case_ids": [],
+        "failure_classes": {}
+      },
+      "generated_from_refs": [
+        "crates/psionic-eval/src/compiled_agent_module_eval.rs"
+      ],
+      "detail": "Module family `verify` runs on the fixed compiled-agent corpus with seed_pass=5/5 and selected_pass=5/5.",
+      "proof_digest": "b3ebbc049e26caa11f722a8dc392c10545124d21b4e420303e685c3179c4621f"
+    }
+  ],
+  "generated_from_refs": [
+    "fixtures/compiled_agent/compiled_agent_module_eval_report_v1.json",
+    "docs/COMPILED_AGENT_DEFAULT_ROW_REFERENCE.md",
+    "crates/psionic-eval/src/compiled_agent_module_eval.rs",
+    "crates/psionic-eval/src/compiled_agent_module_optimization_proof.rs"
+  ],
+  "summary": "Compiled-agent optimizer proof covers 5 bounded module families on one fixed corpus; 2 families improve over the baseline while the remaining families keep the seed candidate without cross-module coupling.",
+  "detail": "This proof report runs the Rust-native optimizer substrate independently over route, tool-policy, tool-argument, grounded-answer, and verify module families on the fixed compiled-agent module corpus. It preserves baseline and optimized case reports plus optimizer receipts, so the proof is bounded fixed-corpus closure rather than a held-out generalization claim.",
+  "report_digest": "66d45efff2fddb7712ca2ebd8f7c237efdaa083d8ffc189ddef4da1e1e49a31b"
+}

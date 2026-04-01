@@ -4210,6 +4210,7 @@ dependencies = [
  "psionic-ir",
  "psionic-models",
  "psionic-nn",
+ "psionic-optimize",
  "psionic-router",
  "psionic-runtime",
  "psionic-sandbox",
