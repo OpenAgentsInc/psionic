@@ -22,6 +22,9 @@ const BATCH_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_batch_receipt|";
 const FRONTIER_SNAPSHOT_PREFIX: &[u8] = b"psionic_optimize_frontier_snapshot|";
 const ITERATION_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_iteration_receipt|";
 const SEARCH_STATE_PREFIX: &[u8] = b"psionic_optimize_search_state|";
+const REFLECTIVE_DATASET_PREFIX: &[u8] = b"psionic_optimize_reflective_dataset|";
+const REFLECTION_PROMPT_PREFIX: &[u8] = b"psionic_optimize_reflection_prompt|";
+const PROPOSER_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_proposer_receipt|";
 const RUN_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_run_receipt|";
 
 /// Stable frontier mode identifier declared by one optimization run spec.
@@ -713,6 +716,173 @@ impl OptimizationFrontierSnapshot {
     }
 }
 
+/// One reflective dataset row derived from typed evaluation feedback.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationReflectiveDatasetRow {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Stable case digest.
+    pub case_digest: String,
+    /// Optional retained case label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_label: Option<String>,
+    /// Scalar score observed for the case.
+    pub scalar_score: i64,
+    /// Objective scores observed for the case.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub objective_scores: BTreeMap<String, i64>,
+    /// Shared typed evaluator feedback.
+    pub shared_feedback: OptimizationSharedFeedback,
+    /// Per-component typed feedback for the case.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub component_feedback: BTreeMap<String, OptimizationComponentFeedback>,
+}
+
+/// Reflective dataset built from one minibatch receipt plus retained case metadata.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationReflectiveDataset {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Parent candidate identifier.
+    pub candidate_id: String,
+    /// Source minibatch receipt digest.
+    pub source_batch_receipt_digest: String,
+    /// Selected components targeted by reflection.
+    pub selected_component_ids: Vec<String>,
+    /// Snapshot of selected component values before mutation.
+    pub current_component_values: BTreeMap<String, String>,
+    /// Ordered reflective dataset rows.
+    pub rows: Vec<OptimizationReflectiveDatasetRow>,
+    /// Stable digest over the reflective dataset payload.
+    pub dataset_digest: String,
+}
+
+impl OptimizationReflectiveDataset {
+    /// Returns the stable digest over the reflective dataset payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.dataset_digest.clear();
+        stable_digest(REFLECTIVE_DATASET_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.dataset_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Rendered reflection prompt for one selected candidate component.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationReflectionPrompt {
+    /// Stable component identifier under mutation.
+    pub component_id: String,
+    /// Prompt family or rendering mode.
+    pub prompt_kind: String,
+    /// Rendered prompt text.
+    pub prompt_text: String,
+    /// Prompt-local metadata.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+    /// Stable digest over the prompt payload.
+    pub prompt_digest: String,
+}
+
+impl OptimizationReflectionPrompt {
+    /// Returns the stable digest over the prompt payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.prompt_digest.clear();
+        stable_digest(REFLECTION_PROMPT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.prompt_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Component-level mutation diff proposed by one proposer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationComponentDiff {
+    /// Stable component identifier.
+    pub component_id: String,
+    /// Previous component value before mutation.
+    pub previous_value: String,
+    /// Proposed component value after mutation.
+    pub proposed_value: String,
+}
+
+/// Receipt for one proposer invocation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationProposerReceipt {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Proposer implementation identifier.
+    pub proposer_kind: String,
+    /// Parent candidate identifier.
+    pub parent_candidate_id: String,
+    /// Proposed candidate identifier.
+    pub proposed_candidate_id: String,
+    /// Source minibatch receipt digest.
+    pub source_batch_receipt_digest: String,
+    /// Optional reflective dataset digest when one was built.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reflective_dataset_digest: Option<String>,
+    /// Selected components inspected by the proposer.
+    pub selected_component_ids: Vec<String>,
+    /// Actual component diffs emitted by the proposer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub component_diffs: Vec<OptimizationComponentDiff>,
+    /// Rendered prompts used by the proposer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prompts: Vec<OptimizationReflectionPrompt>,
+    /// Extra proposer metadata.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, String>,
+    /// Stable digest over the proposer receipt payload.
+    pub receipt_digest: String,
+}
+
+impl OptimizationProposerReceipt {
+    /// Returns the stable digest over the proposer receipt payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.receipt_digest.clear();
+        stable_digest(PROPOSER_RECEIPT_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.receipt_digest = self.stable_digest();
+        self
+    }
+}
+
+/// Candidate proposal plus the receipt that explains how it was materialized.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCandidateProposal {
+    /// Proposed candidate manifest.
+    pub candidate: OptimizationCandidateManifest,
+    /// Proposer receipt for this mutation attempt.
+    pub proposer_receipt: OptimizationProposerReceipt,
+}
+
 /// Evaluator contract for one optimizer candidate family.
 pub trait OptimizationEvaluator {
     /// Evaluates one candidate across the supplied retained cases.
@@ -733,7 +903,475 @@ pub trait OptimizationCandidateProposer {
         state: &OptimizationSearchState,
         current_candidate: &OptimizationCandidateManifest,
         minibatch_receipt: &OptimizationBatchEvaluationReceipt,
-    ) -> Option<OptimizationCandidateManifest>;
+    ) -> Option<OptimizationCandidateProposal>;
+}
+
+/// Selects which candidate components should be targeted by reflection.
+pub trait OptimizationReflectionComponentSelector {
+    /// Returns the ordered component ids to inspect or mutate.
+    fn select_components(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+    ) -> Vec<String>;
+}
+
+/// Builds reflective datasets from typed evaluation feedback.
+pub trait OptimizationReflectiveDatasetBuilder {
+    /// Builds one reflective dataset scoped to the selected components.
+    fn build_dataset(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+        selected_component_ids: &[String],
+    ) -> OptimizationReflectiveDataset;
+}
+
+/// Renders component-scoped prompts from a reflective dataset.
+pub trait OptimizationReflectionPromptBuilder {
+    /// Builds one prompt per selected component.
+    fn build_prompts(
+        &mut self,
+        current_candidate: &OptimizationCandidateManifest,
+        reflective_dataset: &OptimizationReflectiveDataset,
+    ) -> Vec<OptimizationReflectionPrompt>;
+}
+
+/// Mutates selected component values from reflective datasets plus prompts.
+pub trait OptimizationMutationStrategy {
+    /// Returns proposed new values keyed by component id.
+    fn propose_component_values(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        reflective_dataset: &OptimizationReflectiveDataset,
+        prompts: &[OptimizationReflectionPrompt],
+    ) -> BTreeMap<String, String>;
+}
+
+/// Feedback-driven component selector that prefers components mentioned in typed feedback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationFeedbackComponentSelector {
+    /// Upper bound on selected components.
+    pub max_components: usize,
+    /// Whether to fall back to all candidate components when feedback is silent.
+    pub fallback_to_all_components: bool,
+}
+
+impl OptimizationFeedbackComponentSelector {
+    /// Creates a feedback-driven selector.
+    #[must_use]
+    pub fn new(max_components: usize, fallback_to_all_components: bool) -> Self {
+        Self {
+            max_components: max_components.max(1),
+            fallback_to_all_components,
+        }
+    }
+}
+
+impl OptimizationReflectionComponentSelector for OptimizationFeedbackComponentSelector {
+    fn select_components(
+        &mut self,
+        _state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+    ) -> Vec<String> {
+        let mut seen = BTreeSet::new();
+        let feedback_component_ids = minibatch_receipt
+            .case_receipts
+            .iter()
+            .flat_map(|receipt| receipt.component_feedback.keys().cloned())
+            .collect::<BTreeSet<_>>();
+        let mut selected = current_candidate
+            .components
+            .keys()
+            .filter(|component_id| feedback_component_ids.contains(*component_id))
+            .filter_map(|component_id| {
+                if seen.insert(component_id.clone()) {
+                    Some(component_id.clone())
+                } else {
+                    None
+                }
+            })
+            .take(self.max_components)
+            .collect::<Vec<_>>();
+        if selected.is_empty() && self.fallback_to_all_components {
+            selected = current_candidate
+                .components
+                .keys()
+                .take(self.max_components)
+                .cloned()
+                .collect();
+        }
+        selected
+    }
+}
+
+/// Builds a reflective dataset directly from typed batch feedback.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationTypedFeedbackDatasetBuilder;
+
+impl OptimizationReflectiveDatasetBuilder for OptimizationTypedFeedbackDatasetBuilder {
+    fn build_dataset(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+        selected_component_ids: &[String],
+    ) -> OptimizationReflectiveDataset {
+        let mut case_lookup = BTreeMap::new();
+        for case in state
+            .train_cases
+            .iter()
+            .chain(state.validation_cases.iter())
+            .cloned()
+        {
+            case_lookup.insert(case.case_id.clone(), case);
+        }
+
+        let rows = minibatch_receipt
+            .case_receipts
+            .iter()
+            .map(|receipt| OptimizationReflectiveDatasetRow {
+                case_id: receipt.case_id.clone(),
+                case_digest: receipt.case_digest.clone(),
+                case_label: case_lookup
+                    .get(receipt.case_id.as_str())
+                    .and_then(|case| case.label.clone()),
+                scalar_score: receipt.scalar_score,
+                objective_scores: receipt.objective_scores.clone(),
+                shared_feedback: receipt.shared_feedback.clone(),
+                component_feedback: receipt.component_feedback.clone(),
+            })
+            .collect::<Vec<_>>();
+        let current_component_values = selected_component_ids
+            .iter()
+            .filter_map(|component_id| {
+                current_candidate
+                    .components
+                    .get(component_id)
+                    .map(|value| (component_id.clone(), value.clone()))
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        OptimizationReflectiveDataset {
+            schema_version: 1,
+            report_id: String::from("psionic.optimize.reflective_dataset.v1"),
+            run_id: state.run_spec.run_id.clone(),
+            candidate_id: current_candidate.candidate_id.clone(),
+            source_batch_receipt_digest: minibatch_receipt.receipt_digest.clone(),
+            selected_component_ids: selected_component_ids.to_vec(),
+            current_component_values,
+            rows,
+            dataset_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+}
+
+/// Deterministic prompt renderer over one reflective dataset.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationDefaultReflectionPromptBuilder {
+    /// Maximum reflective rows to render for each component prompt.
+    pub max_rows_per_component: usize,
+}
+
+impl OptimizationDefaultReflectionPromptBuilder {
+    /// Creates a prompt builder with a bounded case-row budget.
+    #[must_use]
+    pub fn new(max_rows_per_component: usize) -> Self {
+        Self {
+            max_rows_per_component: max_rows_per_component.max(1),
+        }
+    }
+}
+
+impl OptimizationReflectionPromptBuilder for OptimizationDefaultReflectionPromptBuilder {
+    fn build_prompts(
+        &mut self,
+        current_candidate: &OptimizationCandidateManifest,
+        reflective_dataset: &OptimizationReflectiveDataset,
+    ) -> Vec<OptimizationReflectionPrompt> {
+        reflective_dataset
+            .selected_component_ids
+            .iter()
+            .map(|component_id| {
+                let filtered_rows = reflective_dataset
+                    .rows
+                    .iter()
+                    .filter(|row| row.component_feedback.contains_key(component_id))
+                    .take(self.max_rows_per_component)
+                    .collect::<Vec<_>>();
+                let rows = if filtered_rows.is_empty() {
+                    reflective_dataset
+                        .rows
+                        .iter()
+                        .take(self.max_rows_per_component)
+                        .collect::<Vec<_>>()
+                } else {
+                    filtered_rows
+                };
+                let mut prompt_text = format!(
+                    "Optimize component `{component_id}` for candidate `{}` in family `{}`.\nCurrent value:\n{}\n",
+                    current_candidate.candidate_id,
+                    current_candidate.family_id,
+                    current_candidate
+                        .components
+                        .get(component_id)
+                        .cloned()
+                        .unwrap_or_default()
+                );
+                for row in &rows {
+                    prompt_text.push_str(&format!(
+                        "\nCase `{}` label={:?} scalar_score={}\nShared feedback: {}\n",
+                        row.case_id, row.case_label, row.scalar_score, row.shared_feedback.summary
+                    ));
+                    if !row.shared_feedback.details.is_empty() {
+                        prompt_text.push_str("Shared details:\n");
+                        for detail in &row.shared_feedback.details {
+                            prompt_text.push_str(&format!("- {detail}\n"));
+                        }
+                    }
+                    if let Some(component_feedback) = row.component_feedback.get(component_id) {
+                        prompt_text.push_str(&format!(
+                            "Component feedback: {}\n",
+                            component_feedback.summary
+                        ));
+                        for detail in &component_feedback.details {
+                            prompt_text.push_str(&format!("- {detail}\n"));
+                        }
+                    }
+                }
+
+                OptimizationReflectionPrompt {
+                    component_id: component_id.clone(),
+                    prompt_kind: String::from("component_reflection_v1"),
+                    prompt_text,
+                    metadata: BTreeMap::from([
+                        (String::from("row_count"), rows.len().to_string()),
+                        (
+                            String::from("source_batch_receipt_digest"),
+                            reflective_dataset.source_batch_receipt_digest.clone(),
+                        ),
+                    ]),
+                    prompt_digest: String::new(),
+                }
+                .with_stable_digest()
+            })
+            .collect()
+    }
+}
+
+/// Manual mutation strategy with explicit component-value overrides.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationManualMutationStrategy {
+    /// Explicit proposed values keyed by component id.
+    pub proposed_values: BTreeMap<String, String>,
+}
+
+impl OptimizationMutationStrategy for OptimizationManualMutationStrategy {
+    fn propose_component_values(
+        &mut self,
+        _state: &OptimizationSearchState,
+        _current_candidate: &OptimizationCandidateManifest,
+        reflective_dataset: &OptimizationReflectiveDataset,
+        _prompts: &[OptimizationReflectionPrompt],
+    ) -> BTreeMap<String, String> {
+        reflective_dataset
+            .selected_component_ids
+            .iter()
+            .filter_map(|component_id| {
+                self.proposed_values
+                    .get(component_id)
+                    .map(|value| (component_id.clone(), value.clone()))
+            })
+            .collect()
+    }
+}
+
+/// Feedback-driven test-double mutation strategy that adopts the first case label.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCaseLabelMutationStrategy;
+
+impl OptimizationMutationStrategy for OptimizationCaseLabelMutationStrategy {
+    fn propose_component_values(
+        &mut self,
+        _state: &OptimizationSearchState,
+        _current_candidate: &OptimizationCandidateManifest,
+        reflective_dataset: &OptimizationReflectiveDataset,
+        _prompts: &[OptimizationReflectionPrompt],
+    ) -> BTreeMap<String, String> {
+        let first_label = reflective_dataset
+            .rows
+            .iter()
+            .find_map(|row| row.case_label.clone());
+        let Some(first_label) = first_label else {
+            return BTreeMap::new();
+        };
+        reflective_dataset
+            .selected_component_ids
+            .iter()
+            .map(|component_id| (component_id.clone(), first_label.clone()))
+            .collect()
+    }
+}
+
+/// Generic reflective mutation proposer over explicit component selectors and mutation strategies.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OptimizationReflectiveMutationProposer<S, D, P, M> {
+    /// Stable proposer identifier.
+    pub proposer_kind: String,
+    /// Candidate id prefix for newly materialized variants.
+    pub candidate_id_prefix: String,
+    /// Extra provenance refs to copy into proposed candidates.
+    pub provenance_refs: Vec<String>,
+    /// Component selector.
+    pub component_selector: S,
+    /// Dataset builder.
+    pub dataset_builder: D,
+    /// Prompt builder.
+    pub prompt_builder: P,
+    /// Mutation strategy.
+    pub mutation_strategy: M,
+}
+
+impl<S, D, P, M> OptimizationReflectiveMutationProposer<S, D, P, M> {
+    /// Creates a reflective proposer from explicit subcomponents.
+    #[must_use]
+    pub fn new(
+        proposer_kind: impl Into<String>,
+        candidate_id_prefix: impl Into<String>,
+        component_selector: S,
+        dataset_builder: D,
+        prompt_builder: P,
+        mutation_strategy: M,
+    ) -> Self {
+        Self {
+            proposer_kind: proposer_kind.into(),
+            candidate_id_prefix: candidate_id_prefix.into(),
+            provenance_refs: Vec::new(),
+            component_selector,
+            dataset_builder,
+            prompt_builder,
+            mutation_strategy,
+        }
+    }
+
+    /// Returns a copy with the given extra provenance refs.
+    #[must_use]
+    pub fn with_provenance_refs(mut self, provenance_refs: Vec<String>) -> Self {
+        self.provenance_refs = provenance_refs;
+        self
+    }
+}
+
+impl<S, D, P, M> OptimizationCandidateProposer
+    for OptimizationReflectiveMutationProposer<S, D, P, M>
+where
+    S: OptimizationReflectionComponentSelector,
+    D: OptimizationReflectiveDatasetBuilder,
+    P: OptimizationReflectionPromptBuilder,
+    M: OptimizationMutationStrategy,
+{
+    fn propose_candidate(
+        &mut self,
+        state: &OptimizationSearchState,
+        current_candidate: &OptimizationCandidateManifest,
+        minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+    ) -> Option<OptimizationCandidateProposal> {
+        let selected_component_ids =
+            self.component_selector
+                .select_components(state, current_candidate, minibatch_receipt);
+        if selected_component_ids.is_empty() {
+            return None;
+        }
+
+        let reflective_dataset = self.dataset_builder.build_dataset(
+            state,
+            current_candidate,
+            minibatch_receipt,
+            selected_component_ids.as_slice(),
+        );
+        let prompts = self
+            .prompt_builder
+            .build_prompts(current_candidate, &reflective_dataset);
+        let proposed_values = self.mutation_strategy.propose_component_values(
+            state,
+            current_candidate,
+            &reflective_dataset,
+            prompts.as_slice(),
+        );
+        let mut updated_components = current_candidate.components.clone();
+        let component_diffs = selected_component_ids
+            .iter()
+            .filter_map(|component_id| {
+                let previous_value = current_candidate.components.get(component_id)?.clone();
+                let proposed_value = proposed_values.get(component_id)?.clone();
+                if proposed_value == previous_value {
+                    return None;
+                }
+                updated_components.insert(component_id.clone(), proposed_value.clone());
+                Some(OptimizationComponentDiff {
+                    component_id: component_id.clone(),
+                    previous_value,
+                    proposed_value,
+                })
+            })
+            .collect::<Vec<_>>();
+        if component_diffs.is_empty() {
+            return None;
+        }
+
+        let next_candidate_id = format!(
+            "{}_{:04}",
+            self.candidate_id_prefix,
+            state.lineage_state.discovery_order.len() + 1
+        );
+        let mut provenance_refs = self.provenance_refs.clone();
+        provenance_refs.push(format!(
+            "reflective_dataset_digest:{}",
+            reflective_dataset.dataset_digest
+        ));
+        provenance_refs.push(format!(
+            "source_batch_receipt_digest:{}",
+            minibatch_receipt.receipt_digest
+        ));
+        provenance_refs.push(format!("proposer_kind:{}", self.proposer_kind));
+        let candidate = OptimizationCandidateManifest::new(
+            next_candidate_id.clone(),
+            current_candidate.family_id.clone(),
+            current_candidate.originating_run_id.clone(),
+            updated_components,
+        )
+        .with_parent_candidate_ids(vec![current_candidate.candidate_id.clone()])
+        .with_provenance_refs(provenance_refs);
+        let proposer_receipt = OptimizationProposerReceipt {
+            schema_version: 1,
+            report_id: String::from("psionic.optimize.proposer_receipt.v1"),
+            run_id: state.run_spec.run_id.clone(),
+            proposer_kind: self.proposer_kind.clone(),
+            parent_candidate_id: current_candidate.candidate_id.clone(),
+            proposed_candidate_id: next_candidate_id,
+            source_batch_receipt_digest: minibatch_receipt.receipt_digest.clone(),
+            reflective_dataset_digest: Some(reflective_dataset.dataset_digest.clone()),
+            selected_component_ids,
+            component_diffs,
+            prompts,
+            metadata: BTreeMap::from([(
+                String::from("source_candidate_manifest_digest"),
+                current_candidate.manifest_digest.clone(),
+            )]),
+            receipt_digest: String::new(),
+        }
+        .with_stable_digest();
+
+        Some(OptimizationCandidateProposal {
+            candidate,
+            proposer_receipt,
+        })
+    }
 }
 
 /// Minibatch sampler for train-time proposal gating.
@@ -794,6 +1432,8 @@ pub struct OptimizationIterationReceipt {
     pub current_candidate_id: String,
     /// Proposed candidate id.
     pub proposed_candidate_id: String,
+    /// Proposer receipt digest for the mutation attempt.
+    pub proposer_receipt_digest: String,
     /// Ordered minibatch case ids.
     pub minibatch_case_ids: Vec<String>,
     /// Baseline minibatch scalar score.
@@ -860,6 +1500,9 @@ pub struct OptimizationSearchState {
     /// Ordered iteration receipts emitted so far.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub iteration_receipts: Vec<OptimizationIterationReceipt>,
+    /// Ordered proposer receipts emitted so far.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub proposer_receipts: Vec<OptimizationProposerReceipt>,
     /// Current zero-based iteration count.
     pub current_iteration: u32,
     /// Total case evaluations across all batch receipts.
@@ -988,6 +1631,7 @@ impl OptimizationEngine {
             )]),
             latest_frontier_snapshot: Some(frontier_snapshot),
             iteration_receipts: Vec::new(),
+            proposer_receipts: Vec::new(),
             current_iteration: 0,
             total_case_evaluations: validation_case_count,
             accepted_proposal_count: 0,
@@ -1047,15 +1691,18 @@ impl OptimizationEngine {
                 minibatch_cases.as_slice(),
                 &mut state.evaluation_cache,
             );
-            let Some(proposed_candidate) =
+            let Some(proposal) =
                 proposer.propose_candidate(&state, &current_candidate, &current_batch)
             else {
                 break OptimizationStopReason::ProposalExhausted;
             };
+            let proposed_candidate = proposal.candidate;
+            let proposer_receipt = proposal.proposer_receipt;
 
             state
                 .lineage_state
                 .register_candidate(proposed_candidate.clone())?;
+            state.proposer_receipts.push(proposer_receipt.clone());
             let proposed_batch = evaluator.evaluate_candidate(
                 state.run_spec.run_id.as_str(),
                 &proposed_candidate,
@@ -1137,6 +1784,7 @@ impl OptimizationEngine {
                     iteration_index: state.current_iteration,
                     current_candidate_id: current_candidate.candidate_id.clone(),
                     proposed_candidate_id: proposed_candidate.candidate_id.clone(),
+                    proposer_receipt_digest: proposer_receipt.receipt_digest.clone(),
                     minibatch_case_ids: minibatch_cases
                         .iter()
                         .map(|case| case.case_id.clone())
@@ -1541,13 +2189,17 @@ mod tests {
 
     use super::{
         OptimizationBatchEvaluationReceipt, OptimizationCandidateManifest,
-        OptimizationCandidateProposer, OptimizationCaseEvaluationReceipt, OptimizationCaseManifest,
-        OptimizationCaseSplit, OptimizationComponentFeedback, OptimizationEngine,
+        OptimizationCandidateProposal, OptimizationCandidateProposer,
+        OptimizationCaseEvaluationReceipt, OptimizationCaseLabelMutationStrategy,
+        OptimizationCaseManifest, OptimizationCaseSplit, OptimizationComponentFeedback,
+        OptimizationDefaultReflectionPromptBuilder, OptimizationEngine,
         OptimizationEngineRunOutcome, OptimizationEvaluationCache, OptimizationEvaluator,
-        OptimizationFrontierMode, OptimizationFrontierSnapshot, OptimizationLineageState,
-        OptimizationLineageStateError, OptimizationRunReceipt, OptimizationRunSpec,
-        OptimizationSearchState, OptimizationSequentialMinibatchSampler,
-        OptimizationSharedFeedback, OptimizationStopReason,
+        OptimizationFeedbackComponentSelector, OptimizationFrontierMode,
+        OptimizationFrontierSnapshot, OptimizationLineageState, OptimizationLineageStateError,
+        OptimizationProposerReceipt, OptimizationReflectiveMutationProposer,
+        OptimizationRunReceipt, OptimizationRunSpec, OptimizationSearchState,
+        OptimizationSequentialMinibatchSampler, OptimizationSharedFeedback, OptimizationStopReason,
+        OptimizationTypedFeedbackDatasetBuilder,
     };
 
     fn route_components(route_name: &str) -> BTreeMap<String, String> {
@@ -1677,15 +2329,48 @@ mod tests {
     impl OptimizationCandidateProposer for SequenceProposer {
         fn propose_candidate(
             &mut self,
-            _state: &OptimizationSearchState,
-            _current_candidate: &OptimizationCandidateManifest,
-            _minibatch_receipt: &OptimizationBatchEvaluationReceipt,
-        ) -> Option<OptimizationCandidateManifest> {
-            if self.queued_candidates.is_empty() {
-                None
-            } else {
-                Some(self.queued_candidates.remove(0))
+            state: &OptimizationSearchState,
+            current_candidate: &OptimizationCandidateManifest,
+            minibatch_receipt: &OptimizationBatchEvaluationReceipt,
+        ) -> Option<OptimizationCandidateProposal> {
+            let candidate = self.queued_candidates.first().cloned()?;
+            self.queued_candidates.remove(0);
+            let component_diffs = candidate
+                .components
+                .iter()
+                .filter_map(|(component_id, proposed_value)| {
+                    let previous_value = current_candidate.components.get(component_id)?;
+                    if previous_value == proposed_value {
+                        None
+                    } else {
+                        Some(super::OptimizationComponentDiff {
+                            component_id: component_id.clone(),
+                            previous_value: previous_value.clone(),
+                            proposed_value: proposed_value.clone(),
+                        })
+                    }
+                })
+                .collect::<Vec<_>>();
+            let proposer_receipt = OptimizationProposerReceipt {
+                schema_version: 1,
+                report_id: String::from("psionic.optimize.proposer_receipt.v1"),
+                run_id: state.run_spec.run_id.clone(),
+                proposer_kind: String::from("sequence_test_double"),
+                parent_candidate_id: current_candidate.candidate_id.clone(),
+                proposed_candidate_id: candidate.candidate_id.clone(),
+                source_batch_receipt_digest: minibatch_receipt.receipt_digest.clone(),
+                reflective_dataset_digest: None,
+                selected_component_ids: candidate.components.keys().cloned().collect(),
+                component_diffs,
+                prompts: Vec::new(),
+                metadata: BTreeMap::new(),
+                receipt_digest: String::new(),
             }
+            .with_stable_digest();
+            Some(OptimizationCandidateProposal {
+                candidate,
+                proposer_receipt,
+            })
         }
     }
 
@@ -2037,6 +2722,7 @@ mod tests {
         assert_eq!(outcome.state.rejected_proposal_count, 0);
         assert_eq!(outcome.state.current_iteration, 1);
         assert_eq!(outcome.state.iteration_receipts.len(), 1);
+        assert_eq!(outcome.state.proposer_receipts.len(), 1);
         assert_eq!(
             outcome.state.lineage_state.retained_candidate_ids,
             vec![String::from("candidate_apply_patch")]
@@ -2044,6 +2730,10 @@ mod tests {
 
         let receipt = &outcome.state.iteration_receipts[0];
         assert!(receipt.accepted);
+        assert_eq!(
+            receipt.proposer_receipt_digest,
+            outcome.state.proposer_receipts[0].receipt_digest
+        );
         assert_eq!(receipt.current_minibatch_score, 0);
         assert_eq!(receipt.proposed_minibatch_score, 10_000);
         assert_eq!(receipt.retained_validation_score, Some(10_000));
@@ -2106,6 +2796,7 @@ mod tests {
         );
         assert_eq!(first_outcome.state.accepted_proposal_count, 1);
         assert_eq!(first_outcome.state.iteration_receipts.len(), 1);
+        assert_eq!(first_outcome.state.proposer_receipts.len(), 1);
 
         let temp = tempdir().expect("tempdir");
         let path = temp.path().join("optimizer_search_state.json");
@@ -2135,6 +2826,7 @@ mod tests {
         assert_eq!(state.accepted_proposal_count, 2);
         assert_eq!(state.rejected_proposal_count, 0);
         assert_eq!(state.iteration_receipts.len(), 2);
+        assert_eq!(state.proposer_receipts.len(), 2);
         assert_eq!(
             state.lineage_state.retained_candidate_ids,
             vec![
@@ -2154,5 +2846,87 @@ mod tests {
         );
         assert_eq!(run_receipt.stop_reason, OptimizationStopReason::Manual);
         assert_eq!(run_receipt.candidate_count, 3);
+    }
+
+    #[test]
+    fn reflective_mutation_proposer_builds_feedback_driven_candidate_and_receipt() {
+        let run_spec = OptimizationRunSpec::new("run_a", "probe.tool_route")
+            .with_iteration_budget(4)
+            .with_candidate_budget(4);
+        let seed_candidate = route_candidate("baseline", "read_file", Vec::new());
+        let train_cases = vec![train_route_case("train_apply_patch", "apply_patch")];
+        let validation_cases = vec![route_case("val_apply_patch", "apply_patch")];
+        let mut evaluator = DeterministicRouteEvaluator;
+        let state = OptimizationEngine::initialize(
+            run_spec,
+            seed_candidate,
+            train_cases,
+            validation_cases,
+            &mut evaluator,
+        )
+        .expect("initialize search state");
+        let mut proposer = OptimizationReflectiveMutationProposer::new(
+            "feedback_label_test_double",
+            "reflective_candidate",
+            OptimizationFeedbackComponentSelector::new(1, true),
+            OptimizationTypedFeedbackDatasetBuilder,
+            OptimizationDefaultReflectionPromptBuilder::new(4),
+            OptimizationCaseLabelMutationStrategy,
+        )
+        .with_provenance_refs(vec![String::from("issue:psionic#810")]);
+        let mut sampler = OptimizationSequentialMinibatchSampler::new(1);
+
+        let outcome =
+            OptimizationEngine::run(state, &mut evaluator, &mut proposer, &mut sampler, Some(1))
+                .expect("run optimizer");
+
+        assert_eq!(
+            outcome.state.current_candidate_id,
+            "reflective_candidate_0002"
+        );
+        assert_eq!(outcome.state.proposer_receipts.len(), 1);
+        let proposer_receipt = &outcome.state.proposer_receipts[0];
+        assert_eq!(proposer_receipt.proposer_kind, "feedback_label_test_double");
+        assert_eq!(
+            proposer_receipt.selected_component_ids,
+            vec![String::from("selected_tool")]
+        );
+        assert_eq!(proposer_receipt.component_diffs.len(), 1);
+        assert_eq!(
+            proposer_receipt.component_diffs[0].previous_value,
+            String::from("read_file")
+        );
+        assert_eq!(
+            proposer_receipt.component_diffs[0].proposed_value,
+            String::from("apply_patch")
+        );
+        assert_eq!(proposer_receipt.prompts.len(), 1);
+        assert!(
+            proposer_receipt.prompts[0]
+                .prompt_text
+                .contains("Component feedback:")
+        );
+
+        let iteration_receipt = &outcome.state.iteration_receipts[0];
+        assert_eq!(
+            iteration_receipt.proposer_receipt_digest,
+            proposer_receipt.receipt_digest
+        );
+
+        let proposed_candidate = outcome
+            .state
+            .lineage_state
+            .candidate("reflective_candidate_0002")
+            .expect("proposed candidate in lineage");
+        assert_eq!(
+            proposed_candidate.components.get("selected_tool"),
+            Some(&String::from("apply_patch"))
+        );
+        assert!(
+            proposed_candidate
+                .provenance_refs
+                .iter()
+                .any(|entry| entry.starts_with("reflective_dataset_digest:"))
+        );
     }
 }
