@@ -121,6 +121,14 @@ reproducibility, resource-accounting, and bounded-ablation work into one
 actual-lane contract instead of letting that work turn into a detached
 pedagogical stack.
 
+The repo now also owns a separate bounded full-port A1 reference-lane document
+in `docs/PSION_CS336_A1_REFERENCE_LANE.md`. The first landed tranche there is
+the real byte-level BPE train/runtime pair in
+`crates/psionic-data/src/cs336_a1_bpe.rs` and
+`crates/psionic-models/src/cs336_a1_tokenizer.rs`. That improves the earlier
+selective A1 posture, but it does not by itself mean the rest of Stanford A1 is
+already fully ported.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator

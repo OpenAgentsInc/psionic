@@ -77,3 +77,9 @@ This bundle closes that gap. The actual launcher now consumes it directly as
 one frozen contract ref, so the retained actual-lane manifests show that the
 bring-up trainer, tokenizer reproducibility binding, and bounded ablation
 family belong to the real lane instead of floating nearby as optional notes.
+
+As of 2026-04-02, the tokenizer reproducibility part of that bundle is now
+backed by a real bounded CS336 A1 byte-level BPE trainer/runtime pair in
+`crates/psionic-data/src/cs336_a1_bpe.rs` and
+`crates/psionic-models/src/cs336_a1_tokenizer.rs`. The rest of the full A1 port
+still remains separate follow-on work.

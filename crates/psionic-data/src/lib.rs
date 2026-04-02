@@ -8,6 +8,7 @@
 
 mod apple_adapter;
 mod apple_adapter_curation;
+mod cs336_a1_bpe;
 mod parameter_golf;
 mod psion_benchmark_isolation;
 mod psion_corpus_admission;
@@ -54,6 +55,7 @@ use thiserror::Error;
 
 pub use apple_adapter::*;
 pub use apple_adapter_curation::*;
+pub use cs336_a1_bpe::*;
 pub use parameter_golf::*;
 pub use psion_benchmark_isolation::*;
 pub use psion_corpus_admission::*;
