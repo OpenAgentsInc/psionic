@@ -1,0 +1,20 @@
+{
+  "schema_version": "psion.actual_pretraining_current_run_status.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t090100z",
+  "phase": "checkpoint_eval_retry_required",
+  "current_status_path": "status/current_run_status.json",
+  "retained_summary_path": "status/retained_summary.json",
+  "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+  "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
+  "latest_checkpoint_label": "broader-pretrain-final",
+  "last_completed_step": 16384,
+  "launcher_surfaces": {
+    "start_surface_id": "psion_actual_pretraining.start",
+    "dry_run_surface_id": "psion_actual_pretraining.dry_run",
+    "resume_surface_id": "psion_actual_pretraining.resume",
+    "status_surface_id": "psion_actual_pretraining.status"
+  },
+  "updated_at_utc": "2026-04-02T09:01:00Z",
+  "detail": "Alerted dashboard example keeps the accepted checkpoint but records that automatic checkpoint eval now needs retry."
+}

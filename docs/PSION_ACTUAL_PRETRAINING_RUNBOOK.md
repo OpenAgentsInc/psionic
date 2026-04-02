@@ -17,6 +17,7 @@ The commands are:
 ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
 ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
 ./TRAIN --lane actual_pretraining status --run-root <path>
+./TRAIN --lane actual_pretraining dashboard --run-root <path>
 ```
 
 `./TRAIN` without `--lane actual_pretraining` still means the bounded
@@ -45,13 +46,17 @@ The actual-lane command now does these things for real:
 - writes automatic checkpoint-eval decisions on accepted checkpoints
 - can retain checkpoint-eval retry receipts plus a redacted alert when the eval
   worker is unavailable
+- writes one retained dashboard packet plus one retained aggregate active-alert
+  feed
 - can inject a failed-upload refusal drill without manual artifact editing
 - repeats provenance into the provisional closeout bundle
 - exposes the canonical status command
+- exposes the canonical dashboard command
 
 It does not yet claim:
 
-- dashboards or alert routing
+- external alert delivery or paging
+- a cluster-connected streaming dashboard
 - completed distributed cluster execution
 
 Those come later in the roadmap. This launcher is the operator contract, not
@@ -95,6 +100,8 @@ The start path writes:
 - `preflight/hardware_qualification.json`
 - `preflight/run_shape_qualification.json`
 - `closeout/closeout_bundle.json`
+- `dashboard/current_dashboard.json`
+- `alerts/active_alerts.json`
 - `logs/launcher.log`
 
 Non-dry-run `start` now refuses when either preflight receipt lands with
@@ -129,6 +136,7 @@ checkpoint lineage. It writes:
 - `evals/checkpoint_eval_step-<optimizer_step>.json`
 - `evals/latest_checkpoint_eval_decision.json`
 - refreshed status, retained-summary, closeout, and launcher-log surfaces
+- refreshed retained dashboard and active-alert feed
 
 The default checkpoint byte count comes from the frozen systems bundle. The
 default checkpoint object digest is a stable synthetic digest over the accepted
@@ -165,6 +173,9 @@ Canonical durable-backup replay:
 This command rereads the current accepted pointer and checkpoint manifest and
 re-materializes the retained backup family plus
 `checkpoints/latest_accepted_checkpoint_backup_receipt.json`.
+It also refreshes the retained status, closeout, dashboard, and active-alert
+surfaces so backup refusal or success becomes operator-visible without reading
+raw receipts directly first.
 
 Failure-injection rehearsal:
 
@@ -229,6 +240,30 @@ the continuation stage has already run.
 If auto-resume cannot select a valid checkpoint, the command still retains an
 explicit `auto_resume_receipt.json` with `resolution_state = refused` and logs
 `phase=resume_refused_auto_resume` instead of leaving the run root ambiguous.
+
+## Dashboard Command
+
+```bash
+./TRAIN --lane actual_pretraining dashboard --run-root <path>
+```
+
+This is a thin wrapper over
+`scripts/psion-actual-pretraining-dashboard.sh`. It reads:
+
+- `dashboard/current_dashboard.json`
+- `alerts/active_alerts.json`
+
+and prints:
+
+- run id
+- phase
+- git provenance
+- throughput posture
+- loss and gradient visibility posture
+- checkpoint backup and eval posture
+- hardware health posture
+- active alert count plus the highest severity
+- one line per active alert when any alert is present
 
 ## Status Command
 

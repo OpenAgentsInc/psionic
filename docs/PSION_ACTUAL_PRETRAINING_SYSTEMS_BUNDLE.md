@@ -8,9 +8,10 @@ This document freezes the machine-readable systems authority for the canonical
 actual `Psion` pretraining lane.
 
 It does not claim that later hardware admission gates, durable backup
-automation, automatic eval triggers, or live dashboards are already done. It
-does bind one A2-shaped systems surface directly into the actual lane so later
-hardening issues consume a frozen baseline instead of ad hoc benchmarks.
+automation, automatic eval triggers, external alert delivery, or streaming
+telemetry are already done. It does bind one A2-shaped systems surface
+directly into the actual lane so later hardening issues consume a frozen
+baseline instead of ad hoc benchmarks.
 
 ## Canonical Artifacts
 
@@ -81,7 +82,7 @@ It does not yet claim:
 
 - automatic backup or auto-resume closure
 - automatic checkpoint eval triggering
-- dashboards or alert routing
+- external alert delivery or a cluster-connected streaming dashboard
 - a final end-to-end actual-lane rehearsal
 
 The launcher now does consume those preflight items through one retained

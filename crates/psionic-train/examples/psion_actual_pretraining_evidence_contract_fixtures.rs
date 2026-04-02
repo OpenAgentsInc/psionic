@@ -5,13 +5,13 @@ use std::{
 };
 
 use psionic_train::{
-    PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PsionActualPretrainingArtifactRef, PsionActualPretrainingArtifactSlot,
+    PsionActualPretrainingEvidenceContract, PsionActualPretrainingProvenanceField,
+    PsionActualPretrainingRedactionRule, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_EVIDENCE_FAMILY, PSION_ACTUAL_PRETRAINING_LANE_ID,
     PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RUN_ROOT_FAMILY,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
-    PsionActualPretrainingArtifactSlot, PsionActualPretrainingEvidenceContract,
-    PsionActualPretrainingProvenanceField, PsionActualPretrainingRedactionRule,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 use sha2::{Digest, Sha256};
 
@@ -140,6 +140,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "latest_checkpoint_eval_failure",
                 "durable",
                 "Most recent automatic checkpoint eval failure retained for retry and alert review.",
+            ),
+            slot(
+                "dashboard/current_dashboard.json",
+                "current_dashboard",
+                "durable",
+                "Canonical retained operator dashboard for the actual lane.",
+            ),
+            slot(
+                "alerts/active_alerts.json",
+                "active_alert_feed",
+                "durable",
+                "Canonical retained active-alert feed for the actual lane dashboard.",
             ),
             slot(
                 "exports/promoted_checkpoint_export_manifest.json",

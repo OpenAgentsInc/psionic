@@ -7,9 +7,9 @@
 This document freezes the machine-readable hardware qualification surface for
 the canonical actual `Psion` pretraining lane.
 
-It does not replace later live dashboards or long-run alerting. It does make
-one retained preflight receipt mandatory before non-dry-run start or resume can
-stage the actual lane.
+It does not replace later long-run streaming telemetry or external paging. It
+does make one retained preflight receipt mandatory before non-dry-run start or
+resume can stage the actual lane.
 
 ## Canonical Artifacts
 
@@ -90,7 +90,7 @@ It does not yet claim:
 
 - continuous live health monitoring during training
 - automatic device replacement or topology replanning
-- dashboard or alert fan-out
+- external alert delivery or a cluster-connected streaming dashboard
 - post-launch checkpoint backup or auto-eval closure
 
 The companion systems admission receipt now lives in

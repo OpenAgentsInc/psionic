@@ -16,12 +16,14 @@
     "auto_resume_receipt_path": "checkpoints/auto_resume_receipt.json",
     "latest_checkpoint_eval_decision_path": "evals/latest_checkpoint_eval_decision.json",
     "latest_checkpoint_eval_failure_path": "evals/latest_checkpoint_eval_failure.json",
+    "current_dashboard_path": "dashboard/current_dashboard.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
     "run_shape_qualification_path": "preflight/run_shape_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
     "closeout_bundle_path": "closeout/closeout_bundle.json",
     "launcher_log_path": "logs/launcher.log",
-    "latest_redacted_alert_path": "alerts/latest_redacted_alert.json"
+    "latest_redacted_alert_path": "alerts/latest_redacted_alert.json",
+    "active_alert_feed_path": "alerts/active_alerts.json"
   },
   "launcher_surfaces": {
     "start_surface_id": "psion_actual_pretraining.start",
@@ -38,12 +40,12 @@
   },
   "preflight_receipt": {
     "relative_path": "preflight/hardware_qualification.json",
-    "receipt_digest": "7057e7404885d675995cd700e40c00a4727e65600b13236be54af41589c0e610",
+    "receipt_digest": "87d80720f1e477371a2096fb551e5eca9d75489a88287e078a1416e44ec211f8",
     "admission_state": "admitted"
   },
   "run_shape_receipt": {
     "relative_path": "preflight/run_shape_qualification.json",
-    "receipt_digest": "0e42d8d9d4ed0c72f6e79f7640482247f5a89f8931ce7766f6519c8042a69231",
+    "receipt_digest": "46ba4d3d33e64aab333987de9e996969614683b1449b270c70e6316adc1ad490",
     "admission_state": "admitted"
   },
   "contract_refs": {
@@ -77,7 +79,7 @@
     },
     "evidence_contract": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json",
-      "sha256": "ad020160a577be7a61f0dd04cbabdf91ae87683d9f7c41f8568ae9cb9e4c93f1"
+      "sha256": "b982af6aee8b6ab935a4ad28f543ed271aae5b01e427a4c344ba34dddb6f661d"
     }
   },
   "selected_git_ref": "refs/heads/main",

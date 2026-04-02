@@ -173,9 +173,11 @@ impl PsionActualPretrainingEvidenceContract {
             "checkpoints/auto_resume_receipt.json",
             "evals/latest_checkpoint_eval_decision.json",
             "evals/latest_checkpoint_eval_failure.json",
+            "dashboard/current_dashboard.json",
             "preflight/hardware_qualification.json",
             "preflight/run_shape_qualification.json",
             "alerts/latest_redacted_alert.json",
+            "alerts/active_alerts.json",
             "closeout/closeout_bundle.json",
         ] {
             if !self

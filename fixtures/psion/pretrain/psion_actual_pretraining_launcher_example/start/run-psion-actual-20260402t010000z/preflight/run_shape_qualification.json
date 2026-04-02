@@ -25,7 +25,7 @@
   },
   "evidence_contract": {
     "path": "fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json",
-    "sha256": "ad020160a577be7a61f0dd04cbabdf91ae87683d9f7c41f8568ae9cb9e4c93f1"
+    "sha256": "b982af6aee8b6ab935a4ad28f543ed271aae5b01e427a4c344ba34dddb6f661d"
   },
   "required_dataset_identity": "psion_corpus_tokenized@v1",
   "required_horizon_steps": 16384,
@@ -70,5 +70,5 @@
   "refusal_reasons": [],
   "claim_boundary": "This retained run-shape qualification ties throughput, storage, and dataloader admission to the frozen actual-lane systems, data, and baseline-tools bundles. It does not claim that later backup, eval, or alert automation is already finished.",
   "detail": "Run-shape qualification consumes the frozen actual-lane throughput anchor `psion_actual_pretraining_trusted_cluster_anchor`, replay authority `psion_corpus_tokenized@v1`, and evidence family `psion.actual_pretraining.evidence.v1` before admitting a long run.",
-  "receipt_digest": "e6a568730c4e702e14e3c287449ac4a5129bb9627d5d717c4380135cb3660847"
+  "receipt_digest": "cb8b1c74655e0463add7231c2590f52d26243c589d5fb4053322035b20f62017"
 }

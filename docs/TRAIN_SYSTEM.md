@@ -193,6 +193,22 @@ latest-decision path, one retry-required failure path, and one redacted alert
 path so later continue-vs-restart work consumes one real operator receipt
 family instead of side reports.
 
+The repo now also owns the canonical actual-lane dashboard and active-alert
+feed in `crates/psionic-train/src/psion_actual_pretraining_dashboard.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_dashboard_fixtures.rs`,
+the operator helper `scripts/psion-actual-pretraining-dashboard.sh`, the
+focused doc `docs/PSION_ACTUAL_PRETRAINING_DASHBOARD_AND_ALERTS.md`, and the
+committed fixtures:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_dashboard_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_alert_feed_v1.json`
+
+That surface gives the actual lane one retained operator-owned visibility
+packet over run phase, git provenance, throughput posture, checkpoint posture,
+hardware health, and active alerts without pretending there is already a
+cluster-connected streaming dashboard or external paging system.
+
 The bounded `./TRAIN` operator path is now also explicitly separated from that
 actual-lane truth. It writes bounded reference-pilot artifacts under
 `psion_reference_pilot_runs/<run_id>` naming, uses
@@ -236,6 +252,7 @@ That surface gives the repo one real operator path for:
 - `./TRAIN --lane actual_pretraining backup --run-root <path>`
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
+- `./TRAIN --lane actual_pretraining dashboard --run-root <path>`
 
 It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty
@@ -243,6 +260,7 @@ working trees by default; retains the selected ref plus exact commit SHA; and
 repeats that provenance in the provisional closeout bundle. It now also
 records accepted checkpoint manifests, durable backup receipts, auto-resume
 receipts, automatic checkpoint-eval decisions, retry-required eval failures,
+the retained dashboard packet, the retained aggregate active-alert feed,
 redacted alerts, and stale/corrupt-pointer plus failed-upload drills without
 using destructive git commands or leaking raw secret payloads into retained
 artifacts.

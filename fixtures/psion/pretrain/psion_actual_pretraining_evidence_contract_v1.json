@@ -119,6 +119,18 @@
       "detail": "Most recent automatic checkpoint eval failure retained for retry and alert review."
     },
     {
+      "relative_path": "dashboard/current_dashboard.json",
+      "artifact_kind": "current_dashboard",
+      "retention_class": "durable",
+      "detail": "Canonical retained operator dashboard for the actual lane."
+    },
+    {
+      "relative_path": "alerts/active_alerts.json",
+      "artifact_kind": "active_alert_feed",
+      "retention_class": "durable",
+      "detail": "Canonical retained active-alert feed for the actual lane dashboard."
+    },
+    {
       "relative_path": "exports/promoted_checkpoint_export_manifest.json",
       "artifact_kind": "promoted_export_manifest",
       "retention_class": "durable",

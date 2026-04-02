@@ -7,9 +7,10 @@
 This document freezes the machine-readable run-shape qualification surface for
 the canonical actual `Psion` pretraining lane.
 
-It does not replace later backup, auto-eval, or alert automation. It does make
-one retained throughput/storage/dataloader receipt mandatory before non-dry-run
-start or resume can stage the actual lane.
+It does not replace later backup, auto-eval, external alert delivery, or
+streaming telemetry. It does make one retained throughput/storage/dataloader
+receipt mandatory before non-dry-run start or resume can stage the actual
+lane.
 
 ## Canonical Artifacts
 
@@ -92,5 +93,5 @@ It does not yet claim:
 
 - durable checkpoint backup or auto-resume closure
 - automatic checkpoint eval triggering
-- live dashboards or alert fan-out
+- external alert delivery or a cluster-connected streaming dashboard
 - completed distributed cluster execution

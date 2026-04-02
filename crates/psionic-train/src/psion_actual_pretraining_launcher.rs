@@ -47,6 +47,8 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub latest_checkpoint_eval_decision_path: String,
     /// Relative latest checkpoint eval failure path.
     pub latest_checkpoint_eval_failure_path: String,
+    /// Relative retained dashboard path.
+    pub current_dashboard_path: String,
     /// Relative hardware-qualification receipt path.
     pub hardware_qualification_path: String,
     /// Relative run-shape qualification receipt path.
@@ -59,6 +61,8 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub launcher_log_path: String,
     /// Relative latest redacted alert path.
     pub latest_redacted_alert_path: String,
+    /// Relative active-alert feed path.
+    pub active_alert_feed_path: String,
 }
 
 /// Run-local preflight receipt reference consumed by the actual-lane launcher.
@@ -314,6 +318,11 @@ impl PsionActualPretrainingRetainedPathSet {
             "evals/latest_checkpoint_eval_failure.json",
         )?;
         ensure_exact(
+            self.current_dashboard_path.as_str(),
+            "retained_paths.current_dashboard_path",
+            "dashboard/current_dashboard.json",
+        )?;
+        ensure_exact(
             self.hardware_qualification_path.as_str(),
             "retained_paths.hardware_qualification_path",
             "preflight/hardware_qualification.json",
@@ -342,6 +351,11 @@ impl PsionActualPretrainingRetainedPathSet {
             self.latest_redacted_alert_path.as_str(),
             "retained_paths.latest_redacted_alert_path",
             "alerts/latest_redacted_alert.json",
+        )?;
+        ensure_exact(
+            self.active_alert_feed_path.as_str(),
+            "retained_paths.active_alert_feed_path",
+            "alerts/active_alerts.json",
         )?;
         Ok(())
     }

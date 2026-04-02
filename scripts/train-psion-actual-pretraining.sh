@@ -11,6 +11,7 @@ Usage:
   ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
   ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
   ./TRAIN --lane actual_pretraining status --run-root <path>
+  ./TRAIN --lane actual_pretraining dashboard --run-root <path>
 
 Options for `start`:
   --run-id <id>            Stable run identifier.
@@ -53,6 +54,9 @@ Options for `backup`:
   --git-ref <ref>          Git ref to resolve for the backup provenance. Default: current symbolic ref or HEAD
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --inject-failed-upload   Retain a failed-upload drill receipt instead of a successful durable-backup receipt.
+
+Options for `status` and `dashboard`:
+  --run-root <path>        Existing actual-lane run root containing retained status and dashboard surfaces.
 EOF
 }
 
@@ -70,6 +74,9 @@ case "${command}" in
     ;;
   status)
     exec "${script_dir}/psion-actual-pretraining-status.sh" "$@"
+    ;;
+  dashboard)
+    exec "${script_dir}/psion-actual-pretraining-dashboard.sh" "$@"
     ;;
   --help|-h|help)
     usage

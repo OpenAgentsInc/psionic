@@ -19,6 +19,9 @@ same status command reads them back from a run root.
   regenerates the committed fixtures and example run-root tree.
 - `scripts/psion-actual-pretraining-status.sh` is the canonical operator
   status command for reading those retained files from a run root.
+- `scripts/psion-actual-pretraining-dashboard.sh` is the canonical operator
+  dashboard reader for the retained observability packet written beside the
+  status files.
 - `fixtures/psion/pretrain/psion_actual_pretraining_current_run_status_v1.json`
   is the canonical current-status fixture.
 - `fixtures/psion/pretrain/psion_actual_pretraining_retained_summary_v1.json`
@@ -101,4 +104,5 @@ checkpoint-eval decision and score when present, plus the latest retry-required
 failure and redacted alert when automatic eval could not run.
 
 The remaining hardening work now extends these retained surfaces instead of
-defining them.
+defining them. The companion retained dashboard and active-alert feed now live
+in `docs/PSION_ACTUAL_PRETRAINING_DASHBOARD_AND_ALERTS.md`.

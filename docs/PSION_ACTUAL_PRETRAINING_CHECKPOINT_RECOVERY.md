@@ -57,6 +57,8 @@ It also updates:
 
 - `status/current_run_status.json`
 - `status/retained_summary.json`
+- `dashboard/current_dashboard.json`
+- `alerts/active_alerts.json`
 - `closeout/closeout_bundle.json`
 - `logs/launcher.log`
 
@@ -155,7 +157,8 @@ This surface now proves:
 
 It still does not prove:
 
-- dashboard or alert routing
+- external alert delivery or paging
+- a cluster-connected streaming dashboard
 - final continue-vs-restart policy
 - completed cluster-scale broader-pretraining execution
 

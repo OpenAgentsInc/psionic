@@ -67,7 +67,8 @@ If the automatic eval worker is unavailable, it writes:
 - `alerts/latest_redacted_alert.json`
 
 The current status command also prints the latest eval decision or failure and
-latest alert when those retained files exist.
+latest alert when those retained files exist. The retained dashboard and
+active-alert feed also consume those files directly.
 
 ## Decision Output
 
@@ -122,8 +123,8 @@ This surface now proves:
 
 It does not yet prove:
 
-- live dashboard fan-out
-- alert delivery beyond the retained alert artifact
+- external alert delivery beyond the retained alert artifacts
+- a cluster-connected streaming dashboard
 - the final continue-vs-restart policy packet
 - completed distributed broader-pretraining execution
 

@@ -5,21 +5,10 @@ use std::{
 };
 
 use psionic_train::{
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
-    PSION_ACTUAL_PRETRAINING_LANE_ID,
-    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
-    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
-    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
+    build_psion_actual_pretraining_dashboard_packet,
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    record_psion_actual_pretraining_continuation_handoff, PsionActualPretrainingArtifactRef,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointPointer,
     PsionActualPretrainingCloseoutBundle, PsionActualPretrainingContinuationHandoff,
     PsionActualPretrainingCredentialBinding, PsionActualPretrainingCurrentRunStatus,
@@ -32,9 +21,23 @@ use psionic_train::{
     PsionActualPretrainingRunShapeObservation, PsionActualPretrainingRunShapeQualification,
     PsionActualPretrainingScalingBundle, PsionActualPretrainingSystemsBundle,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    derive_psion_actual_pretraining_hardware_qualification,
-    derive_psion_actual_pretraining_run_shape_qualification,
-    record_psion_actual_pretraining_continuation_handoff,
+    PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
+    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
+    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 use sha2::{Digest, Sha256};
 
@@ -488,6 +491,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .join(launch_run_id),
         &launch_hardware_qualification,
         &launch_run_shape_qualification,
+        &systems_bundle,
         Some(&launch_manifest),
         None,
         &launch_status,
@@ -504,6 +508,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .join(resume_run_id),
         &resume_hardware_qualification,
         &resume_run_shape_qualification,
+        &systems_bundle,
         None,
         Some(&resume_manifest),
         &resume_status,
@@ -559,6 +564,7 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         latest_checkpoint_eval_failure_path: String::from(
             PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
         ),
+        current_dashboard_path: String::from(PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH),
         hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
         run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
         continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
@@ -567,6 +573,7 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         latest_redacted_alert_path: String::from(
             PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
         ),
+        active_alert_feed_path: String::from(PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH),
     }
 }
 
@@ -679,6 +686,7 @@ fn write_run_root(
     run_root: &Path,
     hardware_qualification: &psionic_train::PsionActualPretrainingHardwareQualification,
     run_shape_qualification: &PsionActualPretrainingRunShapeQualification,
+    systems_bundle: &PsionActualPretrainingSystemsBundle,
     launch_manifest: Option<&PsionActualPretrainingLaunchManifest>,
     resume_manifest: Option<&PsionActualPretrainingResumeManifest>,
     current_status: &PsionActualPretrainingCurrentRunStatus,
@@ -693,8 +701,10 @@ fn write_run_root(
     fs::create_dir_all(run_root.join("checkpoints"))?;
     fs::create_dir_all(run_root.join("preflight"))?;
     fs::create_dir_all(run_root.join("continuation"))?;
+    fs::create_dir_all(run_root.join("dashboard"))?;
     fs::create_dir_all(run_root.join("closeout"))?;
     fs::create_dir_all(run_root.join("logs"))?;
+    fs::create_dir_all(run_root.join("alerts"))?;
     if let Some(launch_manifest) = launch_manifest {
         fs::write(
             run_root.join("manifests/launch_manifest.json"),
@@ -726,6 +736,26 @@ fn write_run_root(
     fs::write(
         run_root.join("preflight/run_shape_qualification.json"),
         serde_json::to_string_pretty(run_shape_qualification)?,
+    )?;
+    let (dashboard, alert_feed) = build_psion_actual_pretraining_dashboard_packet(
+        current_status,
+        retained_summary,
+        checkpoint_pointer,
+        hardware_qualification,
+        run_shape_qualification,
+        systems_bundle,
+        None,
+        None,
+        None,
+        None,
+    )?;
+    fs::write(
+        run_root.join(PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH),
+        serde_json::to_string_pretty(&dashboard)?,
+    )?;
+    fs::write(
+        run_root.join(PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH),
+        serde_json::to_string_pretty(&alert_feed)?,
     )?;
     if let Some(continuation_handoff) = continuation_handoff {
         fs::write(

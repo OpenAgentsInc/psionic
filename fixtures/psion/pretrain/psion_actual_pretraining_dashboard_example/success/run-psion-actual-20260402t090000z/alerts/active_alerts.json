@@ -1,0 +1,9 @@
+{
+  "schema_version": "psion.actual_pretraining_alert_feed.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t090000z",
+  "alert_feed_path": "alerts/active_alerts.json",
+  "active_alerts": [],
+  "summary": "Retained alert feed keeps the actual-lane operator response surface explicit without copying raw secret payloads into dashboards or alerts.",
+  "alert_feed_digest": "3bc4bf2bdb38e0ea07dbcf077e6164e21796d26f6049623159addd618c149cc1"
+}

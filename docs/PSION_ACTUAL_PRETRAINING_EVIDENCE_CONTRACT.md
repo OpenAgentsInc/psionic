@@ -7,8 +7,8 @@
 This document freezes one operator-owned output and evidence family for the
 canonical actual pretraining lane.
 
-It does not implement dashboards or final closeout by itself. It does fix the
-layout and naming that backup, auto-resume, automatic checkpoint evaluation,
+It does not implement final closeout by itself. It does fix the layout and
+naming that backup, auto-resume, automatic checkpoint evaluation, dashboards,
 alerts, and later closeout work must reuse.
 
 ## Canonical Artifacts
@@ -51,6 +51,8 @@ psion_actual_pretraining_runs/<run_id>/
   status/
     current_run_status.json
     retained_summary.json
+  dashboard/
+    current_dashboard.json
   checkpoints/
     latest_accepted_checkpoint_pointer.json
     latest_accepted_checkpoint_backup_receipt.json
@@ -77,6 +79,7 @@ psion_actual_pretraining_runs/<run_id>/
   logs/
     launcher.log
   alerts/
+    active_alerts.json
     latest_redacted_alert.json
   closeout/
     closeout_bundle.json
@@ -146,9 +149,10 @@ hardware qualification receipt, retained run-shape qualification receipt,
 retained status surfaces, canonical checkpoint pointer, checkpoint manifest,
 checkpoint backup receipt, auto-resume receipt, failure-drill receipts,
 automatic checkpoint-eval decision receipts, checkpoint-eval retry receipts,
-the latest redacted alert, launcher log, and a provisional closeout bundle
-that repeats git provenance early. Resume over an accepted checkpoint also
-writes the retained continuation handoff at
+the retained dashboard packet, the retained aggregate active-alert feed, the
+latest redacted alert, launcher log, and a provisional closeout bundle that
+repeats git provenance early. Resume over an accepted checkpoint also writes
+the retained continuation handoff at
 `continuation/accepted_checkpoint_handoff.json`, which binds that accepted
 checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
 Later hardening issues extend the same retained family instead of replacing it.
