@@ -77,8 +77,10 @@ After issues `#861` through `#863`, the repo now has the first honest
   prompt, KV-cache, and decode loop instead of routing through `llama.cpp`.
 - the generic OpenAI-compatible server now admits `Gemma 4` on CUDA with
   `backend = cuda`, `execution_mode = native`, and
-  `execution_engine = psionic`, but the bounded `#862` surface is still
-  chat-only on `/v1/chat/completions`.
+  `execution_engine = psionic`, and the bounded lane now stamps both
+  `x-psionic-backend` and `x-psionic-served-backend` as machine-checkable
+  backend labels, but the bounded `#862` surface is still chat-only on
+  `/v1/chat/completions`.
 - the repo now has bounded prompt-render, health/model publication, and
   refusal coverage for the `Gemma 4` CUDA lane, including explicit fail-closed
   checks for tools, structured outputs, multimodal inputs, and

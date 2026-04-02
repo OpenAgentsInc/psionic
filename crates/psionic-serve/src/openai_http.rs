@@ -4284,6 +4284,10 @@ fn insert_execution_headers(headers: &mut HeaderMap, state: &GptOssOpenAiCompatS
         HeaderValue::from_static(state.backend_label),
     );
     headers.insert(
+        HeaderName::from_static("x-psionic-served-backend"),
+        HeaderValue::from_static(state.backend_label),
+    );
+    headers.insert(
         HeaderName::from_static("x-psionic-execution-mode"),
         HeaderValue::from_static(state.execution_mode_label),
     );
@@ -4823,6 +4827,10 @@ fn insert_generic_execution_headers(
 ) {
     headers.insert(
         HeaderName::from_static("x-psionic-backend"),
+        HeaderValue::from_static(loaded_model.backend_label()),
+    );
+    headers.insert(
+        HeaderName::from_static("x-psionic-served-backend"),
         HeaderValue::from_static(loaded_model.backend_label()),
     );
     headers.insert(

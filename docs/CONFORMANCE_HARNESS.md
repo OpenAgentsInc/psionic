@@ -153,7 +153,9 @@ PSIONIC_GEMMA4_PILOT_GGUF_PATH=/abs/path/to/gemma4-e4b-ollama.gguf \
 That test skips cleanly when the pilot GGUF or a CUDA backend is unavailable,
 and the same lane now guards the whole-model KV-cache geometry plus the mixed
 per-layer attention widths that a real multi-layer `gemma4:e4b` artifact
-requires.
+requires. The repeat lane also machine-checks backend publication via the
+response headers, with `x-psionic-backend` as the canonical header and
+`x-psionic-served-backend` kept as a matching compatibility alias.
 
 ## Controlled Local Validation
 
