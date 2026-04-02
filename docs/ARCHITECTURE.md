@@ -2742,6 +2742,7 @@ Phase 0 through Phase 9D are now tracked in
 | Train recovery substrate | `implemented_early` | checkpoint, live-recovery, elastic-membership session truth, explicit checkpoint manifests or pointers, and restore receipts exist in `psionic-train` |
 | Training run graph | `implemented_early` | `psionic-train` now owns typed training runs, stage-program identity, contributor-set revisions, topology revisions, participant lifecycle, and window transitions |
 | Training orchestrator | `implemented_early` | `psionic-train` now owns typed window-control, assignment-posture, rollout-assignment refs, rollout-admission receipts, bounded off-policy freshness budgets, rollout-worker heartbeats, claims, upload receipts, curriculum receipts, instability verdicts, and trainer-batch assembly requests over the run graph |
+| Live RL run service | `implemented_early` | `psionic-train` now also owns a bounded durable `LiveRlRunService` above the run graph, orchestrator, worker protocol, and validator state, with persistent run snapshots, current status or per-window artifacts, graceful drain/stop semantics, and restart recovery from a service-owned filesystem root |
 | Training sampler service | `implemented_early` | `psionic-train` now also owns the first bounded trainer-integrated sampler service over the repo-owned open-adapter lane, with active revision status, synchronous completions/chat/logprob request surfaces, explicit hot-swap to newer promoted revisions, and fail-closed stale-revision refusal instead of treating training and serving as disconnected systems |
 | Live RL update bridge | `implemented_early` | `psionic-train` now also owns a bounded live RL bridge over the same open-adapter lane, joining orchestrator batches to admitted rollout receipts plus prompt-side sequence inputs, materializing prompt/completion boundaries and live logprobs into typed token records, and emitting one promoted served revision instead of leaving trainer updates as disconnected toy batches |
 | Adapter lineage | `implemented_early` | adapter identity, packaging, and hosted binding lineage exist in `psionic-adapters` |
@@ -2997,6 +2998,8 @@ training subsystems.
 | `ProviderSandboxExecutionReceipt` | `psionic-sandbox` | receipt for one bounded sandbox run | `implemented` |
 | `TrainingRun` | `psionic-train` | root identity, participant graph, and lifecycle state for one training program | `implemented_early` |
 | `TrainingWindow` | `psionic-train` | one synchronized contribution or trainer interval with contributor-set and transition state | `implemented_early` |
+| `LiveRlRunStatusArtifact` | `psionic-train` | durable operator-facing run-status artifact for one live RL run | `implemented_early` |
+| `LiveRlWindowStatusArtifact` | `psionic-train` | durable operator-facing window-status artifact for one live RL run window | `implemented_early` |
 | `TrainingSchedulerBinding` | `psionic-train` | typed scheduler config plus mutable per-group scheduler state for optimizer-step resolution | `implemented` |
 | `TrainerBatchAssemblyRequest` | `psionic-train` | lightweight control-plane request for one trainer batch over rollout refs | `implemented_early` |
 | `RolloutTaskClaim` | `psionic-train` | deterministic task-claim contract for one rollout assignment under one worker heartbeat | `implemented_early` |

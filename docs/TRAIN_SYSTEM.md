@@ -2307,6 +2307,7 @@ shape already includes at least:
 | Training core | `implemented_early` | `psionic-train` now has a typed fixed-budget trainer-step loop, `psionic-ir` now provides reusable reverse-mode autodiff plus explicit detach/training-mode gradient semantics beneath it, the repo-owned Apple adapter execution backend now turns packed Apple dataset batches into adapter-only gradient batches for that loop, the first higher-level Apple SFT lane closes the path through typed training summary plus `.fmadapter` export, and an explicitly separate optional Apple draft-model distillation lane now emits paired draft payloads plus latency or acceptance metadata; the crate also now owns a first non-Apple open adapter backend for `gpt_oss.decoder_lm_head_lora`, producing loadable LM-head LoRA `safetensors` artifacts from bounded hidden-state supervision under the same fixed-budget core; parameter-group scaling semantics, scheduler bindings, optimizer state/residency, step telemetry, model-IO roundtrip, and checkpoint restore lineage remain explicit over gradient batches |
 | Training run graph | `implemented_early` | `psionic-train` now owns typed runs, contributor-set revisions, topology revisions, persistent participant ranking, heartbeats, departures, and window transitions |
 | Orchestrator | `implemented_early` | `psionic-train` now owns typed window-control, assignment posture, rollout-assignment refs, rollout-admission receipts, bounded off-policy freshness budgets, rollout-worker heartbeats, claims, upload receipts, and trainer-batch assembly requests over the run graph |
+| Live RL run service | `implemented_early` | `psionic-train` now also owns a bounded durable `LiveRlRunService` above the run graph, orchestrator, worker protocol, and validator state, with persistent run snapshots, current status or per-window artifacts, graceful draining or stop semantics, and restart recovery through a service-owned filesystem root |
 | Training sampler service | `implemented_early` | `psionic-train` now owns the first bounded `TrainingSamplerService` above the repo-owned open-adapter lane, with health/readiness inspection, active policy revision status, completions/chat/logprob request surfaces, explicit hot-swap to newer promoted revisions, optional checkpoint and weight-broadcast identity in refresh/status, and fail-closed stale-revision refusal |
 | Live RL update bridge | `implemented_early` | `psionic-train` now also owns a bounded `OpenAdapterLiveRlUpdateExecutor` that joins orchestrator batches to accepted rollout receipts plus prompt-side sequence inputs, preserves prompt/completion boundaries and per-token observed-versus-live logprobs, carries reward/advantage plus optional chosen-token teacher logprobs into one weighted adapter step, and emits a promoted served revision ready for sampler adoption |
 | Environment ABI | `implemented_early` | `psionic-environments` now owns the package ABI, versioned key, workload/policy/difficulty/benchmark package shape, tool/rubric contracts, deterministic runtime session state machine, registry install/pin/group resolution, the first bounded live `EnvironmentRuntimeService` with worker/queue admission plus typed submission/activation/completion receipts, and a reusable Apple adapter train/eval/benchmark bundle with typed runtime refs plus train/eval parity receipts, while registry and authority truth remain in kernel/Nexus |
@@ -4170,6 +4171,28 @@ The canonical runbook and harness are now:
 This closes the earlier gap between typed RL control-plane truth and one honest
 live adapter update path. The teacher input is still a bounded chosen-token
 auxiliary term, not a full-distribution distillation runtime.
+
+On 2026-04-01, GitHub issue `#813` added the first durable live RL run service
+above that substrate:
+
+- `LiveRlRunService` over `TrainingRunState`, `TrainingOrchestratorState`,
+  `RolloutWorkerProtocolState`, and `RolloutValidatorState`
+- durable `state.json`, `status.json`, per-window status artifacts, and
+  failure artifacts under a service-owned run root
+- run creation, graceful draining, and terminal stop semantics
+- worker heartbeat, claim, upload, validator-ingestion, and trainer-batch flow
+  against live service state rather than harness-only in-memory state
+- restart recovery by loading persisted state back into the service
+
+The canonical runbook and harness are now:
+
+- `docs/TRAIN_LIVE_RL_RUN_SERVICE_REFERENCE.md`
+- `scripts/release/check-psionic-train-live-rl-run-service.sh`
+
+This closes the durability gap above the existing RL control-plane substrate.
+It is still an in-process bounded service. Automatic environment execution,
+sampler-owned rollout generation, and automatic promoted-revision adoption
+remain explicit follow-on layers above it.
 
 ### 14. `Environments: define a package contract for SFT, RL, and eval`
 
