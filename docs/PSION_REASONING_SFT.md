@@ -26,6 +26,17 @@ That declared bridge is now also retained explicitly in
 The actual lane therefore closes into this reasoning-SFT bridge through one
 accepted-checkpoint handoff contract instead of only through the recipe prose.
 
+The same continuation path now also carries one bounded continuation-stage eval
+pack and one derived continuation-alignment bundle:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_alignment_bundle_v1.json`
+
+Those artifacts keep the reasoning bridge explicitly tied to the bounded
+plugin-conditioned stage and the current repo-owned post-training reference
+surface without backfilling a claim that the actual lane already executes
+plugin-conditioned RL.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_reasoning_sft.rs` owns the reasoning-SFT

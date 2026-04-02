@@ -37,6 +37,7 @@ The contract binds:
 - one canonical reasoning-SFT run bundle
 - one canonical plugin-conditioned stage manifest
 - one canonical plugin-conditioned run bundle
+- one canonical continuation-stage eval pack
 - the plugin benchmark-pack bindings and eval hooks already attached to that
   bounded continuation target
 
@@ -69,6 +70,13 @@ It does not claim:
 - plugin-conditioned cluster training
 - completed continuation-stage rehearsal
 - promotion beyond the bounded continuation target
+
+The current repo-owned continuation-review surface above this handoff also
+lives in
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_alignment_bundle_v1.json`.
+That alignment bundle keeps the reasoning bridge, bounded plugin-conditioned
+stage, and current `agentic_sft -> rl` reference-program lineage together for
+later review, but it still does not claim actual continuation execution.
 
 ## Related Docs
 

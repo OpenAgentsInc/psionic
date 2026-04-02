@@ -1,0 +1,91 @@
+{
+  "abi_version": "psionic.benchmark.v1",
+  "key": {
+    "benchmark_ref": "benchmark://psion/actual_pretraining/continuation_stage",
+    "version": "2026.04.02"
+  },
+  "display_name": "Psion Actual Pretraining Continuation Eval Pack",
+  "environment": {
+    "environment_ref": "env.psion.actual_pretraining.continuation_stage",
+    "version": "2026.04.02"
+  },
+  "dataset": {
+    "dataset_ref": "dataset://psion/actual_pretraining/continuation_stage",
+    "version": "2026.04.02"
+  },
+  "split": "continuation_stage_review",
+  "repeat_count": 1,
+  "aggregation": "median_score",
+  "verification_policy": {
+    "require_timer_integrity": false,
+    "require_token_accounting": false,
+    "require_final_state_capture": true,
+    "require_execution_strategy": false
+  },
+  "cases": [
+    {
+      "case_id": "reasoning_style_plurality_gate",
+      "ordinal": 1,
+      "input_ref": "family://psion/reasoning_style_plurality",
+      "expected_output_ref": "acceptance://psion/reasoning_style_plurality",
+      "metadata": {
+        "package_family": "reasoning_style_plurality",
+        "acceptance_family": "reasoning_style_plurality",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 9000,
+        "detail": "Continuation-stage review keeps the actual-lane handoff tied to the frozen `reasoning_style_plurality` family before any later continuation rehearsal or promotion claim consumes it."
+      }
+    },
+    {
+      "case_id": "plugin_result_interpretation_gate",
+      "ordinal": 2,
+      "input_ref": "family://psion/plugin_result_interpretation",
+      "expected_output_ref": "acceptance://psion/plugin_result_interpretation",
+      "metadata": {
+        "package_family": "plugin_result_interpretation",
+        "acceptance_family": "plugin_result_interpretation",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 8000,
+        "detail": "Continuation-stage review keeps the actual-lane handoff tied to the frozen `plugin_result_interpretation` family before any later continuation rehearsal or promotion claim consumes it."
+      }
+    },
+    {
+      "case_id": "rollout_policy_lineage_gate",
+      "ordinal": 3,
+      "input_ref": "family://psion/rollout_policy_lineage",
+      "expected_output_ref": "acceptance://psion/rollout_policy_lineage",
+      "metadata": {
+        "package_family": "rollout_policy_lineage",
+        "acceptance_family": "rollout_policy_lineage",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 10000,
+        "detail": "Continuation-stage review keeps the actual-lane handoff tied to the frozen `rollout_policy_lineage` family before any later continuation rehearsal or promotion claim consumes it."
+      }
+    },
+    {
+      "case_id": "post_training_benchmark_consistency_gate",
+      "ordinal": 4,
+      "input_ref": "family://psion/post_training_benchmark_consistency",
+      "expected_output_ref": "acceptance://psion/post_training_benchmark_consistency",
+      "metadata": {
+        "package_family": "post_training_benchmark_consistency",
+        "acceptance_family": "post_training_benchmark_consistency",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 7800,
+        "detail": "Continuation-stage review keeps the actual-lane handoff tied to the frozen `post_training_benchmark_consistency` family before any later continuation rehearsal or promotion claim consumes it."
+      }
+    }
+  ],
+  "metadata": {
+    "claim_boundary": "This benchmark pack reviews the bounded continuation-stage alignment above the canonical actual pretraining lane. It binds the reasoning bridge, the plugin-conditioned agentic stage, and the current repo-owned post-training reference surface without claiming plugin-conditioned RL execution or cluster-scale continuation closure.",
+    "continuation_target_id": "psion_actual_pretraining_general_sft_agentic_sft_v1",
+    "lane_id": "psion_actual_pretraining_v1",
+    "pack_id": "psion_actual_pretraining_continuation_eval_pack_v1",
+    "required_package_families": [
+      "reasoning_style_plurality",
+      "plugin_result_interpretation",
+      "rollout_policy_lineage",
+      "post_training_benchmark_consistency"
+    ]
+  }
+}

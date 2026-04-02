@@ -100,9 +100,15 @@ That path is anchored to:
 - `fixtures/psion/sft/psion_reasoning_sft_run_bundle_v1.json`
 - `fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_stage_manifest.json`
 - `fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_run_bundle.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json`
 
 This keeps the plugin-conditioned target explicit without pretending the actual
 pretraining lane already proves cluster-scale plugin-conditioned continuation.
+
+The continuation eval pack is intentionally narrower than execution proof. It
+freezes the bounded reasoning-style, plugin-result-interpretation,
+rollout-lineage, and post-training-consistency review surface that later
+continuation rehearsal work must consume.
 
 ## Why This Matters
 

@@ -30,6 +30,17 @@ retained handoff contract in
 That keeps the continuation target machine-legible before later continuation
 rehearsals land.
 
+The same actual-lane continuation path now also carries:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_alignment_bundle_v1.json`
+
+Those retained artifacts do not claim continuation execution. They do keep the
+repo-owned continuation review surface explicit by tying the accepted
+checkpoint handoff to the frozen reasoning bridge, the bounded
+plugin-conditioned `agentic_sft` stage, and the current `agentic_sft -> rl`
+reference-program lineage.
+
 This doc exists so the repo can point at one durable dependency-ordered map for
 that convergence tranche instead of reconstructing it from the alpha planning
 note or scattered issue titles.
@@ -75,9 +86,9 @@ The current repo truth is:
    - the current host-native and mixed reference lanes are still bounded
      reference or evidence surfaces and may not be used as the primary proof
      target for Google GPU training claims
-   - the actual-lane checkpoint handoff is now explicit, but continuation-stage
-     execution proof is still later and must not be backfilled from the handoff
-     contract alone
+   - the actual-lane checkpoint handoff and continuation-review surfaces are
+     now explicit, but continuation-stage execution proof is still later and
+     must not be backfilled from those retained contracts alone
 
 ## Claim Boundary
 

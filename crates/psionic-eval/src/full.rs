@@ -36,6 +36,8 @@ mod parameter_golf_training;
 mod parameter_golf_windowed_validation;
 #[path = "psion_actual_pretraining_checkpoint_eval_pack.rs"]
 mod psion_actual_pretraining_checkpoint_eval_pack;
+#[path = "psion_actual_pretraining_continuation_eval_pack.rs"]
+mod psion_actual_pretraining_continuation_eval_pack;
 #[path = "tassadar.rs"]
 mod tassadar;
 #[path = "tassadar_approximate_attention_closure_matrix.rs"]
@@ -443,6 +445,7 @@ pub use parameter_golf_promotion::*;
 pub use parameter_golf_training::*;
 pub use parameter_golf_windowed_validation::*;
 pub use psion_actual_pretraining_checkpoint_eval_pack::*;
+pub use psion_actual_pretraining_continuation_eval_pack::*;
 pub use tassadar::*;
 pub use tassadar_approximate_attention_closure_matrix::*;
 pub use tassadar_architecture_bakeoff::*;

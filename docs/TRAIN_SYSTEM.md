@@ -334,9 +334,18 @@ committed fixture
 `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_v1.json`.
 That surface binds one accepted actual-lane checkpoint to the frozen
 `pretrain -> general_sft -> agentic_sft` continuation target and carries the
-plugin benchmark-pack bindings already attached to the bounded continuation
-stage without pretending that continuation-stage execution has already been
-proved.
+plugin benchmark-pack bindings plus the bounded continuation eval pack already
+attached to the continuation target without pretending that continuation-stage
+execution has already been proved.
+
+The repo now also owns the bounded continuation-review artifacts in
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json`
+and
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_alignment_bundle_v1.json`.
+Those surfaces keep the reasoning bridge, bounded plugin-conditioned stage, and
+current repo-owned `agentic_sft -> rl` reference surface together for later
+continuation rehearsal work without backfilling a claim that the actual lane
+already executes continuation.
 
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the

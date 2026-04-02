@@ -40,6 +40,7 @@ pub struct PsionActualPretrainingContinuationHandoff {
     pub reasoning_sft_run_bundle: PsionActualPretrainingArtifactRef,
     pub plugin_conditioned_stage_manifest: PsionActualPretrainingArtifactRef,
     pub plugin_conditioned_run_bundle: PsionActualPretrainingArtifactRef,
+    pub continuation_eval_pack: PsionActualPretrainingArtifactRef,
     pub benchmark_bindings: Vec<PsionPluginConditionedBenchmarkBinding>,
     pub eval_hooks: Vec<PsionPluginConditionedEvalHook>,
     pub claim_boundary: String,
@@ -119,6 +120,10 @@ impl PsionActualPretrainingContinuationHandoff {
             &self.plugin_conditioned_run_bundle,
             "continuation_handoff.plugin_conditioned_run_bundle",
         )?;
+        ensure_artifact_ref(
+            &self.continuation_eval_pack,
+            "continuation_handoff.continuation_eval_pack",
+        )?;
         validate_benchmark_bindings(self.benchmark_bindings.as_slice())?;
         validate_eval_hooks(self.eval_hooks.as_slice(), self.benchmark_bindings.as_slice())?;
         ensure_nonempty(
@@ -194,13 +199,17 @@ pub fn record_psion_actual_pretraining_continuation_handoff(
             .continuation_target
             .plugin_conditioned_run_bundle
             .clone(),
+        continuation_eval_pack: recipe_bundle
+            .continuation_target
+            .continuation_eval_pack
+            .clone(),
         benchmark_bindings: plugin_conditioned_stage_manifest.benchmark_bindings.clone(),
         eval_hooks: plugin_conditioned_stage_manifest.eval_hooks.clone(),
         claim_boundary: String::from(
-            "This handoff binds one accepted actual-pretraining checkpoint to the frozen reasoning `general_sft` bridge and bounded plugin-conditioned `agentic_sft` target. It does not claim cluster-scale plugin-conditioned training or continuation-stage execution.",
+            "This handoff binds one accepted actual-pretraining checkpoint to the frozen reasoning `general_sft` bridge and bounded plugin-conditioned `agentic_sft` target, and carries the bounded continuation-stage eval pack for later review. It does not claim cluster-scale plugin-conditioned training or continuation-stage execution.",
         ),
         detail: String::from(
-            "Continuation handoff closes the actual lane into one named continuation target and preserves the plugin benchmark-pack bindings already attached to that bounded target.",
+            "Continuation handoff closes the actual lane into one named continuation target and preserves the plugin benchmark-pack bindings plus the bounded continuation-stage eval pack already attached to that target.",
         ),
     };
     handoff.validate()?;

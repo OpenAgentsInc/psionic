@@ -54,7 +54,11 @@
       "path": "fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_run_bundle.json",
       "sha256": "bde69724339d47a49b6e1c82d472072cb557834b260fa78064a7cee4a67d4a9d"
     },
-    "claim_boundary": "The actual pretraining lane declares a bounded continuation path through the existing reasoning `general_sft` bundle into the bounded plugin-conditioned `agentic_sft` lane without implying cluster-scale plugin-conditioned training closure."
+    "continuation_eval_pack": {
+      "path": "fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json",
+      "sha256": "eb9d9810d82b4a6b3b545ad3a6e1f012c358c80fc91d143f25d7b6d91b83724e"
+    },
+    "claim_boundary": "The actual pretraining lane declares a bounded continuation path through the existing reasoning `general_sft` bundle into the bounded plugin-conditioned `agentic_sft` lane and carries one continuation-stage eval pack for later review without implying cluster-scale plugin-conditioned training closure."
   },
   "summary": "The canonical actual-pretraining recipe binds the broader-pretraining trusted-cluster receipt to one frozen model, tokenizer, tokenized corpus, mixture policy, fixed budget, and bounded continuation path."
 }

@@ -59,6 +59,8 @@ pub struct PsionActualPretrainingContinuationTarget {
     pub plugin_conditioned_stage_manifest: PsionActualPretrainingArtifactRef,
     /// Bounded plugin-conditioned run bundle carrying the `general_sft -> agentic_sft` proof.
     pub plugin_conditioned_run_bundle: PsionActualPretrainingArtifactRef,
+    /// Continuation-stage eval pack used for bounded reasoning and post-training review.
+    pub continuation_eval_pack: PsionActualPretrainingArtifactRef,
     /// Narrow claim boundary for the declared continuation target.
     pub claim_boundary: String,
 }
@@ -278,6 +280,10 @@ impl PsionActualPretrainingRecipeBundle {
         ensure_artifact_ref(
             &self.continuation_target.plugin_conditioned_run_bundle,
             "continuation_target.plugin_conditioned_run_bundle",
+        )?;
+        ensure_artifact_ref(
+            &self.continuation_target.continuation_eval_pack,
+            "continuation_target.continuation_eval_pack",
         )?;
         ensure_nonempty(
             self.continuation_target.claim_boundary.as_str(),

@@ -8,6 +8,12 @@ This document records the first end-to-end Psionic training reference program
 that crosses the current Rust-owned train stack instead of proving each
 subsystem in isolation.
 
+The actual-lane continuation work now consumes this reference program through
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_alignment_bundle_v1.json`.
+That keeps the repo-owned `agentic_sft -> rl` surface attached to the frozen
+actual-lane handoff without claiming that the actual lane already executes
+plugin-conditioned RL.
+
 ## Canonical Runner
 
 Run the pilot from the repo root:

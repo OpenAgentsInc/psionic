@@ -41,6 +41,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let plugin_run_bundle_path = root.join(
         "fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_run_bundle.json",
     );
+    let continuation_eval_pack_path = root.join(
+        "fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json",
+    );
 
     let recipe_bundle = PsionActualPretrainingRecipeBundle {
         schema_version: String::from(PSION_ACTUAL_PRETRAINING_RECIPE_BUNDLE_SCHEMA_VERSION),
@@ -134,8 +137,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             reasoning_sft_run_bundle: artifact_ref(&root, &reasoning_sft_path)?,
             plugin_conditioned_stage_manifest: artifact_ref(&root, &plugin_manifest_path)?,
             plugin_conditioned_run_bundle: artifact_ref(&root, &plugin_run_bundle_path)?,
+            continuation_eval_pack: artifact_ref(&root, &continuation_eval_pack_path)?,
             claim_boundary: String::from(
-                "The actual pretraining lane declares a bounded continuation path through the existing reasoning `general_sft` bundle into the bounded plugin-conditioned `agentic_sft` lane without implying cluster-scale plugin-conditioned training closure.",
+                "The actual pretraining lane declares a bounded continuation path through the existing reasoning `general_sft` bundle into the bounded plugin-conditioned `agentic_sft` lane and carries one continuation-stage eval pack for later review without implying cluster-scale plugin-conditioned training closure.",
             ),
         },
         summary: String::from(

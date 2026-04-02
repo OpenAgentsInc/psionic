@@ -57,7 +57,7 @@
     },
     "recipe_bundle": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_recipe_bundle_v1.json",
-      "sha256": "37f3a4580a5bd7ea48bfad63ce996162d4c76d24c3044032eceae233a9406007"
+      "sha256": "b7c260834035a60ff3284a55ec44e0c2098dca2b9376c532d2d24017da9bbed2"
     },
     "baseline_tools_bundle": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_baseline_tools_bundle_v1.json",
