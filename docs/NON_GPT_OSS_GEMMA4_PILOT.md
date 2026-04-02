@@ -89,6 +89,10 @@ After issues `#861` through `#863`, the repo now has the first honest
 - the managed dense-GGUF lane now allocates whole-model KV-cache width instead
   of silently falling back to one-layer fixture geometry, and the repo now
   carries a multi-layer regression that keeps that boundary explicit.
+- the live `gemma4:e4b` CUDA lane now respects Gemma 4's mixed per-layer
+  attention geometry, including narrower sliding-window layers and wider
+  full-attention layers, instead of assuming one uniform KV shape across the
+  whole stack.
 
 What still does not exist:
 

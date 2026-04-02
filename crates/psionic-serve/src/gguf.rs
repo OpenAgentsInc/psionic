@@ -19,8 +19,9 @@ use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::QuantizationMode;
 use psionic_models::{
     DecoderModelDescriptor, GgufBlobArtifact, GgufDecoderAdapterLoader, GgufDecoderFamily,
-    GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GgufRuntimeTokenizer, ModelLoadError,
-    PagedTensorStorage, TokenId, TokenSequence, TokenizerBoundary,
+    GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GgufMetadataValue,
+    GgufRuntimeTokenizer, ModelLoadError, PagedTensorStorage, TokenId, TokenSequence,
+    TokenizerBoundary,
 };
 use psionic_runtime::DeviceDiscovery;
 use serde::{Deserialize, Serialize};
@@ -1361,13 +1362,21 @@ impl CpuDenseGgufGenerationModel {
         } else {
             token_embedding.clone()
         };
-        let layers = adapter
-            .tensor_layout()
-            .layers
-            .iter()
-            .map(|layout| DenseGgufLayer::load(&artifact, layout))
-            .collect::<Result<Vec<_>, _>>()?;
         let descriptor = adapter.descriptor().clone();
+        let mut cache_offset = 0usize;
+        let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
+        for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
+            let layer = DenseGgufLayer::load(
+                &artifact,
+                layout,
+                &descriptor,
+                adapter.family_metadata(),
+                layer_index,
+                cache_offset,
+            )?;
+            cache_offset = cache_offset.saturating_add(layer.kv_width());
+            layers.push(layer);
+        }
         let inner = DenseGgufModelInner {
             descriptor: descriptor.clone(),
             family_metadata: adapter.family_metadata().clone(),
@@ -1536,10 +1545,10 @@ struct DenseGgufModelInner {
 
 impl DenseGgufModelInner {
     fn cache_width(&self) -> usize {
-        self.descriptor
-            .config
-            .layer_count
-            .saturating_mul(self.descriptor.config.kv_width())
+        self.layers
+            .last()
+            .map(|layer| layer.attention_geometry.cache_end())
+            .unwrap_or(0)
     }
 
     fn forward_step(
@@ -1548,7 +1557,6 @@ impl DenseGgufModelInner {
         position: usize,
         cache: &crate::InMemoryKvCache,
     ) -> Result<DenseGgufForwardStep, ReferenceTextGenerationError> {
-        let kv_width = self.descriptor.config.kv_width();
         let mut bytes_moved = self.token_embedding.byte_length() as u64;
         let mut kernel_count = 1usize;
         let mut hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
@@ -1589,22 +1597,23 @@ impl DenseGgufModelInner {
 
             apply_rope_neox(
                 &mut q,
-                self.descriptor.config.block.attention.head_count,
-                self.descriptor.config.block.attention.head_dim,
-                self.descriptor.config.block.attention.rotary_dim,
+                layer.attention_geometry.head_count,
+                layer.attention_geometry.head_dim,
+                layer.attention_geometry.rotary_dim,
                 position,
                 &self.family_metadata,
             );
             apply_rope_neox(
                 &mut k,
-                self.descriptor.config.block.attention.kv_head_count,
-                self.descriptor.config.block.attention.head_dim,
-                self.descriptor.config.block.attention.rotary_dim,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                layer.attention_geometry.rotary_dim,
                 position,
                 &self.family_metadata,
             );
 
-            let cache_offset = layer_index.saturating_mul(kv_width);
+            let cache_offset = layer.attention_geometry.cache_offset;
+            let kv_width = layer.kv_width();
             cache_key[cache_offset..cache_offset + kv_width].copy_from_slice(k.as_slice());
             cache_value[cache_offset..cache_offset + kv_width].copy_from_slice(v.as_slice());
 
@@ -1614,8 +1623,11 @@ impl DenseGgufModelInner {
                 k.as_slice(),
                 v.as_slice(),
                 cache,
-                &self.descriptor,
-                self.family_metadata.sliding_window,
+                layer.attention_geometry.head_count,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                cache_offset,
+                layer.attention_geometry.sliding_window,
             );
             let mut attention_out = Vec::new();
             layer
@@ -1680,7 +1692,28 @@ impl DenseGgufModelInner {
 }
 
 #[derive(Clone, Debug)]
+struct DenseAttentionGeometry {
+    head_count: usize,
+    kv_head_count: usize,
+    head_dim: usize,
+    rotary_dim: usize,
+    sliding_window: Option<usize>,
+    cache_offset: usize,
+}
+
+impl DenseAttentionGeometry {
+    fn kv_width(&self) -> usize {
+        self.kv_head_count.saturating_mul(self.head_dim)
+    }
+
+    fn cache_end(&self) -> usize {
+        self.cache_offset.saturating_add(self.kv_width())
+    }
+}
+
+#[derive(Clone, Debug)]
 struct DenseGgufLayer {
+    attention_geometry: DenseAttentionGeometry,
     attention_norm: Vec<f32>,
     attention_query_weight: ProjectionMatrix,
     attention_query_bias: Option<Vec<f32>>,
@@ -1700,38 +1733,55 @@ impl DenseGgufLayer {
     fn load(
         artifact: &GgufBlobArtifact,
         layout: &GgufDecoderLayerTensorLayout,
+        descriptor: &DecoderModelDescriptor,
+        family_metadata: &GgufDecoderFamilyMetadata,
+        layer_index: usize,
+        cache_offset: usize,
     ) -> Result<Self, ModelLoadError> {
-        Ok(Self {
-            attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
-            attention_query_weight: ProjectionMatrix::load(
-                artifact,
-                required_tensor_name(
-                    layout.attention_query_weight.as_deref(),
-                    "attention_query_weight",
-                )?,
+        let attention_query_weight = ProjectionMatrix::load(
+            artifact,
+            required_tensor_name(
+                layout.attention_query_weight.as_deref(),
+                "attention_query_weight",
             )?,
+        )?;
+        let attention_key_weight = ProjectionMatrix::load(
+            artifact,
+            required_tensor_name(
+                layout.attention_key_weight.as_deref(),
+                "attention_key_weight",
+            )?,
+        )?;
+        let attention_value_weight = ProjectionMatrix::load(
+            artifact,
+            required_tensor_name(
+                layout.attention_value_weight.as_deref(),
+                "attention_value_weight",
+            )?,
+        )?;
+        let attention_geometry = dense_attention_geometry(
+            descriptor,
+            family_metadata,
+            layer_index,
+            attention_query_weight.rows(),
+            attention_key_weight.rows(),
+            attention_value_weight.rows(),
+            cache_offset,
+        )?;
+        Ok(Self {
+            attention_geometry,
+            attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
+            attention_query_weight,
             attention_query_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_query_bias.as_deref(),
             )?,
-            attention_key_weight: ProjectionMatrix::load(
-                artifact,
-                required_tensor_name(
-                    layout.attention_key_weight.as_deref(),
-                    "attention_key_weight",
-                )?,
-            )?,
+            attention_key_weight,
             attention_key_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_key_bias.as_deref(),
             )?,
-            attention_value_weight: ProjectionMatrix::load(
-                artifact,
-                required_tensor_name(
-                    layout.attention_value_weight.as_deref(),
-                    "attention_value_weight",
-                )?,
-            )?,
+            attention_value_weight,
             attention_value_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_value_bias.as_deref(),
@@ -1773,6 +1823,10 @@ impl DenseGgufLayer {
                 )?,
             )?,
         })
+    }
+
+    fn kv_width(&self) -> usize {
+        self.attention_geometry.kv_width()
     }
 }
 
@@ -1848,6 +1902,13 @@ impl ProjectionMatrix {
         match self {
             Self::Dense(matrix) => matrix.matvec(input, output),
             Self::Quantized(matrix) => matrix.matvec(input, output),
+        }
+    }
+
+    fn rows(&self) -> usize {
+        match self {
+            Self::Dense(matrix) => matrix.rows,
+            Self::Quantized(matrix) => matrix.rows,
         }
     }
 }
@@ -2216,13 +2277,22 @@ impl CudaGemma4GenerationModel {
             .as_deref()
             .unwrap_or(adapter.tensor_layout().token_embedding.as_str());
         let output = CudaQuantizedProjectionMatrix::load(backend, &artifact, output_name)?;
-        let layers = adapter
-            .tensor_layout()
-            .layers
-            .iter()
-            .map(|layout| CudaGemma4Layer::load(backend, &artifact, layout))
-            .collect::<Result<Vec<_>, _>>()?;
         let descriptor = adapter.descriptor().clone();
+        let mut cache_offset = 0usize;
+        let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
+        for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
+            let layer = CudaGemma4Layer::load(
+                backend,
+                &artifact,
+                layout,
+                &descriptor,
+                adapter.family_metadata(),
+                layer_index,
+                cache_offset,
+            )?;
+            cache_offset = cache_offset.saturating_add(layer.kv_width());
+            layers.push(layer);
+        }
         let inner = CudaGemma4ModelInner {
             descriptor: descriptor.clone(),
             family_metadata: adapter.family_metadata().clone(),
@@ -2375,10 +2445,10 @@ struct CudaGemma4ModelInner {
 
 impl CudaGemma4ModelInner {
     fn cache_width(&self) -> usize {
-        self.descriptor
-            .config
-            .layer_count
-            .saturating_mul(self.descriptor.config.kv_width())
+        self.layers
+            .last()
+            .map(|layer| layer.attention_geometry.cache_end())
+            .unwrap_or(0)
     }
 
     fn forward_step(
@@ -2388,7 +2458,6 @@ impl CudaGemma4ModelInner {
         position: usize,
         cache: &crate::InMemoryKvCache,
     ) -> Result<CudaGemma4ForwardStep, ReferenceTextGenerationError> {
-        let kv_width = self.descriptor.config.kv_width();
         let mut bytes_moved = self.token_embedding.byte_length() as u64;
         let mut kernel_count = 1usize;
         let mut hidden = self
@@ -2429,22 +2498,23 @@ impl CudaGemma4ModelInner {
 
             apply_rope_neox(
                 &mut q.values,
-                self.descriptor.config.block.attention.head_count,
-                self.descriptor.config.block.attention.head_dim,
-                self.descriptor.config.block.attention.rotary_dim,
+                layer.attention_geometry.head_count,
+                layer.attention_geometry.head_dim,
+                layer.attention_geometry.rotary_dim,
                 position,
                 &self.family_metadata,
             );
             apply_rope_neox(
                 &mut k.values,
-                self.descriptor.config.block.attention.kv_head_count,
-                self.descriptor.config.block.attention.head_dim,
-                self.descriptor.config.block.attention.rotary_dim,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                layer.attention_geometry.rotary_dim,
                 position,
                 &self.family_metadata,
             );
 
-            let cache_offset = layer_index.saturating_mul(kv_width);
+            let cache_offset = layer.attention_geometry.cache_offset;
+            let kv_width = layer.kv_width();
             cache_key[cache_offset..cache_offset + kv_width].copy_from_slice(k.values.as_slice());
             cache_value[cache_offset..cache_offset + kv_width].copy_from_slice(v.values.as_slice());
 
@@ -2454,8 +2524,11 @@ impl CudaGemma4ModelInner {
                 k.values.as_slice(),
                 v.values.as_slice(),
                 cache,
-                &self.descriptor,
-                self.family_metadata.sliding_window,
+                layer.attention_geometry.head_count,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                cache_offset,
+                layer.attention_geometry.sliding_window,
             );
             let mut attention_out = layer
                 .attention_output_weight
@@ -2525,6 +2598,7 @@ impl CudaGemma4ModelInner {
 
 #[derive(Clone, Debug)]
 struct CudaGemma4Layer {
+    attention_geometry: DenseAttentionGeometry,
     attention_norm: Vec<f32>,
     attention_query_weight: CudaQuantizedProjectionMatrix,
     attention_query_bias: Option<Vec<f32>>,
@@ -2545,41 +2619,58 @@ impl CudaGemma4Layer {
         backend: &mut CudaBackend,
         artifact: &GgufBlobArtifact,
         layout: &GgufDecoderLayerTensorLayout,
+        descriptor: &DecoderModelDescriptor,
+        family_metadata: &GgufDecoderFamilyMetadata,
+        layer_index: usize,
+        cache_offset: usize,
     ) -> Result<Self, ReferenceTextGenerationError> {
-        Ok(Self {
-            attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
-            attention_query_weight: CudaQuantizedProjectionMatrix::load(
-                backend,
-                artifact,
-                required_tensor_name(
-                    layout.attention_query_weight.as_deref(),
-                    "attention_query_weight",
-                )?,
+        let attention_query_weight = CudaQuantizedProjectionMatrix::load(
+            backend,
+            artifact,
+            required_tensor_name(
+                layout.attention_query_weight.as_deref(),
+                "attention_query_weight",
             )?,
+        )?;
+        let attention_key_weight = CudaQuantizedProjectionMatrix::load(
+            backend,
+            artifact,
+            required_tensor_name(
+                layout.attention_key_weight.as_deref(),
+                "attention_key_weight",
+            )?,
+        )?;
+        let attention_value_weight = CudaQuantizedProjectionMatrix::load(
+            backend,
+            artifact,
+            required_tensor_name(
+                layout.attention_value_weight.as_deref(),
+                "attention_value_weight",
+            )?,
+        )?;
+        let attention_geometry = dense_attention_geometry(
+            descriptor,
+            family_metadata,
+            layer_index,
+            attention_query_weight.rows(),
+            attention_key_weight.rows(),
+            attention_value_weight.rows(),
+            cache_offset,
+        )?;
+        Ok(Self {
+            attention_geometry,
+            attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
+            attention_query_weight,
             attention_query_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_query_bias.as_deref(),
             )?,
-            attention_key_weight: CudaQuantizedProjectionMatrix::load(
-                backend,
-                artifact,
-                required_tensor_name(
-                    layout.attention_key_weight.as_deref(),
-                    "attention_key_weight",
-                )?,
-            )?,
+            attention_key_weight,
             attention_key_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_key_bias.as_deref(),
             )?,
-            attention_value_weight: CudaQuantizedProjectionMatrix::load(
-                backend,
-                artifact,
-                required_tensor_name(
-                    layout.attention_value_weight.as_deref(),
-                    "attention_value_weight",
-                )?,
-            )?,
+            attention_value_weight,
             attention_value_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_value_bias.as_deref(),
@@ -2625,6 +2716,10 @@ impl CudaGemma4Layer {
                 )?,
             )?,
         })
+    }
+
+    fn kv_width(&self) -> usize {
+        self.attention_geometry.kv_width()
     }
 }
 
@@ -2694,6 +2789,10 @@ impl CudaQuantizedProjectionMatrix {
                 .host_to_device_bytes
                 .saturating_add(result.stats.device_to_host_bytes),
         })
+    }
+
+    fn rows(&self) -> usize {
+        self.rows
     }
 }
 
@@ -3133,14 +3232,12 @@ fn attend_impl(
     key: &[f32],
     value: &[f32],
     cache: &crate::InMemoryKvCache,
-    descriptor: &DecoderModelDescriptor,
+    head_count: usize,
+    kv_head_count: usize,
+    head_dim: usize,
+    layer_offset: usize,
     sliding_window: Option<usize>,
 ) -> Vec<f32> {
-    let head_count = descriptor.config.block.attention.head_count;
-    let kv_head_count = descriptor.config.block.attention.kv_head_count;
-    let head_dim = descriptor.config.block.attention.head_dim;
-    let kv_width = descriptor.config.kv_width();
-    let layer_offset = layer_index.saturating_mul(kv_width);
     let group_size = head_count / kv_head_count.max(1);
     let scale = 1.0 / (head_dim as f32).sqrt();
 
@@ -3196,6 +3293,77 @@ fn attend_impl(
         axpy(output_slice, local_value, *weights.last().unwrap_or(&0.0));
     }
     output
+}
+
+fn dense_attention_geometry(
+    descriptor: &DecoderModelDescriptor,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+    query_width: usize,
+    key_width: usize,
+    value_width: usize,
+    cache_offset: usize,
+) -> Result<DenseAttentionGeometry, ModelLoadError> {
+    let head_count = descriptor.config.block.attention.head_count;
+    if head_count == 0 || query_width == 0 || query_width % head_count != 0 {
+        return Err(ModelLoadError::InvalidGgufMetadata {
+            key: format!("{}.attention.head_count", family_metadata.architecture),
+            message: format!(
+                "layer {layer_index} query width {query_width} is not divisible by attention head count {head_count}"
+            ),
+        });
+    }
+    let head_dim = query_width / head_count;
+    if key_width == 0 || key_width % head_dim != 0 {
+        return Err(ModelLoadError::InvalidTensorShape {
+            name: format!("blk.{layer_index}.attn_k.weight"),
+            expected: vec![0, descriptor.config.hidden_size],
+            actual: vec![key_width, descriptor.config.hidden_size],
+        });
+    }
+    if value_width != key_width {
+        return Err(ModelLoadError::UnsupportedGgufDecoderFamilyFeature {
+            family: family_metadata.family.as_str().to_string(),
+            feature: String::from("distinct_layer_value_width"),
+        });
+    }
+    let kv_head_count = key_width / head_dim;
+    let sliding_window = layer_sliding_window(family_metadata, layer_index, head_dim);
+    Ok(DenseAttentionGeometry {
+        head_count,
+        kv_head_count,
+        head_dim,
+        rotary_dim: descriptor.config.block.attention.rotary_dim.min(head_dim),
+        sliding_window,
+        cache_offset,
+    })
+}
+
+fn layer_sliding_window(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+    head_dim: usize,
+) -> Option<usize> {
+    let default_window = family_metadata.sliding_window?;
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return Some(default_window);
+    }
+    let pattern_key = format!(
+        "{}.attention.sliding_window_pattern",
+        family_metadata.architecture
+    );
+    if let Some(enabled) = family_metadata
+        .family_facts
+        .get(pattern_key.as_str())
+        .and_then(GgufMetadataValue::as_array)
+        .and_then(|values| values.get(layer_index))
+        .and_then(GgufMetadataValue::as_bool)
+    {
+        return enabled.then_some(default_window);
+    }
+    family_metadata
+        .attention_key_length
+        .and_then(|full_head_dim| (head_dim < full_head_dim).then_some(default_window))
 }
 
 fn apply_rope_neox(
