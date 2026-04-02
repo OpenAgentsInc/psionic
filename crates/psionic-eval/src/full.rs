@@ -34,6 +34,8 @@ mod parameter_golf_promotion;
 mod parameter_golf_training;
 #[path = "parameter_golf_windowed_validation.rs"]
 mod parameter_golf_windowed_validation;
+#[path = "psion_actual_pretraining_checkpoint_eval_pack.rs"]
+mod psion_actual_pretraining_checkpoint_eval_pack;
 #[path = "tassadar.rs"]
 mod tassadar;
 #[path = "tassadar_approximate_attention_closure_matrix.rs"]
@@ -440,6 +442,7 @@ pub use parameter_golf_distributed::*;
 pub use parameter_golf_promotion::*;
 pub use parameter_golf_training::*;
 pub use parameter_golf_windowed_validation::*;
+pub use psion_actual_pretraining_checkpoint_eval_pack::*;
 pub use tassadar::*;
 pub use tassadar_approximate_attention_closure_matrix::*;
 pub use tassadar_architecture_bakeoff::*;
@@ -541,8 +544,8 @@ pub use tassadar_learned_call_stack_heap_suite::*;
 pub use tassadar_linked_program_bundle::*;
 pub use tassadar_locality_envelope::*;
 pub use tassadar_locality_scratchpad::*;
-pub use tassadar_memory64_profile::*;
 pub use tassadar_memory_abi_v2::*;
+pub use tassadar_memory64_profile::*;
 pub use tassadar_minimal_universal_substrate_acceptance_gate::*;
 pub use tassadar_mixed_numeric_ladder::*;
 pub use tassadar_mixed_trajectory::*;
@@ -2418,8 +2421,8 @@ mod tests {
     }
 
     #[test]
-    fn eval_sample_from_environment_summary_is_machine_legible(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn eval_sample_from_environment_summary_is_machine_legible()
+    -> Result<(), Box<dyn std::error::Error>> {
         let package = eval_environment();
         let summary = scored_summary("session-1", "task-1", 8_600, true)?;
         let sample = EvalSampleRecord::from_environment_summary(
@@ -2443,8 +2446,8 @@ mod tests {
     }
 
     #[test]
-    fn eval_run_finalizes_summary_and_preserves_online_offline_parity(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn eval_run_finalizes_summary_and_preserves_online_offline_parity()
+    -> Result<(), Box<dyn std::error::Error>> {
         let package = eval_environment();
         let offline_sample = EvalSampleRecord::from_environment_summary(
             "sample-offline",
@@ -2509,8 +2512,8 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_package_supports_repeat_aggregation_and_operator_simulation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn benchmark_package_supports_repeat_aggregation_and_operator_simulation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let package = eval_environment();
         let benchmark_package = BenchmarkPackage::new(
             BenchmarkPackageKey::new("benchmark://openagents/math/basic", "2026.03.14"),
@@ -2589,8 +2592,8 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_policy_refuses_missing_verification_facts(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn benchmark_policy_refuses_missing_verification_facts()
+    -> Result<(), Box<dyn std::error::Error>> {
         let package = eval_environment();
         let benchmark_package = BenchmarkPackage::new(
             BenchmarkPackageKey::new("benchmark://openagents/math/basic", "2026.03.14"),

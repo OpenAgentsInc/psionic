@@ -101,6 +101,24 @@
       "detail": "Checkpoint evaluation receipt used by continue-vs-restart policy."
     },
     {
+      "relative_path": "evals/latest_checkpoint_eval_decision.json",
+      "artifact_kind": "latest_checkpoint_eval_decision",
+      "retention_class": "durable",
+      "detail": "Most recent automatic checkpoint eval decision retained for later continue-vs-restart logic."
+    },
+    {
+      "relative_path": "evals/checkpoint_eval_failure_step-<optimizer_step>.json",
+      "artifact_kind": "checkpoint_eval_failure_receipt",
+      "retention_class": "durable",
+      "detail": "Retained checkpoint eval failure receipt for one accepted checkpoint when automatic review could not run."
+    },
+    {
+      "relative_path": "evals/latest_checkpoint_eval_failure.json",
+      "artifact_kind": "latest_checkpoint_eval_failure",
+      "retention_class": "durable",
+      "detail": "Most recent automatic checkpoint eval failure retained for retry and alert review."
+    },
+    {
       "relative_path": "exports/promoted_checkpoint_export_manifest.json",
       "artifact_kind": "promoted_export_manifest",
       "retention_class": "durable",

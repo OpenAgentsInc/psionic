@@ -155,7 +155,6 @@ This surface now proves:
 
 It still does not prove:
 
-- automatic checkpoint eval
 - dashboard or alert routing
 - final continue-vs-restart policy
 - completed cluster-scale broader-pretraining execution
@@ -165,5 +164,6 @@ It still does not prove:
 - `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
+- `docs/PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVALS.md`
 - `docs/PSION_ACTUAL_PRETRAINING_SYSTEMS_BUNDLE.md`
 - `docs/TRAIN_CHECKPOINT_RECOVERY_REFERENCE.md`

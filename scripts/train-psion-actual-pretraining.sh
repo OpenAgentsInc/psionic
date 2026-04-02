@@ -45,6 +45,8 @@ Options for `record-checkpoint`:
                            Optional checkpoint byte size. Default: frozen actual-lane checkpoint size from the systems bundle.
   --git-ref <ref>          Git ref to resolve for the checkpoint provenance. Default: current symbolic ref or HEAD
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
+  --inject-eval-worker-unavailable
+                           Retain a checkpoint-eval retry receipt and redacted alert instead of a successful automatic checkpoint eval decision.
 
 Options for `backup`:
   --run-root <path>        Existing actual-lane run root containing an accepted checkpoint pointer and manifest.

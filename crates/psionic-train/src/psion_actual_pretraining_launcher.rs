@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    PsionActualPretrainingArtifactRef, PsionActualPretrainingLauncherSurfaces,
     PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID, PSION_ACTUAL_PRETRAINING_START_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingLauncherSurfaces,
 };
 
 /// Stable schema version for the canonical actual-lane launch manifest.
@@ -43,6 +43,10 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub latest_checkpoint_backup_receipt_path: String,
     /// Relative latest auto-resume receipt path.
     pub auto_resume_receipt_path: String,
+    /// Relative latest checkpoint eval decision path.
+    pub latest_checkpoint_eval_decision_path: String,
+    /// Relative latest checkpoint eval failure path.
+    pub latest_checkpoint_eval_failure_path: String,
     /// Relative hardware-qualification receipt path.
     pub hardware_qualification_path: String,
     /// Relative run-shape qualification receipt path.
@@ -53,6 +57,8 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub closeout_bundle_path: String,
     /// Relative launcher log path.
     pub launcher_log_path: String,
+    /// Relative latest redacted alert path.
+    pub latest_redacted_alert_path: String,
 }
 
 /// Run-local preflight receipt reference consumed by the actual-lane launcher.
@@ -298,6 +304,16 @@ impl PsionActualPretrainingRetainedPathSet {
             "checkpoints/auto_resume_receipt.json",
         )?;
         ensure_exact(
+            self.latest_checkpoint_eval_decision_path.as_str(),
+            "retained_paths.latest_checkpoint_eval_decision_path",
+            "evals/latest_checkpoint_eval_decision.json",
+        )?;
+        ensure_exact(
+            self.latest_checkpoint_eval_failure_path.as_str(),
+            "retained_paths.latest_checkpoint_eval_failure_path",
+            "evals/latest_checkpoint_eval_failure.json",
+        )?;
+        ensure_exact(
             self.hardware_qualification_path.as_str(),
             "retained_paths.hardware_qualification_path",
             "preflight/hardware_qualification.json",
@@ -321,6 +337,11 @@ impl PsionActualPretrainingRetainedPathSet {
             self.launcher_log_path.as_str(),
             "retained_paths.launcher_log_path",
             "logs/launcher.log",
+        )?;
+        ensure_exact(
+            self.latest_redacted_alert_path.as_str(),
+            "retained_paths.latest_redacted_alert_path",
+            "alerts/latest_redacted_alert.json",
         )?;
         Ok(())
     }

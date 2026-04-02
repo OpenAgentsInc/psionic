@@ -85,6 +85,8 @@ family when the operator path advances beyond first launch:
 
 - `resume_dry_run_planned`
 - `resume_staged`
+- `checkpoint_evaluated`
+- `checkpoint_eval_retry_required`
 - `checkpoint_backed_up`
 - `checkpoint_backup_refused`
 - `resume_refused_auto_resume`
@@ -94,7 +96,9 @@ family when the operator path advances beyond first launch:
 The bounded reference-pilot launcher already had operator-manifest and summary
 surfaces. The actual lane needed the same kind of named retained status surface
 so the actual launcher could materialize one honest operator bundle without
-inventing ad hoc filenames.
+inventing ad hoc filenames. The same status command now also prints the latest
+checkpoint-eval decision and score when present, plus the latest retry-required
+failure and redacted alert when automatic eval could not run.
 
 The remaining hardening work now extends these retained surfaces instead of
 defining them.

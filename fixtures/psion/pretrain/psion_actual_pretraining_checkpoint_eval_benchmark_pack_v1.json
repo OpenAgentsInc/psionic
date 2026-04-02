@@ -1,0 +1,90 @@
+{
+  "abi_version": "psionic.benchmark.v1",
+  "key": {
+    "benchmark_ref": "benchmark://psion/actual_pretraining/checkpoint_eval",
+    "version": "2026.04.02"
+  },
+  "display_name": "Psion Actual Pretraining Checkpoint Eval Pack",
+  "environment": {
+    "environment_ref": "env.psion.actual_pretraining.checkpoint_eval",
+    "version": "2026.04.02"
+  },
+  "dataset": {
+    "dataset_ref": "dataset://psion/actual_pretraining/checkpoint_eval",
+    "version": "2026.04.02"
+  },
+  "split": "checkpoint_eval_review",
+  "repeat_count": 1,
+  "aggregation": "median_score",
+  "verification_policy": {
+    "require_timer_integrity": false,
+    "require_token_accounting": false,
+    "require_final_state_capture": true,
+    "require_execution_strategy": false
+  },
+  "cases": [
+    {
+      "case_id": "architecture_reasoning_gate",
+      "ordinal": 1,
+      "input_ref": "family://psion/architecture_reasoning",
+      "expected_output_ref": "acceptance://psion/architecture_reasoning",
+      "metadata": {
+        "package_family": "architecture_reasoning",
+        "acceptance_family": "architecture_reasoning",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 8200,
+        "detail": "Checkpoint eval gate keeps the actual lane bound to the frozen `architecture_reasoning` family before later continue-vs-restart logic consumes the retained checkpoint decision."
+      }
+    },
+    {
+      "case_id": "normative_spec_reading_gate",
+      "ordinal": 2,
+      "input_ref": "family://psion/normative_spec_reading",
+      "expected_output_ref": "acceptance://psion/normative_spec_reading",
+      "metadata": {
+        "package_family": "normative_spec_reading",
+        "acceptance_family": "normative_spec_reading",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 8600,
+        "detail": "Checkpoint eval gate keeps the actual lane bound to the frozen `normative_spec_reading` family before later continue-vs-restart logic consumes the retained checkpoint decision."
+      }
+    },
+    {
+      "case_id": "engineering_spec_interpretation_gate",
+      "ordinal": 3,
+      "input_ref": "family://psion/engineering_spec_interpretation",
+      "expected_output_ref": "acceptance://psion/engineering_spec_interpretation",
+      "metadata": {
+        "package_family": "engineering_spec_interpretation",
+        "acceptance_family": "engineering_spec_interpretation",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 8500,
+        "detail": "Checkpoint eval gate keeps the actual lane bound to the frozen `engineering_spec_interpretation` family before later continue-vs-restart logic consumes the retained checkpoint decision."
+      }
+    },
+    {
+      "case_id": "memorization_versus_reasoning_gate",
+      "ordinal": 4,
+      "input_ref": "family://psion/memorization_versus_reasoning",
+      "expected_output_ref": "acceptance://psion/memorization_versus_reasoning",
+      "metadata": {
+        "package_family": "memorization_versus_reasoning",
+        "acceptance_family": "memorization_versus_reasoning",
+        "metric_kind": "pass_rate_bps",
+        "threshold_bps": 7900,
+        "detail": "Checkpoint eval gate keeps the actual lane bound to the frozen `memorization_versus_reasoning` family before later continue-vs-restart logic consumes the retained checkpoint decision."
+      }
+    }
+  ],
+  "metadata": {
+    "claim_boundary": "This benchmark pack is the checkpoint-time review surface for the canonical actual pretraining lane only. It does not widen the actual lane into a detached curriculum program or claim that distributed broader-pretraining execution is already closed.",
+    "lane_id": "psion_actual_pretraining_v1",
+    "pack_id": "psion_actual_pretraining_checkpoint_eval_pack_v1",
+    "required_package_families": [
+      "architecture_reasoning",
+      "normative_spec_reading",
+      "engineering_spec_interpretation",
+      "memorization_versus_reasoning"
+    ]
+  }
+}

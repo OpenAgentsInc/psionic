@@ -6,14 +6,26 @@ use std::{
     process::Command,
 };
 
+use psionic_eval::{
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
+    build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
+};
 use psionic_train::{
-    derive_psion_actual_pretraining_hardware_qualification,
-    derive_psion_actual_pretraining_run_shape_qualification,
-    record_psion_actual_pretraining_auto_resume_receipt,
-    record_psion_actual_pretraining_checkpoint_backup_receipt,
-    record_psion_actual_pretraining_checkpoint_failure_drill,
-    record_psion_actual_pretraining_checkpoint_manifest,
-    record_psion_actual_pretraining_continuation_handoff, PsionActualPretrainingArtifactRef,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
+    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
+    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
     PsionActualPretrainingAutoResumeReceipt, PsionActualPretrainingBaselineToolsBundle,
     PsionActualPretrainingCheckpointBackupReceipt, PsionActualPretrainingCheckpointFailureDrill,
     PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
@@ -32,17 +44,17 @@ use psionic_train::{
     PsionActualPretrainingScalingBundle, PsionActualPretrainingStorageProbe,
     PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    checkpoint_eval_decision_relative_path, checkpoint_eval_failure_relative_path,
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    record_psion_actual_pretraining_auto_resume_receipt,
+    record_psion_actual_pretraining_checkpoint_backup_receipt,
+    record_psion_actual_pretraining_checkpoint_eval_decision,
+    record_psion_actual_pretraining_checkpoint_eval_failure,
+    record_psion_actual_pretraining_checkpoint_failure_drill,
+    record_psion_actual_pretraining_checkpoint_manifest,
+    record_psion_actual_pretraining_continuation_handoff,
+    record_psion_actual_pretraining_redacted_alert,
 };
 use sha2::{Digest, Sha256};
 use std::time::Instant;
@@ -73,6 +85,7 @@ enum Cli {
         checkpoint_ref: String,
         checkpoint_object_digest: Option<String>,
         checkpoint_total_bytes: Option<u64>,
+        inject_eval_worker_unavailable: bool,
         allow_dirty_tree: bool,
     },
     Backup {
@@ -92,6 +105,7 @@ struct FrozenContracts {
     systems_bundle_ref: PsionActualPretrainingArtifactRef,
     topology_storage_bundle_ref: PsionActualPretrainingArtifactRef,
     evidence_contract_ref: PsionActualPretrainingArtifactRef,
+    checkpoint_eval_benchmark_fixture_ref: PsionActualPretrainingArtifactRef,
     baseline_tools_bundle: PsionActualPretrainingBaselineToolsBundle,
     data_bundle: PsionActualPretrainingDataBundle,
     recipe_bundle: PsionActualPretrainingRecipeBundle,
@@ -451,13 +465,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )
                 .into());
             }
-            let checkpoint_pointer = resolved_resume
-                .checkpoint_pointer
-                .ok_or_else(|| {
-                    std::io::Error::other(
-                        "resolved auto-resume receipt is missing checkpoint pointer",
-                    )
-                })?;
+            let checkpoint_pointer = resolved_resume.checkpoint_pointer.ok_or_else(|| {
+                std::io::Error::other("resolved auto-resume receipt is missing checkpoint pointer")
+            })?;
             let run_roots = run_roots(&run_root, &checkpoint_pointer.run_id, &contracts.topology);
             let hardware_qualification = build_hardware_qualification(
                 repo_root,
@@ -737,6 +747,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             checkpoint_ref,
             checkpoint_object_digest,
             checkpoint_total_bytes,
+            inject_eval_worker_unavailable,
             allow_dirty_tree,
         } => {
             let git_commit_sha = git_output(repo_root, &["rev-parse", selected_git_ref.as_str()])?;
@@ -768,8 +779,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 optimizer_step,
                 &checkpoint_ref,
                 &resolved_checkpoint_object_digest,
-                checkpoint_total_bytes
-                    .unwrap_or(contracts.systems_bundle.memory_qualification.checkpoint_total_bytes),
+                checkpoint_total_bytes.unwrap_or(
+                    contracts
+                        .systems_bundle
+                        .memory_qualification
+                        .checkpoint_total_bytes,
+                ),
                 &contracts.data_bundle.replay_authority.dataset_identity,
                 &selected_git_ref,
                 &git_commit_sha,
@@ -780,6 +795,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             write_json_pretty(
                 &run_root.join(&checkpoint_manifest.relative_manifest_path),
                 &checkpoint_manifest,
+            )?;
+            let checkpoint_manifest_ref = run_artifact_ref(
+                &run_root,
+                &run_root.join(&checkpoint_manifest.relative_manifest_path),
             )?;
             checkpoint_pointer.pointer_state = String::from("accepted");
             checkpoint_pointer.checkpoint_label = checkpoint_label.clone();
@@ -809,21 +828,104 @@ fn main() -> Result<(), Box<dyn Error>> {
                     failure_drill,
                 )?;
             }
-            current_status.phase = String::from("checkpoint_backed_up");
+            let checkpoint_eval_decision_relative_path =
+                checkpoint_eval_decision_relative_path(optimizer_step);
+            let checkpoint_eval_failure_receipt_relative_path =
+                checkpoint_eval_failure_relative_path(optimizer_step);
+            let checkpoint_eval_decision = if inject_eval_worker_unavailable {
+                None
+            } else {
+                let decision = record_psion_actual_pretraining_checkpoint_eval_decision(
+                    &checkpoint_pointer.run_id,
+                    &selected_git_ref,
+                    &git_commit_sha,
+                    &dirty_tree_admission,
+                    workspace_status_sha256.clone(),
+                    &checkpoint_label,
+                    optimizer_step,
+                    &checkpoint_ref,
+                    checkpoint_manifest_ref.clone(),
+                    contracts.checkpoint_eval_benchmark_fixture_ref.clone(),
+                    &contracts.data_bundle,
+                    "This retained checkpoint-eval decision binds one accepted actual-lane checkpoint to the frozen checkpoint review pack and the frozen benchmark families already attached to the actual-lane data bundle. It is the automatic checkpoint review surface for later continue-vs-restart logic. It does not claim distributed broader-pretraining closure, dashboard fan-out, or final promotion review.",
+                    "Checkpoint eval decision records one automatic retained review over the accepted checkpoint using the canonical actual-lane benchmark pack.",
+                )?;
+                write_json_pretty(
+                    &run_root.join(&checkpoint_eval_decision_relative_path),
+                    &decision,
+                )?;
+                write_json_pretty(
+                    &run_root.join(&retained_paths.latest_checkpoint_eval_decision_path),
+                    &decision,
+                )?;
+                Some(decision)
+            };
+            let checkpoint_eval_failure = if inject_eval_worker_unavailable {
+                let failure = record_psion_actual_pretraining_checkpoint_eval_failure(
+                    &checkpoint_pointer.run_id,
+                    &selected_git_ref,
+                    &git_commit_sha,
+                    &dirty_tree_admission,
+                    workspace_status_sha256.clone(),
+                    &checkpoint_label,
+                    optimizer_step,
+                    &checkpoint_ref,
+                    checkpoint_manifest_ref.clone(),
+                    contracts.checkpoint_eval_benchmark_fixture_ref.clone(),
+                    "eval_worker_unavailable",
+                    "This retained checkpoint-eval failure proves the actual-lane operator path does not silently skip automatic checkpoint review when the eval worker is unavailable. It retains an explicit retry requirement and a redacted alert instead.",
+                    "Checkpoint eval failure records that the automatic checkpoint-review worker was unavailable after the accepted checkpoint entered the retained backup family.",
+                )?;
+                write_json_pretty(
+                    &run_root.join(&checkpoint_eval_failure_receipt_relative_path),
+                    &failure,
+                )?;
+                write_json_pretty(
+                    &run_root.join(&retained_paths.latest_checkpoint_eval_failure_path),
+                    &failure,
+                )?;
+                Some(failure)
+            } else {
+                None
+            };
+            let redacted_alert = if let Some(_failure) = &checkpoint_eval_failure {
+                let alert = record_psion_actual_pretraining_redacted_alert(
+                    &checkpoint_pointer.run_id,
+                    optimizer_step,
+                    &checkpoint_eval_failure_receipt_relative_path,
+                    "Checkpoint eval retry alerts keep the actual lane honest by retaining the failed trigger path under one redacted alert surface instead of silently dropping the missing eval.",
+                )?;
+                write_json_pretty(
+                    &run_root.join(&retained_paths.latest_redacted_alert_path),
+                    &alert,
+                )?;
+                Some(alert)
+            } else {
+                None
+            };
+            current_status.phase = String::from(if checkpoint_eval_decision.is_some() {
+                "checkpoint_evaluated"
+            } else {
+                "checkpoint_eval_retry_required"
+            });
             current_status.latest_checkpoint_label = checkpoint_label.clone();
             current_status.last_completed_step = optimizer_step;
             current_status.updated_at_utc = now_utc(repo_root)?;
-            current_status.detail = String::from(
-                "Current status records that one accepted checkpoint was materialized and backed up under the actual-lane recovery contract.",
-            );
+            current_status.detail = String::from(if checkpoint_eval_decision.is_some() {
+                "Current status records that one accepted checkpoint was materialized, backed up, and automatically evaluated under the actual-lane checkpoint review contract."
+            } else {
+                "Current status records that one accepted checkpoint was materialized and backed up, but automatic checkpoint eval now requires retry under the retained actual-lane alert surface."
+            });
             current_status.validate()?;
-            retained_summary.last_known_phase = String::from("checkpoint_backed_up");
+            retained_summary.last_known_phase = current_status.phase.clone();
             retained_summary.selected_git_ref = selected_git_ref.clone();
             retained_summary.git_commit_sha = git_commit_sha.clone();
             retained_summary.dirty_tree_admission = dirty_tree_admission.clone();
-            retained_summary.detail = String::from(
-                "Retained summary records the latest accepted checkpoint and backup posture for the actual lane.",
-            );
+            retained_summary.detail = String::from(if checkpoint_eval_decision.is_some() {
+                "Retained summary records the latest accepted checkpoint, backup posture, and automatic checkpoint-eval decision for the actual lane."
+            } else {
+                "Retained summary records the latest accepted checkpoint and backup posture while keeping the checkpoint-eval retry requirement explicit for the actual lane."
+            });
             retained_summary.validate()?;
             let closeout_bundle = PsionActualPretrainingCloseoutBundle {
                 schema_version: String::from(
@@ -831,18 +933,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ),
                 lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
                 run_id: checkpoint_pointer.run_id.clone(),
-                closeout_state: String::from("checkpoint_backed_up"),
+                closeout_state: current_status.phase.clone(),
                 retained_paths: retained_paths.clone(),
                 selected_git_ref: selected_git_ref.clone(),
                 git_commit_sha: git_commit_sha.clone(),
                 dirty_tree_admission: dirty_tree_admission.clone(),
                 workspace_status_sha256: workspace_status_sha256.clone(),
-                claim_boundary: String::from(
-                    "This provisional closeout bundle now records accepted-checkpoint and backup progress under the actual-lane evidence family. It does not claim automatic eval, dashboard alerting, or final closeout completion.",
-                ),
-                detail: String::from(
-                    "Checkpoint-backed-up closeout bundle repeats the selected ref, git SHA, and dirty-tree posture after the accepted checkpoint entered the recovery family.",
-                ),
+                claim_boundary: String::from(if checkpoint_eval_decision.is_some() {
+                    "This provisional closeout bundle now records accepted-checkpoint, backup, and automatic checkpoint-eval progress under the actual-lane evidence family. It does not claim dashboard alerting fan-out or final closeout completion."
+                } else {
+                    "This provisional closeout bundle now records accepted-checkpoint and backup progress plus an explicit checkpoint-eval retry requirement under the actual-lane evidence family. It does not claim dashboard alerting fan-out or final closeout completion."
+                }),
+                detail: String::from(if checkpoint_eval_decision.is_some() {
+                    "Checkpoint-evaluated closeout bundle repeats the selected ref, git SHA, and dirty-tree posture after the accepted checkpoint entered the automatic review family."
+                } else {
+                    "Checkpoint-eval-retry closeout bundle repeats the selected ref, git SHA, and dirty-tree posture after the accepted checkpoint entered the retained failure and alert family."
+                }),
             };
             closeout_bundle.validate()?;
             write_json_pretty(
@@ -860,21 +966,29 @@ fn main() -> Result<(), Box<dyn Error>> {
             append_launcher_log(
                 &run_root,
                 &format!(
-                    "{} phase=checkpoint_backed_up surface_id={} git_commit_sha={} checkpoint_label={} checkpoint_step={} backup_state={}\n",
+                    "{} phase={} surface_id={} git_commit_sha={} checkpoint_label={} checkpoint_step={} backup_state={} checkpoint_eval_state={}\n",
                     now_utc(repo_root)?,
+                    current_status.phase,
                     "psion_actual_pretraining.record_checkpoint",
                     git_commit_sha,
                     checkpoint_label,
                     optimizer_step,
-                    backup_receipt.backup_state
+                    backup_receipt.backup_state,
+                    if let Some(decision) = &checkpoint_eval_decision {
+                        decision.decision_state.as_str()
+                    } else {
+                        "retry_required"
+                    }
                 ),
             )?;
-            println!("status=checkpoint_backed_up");
+            println!("status={}", current_status.phase);
             println!("run_id={}", checkpoint_pointer.run_id);
             println!("run_root={}", run_root.display());
             println!(
                 "checkpoint_manifest={}",
-                run_root.join(&checkpoint_manifest.relative_manifest_path).display()
+                run_root
+                    .join(&checkpoint_manifest.relative_manifest_path)
+                    .display()
             );
             println!("checkpoint_pointer={}", pointer_path.display());
             println!(
@@ -883,9 +997,35 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .join(&retained_paths.latest_checkpoint_backup_receipt_path)
                     .display()
             );
+            if checkpoint_eval_decision.is_some() {
+                println!(
+                    "checkpoint_eval_decision={}",
+                    run_root
+                        .join(&retained_paths.latest_checkpoint_eval_decision_path)
+                        .display()
+                );
+            }
+            if checkpoint_eval_failure.is_some() {
+                println!(
+                    "checkpoint_eval_failure={}",
+                    run_root
+                        .join(&retained_paths.latest_checkpoint_eval_failure_path)
+                        .display()
+                );
+            }
+            if redacted_alert.is_some() {
+                println!(
+                    "latest_redacted_alert={}",
+                    run_root
+                        .join(&retained_paths.latest_redacted_alert_path)
+                        .display()
+                );
+            }
             println!(
                 "closeout_bundle={}",
-                run_root.join(&retained_paths.closeout_bundle_path).display()
+                run_root
+                    .join(&retained_paths.closeout_bundle_path)
+                    .display()
             );
         }
         Cli::Backup {
@@ -985,6 +1125,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
     let mut allow_dirty_tree = false;
     let mut dry_run = false;
     let mut inject_failed_upload = false;
+    let mut inject_eval_worker_unavailable = false;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -1052,6 +1193,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
             "--allow-dirty-tree" => allow_dirty_tree = true,
             "--dry-run" => dry_run = true,
             "--inject-failed-upload" => inject_failed_upload = true,
+            "--inject-eval-worker-unavailable" => inject_eval_worker_unavailable = true,
             "--help" | "-h" => {
                 usage();
                 std::process::exit(0);
@@ -1119,21 +1261,19 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                 );
             }
             if checkpoint_label.is_empty() {
-                return Err(
-                    std::io::Error::other(
-                        "record-checkpoint requires --checkpoint-label <label>",
-                    )
-                    .into(),
-                );
+                return Err(std::io::Error::other(
+                    "record-checkpoint requires --checkpoint-label <label>",
+                )
+                .into());
             }
             let optimizer_step = optimizer_step.ok_or_else(|| {
                 std::io::Error::other("record-checkpoint requires --optimizer-step <step>")
             })?;
             if checkpoint_ref.is_empty() {
-                return Err(
-                    std::io::Error::other("record-checkpoint requires --checkpoint-ref <ref>")
-                        .into(),
-                );
+                return Err(std::io::Error::other(
+                    "record-checkpoint requires --checkpoint-ref <ref>",
+                )
+                .into());
             }
             Ok(Cli::RecordCheckpoint {
                 run_root: PathBuf::from(run_root),
@@ -1147,6 +1287,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                     Some(checkpoint_object_digest)
                 },
                 checkpoint_total_bytes,
+                inject_eval_worker_unavailable,
                 allow_dirty_tree,
             })
         }
@@ -1170,7 +1311,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
 
 fn usage() {
     eprintln!(
-        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]"
+        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]"
     );
 }
 
@@ -1195,6 +1336,8 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
         pretrain_dir.join("psion_actual_pretraining_topology_storage_bundle_v1.json");
     let systems_path = pretrain_dir.join("psion_actual_pretraining_systems_bundle_v1.json");
     let evidence_path = pretrain_dir.join("psion_actual_pretraining_evidence_contract_v1.json");
+    let checkpoint_eval_benchmark_path =
+        repo_root.join(PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH);
     let lane_spec: PsionActualPretrainingLaneSpec = load_json(&lane_spec_path)?;
     lane_spec.validate()?;
     let recipe: PsionActualPretrainingRecipeBundle = load_json(&recipe_path)?;
@@ -1220,6 +1363,7 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
     systems_bundle.validate()?;
     let evidence: PsionActualPretrainingEvidenceContract = load_json(&evidence_path)?;
     evidence.validate().map_err(map_evidence_error)?;
+    build_psion_actual_pretraining_checkpoint_eval_benchmark_package()?.validate()?;
 
     Ok(FrozenContracts {
         lane_spec_ref: artifact_ref(repo_root, &lane_spec_path)?,
@@ -1230,6 +1374,10 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
         systems_bundle_ref: artifact_ref(repo_root, &systems_path)?,
         topology_storage_bundle_ref: artifact_ref(repo_root, &topology_path)?,
         evidence_contract_ref: artifact_ref(repo_root, &evidence_path)?,
+        checkpoint_eval_benchmark_fixture_ref: artifact_ref(
+            repo_root,
+            &checkpoint_eval_benchmark_path,
+        )?,
         baseline_tools_bundle,
         data_bundle,
         recipe_bundle: recipe,
@@ -1257,11 +1405,20 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
             "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
         ),
         auto_resume_receipt_path: String::from("checkpoints/auto_resume_receipt.json"),
+        latest_checkpoint_eval_decision_path: String::from(
+            PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
+        ),
+        latest_checkpoint_eval_failure_path: String::from(
+            PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
+        ),
         hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
         run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
         continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         closeout_bundle_path: String::from("closeout/closeout_bundle.json"),
         launcher_log_path: String::from("logs/launcher.log"),
+        latest_redacted_alert_path: String::from(
+            PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
+        ),
     }
 }
 
@@ -1874,7 +2031,10 @@ fn write_json_pretty<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), 
     Ok(())
 }
 
-fn run_artifact_ref(run_root: &Path, path: &Path) -> Result<PsionActualPretrainingArtifactRef, Box<dyn Error>> {
+fn run_artifact_ref(
+    run_root: &Path,
+    path: &Path,
+) -> Result<PsionActualPretrainingArtifactRef, Box<dyn Error>> {
     let relative = path
         .strip_prefix(run_root)?
         .to_string_lossy()
@@ -1944,7 +2104,9 @@ fn validate_resume_candidate(
     let manifest_relative_path = checkpoint_pointer
         .checkpoint_manifest_relative_path
         .as_deref()
-        .ok_or_else(|| String::from("accepted checkpoint pointer is missing checkpoint manifest path"))?;
+        .ok_or_else(|| {
+            String::from("accepted checkpoint pointer is missing checkpoint manifest path")
+        })?;
     let manifest = load_checkpoint_manifest(run_root, manifest_relative_path)
         .map_err(|error| error.to_string())?;
     if manifest.run_id != checkpoint_pointer.run_id {
@@ -2026,7 +2188,9 @@ fn materialize_checkpoint_backup(
         checkpoint_pointer
             .checkpoint_ref
             .as_deref()
-            .ok_or_else(|| std::io::Error::other("accepted checkpoint pointer is missing checkpoint_ref"))?,
+            .ok_or_else(|| {
+                std::io::Error::other("accepted checkpoint pointer is missing checkpoint_ref")
+            })?,
         selected_git_ref,
         git_commit_sha,
         dirty_tree_admission,
@@ -2094,7 +2258,8 @@ fn resolve_resume_target(
     workspace_status_sha256: Option<String>,
 ) -> Result<ResolvedResumeTarget, Box<dyn Error>> {
     let primary_pointer_path = run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
-    let backup_receipt_path = run_root.join("checkpoints/latest_accepted_checkpoint_backup_receipt.json");
+    let backup_receipt_path =
+        run_root.join("checkpoints/latest_accepted_checkpoint_backup_receipt.json");
     let backup_pointer_path = checkpoint_backup_pointer_path(run_root);
 
     let primary_pointer_state;
@@ -2146,16 +2311,16 @@ fn resolve_resume_target(
             load_json(&backup_receipt_path)?;
         backup_receipt.validate()?;
         if backup_receipt.backup_state != "backed_up" {
-            return Err(
-                std::io::Error::other(
-                    "latest checkpoint backup receipt is not durable enough for auto-resume",
-                )
-                .into(),
-            );
+            return Err(std::io::Error::other(
+                "latest checkpoint backup receipt is not durable enough for auto-resume",
+            )
+            .into());
         }
-        let checkpoint_pointer: PsionActualPretrainingCheckpointPointer = load_json(&backup_pointer_path)?;
+        let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
+            load_json(&backup_pointer_path)?;
         let backup_manifest_path = run_root.join(&backup_receipt.backup_checkpoint_manifest.path);
-        let checkpoint_manifest: PsionActualPretrainingCheckpointManifest = load_json(&backup_manifest_path)?;
+        let checkpoint_manifest: PsionActualPretrainingCheckpointManifest =
+            load_json(&backup_manifest_path)?;
         checkpoint_manifest.validate()?;
         write_json_pretty(&primary_pointer_path, &checkpoint_pointer)?;
         write_json_pretty(
@@ -2203,7 +2368,9 @@ fn resolve_resume_target(
                     vec![
                         String::from("checkpoints/auto_resume_receipt.json"),
                         String::from("checkpoints/latest_accepted_checkpoint_backup_receipt.json"),
-                        String::from("checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json"),
+                        String::from(
+                            "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+                        ),
                         format!(
                             "checkpoints/backups/step-{}/checkpoint_manifest.backup.json",
                             checkpoint_pointer.optimizer_step
@@ -2227,7 +2394,9 @@ fn resolve_resume_target(
     match recovery {
         Ok(resolved) => Ok(resolved),
         Err(_) => {
-            let run_id = if let Ok(pointer) = load_json::<PsionActualPretrainingCheckpointPointer>(&backup_pointer_path) {
+            let run_id = if let Ok(pointer) =
+                load_json::<PsionActualPretrainingCheckpointPointer>(&backup_pointer_path)
+            {
                 pointer.run_id
             } else {
                 String::from("unknown_run")

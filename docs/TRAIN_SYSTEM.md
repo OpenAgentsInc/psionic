@@ -175,6 +175,24 @@ zero-guess auto-resume receipts, and failure-injection drills into the same
 actual-lane evidence family while keeping secret material redacted and git
 provenance repeated through the retained recovery artifacts.
 
+The repo now also owns the canonical actual-lane checkpoint-eval contract in
+`crates/psionic-eval/src/psion_actual_pretraining_checkpoint_eval_pack.rs`,
+`crates/psionic-train/src/psion_actual_pretraining_checkpoint_evals.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_checkpoint_eval_fixtures.rs`,
+the focused doc `docs/PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVALS.md`, and the
+committed fixtures:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_eval_benchmark_pack_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_eval_decision_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_eval_failure_worker_unavailable_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_redacted_alert_v1.json`
+
+That surface freezes one actual-lane benchmark pack, one retained
+latest-decision path, one retry-required failure path, and one redacted alert
+path so later continue-vs-restart work consumes one real operator receipt
+family instead of side reports.
+
 The bounded `./TRAIN` operator path is now also explicitly separated from that
 actual-lane truth. It writes bounded reference-pilot artifacts under
 `psion_reference_pilot_runs/<run_id>` naming, uses
@@ -192,7 +210,9 @@ fixtures `fixtures/psion/pretrain/psion_actual_pretraining_current_run_status_v1
 plus `fixtures/psion/pretrain/psion_actual_pretraining_retained_summary_v1.json`.
 That surface now carries the real actual-lane status contract used by the
 launcher, including explicit pre-first-checkpoint phases such as
-`dry_run_planned` and `launch_staged`.
+`dry_run_planned` and `launch_staged`, plus
+`checkpoint_evaluated` and `checkpoint_eval_retry_required` once automatic
+checkpoint review has written retained decision or retry receipts.
 
 The repo now also owns the canonical actual-lane launcher and checkpoint
 lifecycle contract
@@ -222,8 +242,9 @@ topology/storage, evidence, and status contracts directly; refuses dirty
 working trees by default; retains the selected ref plus exact commit SHA; and
 repeats that provenance in the provisional closeout bundle. It now also
 records accepted checkpoint manifests, durable backup receipts, auto-resume
-receipts, and stale/corrupt-pointer plus failed-upload drills without using
-destructive git commands or leaking raw secret payloads into retained
+receipts, automatic checkpoint-eval decisions, retry-required eval failures,
+redacted alerts, and stale/corrupt-pointer plus failed-upload drills without
+using destructive git commands or leaking raw secret payloads into retained
 artifacts.
 
 The repo now also owns the canonical actual-lane hardware observation and

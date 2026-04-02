@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    PsionActualPretrainingArtifactRef, PSION_ACTUAL_PRETRAINING_LANE_ID,
-    PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
 };
 
 /// Stable schema version for the canonical actual-lane output and evidence contract.
@@ -171,8 +171,11 @@ impl PsionActualPretrainingEvidenceContract {
             "checkpoints/latest_accepted_checkpoint_pointer.json",
             "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
             "checkpoints/auto_resume_receipt.json",
+            "evals/latest_checkpoint_eval_decision.json",
+            "evals/latest_checkpoint_eval_failure.json",
             "preflight/hardware_qualification.json",
             "preflight/run_shape_qualification.json",
+            "alerts/latest_redacted_alert.json",
             "closeout/closeout_bundle.json",
         ] {
             if !self
@@ -242,7 +245,9 @@ pub enum PsionActualPretrainingEvidenceContractError {
     },
     #[error("psion actual-pretraining evidence contract is missing artifact slots")]
     MissingArtifactSlots,
-    #[error("psion actual-pretraining evidence contract is missing required artifact path `{relative_path}`")]
+    #[error(
+        "psion actual-pretraining evidence contract is missing required artifact path `{relative_path}`"
+    )]
     MissingArtifactPath { relative_path: String },
     #[error("psion actual-pretraining evidence contract is missing provenance fields")]
     MissingProvenanceFields,

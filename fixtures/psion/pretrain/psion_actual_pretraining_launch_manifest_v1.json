@@ -14,11 +14,14 @@
     "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
     "latest_checkpoint_backup_receipt_path": "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
     "auto_resume_receipt_path": "checkpoints/auto_resume_receipt.json",
+    "latest_checkpoint_eval_decision_path": "evals/latest_checkpoint_eval_decision.json",
+    "latest_checkpoint_eval_failure_path": "evals/latest_checkpoint_eval_failure.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
     "run_shape_qualification_path": "preflight/run_shape_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
     "closeout_bundle_path": "closeout/closeout_bundle.json",
-    "launcher_log_path": "logs/launcher.log"
+    "launcher_log_path": "logs/launcher.log",
+    "latest_redacted_alert_path": "alerts/latest_redacted_alert.json"
   },
   "launcher_surfaces": {
     "start_surface_id": "psion_actual_pretraining.start",
@@ -35,12 +38,12 @@
   },
   "preflight_receipt": {
     "relative_path": "preflight/hardware_qualification.json",
-    "receipt_digest": "d4e6d27ec293e808847564b459c9cbf33cfabcae6a7a5ab8c87f33f080149909",
+    "receipt_digest": "c9f22cad062a79a2cf0faa5c886a71f9b0283ccb381a4799b205ee1db253fa17",
     "admission_state": "admitted"
   },
   "run_shape_receipt": {
     "relative_path": "preflight/run_shape_qualification.json",
-    "receipt_digest": "861b4bb5179de56295b21b443377096e3cdb5b9c8023d5542236bcdf83dd4eee",
+    "receipt_digest": "e6a568730c4e702e14e3c287449ac4a5129bb9627d5d717c4380135cb3660847",
     "admission_state": "admitted"
   },
   "contract_refs": {
@@ -74,7 +77,7 @@
     },
     "evidence_contract": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json",
-      "sha256": "93414e8b31f96b564d840a3ad271c602d922a0afafc2fe36aaaf8c09d16a31d1"
+      "sha256": "ad020160a577be7a61f0dd04cbabdf91ae87683d9f7c41f8568ae9cb9e4c93f1"
     }
   },
   "selected_git_ref": "refs/heads/main",

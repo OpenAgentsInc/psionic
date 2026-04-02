@@ -7,9 +7,9 @@
 This document freezes one operator-owned output and evidence family for the
 canonical actual pretraining lane.
 
-It does not implement backup, auto-resume, automatic evaluation, or dashboards
-by itself. It does fix the layout and naming that those later issues must
-reuse.
+It does not implement dashboards or final closeout by itself. It does fix the
+layout and naming that backup, auto-resume, automatic checkpoint evaluation,
+alerts, and later closeout work must reuse.
 
 ## Canonical Artifacts
 
@@ -69,6 +69,9 @@ psion_actual_pretraining_runs/<run_id>/
     accepted_checkpoint_handoff.json
   evals/
     checkpoint_eval_step-<optimizer_step>.json
+    latest_checkpoint_eval_decision.json
+    checkpoint_eval_failure_step-<optimizer_step>.json
+    latest_checkpoint_eval_failure.json
   exports/
     promoted_checkpoint_export_manifest.json
   logs/
@@ -142,9 +145,10 @@ Those surfaces currently write the launch or resume manifest, retained
 hardware qualification receipt, retained run-shape qualification receipt,
 retained status surfaces, canonical checkpoint pointer, checkpoint manifest,
 checkpoint backup receipt, auto-resume receipt, failure-drill receipts,
-launcher log, and a provisional closeout bundle that repeats git provenance
-early. Resume over an accepted checkpoint also writes the retained
-continuation handoff at `continuation/accepted_checkpoint_handoff.json`, which
-binds that accepted checkpoint to the frozen `general_sft -> agentic_sft`
-continuation target. Later hardening issues extend the same retained family
-instead of replacing it.
+automatic checkpoint-eval decision receipts, checkpoint-eval retry receipts,
+the latest redacted alert, launcher log, and a provisional closeout bundle
+that repeats git provenance early. Resume over an accepted checkpoint also
+writes the retained continuation handoff at
+`continuation/accepted_checkpoint_handoff.json`, which binds that accepted
+checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
+Later hardening issues extend the same retained family instead of replacing it.

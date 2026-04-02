@@ -11,11 +11,14 @@
     "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
     "latest_checkpoint_backup_receipt_path": "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
     "auto_resume_receipt_path": "checkpoints/auto_resume_receipt.json",
+    "latest_checkpoint_eval_decision_path": "evals/latest_checkpoint_eval_decision.json",
+    "latest_checkpoint_eval_failure_path": "evals/latest_checkpoint_eval_failure.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
     "run_shape_qualification_path": "preflight/run_shape_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
     "closeout_bundle_path": "closeout/closeout_bundle.json",
-    "launcher_log_path": "logs/launcher.log"
+    "launcher_log_path": "logs/launcher.log",
+    "latest_redacted_alert_path": "alerts/latest_redacted_alert.json"
   },
   "selected_git_ref": "refs/heads/main",
   "git_commit_sha": "1111222233334444555566667777888899990000",

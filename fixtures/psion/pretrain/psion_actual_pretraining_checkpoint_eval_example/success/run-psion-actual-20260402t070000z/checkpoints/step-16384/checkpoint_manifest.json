@@ -1,0 +1,20 @@
+{
+  "schema_version": "psion.actual_pretraining_checkpoint_manifest.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "recipe_id": "psion_actual_pretraining_recipe_v1",
+  "run_id": "run-psion-actual-20260402t070000z",
+  "checkpoint_label": "broader-pretrain-final",
+  "optimizer_step": 16384,
+  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+  "relative_manifest_path": "checkpoints/step-16384/checkpoint_manifest.json",
+  "relative_checkpoint_dir": "checkpoints/step-16384",
+  "checkpoint_object_digest": "3f8c854152cd7e2341ea88a11ea1fc0a2d17c3562d34173c59ef8dfab829efc6",
+  "checkpoint_total_bytes": 4294967296,
+  "dataset_identity": "psion_corpus_tokenized@v1",
+  "selected_git_ref": "refs/heads/main",
+  "git_commit_sha": "1111222233334444555566667777888899990000",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "detail": "Checkpoint manifest records one accepted actual-lane checkpoint inside the frozen evidence family without claiming that the broader distributed training job ran inside this launcher process.",
+  "manifest_digest": "e97c48be2cbe8dab1af58fde12f412c141ac0efe7b96f95fc8ca9dc5f493a8dc"
+}

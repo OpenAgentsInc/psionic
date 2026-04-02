@@ -5,13 +5,13 @@ use std::{
 };
 
 use psionic_train::{
-    PsionActualPretrainingArtifactRef, PsionActualPretrainingArtifactSlot,
-    PsionActualPretrainingEvidenceContract, PsionActualPretrainingProvenanceField,
-    PsionActualPretrainingRedactionRule, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_EVIDENCE_FAMILY, PSION_ACTUAL_PRETRAINING_LANE_ID,
     PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RUN_ROOT_FAMILY,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingArtifactSlot, PsionActualPretrainingEvidenceContract,
+    PsionActualPretrainingProvenanceField, PsionActualPretrainingRedactionRule,
 };
 use sha2::{Digest, Sha256};
 
@@ -30,7 +30,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         contract_id: String::from(PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID),
         lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
         recipe_id: String::from(PSION_ACTUAL_PRETRAINING_RECIPE_ID),
-        topology_storage_bundle_id: String::from(PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID),
+        topology_storage_bundle_id: String::from(
+            PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+        ),
         recipe_bundle: artifact_ref(&root, &recipe_bundle_path)?,
         topology_storage_bundle: artifact_ref(&root, &topology_bundle_path)?,
         evidence_family: String::from(PSION_ACTUAL_PRETRAINING_EVIDENCE_FAMILY),
@@ -122,6 +124,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Checkpoint evaluation receipt used by continue-vs-restart policy.",
             ),
             slot(
+                "evals/latest_checkpoint_eval_decision.json",
+                "latest_checkpoint_eval_decision",
+                "durable",
+                "Most recent automatic checkpoint eval decision retained for later continue-vs-restart logic.",
+            ),
+            slot(
+                "evals/checkpoint_eval_failure_step-<optimizer_step>.json",
+                "checkpoint_eval_failure_receipt",
+                "durable",
+                "Retained checkpoint eval failure receipt for one accepted checkpoint when automatic review could not run.",
+            ),
+            slot(
+                "evals/latest_checkpoint_eval_failure.json",
+                "latest_checkpoint_eval_failure",
+                "durable",
+                "Most recent automatic checkpoint eval failure retained for retry and alert review.",
+            ),
+            slot(
                 "exports/promoted_checkpoint_export_manifest.json",
                 "promoted_export_manifest",
                 "durable",
@@ -193,26 +213,71 @@ fn main() -> Result<(), Box<dyn Error>> {
         redaction_rules: vec![
             redaction(
                 "manifests",
-                &["artifact_ref", "digest", "env_var_name", "cluster_label", "topology_digest"],
-                &["credential_payload", "access_token", "service_account_json", "private_key", "tailnet_ip", "ssh_target"],
+                &[
+                    "artifact_ref",
+                    "digest",
+                    "env_var_name",
+                    "cluster_label",
+                    "topology_digest",
+                ],
+                &[
+                    "credential_payload",
+                    "access_token",
+                    "service_account_json",
+                    "private_key",
+                    "tailnet_ip",
+                    "ssh_target",
+                ],
                 "Retained manifests keep refs, digests, and redacted connection metadata only.",
             ),
             redaction(
                 "preflight",
-                &["redacted_host_label", "digest", "device_name", "health_signal", "env_var_name"],
-                &["credential_payload", "access_token", "private_key", "service_account_json", "tailnet_ip", "ssh_target", "credential_file_path"],
+                &[
+                    "redacted_host_label",
+                    "digest",
+                    "device_name",
+                    "health_signal",
+                    "env_var_name",
+                ],
+                &[
+                    "credential_payload",
+                    "access_token",
+                    "private_key",
+                    "service_account_json",
+                    "tailnet_ip",
+                    "ssh_target",
+                    "credential_file_path",
+                ],
                 "Preflight qualification receipts retain redacted worker labels, device health signals, throughput and storage digests, and credential digests only.",
             ),
             redaction(
                 "logs",
                 &["event_label", "step_id", "digest", "redacted_host_label"],
-                &["credential_payload", "access_token", "private_key", "bucket_secret", "credential_file_path"],
+                &[
+                    "credential_payload",
+                    "access_token",
+                    "private_key",
+                    "bucket_secret",
+                    "credential_file_path",
+                ],
                 "Launcher logs may retain event labels and digests but not raw secret or credential material.",
             ),
             redaction(
                 "alerts",
-                &["event_label", "digest", "redacted_host_label", "artifact_ref"],
-                &["credential_payload", "access_token", "private_key", "tailnet_ip", "ssh_target", "bucket_secret"],
+                &[
+                    "event_label",
+                    "digest",
+                    "redacted_host_label",
+                    "artifact_ref",
+                ],
+                &[
+                    "credential_payload",
+                    "access_token",
+                    "private_key",
+                    "tailnet_ip",
+                    "ssh_target",
+                    "bucket_secret",
+                ],
                 "Alert payloads keep only redacted host labels and artifact references.",
             ),
         ],

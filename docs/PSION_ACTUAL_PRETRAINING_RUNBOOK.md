@@ -42,13 +42,15 @@ The actual-lane command now does these things for real:
 - writes the canonical latest-checkpoint pointer file
 - writes accepted checkpoint manifests plus durable-backup receipts
 - writes auto-resume receipts and retained stale/corrupt-pointer recovery drills
+- writes automatic checkpoint-eval decisions on accepted checkpoints
+- can retain checkpoint-eval retry receipts plus a redacted alert when the eval
+  worker is unavailable
 - can inject a failed-upload refusal drill without manual artifact editing
 - repeats provenance into the provisional closeout bundle
 - exposes the canonical status command
 
 It does not yet claim:
 
-- automatic checkpoint evals
 - dashboards or alert routing
 - completed distributed cluster execution
 
@@ -124,11 +126,33 @@ checkpoint lineage. It writes:
 - `checkpoints/latest_accepted_checkpoint_backup_receipt.json`
 - `checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json`
 - `checkpoints/backups/step-<optimizer_step>/checkpoint_manifest.backup.json`
+- `evals/checkpoint_eval_step-<optimizer_step>.json`
+- `evals/latest_checkpoint_eval_decision.json`
 - refreshed status, retained-summary, closeout, and launcher-log surfaces
 
 The default checkpoint byte count comes from the frozen systems bundle. The
 default checkpoint object digest is a stable synthetic digest over the accepted
 checkpoint identity unless the operator provides an explicit digest.
+
+Unavailable-worker rehearsal:
+
+```bash
+./TRAIN --lane actual_pretraining record-checkpoint \
+  --run-root <path> \
+  --checkpoint-label broader-pretrain-final \
+  --optimizer-step 16384 \
+  --checkpoint-ref checkpoint://psion/broad/pretrain/final \
+  --inject-eval-worker-unavailable
+```
+
+That path writes:
+
+- `evals/checkpoint_eval_failure_step-<optimizer_step>.json`
+- `evals/latest_checkpoint_eval_failure.json`
+- `alerts/latest_redacted_alert.json`
+
+It keeps the checkpoint itself admitted and backed up, but retains explicit
+retry-required evidence instead of silently skipping automatic eval.
 
 ## Backup Command
 
@@ -223,6 +247,8 @@ prints:
 - git commit SHA
 - dirty-tree admission posture
 - status surface id
+- latest checkpoint-eval decision and score when present
+- latest checkpoint-eval failure and latest alert when present
 
 ## Dirty Trees And Provenance
 
@@ -255,6 +281,7 @@ provisional closeout bundle.
 - `docs/PSION_ACTUAL_PRETRAINING_BASELINE_TOOLS_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
+- `docs/PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVALS.md`
 - `docs/PSION_ACTUAL_PRETRAINING_HARDWARE_QUALIFICATION.md`
 - `docs/PSION_ACTUAL_PRETRAINING_RUN_SHAPE_QUALIFICATION.md`
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
