@@ -14,6 +14,7 @@ evidence.
 - Detailed workspace map: [docs/WORKSPACE_MAP.md](docs/WORKSPACE_MAP.md)
 - Inference and serving: [docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)
 - Optimizer substrate: [docs/OPTIMIZER_SUBSTRATE.md](docs/OPTIMIZER_SUBSTRATE.md)
+- Forge-facing eval pack publication: [docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md](docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)
 - Repo-local library roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)

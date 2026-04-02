@@ -1,0 +1,116 @@
+{
+  "schema_version": "psion.forge_benchmark_pack_manifest.v1",
+  "pack_id": "psion.pack.benchmark.core.v1",
+  "display_name": "Psion core benchmark pack",
+  "catalog_id": "psion-benchmark-catalog-v1",
+  "catalog_digest": "448772c9171cbedb4200cbf01254316026ee3bfdc362f16e7abfe3d17b0e96a2",
+  "receipt_set_id": "psion-benchmark-receipt-set-v1",
+  "receipt_set_digest": "8490dc770d0e20178376d92d771366be8812b0338c83e7fcf80e6ff8f3464795",
+  "source_artifacts": [
+    {
+      "path": "fixtures/psion/benchmarks/psion_benchmark_catalog_v1.json",
+      "sha256": "cce95eab1c6a869da7c62a10c70684a9946876effcde1a3281426ad08145ae3e",
+      "detail": "Canonical benchmark catalog defining the benchmark package set projected into the first Forge-facing benchmark pack."
+    },
+    {
+      "path": "fixtures/psion/benchmarks/psion_benchmark_receipt_set_v1.json",
+      "sha256": "288684507e93e496d4931aaefa1493818b2c7736b9031049eb3c75192f2eefc7",
+      "detail": "Canonical benchmark receipt set carrying the bounded review posture and metric selectors for the published benchmark-pack entries."
+    }
+  ],
+  "packages": [
+    {
+      "package_id": "psion_architecture_reasoning_benchmark_v1",
+      "package_family": "architecture_reasoning",
+      "acceptance_family": "architecture_reasoning",
+      "benchmark_ref": "psion_architecture_reasoning_benchmark_v1",
+      "benchmark_version": "v1",
+      "benchmark_digest": "6d6f1ec0dcbdc2dea7a7befa59befb97fe31726f1e05672ddc008262fe5b54e7",
+      "receipt_id": "psion-architecture-benchmark-receipt-v1",
+      "receipt_digest": "1f9a8710ad3f15fe5a84cbddd5ee42024f3fb0da362551aeafa7f7de6717ad6f",
+      "phase": "pilot",
+      "item_count": 4,
+      "metric_kinds": [
+        "pass_rate_bps"
+      ]
+    },
+    {
+      "package_id": "psion_normative_spec_benchmark_v1",
+      "package_family": "normative_spec_reading",
+      "acceptance_family": "normative_spec_reading",
+      "benchmark_ref": "psion_normative_spec_benchmark_v1",
+      "benchmark_version": "v1",
+      "benchmark_digest": "94774559907d8fdd8461d92cf4aa15b2d35228595334b8e46aa2d69c682be3db",
+      "receipt_id": "psion-normative-benchmark-receipt-v1",
+      "receipt_digest": "bc87c45347c9da6be0a7316af106bb525ba452a668e94ce72112c104c22cd211",
+      "phase": "pilot",
+      "item_count": 3,
+      "metric_kinds": [
+        "pass_rate_bps"
+      ]
+    },
+    {
+      "package_id": "psion_engineering_spec_benchmark_v1",
+      "package_family": "engineering_spec_interpretation",
+      "acceptance_family": "engineering_spec_interpretation",
+      "benchmark_ref": "psion_engineering_spec_benchmark_v1",
+      "benchmark_version": "v1",
+      "benchmark_digest": "9adb029aac3d9a8316f4826f2cf51feabca919e6ef7d479ceb87369ea4c042ec",
+      "receipt_id": "psion-engineering-benchmark-receipt-v1",
+      "receipt_digest": "90e5302aabc4fdac5ae83374fa53242313a88c789dfbc9d26e217c80d2011ba0",
+      "phase": "pilot",
+      "item_count": 4,
+      "metric_kinds": [
+        "pass_rate_bps"
+      ]
+    },
+    {
+      "package_id": "psion_memorization_reasoning_benchmark_v1",
+      "package_family": "memorization_versus_reasoning",
+      "acceptance_family": "memorization_versus_reasoning",
+      "benchmark_ref": "psion_memorization_reasoning_benchmark_v1",
+      "benchmark_version": "v1",
+      "benchmark_digest": "28bf9e44d9e4ab25c59d61f7e6336be0b7ed39a96f03a948ddc7a83bf42d87b9",
+      "receipt_id": "psion-memorization-benchmark-receipt-v1",
+      "receipt_digest": "b460b10dcce8be917976b3e88feb7c3d202d5bedd700911a565117696ec62e42",
+      "phase": "pilot",
+      "item_count": 5,
+      "metric_kinds": [
+        "pass_rate_bps"
+      ]
+    },
+    {
+      "package_id": "psion_route_benchmark_v1",
+      "package_family": "route_evaluation",
+      "acceptance_family": "route_selection",
+      "benchmark_ref": "psion_route_benchmark_v1",
+      "benchmark_version": "v1",
+      "benchmark_digest": "50d54eeed1ca2d28a8f0bbeb61c0fb1f15e4b429acc8e4d392cfa972c4fe5d84",
+      "receipt_id": "psion-route-benchmark-receipt-v1",
+      "receipt_digest": "f9ae80027e9d2a2ea5f95bc658577aad6a1afbc00c31774d4fae407ce0f0b44c",
+      "phase": "pilot",
+      "item_count": 4,
+      "metric_kinds": [
+        "route_selection_accuracy_bps"
+      ]
+    },
+    {
+      "package_id": "psion_unsupported_request_refusal_benchmark_v1",
+      "package_family": "refusal_evaluation",
+      "acceptance_family": "unsupported_request_refusal",
+      "benchmark_ref": "psion_unsupported_request_refusal_benchmark_v1",
+      "benchmark_version": "v1",
+      "benchmark_digest": "ed5424d9057ba5103f4430ace6cfc76304c43f637dabc90c3e7c645da86d5777",
+      "receipt_id": "psion-unsupported-request-refusal-benchmark-receipt-v1",
+      "receipt_digest": "b29315d9d1a5b29041782d488d6afe7c0f692f0335f473da6b6dba85c99b606f",
+      "phase": "pilot",
+      "item_count": 5,
+      "metric_kinds": [
+        "unsupported_request_refusal_bps",
+        "overrefusal_bps"
+      ]
+    }
+  ],
+  "claim_boundary": "This manifest publishes the current bounded Psion benchmark package set and receipt-backed selectors for Forge consumption. It does not claim campaign orchestration, payout authority, or automatic promotion beyond the cited benchmark and receipt artifacts.",
+  "pack_digest": "be85d2d3ce56b2ea004ea30ebbc59160228b145f39a8c1df92b5b50f037ba62d"
+}

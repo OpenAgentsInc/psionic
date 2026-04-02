@@ -1,0 +1,206 @@
+{
+  "schema_version": "psion.forge_judge_pack_manifest.v1",
+  "pack_id": "psion.pack.judge.core.v1",
+  "display_name": "Psion core judge pack",
+  "catalog_id": "psion-benchmark-catalog-v1",
+  "catalog_digest": "448772c9171cbedb4200cbf01254316026ee3bfdc362f16e7abfe3d17b0e96a2",
+  "source_artifacts": [
+    {
+      "path": "fixtures/psion/benchmarks/psion_benchmark_catalog_v1.json",
+      "sha256": "cce95eab1c6a869da7c62a10c70684a9946876effcde1a3281426ad08145ae3e",
+      "detail": "Canonical benchmark catalog carrying the grader interfaces that the first Forge-facing judge pack reuses directly."
+    }
+  ],
+  "judges": [
+    {
+      "judge_id": "exact_label_v1",
+      "judge_kind": "exact_label",
+      "package_ids": [
+        "psion_normative_spec_benchmark_v1",
+        "psion_engineering_spec_benchmark_v1",
+        "psion_memorization_reasoning_benchmark_v1"
+      ],
+      "package_families": [
+        "normative_spec_reading",
+        "engineering_spec_interpretation",
+        "memorization_versus_reasoning"
+      ],
+      "acceptance_families": [
+        "normative_spec_reading",
+        "engineering_spec_interpretation",
+        "memorization_versus_reasoning"
+      ],
+      "label_namespace": "psion.spec.reading",
+      "accepted_labels": [
+        "pass",
+        "boundary_clear"
+      ],
+      "detail": "Exact-label grader supports deterministic label-based grading."
+    },
+    {
+      "judge_id": "exact_refusal_context_v1",
+      "judge_kind": "exact_refusal",
+      "package_ids": [
+        "psion_unsupported_request_refusal_benchmark_v1"
+      ],
+      "package_families": [
+        "refusal_evaluation"
+      ],
+      "acceptance_families": [
+        "unsupported_request_refusal"
+      ],
+      "accepted_reason_codes": [
+        "unsupported_context_length"
+      ],
+      "detail": "Refusal grader requires one of the admitted refusal codes exactly."
+    },
+    {
+      "judge_id": "exact_refusal_exactness_v1",
+      "judge_kind": "exact_refusal",
+      "package_ids": [
+        "psion_unsupported_request_refusal_benchmark_v1"
+      ],
+      "package_families": [
+        "refusal_evaluation"
+      ],
+      "acceptance_families": [
+        "unsupported_request_refusal"
+      ],
+      "accepted_reason_codes": [
+        "unsupported_exactness_request"
+      ],
+      "detail": "Refusal grader requires one of the admitted refusal codes exactly."
+    },
+    {
+      "judge_id": "exact_refusal_freshness_v1",
+      "judge_kind": "exact_refusal",
+      "package_ids": [
+        "psion_unsupported_request_refusal_benchmark_v1"
+      ],
+      "package_families": [
+        "refusal_evaluation"
+      ],
+      "acceptance_families": [
+        "unsupported_request_refusal"
+      ],
+      "accepted_reason_codes": [
+        "currentness_or_run_artifact_dependency"
+      ],
+      "detail": "Refusal grader requires one of the admitted refusal codes exactly."
+    },
+    {
+      "judge_id": "exact_refusal_missing_constraints_v1",
+      "judge_kind": "exact_refusal",
+      "package_ids": [
+        "psion_unsupported_request_refusal_benchmark_v1"
+      ],
+      "package_families": [
+        "refusal_evaluation"
+      ],
+      "acceptance_families": [
+        "unsupported_request_refusal"
+      ],
+      "accepted_reason_codes": [
+        "missing_required_constraints"
+      ],
+      "detail": "Refusal grader requires one of the admitted refusal codes exactly."
+    },
+    {
+      "judge_id": "exact_refusal_open_ended_v1",
+      "judge_kind": "exact_refusal",
+      "package_ids": [
+        "psion_unsupported_request_refusal_benchmark_v1"
+      ],
+      "package_families": [
+        "refusal_evaluation"
+      ],
+      "acceptance_families": [
+        "unsupported_request_refusal"
+      ],
+      "accepted_reason_codes": [
+        "open_ended_general_assistant_unsupported"
+      ],
+      "detail": "Refusal grader requires one of the admitted refusal codes exactly."
+    },
+    {
+      "judge_id": "route_answer_v1",
+      "judge_kind": "exact_route",
+      "package_ids": [
+        "psion_route_benchmark_v1"
+      ],
+      "package_families": [
+        "route_evaluation"
+      ],
+      "acceptance_families": [
+        "route_selection"
+      ],
+      "expected_route": "answer_in_language",
+      "detail": "Route grader requires the declared route exactly."
+    },
+    {
+      "judge_id": "route_delegate_v1",
+      "judge_kind": "exact_route",
+      "package_ids": [
+        "psion_route_benchmark_v1"
+      ],
+      "package_families": [
+        "route_evaluation"
+      ],
+      "acceptance_families": [
+        "route_selection"
+      ],
+      "expected_route": "delegate_to_exact_executor",
+      "detail": "Route grader requires the declared route exactly."
+    },
+    {
+      "judge_id": "route_structure_v1",
+      "judge_kind": "exact_route",
+      "package_ids": [
+        "psion_route_benchmark_v1"
+      ],
+      "package_families": [
+        "route_evaluation"
+      ],
+      "acceptance_families": [
+        "route_selection"
+      ],
+      "expected_route": "request_structured_inputs",
+      "detail": "Route grader requires the declared route exactly."
+    },
+    {
+      "judge_id": "route_uncertainty_v1",
+      "judge_kind": "exact_route",
+      "package_ids": [
+        "psion_route_benchmark_v1"
+      ],
+      "package_families": [
+        "route_evaluation"
+      ],
+      "acceptance_families": [
+        "route_selection"
+      ],
+      "expected_route": "answer_with_uncertainty",
+      "detail": "Route grader requires the declared route exactly."
+    },
+    {
+      "judge_id": "rubric_reasoning_v1",
+      "judge_kind": "rubric_score",
+      "package_ids": [
+        "psion_architecture_reasoning_benchmark_v1",
+        "psion_engineering_spec_benchmark_v1"
+      ],
+      "package_families": [
+        "architecture_reasoning",
+        "engineering_spec_interpretation"
+      ],
+      "acceptance_families": [
+        "architecture_reasoning",
+        "engineering_spec_interpretation"
+      ],
+      "rubric_ref": "rubric://psion/benchmark/reasoning",
+      "detail": "Rubric grader supports bounded reasoning labels without collapsing them into one exact string."
+    }
+  ],
+  "claim_boundary": "This manifest publishes the current bounded Psion grader and verifier selectors already attached to the canonical benchmark packages. It does not claim generic rubric hosting, campaign control, or arbitrary judge execution outside the cited benchmark catalog.",
+  "pack_digest": "0929149d918e26bd07bf19ebec34cead3eedb6cf7ea9b4db971d86c47335ce9b"
+}

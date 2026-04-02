@@ -46,6 +46,11 @@ separate.
 unsupported-envelope refusal probes and the receipt that keeps capability
 region, reason-code match, and supported-control over-refusal visible.
 
+`docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md` now records the first published
+benchmark-pack and judge-pack manifests above this benchmark catalog, keeping
+Forge-facing pack selection bound to the same Psionic-owned package and grader
+artifacts.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_benchmark_packages.rs` owns the shared
@@ -56,6 +61,14 @@ region, reason-code match, and supported-control over-refusal visible.
   package catalog spanning the main benchmark families.
 - `fixtures/psion/benchmarks/psion_benchmark_receipt_set_v1.json` is the
   canonical receipt set for those packages.
+- `crates/psionic-train/src/psion_forge_eval_pack_manifests.rs` owns the first
+  Forge-facing pack-manifest layer above that catalog.
+- `crates/psionic-train/examples/psion_forge_eval_pack_manifest_fixtures.rs`
+  regenerates the committed benchmark-pack and judge-pack fixtures.
+- `fixtures/psion/packs/psion_forge_benchmark_pack_manifest_v1.json` is the
+  first published benchmark-pack manifest.
+- `fixtures/psion/packs/psion_forge_judge_pack_manifest_v1.json` is the first
+  published judge-pack manifest.
 
 The stable schema versions are:
 
