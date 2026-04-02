@@ -1,0 +1,165 @@
+{
+  "schema_version": "psion.actual_pretraining_baseline_tools_bundle.v1",
+  "baseline_tools_bundle_id": "psion_actual_pretraining_baseline_tools_bundle_v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "lane_spec": {
+    "path": "fixtures/psion/pretrain/psion_actual_pretraining_lane_spec_v1.json",
+    "sha256": "6640fce7435338dc0f66b28135f024d4b62b428826aa6ba122c22644749c8057"
+  },
+  "recipe_bundle": {
+    "path": "fixtures/psion/pretrain/psion_actual_pretraining_recipe_bundle_v1.json",
+    "sha256": "37f3a4580a5bd7ea48bfad63ce996162d4c76d24c3044032eceae233a9406007"
+  },
+  "scaling_bundle": {
+    "path": "fixtures/psion/pretrain/psion_actual_pretraining_scaling_bundle_v1.json",
+    "sha256": "96ab2ff226a8b10ed60ad52194db296b963de95da343fd19b8dd89ba0ee23ded"
+  },
+  "data_bundle": {
+    "path": "fixtures/psion/pretrain/psion_actual_pretraining_data_bundle_v1.json",
+    "sha256": "8e0d15306d1cd4c438bb27b4057f05d0923bc1cafd2f3c73452c612b85098319"
+  },
+  "systems_bundle": {
+    "path": "fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json",
+    "sha256": "529d4a31e04f8594b032569311c84e591b6d95ae6511111ba36399f9b5ff3268"
+  },
+  "bringup_trainer": {
+    "trainer_id": "psion_actual_pretraining_bringup_trainer_v1",
+    "stage_program_id": "psion_pretrain_stage",
+    "trainer_entry_surface": "crates/psionic-train/src/psion_pretrain_stage.rs",
+    "stage_config": {
+      "path": "fixtures/psion/pretrain/psion_actual_pretraining_bringup_stage_config_v1.json",
+      "sha256": "4a90200ab9ac4efb5de1d5b747de359ceab0f06d401268cb739d5671670ef260"
+    },
+    "model_descriptor": {
+      "path": "fixtures/psion/models/psion_compact_decoder_internal_descriptor_v1.json",
+      "sha256": "ec62d008fda209b143c50cd0c7ceee3e8675bc8b22a40619f0ded814d414c8bf"
+    },
+    "model_id": "psion-compact-decoder-internal-v1",
+    "dataset_identity": "psion_corpus_tokenized@v1",
+    "sampling_policy_id": "psion_pretrain_mix",
+    "sampling_policy_version": "v1",
+    "tokenizer_binding_digest": "92c451001e4cec3481a3480b29d80ecaa1696f9bffe553139d3a2f65da69e321",
+    "max_context_tokens": 8192,
+    "detail": "The actual lane now binds one honest pretrain-stage bring-up surface directly to the frozen internal 128M recipe instead of leaving correctness and launch-shape checks buried in the larger trusted-cluster anchor."
+  },
+  "tokenizer_reproducibility": {
+    "tokenizer_training_manifest": {
+      "path": "fixtures/psion/tokenizer/psion_tokenizer_training_manifest_v1.json",
+      "sha256": "3b5511e2e69f7b772065e7c2073ef27d35a4eb3b87fd3b1951c4cb292ddab062"
+    },
+    "tokenizer_artifact_bundle": {
+      "path": "fixtures/psion/tokenizer/psion_tokenizer_artifact_bundle_v1.json",
+      "sha256": "457c0ce16653ee5c3fac279d70ad51add402eeae3726c6b2a9b25c276324c1d0"
+    },
+    "tokenized_corpus_manifest": {
+      "path": "fixtures/psion/tokenized/psion_tokenized_corpus_manifest_v1.json",
+      "sha256": "f8cc49f56a5667af510456b0c990368f6147fa4ad318d49cedc3ec622bde0354"
+    },
+    "tokenizer_id": "psion_sentencepiece_seed",
+    "tokenizer_version": "v1",
+    "tokenizer_digest": "sha256:psion_sentencepiece_seed_tokenizer_digest_v1",
+    "tokenizer_binding_digest": "92c451001e4cec3481a3480b29d80ecaa1696f9bffe553139d3a2f65da69e321",
+    "tokenizer_only_source_ids": [
+      "vendor_manual_private_scan_v1"
+    ],
+    "model_training_source_ids": [
+      "arch_textbook_foster_1985",
+      "wasm_core_spec_release_2"
+    ],
+    "held_out_source_ids": [
+      "spec_quiz_eval_pack_v1"
+    ],
+    "detail": "Tokenizer reproducibility stays bound to the canonical tokenizer training manifest, artifact bundle, and tokenized corpus manifest so actual-lane bring-up and ablations cannot silently drift vocab or held-out exposure."
+  },
+  "resource_accounting_rows": [
+    {
+      "row_id": "psion_actual_pretraining_internal128m_accounting",
+      "scope_kind": "actual_lane",
+      "config_binding_id": "psion_actual_pretraining_internal128m_anchor",
+      "model_id": "psion-compact-decoder-internal-v1",
+      "size_anchor": "internal128m",
+      "parameter_count_estimate": 144894464,
+      "train_token_budget": 1073741824,
+      "validation_token_budget": 33554432,
+      "held_out_token_budget": 8388608,
+      "optimizer_steps": 16384,
+      "tokens_per_step": 65536,
+      "max_context_tokens": 8192,
+      "checkpoint_total_bytes": 2333954048,
+      "optimizer_state_bytes": 773091328,
+      "activation_headroom_bytes": 60243722240,
+      "expected_mean_tokens_per_second": 296214,
+      "detail": "Resource accounting exposes the canonical 128M lane shape in one smaller operator-readable table derived from the frozen recipe and systems bundle instead of forcing every operator check to re-open the full anchor receipts."
+    },
+    {
+      "row_id": "psion_actual_pretraining_pilot32m_ablation_accounting",
+      "scope_kind": "bounded_ablation",
+      "config_binding_id": "psion_actual_pretraining_pilot32m_replay_ablation",
+      "model_id": "psion-compact-decoder-pilot-v1",
+      "size_anchor": "pilot32m",
+      "parameter_count_estimate": 33115904,
+      "train_token_budget": 8388608,
+      "validation_token_budget": 262144,
+      "held_out_token_budget": 65536,
+      "optimizer_steps": 256,
+      "tokens_per_step": 32768,
+      "max_context_tokens": 4096,
+      "checkpoint_total_bytes": 533429615,
+      "optimizer_state_bytes": 176691486,
+      "activation_headroom_bytes": 62640646515,
+      "expected_mean_tokens_per_second": 619603,
+      "detail": "The bounded pilot32m ablation keeps tokenizer replay and loss-accounting checks cheap enough to run before the actual lane while still preserving the same tokenizer, dataset identity, and stage program surface."
+    }
+  ],
+  "bounded_ablation_configs": [
+    {
+      "ablation_id": "psion_actual_pretraining_internal128m_smoke",
+      "ablation_family": "actual_lane_bringup_family",
+      "stage_config": {
+        "path": "fixtures/psion/pretrain/psion_actual_pretraining_bringup_stage_config_v1.json",
+        "sha256": "4a90200ab9ac4efb5de1d5b747de359ceab0f06d401268cb739d5671670ef260"
+      },
+      "model_descriptor": {
+        "path": "fixtures/psion/models/psion_compact_decoder_internal_descriptor_v1.json",
+        "sha256": "ec62d008fda209b143c50cd0c7ceee3e8675bc8b22a40619f0ded814d414c8bf"
+      },
+      "config_binding_id": "psion_actual_pretraining_internal128m_anchor",
+      "max_train_token_budget": 16777216,
+      "max_validation_token_budget": 524288,
+      "max_optimizer_steps": 256,
+      "tokens_per_step": 65536,
+      "consumption_target": "actual_lane_smoke_and_bringup",
+      "detail": "The 128M smoke ablation reuses the actual-lane stage config with a short capped budget so launcher, accounting, and tokenizer bindings can be checked honestly before a longer admitted run."
+    },
+    {
+      "ablation_id": "psion_actual_pretraining_pilot32m_replay",
+      "ablation_family": "actual_lane_bringup_family",
+      "stage_config": {
+        "path": "fixtures/psion/pretrain/psion_actual_pretraining_pilot32m_ablation_stage_config_v1.json",
+        "sha256": "84a6ed50b4d23264bbd80e26ea0bdac70ccd54d75816d6c1e5a036535099e13a"
+      },
+      "model_descriptor": {
+        "path": "fixtures/psion/models/psion_compact_decoder_pilot_descriptor_v1.json",
+        "sha256": "4ce7386baec8aac46f1d9f3bc99258a5bf041bfbc5dd79e67a808f24885b6bb1"
+      },
+      "config_binding_id": "psion_actual_pretraining_pilot32m_replay_ablation",
+      "max_train_token_budget": 8388608,
+      "max_validation_token_budget": 262144,
+      "max_optimizer_steps": 256,
+      "tokens_per_step": 32768,
+      "consumption_target": "actual_lane_bounded_ablation_family",
+      "detail": "The pilot32m ablation is the bounded cheap replay lane that shares tokenizer and dataset truth with the actual lane while keeping model size and budget low enough for routine bring-up and accounting checks."
+    }
+  ],
+  "support_refs": [
+    "docs/PSION_ACTUAL_PRETRAINING_BASELINE_TOOLS_BUNDLE.md",
+    "docs/PSION_PRETRAIN_STAGE.md",
+    "docs/PSION_TOKENIZER_TRAINING.md",
+    "docs/TRAIN_SYSTEM.md",
+    "fixtures/psion/pretrain/psion_actual_pretraining_bringup_stage_config_v1.json",
+    "fixtures/psion/pretrain/psion_actual_pretraining_pilot32m_ablation_stage_config_v1.json"
+  ],
+  "claim_boundary": "The baseline-tools bundle ports selective CS336 A1 work into the actual lane by freezing one honest pretrain-stage bring-up surface, one tokenizer reproducibility binding, two resource-accounting rows, and two bounded ablation configs. It does not create a second pedagogical trainer stack or a detached curriculum lane.",
+  "summary": "The canonical actual-pretraining baseline-tools bundle binds bring-up trainer, tokenizer reproducibility, resource accounting, and bounded ablation configs directly into the actual lane.",
+  "bundle_digest": "861059f844b58ddba855055259dfa03a78a76d1b234f79692b3805987ff31297"
+}

@@ -22,6 +22,9 @@ work must target.
   admitted topology/storage bundle consumed by this lane.
 - `docs/PSION_ACTUAL_PRETRAINING_SCALING_BUNDLE.md` freezes the canonical
   scaling and budget-selection authority consumed by this lane.
+- `docs/PSION_ACTUAL_PRETRAINING_BASELINE_TOOLS_BUNDLE.md` freezes the
+  selective CS336 A1 bring-up trainer, tokenizer reproducibility, and bounded
+  ablation surface consumed by this lane.
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md` freezes the canonical
   filtering, deduplication, replay, and mixture authority consumed by this
   lane.
@@ -76,6 +79,12 @@ the bounded 64M/128M/256M recipe family, tokens-per-parameter discipline, and
 largest-eligible budget-selection rule that keeps the current actual recipe
 anchored to retained scaling evidence. That keeps CS336 A3 work subordinate to
 the real lane instead of a detached scaling study.
+
+The same lane now also carries one explicit baseline-tools surface covering
+one honest pretrain-stage bring-up config, one tokenizer reproducibility
+binding, one operator-readable resource-accounting table, and one bounded
+ablation family. That keeps selective CS336 A1 work subordinate to the real
+lane instead of a detached teaching stack.
 
 ## What Does Not Count
 

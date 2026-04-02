@@ -54,6 +54,8 @@ pub struct PsionActualPretrainingLauncherContractRefs {
     pub lane_spec: PsionActualPretrainingArtifactRef,
     /// Recipe bundle fixture.
     pub recipe_bundle: PsionActualPretrainingArtifactRef,
+    /// Baseline-tools bundle fixture.
+    pub baseline_tools_bundle: PsionActualPretrainingArtifactRef,
     /// Scaling bundle fixture.
     pub scaling_bundle: PsionActualPretrainingArtifactRef,
     /// Data bundle fixture.
@@ -282,6 +284,10 @@ impl PsionActualPretrainingLauncherContractRefs {
     pub fn validate(&self) -> Result<(), PsionActualPretrainingLauncherError> {
         ensure_artifact_ref(&self.lane_spec, "contract_refs.lane_spec")?;
         ensure_artifact_ref(&self.recipe_bundle, "contract_refs.recipe_bundle")?;
+        ensure_artifact_ref(
+            &self.baseline_tools_bundle,
+            "contract_refs.baseline_tools_bundle",
+        )?;
         ensure_artifact_ref(&self.scaling_bundle, "contract_refs.scaling_bundle")?;
         ensure_artifact_ref(&self.data_bundle, "contract_refs.data_bundle")?;
         ensure_artifact_ref(&self.systems_bundle, "contract_refs.systems_bundle")?;

@@ -105,6 +105,22 @@ into actual recipe authority through one measured 128M anchor, one smaller
 projection, one larger projection, and one largest-eligible selection rule
 instead of leaving model-size and token-budget discipline implicit.
 
+The repo now also owns the canonical actual-lane baseline-tools bundle in
+`crates/psionic-train/src/psion_actual_pretraining_baseline_tools_bundle.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_baseline_tools_bundle_fixtures.rs`,
+the focused doc
+`docs/PSION_ACTUAL_PRETRAINING_BASELINE_TOOLS_BUNDLE.md`, and the committed
+fixtures
+`fixtures/psion/pretrain/psion_actual_pretraining_baseline_tools_bundle_v1.json`,
+`fixtures/psion/pretrain/psion_actual_pretraining_bringup_stage_config_v1.json`,
+and
+`fixtures/psion/pretrain/psion_actual_pretraining_pilot32m_ablation_stage_config_v1.json`.
+That surface ports selective CS336 A1-style bring-up trainer, tokenizer
+reproducibility, resource-accounting, and bounded-ablation work into one
+actual-lane contract instead of letting that work turn into a detached
+pedagogical stack.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator
@@ -179,7 +195,7 @@ That surface gives the repo one real operator path for:
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 
-It consumes the frozen lane, recipe, scaling, data, systems,
+It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty
 working trees by default; retains the selected ref plus exact commit SHA; and
 repeats that provenance in the provisional closeout bundle without claiming

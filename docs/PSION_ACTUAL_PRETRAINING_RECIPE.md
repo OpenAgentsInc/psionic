@@ -23,6 +23,9 @@ bounded continuation path that later launcher and hardening work must consume.
   carries the canonical actual-lane topology/storage bundle.
 - `docs/PSION_ACTUAL_PRETRAINING_SCALING_BUNDLE.md` freezes the scaling and
   budget-selection bundle that the actual recipe cites directly.
+- `docs/PSION_ACTUAL_PRETRAINING_BASELINE_TOOLS_BUNDLE.md` freezes the
+  selective bring-up trainer, tokenizer reproducibility, and bounded ablation
+  surfaces the launcher now carries beside the recipe.
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md` freezes the data
   transformation, filter, deduplication, replay, and mixture authority the
   actual recipe consumes directly.

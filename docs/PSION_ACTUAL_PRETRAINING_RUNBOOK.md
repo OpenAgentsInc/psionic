@@ -25,8 +25,9 @@ reference-pilot lane.
 The actual-lane command now does these things for real:
 
 - loads the frozen actual-lane spec, recipe bundle, scaling bundle, data
-  bundle, systems bundle, topology/storage bundle, evidence contract, and
-  status surface contract directly from committed repo artifacts
+  bundle, baseline-tools bundle, systems bundle, topology/storage bundle,
+  evidence contract, and status surface contract directly from committed repo
+  artifacts
 - refuses dirty launches by default unless `--allow-dirty-tree` is supplied
 - resolves and retains the selected git ref plus exact commit SHA
 - writes the canonical launch or resume manifest under the retained evidence
@@ -154,6 +155,7 @@ provisional closeout bundle.
 - `docs/PSION_ACTUAL_PRETRAINING_LANE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_SCALING_BUNDLE.md`
+- `docs/PSION_ACTUAL_PRETRAINING_BASELINE_TOOLS_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
