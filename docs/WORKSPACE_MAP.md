@@ -87,6 +87,7 @@ Reference:
 - `docs/GPT_OSS_LOCAL_SERVING.md`
 - `docs/LLAMA_VLLM_SGLANG_INFERENCE_SPEC.md`
 - `docs/NON_GPT_OSS_QWEN_PILOT.md`
+- `docs/NON_GPT_OSS_GEMMA4_PILOT.md`
 
 ### Cluster and distributed execution
 

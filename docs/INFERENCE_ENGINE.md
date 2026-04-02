@@ -22,6 +22,25 @@ than just run tensor math.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
+- `Gemma 4` is not yet an implemented Psionic serving lane on this checkout.
+  The first frozen `Gemma 4` target is now:
+  - artifact = `gemma4:e4b`
+  - family shape = dense `Gemma 4`
+  - first claim = one bounded text-generation lane on CUDA
+  - first publication bar = truthful backend, execution mode, execution
+    engine, and refusal metadata on the generic OpenAI-compatible server
+- The first bounded `Gemma 4` claim must stay explicit about its unsupported
+  regions:
+  - image
+  - video
+  - audio
+  - `31B`
+  - `26B A4B`
+  - Metal
+  - full parity with `llama.cpp` or `ollama`
+- CPU-only debug bring-up may still be useful while the lane is under active
+  development, but it does not satisfy the first `Gemma 4` support claim for
+  Psionic.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
 - The `qwen35` lane must publish:
