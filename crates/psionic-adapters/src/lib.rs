@@ -829,6 +829,18 @@ impl LmHeadLoraAdapterArtifact {
         self.alpha / (self.rank.max(1) as f32)
     }
 
+    /// Returns the dense `rank x hidden` LoRA `A` matrix as row-major `f32`.
+    #[must_use]
+    pub fn lora_a(&self) -> &[f32] {
+        self.lora_a.as_slice()
+    }
+
+    /// Returns the dense `vocab x rank` LoRA `B` matrix as row-major `f32`.
+    #[must_use]
+    pub fn lora_b(&self) -> &[f32] {
+        self.lora_b.as_slice()
+    }
+
     /// Applies the adapter directly to a logits vector for one final hidden state.
     pub fn apply_to_logits(
         &self,
@@ -1384,7 +1396,7 @@ mod tests {
 
     use psionic_core::QuantizationMode;
     use psionic_datastream::{DatastreamEncoding, DatastreamManifest, DatastreamSubjectKind};
-    use safetensors::{Dtype as SafeTensorsDType, serialize_to_file, tensor::TensorView};
+    use safetensors::{serialize_to_file, tensor::TensorView, Dtype as SafeTensorsDType};
     use serde::Deserialize;
     use tempfile::tempdir;
 
@@ -1426,8 +1438,8 @@ mod tests {
     }
 
     #[test]
-    fn adapter_package_manifest_requires_adapter_package_stream()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn adapter_package_manifest_requires_adapter_package_stream(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let manifest = DatastreamManifest::from_bytes(
             "adapter-stream",
             DatastreamSubjectKind::Checkpoint,

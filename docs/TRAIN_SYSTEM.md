@@ -2308,6 +2308,7 @@ shape already includes at least:
 | Training run graph | `implemented_early` | `psionic-train` now owns typed runs, contributor-set revisions, topology revisions, persistent participant ranking, heartbeats, departures, and window transitions |
 | Orchestrator | `implemented_early` | `psionic-train` now owns typed window-control, assignment posture, rollout-assignment refs, rollout-admission receipts, bounded off-policy freshness budgets, rollout-worker heartbeats, claims, upload receipts, and trainer-batch assembly requests over the run graph |
 | Training sampler service | `implemented_early` | `psionic-train` now owns the first bounded `TrainingSamplerService` above the repo-owned open-adapter lane, with health/readiness inspection, active policy revision status, completions/chat/logprob request surfaces, explicit hot-swap to newer promoted revisions, optional checkpoint and weight-broadcast identity in refresh/status, and fail-closed stale-revision refusal |
+| Live RL update bridge | `implemented_early` | `psionic-train` now also owns a bounded `OpenAdapterLiveRlUpdateExecutor` that joins orchestrator batches to accepted rollout receipts plus prompt-side sequence inputs, preserves prompt/completion boundaries and per-token observed-versus-live logprobs, carries reward/advantage plus optional chosen-token teacher logprobs into one weighted adapter step, and emits a promoted served revision ready for sampler adoption |
 | Environment ABI | `implemented_early` | `psionic-environments` now owns the package ABI, versioned key, workload/policy/difficulty/benchmark package shape, tool/rubric contracts, deterministic runtime session state machine, registry install/pin/group resolution, the first bounded live `EnvironmentRuntimeService` with worker/queue admission plus typed submission/activation/completion receipts, and a reusable Apple adapter train/eval/benchmark bundle with typed runtime refs plus train/eval parity receipts, while registry and authority truth remain in kernel/Nexus |
 | Eval runtime | `implemented_early` | `psionic-eval` now owns held-out eval runs, rubric-scored sample/runtime contracts, benchmark packages, repeat-run aggregation, local validator simulation, and Apple adapter held-out plus benchmark harnesses with structured-output, tool-call, and runtime-smoke receipts, while kernel/Nexus still own canonical eval-run authority truth |
 | Synthetic-data flows | `partial_outside_psionic` | synthetic-data job creation, append, finalize, and verification flows exist in kernel/Nexus, but no Psionic-native generation runtime exists yet |
@@ -4147,6 +4148,28 @@ The canonical runbook and harness are now:
 This issue makes validator-ready rollout integrity first-class typed Psionic
 truth. Broader external validator services, batch-level verdicts, and authority
 integration are still later layers.
+
+On 2026-04-01, GitHub issue `#816` added the first bounded live RL update
+bridge on top of that rollout and validator substrate:
+
+- `OpenAdapterLiveRlUpdateExecutor` over the repo-owned open-adapter lane
+- typed `LiveRlMaterializedBatch`, `LiveRlMaterializedRollout`, and
+  `LiveRlMaterializedToken` records that keep prompt/completion boundaries,
+  observed-versus-live logprobs, importance ratios, reward, advantage, and
+  optional chosen-token teacher logprobs explicit
+- one live update receipt plus one promoted adapter revision ready for
+  `TrainingSamplerService::refresh_revision`
+- a focused end-to-end harness proving admitted rollout batch -> weighted
+  trainer step -> promoted revision
+
+The canonical runbook and harness are now:
+
+- `docs/TRAIN_LIVE_RL_UPDATE_REFERENCE.md`
+- `scripts/release/check-psionic-train-live-rl-update.sh`
+
+This closes the earlier gap between typed RL control-plane truth and one honest
+live adapter update path. The teacher input is still a bounded chosen-token
+auxiliary term, not a full-distribution distillation runtime.
 
 ### 14. `Environments: define a package contract for SFT, RL, and eval`
 

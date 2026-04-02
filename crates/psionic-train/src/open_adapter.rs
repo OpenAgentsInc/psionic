@@ -11,7 +11,7 @@ use psionic_array::{ArrayContext, ArrayError};
 use psionic_core::{DType, Device, DeviceKind, QuantizationMode, Shape, TensorSpec};
 use psionic_data::TokenizerDigest;
 use rayon::prelude::*;
-use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -346,6 +346,100 @@ pub struct OpenAdapterGradientBatchRecord {
     pub execution_digest: String,
 }
 
+/// One live weighted token-target update consumed by the open-adapter backend.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OpenAdapterWeightedTokenTarget {
+    /// Stable target identifier.
+    pub target_id: String,
+    /// Prompt- or prefix-derived hidden state used for this token update.
+    pub hidden_state: Vec<f32>,
+    /// Token id whose likelihood should move under the weighted update.
+    pub target_token_id: u32,
+    /// Scalar update weight applied to the chosen-token loss.
+    pub loss_weight: f32,
+    /// Optional teacher logprob for the same chosen token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub teacher_target_logprob: Option<f32>,
+}
+
+impl OpenAdapterWeightedTokenTarget {
+    /// Creates one weighted token-target update.
+    #[must_use]
+    pub fn new(
+        target_id: impl Into<String>,
+        hidden_state: Vec<f32>,
+        target_token_id: u32,
+        loss_weight: f32,
+    ) -> Self {
+        Self {
+            target_id: target_id.into(),
+            hidden_state,
+            target_token_id,
+            loss_weight,
+            teacher_target_logprob: None,
+        }
+    }
+
+    /// Attaches an optional teacher logprob for the chosen token.
+    #[must_use]
+    pub fn with_teacher_target_logprob(mut self, teacher_target_logprob: f32) -> Self {
+        self.teacher_target_logprob = Some(teacher_target_logprob);
+        self
+    }
+}
+
+/// One weighted token-target batch request over a live adapter revision.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OpenAdapterWeightedTargetBatchRequest {
+    /// Stable batch identifier.
+    pub batch_id: String,
+    /// Weighted token targets.
+    pub targets: Vec<OpenAdapterWeightedTokenTarget>,
+    /// Optional auxiliary blend applied to chosen-token teacher confidence.
+    pub teacher_target_blend: f32,
+}
+
+impl OpenAdapterWeightedTargetBatchRequest {
+    /// Creates one weighted token-target batch request.
+    #[must_use]
+    pub fn new(
+        batch_id: impl Into<String>,
+        targets: Vec<OpenAdapterWeightedTokenTarget>,
+        teacher_target_blend: f32,
+    ) -> Self {
+        Self {
+            batch_id: batch_id.into(),
+            targets,
+            teacher_target_blend,
+        }
+    }
+}
+
+/// Gradient-production record for one weighted token-target batch.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OpenAdapterWeightedTargetBatchRecord {
+    /// Stable batch identifier.
+    pub batch_id: String,
+    /// Stable digest over the weighted token-target inputs.
+    pub batch_digest: String,
+    /// Weighted target count.
+    pub target_count: u32,
+    /// Number of targets carrying teacher logprobs.
+    pub teacher_target_count: u32,
+    /// Mean unweighted chosen-token loss across the batch.
+    pub mean_raw_loss: f32,
+    /// Mean weighted chosen-token loss across the batch.
+    pub mean_weighted_loss: f32,
+    /// Mean loss weight applied across the batch.
+    pub mean_loss_weight: f32,
+    /// Mean current-policy logprob for the chosen token.
+    pub mean_current_logprob: f32,
+    /// Machine-legible gradient batch for the fixed-budget trainer core.
+    pub gradient_record: OpenAdapterGradientBatchRecord,
+    /// Stable digest over the weighted batch record.
+    pub execution_digest: String,
+}
+
 /// Repo-owned open adapter hidden-state -> gradient backend.
 #[derive(Clone, Debug)]
 pub struct OpenAdapterTrainingExecutionBackend {
@@ -483,55 +577,32 @@ impl OpenAdapterTrainingExecutionBackend {
     pub fn initial_training_groups(
         &self,
     ) -> Result<Vec<TrainingParameterGroupState>, OpenAdapterTrainingExecutionError> {
-        let target = &self.config.model.target;
-        let group_a_id = target.lora_a_group_id();
-        let group_b_id = target.lora_b_group_id();
-        Ok(vec![
-            TrainingParameterGroupState::new(
-                group_a_id.clone(),
-                TrainingParameterClass::Matrix,
-                TrainingTensorBuffer::from_f32(
-                    group_a_id.clone(),
-                    lora_a_spec(target.lora_rank, self.config.model.hidden_size),
-                    seeded_matrix(
-                        format!(
-                            "{}|{}|{}|lora_a",
-                            self.config.model.base_model_id,
-                            self.config.model.base_model_revision,
-                            target.target_id,
-                        )
-                        .as_str(),
-                        target.lora_rank,
-                        self.config.model.hidden_size,
-                        0.02,
-                    ),
-                )?,
-                target.optimizer.clone(),
-                target.optimizer_residency_policy,
-            )?,
-            TrainingParameterGroupState::new(
-                group_b_id.clone(),
-                TrainingParameterClass::Matrix,
-                TrainingTensorBuffer::from_f32(
-                    group_b_id.clone(),
-                    lora_b_spec(self.config.model.vocab_size, target.lora_rank),
-                    seeded_matrix(
-                        format!(
-                            "{}|{}|{}|lora_b",
-                            self.config.model.base_model_id,
-                            self.config.model.base_model_revision,
-                            target.target_id,
-                        )
-                        .as_str(),
-                        self.config.model.vocab_size,
-                        target.lora_rank,
-                        0.02,
-                    ),
-                )?,
-                target.optimizer.clone(),
-                target.optimizer_residency_policy,
-            )?,
-        ])
+        self.training_groups_from_weights(
+            seeded_matrix(
+                format!(
+                    "{}|{}|{}|lora_a",
+                    self.config.model.base_model_id,
+                    self.config.model.base_model_revision,
+                    self.config.model.target.target_id,
+                )
+                .as_str(),
+                self.config.model.target.lora_rank,
+                self.config.model.hidden_size,
+                0.02,
+            ),
+            seeded_matrix(
+                format!(
+                    "{}|{}|{}|lora_b",
+                    self.config.model.base_model_id,
+                    self.config.model.base_model_revision,
+                    self.config.model.target.target_id,
+                )
+                .as_str(),
+                self.config.model.vocab_size,
+                self.config.model.target.lora_rank,
+                0.02,
+            ),
+        )
     }
 
     /// Creates a fresh fixed-budget run seeded with trainable adapter-only groups.
@@ -543,6 +614,30 @@ impl OpenAdapterTrainingExecutionBackend {
             self.config.checkpoint_family.clone(),
             self.config.budget,
             self.initial_training_groups()?,
+        )?)
+    }
+
+    /// Creates trainable adapter groups from one already-materialized LM-head
+    /// LoRA artifact targeting the same base model and shapes.
+    pub fn initial_training_groups_from_loaded_adapter(
+        &self,
+        adapter: &LmHeadLoraAdapterArtifact,
+    ) -> Result<Vec<TrainingParameterGroupState>, OpenAdapterTrainingExecutionError> {
+        self.validate_loaded_adapter(adapter)?;
+        self.training_groups_from_weights(adapter.lora_a().to_vec(), adapter.lora_b().to_vec())
+    }
+
+    /// Creates a fresh fixed-budget run seeded from one loaded LM-head LoRA
+    /// adapter rather than the deterministic cold-start weights.
+    pub fn initialize_run_from_loaded_adapter(
+        &self,
+        adapter: &LmHeadLoraAdapterArtifact,
+    ) -> Result<FixedBudgetTrainingRun, OpenAdapterTrainingExecutionError> {
+        Ok(FixedBudgetTrainingRun::new(
+            self.config.run_id.clone(),
+            self.config.checkpoint_family.clone(),
+            self.config.budget,
+            self.initial_training_groups_from_loaded_adapter(adapter)?,
         )?)
     }
 
@@ -715,6 +810,232 @@ impl OpenAdapterTrainingExecutionBackend {
         ))
     }
 
+    /// Produces one weighted token-target gradient batch for live RL-style or
+    /// distillation-style updates over a loaded adapter revision.
+    pub fn produce_weighted_target_gradient_batch(
+        &self,
+        run: &FixedBudgetTrainingRun,
+        request: &OpenAdapterWeightedTargetBatchRequest,
+    ) -> Result<OpenAdapterWeightedTargetBatchRecord, OpenAdapterTrainingExecutionError> {
+        if request.batch_id.trim().is_empty() {
+            return Err(OpenAdapterTrainingExecutionError::MissingWeightedTargetBatchId);
+        }
+        if request.targets.is_empty() {
+            return Err(OpenAdapterTrainingExecutionError::EmptyWeightedTargets {
+                batch_id: request.batch_id.clone(),
+            });
+        }
+        if !request.teacher_target_blend.is_finite() || request.teacher_target_blend < 0.0 {
+            return Err(
+                OpenAdapterTrainingExecutionError::InvalidTeacherTargetBlend {
+                    value: request.teacher_target_blend,
+                },
+            );
+        }
+
+        let target = &self.config.model.target;
+        let group_a_id = target.lora_a_group_id();
+        let group_b_id = target.lora_b_group_id();
+        let group_a = self.training_group(run, group_a_id.as_str())?;
+        let group_b = self.training_group(run, group_b_id.as_str())?;
+        let a_values = dense_values(group_a, group_a_id.as_str())?;
+        let b_values = dense_values(group_b, group_b_id.as_str())?;
+
+        let batch_digest = stable_weighted_target_batch_digest(
+            request.batch_id.as_str(),
+            request.targets.as_slice(),
+            request.teacher_target_blend,
+        );
+        let mut grad_a = vec![0.0_f32; a_values.len()];
+        let mut grad_b = vec![0.0_f32; b_values.len()];
+        let mut total_raw_loss = 0.0_f32;
+        let mut total_weighted_loss = 0.0_f32;
+        let mut total_loss_weight = 0.0_f32;
+        let mut total_current_logprob = 0.0_f32;
+        let mut teacher_target_count = 0_u32;
+
+        for weighted_target in &request.targets {
+            if weighted_target.target_id.trim().is_empty() {
+                return Err(OpenAdapterTrainingExecutionError::MissingWeightedTargetId);
+            }
+            if weighted_target.hidden_state.len() != self.config.model.hidden_size {
+                return Err(
+                    OpenAdapterTrainingExecutionError::WeightedTargetHiddenSizeMismatch {
+                        target_id: weighted_target.target_id.clone(),
+                        expected: self.config.model.hidden_size,
+                        actual: weighted_target.hidden_state.len(),
+                    },
+                );
+            }
+            if weighted_target.target_token_id as usize >= self.config.model.vocab_size {
+                return Err(
+                    OpenAdapterTrainingExecutionError::WeightedTargetTokenOutOfRange {
+                        target_id: weighted_target.target_id.clone(),
+                        target_token_id: weighted_target.target_token_id,
+                        vocab_size: self.config.model.vocab_size,
+                    },
+                );
+            }
+            if !weighted_target.loss_weight.is_finite() {
+                return Err(
+                    OpenAdapterTrainingExecutionError::InvalidWeightedTargetLossWeight {
+                        target_id: weighted_target.target_id.clone(),
+                        loss_weight: weighted_target.loss_weight,
+                    },
+                );
+            }
+            if let Some(teacher_target_logprob) = weighted_target.teacher_target_logprob {
+                if !teacher_target_logprob.is_finite() {
+                    return Err(
+                        OpenAdapterTrainingExecutionError::InvalidWeightedTeacherLogprob {
+                            target_id: weighted_target.target_id.clone(),
+                            teacher_target_logprob,
+                        },
+                    );
+                }
+            }
+
+            let forward = self.forward_hidden_state(
+                weighted_target.hidden_state.as_slice(),
+                weighted_target.target_token_id,
+                a_values,
+                b_values,
+            );
+            let teacher_target_weight = weighted_target
+                .teacher_target_logprob
+                .map(|teacher_target_logprob| {
+                    teacher_target_count = teacher_target_count.saturating_add(1);
+                    request.teacher_target_blend
+                        * teacher_target_logprob.exp().clamp(f32::EPSILON, 1.0)
+                })
+                .unwrap_or(0.0);
+            let effective_weight = weighted_target.loss_weight + teacher_target_weight;
+            let mut logits_gradient = forward.logits_gradient.clone();
+            for value in &mut logits_gradient {
+                *value *= effective_weight;
+            }
+            accumulate_lm_head_gradients(
+                grad_a.as_mut_slice(),
+                grad_b.as_mut_slice(),
+                b_values,
+                weighted_target.hidden_state.as_slice(),
+                forward.intermediate.as_slice(),
+                logits_gradient.as_slice(),
+                target.scale(),
+            );
+            total_raw_loss += forward.loss;
+            total_weighted_loss += forward.loss * effective_weight;
+            total_loss_weight += effective_weight;
+            total_current_logprob += forward.target_probability.max(f32::EPSILON).ln();
+        }
+
+        let scale = 1.0_f32 / request.targets.len() as f32;
+        for value in &mut grad_a {
+            *value *= scale;
+        }
+        for value in &mut grad_b {
+            *value *= scale;
+        }
+
+        let mean_raw_loss = total_raw_loss * scale;
+        let mean_weighted_loss = total_weighted_loss * scale;
+        let mean_loss_weight = total_loss_weight * scale;
+        let mean_current_logprob = total_current_logprob * scale;
+        let gradient_norms_l2 = BTreeMap::from([
+            (group_a_id.clone(), l2_norm(grad_a.as_slice())),
+            (group_b_id.clone(), l2_norm(grad_b.as_slice())),
+        ]);
+        let training_batch = TrainingGradientBatch::new(
+            format!("{}-gradient", request.batch_id),
+            mean_weighted_loss,
+            request.targets.len() as u32,
+            BTreeMap::from([
+                (
+                    group_a_id.clone(),
+                    TrainingTensorBuffer::from_f32(
+                        group_a_id.clone(),
+                        group_a.parameter.spec.clone(),
+                        grad_a,
+                    )?,
+                ),
+                (
+                    group_b_id.clone(),
+                    TrainingTensorBuffer::from_f32(
+                        group_b_id.clone(),
+                        group_b.parameter.spec.clone(),
+                        grad_b,
+                    )?,
+                ),
+            ]),
+        );
+        let gradient_record = OpenAdapterGradientBatchRecord {
+            batch_id: request.batch_id.clone(),
+            batch_digest: batch_digest.clone(),
+            execution_digest: stable_gradient_execution_digest(
+                request.batch_id.as_str(),
+                batch_digest.as_str(),
+                &gradient_norms_l2,
+                mean_weighted_loss,
+            ),
+            training_batch,
+            mean_loss: mean_weighted_loss,
+            gradient_norms_l2,
+        };
+        Ok(OpenAdapterWeightedTargetBatchRecord {
+            batch_id: request.batch_id.clone(),
+            batch_digest: batch_digest.clone(),
+            target_count: request.targets.len() as u32,
+            teacher_target_count,
+            mean_raw_loss,
+            mean_weighted_loss,
+            mean_loss_weight,
+            mean_current_logprob,
+            execution_digest: stable_weighted_target_execution_digest(
+                request.batch_id.as_str(),
+                batch_digest.as_str(),
+                mean_raw_loss,
+                mean_weighted_loss,
+                mean_loss_weight,
+                mean_current_logprob,
+                teacher_target_count,
+                gradient_record.execution_digest.as_str(),
+            ),
+            gradient_record,
+        })
+    }
+
+    /// Produces one typed step input for a weighted token-target batch.
+    pub fn produce_weighted_target_step_input(
+        &self,
+        run: &FixedBudgetTrainingRun,
+        request: &OpenAdapterWeightedTargetBatchRequest,
+        started_at_ms: u64,
+        finished_at_ms: u64,
+    ) -> Result<
+        (TrainingStepInput, OpenAdapterWeightedTargetBatchRecord),
+        OpenAdapterTrainingExecutionError,
+    > {
+        let weighted_record = self.produce_weighted_target_gradient_batch(run, request)?;
+        Ok((
+            TrainingStepInput::new(
+                weighted_record.gradient_record.training_batch.clone(),
+                started_at_ms,
+                finished_at_ms,
+            ),
+            weighted_record,
+        ))
+    }
+
+    /// Exports the current run state as a loadable LM-head LoRA artifact.
+    pub fn export_run_artifact(
+        &self,
+        run: &FixedBudgetTrainingRun,
+        request: &OpenAdapterArtifactExportRequest,
+    ) -> Result<OpenAdapterExportedArtifact, OpenAdapterSftError> {
+        request.validate()?;
+        export_open_adapter_artifact(self, run, request)
+    }
+
     fn training_group<'a>(
         &self,
         run: &'a FixedBudgetTrainingRun,
@@ -727,9 +1048,106 @@ impl OpenAdapterTrainingExecutionBackend {
         })
     }
 
+    fn training_groups_from_weights(
+        &self,
+        lora_a: Vec<f32>,
+        lora_b: Vec<f32>,
+    ) -> Result<Vec<TrainingParameterGroupState>, OpenAdapterTrainingExecutionError> {
+        let target = &self.config.model.target;
+        let group_a_id = target.lora_a_group_id();
+        let group_b_id = target.lora_b_group_id();
+        Ok(vec![
+            TrainingParameterGroupState::new(
+                group_a_id.clone(),
+                TrainingParameterClass::Matrix,
+                TrainingTensorBuffer::from_f32(
+                    group_a_id.clone(),
+                    lora_a_spec(target.lora_rank, self.config.model.hidden_size),
+                    lora_a,
+                )?,
+                target.optimizer.clone(),
+                target.optimizer_residency_policy,
+            )?,
+            TrainingParameterGroupState::new(
+                group_b_id.clone(),
+                TrainingParameterClass::Matrix,
+                TrainingTensorBuffer::from_f32(
+                    group_b_id.clone(),
+                    lora_b_spec(self.config.model.vocab_size, target.lora_rank),
+                    lora_b,
+                )?,
+                target.optimizer.clone(),
+                target.optimizer_residency_policy,
+            )?,
+        ])
+    }
+
+    fn validate_loaded_adapter(
+        &self,
+        adapter: &LmHeadLoraAdapterArtifact,
+    ) -> Result<(), OpenAdapterTrainingExecutionError> {
+        validate_loaded_adapter_field(
+            "base_model_id",
+            self.config.model.base_model_id.as_str(),
+            adapter.identity.base_model_id.as_str(),
+        )?;
+        validate_loaded_adapter_field(
+            "base_model_revision",
+            self.config.model.base_model_revision.as_str(),
+            adapter.identity.base_model_revision.as_str(),
+        )?;
+        validate_loaded_adapter_field(
+            "base_served_artifact_digest",
+            self.config.model.base_served_artifact_digest.as_str(),
+            adapter.identity.base_served_artifact_digest.as_str(),
+        )?;
+        if adapter.rank != self.config.model.target.lora_rank {
+            return Err(
+                OpenAdapterTrainingExecutionError::LoadedAdapterRankMismatch {
+                    expected: self.config.model.target.lora_rank,
+                    actual: adapter.rank,
+                },
+            );
+        }
+        if adapter.hidden_size != self.config.model.hidden_size {
+            return Err(
+                OpenAdapterTrainingExecutionError::LoadedAdapterShapeMismatch {
+                    field: "hidden_size",
+                    expected: self.config.model.hidden_size,
+                    actual: adapter.hidden_size,
+                },
+            );
+        }
+        if adapter.vocab_size != self.config.model.vocab_size {
+            return Err(
+                OpenAdapterTrainingExecutionError::LoadedAdapterShapeMismatch {
+                    field: "vocab_size",
+                    expected: self.config.model.vocab_size,
+                    actual: adapter.vocab_size,
+                },
+            );
+        }
+        Ok(())
+    }
+
     fn forward_sample(
         &self,
         sample: &OpenAdapterHiddenStateSample,
+        a_values: &[f32],
+        b_values: &[f32],
+    ) -> OpenAdapterForwardRecord {
+        self.forward_hidden_state(
+            sample.hidden_state.as_slice(),
+            sample.target_token_id,
+            a_values,
+            b_values,
+        )
+    }
+
+    fn forward_hidden_state(
+        &self,
+        hidden_state: &[f32],
+        target_token_id: u32,
         a_values: &[f32],
         b_values: &[f32],
     ) -> OpenAdapterForwardRecord {
@@ -737,13 +1155,13 @@ impl OpenAdapterTrainingExecutionBackend {
             self.frozen_base_projection.as_slice(),
             self.config.model.vocab_size,
             self.config.model.hidden_size,
-            sample.hidden_state.as_slice(),
+            hidden_state,
         );
         let intermediate = mat_vec(
             a_values,
             self.config.model.target.lora_rank,
             self.config.model.hidden_size,
-            sample.hidden_state.as_slice(),
+            hidden_state,
         );
         let adapter_logits = mat_vec(
             b_values,
@@ -758,16 +1176,16 @@ impl OpenAdapterTrainingExecutionBackend {
         );
         let distribution = softmax(logits.as_slice());
         let mut logits_gradient = distribution.clone();
-        if let Some(target) = logits_gradient.get_mut(sample.target_token_id as usize) {
+        if let Some(target) = logits_gradient.get_mut(target_token_id as usize) {
             *target -= 1.0;
         }
-        let loss = -distribution[sample.target_token_id as usize]
-            .max(f32::EPSILON)
-            .ln();
+        let target_probability = distribution[target_token_id as usize];
+        let loss = -target_probability.max(f32::EPSILON).ln();
         OpenAdapterForwardRecord {
             intermediate,
             logits_gradient,
             loss,
+            target_probability,
         }
     }
 }
@@ -777,6 +1195,7 @@ struct OpenAdapterForwardRecord {
     intermediate: Vec<f32>,
     logits_gradient: Vec<f32>,
     loss: f32,
+    target_probability: f32,
 }
 
 /// Higher-level export request layered on top of the repo-owned open adapter backend.
@@ -797,7 +1216,7 @@ pub struct OpenAdapterSftRunRequest {
 }
 
 impl OpenAdapterSftRunRequest {
-    fn validate(&self) -> Result<(), OpenAdapterSftError> {
+    pub(crate) fn validate(&self) -> Result<(), OpenAdapterSftError> {
         if self.dataset_ref.trim().is_empty() {
             return Err(OpenAdapterSftError::MissingDatasetRef);
         }
@@ -815,6 +1234,68 @@ impl OpenAdapterSftRunRequest {
         }
         Ok(())
     }
+}
+
+/// Generic artifact-export request reused by live adapter update paths.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenAdapterArtifactExportRequest {
+    /// Stable dataset ref carried into adapter governance lineage.
+    pub dataset_ref: String,
+    /// Stable validator policy ref carried into adapter governance lineage.
+    pub validator_policy_ref: String,
+    /// Stable adapter identifier for the exported artifact.
+    pub adapter_id: String,
+    /// Stable adapter revision for the exported artifact.
+    pub adapter_revision: String,
+}
+
+impl OpenAdapterArtifactExportRequest {
+    /// Creates one generic adapter-export request.
+    #[must_use]
+    pub fn new(
+        dataset_ref: impl Into<String>,
+        validator_policy_ref: impl Into<String>,
+        adapter_id: impl Into<String>,
+        adapter_revision: impl Into<String>,
+    ) -> Self {
+        Self {
+            dataset_ref: dataset_ref.into(),
+            validator_policy_ref: validator_policy_ref.into(),
+            adapter_id: adapter_id.into(),
+            adapter_revision: adapter_revision.into(),
+        }
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), OpenAdapterSftError> {
+        if self.dataset_ref.trim().is_empty() {
+            return Err(OpenAdapterSftError::MissingDatasetRef);
+        }
+        if self.validator_policy_ref.trim().is_empty() {
+            return Err(OpenAdapterSftError::MissingValidatorPolicyRef);
+        }
+        if self.adapter_id.trim().is_empty() {
+            return Err(OpenAdapterSftError::MissingAdapterId);
+        }
+        if self.adapter_revision.trim().is_empty() {
+            return Err(OpenAdapterSftError::MissingAdapterRevision);
+        }
+        Ok(())
+    }
+}
+
+/// Generic exported adapter artifact emitted from one current run state.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OpenAdapterExportedArtifact {
+    /// Stable adapter identity for the exported artifact.
+    pub adapter_identity: AdapterArtifactIdentity,
+    /// Stable adapter-artifact digest.
+    pub adapter_artifact_digest: String,
+    /// Stable adapter-identity digest.
+    pub adapter_identity_digest: String,
+    /// LoRA alpha needed to reload the exported artifact correctly.
+    pub adapter_alpha: f32,
+    /// Raw `safetensors` payload.
+    pub adapter_bytes: Vec<u8>,
 }
 
 /// Typed training summary emitted by the higher-level open adapter lane.
@@ -937,68 +1418,22 @@ pub fn run_open_adapter_sft_export(
         &final_bundle.state_dict,
         request.adapter_id.clone(),
     )?;
-    let manifest = OpenAdapterSafetensorsManifest {
-        abi_version: String::from("openagents.open_adapter.safetensors.v1"),
-        execution_backend_label: backend.config().execution_backend_label.clone(),
-        admissible_model_family: backend.config().admissible_model_family,
-        adapter_family: backend
-            .config()
-            .admissible_model_family
-            .adapter_family()
-            .to_string(),
-        adapter_format: backend
-            .config()
-            .admissible_model_family
-            .adapter_format()
-            .to_string(),
-        dataset_ref: request.dataset_ref.clone(),
-        validator_policy_ref: request.validator_policy_ref.clone(),
-        adapter_id: request.adapter_id.clone(),
-        adapter_revision: request.adapter_revision.clone(),
-        base_model_id: backend.config().model.base_model_id.clone(),
-        base_model_revision: backend.config().model.base_model_revision.clone(),
-        base_served_artifact_digest: backend.config().model.base_served_artifact_digest.clone(),
-        tokenizer_digest: backend.config().model.tokenizer.tokenizer_digest.clone(),
-        tokenizer_contract_digest: backend.tokenizer.contract_digest(),
-        checkpoint_family: backend.config().checkpoint_family.clone(),
-        run_id: backend.config().run_id.clone(),
-        lora_rank: backend.config().model.target.lora_rank,
-        lora_alpha: backend.config().model.target.lora_alpha,
-        hidden_size: backend.config().model.hidden_size,
-        vocab_size: backend.config().model.vocab_size,
-        final_state_dict_digest: final_bundle_receipt.state_dict_digest.clone(),
-        execution_provenance_digest: backend.provenance().stable_digest(),
-    };
-    let adapter_bytes = export_open_adapter_safetensors(backend, &run, &manifest)?;
-    let adapter_artifact_digest = hex::encode(Sha256::digest(adapter_bytes.as_slice()));
-    let adapter_identity = AdapterArtifactIdentity::new(
-        request.adapter_id.clone(),
-        request.adapter_revision.clone(),
-        AdapterArtifactKind::Lora,
-        AdapterArtifactFormat::Safetensors,
-        backend.config().model.base_model_id.clone(),
-        backend.config().model.base_model_revision.clone(),
-        backend.config().model.base_served_artifact_digest.clone(),
-        adapter_artifact_digest.clone(),
-        QuantizationMode::None,
-        AdapterTargetFamily::DecoderComposite,
-        u64::try_from(backend.config().model.target.lora_rank.saturating_mul(
-            backend.config().model.hidden_size + backend.config().model.vocab_size,
-        ))
-        .unwrap_or(u64::MAX),
-    )
-    .with_provenance_digest(backend.provenance().stable_digest())
-    .with_governance_digest(stable_governance_digest(
-        request.dataset_ref.as_str(),
-        request.validator_policy_ref.as_str(),
-    ));
+    let exported = backend.export_run_artifact(
+        &run,
+        &OpenAdapterArtifactExportRequest::new(
+            request.dataset_ref.clone(),
+            request.validator_policy_ref.clone(),
+            request.adapter_id.clone(),
+            request.adapter_revision.clone(),
+        ),
+    )?;
     let summary = OpenAdapterSftTrainingSummary {
         run_summary: run.summary(),
         execution_provenance: backend.provenance().clone(),
         dataset_ref: request.dataset_ref.clone(),
         validator_policy_ref: request.validator_policy_ref.clone(),
-        adapter_artifact_digest,
-        adapter_identity_digest: adapter_identity.stable_digest(),
+        adapter_artifact_digest: exported.adapter_artifact_digest.clone(),
+        adapter_identity_digest: exported.adapter_identity_digest.clone(),
         initial_state_dict_digest: initial_bundle_receipt.state_dict_digest.clone(),
         final_state_dict_digest: final_bundle_receipt.state_dict_digest.clone(),
         lora_alpha: backend.config().model.target.lora_alpha,
@@ -1013,8 +1448,8 @@ pub fn run_open_adapter_sft_export(
         initial_bundle_receipt,
         final_bundle_receipt,
         adapter_delta,
-        adapter_identity,
-        adapter_bytes,
+        adapter_identity: exported.adapter_identity,
+        adapter_bytes: exported.adapter_bytes,
     };
     outcome.load_lm_head_lora_artifact()?;
     Ok(outcome)
@@ -1117,6 +1552,86 @@ fn export_open_adapter_safetensors(
         Some(metadata),
     )
     .map_err(safetensors_error)
+}
+
+fn export_open_adapter_artifact(
+    backend: &OpenAdapterTrainingExecutionBackend,
+    run: &FixedBudgetTrainingRun,
+    request: &OpenAdapterArtifactExportRequest,
+) -> Result<OpenAdapterExportedArtifact, OpenAdapterSftError> {
+    let manifest = OpenAdapterSafetensorsManifest {
+        abi_version: String::from("openagents.open_adapter.safetensors.v1"),
+        execution_backend_label: backend.config().execution_backend_label.clone(),
+        admissible_model_family: backend.config().admissible_model_family,
+        adapter_family: backend
+            .config()
+            .admissible_model_family
+            .adapter_family()
+            .to_string(),
+        adapter_format: backend
+            .config()
+            .admissible_model_family
+            .adapter_format()
+            .to_string(),
+        dataset_ref: request.dataset_ref.clone(),
+        validator_policy_ref: request.validator_policy_ref.clone(),
+        adapter_id: request.adapter_id.clone(),
+        adapter_revision: request.adapter_revision.clone(),
+        base_model_id: backend.config().model.base_model_id.clone(),
+        base_model_revision: backend.config().model.base_model_revision.clone(),
+        base_served_artifact_digest: backend.config().model.base_served_artifact_digest.clone(),
+        tokenizer_digest: backend.config().model.tokenizer.tokenizer_digest.clone(),
+        tokenizer_contract_digest: backend.tokenizer.contract_digest(),
+        checkpoint_family: backend.config().checkpoint_family.clone(),
+        run_id: backend.config().run_id.clone(),
+        lora_rank: backend.config().model.target.lora_rank,
+        lora_alpha: backend.config().model.target.lora_alpha,
+        hidden_size: backend.config().model.hidden_size,
+        vocab_size: backend.config().model.vocab_size,
+        final_state_dict_digest: PortableModelBundle::from_training_groups(
+            backend.config().admissible_model_family.adapter_family(),
+            backend.config().model.base_model_revision.clone(),
+            backend.config().checkpoint_family.clone(),
+            Some(format!("checkpoint://{}/final", backend.config().run_id)),
+            backend.snapshot_training_groups(run)?.as_slice(),
+            backend.tokenizer.clone(),
+            backend.config().model.tokenizer.template_digest.clone(),
+        )?
+        .export_safetensors()?
+        .1
+        .state_dict_digest,
+        execution_provenance_digest: backend.provenance().stable_digest(),
+    };
+    let adapter_bytes = export_open_adapter_safetensors(backend, run, &manifest)?;
+    let adapter_artifact_digest = hex::encode(Sha256::digest(adapter_bytes.as_slice()));
+    let adapter_identity = AdapterArtifactIdentity::new(
+        request.adapter_id.clone(),
+        request.adapter_revision.clone(),
+        AdapterArtifactKind::Lora,
+        AdapterArtifactFormat::Safetensors,
+        backend.config().model.base_model_id.clone(),
+        backend.config().model.base_model_revision.clone(),
+        backend.config().model.base_served_artifact_digest.clone(),
+        adapter_artifact_digest.clone(),
+        QuantizationMode::None,
+        AdapterTargetFamily::DecoderComposite,
+        u64::try_from(backend.config().model.target.lora_rank.saturating_mul(
+            backend.config().model.hidden_size + backend.config().model.vocab_size,
+        ))
+        .unwrap_or(u64::MAX),
+    )
+    .with_provenance_digest(backend.provenance().stable_digest())
+    .with_governance_digest(stable_governance_digest(
+        request.dataset_ref.as_str(),
+        request.validator_policy_ref.as_str(),
+    ));
+    Ok(OpenAdapterExportedArtifact {
+        adapter_identity_digest: adapter_identity.stable_digest(),
+        adapter_alpha: backend.config().model.target.lora_alpha,
+        adapter_identity,
+        adapter_artifact_digest,
+        adapter_bytes,
+    })
 }
 
 fn accumulate_lm_head_gradients(
@@ -1400,6 +1915,65 @@ fn stable_gradient_execution_digest(
     hex::encode(hasher.finalize())
 }
 
+fn stable_weighted_target_batch_digest(
+    batch_id: &str,
+    targets: &[OpenAdapterWeightedTokenTarget],
+    teacher_target_blend: f32,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"psionic_open_adapter_weighted_target_batch|");
+    hasher.update(batch_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(teacher_target_blend.to_bits().to_le_bytes());
+    for target in targets {
+        hasher.update(b"|target|");
+        hasher.update(target.target_id.as_bytes());
+        hasher.update(b"|");
+        hasher.update(target.target_token_id.to_le_bytes());
+        hasher.update(b"|");
+        hasher.update(target.loss_weight.to_bits().to_le_bytes());
+        if let Some(teacher_target_logprob) = target.teacher_target_logprob {
+            hasher.update(b"|teacher|");
+            hasher.update(teacher_target_logprob.to_bits().to_le_bytes());
+        }
+        for value in &target.hidden_state {
+            hasher.update(b"|");
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+    }
+    hex::encode(hasher.finalize())
+}
+
+fn stable_weighted_target_execution_digest(
+    batch_id: &str,
+    batch_digest: &str,
+    mean_raw_loss: f32,
+    mean_weighted_loss: f32,
+    mean_loss_weight: f32,
+    mean_current_logprob: f32,
+    teacher_target_count: u32,
+    gradient_execution_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"psionic_open_adapter_weighted_target_execution|");
+    hasher.update(batch_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(batch_digest.as_bytes());
+    hasher.update(b"|");
+    hasher.update(mean_raw_loss.to_bits().to_le_bytes());
+    hasher.update(b"|");
+    hasher.update(mean_weighted_loss.to_bits().to_le_bytes());
+    hasher.update(b"|");
+    hasher.update(mean_loss_weight.to_bits().to_le_bytes());
+    hasher.update(b"|");
+    hasher.update(mean_current_logprob.to_bits().to_le_bytes());
+    hasher.update(b"|");
+    hasher.update(teacher_target_count.to_le_bytes());
+    hasher.update(b"|");
+    hasher.update(gradient_execution_digest.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
 fn stable_governance_digest(dataset_ref: &str, validator_policy_ref: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"psionic_open_adapter_governance|");
@@ -1415,6 +1989,23 @@ fn open_adapter_family_label(family: OpenAdapterAdmissibleModelFamily) -> &'stat
             b"gpt_oss_decoder_lm_head_lora"
         }
     }
+}
+
+fn validate_loaded_adapter_field(
+    field: &'static str,
+    expected: &str,
+    actual: &str,
+) -> Result<(), OpenAdapterTrainingExecutionError> {
+    if expected != actual {
+        return Err(
+            OpenAdapterTrainingExecutionError::LoadedAdapterFieldMismatch {
+                field,
+                expected: expected.to_string(),
+                actual: actual.to_string(),
+            },
+        );
+    }
+    Ok(())
 }
 
 fn safetensors_error(error: safetensors::SafeTensorError) -> OpenAdapterSftError {
@@ -1492,6 +2083,57 @@ pub enum OpenAdapterTrainingExecutionError {
     },
     #[error("open adapter requested unknown batch index `{batch_index}`")]
     UnknownBatchIndex { batch_index: usize },
+    #[error("open adapter weighted-target batch is missing `batch_id`")]
+    MissingWeightedTargetBatchId,
+    #[error("open adapter weighted-target batch `{batch_id}` must carry at least one target")]
+    EmptyWeightedTargets { batch_id: String },
+    #[error("open adapter weighted target is missing `target_id`")]
+    MissingWeightedTargetId,
+    #[error(
+        "open adapter weighted target `{target_id}` hidden width mismatch: expected {expected}, found {actual}"
+    )]
+    WeightedTargetHiddenSizeMismatch {
+        target_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    #[error(
+        "open adapter weighted target `{target_id}` token `{target_token_id}` exceeds vocab size {vocab_size}"
+    )]
+    WeightedTargetTokenOutOfRange {
+        target_id: String,
+        target_token_id: u32,
+        vocab_size: usize,
+    },
+    #[error(
+        "open adapter weighted target `{target_id}` carried invalid loss_weight `{loss_weight}`"
+    )]
+    InvalidWeightedTargetLossWeight { target_id: String, loss_weight: f32 },
+    #[error(
+        "open adapter weighted target `{target_id}` carried invalid teacher logprob `{teacher_target_logprob}`"
+    )]
+    InvalidWeightedTeacherLogprob {
+        target_id: String,
+        teacher_target_logprob: f32,
+    },
+    #[error("open adapter weighted-target batch carried invalid teacher_target_blend `{value}`")]
+    InvalidTeacherTargetBlend { value: f32 },
+    #[error(
+        "open adapter loaded adapter field `{field}` expected `{expected}` but found `{actual}`"
+    )]
+    LoadedAdapterFieldMismatch {
+        field: &'static str,
+        expected: String,
+        actual: String,
+    },
+    #[error("open adapter loaded adapter rank mismatch: expected {expected}, found {actual}")]
+    LoadedAdapterRankMismatch { expected: usize, actual: usize },
+    #[error("open adapter loaded adapter `{field}` mismatch: expected {expected}, found {actual}")]
+    LoadedAdapterShapeMismatch {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
     #[error("open adapter run is missing parameter group `{group_id}`")]
     MissingParameterGroup { group_id: String },
     #[error("open adapter parameter group `{group_id}` is not dense f32 data")]
@@ -1666,8 +2308,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_backend_produces_repo_owned_gradients_and_steps()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_backend_produces_repo_owned_gradients_and_steps(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         assert_eq!(backend.batches().len(), 2);
         assert_eq!(
@@ -1680,12 +2322,10 @@ mod tests {
         let (step_input, gradient_record) = backend.produce_step_input(&run, 0, 1_000, 1_020)?;
         assert_eq!(gradient_record.training_batch.sample_count, 2);
         assert!(gradient_record.mean_loss > 0.0);
-        assert!(
-            gradient_record
-                .gradient_norms_l2
-                .values()
-                .all(|norm| *norm > 0.0)
-        );
+        assert!(gradient_record
+            .gradient_norms_l2
+            .values()
+            .all(|norm| *norm > 0.0));
 
         let receipt = run.apply_step(step_input)?;
         assert_eq!(
@@ -1697,8 +2337,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_sft_lane_exports_loadable_lm_head_lora_artifact()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_sft_lane_exports_loadable_lm_head_lora_artifact(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         let outcome = run_open_adapter_sft_export(
             &backend,
@@ -1741,8 +2381,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_backend_reuses_generic_cluster_window_planning()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_backend_reuses_generic_cluster_window_planning(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         let state = cluster_state(
             &[
@@ -1842,8 +2482,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn mlx_metal_open_adapter_backend_uses_metal_logical_device_when_available()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn mlx_metal_open_adapter_backend_uses_metal_logical_device_when_available(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut config = config();
         config.execution_backend_label = OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL.to_string();
         let backend = OpenAdapterTrainingExecutionBackend::new(config, samples())?;
