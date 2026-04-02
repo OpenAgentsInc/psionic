@@ -14,7 +14,8 @@ use psionic_cluster::{
     ClusterTrustRolloutDisposition, ClusterTunnelError, ClusterTunnelHttpRequest,
     ClusterTunnelPolicy, ClusterTunnelServiceKind, ClusterTunnelServicePolicy, ClusterTunnelState,
     ConfiguredClusterPeer, ConfiguredPeerDialPolicy, ConfiguredPeerKeyMatch,
-    ConfiguredPeerReachability, LocalClusterConfig, LocalClusterNode, NodeRole,
+    ConfiguredPeerReachability, LocalClusterConfig, LocalClusterNode, NodeRole, ServedMeshRole,
+    ServedMeshRoleReason, ServedMeshRoleState,
 };
 use tempfile::tempdir;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -325,6 +326,15 @@ async fn seeded_local_nodes_discover_each_other_and_exchange_hello_and_ping() {
     );
     assert_eq!(executor_peer.identity.role, NodeRole::CoordinatorOnly);
     assert_eq!(coordinator_peer.identity.role, NodeRole::ExecutorOnly);
+    assert_eq!(
+        executor_peer.served_mesh_role,
+        ServedMeshRoleState::new(ServedMeshRole::ThinClient)
+            .with_reason(ServedMeshRoleReason::RemoteOnly)
+    );
+    assert_eq!(
+        coordinator_peer.served_mesh_role,
+        ServedMeshRoleState::new(ServedMeshRole::Worker)
+    );
     assert_eq!(executor_peer.identity.node_epoch.as_u64(), 1);
     assert_eq!(coordinator_peer.identity.node_epoch.as_u64(), 1);
     assert_eq!(

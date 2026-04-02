@@ -2330,6 +2330,106 @@ pub enum NodeRole {
     Mixed,
 }
 
+/// Served inference-mesh role published above the transport role.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ServedMeshRole {
+    /// Hosts the active served model lane for the current mesh view.
+    Host,
+    /// Serves execution work without owning the current host role.
+    Worker,
+    /// Is reserved for promotion into active serving.
+    Standby,
+    /// Exposes the API but routes work to a remote mesh worker.
+    ThinClient,
+}
+
+/// Posture for one served inference-mesh role.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ServedMeshRolePosture {
+    /// The node currently satisfies the declared served-mesh role.
+    Ready,
+    /// The node still carries the role but is temporarily degraded.
+    Downgraded,
+    /// The node cannot currently satisfy the declared role.
+    Refused,
+}
+
+/// Machine-readable reason for one served-mesh role transition or refusal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ServedMeshRoleReason {
+    /// The node is still warming before it can satisfy the role fully.
+    Warming,
+    /// Required local model or support artifacts are missing.
+    ArtifactMissing,
+    /// Admission policy or mesh trust posture refused the node.
+    AdmissionRefused,
+    /// The node is draining and should not receive new work.
+    Draining,
+    /// The node is intentionally remote-only for the served lane.
+    RemoteOnly,
+}
+
+/// Current served-mesh role state published by Psionic management surfaces.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServedMeshRoleState {
+    /// Declared served-mesh role.
+    pub role: ServedMeshRole,
+    /// Current posture for the role.
+    pub posture: ServedMeshRolePosture,
+    /// Machine-readable reasons for the current posture.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasons: Vec<ServedMeshRoleReason>,
+}
+
+impl ServedMeshRoleState {
+    /// Creates one ready served-mesh role state.
+    #[must_use]
+    pub fn new(role: ServedMeshRole) -> Self {
+        Self {
+            role,
+            posture: ServedMeshRolePosture::Ready,
+            reasons: Vec::new(),
+        }
+    }
+
+    /// Derives the bootstrap served-mesh role from the transport role.
+    #[must_use]
+    pub fn from_transport_role(role: NodeRole) -> Self {
+        match role {
+            NodeRole::CoordinatorOnly => {
+                Self::new(ServedMeshRole::ThinClient).with_reason(ServedMeshRoleReason::RemoteOnly)
+            }
+            NodeRole::ExecutorOnly => Self::new(ServedMeshRole::Worker),
+            NodeRole::Mixed => Self::new(ServedMeshRole::Host),
+        }
+    }
+
+    /// Applies an explicit posture to the served-mesh role.
+    #[must_use]
+    pub fn with_posture(mut self, posture: ServedMeshRolePosture) -> Self {
+        self.posture = posture;
+        self
+    }
+
+    /// Adds one machine-readable reason if it is not already present.
+    #[must_use]
+    pub fn with_reason(mut self, reason: ServedMeshRoleReason) -> Self {
+        if !self.reasons.contains(&reason) {
+            self.reasons.push(reason);
+        }
+        self
+    }
+}
+
+impl Default for ServedMeshRoleState {
+    fn default() -> Self {
+        Self::new(ServedMeshRole::Host)
+    }
+}
+
 /// Stable cluster identity for one trusted local namespace/admission pair.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ClusterId(String);
@@ -2802,6 +2902,9 @@ pub struct PeerSnapshot {
     pub remote_addr: SocketAddr,
     /// Cluster/node identity surfaced by the peer.
     pub identity: ClusterNodeIdentity,
+    /// Served inference-mesh role reported for the peer.
+    #[serde(default)]
+    pub served_mesh_role: ServedMeshRoleState,
     /// Hello/ping handshake facts observed so far.
     pub handshake: PeerHandshakeState,
     /// Selected path and observed transport metrics for the peer.
@@ -4768,6 +4871,7 @@ impl SharedState {
             .or_insert_with(|| PeerSnapshot {
                 remote_addr,
                 identity: identity.clone(),
+                served_mesh_role: ServedMeshRoleState::from_transport_role(identity.role),
                 handshake: PeerHandshakeState {
                     saw_hello: false,
                     last_ping_sequence: None,
@@ -4784,6 +4888,7 @@ impl SharedState {
         }
         entry.remote_addr = remote_addr;
         entry.identity = identity.clone();
+        entry.served_mesh_role = ServedMeshRoleState::from_transport_role(identity.role);
         entry.transport.path = path;
         entry.transport.multiplex_profile = multiplex_profile;
         entry.transport.active_streams = active_streams;
@@ -6903,6 +7008,37 @@ mod tests {
             "scheduler-digest-1",
         ))
         .with_claims_profile_id("cluster.proof.required.v1")
+    }
+
+    #[test]
+    fn served_mesh_role_defaults_follow_transport_role_honestly() {
+        assert_eq!(
+            ServedMeshRoleState::from_transport_role(NodeRole::CoordinatorOnly),
+            ServedMeshRoleState::new(ServedMeshRole::ThinClient)
+                .with_reason(ServedMeshRoleReason::RemoteOnly)
+        );
+        assert_eq!(
+            ServedMeshRoleState::from_transport_role(NodeRole::ExecutorOnly),
+            ServedMeshRoleState::new(ServedMeshRole::Worker)
+        );
+        assert_eq!(
+            ServedMeshRoleState::from_transport_role(NodeRole::Mixed),
+            ServedMeshRoleState::new(ServedMeshRole::Host)
+        );
+        assert_eq!(
+            ServedMeshRoleState::new(ServedMeshRole::Standby)
+                .with_posture(ServedMeshRolePosture::Downgraded)
+                .with_reason(ServedMeshRoleReason::Warming)
+                .with_reason(ServedMeshRoleReason::Draining),
+            ServedMeshRoleState {
+                role: ServedMeshRole::Standby,
+                posture: ServedMeshRolePosture::Downgraded,
+                reasons: vec![
+                    ServedMeshRoleReason::Warming,
+                    ServedMeshRoleReason::Draining
+                ],
+            }
+        );
     }
 
     fn signed_ping_envelope_with_session_claims(

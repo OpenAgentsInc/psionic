@@ -134,3 +134,22 @@ Later mesh issues should extend typed Psionic contracts in this order:
 
 Consumer repos should integrate above those contracts. They should not redefine
 mesh identity, admission, topology, or routing in product code.
+
+## Role Split
+
+Mesh management state must publish two separate role surfaces:
+
+- transport role
+  - `coordinator_only`, `executor_only`, or `mixed`
+  - owned by `psionic-net` transport and identity truth
+- served-mesh role
+  - `host`, `worker`, `standby`, or `thin_client`
+  - owned by mesh serving and routing truth
+
+The served-mesh role also carries posture and machine-readable reasons such as
+`warming`, `artifact_missing`, `admission_refused`, `draining`, and
+`remote_only`.
+
+Those roles must not be collapsed back into one enum. A node can honestly be
+`mixed` at the transport layer and `standby` at the served-mesh layer at the
+same time.

@@ -16,7 +16,7 @@ use crate::{
     ClusterDiscoveryCandidate, ClusterId, ClusterIntroductionPolicy,
     ClusterIntroductionVerificationError, ClusterJoinRefusal, ClusterNodeIdentity,
     ClusterTrustPolicy, ConfiguredClusterPeer, NodeAttestationRequirement, NodeId, NodeRole,
-    PeerSnapshot, SignedClusterIntroductionEnvelope,
+    PeerSnapshot, ServedMeshRoleState, SignedClusterIntroductionEnvelope,
 };
 
 /// Monotonic cluster-election term for the first ordered-control seam.
@@ -150,6 +150,9 @@ pub struct ClusterMembershipRecord {
     pub advertised_addr: Option<SocketAddr>,
     /// Current membership state for the node.
     pub status: ClusterMembershipStatus,
+    /// Served inference-mesh role published alongside the transport role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub served_mesh_role: Option<ServedMeshRoleState>,
 }
 
 impl ClusterMembershipRecord {
@@ -160,11 +163,28 @@ impl ClusterMembershipRecord {
         advertised_addr: Option<SocketAddr>,
         status: ClusterMembershipStatus,
     ) -> Self {
+        let transport_role = identity.role;
         Self {
             identity,
             advertised_addr,
             status,
+            served_mesh_role: Some(ServedMeshRoleState::from_transport_role(transport_role)),
         }
+    }
+
+    /// Overrides the served inference-mesh role for this membership.
+    #[must_use]
+    pub fn with_served_mesh_role(mut self, served_mesh_role: ServedMeshRoleState) -> Self {
+        self.served_mesh_role = Some(served_mesh_role);
+        self
+    }
+
+    /// Returns the effective served inference-mesh role for this membership.
+    #[must_use]
+    pub fn effective_served_mesh_role(&self) -> ServedMeshRoleState {
+        self.served_mesh_role
+            .clone()
+            .unwrap_or_else(|| ServedMeshRoleState::from_transport_role(self.identity.role))
     }
 }
 
@@ -2445,6 +2465,15 @@ impl ClusterSnapshot {
             hasher.update(b"|");
             hasher.update(membership_status_label(membership.status));
             hasher.update(b"|");
+            let served_mesh_role = membership.effective_served_mesh_role();
+            hasher.update(served_mesh_role_label(served_mesh_role.role));
+            hasher.update(b"|");
+            hasher.update(served_mesh_role_posture_label(served_mesh_role.posture));
+            for reason in &served_mesh_role.reasons {
+                hasher.update(b"|served_mesh_reason|");
+                hasher.update(served_mesh_role_reason_label(*reason));
+            }
+            hasher.update(b"|");
             hasher.update(
                 membership
                     .advertised_addr
@@ -2717,6 +2746,14 @@ impl ClusterState {
     /// Rehydrates authoritative cluster state from one prior snapshot.
     #[must_use]
     pub fn from_snapshot(snapshot: ClusterSnapshot) -> Self {
+        let mut snapshot = snapshot;
+        for membership in snapshot.memberships.values_mut() {
+            if membership.served_mesh_role.is_none() {
+                membership.served_mesh_role = Some(ServedMeshRoleState::from_transport_role(
+                    membership.identity.role,
+                ));
+            }
+        }
         Self { snapshot }
     }
 
@@ -3994,6 +4031,33 @@ fn node_role_label(role: crate::NodeRole) -> &'static [u8] {
     }
 }
 
+fn served_mesh_role_label(role: crate::ServedMeshRole) -> &'static [u8] {
+    match role {
+        crate::ServedMeshRole::Host => b"host",
+        crate::ServedMeshRole::Worker => b"worker",
+        crate::ServedMeshRole::Standby => b"standby",
+        crate::ServedMeshRole::ThinClient => b"thin_client",
+    }
+}
+
+fn served_mesh_role_posture_label(posture: crate::ServedMeshRolePosture) -> &'static [u8] {
+    match posture {
+        crate::ServedMeshRolePosture::Ready => b"ready",
+        crate::ServedMeshRolePosture::Downgraded => b"downgraded",
+        crate::ServedMeshRolePosture::Refused => b"refused",
+    }
+}
+
+fn served_mesh_role_reason_label(reason: crate::ServedMeshRoleReason) -> &'static [u8] {
+    match reason {
+        crate::ServedMeshRoleReason::Warming => b"warming",
+        crate::ServedMeshRoleReason::ArtifactMissing => b"artifact_missing",
+        crate::ServedMeshRoleReason::AdmissionRefused => b"admission_refused",
+        crate::ServedMeshRoleReason::Draining => b"draining",
+        crate::ServedMeshRoleReason::RemoteOnly => b"remote_only",
+    }
+}
+
 fn membership_status_label(status: ClusterMembershipStatus) -> &'static [u8] {
     match status {
         ClusterMembershipStatus::Joining => b"joining",
@@ -4152,7 +4216,8 @@ mod tests {
 
     use crate::{
         AdmissionToken, ClusterDiscoveryCandidate, ClusterDiscoveryPosture, ClusterNamespace,
-        NodeEpoch, NodeRole,
+        NodeEpoch, NodeRole, ServedMeshRole, ServedMeshRolePosture, ServedMeshRoleReason,
+        ServedMeshRoleState,
     };
 
     use super::{
@@ -4200,6 +4265,29 @@ mod tests {
             Some(SocketAddr::from(([127, 0, 0, 1], port))),
             status,
         )
+    }
+
+    #[test]
+    fn membership_can_publish_transport_and_served_mesh_roles_independently() {
+        let cluster_id = sample_cluster_id();
+        let membership = sample_membership_record(
+            &cluster_id,
+            4100,
+            NodeRole::Mixed,
+            ClusterMembershipStatus::Ready,
+        )
+        .with_served_mesh_role(
+            ServedMeshRoleState::new(ServedMeshRole::Standby)
+                .with_posture(ServedMeshRolePosture::Downgraded)
+                .with_reason(ServedMeshRoleReason::Warming),
+        );
+        assert_eq!(membership.identity.role, NodeRole::Mixed);
+        assert_eq!(
+            membership.effective_served_mesh_role(),
+            ServedMeshRoleState::new(ServedMeshRole::Standby)
+                .with_posture(ServedMeshRolePosture::Downgraded)
+                .with_reason(ServedMeshRoleReason::Warming)
+        );
     }
 
     fn sample_recovery_policy() -> ClusterRecoveryPolicy {
