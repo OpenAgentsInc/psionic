@@ -1,0 +1,13 @@
+{
+  "schema_version": "tassadar.default_train_lane_contract_checker_receipt.v1",
+  "receipt_id": "tassadar_default_train_lane_contract_checker_receipt_v1",
+  "lane_id": "tassadar_article_transformer_trace_bound_trained_v0",
+  "checker_bundle_id": "tassadar_default_train_lane_checker_bundle_v1",
+  "checker_command": "scripts/check-tassadar-default-train-lane.sh",
+  "checked_artifact": {
+    "path": "fixtures/tassadar/operator/tassadar_default_train_lane_contract_v1.json",
+    "sha256": "4d6fc61256cb1849c4c17c6b7d586615cf42a3b3890386e9b4bf11e0f79471a7"
+  },
+  "status": "green",
+  "detail": "The focused default-lane checker keeps the canonical launcher, hardware profile, run-root family, checker bundle, and promotion target bound to the incumbent default lane."
+}

@@ -1,0 +1,100 @@
+{
+  "schema_version": "tassadar.default_train_rehearsal_bundle.v1",
+  "rehearsal_id": "tassadar_default_train_rehearsal_v1",
+  "lane_id": "tassadar_article_transformer_trace_bound_trained_v0",
+  "launcher_path": "./TRAIN_TASSADAR",
+  "launcher_surface_id": "tassadar_train_start",
+  "run_id": "run-tassadar-default-rehearsal-20260402t220000z",
+  "run_root": "fixtures/tassadar/operator/tassadar_default_train_rehearsal_example/run-tassadar-default-rehearsal-20260402t220000z",
+  "launch_manifest_ref": "manifests/launch_manifest.json",
+  "current_run_status_ref": "status/current_run_status.json",
+  "retained_summary_ref": "status/retained_summary.json",
+  "checker_receipt_refs": [
+    "checker/default_train_lane_contract_check.json",
+    "checker/acceptance_check.json"
+  ],
+  "promotion_evidence_ref": "promotion/promotion_target_evidence.json",
+  "evidence_artifacts": [
+    {
+      "artifact_kind": "launch_manifest",
+      "artifact": {
+        "path": "fixtures/tassadar/operator/tassadar_default_train_rehearsal_example/run-tassadar-default-rehearsal-20260402t220000z/manifests/launch_manifest.json",
+        "sha256": "08c76e5166b738530185238ec023c5a5c1acd171ae03bee90b19415538a5e438"
+      },
+      "detail": "The bounded rehearsal keeps the start-surface launch manifest under the retained operator run root."
+    },
+    {
+      "artifact_kind": "current_run_status",
+      "artifact": {
+        "path": "fixtures/tassadar/operator/tassadar_default_train_rehearsal_example/run-tassadar-default-rehearsal-20260402t220000z/status/current_run_status.json",
+        "sha256": "500223e4abb4c419ee2c6a222727c0c67ad88e4adb43c1b0fd225c67ec7dbd5e"
+      },
+      "detail": "The bounded rehearsal keeps the current run status under the same operator run root."
+    },
+    {
+      "artifact_kind": "retained_summary",
+      "artifact": {
+        "path": "fixtures/tassadar/operator/tassadar_default_train_rehearsal_example/run-tassadar-default-rehearsal-20260402t220000z/status/retained_summary.json",
+        "sha256": "834b0db9caca36990c98af1f58e1e7b0e9050d7f47d51187e3d5bc2409da1cd8"
+      },
+      "detail": "The bounded rehearsal keeps the launcher retained summary under the same operator run root."
+    },
+    {
+      "artifact_kind": "default_lane_contract_checker_receipt",
+      "artifact": {
+        "path": "fixtures/tassadar/operator/tassadar_default_train_lane_contract_checker_receipt_v1.json",
+        "sha256": "0c9d7f47b826c7aa27bf3745a6f6da31783d54282f90a8c01693fbeb528db976"
+      },
+      "detail": "The focused default-lane checker receipt stays green for the incumbent default lane."
+    },
+    {
+      "artifact_kind": "acceptance_checker_receipt",
+      "artifact": {
+        "path": "fixtures/tassadar/operator/tassadar_default_train_acceptance_checker_receipt_v1.json",
+        "sha256": "18254d45b8395f9081cd621a04d9ff7352f50ff99af1e88cd1588f1a890f552d"
+      },
+      "detail": "The broader acceptance checker receipt keeps the retained weight-production bundle inside the same operator proof packet."
+    },
+    {
+      "artifact_kind": "promotion_evidence",
+      "artifact": {
+        "path": "fixtures/tassadar/operator/tassadar_default_train_promotion_evidence_v1.json",
+        "sha256": "d7a1bde43ddb38e6c4e8247d16704c91feca68c21dc7bd180cc01a09c1f7e724"
+      },
+      "detail": "The rehearsal keeps the incumbent trained-v0 promotion-target evidence explicit rather than implying a separate promotion path."
+    }
+  ],
+  "closeout_gates": [
+    {
+      "gate_id": "launcher_surface_bound",
+      "satisfied": true,
+      "detail": "The bounded rehearsal keeps the start-surface manifest, current status, and retained summary under one operator run root."
+    },
+    {
+      "gate_id": "default_checker_bound",
+      "satisfied": true,
+      "detail": "The focused default-lane checker receipt keeps the frozen lane contract and launcher meaning explicit."
+    },
+    {
+      "gate_id": "acceptance_checker_bound",
+      "satisfied": true,
+      "detail": "The broader acceptance checker receipt keeps the retained weight-production bundle inside the same operator proof packet."
+    },
+    {
+      "gate_id": "promotion_target_bound",
+      "satisfied": true,
+      "detail": "The rehearsal binds the incumbent trained-v0 descriptor, artifact, lineage contract, and anchor run bundle into one promotion-evidence packet."
+    }
+  ],
+  "can_now_claim": [
+    "Tassadar now has one bounded default-lane rehearsal that cites the same launcher path, checker bundle, and promotion-target family from retained repo truth.",
+    "The canonical meaning of `./TRAIN_TASSADAR` is operator-legible at launcher level for the incumbent article-transformer trained-v0 lane."
+  ],
+  "still_out_of_scope": [
+    "This rehearsal does not claim that every historical Tassadar lane has equal launcher or checker parity.",
+    "This rehearsal does not promote any later 4080 executor candidate or redefine the incumbent default lane above the retained trained-v0 family.",
+    "This rehearsal does not widen the article-equivalence claim boundary beyond the bounded trained-v0 artifact family already cited elsewhere in the repo."
+  ],
+  "claim_boundary": "This closeout bundle proves one bounded default-lane rehearsal for the incumbent Tassadar train operator path, including explicit start-surface outputs, two retained checker receipts, and one retained promotion-target packet. It does not claim broader lane unification, later candidate promotion, or new article-equivalence closure beyond the existing trained-v0 family.",
+  "detail": "The default-lane rehearsal ties the exact launcher run root, checker receipts, and incumbent promotion-target evidence into one operator-readable proof packet for Tassadar parity."
+}

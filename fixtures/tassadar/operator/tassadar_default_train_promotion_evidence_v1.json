@@ -1,0 +1,25 @@
+{
+  "schema_version": "tassadar.default_train_promotion_evidence.v1",
+  "evidence_id": "tassadar_default_train_promotion_evidence_v1",
+  "lane_id": "tassadar_article_transformer_trace_bound_trained_v0",
+  "promotion_target_model_id": "tassadar-article-transformer-trace-bound-trained-v0",
+  "promotion_target_descriptor": {
+    "path": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_descriptor.json",
+    "sha256": "c48ccc6503b9f7d624204502a894924d819d6ac43312a727f38da45191e4ecb1"
+  },
+  "promotion_target_artifact": {
+    "path": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0.safetensors",
+    "sha256": "e24923e6fe39f0656b3f331fb935e0827a3de43b706014610e513ca5a54e9f84"
+  },
+  "promotion_target_artifact_id": "tassadar://article_transformer/weights/tassadar-article-transformer-trace-bound-trained-v0/99df3f08d8e881989dd1e9b3a96165865facf8374aecc72c59e3b23f0c1a792c",
+  "promotion_target_lineage": {
+    "path": "fixtures/tassadar/models/tassadar_article_transformer_trace_bound_trained_v0_lineage_contract.json",
+    "sha256": "05d277e6234849327ae03eecd4fd5f557356198543da139d11214af345cc0a05"
+  },
+  "anchor_run_bundle": {
+    "path": "fixtures/tassadar/runs/tassadar_article_transformer_weight_production_v1/article_transformer_weight_production_bundle.json",
+    "sha256": "e8bacb422825c2e654a0bed890c60337eac6e97d387e6dde53882374145f1b89"
+  },
+  "status": "bound_to_canonical_trained_v0",
+  "detail": "The rehearsal carries the incumbent trained-v0 descriptor, weight artifact, lineage contract, and anchor run bundle together so the default lane stays tied to the same model family already served and cited elsewhere in the repo."
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": "tassadar.default_train_acceptance_checker_receipt.v1",
+  "receipt_id": "tassadar_default_train_acceptance_checker_receipt_v1",
+  "lane_id": "tassadar_article_transformer_trace_bound_trained_v0",
+  "checker_bundle_id": "tassadar_default_train_lane_checker_bundle_v1",
+  "checker_command": "scripts/check-tassadar-acceptance.sh",
+  "checked_artifact": {
+    "path": "fixtures/tassadar/runs/tassadar_article_transformer_weight_production_v1/article_transformer_weight_production_bundle.json",
+    "sha256": "e8bacb422825c2e654a0bed890c60337eac6e97d387e6dde53882374145f1b89"
+  },
+  "status": "green",
+  "detail": "The broader Tassadar acceptance checker keeps the retained article-transformer weight-production bundle bound into the same checker bundle as the launcher default."
+}

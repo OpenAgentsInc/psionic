@@ -1,0 +1,19 @@
+{
+  "schema_version": "tassadar.train_retained_summary.v1",
+  "run_id": "run-tassadar-default-rehearsal-20260402t220000z",
+  "run_root": "fixtures/tassadar/operator/tassadar_default_train_rehearsal_example/run-tassadar-default-rehearsal-20260402t220000z",
+  "selected_lane": {
+    "lane_id": "tassadar_article_transformer_trace_bound_trained_v0",
+    "lane_label": "trace-bound trained-v0 default",
+    "is_default": true,
+    "launch_command": "cargo run -q -p psionic-train --example tassadar_article_transformer_weight_production",
+    "checker_command": "scripts/check-tassadar-default-train-lane.sh",
+    "lane_output_root_family": "fixtures/tassadar/runs/tassadar_article_transformer_weight_production_v1",
+    "evidence_family": "train.tassadar.article_transformer.weight_production",
+    "promotion_target": "tassadar-article-transformer-trace-bound-trained-v0"
+  },
+  "last_launcher_surface_id": "tassadar_train_start",
+  "launch_manifest_ref": "manifests/launch_manifest.json",
+  "current_status_ref": "status/current_run_status.json",
+  "claim_boundary": "The retained summary records which Tassadar lane the operator selected, where its retained repo-owned output family lives, and which checker command governs it. It does not collapse every historical Tassadar lane into one implementation path."
+}

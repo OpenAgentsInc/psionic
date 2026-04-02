@@ -330,6 +330,24 @@ launcher deliberately excludes the 9x9 learned reference lane and later 4080
 candidate tracks from the supported table because they do not yet have the
 same operator-owned checker parity.
 
+The repo now also owns the bounded Tassadar default-lane rehearsal in
+`crates/psionic-train/src/tassadar_default_train_rehearsal.rs`, the fixture
+generator `crates/psionic-train/examples/tassadar_default_train_rehearsal_fixtures.rs`,
+the focused checker `scripts/check-tassadar-default-train-rehearsal.sh`, the
+doc `docs/TASSADAR_DEFAULT_TRAIN_REHEARSAL.md`, and the committed fixtures:
+
+- `fixtures/tassadar/operator/tassadar_default_train_lane_contract_checker_receipt_v1.json`
+- `fixtures/tassadar/operator/tassadar_default_train_acceptance_checker_receipt_v1.json`
+- `fixtures/tassadar/operator/tassadar_default_train_promotion_evidence_v1.json`
+- `fixtures/tassadar/operator/tassadar_default_train_rehearsal_bundle_v1.json`
+
+That rehearsal keeps one start-surface operator run root for the incumbent
+default lane, one focused lane-contract checker receipt, one broader
+acceptance-checker receipt, and one promotion-target evidence packet for the
+retained `tassadar-article-transformer-trace-bound-trained-v0` family. It does
+not claim that historical learned lanes or later 4080 candidate tracks now
+share the same operator parity.
+
 The repo now also owns the canonical actual-lane hardware observation and
 hardware qualification receipt in
 `crates/psionic-train/src/psion_actual_pretraining_hardware_qualification.rs`,

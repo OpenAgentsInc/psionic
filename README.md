@@ -89,6 +89,9 @@ The lane contract lives in
 The operator launcher lives in
 [docs/TASSADAR_TRAIN_LAUNCHER.md](docs/TASSADAR_TRAIN_LAUNCHER.md).
 
+The bounded default-lane rehearsal lives in
+[docs/TASSADAR_DEFAULT_TRAIN_REHEARSAL.md](docs/TASSADAR_DEFAULT_TRAIN_REHEARSAL.md).
+
 ## Tassadar Executor Lane
 
 Executor-class research and runtime work for exact computation starts with
