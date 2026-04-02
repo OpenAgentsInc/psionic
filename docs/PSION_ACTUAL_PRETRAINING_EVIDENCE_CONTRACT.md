@@ -53,6 +53,16 @@ psion_actual_pretraining_runs/<run_id>/
     retained_summary.json
   checkpoints/
     latest_accepted_checkpoint_pointer.json
+    latest_accepted_checkpoint_backup_receipt.json
+    auto_resume_receipt.json
+    backups/
+      latest_accepted_checkpoint_pointer.backup.json
+      step-<optimizer_step>/
+        checkpoint_manifest.backup.json
+    failures/
+      failed_upload_drill.json
+      corrupt_pointer_drill.json
+      stale_pointer_drill.json
     step-<optimizer_step>/
       checkpoint_manifest.json
   continuation/
@@ -127,13 +137,14 @@ This contract prevents that drift before the actual-lane launcher starts
 writing those retained artifacts for real.
 
 The first concrete writer for this family now exists in
-`./TRAIN --lane actual_pretraining start|resume`. It currently writes the
-launch or resume manifest, retained hardware qualification receipt, retained
-run-shape qualification receipt, retained status surfaces, canonical
-checkpoint pointer, launcher log, and a provisional closeout bundle that
-repeats git provenance early. Resume over an accepted checkpoint also writes
-the retained continuation handoff at
-`continuation/accepted_checkpoint_handoff.json`, which binds that accepted
-checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
-Later hardening issues extend the same retained family instead of replacing
-it.
+`./TRAIN --lane actual_pretraining start|record-checkpoint|backup|resume`.
+Those surfaces currently write the launch or resume manifest, retained
+hardware qualification receipt, retained run-shape qualification receipt,
+retained status surfaces, canonical checkpoint pointer, checkpoint manifest,
+checkpoint backup receipt, auto-resume receipt, failure-drill receipts,
+launcher log, and a provisional closeout bundle that repeats git provenance
+early. Resume over an accepted checkpoint also writes the retained
+continuation handoff at `continuation/accepted_checkpoint_handoff.json`, which
+binds that accepted checkpoint to the frozen `general_sft -> agentic_sft`
+continuation target. Later hardening issues extend the same retained family
+instead of replacing it.

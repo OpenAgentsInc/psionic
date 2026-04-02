@@ -13,6 +13,8 @@ The commands are:
 
 ```bash
 ./TRAIN --lane actual_pretraining start [options]
+./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
+./TRAIN --lane actual_pretraining backup --run-root <path> [options]
 ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
 ./TRAIN --lane actual_pretraining status --run-root <path>
 ```
@@ -38,12 +40,14 @@ The actual-lane command now does these things for real:
   family
 - writes the canonical current-status and retained-summary files
 - writes the canonical latest-checkpoint pointer file
+- writes accepted checkpoint manifests plus durable-backup receipts
+- writes auto-resume receipts and retained stale/corrupt-pointer recovery drills
+- can inject a failed-upload refusal drill without manual artifact editing
 - repeats provenance into the provisional closeout bundle
 - exposes the canonical status command
 
 It does not yet claim:
 
-- durable checkpoint backup
 - automatic checkpoint evals
 - dashboards or alert routing
 - completed distributed cluster execution
@@ -100,6 +104,60 @@ Before the first accepted checkpoint exists, the retained state is explicit:
 - latest checkpoint label: `pending_first_checkpoint`
 - last completed step: `0`
 
+## Record Checkpoint
+
+Canonical accepted-checkpoint materialization:
+
+```bash
+./TRAIN --lane actual_pretraining record-checkpoint \
+  --run-root <path> \
+  --checkpoint-label broader-pretrain-final \
+  --optimizer-step 16384 \
+  --checkpoint-ref checkpoint://psion/broad/pretrain/final
+```
+
+This command promotes the run from `pending_first_checkpoint` into one accepted
+checkpoint lineage. It writes:
+
+- `checkpoints/step-<optimizer_step>/checkpoint_manifest.json`
+- `checkpoints/latest_accepted_checkpoint_pointer.json`
+- `checkpoints/latest_accepted_checkpoint_backup_receipt.json`
+- `checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json`
+- `checkpoints/backups/step-<optimizer_step>/checkpoint_manifest.backup.json`
+- refreshed status, retained-summary, closeout, and launcher-log surfaces
+
+The default checkpoint byte count comes from the frozen systems bundle. The
+default checkpoint object digest is a stable synthetic digest over the accepted
+checkpoint identity unless the operator provides an explicit digest.
+
+## Backup Command
+
+Canonical durable-backup replay:
+
+```bash
+./TRAIN --lane actual_pretraining backup --run-root <path>
+```
+
+This command rereads the current accepted pointer and checkpoint manifest and
+re-materializes the retained backup family plus
+`checkpoints/latest_accepted_checkpoint_backup_receipt.json`.
+
+Failure-injection rehearsal:
+
+```bash
+./TRAIN --lane actual_pretraining backup \
+  --run-root <path> \
+  --inject-failed-upload
+```
+
+That drill writes:
+
+- a refused backup receipt
+- `checkpoints/failures/failed_upload_drill.json`
+
+It retains declared secret/config source names only. Raw SSH, bucket, or
+service-account payloads are not copied into retained artifacts or logs.
+
 ## Resume Command
 
 Canonical resume:
@@ -108,15 +166,30 @@ Canonical resume:
 ./TRAIN --lane actual_pretraining resume --run-root <path>
 ```
 
-Resume reads exactly:
+Resume first reads:
 
 - `<run-root>/checkpoints/latest_accepted_checkpoint_pointer.json`
 
-Resume refuses when that pointer is missing or still in
-`pending_first_checkpoint` state. Resume also writes and consumes
+If that primary pointer is stale or corrupt, resume falls back to:
+
+- `<run-root>/checkpoints/latest_accepted_checkpoint_backup_receipt.json`
+- `<run-root>/checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json`
+- `<run-root>/checkpoints/backups/step-<optimizer_step>/checkpoint_manifest.backup.json`
+
+Resume refuses when neither the primary pointer nor the retained backup family
+can produce an admitted accepted checkpoint. It also writes and consumes
 `preflight/hardware_qualification.json` plus
 `preflight/run_shape_qualification.json`, and non-dry-run resume refuses when
-either receipt is not admitted. When it succeeds, it writes:
+either receipt is not admitted. Every resume attempt now writes:
+
+- `checkpoints/auto_resume_receipt.json`
+
+Corrupt or stale primary-pointer recovery also writes:
+
+- `checkpoints/failures/corrupt_pointer_drill.json`
+- or `checkpoints/failures/stale_pointer_drill.json`
+
+When resume succeeds, it writes:
 
 - `manifests/resume_manifest.json`
 - refreshed status and retained-summary files
@@ -128,6 +201,10 @@ The continuation handoff binds the accepted checkpoint to the frozen
 `general_sft -> agentic_sft` target and preserves the bounded plugin
 benchmark-pack bindings already attached to that target. It does not claim that
 the continuation stage has already run.
+
+If auto-resume cannot select a valid checkpoint, the command still retains an
+explicit `auto_resume_receipt.json` with `resolution_state = refused` and logs
+`phase=resume_refused_auto_resume` instead of leaving the run root ambiguous.
 
 ## Status Command
 
@@ -183,3 +260,4 @@ provisional closeout bundle.
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_SYSTEMS_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md`
+- `docs/PSION_ACTUAL_PRETRAINING_CHECKPOINT_RECOVERY.md`

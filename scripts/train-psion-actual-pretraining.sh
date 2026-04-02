@@ -7,6 +7,8 @@ usage() {
   cat <<'EOF' >&2
 Usage:
   ./TRAIN --lane actual_pretraining start [options]
+  ./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
+  ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
   ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
   ./TRAIN --lane actual_pretraining status --run-root <path>
 
@@ -30,6 +32,25 @@ Options for `resume`:
                            Optional retained throughput/storage/dataloader observation snapshot to consume instead of probing the local host.
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --dry-run                Materialize the retained resume bundle without claiming cluster execution.
+
+Options for `record-checkpoint`:
+  --run-root <path>        Existing actual-lane run root to update with an accepted checkpoint.
+  --checkpoint-label <label>
+                           Stable accepted checkpoint label.
+  --optimizer-step <step>  Accepted optimizer step.
+  --checkpoint-ref <ref>   Stable checkpoint ref for later resume and continuation.
+  --checkpoint-object-digest <digest>
+                           Optional checkpoint object digest. Default: stable synthetic digest over the accepted checkpoint identity.
+  --checkpoint-total-bytes <bytes>
+                           Optional checkpoint byte size. Default: frozen actual-lane checkpoint size from the systems bundle.
+  --git-ref <ref>          Git ref to resolve for the checkpoint provenance. Default: current symbolic ref or HEAD
+  --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
+
+Options for `backup`:
+  --run-root <path>        Existing actual-lane run root containing an accepted checkpoint pointer and manifest.
+  --git-ref <ref>          Git ref to resolve for the backup provenance. Default: current symbolic ref or HEAD
+  --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
+  --inject-failed-upload   Retain a failed-upload drill receipt instead of a successful durable-backup receipt.
 EOF
 }
 
@@ -42,7 +63,7 @@ command="$1"
 shift
 
 case "${command}" in
-  start|resume)
+  start|record-checkpoint|backup|resume)
     exec cargo run -q -p psionic-train --example psion_actual_pretraining_operator -- "${command}" "$@"
     ;;
   status)

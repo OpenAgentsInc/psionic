@@ -39,6 +39,10 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub retained_summary_path: String,
     /// Relative latest-checkpoint pointer path.
     pub latest_checkpoint_pointer_path: String,
+    /// Relative latest accepted-checkpoint backup receipt path.
+    pub latest_checkpoint_backup_receipt_path: String,
+    /// Relative latest auto-resume receipt path.
+    pub auto_resume_receipt_path: String,
     /// Relative hardware-qualification receipt path.
     pub hardware_qualification_path: String,
     /// Relative run-shape qualification receipt path.
@@ -282,6 +286,16 @@ impl PsionActualPretrainingRetainedPathSet {
             self.latest_checkpoint_pointer_path.as_str(),
             "retained_paths.latest_checkpoint_pointer_path",
             "checkpoints/latest_accepted_checkpoint_pointer.json",
+        )?;
+        ensure_exact(
+            self.latest_checkpoint_backup_receipt_path.as_str(),
+            "retained_paths.latest_checkpoint_backup_receipt_path",
+            "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+        )?;
+        ensure_exact(
+            self.auto_resume_receipt_path.as_str(),
+            "retained_paths.auto_resume_receipt_path",
+            "checkpoints/auto_resume_receipt.json",
         )?;
         ensure_exact(
             self.hardware_qualification_path.as_str(),

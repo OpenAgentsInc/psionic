@@ -169,6 +169,8 @@ impl PsionActualPretrainingEvidenceContract {
             "status/current_run_status.json",
             "status/retained_summary.json",
             "checkpoints/latest_accepted_checkpoint_pointer.json",
+            "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+            "checkpoints/auto_resume_receipt.json",
             "preflight/hardware_qualification.json",
             "preflight/run_shape_qualification.json",
             "closeout/closeout_bundle.json",

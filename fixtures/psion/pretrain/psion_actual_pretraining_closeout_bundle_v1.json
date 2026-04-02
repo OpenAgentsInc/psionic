@@ -9,6 +9,8 @@
     "current_status_path": "status/current_run_status.json",
     "retained_summary_path": "status/retained_summary.json",
     "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "latest_checkpoint_backup_receipt_path": "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+    "auto_resume_receipt_path": "checkpoints/auto_resume_receipt.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
     "run_shape_qualification_path": "preflight/run_shape_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",

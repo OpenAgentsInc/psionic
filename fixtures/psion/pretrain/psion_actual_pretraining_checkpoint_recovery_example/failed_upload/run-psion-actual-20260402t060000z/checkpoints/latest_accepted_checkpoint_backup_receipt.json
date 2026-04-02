@@ -1,0 +1,40 @@
+{
+  "schema_version": "psion.actual_pretraining_checkpoint_backup_receipt.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t060000z",
+  "checkpoint_label": "broader-pretrain-final",
+  "optimizer_step": 16384,
+  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+  "selected_git_ref": "refs/heads/main",
+  "git_commit_sha": "1111222233334444555566667777888899990000",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "primary_pointer": {
+    "path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "sha256": "6e93d5e8f57182c4cd0c69cd258d1bfe115534eafed2277e0ccb9f952564c8e4"
+  },
+  "primary_checkpoint_manifest": {
+    "path": "checkpoints/step-16384/checkpoint_manifest.json",
+    "sha256": "88d933d6d1d62ea3d91b8dfc8f6c5132682231b1559a161bcc510bb602120994"
+  },
+  "backup_pointer": {
+    "path": "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+    "sha256": "6e93d5e8f57182c4cd0c69cd258d1bfe115534eafed2277e0ccb9f952564c8e4"
+  },
+  "backup_checkpoint_manifest": {
+    "path": "checkpoints/backups/step-16384/checkpoint_manifest.backup.json",
+    "sha256": "88d933d6d1d62ea3d91b8dfc8f6c5132682231b1559a161bcc510bb602120994"
+  },
+  "remote_backup_root": "${PSION_ACTUAL_PRETRAINING_BUCKET_URL}/psion_actual_pretraining_runs/run-psion-actual-20260402t060000z/checkpoints/backups",
+  "credential_source_names": [
+    "PSION_ACTUAL_PRETRAINING_BUCKET_URL",
+    "PSION_ACTUAL_PRETRAINING_ACCESS_KEY",
+    "PSION_ACTUAL_PRETRAINING_SECRET_FILE"
+  ],
+  "backup_state": "refused",
+  "upload_outcome": "failed",
+  "upload_failure_reason": "Injected failed checkpoint upload drill refused durable remote backup confirmation without copying any secret payload into retained evidence.",
+  "claim_boundary": "This retained backup receipt binds the actual-lane latest accepted checkpoint to one durable backup contract and redacted credential-source posture. It does not claim that training continued or that automatic checkpoint eval already ran.",
+  "detail": "Fixture checkpoint backup receipt preserves the accepted pointer plus checkpoint manifest under one local backup family and one redacted remote-backup root.",
+  "receipt_digest": "c603f529f7c98ae8f58b6768f9594c5509318ed780cffe8b68e6dac653c327c2"
+}

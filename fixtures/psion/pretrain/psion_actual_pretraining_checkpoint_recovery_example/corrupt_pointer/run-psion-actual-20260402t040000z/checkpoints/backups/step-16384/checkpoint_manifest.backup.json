@@ -1,0 +1,20 @@
+{
+  "schema_version": "psion.actual_pretraining_checkpoint_manifest.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "recipe_id": "psion_actual_pretraining_recipe_v1",
+  "run_id": "run-psion-actual-20260402t040000z",
+  "checkpoint_label": "broader-pretrain-final",
+  "optimizer_step": 16384,
+  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+  "relative_manifest_path": "checkpoints/step-16384/checkpoint_manifest.json",
+  "relative_checkpoint_dir": "checkpoints/step-16384",
+  "checkpoint_object_digest": "c573513522e616bc003217a3018ce0a4087e9520c58f74e5b75be8e2b13c2cef",
+  "checkpoint_total_bytes": 2333954048,
+  "dataset_identity": "psion_corpus_tokenized@v1",
+  "selected_git_ref": "refs/heads/main",
+  "git_commit_sha": "1111222233334444555566667777888899990000",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "detail": "Fixture checkpoint manifest records one accepted actual-lane checkpoint under the retained evidence family.",
+  "manifest_digest": "9d9dbd2e60336342b77d6aae6f6dacb112b91a280a1e6392b2f3a585734d1e1d"
+}

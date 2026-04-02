@@ -47,6 +47,18 @@
       "detail": "Zero-guess pointer to the latest accepted checkpoint for resume."
     },
     {
+      "relative_path": "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+      "artifact_kind": "checkpoint_backup_receipt",
+      "retention_class": "durable",
+      "detail": "Retained durable-backup receipt for the latest accepted checkpoint."
+    },
+    {
+      "relative_path": "checkpoints/auto_resume_receipt.json",
+      "artifact_kind": "auto_resume_receipt",
+      "retention_class": "durable",
+      "detail": "Retained auto-resume resolution receipt for the latest resume attempt."
+    },
+    {
       "relative_path": "preflight/hardware_qualification.json",
       "artifact_kind": "hardware_qualification_receipt",
       "retention_class": "durable",
@@ -63,6 +75,24 @@
       "artifact_kind": "checkpoint_manifest",
       "retention_class": "durable",
       "detail": "Retained manifest for one concrete checkpoint write."
+    },
+    {
+      "relative_path": "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+      "artifact_kind": "checkpoint_pointer_backup",
+      "retention_class": "durable",
+      "detail": "Latest accepted checkpoint pointer copied into the retained backup family."
+    },
+    {
+      "relative_path": "checkpoints/backups/step-<optimizer_step>/checkpoint_manifest.backup.json",
+      "artifact_kind": "checkpoint_manifest_backup",
+      "retention_class": "durable",
+      "detail": "Latest accepted checkpoint manifest copied into the retained backup family."
+    },
+    {
+      "relative_path": "checkpoints/failures/<drill_kind>_drill.json",
+      "artifact_kind": "checkpoint_failure_drill",
+      "retention_class": "durable",
+      "detail": "Retained failed-upload, stale-pointer, or corrupt-pointer drill receipt for checkpoint backup and resume."
     },
     {
       "relative_path": "evals/checkpoint_eval_step-<optimizer_step>.json",

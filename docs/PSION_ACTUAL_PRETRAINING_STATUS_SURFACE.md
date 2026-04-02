@@ -8,8 +8,8 @@ This document freezes one current-status artifact, one retained-summary
 artifact, and one status command for the actual pretraining lane.
 
 The actual-lane launcher now writes those retained files through
-`./TRAIN --lane actual_pretraining start|resume`, and the same status command
-reads them back from a run root.
+`./TRAIN --lane actual_pretraining start|resume|record-checkpoint`, and the
+same status command reads them back from a run root.
 
 ## Canonical Artifacts
 
@@ -79,6 +79,15 @@ Pre-first-checkpoint launch states are now explicit:
 
 Those phases legitimately retain `last_completed_step = 0` and
 `latest_checkpoint_label = pending_first_checkpoint`.
+
+Checkpoint-lifecycle and refusal states now also appear in the retained status
+family when the operator path advances beyond first launch:
+
+- `resume_dry_run_planned`
+- `resume_staged`
+- `checkpoint_backed_up`
+- `checkpoint_backup_refused`
+- `resume_refused_auto_resume`
 
 ## Why This Matters
 

@@ -156,6 +156,25 @@ That surface freezes one retained output family, one required provenance field
 set, and one redaction policy for manifests, logs, alerts, resume pointers,
 checkpoint manifests, eval receipts, exports, and closeout bundles.
 
+The repo now also owns the canonical actual-lane checkpoint-recovery contract
+in `crates/psionic-train/src/psion_actual_pretraining_checkpoint_recovery.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_checkpoint_recovery_fixtures.rs`,
+the focused doc `docs/PSION_ACTUAL_PRETRAINING_CHECKPOINT_RECOVERY.md`, and
+the committed fixtures:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_manifest_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_backup_receipt_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_auto_resume_receipt_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_failure_drill_failed_upload_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_failure_drill_corrupt_pointer_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_failure_drill_stale_pointer_v1.json`
+
+That surface binds accepted checkpoint manifests, durable backup receipts,
+zero-guess auto-resume receipts, and failure-injection drills into the same
+actual-lane evidence family while keeping secret material redacted and git
+provenance repeated through the retained recovery artifacts.
+
 The bounded `./TRAIN` operator path is now also explicitly separated from that
 actual-lane truth. It writes bounded reference-pilot artifacts under
 `psion_reference_pilot_runs/<run_id>` naming, uses
@@ -175,7 +194,8 @@ That surface now carries the real actual-lane status contract used by the
 launcher, including explicit pre-first-checkpoint phases such as
 `dry_run_planned` and `launch_staged`.
 
-The repo now also owns the canonical actual-lane launcher and resume contract
+The repo now also owns the canonical actual-lane launcher and checkpoint
+lifecycle contract
 in `crates/psionic-train/src/psion_actual_pretraining_launcher.rs`, the
 fixture generators
 `crates/psionic-train/examples/psion_actual_pretraining_launcher_fixtures.rs`
@@ -192,14 +212,19 @@ lane dispatch in `psionic/TRAIN`, the focused runbook
 That surface gives the repo one real operator path for:
 
 - `./TRAIN --lane actual_pretraining start`
+- `./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref>`
+- `./TRAIN --lane actual_pretraining backup --run-root <path>`
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 
 It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty
 working trees by default; retains the selected ref plus exact commit SHA; and
-repeats that provenance in the provisional closeout bundle without claiming
-that later hardening issues are already finished.
+repeats that provenance in the provisional closeout bundle. It now also
+records accepted checkpoint manifests, durable backup receipts, auto-resume
+receipts, and stale/corrupt-pointer plus failed-upload drills without using
+destructive git commands or leaking raw secret payloads into retained
+artifacts.
 
 The repo now also owns the canonical actual-lane hardware observation and
 hardware qualification receipt in

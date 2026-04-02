@@ -545,6 +545,10 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        latest_checkpoint_backup_receipt_path: String::from(
+            "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+        ),
+        auto_resume_receipt_path: String::from("checkpoints/auto_resume_receipt.json"),
         hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
         run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
         continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),

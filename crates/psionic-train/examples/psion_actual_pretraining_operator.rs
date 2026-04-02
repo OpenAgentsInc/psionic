@@ -9,8 +9,14 @@ use std::{
 use psionic_train::{
     derive_psion_actual_pretraining_hardware_qualification,
     derive_psion_actual_pretraining_run_shape_qualification,
+    record_psion_actual_pretraining_auto_resume_receipt,
+    record_psion_actual_pretraining_checkpoint_backup_receipt,
+    record_psion_actual_pretraining_checkpoint_failure_drill,
+    record_psion_actual_pretraining_checkpoint_manifest,
     record_psion_actual_pretraining_continuation_handoff, PsionActualPretrainingArtifactRef,
-    PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointPointer,
+    PsionActualPretrainingAutoResumeReceipt, PsionActualPretrainingBaselineToolsBundle,
+    PsionActualPretrainingCheckpointBackupReceipt, PsionActualPretrainingCheckpointFailureDrill,
+    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
     PsionActualPretrainingCloseoutBundle, PsionActualPretrainingContinuationHandoff,
     PsionActualPretrainingCredentialBinding, PsionActualPretrainingCurrentRunStatus,
     PsionActualPretrainingDataBundle, PsionActualPretrainingDataloaderProbe,
@@ -59,6 +65,22 @@ enum Cli {
         allow_dirty_tree: bool,
         dry_run: bool,
     },
+    RecordCheckpoint {
+        run_root: PathBuf,
+        selected_git_ref: String,
+        checkpoint_label: String,
+        optimizer_step: u64,
+        checkpoint_ref: String,
+        checkpoint_object_digest: Option<String>,
+        checkpoint_total_bytes: Option<u64>,
+        allow_dirty_tree: bool,
+    },
+    Backup {
+        run_root: PathBuf,
+        selected_git_ref: String,
+        allow_dirty_tree: bool,
+        inject_failed_upload: bool,
+    },
 }
 
 struct FrozenContracts {
@@ -77,6 +99,12 @@ struct FrozenContracts {
     topology: PsionActualPretrainingTopologyStorageBundle,
     systems_bundle: PsionActualPretrainingSystemsBundle,
     evidence_contract: PsionActualPretrainingEvidenceContract,
+}
+
+struct ResolvedResumeTarget {
+    checkpoint_pointer: Option<PsionActualPretrainingCheckpointPointer>,
+    auto_resume_receipt: PsionActualPretrainingAutoResumeReceipt,
+    failure_drill: Option<PsionActualPretrainingCheckpointFailureDrill>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -387,16 +415,49 @@ fn main() -> Result<(), Box<dyn Error>> {
             let (dirty_tree_admission, workspace_status_sha256) =
                 dirty_tree_posture(repo_root, allow_dirty_tree)?;
             let retained_paths = retained_paths();
-            let pointer_path = run_root.join(&retained_paths.latest_checkpoint_pointer_path);
-            let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
-                load_json(&pointer_path)?;
-            checkpoint_pointer.validate()?;
-            if checkpoint_pointer.pointer_state != "accepted" {
+            let resolved_resume = resolve_resume_target(
+                &run_root,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                workspace_status_sha256.clone(),
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.auto_resume_receipt_path),
+                &resolved_resume.auto_resume_receipt,
+            )?;
+            if let Some(failure_drill) = &resolved_resume.failure_drill {
+                let drill_path =
+                    checkpoint_failure_drill_path(&run_root, &failure_drill.drill_kind);
+                write_json_pretty(&drill_path, failure_drill)?;
+            }
+            if resolved_resume.auto_resume_receipt.resolution_state == "refused" {
+                append_launcher_log(
+                    &run_root,
+                    &format!(
+                        "{} phase=resume_refused_auto_resume surface_id={} git_commit_sha={} refusal_reason={}\n",
+                        now_utc(repo_root)?,
+                        PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+                        git_commit_sha,
+                        resolved_resume
+                            .auto_resume_receipt
+                            .refusal_reason
+                            .as_deref()
+                            .unwrap_or("none")
+                    ),
+                )?;
                 return Err(std::io::Error::other(
-                    "resume requires an accepted checkpoint pointer under checkpoints/latest_accepted_checkpoint_pointer.json",
+                    "resume could not resolve an admitted checkpoint pointer from the primary or backup path",
                 )
                 .into());
             }
+            let checkpoint_pointer = resolved_resume
+                .checkpoint_pointer
+                .ok_or_else(|| {
+                    std::io::Error::other(
+                        "resolved auto-resume receipt is missing checkpoint pointer",
+                    )
+                })?;
             let run_roots = run_roots(&run_root, &checkpoint_pointer.run_id, &contracts.topology);
             let hardware_qualification = build_hardware_qualification(
                 repo_root,
@@ -626,6 +687,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .display()
             );
             println!(
+                "auto_resume_receipt={}",
+                run_root
+                    .join(&retained_paths.auto_resume_receipt_path)
+                    .display()
+            );
+            println!(
                 "hardware_qualification={}",
                 run_root
                     .join(&retained_paths.hardware_qualification_path)
@@ -662,6 +729,236 @@ fn main() -> Result<(), Box<dyn Error>> {
                 run_root.join(&retained_paths.launcher_log_path).display()
             );
         }
+        Cli::RecordCheckpoint {
+            run_root,
+            selected_git_ref,
+            checkpoint_label,
+            optimizer_step,
+            checkpoint_ref,
+            checkpoint_object_digest,
+            checkpoint_total_bytes,
+            allow_dirty_tree,
+        } => {
+            let git_commit_sha = git_output(repo_root, &["rev-parse", selected_git_ref.as_str()])?;
+            let (dirty_tree_admission, workspace_status_sha256) =
+                dirty_tree_posture(repo_root, allow_dirty_tree)?;
+            let retained_paths = retained_paths();
+            let pointer_path = run_root.join(&retained_paths.latest_checkpoint_pointer_path);
+            let mut checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
+                load_json(&pointer_path)?;
+            checkpoint_pointer.validate()?;
+            let mut current_status: PsionActualPretrainingCurrentRunStatus =
+                load_json(&run_root.join(&retained_paths.current_status_path))?;
+            current_status.validate()?;
+            let mut retained_summary: PsionActualPretrainingRetainedSummary =
+                load_json(&run_root.join(&retained_paths.retained_summary_path))?;
+            retained_summary.validate()?;
+            let resolved_checkpoint_object_digest = checkpoint_object_digest.unwrap_or_else(|| {
+                sha256_hex(
+                    format!(
+                        "{}|{}|{}|{}",
+                        checkpoint_pointer.run_id, checkpoint_label, optimizer_step, checkpoint_ref
+                    )
+                    .as_bytes(),
+                )
+            });
+            let checkpoint_manifest = record_psion_actual_pretraining_checkpoint_manifest(
+                &checkpoint_pointer.run_id,
+                &checkpoint_label,
+                optimizer_step,
+                &checkpoint_ref,
+                &resolved_checkpoint_object_digest,
+                checkpoint_total_bytes
+                    .unwrap_or(contracts.systems_bundle.memory_qualification.checkpoint_total_bytes),
+                &contracts.data_bundle.replay_authority.dataset_identity,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                workspace_status_sha256.clone(),
+                "Checkpoint manifest records one accepted actual-lane checkpoint inside the frozen evidence family without claiming that the broader distributed training job ran inside this launcher process.",
+            )?;
+            write_json_pretty(
+                &run_root.join(&checkpoint_manifest.relative_manifest_path),
+                &checkpoint_manifest,
+            )?;
+            checkpoint_pointer.pointer_state = String::from("accepted");
+            checkpoint_pointer.checkpoint_label = checkpoint_label.clone();
+            checkpoint_pointer.optimizer_step = optimizer_step;
+            checkpoint_pointer.checkpoint_ref = Some(checkpoint_ref.clone());
+            checkpoint_pointer.checkpoint_manifest_relative_path =
+                Some(checkpoint_manifest.relative_manifest_path.clone());
+            checkpoint_pointer.detail = String::from(
+                "Accepted checkpoint pointer binds actual-lane resume to the latest admitted checkpoint manifest.",
+            );
+            checkpoint_pointer.validate()?;
+            write_json_pretty(&pointer_path, &checkpoint_pointer)?;
+            let (backup_receipt, failure_drill) = materialize_checkpoint_backup(
+                &run_root,
+                &checkpoint_pointer,
+                &checkpoint_manifest,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                workspace_status_sha256.clone(),
+                &contracts,
+                false,
+            )?;
+            if let Some(failure_drill) = &failure_drill {
+                write_json_pretty(
+                    &checkpoint_failure_drill_path(&run_root, &failure_drill.drill_kind),
+                    failure_drill,
+                )?;
+            }
+            current_status.phase = String::from("checkpoint_backed_up");
+            current_status.latest_checkpoint_label = checkpoint_label.clone();
+            current_status.last_completed_step = optimizer_step;
+            current_status.updated_at_utc = now_utc(repo_root)?;
+            current_status.detail = String::from(
+                "Current status records that one accepted checkpoint was materialized and backed up under the actual-lane recovery contract.",
+            );
+            current_status.validate()?;
+            retained_summary.last_known_phase = String::from("checkpoint_backed_up");
+            retained_summary.selected_git_ref = selected_git_ref.clone();
+            retained_summary.git_commit_sha = git_commit_sha.clone();
+            retained_summary.dirty_tree_admission = dirty_tree_admission.clone();
+            retained_summary.detail = String::from(
+                "Retained summary records the latest accepted checkpoint and backup posture for the actual lane.",
+            );
+            retained_summary.validate()?;
+            let closeout_bundle = PsionActualPretrainingCloseoutBundle {
+                schema_version: String::from(
+                    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+                ),
+                lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+                run_id: checkpoint_pointer.run_id.clone(),
+                closeout_state: String::from("checkpoint_backed_up"),
+                retained_paths: retained_paths.clone(),
+                selected_git_ref: selected_git_ref.clone(),
+                git_commit_sha: git_commit_sha.clone(),
+                dirty_tree_admission: dirty_tree_admission.clone(),
+                workspace_status_sha256: workspace_status_sha256.clone(),
+                claim_boundary: String::from(
+                    "This provisional closeout bundle now records accepted-checkpoint and backup progress under the actual-lane evidence family. It does not claim automatic eval, dashboard alerting, or final closeout completion.",
+                ),
+                detail: String::from(
+                    "Checkpoint-backed-up closeout bundle repeats the selected ref, git SHA, and dirty-tree posture after the accepted checkpoint entered the recovery family.",
+                ),
+            };
+            closeout_bundle.validate()?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.current_status_path),
+                &current_status,
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.retained_summary_path),
+                &retained_summary,
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.closeout_bundle_path),
+                &closeout_bundle,
+            )?;
+            append_launcher_log(
+                &run_root,
+                &format!(
+                    "{} phase=checkpoint_backed_up surface_id={} git_commit_sha={} checkpoint_label={} checkpoint_step={} backup_state={}\n",
+                    now_utc(repo_root)?,
+                    "psion_actual_pretraining.record_checkpoint",
+                    git_commit_sha,
+                    checkpoint_label,
+                    optimizer_step,
+                    backup_receipt.backup_state
+                ),
+            )?;
+            println!("status=checkpoint_backed_up");
+            println!("run_id={}", checkpoint_pointer.run_id);
+            println!("run_root={}", run_root.display());
+            println!(
+                "checkpoint_manifest={}",
+                run_root.join(&checkpoint_manifest.relative_manifest_path).display()
+            );
+            println!("checkpoint_pointer={}", pointer_path.display());
+            println!(
+                "checkpoint_backup_receipt={}",
+                run_root
+                    .join(&retained_paths.latest_checkpoint_backup_receipt_path)
+                    .display()
+            );
+            println!(
+                "closeout_bundle={}",
+                run_root.join(&retained_paths.closeout_bundle_path).display()
+            );
+        }
+        Cli::Backup {
+            run_root,
+            selected_git_ref,
+            allow_dirty_tree,
+            inject_failed_upload,
+        } => {
+            let git_commit_sha = git_output(repo_root, &["rev-parse", selected_git_ref.as_str()])?;
+            let (dirty_tree_admission, workspace_status_sha256) =
+                dirty_tree_posture(repo_root, allow_dirty_tree)?;
+            let retained_paths = retained_paths();
+            let pointer_path = run_root.join(&retained_paths.latest_checkpoint_pointer_path);
+            let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
+                load_json(&pointer_path)?;
+            let checkpoint_manifest = validate_resume_candidate(&run_root, &checkpoint_pointer)
+                .map_err(std::io::Error::other)?;
+            let (backup_receipt, failure_drill) = materialize_checkpoint_backup(
+                &run_root,
+                &checkpoint_pointer,
+                &checkpoint_manifest,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                workspace_status_sha256,
+                &contracts,
+                inject_failed_upload,
+            )?;
+            if let Some(failure_drill) = &failure_drill {
+                write_json_pretty(
+                    &checkpoint_failure_drill_path(&run_root, &failure_drill.drill_kind),
+                    failure_drill,
+                )?;
+            }
+            append_launcher_log(
+                &run_root,
+                &format!(
+                    "{} phase={} surface_id={} git_commit_sha={} checkpoint_label={} checkpoint_step={}\n",
+                    now_utc(repo_root)?,
+                    if backup_receipt.backup_state == "backed_up" {
+                        "checkpoint_backed_up"
+                    } else {
+                        "checkpoint_backup_refused"
+                    },
+                    "psion_actual_pretraining.backup",
+                    git_commit_sha,
+                    checkpoint_pointer.checkpoint_label,
+                    checkpoint_pointer.optimizer_step
+                ),
+            )?;
+            println!(
+                "status={}",
+                if backup_receipt.backup_state == "backed_up" {
+                    "checkpoint_backed_up"
+                } else {
+                    "checkpoint_backup_refused"
+                }
+            );
+            println!("run_id={}", checkpoint_pointer.run_id);
+            println!("run_root={}", run_root.display());
+            println!(
+                "checkpoint_backup_receipt={}",
+                run_root
+                    .join(&retained_paths.latest_checkpoint_backup_receipt_path)
+                    .display()
+            );
+            if let Some(failure_drill) = failure_drill {
+                println!(
+                    "checkpoint_failure_drill={}",
+                    checkpoint_failure_drill_path(&run_root, &failure_drill.drill_kind).display()
+                );
+            }
+        }
     }
 
     Ok(())
@@ -678,10 +975,16 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
     let mut output_root = String::new();
     let mut run_root = String::new();
     let mut git_ref = String::new();
+    let mut checkpoint_label = String::new();
+    let mut checkpoint_ref = String::new();
+    let mut checkpoint_object_digest = String::new();
+    let mut optimizer_step: Option<u64> = None;
+    let mut checkpoint_total_bytes: Option<u64> = None;
     let mut hardware_observation_path: Option<PathBuf> = None;
     let mut run_shape_observation_path: Option<PathBuf> = None;
     let mut allow_dirty_tree = false;
     let mut dry_run = false;
+    let mut inject_failed_upload = false;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -705,6 +1008,37 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                     .next()
                     .ok_or_else(|| std::io::Error::other("--git-ref requires a value"))?;
             }
+            "--checkpoint-label" => {
+                checkpoint_label = args
+                    .next()
+                    .ok_or_else(|| std::io::Error::other("--checkpoint-label requires a value"))?;
+            }
+            "--checkpoint-ref" => {
+                checkpoint_ref = args
+                    .next()
+                    .ok_or_else(|| std::io::Error::other("--checkpoint-ref requires a value"))?;
+            }
+            "--optimizer-step" => {
+                optimizer_step = Some(
+                    args.next()
+                        .ok_or_else(|| std::io::Error::other("--optimizer-step requires a value"))?
+                        .parse::<u64>()?,
+                );
+            }
+            "--checkpoint-object-digest" => {
+                checkpoint_object_digest = args.next().ok_or_else(|| {
+                    std::io::Error::other("--checkpoint-object-digest requires a value")
+                })?;
+            }
+            "--checkpoint-total-bytes" => {
+                checkpoint_total_bytes = Some(
+                    args.next()
+                        .ok_or_else(|| {
+                            std::io::Error::other("--checkpoint-total-bytes requires a value")
+                        })?
+                        .parse::<u64>()?,
+                );
+            }
             "--hardware-observation" => {
                 hardware_observation_path = Some(PathBuf::from(args.next().ok_or_else(|| {
                     std::io::Error::other("--hardware-observation requires a value")
@@ -717,6 +1051,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
             }
             "--allow-dirty-tree" => allow_dirty_tree = true,
             "--dry-run" => dry_run = true,
+            "--inject-failed-upload" => inject_failed_upload = true,
             "--help" | "-h" => {
                 usage();
                 std::process::exit(0);
@@ -777,6 +1112,55 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                 dry_run,
             })
         }
+        "record-checkpoint" => {
+            if run_root.is_empty() {
+                return Err(
+                    std::io::Error::other("record-checkpoint requires --run-root <path>").into(),
+                );
+            }
+            if checkpoint_label.is_empty() {
+                return Err(
+                    std::io::Error::other(
+                        "record-checkpoint requires --checkpoint-label <label>",
+                    )
+                    .into(),
+                );
+            }
+            let optimizer_step = optimizer_step.ok_or_else(|| {
+                std::io::Error::other("record-checkpoint requires --optimizer-step <step>")
+            })?;
+            if checkpoint_ref.is_empty() {
+                return Err(
+                    std::io::Error::other("record-checkpoint requires --checkpoint-ref <ref>")
+                        .into(),
+                );
+            }
+            Ok(Cli::RecordCheckpoint {
+                run_root: PathBuf::from(run_root),
+                selected_git_ref,
+                checkpoint_label,
+                optimizer_step,
+                checkpoint_ref,
+                checkpoint_object_digest: if checkpoint_object_digest.is_empty() {
+                    None
+                } else {
+                    Some(checkpoint_object_digest)
+                },
+                checkpoint_total_bytes,
+                allow_dirty_tree,
+            })
+        }
+        "backup" => {
+            if run_root.is_empty() {
+                return Err(std::io::Error::other("backup requires --run-root <path>").into());
+            }
+            Ok(Cli::Backup {
+                run_root: PathBuf::from(run_root),
+                selected_git_ref,
+                allow_dirty_tree,
+                inject_failed_upload,
+            })
+        }
         _ => {
             usage();
             Err(std::io::Error::other(format!("unsupported subcommand `{command}`")).into())
@@ -786,7 +1170,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
 
 fn usage() {
     eprintln!(
-        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]"
+        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]"
     );
 }
 
@@ -869,6 +1253,10 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        latest_checkpoint_backup_receipt_path: String::from(
+            "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+        ),
+        auto_resume_receipt_path: String::from("checkpoints/auto_resume_receipt.json"),
         hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
         run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
         continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
@@ -1352,7 +1740,7 @@ fn write_preflight_receipts(
         run_root.join("preflight/run_shape_qualification.json"),
         serde_json::to_string_pretty(run_shape_qualification)?,
     )?;
-    fs::write(run_root.join("logs/launcher.log"), launcher_log_line)?;
+    append_launcher_log(run_root, launcher_log_line)?;
     Ok(())
 }
 
@@ -1465,10 +1853,412 @@ fn file_sha256(path: &Path) -> Result<String, Box<dyn Error>> {
     Ok(sha256_hex(&bytes))
 }
 
+fn append_launcher_log(run_root: &Path, line: &str) -> Result<(), Box<dyn Error>> {
+    fs::create_dir_all(run_root.join("logs"))?;
+    let path = run_root.join("logs/launcher.log");
+    let mut existing = if path.is_file() {
+        fs::read_to_string(&path)?
+    } else {
+        String::new()
+    };
+    existing.push_str(line);
+    fs::write(path, existing)?;
+    Ok(())
+}
+
+fn write_json_pretty<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), Box<dyn Error>> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, serde_json::to_string_pretty(value)?)?;
+    Ok(())
+}
+
+fn run_artifact_ref(run_root: &Path, path: &Path) -> Result<PsionActualPretrainingArtifactRef, Box<dyn Error>> {
+    let relative = path
+        .strip_prefix(run_root)?
+        .to_string_lossy()
+        .replace('\\', "/");
+    Ok(PsionActualPretrainingArtifactRef {
+        path: relative,
+        sha256: file_sha256(path)?,
+    })
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let mut digest = Sha256::new();
     digest.update(bytes);
     format!("{:x}", digest.finalize())
+}
+
+fn checkpoint_backup_pointer_path(run_root: &Path) -> PathBuf {
+    run_root.join("checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json")
+}
+
+fn checkpoint_backup_manifest_path(run_root: &Path, optimizer_step: u64) -> PathBuf {
+    run_root.join(format!(
+        "checkpoints/backups/step-{optimizer_step}/checkpoint_manifest.backup.json"
+    ))
+}
+
+fn checkpoint_failure_drill_relative_path(drill_kind: &str) -> String {
+    format!("checkpoints/failures/{drill_kind}_drill.json")
+}
+
+fn checkpoint_failure_drill_path(run_root: &Path, drill_kind: &str) -> PathBuf {
+    run_root.join(checkpoint_failure_drill_relative_path(drill_kind))
+}
+
+fn checkpoint_failure_drill_kind_for_primary_pointer_state(
+    primary_pointer_state: &str,
+) -> Option<&'static str> {
+    match primary_pointer_state {
+        "corrupt" => Some("corrupt_pointer"),
+        "stale" => Some("stale_pointer"),
+        _ => None,
+    }
+}
+
+fn load_checkpoint_manifest(
+    run_root: &Path,
+    relative_path: &str,
+) -> Result<PsionActualPretrainingCheckpointManifest, Box<dyn Error>> {
+    let manifest_path = run_root.join(relative_path);
+    let manifest: PsionActualPretrainingCheckpointManifest = load_json(&manifest_path)?;
+    manifest.validate()?;
+    Ok(manifest)
+}
+
+fn validate_resume_candidate(
+    run_root: &Path,
+    checkpoint_pointer: &PsionActualPretrainingCheckpointPointer,
+) -> Result<PsionActualPretrainingCheckpointManifest, String> {
+    checkpoint_pointer
+        .validate()
+        .map_err(|error| error.to_string())?;
+    if checkpoint_pointer.pointer_state != "accepted" {
+        return Err(String::from(
+            "resume requires an accepted checkpoint pointer under checkpoints/latest_accepted_checkpoint_pointer.json",
+        ));
+    }
+    let manifest_relative_path = checkpoint_pointer
+        .checkpoint_manifest_relative_path
+        .as_deref()
+        .ok_or_else(|| String::from("accepted checkpoint pointer is missing checkpoint manifest path"))?;
+    let manifest = load_checkpoint_manifest(run_root, manifest_relative_path)
+        .map_err(|error| error.to_string())?;
+    if manifest.run_id != checkpoint_pointer.run_id {
+        return Err(String::from(
+            "checkpoint manifest run_id drifted from the accepted checkpoint pointer",
+        ));
+    }
+    if manifest.checkpoint_label != checkpoint_pointer.checkpoint_label {
+        return Err(String::from(
+            "checkpoint manifest label drifted from the accepted checkpoint pointer",
+        ));
+    }
+    if manifest.optimizer_step != checkpoint_pointer.optimizer_step {
+        return Err(String::from(
+            "checkpoint manifest optimizer_step drifted from the accepted checkpoint pointer",
+        ));
+    }
+    if manifest.checkpoint_ref
+        != checkpoint_pointer
+            .checkpoint_ref
+            .as_deref()
+            .ok_or_else(|| String::from("accepted checkpoint pointer is missing checkpoint ref"))?
+    {
+        return Err(String::from(
+            "checkpoint manifest ref drifted from the accepted checkpoint pointer",
+        ));
+    }
+    Ok(manifest)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn materialize_checkpoint_backup(
+    run_root: &Path,
+    checkpoint_pointer: &PsionActualPretrainingCheckpointPointer,
+    checkpoint_manifest: &PsionActualPretrainingCheckpointManifest,
+    selected_git_ref: &str,
+    git_commit_sha: &str,
+    dirty_tree_admission: &str,
+    workspace_status_sha256: Option<String>,
+    contracts: &FrozenContracts,
+    inject_failed_upload: bool,
+) -> Result<
+    (
+        PsionActualPretrainingCheckpointBackupReceipt,
+        Option<PsionActualPretrainingCheckpointFailureDrill>,
+    ),
+    Box<dyn Error>,
+> {
+    let primary_pointer_path = run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
+    let primary_manifest_path = run_root.join(&checkpoint_manifest.relative_manifest_path);
+    let backup_pointer_path = checkpoint_backup_pointer_path(run_root);
+    let backup_manifest_path =
+        checkpoint_backup_manifest_path(run_root, checkpoint_manifest.optimizer_step);
+    write_json_pretty(&backup_pointer_path, checkpoint_pointer)?;
+    write_json_pretty(&backup_manifest_path, checkpoint_manifest)?;
+    let backup_state = if inject_failed_upload {
+        "refused"
+    } else {
+        "backed_up"
+    };
+    let upload_outcome = if inject_failed_upload {
+        "failed"
+    } else {
+        "succeeded"
+    };
+    let failure_reason = inject_failed_upload.then(|| {
+        String::from(
+            "Injected failed checkpoint upload drill refused durable remote backup confirmation without copying any secret payload into retained evidence.",
+        )
+    });
+    let remote_backup_root = format!(
+        "{}/backups",
+        run_roots(run_root, &checkpoint_pointer.run_id, &contracts.topology).remote_checkpoint_root
+    );
+    let receipt = record_psion_actual_pretraining_checkpoint_backup_receipt(
+        &checkpoint_pointer.run_id,
+        &checkpoint_pointer.checkpoint_label,
+        checkpoint_pointer.optimizer_step,
+        checkpoint_pointer
+            .checkpoint_ref
+            .as_deref()
+            .ok_or_else(|| std::io::Error::other("accepted checkpoint pointer is missing checkpoint_ref"))?,
+        selected_git_ref,
+        git_commit_sha,
+        dirty_tree_admission,
+        workspace_status_sha256.clone(),
+        run_artifact_ref(run_root, &primary_pointer_path)?,
+        run_artifact_ref(run_root, &primary_manifest_path)?,
+        run_artifact_ref(run_root, &backup_pointer_path)?,
+        run_artifact_ref(run_root, &backup_manifest_path)?,
+        &remote_backup_root,
+        contracts
+            .topology
+            .credential_sources
+            .iter()
+            .map(|source| source.source_name.clone())
+            .collect(),
+        backup_state,
+        upload_outcome,
+        failure_reason.clone(),
+        "This retained backup receipt binds the actual-lane latest accepted checkpoint to one durable backup contract and redacted credential-source posture. It does not claim that training continued or that automatic checkpoint eval already ran.",
+        "Checkpoint backup receipt preserves the accepted pointer plus checkpoint manifest under one local backup family and one redacted remote-backup root.",
+    )?;
+    write_json_pretty(
+        &run_root.join("checkpoints/latest_accepted_checkpoint_backup_receipt.json"),
+        &receipt,
+    )?;
+    let failure_drill = if inject_failed_upload {
+        let drill = record_psion_actual_pretraining_checkpoint_failure_drill(
+            &checkpoint_pointer.run_id,
+            &format!(
+                "psion_actual_pretraining_checkpoint_failure_drill::{}::failed_upload",
+                checkpoint_pointer.optimizer_step
+            ),
+            "failed_upload",
+            "backup",
+            selected_git_ref,
+            git_commit_sha,
+            dirty_tree_admission,
+            workspace_status_sha256,
+            "retained_refusal",
+            vec![
+                String::from("checkpoints/latest_accepted_checkpoint_backup_receipt.json"),
+                String::from("checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json"),
+                format!(
+                    "checkpoints/backups/step-{}/checkpoint_manifest.backup.json",
+                    checkpoint_pointer.optimizer_step
+                ),
+            ],
+            failure_reason,
+            "This retained failure drill proves that checkpoint-upload failures surface as explicit refusal evidence under the actual-lane family rather than silent launcher optimism.",
+            "Injected failed-upload drill retained the refusal receipt and local backup copies without requiring manual log surgery.",
+        )?;
+        Some(drill)
+    } else {
+        None
+    };
+    Ok((receipt, failure_drill))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_resume_target(
+    run_root: &Path,
+    selected_git_ref: &str,
+    git_commit_sha: &str,
+    dirty_tree_admission: &str,
+    workspace_status_sha256: Option<String>,
+) -> Result<ResolvedResumeTarget, Box<dyn Error>> {
+    let primary_pointer_path = run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
+    let backup_receipt_path = run_root.join("checkpoints/latest_accepted_checkpoint_backup_receipt.json");
+    let backup_pointer_path = checkpoint_backup_pointer_path(run_root);
+
+    let primary_pointer_state;
+    if primary_pointer_path.is_file() {
+        match load_json::<PsionActualPretrainingCheckpointPointer>(&primary_pointer_path) {
+            Ok(pointer) => match validate_resume_candidate(run_root, &pointer) {
+                Ok(manifest) => {
+                    let receipt = record_psion_actual_pretraining_auto_resume_receipt(
+                        &pointer.run_id,
+                        selected_git_ref,
+                        git_commit_sha,
+                        dirty_tree_admission,
+                        workspace_status_sha256,
+                        "accepted",
+                        "accepted_primary_pointer",
+                        "primary_pointer",
+                        false,
+                        Some(pointer.checkpoint_label.clone()),
+                        Some(pointer.optimizer_step),
+                        pointer.checkpoint_ref.clone(),
+                        Some(run_artifact_ref(
+                            run_root,
+                            &run_root.join(&manifest.relative_manifest_path),
+                        )?),
+                        None,
+                        "The actual-lane auto-resume receipt records whether resume trusted the primary pointer or had to recover from the retained backup family. It does not claim that preflight admission or post-resume training succeeded.",
+                        "Auto-resume accepted the primary retained checkpoint pointer without needing the backup copy.",
+                    )?;
+                    return Ok(ResolvedResumeTarget {
+                        checkpoint_pointer: Some(pointer),
+                        auto_resume_receipt: receipt,
+                        failure_drill: None,
+                    });
+                }
+                Err(_) => {
+                    primary_pointer_state = String::from("stale");
+                }
+            },
+            Err(_) => {
+                primary_pointer_state = String::from("corrupt");
+            }
+        }
+    } else {
+        primary_pointer_state = String::from("missing");
+    }
+
+    let recovery = (|| -> Result<ResolvedResumeTarget, Box<dyn Error>> {
+        let backup_receipt: PsionActualPretrainingCheckpointBackupReceipt =
+            load_json(&backup_receipt_path)?;
+        backup_receipt.validate()?;
+        if backup_receipt.backup_state != "backed_up" {
+            return Err(
+                std::io::Error::other(
+                    "latest checkpoint backup receipt is not durable enough for auto-resume",
+                )
+                .into(),
+            );
+        }
+        let checkpoint_pointer: PsionActualPretrainingCheckpointPointer = load_json(&backup_pointer_path)?;
+        let backup_manifest_path = run_root.join(&backup_receipt.backup_checkpoint_manifest.path);
+        let checkpoint_manifest: PsionActualPretrainingCheckpointManifest = load_json(&backup_manifest_path)?;
+        checkpoint_manifest.validate()?;
+        write_json_pretty(&primary_pointer_path, &checkpoint_pointer)?;
+        write_json_pretty(
+            &run_root.join(&checkpoint_manifest.relative_manifest_path),
+            &checkpoint_manifest,
+        )?;
+        let auto_resume_receipt = record_psion_actual_pretraining_auto_resume_receipt(
+            &checkpoint_pointer.run_id,
+            selected_git_ref,
+            git_commit_sha,
+            dirty_tree_admission,
+            workspace_status_sha256.clone(),
+            &primary_pointer_state,
+            "recovered_from_backup",
+            "backup_receipt",
+            true,
+            Some(checkpoint_pointer.checkpoint_label.clone()),
+            Some(checkpoint_pointer.optimizer_step),
+            checkpoint_pointer.checkpoint_ref.clone(),
+            Some(run_artifact_ref(
+                run_root,
+                &run_root.join(&checkpoint_manifest.relative_manifest_path),
+            )?),
+            None,
+            "The actual-lane auto-resume receipt records whether resume trusted the primary pointer or had to recover from the retained backup family. It does not claim that preflight admission or post-resume training succeeded.",
+            "Auto-resume restored the primary pointer from the retained backup receipt without requiring manual file edits.",
+        )?;
+        let failure_drill = match checkpoint_failure_drill_kind_for_primary_pointer_state(
+            &primary_pointer_state,
+        ) {
+            Some(drill_kind) => {
+                let drill = record_psion_actual_pretraining_checkpoint_failure_drill(
+                    &checkpoint_pointer.run_id,
+                    &format!(
+                        "psion_actual_pretraining_checkpoint_failure_drill::{}::{drill_kind}",
+                        checkpoint_pointer.optimizer_step
+                    ),
+                    drill_kind,
+                    "resume",
+                    selected_git_ref,
+                    git_commit_sha,
+                    dirty_tree_admission,
+                    workspace_status_sha256.clone(),
+                    "recovered_without_manual_edit",
+                    vec![
+                        String::from("checkpoints/auto_resume_receipt.json"),
+                        String::from("checkpoints/latest_accepted_checkpoint_backup_receipt.json"),
+                        String::from("checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json"),
+                        format!(
+                            "checkpoints/backups/step-{}/checkpoint_manifest.backup.json",
+                            checkpoint_pointer.optimizer_step
+                        ),
+                    ],
+                    None,
+                    "This retained failure drill proves that stale or corrupt primary resume pointers recover from the actual-lane backup family without manual editing.",
+                    "Auto-resume repaired the primary checkpoint lineage from the retained backup copy after detecting a stale or corrupt primary pointer.",
+                )?;
+                Some(drill)
+            }
+            _ => None,
+        };
+        Ok(ResolvedResumeTarget {
+            checkpoint_pointer: Some(checkpoint_pointer),
+            auto_resume_receipt,
+            failure_drill,
+        })
+    })();
+
+    match recovery {
+        Ok(resolved) => Ok(resolved),
+        Err(_) => {
+            let run_id = if let Ok(pointer) = load_json::<PsionActualPretrainingCheckpointPointer>(&backup_pointer_path) {
+                pointer.run_id
+            } else {
+                String::from("unknown_run")
+            };
+            let auto_resume_receipt = record_psion_actual_pretraining_auto_resume_receipt(
+                &run_id,
+                selected_git_ref,
+                git_commit_sha,
+                dirty_tree_admission,
+                workspace_status_sha256.clone(),
+                &primary_pointer_state,
+                "refused",
+                "none",
+                false,
+                None,
+                None,
+                None,
+                None,
+                Some(String::from(
+                    "primary pointer could not be resumed and no admitted backup receipt was available",
+                )),
+                "The actual-lane auto-resume receipt records whether resume trusted the primary pointer or had to recover from the retained backup family. It does not claim that preflight admission or post-resume training succeeded.",
+                "Auto-resume refused because neither the primary pointer nor the retained backup family could produce an admitted checkpoint selection.",
+            )?;
+            Ok(ResolvedResumeTarget {
+                checkpoint_pointer: None,
+                auto_resume_receipt,
+                failure_drill: None,
+            })
+        }
+    }
 }
 
 fn write_launcher_bundle(
@@ -1533,6 +2323,6 @@ fn write_launcher_bundle(
         run_root.join("closeout/closeout_bundle.json"),
         serde_json::to_string_pretty(closeout_bundle)?,
     )?;
-    fs::write(run_root.join("logs/launcher.log"), launcher_log_line)?;
+    append_launcher_log(run_root, launcher_log_line)?;
     Ok(())
 }

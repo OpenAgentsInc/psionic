@@ -68,6 +68,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Zero-guess pointer to the latest accepted checkpoint for resume.",
             ),
             slot(
+                "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+                "checkpoint_backup_receipt",
+                "durable",
+                "Retained durable-backup receipt for the latest accepted checkpoint.",
+            ),
+            slot(
+                "checkpoints/auto_resume_receipt.json",
+                "auto_resume_receipt",
+                "durable",
+                "Retained auto-resume resolution receipt for the latest resume attempt.",
+            ),
+            slot(
                 "preflight/hardware_qualification.json",
                 "hardware_qualification_receipt",
                 "durable",
@@ -84,6 +96,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "checkpoint_manifest",
                 "durable",
                 "Retained manifest for one concrete checkpoint write.",
+            ),
+            slot(
+                "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+                "checkpoint_pointer_backup",
+                "durable",
+                "Latest accepted checkpoint pointer copied into the retained backup family.",
+            ),
+            slot(
+                "checkpoints/backups/step-<optimizer_step>/checkpoint_manifest.backup.json",
+                "checkpoint_manifest_backup",
+                "durable",
+                "Latest accepted checkpoint manifest copied into the retained backup family.",
+            ),
+            slot(
+                "checkpoints/failures/<drill_kind>_drill.json",
+                "checkpoint_failure_drill",
+                "durable",
+                "Retained failed-upload, stale-pointer, or corrupt-pointer drill receipt for checkpoint backup and resume.",
             ),
             slot(
                 "evals/checkpoint_eval_step-<optimizer_step>.json",

@@ -21,7 +21,7 @@
   },
   "evidence_contract": {
     "path": "fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json",
-    "sha256": "9375bc213096aa5c667c070d9ee5dc1a82513037144fbaa8d7a648dc28d6b80b"
+    "sha256": "93414e8b31f96b564d840a3ad271c602d922a0afafc2fe36aaaf8c09d16a31d1"
   },
   "required_backend": "cuda",
   "required_worker_count": 4,
@@ -120,5 +120,5 @@
   "refusal_reasons": [],
   "claim_boundary": "This hardware qualification binds actual-lane launch admission to one retained preflight receipt under `psion.actual_pretraining.evidence.v1`. It proves backend, worker inventory, free-memory, temperature, ECC, throttling, credential, and checkpoint-restore posture only; it does not claim durable backup, automatic eval triggering, or live run health.",
   "detail": "Actual-lane launch now consumes a retained hardware qualification receipt before non-dry-run start or resume can stage manifests.",
-  "receipt_digest": "8262f7b4f2d5f2ffd04f1f47d7cf2398a47337ed67cd378444a6f39bd17bec76"
+  "receipt_digest": "5485e83eb606dd2da536272812a626ed1c42d9ca669cd9af8e076296e090b4e3"
 }
