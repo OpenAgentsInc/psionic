@@ -33,6 +33,7 @@ psionic-backend-cuda = { path = "../psionic-backend-cuda" }
 psionic-backend-cpu = { path = "../psionic-backend-cpu" }
 psionic-backend-metal = { path = "../psionic-backend-metal" }
 psionic-catalog = { path = "../psionic-catalog" }
+psionic-cluster = { path = "../psionic-cluster" }
 psionic-compiler = { path = "../psionic-compiler" }
 psionic-core = { path = "../psionic-core" }
 psionic-eval = { path = "../psionic-eval" }

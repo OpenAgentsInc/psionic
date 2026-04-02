@@ -179,6 +179,31 @@ The execution contract above that ordered record is:
 - management state can explain the current term, promotion reason, and standby
   set without inferring them from traffic
 
+## Demand And Rebalance
+
+Mesh demand is now a first-class Psionic control signal instead of an operator
+guess.
+
+The router-owned demand window is keyed by:
+
+- product surface
+- stable model identifier
+- requested route alias when demand came through one alias
+
+That demand window carries explicit request count, selected-route concurrency,
+and expiry time.
+
+`psionic-cluster` consumes that signal through the replica lifecycle policy and
+returns one explicit rebalance decision:
+
+- `steady_state`
+- `hot_demand_scale_out`
+- `idle_keepalive`
+- `idle_unload`
+
+Management status now needs to publish both the raw demand windows and the
+resulting rebalance decisions so promotion and unload actions stay explainable.
+
 ## Join Bundle Contract
 
 Mesh setup now depends on one durable join bundle contract above the existing

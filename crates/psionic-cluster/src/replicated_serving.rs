@@ -171,6 +171,10 @@ pub struct ClusterReplicaLifecyclePolicy {
     pub target_warm_replicas: usize,
     /// Maximum warm replicas retained simultaneously.
     pub max_warm_replicas: usize,
+    /// Routed request count carried safely by one warm replica before scale-out.
+    pub requests_per_target_warm_replica: usize,
+    /// Peak active requests tolerated on one warm replica before scale-out.
+    pub active_requests_per_target_warm_replica: usize,
     /// Idle keepalive budget before a warm replica may be unloaded.
     pub idle_keepalive_seconds: u64,
     /// Hard unload threshold after sustained idleness.
@@ -185,6 +189,8 @@ impl ClusterReplicaLifecyclePolicy {
             min_warm_replicas: 2,
             target_warm_replicas: 2,
             max_warm_replicas: 4,
+            requests_per_target_warm_replica: 4,
+            active_requests_per_target_warm_replica: 2,
             idle_keepalive_seconds: 60,
             unload_after_idle_seconds: 300,
         }
@@ -200,10 +206,145 @@ impl ClusterReplicaLifecyclePolicy {
         hasher.update(b"|");
         hasher.update(self.max_warm_replicas.to_string());
         hasher.update(b"|");
+        hasher.update(self.requests_per_target_warm_replica.to_string());
+        hasher.update(b"|");
+        hasher.update(self.active_requests_per_target_warm_replica.to_string());
+        hasher.update(b"|");
         hasher.update(self.idle_keepalive_seconds.to_string());
         hasher.update(b"|");
         hasher.update(self.unload_after_idle_seconds.to_string());
         hex::encode(hasher.finalize())
+    }
+
+    /// Computes the next explicit warm-capacity target from observed demand.
+    #[must_use]
+    pub fn rebalance_for_demand(
+        &self,
+        demand: Option<&ClusterReplicaDemandSnapshot>,
+        current_warm_replicas: usize,
+        observed_at_ms: u64,
+    ) -> ClusterReplicaDemandRebalanceDecision {
+        let steady_target = self
+            .target_warm_replicas
+            .clamp(self.min_warm_replicas, self.max_warm_replicas);
+        let zero_denominator_guard = |value: usize| value.max(1);
+
+        let (product_id, model_id, route_alias) = demand
+            .map(|snapshot| {
+                (
+                    snapshot.product_id.clone(),
+                    snapshot.model_id.clone(),
+                    snapshot.route_alias.clone(),
+                )
+            })
+            .unwrap_or_else(|| {
+                (
+                    String::from("psionic.unscoped"),
+                    String::from("unknown"),
+                    None,
+                )
+            });
+
+        let (target_warm_replicas, reason, detail) = match demand {
+            Some(snapshot) if !snapshot.is_expired_at(observed_at_ms) => {
+                let request_target = snapshot.request_count.div_ceil(zero_denominator_guard(
+                    self.requests_per_target_warm_replica,
+                ));
+                let active_target =
+                    snapshot
+                        .peak_selected_active_requests
+                        .div_ceil(zero_denominator_guard(
+                            self.active_requests_per_target_warm_replica,
+                        ));
+                let demanded_target = steady_target
+                    .max(request_target.max(active_target))
+                    .min(self.max_warm_replicas);
+                if demanded_target > steady_target {
+                    (
+                        demanded_target,
+                        ClusterReplicaDemandRebalanceReason::HotDemandScaleOut,
+                        format!(
+                            "fresh demand window recorded {} requests and peak {} active requests for model `{}`",
+                            snapshot.request_count,
+                            snapshot.peak_selected_active_requests,
+                            snapshot.model_id
+                        ),
+                    )
+                } else {
+                    (
+                        steady_target,
+                        ClusterReplicaDemandRebalanceReason::SteadyState,
+                        format!(
+                            "fresh demand window stays within steady target {} for model `{}`",
+                            steady_target, snapshot.model_id
+                        ),
+                    )
+                }
+            }
+            Some(snapshot) => {
+                let idle_ms = observed_at_ms.saturating_sub(snapshot.last_observed_at_ms);
+                if current_warm_replicas > steady_target
+                    && idle_ms >= self.unload_after_idle_seconds.saturating_mul(1_000)
+                {
+                    (
+                        steady_target,
+                        ClusterReplicaDemandRebalanceReason::IdleUnload,
+                        format!(
+                            "demand window for model `{}` expired at {} and remained idle for {} ms",
+                            snapshot.model_id, snapshot.expires_at_ms, idle_ms
+                        ),
+                    )
+                } else if current_warm_replicas > steady_target {
+                    (
+                        current_warm_replicas,
+                        ClusterReplicaDemandRebalanceReason::IdleKeepalive,
+                        format!(
+                            "model `{}` is past fresh demand but still inside unload grace after {} ms of idleness",
+                            snapshot.model_id, idle_ms
+                        ),
+                    )
+                } else {
+                    (
+                        steady_target,
+                        ClusterReplicaDemandRebalanceReason::SteadyState,
+                        format!(
+                            "expired demand for model `{}` does not require a warm-capacity change",
+                            snapshot.model_id
+                        ),
+                    )
+                }
+            }
+            None => {
+                if current_warm_replicas > steady_target {
+                    (
+                        steady_target,
+                        ClusterReplicaDemandRebalanceReason::IdleUnload,
+                        format!(
+                            "no fresh demand snapshot exists, so warm capacity returns to steady target {}",
+                            steady_target
+                        ),
+                    )
+                } else {
+                    (
+                        steady_target,
+                        ClusterReplicaDemandRebalanceReason::SteadyState,
+                        String::from("no demand snapshot exists for this model"),
+                    )
+                }
+            }
+        };
+
+        ClusterReplicaDemandRebalanceDecision {
+            product_id,
+            model_id,
+            route_alias,
+            current_warm_replicas,
+            target_warm_replicas,
+            promote_replicas: target_warm_replicas.saturating_sub(current_warm_replicas),
+            unload_replicas: current_warm_replicas.saturating_sub(target_warm_replicas),
+            reason,
+            detail,
+        }
     }
 }
 
@@ -211,6 +352,94 @@ impl Default for ClusterReplicaLifecyclePolicy {
     fn default() -> Self {
         Self::replicated_lane()
     }
+}
+
+/// Demand snapshot fed into the replica lifecycle policy.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterReplicaDemandSnapshot {
+    /// Product surface publishing the demand.
+    pub product_id: String,
+    /// Stable model identifier.
+    pub model_id: String,
+    /// External alias used for the demand signal, when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_alias: Option<String>,
+    /// Requests observed in the current demand window.
+    pub request_count: usize,
+    /// Highest selected active-request count observed in the window.
+    pub peak_selected_active_requests: usize,
+    /// Most recent request observation in the window.
+    pub last_observed_at_ms: u64,
+    /// Time after which the demand window is stale.
+    pub expires_at_ms: u64,
+}
+
+impl ClusterReplicaDemandSnapshot {
+    /// Creates one lifecycle-consumable demand snapshot.
+    #[must_use]
+    pub fn new(
+        product_id: impl Into<String>,
+        model_id: impl Into<String>,
+        route_alias: Option<String>,
+        request_count: usize,
+        peak_selected_active_requests: usize,
+        last_observed_at_ms: u64,
+        expires_at_ms: u64,
+    ) -> Self {
+        Self {
+            product_id: product_id.into(),
+            model_id: model_id.into(),
+            route_alias,
+            request_count,
+            peak_selected_active_requests,
+            last_observed_at_ms,
+            expires_at_ms,
+        }
+    }
+
+    /// Returns whether the demand window is stale at the observed time.
+    #[must_use]
+    pub const fn is_expired_at(&self, observed_at_ms: u64) -> bool {
+        observed_at_ms > self.expires_at_ms
+    }
+}
+
+/// Machine-checkable reason for one warm-capacity rebalance decision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterReplicaDemandRebalanceReason {
+    /// Current demand fits the existing steady target.
+    SteadyState,
+    /// Fresh demand requires extra warm capacity.
+    HotDemandScaleOut,
+    /// Demand expired, but replicas remain inside the configured keepalive window.
+    IdleKeepalive,
+    /// Demand expired and extra warm replicas should now be unloaded.
+    IdleUnload,
+}
+
+/// One explicit warm-capacity rebalance decision for one model lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterReplicaDemandRebalanceDecision {
+    /// Product surface publishing the demand.
+    pub product_id: String,
+    /// Stable model identifier the decision applies to.
+    pub model_id: String,
+    /// External alias used for the demand signal, when preserved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_alias: Option<String>,
+    /// Current number of warm replicas observed for the model.
+    pub current_warm_replicas: usize,
+    /// Target number of warm replicas after the decision.
+    pub target_warm_replicas: usize,
+    /// Replicas that should be promoted or warmed to meet the target.
+    pub promote_replicas: usize,
+    /// Replicas that should be unloaded to return to the target.
+    pub unload_replicas: usize,
+    /// Explicit reason for the rebalance outcome.
+    pub reason: ClusterReplicaDemandRebalanceReason,
+    /// Plain-language detail for management surfaces.
+    pub detail: String,
 }
 
 /// Stable failure code for per-lane active-host election reconciliation.
@@ -1509,6 +1738,57 @@ mod tests {
         );
         assert!(promoted_election.standby_node_ids.is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn replica_lifecycle_policy_scales_target_warm_replicas_for_hot_demand() {
+        let policy = ClusterReplicaLifecyclePolicy::replicated_lane();
+        let demand = ClusterReplicaDemandSnapshot::new(
+            "psionic.openai_compat",
+            "tiny-llama",
+            Some(String::from("chat-default")),
+            9,
+            5,
+            10_000,
+            70_000,
+        );
+
+        let decision = policy.rebalance_for_demand(Some(&demand), 1, 12_000);
+
+        assert_eq!(decision.product_id, "psionic.openai_compat");
+        assert_eq!(decision.model_id, "tiny-llama");
+        assert_eq!(decision.target_warm_replicas, 3);
+        assert_eq!(decision.promote_replicas, 2);
+        assert_eq!(decision.unload_replicas, 0);
+        assert_eq!(
+            decision.reason,
+            ClusterReplicaDemandRebalanceReason::HotDemandScaleOut
+        );
+    }
+
+    #[test]
+    fn replica_lifecycle_policy_unloads_after_demand_stays_idle_past_threshold() {
+        let policy = ClusterReplicaLifecyclePolicy::replicated_lane();
+        let demand = ClusterReplicaDemandSnapshot::new(
+            "psionic.openai_compat",
+            "tiny-llama",
+            None,
+            4,
+            2,
+            1_000,
+            10_000,
+        );
+
+        let decision = policy.rebalance_for_demand(Some(&demand), 4, 400_000);
+
+        assert_eq!(decision.target_warm_replicas, 2);
+        assert_eq!(decision.promote_replicas, 0);
+        assert_eq!(decision.unload_replicas, 2);
+        assert_eq!(
+            decision.reason,
+            ClusterReplicaDemandRebalanceReason::IdleUnload
+        );
+        assert!(decision.detail.contains("expired"));
     }
 
     #[test]

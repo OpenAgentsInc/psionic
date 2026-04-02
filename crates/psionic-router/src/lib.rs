@@ -279,6 +279,9 @@ pub struct RoutingRequest {
     pub endpoint: RoutingEndpoint,
     /// Requested target model posture.
     pub target: RoutingTarget,
+    /// Optional product surface publishing the demand signal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub product_id: Option<String>,
     /// Required capabilities.
     pub capability_filters: RoutingCapabilityFilters,
     /// Explicit KV-cache encoding placement constraints.
@@ -300,6 +303,7 @@ impl RoutingRequest {
         Self {
             endpoint,
             target: RoutingTarget::Default,
+            product_id: None,
             capability_filters: RoutingCapabilityFilters::default(),
             kv_cache_encoding_preferences: RoutingKvCacheEncodingPreferences::default(),
             policy_hints: RoutingPolicyHints::default(),
@@ -319,6 +323,13 @@ impl RoutingRequest {
     #[must_use]
     pub fn with_model_key(mut self, model_key: impl Into<String>) -> Self {
         self.target = RoutingTarget::ModelKey(model_key.into());
+        self
+    }
+
+    /// Tags the request with the product surface publishing this demand signal.
+    #[must_use]
+    pub fn with_product_id(mut self, product_id: impl Into<String>) -> Self {
+        self.product_id = Some(product_id.into());
         self
     }
 
@@ -404,6 +415,170 @@ impl RoutingRequest {
     pub fn prefer_family(mut self, family: impl Into<String>) -> Self {
         self.preferred_family = Some(family.into());
         self
+    }
+}
+
+/// Stable demand key for one routed product and model lane.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct RoutingDemandKey {
+    /// Product surface that emitted the demand.
+    pub product_id: String,
+    /// Stable model identifier selected by the router.
+    pub model_id: String,
+    /// Requested external route alias, when demand came through one alias.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route_alias: Option<String>,
+}
+
+impl RoutingDemandKey {
+    /// Creates one stable demand key.
+    #[must_use]
+    pub fn new(
+        product_id: impl Into<String>,
+        model_id: impl Into<String>,
+        route_alias: Option<String>,
+    ) -> Self {
+        Self {
+            product_id: product_id.into(),
+            model_id: model_id.into(),
+            route_alias,
+        }
+    }
+}
+
+/// Freshness policy for routed demand snapshots.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutingDemandPolicy {
+    /// Demand becomes stale after this many milliseconds without new observations.
+    pub freshness_window_ms: u64,
+}
+
+impl Default for RoutingDemandPolicy {
+    fn default() -> Self {
+        Self {
+            freshness_window_ms: 300_000,
+        }
+    }
+}
+
+/// Aggregated demand snapshot for one routed product/model lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutingDemandSnapshot {
+    /// Stable product/model demand key.
+    pub key: RoutingDemandKey,
+    /// Canonical model name behind the selected route.
+    pub canonical_name: String,
+    /// Requests observed in the current freshness window.
+    pub request_count: usize,
+    /// Highest active-request count seen on the selected route.
+    pub peak_selected_active_requests: usize,
+    /// First observation currently represented by this window.
+    pub first_observed_at_ms: u64,
+    /// Most recent observation in this window.
+    pub last_observed_at_ms: u64,
+    /// Time after which this demand window is stale.
+    pub expires_at_ms: u64,
+}
+
+impl RoutingDemandSnapshot {
+    /// Creates one fresh demand window from a selected route.
+    #[must_use]
+    pub fn new(
+        key: RoutingDemandKey,
+        selection: &RouteSelection,
+        observed_at_ms: u64,
+        policy: RoutingDemandPolicy,
+    ) -> Self {
+        Self {
+            key,
+            canonical_name: selection.canonical_name.clone(),
+            request_count: 1,
+            peak_selected_active_requests: selection.metrics.selected_active_requests,
+            first_observed_at_ms: observed_at_ms,
+            last_observed_at_ms: observed_at_ms,
+            expires_at_ms: observed_at_ms.saturating_add(policy.freshness_window_ms),
+        }
+    }
+
+    /// Returns whether the demand window is stale at the observed time.
+    #[must_use]
+    pub const fn is_expired_at(&self, observed_at_ms: u64) -> bool {
+        observed_at_ms > self.expires_at_ms
+    }
+}
+
+/// Mutable demand ledger keyed by product, model, and alias where needed.
+#[derive(Clone, Debug, Default)]
+pub struct RoutingDemandLedger {
+    policy: RoutingDemandPolicy,
+    snapshots_by_key: BTreeMap<RoutingDemandKey, RoutingDemandSnapshot>,
+}
+
+impl RoutingDemandLedger {
+    /// Creates one routed demand ledger with explicit freshness policy.
+    #[must_use]
+    pub fn new(policy: RoutingDemandPolicy) -> Self {
+        Self {
+            policy,
+            snapshots_by_key: BTreeMap::new(),
+        }
+    }
+
+    /// Returns the current freshness policy.
+    #[must_use]
+    pub const fn policy(&self) -> RoutingDemandPolicy {
+        self.policy
+    }
+
+    /// Records one routed request against the selected worker and model.
+    pub fn record(
+        &mut self,
+        request: &RoutingRequest,
+        selection: &RouteSelection,
+        observed_at_ms: u64,
+    ) {
+        let key = RoutingDemandKey::new(
+            request
+                .product_id
+                .clone()
+                .unwrap_or_else(|| String::from("psionic.unscoped")),
+            selection.model_key.clone(),
+            route_alias_for_demand(request),
+        );
+        match self.snapshots_by_key.get_mut(&key) {
+            Some(snapshot) if !snapshot.is_expired_at(observed_at_ms) => {
+                snapshot.canonical_name = selection.canonical_name.clone();
+                snapshot.request_count = snapshot.request_count.saturating_add(1);
+                snapshot.peak_selected_active_requests = snapshot
+                    .peak_selected_active_requests
+                    .max(selection.metrics.selected_active_requests);
+                snapshot.last_observed_at_ms = observed_at_ms;
+                snapshot.expires_at_ms =
+                    observed_at_ms.saturating_add(self.policy.freshness_window_ms);
+            }
+            Some(snapshot) => {
+                *snapshot =
+                    RoutingDemandSnapshot::new(key.clone(), selection, observed_at_ms, self.policy);
+            }
+            None => {
+                let snapshot =
+                    RoutingDemandSnapshot::new(key.clone(), selection, observed_at_ms, self.policy);
+                self.snapshots_by_key.insert(key, snapshot);
+            }
+        }
+    }
+
+    /// Returns the current demand windows in deterministic order.
+    #[must_use]
+    pub fn snapshot_at(&self, observed_at_ms: u64) -> Vec<RoutingDemandSnapshot> {
+        let mut snapshots = self.snapshots_by_key.values().cloned().collect::<Vec<_>>();
+        snapshots.sort_by(|left, right| {
+            left.is_expired_at(observed_at_ms)
+                .cmp(&right.is_expired_at(observed_at_ms))
+                .then_with(|| left.key.cmp(&right.key))
+                .then_with(|| left.last_observed_at_ms.cmp(&right.last_observed_at_ms))
+        });
+        snapshots
     }
 }
 
@@ -1562,6 +1737,7 @@ fn power_of_two_sample<'a>(
     let mut hasher = DefaultHasher::new();
     request.endpoint.path().hash(&mut hasher);
     target_label(&request.target, default_model).hash(&mut hasher);
+    request.product_id.hash(&mut hasher);
     request.policy_hints.cache_key.hash(&mut hasher);
     request
         .kv_cache_encoding_preferences
@@ -1597,6 +1773,13 @@ fn target_label(target: &RoutingTarget, default_model: &str) -> String {
     }
 }
 
+fn route_alias_for_demand(request: &RoutingRequest) -> Option<String> {
+    match &request.target {
+        RoutingTarget::RequestedModel(requested) => Some(requested.clone()),
+        RoutingTarget::Default | RoutingTarget::ModelKey(_) => None,
+    }
+}
+
 fn route_supports_kv_cache_encoding(
     selection: &RouteSelection,
     family: KvCacheEncodingFamily,
@@ -1615,7 +1798,8 @@ fn model_supports_kv_cache_encoding(
     model: &RoutedModelInventory,
     family: KvCacheEncodingFamily,
 ) -> bool {
-    model.kv_cache_encoding_policy
+    model
+        .kv_cache_encoding_policy
         .as_ref()
         .is_some_and(|policy| policy.family == family)
         || model
@@ -1628,11 +1812,13 @@ fn model_kv_cache_encoding_policy_for_family<'a>(
     model: &'a RoutedModelInventory,
     family: KvCacheEncodingFamily,
 ) -> Option<&'a KvCacheEncodingPolicy> {
-    model.supported_kv_cache_encoding_policies
+    model
+        .supported_kv_cache_encoding_policies
         .iter()
         .find(|policy| policy.family == family)
         .or_else(|| {
-            model.kv_cache_encoding_policy
+            model
+                .kv_cache_encoding_policy
                 .as_ref()
                 .filter(|policy| policy.family == family)
         })
@@ -1687,12 +1873,12 @@ mod tests {
     use super::{
         FleetRouter, ReliabilityAction, ReliabilityReason, RouteReliabilityController,
         RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry, RoutedModelInventory,
-        RoutedWarmState, RoutedWorkerInventory, RoutingEndpoint, RoutingError, RoutingRequest,
-        WorkerCircuitState,
+        RoutedWarmState, RoutedWorkerInventory, RoutingDemandKey, RoutingDemandLedger,
+        RoutingDemandPolicy, RoutingEndpoint, RoutingError, RoutingRequest, WorkerCircuitState,
     };
     use psionic_runtime::{
-        ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily,
-        KvCacheEncodingObjective, KvCacheEncodingPolicy, PrefillDecodeCapability,
+        ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily, KvCacheEncodingObjective,
+        KvCacheEncodingPolicy, PrefillDecodeCapability,
     };
 
     fn sample_profile() -> ExecutionCapabilityProfile {
@@ -1961,10 +2147,12 @@ mod tests {
             )
             .expect("turboquant-capable route should resolve");
         assert_eq!(selection.worker_id, "worker-b");
-        assert!(selection
-            .supported_kv_cache_encoding_policies
-            .iter()
-            .any(|policy| policy.family == KvCacheEncodingFamily::TurboQuant));
+        assert!(
+            selection
+                .supported_kv_cache_encoding_policies
+                .iter()
+                .any(|policy| policy.family == KvCacheEncodingFamily::TurboQuant)
+        );
         assert!(selection.routing_notes.iter().any(|note| {
             note.contains("required kv-cache encoding support `turboquant` matched")
         }));
@@ -2041,10 +2229,11 @@ mod tests {
             )
             .expect("dense-only route should resolve");
         assert_eq!(selection.worker_id, "worker-b");
-        assert!(selection
-            .routing_notes
-            .iter()
-            .any(|note| note.contains("excluded kv-cache encoding support filters were applied")));
+        assert!(
+            selection.routing_notes.iter().any(
+                |note| note.contains("excluded kv-cache encoding support filters were applied")
+            )
+        );
     }
 
     #[test]
@@ -2130,6 +2319,91 @@ mod tests {
             selection.metrics.strategy,
             RouteSelectionStrategy::PowerOfTwoLeastLoaded
         ));
+    }
+
+    #[test]
+    fn demand_ledger_keys_snapshots_by_product_model_and_requested_alias() {
+        let router = FleetRouter::new(
+            "tiny-llama",
+            vec![
+                RoutedWorkerInventory::new("worker-a", "cpu", "native", "psionic").with_model(
+                    RoutedModelInventory::new(
+                        "tiny-llama",
+                        "tiny-llama",
+                        "llama",
+                        sample_profile(),
+                    )
+                    .with_alias("chat-default")
+                    .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                    .with_warm_state(RoutedWarmState::Warm)
+                    .with_active_requests(3),
+                ),
+            ],
+        )
+        .expect("router should build");
+        let request = RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+            .with_product_id("psionic.openai_compat")
+            .with_requested_model("chat-default");
+        let selection = router.resolve(&request).expect("route should resolve");
+        let mut ledger = RoutingDemandLedger::new(RoutingDemandPolicy {
+            freshness_window_ms: 120_000,
+        });
+
+        ledger.record(&request, &selection, 10_000);
+
+        let snapshots = ledger.snapshot_at(10_000);
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(
+            snapshots[0].key,
+            RoutingDemandKey::new(
+                "psionic.openai_compat",
+                "tiny-llama",
+                Some(String::from("chat-default")),
+            )
+        );
+        assert_eq!(snapshots[0].request_count, 1);
+        assert_eq!(snapshots[0].peak_selected_active_requests, 3);
+        assert_eq!(snapshots[0].canonical_name, "tiny-llama");
+    }
+
+    #[test]
+    fn demand_ledger_marks_stale_windows_and_resets_after_expiry() {
+        let router = FleetRouter::new(
+            "tiny-llama",
+            vec![
+                RoutedWorkerInventory::new("worker-a", "cpu", "native", "psionic").with_model(
+                    RoutedModelInventory::new(
+                        "tiny-llama",
+                        "tiny-llama",
+                        "llama",
+                        sample_profile(),
+                    )
+                    .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                    .with_warm_state(RoutedWarmState::Warm)
+                    .with_active_requests(1),
+                ),
+            ],
+        )
+        .expect("router should build");
+        let request =
+            RoutingRequest::new(RoutingEndpoint::ChatCompletions).with_product_id("psionic.test");
+        let selection = router.resolve(&request).expect("route should resolve");
+        let mut ledger = RoutingDemandLedger::new(RoutingDemandPolicy {
+            freshness_window_ms: 1_000,
+        });
+
+        ledger.record(&request, &selection, 100);
+        let stale_snapshot = ledger.snapshot_at(1_101);
+        assert_eq!(stale_snapshot.len(), 1);
+        assert!(stale_snapshot[0].is_expired_at(1_101));
+
+        ledger.record(&request, &selection, 1_200);
+        let refreshed_snapshot = ledger.snapshot_at(1_200);
+        assert_eq!(refreshed_snapshot.len(), 1);
+        assert_eq!(refreshed_snapshot[0].request_count, 1);
+        assert_eq!(refreshed_snapshot[0].first_observed_at_ms, 1_200);
+        assert_eq!(refreshed_snapshot[0].last_observed_at_ms, 1_200);
+        assert!(!refreshed_snapshot[0].is_expired_at(1_200));
     }
 
     #[test]

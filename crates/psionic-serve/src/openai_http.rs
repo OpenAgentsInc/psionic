@@ -26,6 +26,10 @@ use axum::{
 };
 use futures_util::stream::{self, Stream, StreamExt};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
+use psionic_cluster::{
+    ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandSnapshot,
+    ClusterReplicaLifecyclePolicy,
+};
 use psionic_models::{
     GgufBlobArtifact, GgufDecoderFamily, GgufPromptTemplateRenderer, GptOssHarmonyParseOptions,
     GptOssHarmonyParsedOutput, GptOssHarmonyRenderContext, GptOssTokenizer,
@@ -41,7 +45,8 @@ use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
     ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore, RouteSelection,
     RouteSelectionStrategy, RoutedModelInventory, RoutedWarmState, RoutedWorkerInventory,
-    RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
+    RoutingDemandLedger, RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest,
+    RoutingTarget,
 };
 use psionic_runtime::{
     ExecutionCapabilityProfile, GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt,
@@ -100,6 +105,7 @@ const BOOTSTRAP_PROXY_PROVENANCE: &str = "bootstrap_proxy";
 const LOCAL_EXECUTION_PROVENANCE: &str = "local_execution";
 const THIN_CLIENT_FALLBACK_POSTURE: &str = "thin_client_remote_only";
 const WARMING_FALLBACK_POSTURE: &str = "warming_until_local_ready";
+const OPENAI_COMPAT_PRODUCT_ID: &str = "psionic.openai_compat";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct LocalServingTruth {
@@ -883,6 +889,8 @@ struct OpenAiCompatState {
     management_events: broadcast::Sender<MeshManagementEventEnvelope>,
     local_management_node: Option<MeshManagementNodeStatus>,
     last_route_execution: Mutex<Option<MeshManagementRouteExecutionStatus>>,
+    route_demand: Mutex<RoutingDemandLedger>,
+    replica_lifecycle_policy: ClusterReplicaLifecyclePolicy,
     bootstrap_proxy: Option<Arc<BootstrapProxyState>>,
 }
 
@@ -1072,6 +1080,8 @@ struct MeshManagementStatusDigestInput {
     join_state: MeshManagementJoinStateResponse,
     nodes: Vec<MeshManagementNodeStatus>,
     routes: Vec<MeshManagementRouteStatus>,
+    demand: Vec<RoutingDemandSnapshot>,
+    rebalance_plan: Vec<ClusterReplicaDemandRebalanceDecision>,
     last_route_execution: Option<MeshManagementRouteExecutionStatus>,
 }
 
@@ -1087,6 +1097,10 @@ struct MeshManagementStatusResponse {
     join_state: MeshManagementJoinStateResponse,
     nodes: Vec<MeshManagementNodeStatus>,
     routes: Vec<MeshManagementRouteStatus>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    demand: Vec<RoutingDemandSnapshot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rebalance_plan: Vec<ClusterReplicaDemandRebalanceDecision>,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_route_execution: Option<MeshManagementRouteExecutionStatus>,
 }
@@ -1362,6 +1376,7 @@ impl OpenAiCompatLoadedModel {
 
 impl OpenAiCompatState {
     fn management_status(&self) -> MeshManagementStatusResponse {
+        let observed_at_ms = unix_timestamp_ms();
         let join_state = self
             .management_join_state
             .lock()
@@ -1373,6 +1388,11 @@ impl OpenAiCompatState {
             .lock()
             .expect("last route execution should not be poisoned")
             .clone();
+        let demand = self
+            .route_demand
+            .lock()
+            .expect("route demand should not be poisoned")
+            .snapshot_at(observed_at_ms);
         let inventories = self.router.inventory();
         let mut nodes = inventories
             .iter()
@@ -1392,10 +1412,18 @@ impl OpenAiCompatState {
                 .then_with(|| left.model_key.cmp(&right.model_key))
                 .then_with(|| left.endpoint.cmp(right.endpoint))
         });
+        let rebalance_plan = mesh_management_rebalance_plan(
+            nodes.as_slice(),
+            demand.as_slice(),
+            &self.replica_lifecycle_policy,
+            observed_at_ms,
+        );
         let topology_digest = mesh_management_topology_digest(&MeshManagementStatusDigestInput {
             join_state: join_state.clone(),
             nodes: nodes.clone(),
             routes: routes.clone(),
+            demand: demand.clone(),
+            rebalance_plan: rebalance_plan.clone(),
             last_route_execution: last_route_execution.clone(),
         });
         MeshManagementStatusResponse {
@@ -1409,6 +1437,8 @@ impl OpenAiCompatState {
             join_state,
             nodes,
             routes,
+            demand,
+            rebalance_plan,
             last_route_execution,
         }
     }
@@ -1452,6 +1482,22 @@ impl OpenAiCompatState {
             .lock()
             .expect("last route execution should not be poisoned") = Some(status);
     }
+
+    fn record_route_demand(&self, request: &RoutingRequest, selection: &RouteSelection) {
+        self.record_route_demand_at(request, selection, unix_timestamp_ms());
+    }
+
+    fn record_route_demand_at(
+        &self,
+        request: &RoutingRequest,
+        selection: &RouteSelection,
+        observed_at_ms: u64,
+    ) {
+        self.route_demand
+            .lock()
+            .expect("route demand should not be poisoned")
+            .record(request, selection, observed_at_ms);
+    }
 }
 
 fn routing_target_label(target: &RoutingTarget) -> String {
@@ -1460,6 +1506,110 @@ fn routing_target_label(target: &RoutingTarget) -> String {
         RoutingTarget::RequestedModel(requested) => format!("requested:{requested}"),
         RoutingTarget::ModelKey(model_key) => format!("model_key:{model_key}"),
     }
+}
+
+fn mesh_management_rebalance_plan(
+    nodes: &[MeshManagementNodeStatus],
+    demand: &[RoutingDemandSnapshot],
+    lifecycle_policy: &ClusterReplicaLifecyclePolicy,
+    observed_at_ms: u64,
+) -> Vec<ClusterReplicaDemandRebalanceDecision> {
+    let current_warm_by_model = mesh_management_current_warm_routes_by_model(nodes);
+    let aggregated_demand = mesh_management_aggregate_model_demand(demand);
+    let mut keys = BTreeSet::new();
+    keys.extend(
+        current_warm_by_model
+            .keys()
+            .map(|model_id| (String::from(OPENAI_COMPAT_PRODUCT_ID), model_id.clone())),
+    );
+    keys.extend(
+        aggregated_demand
+            .keys()
+            .map(|(product_id, model_id)| (product_id.clone(), model_id.clone())),
+    );
+
+    let mut decisions = Vec::new();
+    for (product_id, model_id) in keys {
+        let current_warm_replicas = current_warm_by_model.get(&model_id).copied().unwrap_or(0);
+        let demand_snapshot = aggregated_demand.get(&(product_id.clone(), model_id.clone()));
+        if demand_snapshot.is_none()
+            && current_warm_replicas <= lifecycle_policy.target_warm_replicas
+        {
+            continue;
+        }
+        decisions.push(lifecycle_policy.rebalance_for_demand(
+            demand_snapshot,
+            current_warm_replicas,
+            observed_at_ms,
+        ));
+    }
+    decisions.sort_by(|left, right| {
+        left.product_id
+            .cmp(&right.product_id)
+            .then_with(|| left.model_id.cmp(&right.model_id))
+            .then_with(|| left.route_alias.cmp(&right.route_alias))
+    });
+    decisions
+}
+
+fn mesh_management_current_warm_routes_by_model(
+    nodes: &[MeshManagementNodeStatus],
+) -> BTreeMap<String, usize> {
+    let mut warm_replicas = BTreeSet::new();
+    for route in nodes.iter().flat_map(|node| node.route_inventory.iter()) {
+        if route.warm_state == RoutedWarmState::Warm {
+            warm_replicas.insert((route.worker_id.clone(), route.model_key.clone()));
+        }
+    }
+    let mut counts = BTreeMap::new();
+    for (_, model_key) in warm_replicas {
+        *counts.entry(model_key).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn mesh_management_aggregate_model_demand(
+    demand: &[RoutingDemandSnapshot],
+) -> BTreeMap<(String, String), ClusterReplicaDemandSnapshot> {
+    let mut aggregated: BTreeMap<(String, String), ClusterReplicaDemandSnapshot> = BTreeMap::new();
+    for snapshot in demand {
+        let key = (
+            snapshot.key.product_id.clone(),
+            snapshot.key.model_id.clone(),
+        );
+        match aggregated.get_mut(&key) {
+            Some(existing) => {
+                existing.request_count = existing
+                    .request_count
+                    .saturating_add(snapshot.request_count);
+                existing.peak_selected_active_requests = existing
+                    .peak_selected_active_requests
+                    .max(snapshot.peak_selected_active_requests);
+                existing.last_observed_at_ms = existing
+                    .last_observed_at_ms
+                    .max(snapshot.last_observed_at_ms);
+                existing.expires_at_ms = existing.expires_at_ms.max(snapshot.expires_at_ms);
+                if existing.route_alias != snapshot.key.route_alias {
+                    existing.route_alias = None;
+                }
+            }
+            None => {
+                aggregated.insert(
+                    key,
+                    ClusterReplicaDemandSnapshot::new(
+                        snapshot.key.product_id.clone(),
+                        snapshot.key.model_id.clone(),
+                        snapshot.key.route_alias.clone(),
+                        snapshot.request_count,
+                        snapshot.peak_selected_active_requests,
+                        snapshot.last_observed_at_ms,
+                        snapshot.expires_at_ms,
+                    ),
+                );
+            }
+        }
+    }
+    aggregated
 }
 
 fn mesh_management_node_role(worker_id: &str) -> ServedMeshRoleState {
@@ -1980,6 +2130,8 @@ impl OpenAiCompatServer {
                 management_events,
                 local_management_node,
                 last_route_execution: Mutex::new(None),
+                route_demand: Mutex::new(RoutingDemandLedger::default()),
+                replica_lifecycle_policy: ClusterReplicaLifecyclePolicy::replicated_lane(),
                 bootstrap_proxy,
             }),
         })
@@ -5952,7 +6104,7 @@ fn resolve_generic_route<'a>(
     target: RoutingTarget,
     request: Option<RoutingRequest>,
 ) -> Result<ResolvedGenericRoute<'a>, OpenAiCompatHttpError> {
-    let request = match request {
+    let mut request = match request {
         Some(mut request) => {
             request.target = target;
             request
@@ -5963,6 +6115,9 @@ fn resolve_generic_route<'a>(
             request
         }
     };
+    if request.product_id.is_none() {
+        request.product_id = Some(String::from(OPENAI_COMPAT_PRODUCT_ID));
+    }
     let selection = state
         .router
         .resolve(&request)
@@ -5976,6 +6131,7 @@ fn resolve_generic_route<'a>(
                 selection.model_key
             ))
         })?;
+    state.record_route_demand(&request, &selection);
     state.publish_route_selection_event(&request, &selection);
     Ok(ResolvedGenericRoute {
         selection,
@@ -7015,22 +7171,22 @@ mod tests {
         HARMONY_CALL_STOP, HARMONY_RETURN_STOP, LOCAL_SERVER_LOAD_STATUS,
         LOCAL_SERVER_MEMORY_PRESSURE_REPORTING, LOCAL_SERVER_UNLOAD_CONTROL,
         LOCAL_SERVER_WARM_CONTROL, LocalServingTruth, NamedToolChoiceFunction,
-        NamedToolChoiceRequest, OPENAI_COMPAT_WORKER_ID, OpenAiCompatConfig,
-        OpenAiCompatRuntimeKind, OpenAiCompatServer, PromptTokenCache, PsionicGrammarRequest,
-        PsionicReasoningMode, PsionicReasoningRequest, PsionicResponseStateRequest,
-        ResolvedReasoningRequest, ResolvedToolCall, ResponseContinuationMode, ResponsesInput,
-        ResponsesRequest, RoutingEndpoint, RoutingRequest, StopSequences,
-        THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract, ToolChoiceMode, ToolChoiceRequest,
-        ToolDefinitionEnvelope, ToolDefinitionRequest, WARMING_FALLBACK_POSTURE,
-        apply_tool_contract_to_prompt_messages, assistant_prompt_message_for_tool_loop,
-        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
-        chat_messages_to_prompt_messages_generic, completion_choice, ensure_harmony_stop_sequences,
-        generation_options_from_chat_request, generation_options_from_chat_request_for_family,
-        generation_options_from_responses_request, generic_embeddings, generic_health,
-        generic_list_models, generic_management_status, gpt_oss_local_serving_truth,
-        handle_generic_chat_completions, handle_generic_embeddings, handle_generic_responses,
-        insert_local_serving_truth_headers, load_generic_decoder_model, model_endpoint_paths,
-        prompt_request_cache_key, render_prompt_for_model,
+        NamedToolChoiceRequest, OPENAI_COMPAT_PRODUCT_ID, OPENAI_COMPAT_WORKER_ID,
+        OpenAiCompatConfig, OpenAiCompatRuntimeKind, OpenAiCompatServer, PromptTokenCache,
+        PsionicGrammarRequest, PsionicReasoningMode, PsionicReasoningRequest,
+        PsionicResponseStateRequest, ResolvedReasoningRequest, ResolvedToolCall,
+        ResponseContinuationMode, ResponsesInput, ResponsesRequest, RoutingEndpoint,
+        RoutingRequest, StopSequences, THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract,
+        ToolChoiceMode, ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
+        WARMING_FALLBACK_POSTURE, apply_tool_contract_to_prompt_messages,
+        assistant_prompt_message_for_tool_loop, chat_messages_to_prompt_messages,
+        chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
+        completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
+        generation_options_from_chat_request_for_family, generation_options_from_responses_request,
+        generic_embeddings, generic_health, generic_list_models, generic_management_status,
+        gpt_oss_local_serving_truth, handle_generic_chat_completions, handle_generic_embeddings,
+        handle_generic_responses, insert_local_serving_truth_headers, load_generic_decoder_model,
+        model_endpoint_paths, prompt_request_cache_key, render_prompt_for_model,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
         resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
@@ -7053,6 +7209,7 @@ mod tests {
         http::{HeaderMap, Request, StatusCode},
         response::{IntoResponse, Response},
     };
+    use psionic_cluster::ClusterReplicaDemandRebalanceReason;
     use psionic_models::{
         ByteProjectionEmbedder, GgufContent, GgufDecoderFamily, GgufMetadataValue,
         GgufPromptTemplateRenderer, GgufTensorType, GptOssHarmonyParseOptions,
@@ -7932,6 +8089,54 @@ mod tests {
             }
             other => panic!("unexpected management event payload: {other:?}"),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_status_includes_demand_and_rebalance_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-demand-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny demand llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        let requested_model = server.state.default_model_name.clone();
+        let request = RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+            .with_product_id(OPENAI_COMPAT_PRODUCT_ID)
+            .with_requested_model(requested_model.clone());
+        let selection = server.state.router.resolve(&request)?;
+        let observed_at_ms = super::unix_timestamp_ms();
+
+        for offset in 0..9u64 {
+            server
+                .state
+                .record_route_demand_at(&request, &selection, observed_at_ms + offset);
+        }
+
+        let management = tokio::runtime::Runtime::new()?.block_on(generic_management_status(
+            State(std::sync::Arc::clone(&server.state)),
+        ));
+        assert_eq!(management.0.demand.len(), 1);
+        assert_eq!(
+            management.0.demand[0].key.product_id,
+            OPENAI_COMPAT_PRODUCT_ID
+        );
+        assert_eq!(management.0.demand[0].key.model_id, selection.model_key);
+        assert_eq!(
+            management.0.demand[0].key.route_alias.as_deref(),
+            Some(requested_model.as_str())
+        );
+        assert_eq!(management.0.demand[0].request_count, 9);
+        assert_eq!(management.0.rebalance_plan.len(), 1);
+        assert_eq!(
+            management.0.rebalance_plan[0].reason,
+            ClusterReplicaDemandRebalanceReason::HotDemandScaleOut
+        );
+        assert_eq!(management.0.rebalance_plan[0].target_warm_replicas, 3);
+        assert_eq!(management.0.rebalance_plan[0].promote_replicas, 2);
         Ok(())
     }
 
