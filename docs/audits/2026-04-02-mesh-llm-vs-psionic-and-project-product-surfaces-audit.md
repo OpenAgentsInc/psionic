@@ -1,28 +1,51 @@
-# Mesh-llm Versus Psionic And Project Product Surfaces Audit
+# Mesh-llm Harvest And Integration Audit For Psionic And Project Product Surfaces
 
 Date: 2026-04-02
 
-Scope: audit of the local synced `competition/repos/mesh-llm` checkout at
-`65ac783`, compared against the current `psionic`, `openagents`, and `probe`
-docs in this workspace. This document answers four questions:
+Scope: audit of the local synced open-source `competition/repos/mesh-llm`
+checkout at `65ac783`, compared against the current `psionic`, `openagents`,
+and `probe` docs in this workspace. This document answers four questions:
 
 1. what `mesh-llm` actually is today
 2. where it overlaps directly with `psionic`
 3. where it overlaps with product surfaces in this workspace
 4. what we should harvest, and what we should explicitly not adopt
 
-## Bottom Line
+## Why This Matters
 
-`mesh-llm` is not a whole-stack competitor to this workspace.
+The useful question here is not whether `mesh-llm` is a "competitor."
 
-It is a strong competitor in one narrower band:
+It is open source. We can read it, port from it, adapt it, and absorb the
+parts that are actually good into our own codebase.
+
+The real question is what it unlocks if we combine its best distributed-
+inference product ideas with the stronger ownership split we already have
+across `psionic`, `openagents`, and `probe`.
+
+Absorbing the right parts would unlock:
 
 - distributed inference bring-up
-- zero-friction node joining
-- operator-friendly mesh status and routing UX
+- much faster multi-machine join and bootstrap UX
+- a cleaner operator view of mesh topology, model availability, and host state
+- thin-client and standby-node roles that feel productized instead of ad hoc
 - agent-adjacent coordination on top of a pooled GPU mesh
+- a path to turn pooled inference into a first-class OpenAgents compute surface
+  inside the broader compute market rather than a detached sidecar product
 
-It is strongest exactly where current `psionic` is still the least productized:
+The end state should not be "run `mesh-llm` next to us forever."
+
+The end state should be:
+
+- absorb the useful mesh and operator patterns into `psionic`
+- combine them with `psionic` runtime truth, evidence, and refusal posture
+- connect that substrate to the larger OpenAgents Compute Market, wallet,
+  settlement, and kernel authority
+- reuse the agent-facing pieces where they fit `probe` instead of inventing a
+  separate agent stack beside it
+
+## Integration Thesis
+
+`mesh-llm` is a high-value open-source harvest repo for one narrower band:
 
 - easy multi-node inference packaging
 - instant join-and-serve behavior
@@ -30,8 +53,8 @@ It is strongest exactly where current `psionic` is still the least productized:
 - consumer-grade install and service mode
 - agent-facing coordination patterns such as blackboard and launcher shortcuts
 
-It is weak exactly where `psionic` and the broader workspace are intentionally
-stronger:
+It is not the right long-term owner for the broader things this workspace is
+already building:
 
 - native runtime ownership
 - backend truth and capability publication
@@ -355,7 +378,7 @@ adjunct.
 - durable session storage
 - TUI and CLI contracts
 
-`mesh-llm` does not compete here.
+`mesh-llm` is not trying to own this runtime layer.
 
 Its launcher story is:
 
@@ -387,7 +410,7 @@ There is effectively no direct overlap with `dataroom`.
 - private portal UX
 - WorkOS flows
 
-This repo is not a competitor in that lane.
+This repo is not relevant in that lane.
 
 ## Capability Matrix
 
@@ -420,6 +443,8 @@ This repo is not a competitor in that lane.
 - clearer local-runtime status and model-availability views
 - friendlier multi-machine join/invite flows where that fits the product
 - a productized "what is my machine contributing right now?" control-panel view
+- a first-class pooled-inference surface inside the broader Compute Market
+  instead of a disconnected mesh-only experience
 
 ## 3. Into Probe
 
@@ -474,24 +499,26 @@ It is not automatically the correct trust model for:
 - kernel-bearing `openagents`
 - evidence-first `psionic`
 
-## Final Verdict
+## Final Thesis
 
-`mesh-llm` is a serious competitor in the distributed-inference product lane.
+`mesh-llm` is one of the clearest open-source harvest targets in the
+distributed-inference product lane.
 
-It currently beats this workspace on one concrete axis:
+It currently shows one thing this workspace still needs to absorb:
 
 - how quickly a user can turn a pile of machines into one visible shared
   inference surface
 
-This workspace still has the stronger long-term architecture where the system
-needs to be deeper than that:
+This workspace already has the stronger long-term ownership split where the
+system needs to be deeper than that:
 
 - `psionic` for execution truth, training, and evidence
 - `openagents` for product and economic authority
 - `probe` for coding-runtime truth
 
-The correct response is not to copy `mesh-llm` whole.
+The right move is not a wholesale embed of `mesh-llm` as a parallel stack.
 
-The correct response is to harvest its best distributed-inference UX and mesh
-operator patterns, then rebuild those ideas on top of the stronger ownership
-split that this workspace already documents.
+The right move is to absorb its best distributed-inference UX, mesh operator
+patterns, and selected implementation ideas into our own boundaries, then
+combine them with `psionic` runtime truth and the larger OpenAgents Compute
+Market rather than treating pooled inference as a separate product universe.
