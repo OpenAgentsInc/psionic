@@ -170,3 +170,20 @@ That bundle carries:
 Durable network state keeps the last imported join bundle separate from the
 last joined mesh preference. That keeps setup intent and transient transport
 state from collapsing into the same record.
+
+## Management Namespace
+
+Mesh management now lives in a dedicated served namespace instead of leaking
+operator state into the OpenAI-compatible endpoints.
+
+The first published paths are:
+
+- `/psionic/management/status`
+  - one typed snapshot for join posture, node roles, warm model state, and
+    route inventory
+- `/psionic/management/events`
+  - one SSE stream that emits an initial topology snapshot and live
+    route-selection events
+
+Those responses must stay backed by typed router and network truth. They are
+not allowed to depend on scraping logs or inferring topology from user traffic.

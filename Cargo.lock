@@ -4612,6 +4612,7 @@ dependencies = [
  "psionic-eval",
  "psionic-ir",
  "psionic-models",
+ "psionic-net",
  "psionic-observe",
  "psionic-provider",
  "psionic-research",

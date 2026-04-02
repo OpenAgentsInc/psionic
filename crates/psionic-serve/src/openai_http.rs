@@ -24,6 +24,7 @@ use axum::{
     },
     routing::{get, post},
 };
+use futures_util::stream::{self, Stream, StreamExt};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_models::{
     GgufBlobArtifact, GgufDecoderFamily, GgufPromptTemplateRenderer, GptOssHarmonyParseOptions,
@@ -32,6 +33,9 @@ use psionic_models::{
     PromptReasoningEffort, PromptRenderOptions, Qwen35MultimodalProjectionConfig, ReasoningParser,
     parse_gpt_oss_harmony_text, parse_reasoning_response_text_for_decoder_family,
     reasoning_parser_for_decoder_family, render_gpt_oss_harmony_prompt,
+};
+use psionic_net::{
+    PersistedImportedJoinBundle, PersistedJoinedMeshPreference, ServedMeshRole, ServedMeshRoleState,
 };
 use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
@@ -50,7 +54,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, oneshot},
+    sync::{broadcast, mpsc, oneshot},
 };
 use tokio_stream::iter;
 
@@ -63,9 +67,8 @@ use crate::{
     GgufDecoderAdapterLoader, GptOssPerformanceMetrics, MetalGgufGptOssTextGenerationService,
     MetalGptOssTextGenerationError, ModelEmbeddingsError, PromptRenderError,
     ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor, TokenSequence,
-    continuous_batch_text_generation_execution_profile,
-    default_embeddings_execution_profile, default_generation_scheduler_policy,
-    default_text_generation_execution_profile,
+    continuous_batch_text_generation_execution_profile, default_embeddings_execution_profile,
+    default_generation_scheduler_policy, default_text_generation_execution_profile,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
@@ -844,6 +847,150 @@ struct OpenAiCompatState {
     conversation_counter: AtomicU64,
     response_state_capability: ResponseStateCapability,
     response_state: Mutex<ResponseStateStore>,
+    management_join_state: Mutex<MeshManagementJoinState>,
+    management_event_counter: AtomicU64,
+    management_events: broadcast::Sender<MeshManagementEventEnvelope>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshManagementJoinPosture {
+    Standalone,
+    PendingImport,
+    Joined,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct MeshManagementJoinState {
+    last_joined_mesh_preference: Option<PersistedJoinedMeshPreference>,
+    last_imported_join_bundle: Option<PersistedImportedJoinBundle>,
+}
+
+impl MeshManagementJoinState {
+    fn posture(&self) -> MeshManagementJoinPosture {
+        if self.last_joined_mesh_preference.is_some() {
+            MeshManagementJoinPosture::Joined
+        } else if self.last_imported_join_bundle.is_some() {
+            MeshManagementJoinPosture::PendingImport
+        } else {
+            MeshManagementJoinPosture::Standalone
+        }
+    }
+
+    fn into_response(self) -> MeshManagementJoinStateResponse {
+        MeshManagementJoinStateResponse {
+            posture: self.posture(),
+            last_joined_mesh_preference: self.last_joined_mesh_preference,
+            last_imported_join_bundle: self.last_imported_join_bundle,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct MeshManagementJoinStateResponse {
+    posture: MeshManagementJoinPosture,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_joined_mesh_preference: Option<PersistedJoinedMeshPreference>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_imported_join_bundle: Option<PersistedImportedJoinBundle>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct MeshManagementModelStatus {
+    model_key: String,
+    canonical_name: String,
+    family: String,
+    supported_endpoints: Vec<&'static str>,
+    warm_state: RoutedWarmState,
+    active_requests: usize,
+    structured_outputs: bool,
+    tool_calling: bool,
+    response_state: bool,
+    execution_profile: ExecutionCapabilityProfile,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scheduler_policy: Option<GenerationSchedulerPolicy>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct MeshManagementRouteStatus {
+    worker_id: String,
+    model_key: String,
+    canonical_name: String,
+    family: String,
+    endpoint: &'static str,
+    warm_state: RoutedWarmState,
+    active_requests: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct MeshManagementNodeStatus {
+    worker_id: String,
+    served_mesh_role: ServedMeshRoleState,
+    backend_label: String,
+    execution_mode_label: String,
+    execution_engine_label: String,
+    models: Vec<MeshManagementModelStatus>,
+    route_inventory: Vec<MeshManagementRouteStatus>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct MeshManagementStatusDigestInput {
+    join_state: MeshManagementJoinStateResponse,
+    nodes: Vec<MeshManagementNodeStatus>,
+    routes: Vec<MeshManagementRouteStatus>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct MeshManagementStatusResponse {
+    status: &'static str,
+    namespace: &'static str,
+    topology_digest: String,
+    default_model: String,
+    node_count: usize,
+    model_count: usize,
+    event_stream_path: &'static str,
+    join_state: MeshManagementJoinStateResponse,
+    nodes: Vec<MeshManagementNodeStatus>,
+    routes: Vec<MeshManagementRouteStatus>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct MeshManagementRoutingRequestSummary {
+    endpoint: &'static str,
+    target: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    preferred_family: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    preferred_worker_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum MeshManagementEventPayload {
+    TopologySnapshot {
+        status: MeshManagementStatusResponse,
+    },
+    RouteSelection {
+        request: MeshManagementRoutingRequestSummary,
+        selection: RouteSelection,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct MeshManagementEventEnvelope {
+    event_id: u64,
+    emitted_at_ms: u64,
+    topology_digest: String,
+    payload: MeshManagementEventPayload,
+}
+
+impl MeshManagementEventEnvelope {
+    fn event_name(&self) -> &'static str {
+        match &self.payload {
+            MeshManagementEventPayload::TopologySnapshot { .. } => "topology_snapshot",
+            MeshManagementEventPayload::RouteSelection { .. } => "route_selection",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -992,14 +1139,12 @@ impl OpenAiCompatLoadedModel {
 
     fn tool_calling_capability(&self) -> ToolCallingCapability {
         match self.decoder() {
-            Some(_) if !self.supports_tool_calling() => {
-                ToolCallingCapability {
-                    support_level: ToolCallingSupportLevel::Unsupported,
-                    supported_modes: vec!["none"],
-                    parser: "not_available",
-                    argument_validation: "not_available",
-                }
-            }
+            Some(_) if !self.supports_tool_calling() => ToolCallingCapability {
+                support_level: ToolCallingSupportLevel::Unsupported,
+                supported_modes: vec!["none"],
+                parser: "not_available",
+                argument_validation: "not_available",
+            },
             Some(_) => ToolCallingCapability {
                 support_level: ToolCallingSupportLevel::Fallback,
                 supported_modes: vec!["none", "auto", "required", "named"],
@@ -1057,6 +1202,182 @@ impl OpenAiCompatLoadedModel {
         self.decoder()
             .and_then(|model| model.qwen35_multimodal_projection.clone())
     }
+}
+
+impl OpenAiCompatState {
+    fn management_status(&self) -> MeshManagementStatusResponse {
+        let join_state = self
+            .management_join_state
+            .lock()
+            .expect("management join state should not be poisoned")
+            .clone()
+            .into_response();
+        let inventories = self.router.inventory();
+        let mut nodes = inventories
+            .iter()
+            .map(mesh_management_node_status)
+            .collect::<Vec<_>>();
+        nodes.sort_by(|left, right| left.worker_id.cmp(&right.worker_id));
+        let mut routes = nodes
+            .iter()
+            .flat_map(|node| node.route_inventory.clone())
+            .collect::<Vec<_>>();
+        routes.sort_by(|left, right| {
+            left.worker_id
+                .cmp(&right.worker_id)
+                .then_with(|| left.model_key.cmp(&right.model_key))
+                .then_with(|| left.endpoint.cmp(right.endpoint))
+        });
+        let topology_digest = mesh_management_topology_digest(&MeshManagementStatusDigestInput {
+            join_state: join_state.clone(),
+            nodes: nodes.clone(),
+            routes: routes.clone(),
+        });
+        MeshManagementStatusResponse {
+            status: "ok",
+            namespace: "psionic_management",
+            topology_digest,
+            default_model: self.default_model_name.clone(),
+            node_count: nodes.len(),
+            model_count: self.models_by_key.len(),
+            event_stream_path: "/psionic/management/events",
+            join_state,
+            nodes,
+            routes,
+        }
+    }
+
+    fn publish_route_selection_event(&self, request: &RoutingRequest, selection: &RouteSelection) {
+        let status = self.management_status();
+        let event = MeshManagementEventEnvelope {
+            event_id: self
+                .management_event_counter
+                .fetch_add(1, Ordering::Relaxed),
+            emitted_at_ms: unix_timestamp_ms(),
+            topology_digest: status.topology_digest.clone(),
+            payload: MeshManagementEventPayload::RouteSelection {
+                request: MeshManagementRoutingRequestSummary {
+                    endpoint: request.endpoint.path(),
+                    target: routing_target_label(&request.target),
+                    preferred_family: request.preferred_family.clone(),
+                    preferred_worker_ids: request.preferred_worker_ids.clone(),
+                },
+                selection: selection.clone(),
+            },
+        };
+        let _ = self.management_events.send(event);
+    }
+
+    fn management_snapshot_event(&self) -> MeshManagementEventEnvelope {
+        let status = self.management_status();
+        MeshManagementEventEnvelope {
+            event_id: self
+                .management_event_counter
+                .fetch_add(1, Ordering::Relaxed),
+            emitted_at_ms: unix_timestamp_ms(),
+            topology_digest: status.topology_digest.clone(),
+            payload: MeshManagementEventPayload::TopologySnapshot { status },
+        }
+    }
+}
+
+fn routing_target_label(target: &RoutingTarget) -> String {
+    match target {
+        RoutingTarget::Default => String::from("default"),
+        RoutingTarget::RequestedModel(requested) => format!("requested:{requested}"),
+        RoutingTarget::ModelKey(model_key) => format!("model_key:{model_key}"),
+    }
+}
+
+fn mesh_management_node_role(worker_id: &str) -> ServedMeshRoleState {
+    if worker_id == OPENAI_COMPAT_WORKER_ID {
+        ServedMeshRoleState::new(ServedMeshRole::Host)
+    } else {
+        ServedMeshRoleState::new(ServedMeshRole::Worker)
+    }
+}
+
+fn mesh_management_model_status(model: &RoutedModelInventory) -> MeshManagementModelStatus {
+    MeshManagementModelStatus {
+        model_key: model.model_key.clone(),
+        canonical_name: model.canonical_name.clone(),
+        family: model.family.clone(),
+        supported_endpoints: model
+            .supported_endpoints
+            .iter()
+            .map(|endpoint| endpoint.path())
+            .collect(),
+        warm_state: model.runtime_state.warm_state,
+        active_requests: model.runtime_state.active_requests,
+        structured_outputs: model.structured_outputs,
+        tool_calling: model.tool_calling,
+        response_state: model.response_state,
+        execution_profile: model.execution_profile.clone(),
+        scheduler_policy: model.scheduler_policy.clone(),
+    }
+}
+
+fn mesh_management_route_status(
+    worker_id: &str,
+    model: &RoutedModelInventory,
+) -> Vec<MeshManagementRouteStatus> {
+    model
+        .supported_endpoints
+        .iter()
+        .map(|endpoint| MeshManagementRouteStatus {
+            worker_id: worker_id.to_string(),
+            model_key: model.model_key.clone(),
+            canonical_name: model.canonical_name.clone(),
+            family: model.family.clone(),
+            endpoint: endpoint.path(),
+            warm_state: model.runtime_state.warm_state,
+            active_requests: model.runtime_state.active_requests,
+        })
+        .collect()
+}
+
+fn mesh_management_node_status(worker: &RoutedWorkerInventory) -> MeshManagementNodeStatus {
+    let mut models = worker
+        .models
+        .iter()
+        .map(mesh_management_model_status)
+        .collect::<Vec<_>>();
+    models.sort_by(|left, right| left.model_key.cmp(&right.model_key));
+    let mut route_inventory = worker
+        .models
+        .iter()
+        .flat_map(|model| mesh_management_route_status(worker.worker_id.as_str(), model))
+        .collect::<Vec<_>>();
+    route_inventory.sort_by(|left, right| {
+        left.model_key
+            .cmp(&right.model_key)
+            .then_with(|| left.endpoint.cmp(right.endpoint))
+    });
+    MeshManagementNodeStatus {
+        worker_id: worker.worker_id.clone(),
+        served_mesh_role: mesh_management_node_role(worker.worker_id.as_str()),
+        backend_label: worker.backend_label.clone(),
+        execution_mode_label: worker.execution_mode_label.clone(),
+        execution_engine_label: worker.execution_engine_label.clone(),
+        models,
+        route_inventory,
+    }
+}
+
+fn mesh_management_topology_digest(input: &MeshManagementStatusDigestInput) -> String {
+    let mut hasher = Sha256::new();
+    let encoded =
+        serde_json::to_vec(input).expect("mesh management topology digest input should serialize");
+    hasher.update(encoded);
+    hex::encode(hasher.finalize())
+}
+
+fn mesh_management_event_to_sse(event: &MeshManagementEventEnvelope) -> Event {
+    Event::default()
+        .event(event.event_name())
+        .id(event.event_id.to_string())
+        .json_data(event)
+        .expect("mesh management event should serialize")
 }
 
 fn qwen35_structured_output_unavailable_detail(execution_engine_label: &str) -> &'static str {
@@ -1170,6 +1491,7 @@ impl OpenAiCompatServer {
             .expect("default model should exist")
             .serving_truth();
         let response_state_capability = response_state.capability();
+        let (management_events, _) = broadcast::channel(64);
         let router = FleetRouter::new(
             default_model_key.clone(),
             vec![
@@ -1201,6 +1523,9 @@ impl OpenAiCompatServer {
                 conversation_counter: AtomicU64::new(1),
                 response_state_capability,
                 response_state: Mutex::new(response_state),
+                management_join_state: Mutex::new(MeshManagementJoinState::default()),
+                management_event_counter: AtomicU64::new(1),
+                management_events,
             }),
         })
     }
@@ -1223,6 +1548,8 @@ impl OpenAiCompatServer {
     pub fn router(&self) -> Router {
         Router::new()
             .route("/health", get(generic_health))
+            .route("/psionic/management/status", get(generic_management_status))
+            .route("/psionic/management/events", get(generic_management_events))
             .route("/v1/models", get(generic_list_models))
             .route("/v1/chat/completions", post(generic_chat_completions))
             .route("/v1/responses", post(generic_responses))
@@ -1265,9 +1592,7 @@ impl OpenAiCompatWorker {
                             }
                         }
                         OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4 => {
-                            match CudaGemma4TextGenerationService::from_gguf_path(
-                                &load_plan.path,
-                            ) {
+                            match CudaGemma4TextGenerationService::from_gguf_path(&load_plan.path) {
                                 Ok(service) => {
                                     let model_key =
                                         service.model_descriptor().model.model_id.clone();
@@ -2053,6 +2378,33 @@ async fn generic_health(
         multimodal_supported_media: default_model.multimodal_supported_media(),
         multimodal_projection_config: default_model.multimodal_projection_config(),
     })
+}
+
+async fn generic_management_status(
+    State(state): State<Arc<OpenAiCompatState>>,
+) -> Json<MeshManagementStatusResponse> {
+    Json(state.management_status())
+}
+
+async fn generic_management_events(
+    State(state): State<Arc<OpenAiCompatState>>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let snapshot = mesh_management_event_to_sse(&state.management_snapshot_event());
+    let receiver = state.management_events.subscribe();
+    let initial = iter(vec![Ok::<_, Infallible>(snapshot)]);
+    let updates = stream::unfold(receiver, |mut receiver| async move {
+        loop {
+            match receiver.recv().await {
+                Ok(event) => {
+                    let sse = mesh_management_event_to_sse(&event);
+                    return Some((Ok::<_, Infallible>(sse), receiver));
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => return None,
+            }
+        }
+    });
+    Sse::new(initial.chain(updates))
 }
 
 async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Json<ModelsResponse> {
@@ -5046,6 +5398,7 @@ fn resolve_generic_route<'a>(
                 selection.model_key
             ))
         })?;
+    state.publish_route_selection_event(&request, &selection);
     Ok(ResolvedGenericRoute {
         selection,
         loaded_model,
@@ -5495,6 +5848,13 @@ fn unix_timestamp_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn unix_timestamp_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0)
 }
 
@@ -6065,18 +6425,18 @@ mod tests {
         HARMONY_CALL_STOP, HARMONY_RETURN_STOP, LOCAL_SERVER_LOAD_STATUS,
         LOCAL_SERVER_MEMORY_PRESSURE_REPORTING, LOCAL_SERVER_UNLOAD_CONTROL,
         LOCAL_SERVER_WARM_CONTROL, LocalServingTruth, NamedToolChoiceFunction,
-        NamedToolChoiceRequest, OpenAiCompatConfig, OpenAiCompatServer, PromptTokenCache,
-        OpenAiCompatRuntimeKind, PsionicGrammarRequest, PsionicReasoningMode,
-        PsionicReasoningRequest, PsionicResponseStateRequest, ResolvedReasoningRequest,
-        ResolvedToolCall, ResponseContinuationMode, ResponsesInput, ResponsesRequest,
-        RoutingEndpoint, RoutingRequest, StopSequences, ToolCallingContract, ToolChoiceMode,
-        ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
+        NamedToolChoiceRequest, OPENAI_COMPAT_WORKER_ID, OpenAiCompatConfig,
+        OpenAiCompatRuntimeKind, OpenAiCompatServer, PromptTokenCache, PsionicGrammarRequest,
+        PsionicReasoningMode, PsionicReasoningRequest, PsionicResponseStateRequest,
+        ResolvedReasoningRequest, ResolvedToolCall, ResponseContinuationMode, ResponsesInput,
+        ResponsesRequest, RoutingEndpoint, RoutingRequest, StopSequences, ToolCallingContract,
+        ToolChoiceMode, ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
         apply_tool_contract_to_prompt_messages, assistant_prompt_message_for_tool_loop,
         chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
-        chat_messages_to_prompt_messages_generic, completion_choice,
-        ensure_harmony_stop_sequences, generation_options_from_chat_request,
-        generation_options_from_chat_request_for_family, generation_options_from_responses_request,
-        generic_embeddings, generic_health, generic_list_models, gpt_oss_local_serving_truth,
+        chat_messages_to_prompt_messages_generic, completion_choice, ensure_harmony_stop_sequences,
+        generation_options_from_chat_request, generation_options_from_chat_request_for_family,
+        generation_options_from_responses_request, generic_embeddings, generic_health,
+        generic_list_models, generic_management_status, gpt_oss_local_serving_truth,
         handle_generic_chat_completions, handle_generic_responses,
         insert_local_serving_truth_headers, load_generic_decoder_model, model_endpoint_paths,
         prompt_request_cache_key, render_prompt_for_model,
@@ -6088,8 +6448,8 @@ mod tests {
         tool_loop_tool_call_from_resolved, tool_prompt_message, tool_result_prompt_message,
     };
     use crate::conformance::{
-        ConformanceSuite, GenerateConformanceCase, GenerateObservation,
-        RecordedConformanceSubject, SubjectObservation, run_conformance_suite,
+        ConformanceSuite, GenerateConformanceCase, GenerateObservation, RecordedConformanceSubject,
+        SubjectObservation, run_conformance_suite,
     };
     use crate::{
         DecodeStrategy, GenerationMetrics, GenerationOptions, GenerationOutput, GenerationRequest,
@@ -6097,9 +6457,9 @@ mod tests {
     };
     use axum::{
         Json,
-        body::to_bytes,
+        body::{Body, to_bytes},
         extract::State,
-        http::{HeaderMap, StatusCode},
+        http::{HeaderMap, Request, StatusCode},
         response::{IntoResponse, Response},
     };
     use psionic_models::{
@@ -6107,8 +6467,8 @@ mod tests {
         GgufPromptTemplateRenderer, GgufTensorType, GptOssHarmonyParseOptions,
         GptOssHarmonyRenderContext, PromptChannelConfig, PromptMessage, PromptMessageRole,
         PromptReasoningEffort, PromptRenderOptions, Qwen35MultimodalProjectionConfig,
-        ReasoningParser, TokenId, TokenSequence, golden_prompt_fixture,
-        parse_gpt_oss_harmony_text, render_gpt_oss_harmony_prompt,
+        ReasoningParser, TokenId, TokenSequence, golden_prompt_fixture, parse_gpt_oss_harmony_text,
+        render_gpt_oss_harmony_prompt,
     };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
@@ -6126,6 +6486,7 @@ mod tests {
         path::Path,
         sync::{Mutex, OnceLock},
     };
+    use tower::util::ServiceExt;
 
     #[test]
     fn chat_messages_map_to_prompt_messages() {
@@ -6852,6 +7213,137 @@ mod tests {
     }
 
     #[test]
+    fn generic_management_status_reports_join_state_and_routes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-llama.gguf");
+        let qwen_path = temp.path().join("tiny-qwen.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny server llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        write_test_gguf(
+            &qwen_path,
+            dense_qwen_metadata("tiny server qwen").as_slice(),
+            dense_decoder_tensors(true, 2, 3).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&llama_path);
+        config.add_model_path(&qwen_path);
+        let server = OpenAiCompatServer::from_config(&config)?;
+
+        let response = tokio::runtime::Runtime::new()?.block_on(async {
+            server
+                .router()
+                .oneshot(
+                    Request::builder()
+                        .uri("/psionic/management/status")
+                        .body(Body::empty())
+                        .expect("management status request"),
+                )
+                .await
+        })?;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = tokio::runtime::Runtime::new()?
+            .block_on(async { to_bytes(response.into_body(), usize::MAX).await })?;
+        let payload: serde_json::Value = serde_json::from_slice(&body)?;
+
+        assert_eq!(
+            payload["namespace"],
+            serde_json::json!("psionic_management")
+        );
+        assert_eq!(
+            payload["join_state"]["posture"],
+            serde_json::json!("standalone")
+        );
+        assert_eq!(payload["node_count"], serde_json::json!(1));
+        assert_eq!(payload["model_count"], serde_json::json!(2));
+        assert_eq!(
+            payload["nodes"][0]["worker_id"],
+            serde_json::json!(OPENAI_COMPAT_WORKER_ID)
+        );
+        assert_eq!(
+            payload["nodes"][0]["served_mesh_role"]["role"],
+            serde_json::json!("host")
+        );
+        assert!(
+            payload["nodes"][0]["models"]
+                .as_array()
+                .is_some_and(|models| models.iter().all(|model| model["warm_state"] == "warm"))
+        );
+        assert!(payload["routes"].as_array().is_some_and(|routes| {
+            routes
+                .iter()
+                .any(|route| route["endpoint"] == RoutingEndpoint::ChatCompletions.path())
+        }));
+
+        let direct = tokio::runtime::Runtime::new()?.block_on(generic_management_status(State(
+            std::sync::Arc::clone(&server.state),
+        )));
+        assert_eq!(direct.0.node_count, 1);
+        assert_eq!(
+            direct.0.join_state.posture,
+            super::MeshManagementJoinPosture::Standalone
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_events_publish_route_selection_updates()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny management llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+
+        let event_response = tokio::runtime::Runtime::new()?.block_on(async {
+            server
+                .router()
+                .oneshot(
+                    Request::builder()
+                        .uri("/psionic/management/events")
+                        .body(Body::empty())
+                        .expect("management events request"),
+                )
+                .await
+        })?;
+        assert_eq!(event_response.status(), StatusCode::OK);
+        assert_eq!(
+            event_response
+                .headers()
+                .get("content-type")
+                .and_then(|value| value.to_str().ok()),
+            Some("text/event-stream")
+        );
+
+        let mut receiver = server.state.management_events.subscribe();
+        let route = super::resolve_generic_route(
+            server.state.as_ref(),
+            psionic_router::RoutingTarget::Default,
+            None,
+        )?;
+        let event = receiver
+            .try_recv()
+            .expect("route selection event should publish");
+
+        match event.payload {
+            super::MeshManagementEventPayload::RouteSelection { request, selection } => {
+                assert_eq!(request.endpoint, RoutingEndpoint::ChatCompletions.path());
+                assert_eq!(request.target, "default");
+                assert_eq!(selection.worker_id, OPENAI_COMPAT_WORKER_ID);
+                assert_eq!(selection.model_key, route.selection.model_key);
+            }
+            other => panic!("unexpected management event payload: {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_qwen_pilot_is_end_to_end_machine_checkable()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
@@ -6968,7 +7460,10 @@ mod tests {
         assert_eq!(loaded_model.backend_label(), "cuda");
         assert_eq!(loaded_model.execution_mode_label(), "native");
         assert_eq!(loaded_model.execution_engine_label(), "psionic");
-        assert_eq!(model_endpoint_paths(&loaded_model), vec!["/v1/chat/completions"]);
+        assert_eq!(
+            model_endpoint_paths(&loaded_model),
+            vec!["/v1/chat/completions"]
+        );
         assert!(!loaded_model.supports_tool_calling());
         assert!(!loaded_model.supports_response_state());
         assert_eq!(
@@ -7039,7 +7534,10 @@ mod tests {
         assert_eq!(health.0.backend, "cuda");
         assert_eq!(health.0.execution_mode, "native");
         assert_eq!(health.0.execution_engine, "psionic");
-        assert_eq!(health.0.default_model_supported_endpoints, vec!["/v1/chat/completions"]);
+        assert_eq!(
+            health.0.default_model_supported_endpoints,
+            vec!["/v1/chat/completions"]
+        );
         assert_eq!(health.0.supported_endpoints, vec!["/v1/chat/completions"]);
         assert_eq!(
             health.0.execution_profile.batch_posture,
@@ -7083,7 +7581,10 @@ mod tests {
             .find(|candidate| candidate.id == model_id)
             .expect("gemma4 cuda model should be listed");
         assert_eq!(model.psionic_model_family, "gemma4");
-        assert_eq!(model.psionic_supported_endpoints, vec!["/v1/chat/completions"]);
+        assert_eq!(
+            model.psionic_supported_endpoints,
+            vec!["/v1/chat/completions"]
+        );
         assert_eq!(model.psionic_served_backend, Some("cuda"));
         assert_eq!(model.psionic_execution_mode, Some("native"));
         assert_eq!(model.psionic_execution_engine, Some("psionic"));
@@ -7242,9 +7743,7 @@ mod tests {
                         "user",
                         vec![
                             ChatCompletionContentPart::text("hello "),
-                            ChatCompletionContentPart::image_url(
-                                "https://example.invalid/cat.png",
-                            ),
+                            ChatCompletionContentPart::image_url("https://example.invalid/cat.png"),
                         ],
                     )],
                     temperature: Some(0.0),
@@ -7262,7 +7761,8 @@ mod tests {
                 },
             ))
             .expect_err("gemma4 multimodal input should fail closed");
-        let multimodal_payload = runtime.block_on(response_json(multimodal_error.into_response()))?;
+        let multimodal_payload =
+            runtime.block_on(response_json(multimodal_error.into_response()))?;
         assert_eq!(
             multimodal_payload["error"]["message"],
             serde_json::json!(
@@ -7412,12 +7912,18 @@ mod tests {
         let third_payload = runtime.block_on(response_json(third))?;
 
         let expected_rendered_prompt = case.expected_rendered_prompt.clone();
-        let first_observation =
-            generate_observation_from_chat_payload(&first_payload, expected_rendered_prompt.as_deref());
-        let second_observation =
-            generate_observation_from_chat_payload(&second_payload, expected_rendered_prompt.as_deref());
-        let third_observation =
-            generate_observation_from_chat_payload(&third_payload, expected_rendered_prompt.as_deref());
+        let first_observation = generate_observation_from_chat_payload(
+            &first_payload,
+            expected_rendered_prompt.as_deref(),
+        );
+        let second_observation = generate_observation_from_chat_payload(
+            &second_payload,
+            expected_rendered_prompt.as_deref(),
+        );
+        let third_observation = generate_observation_from_chat_payload(
+            &third_payload,
+            expected_rendered_prompt.as_deref(),
+        );
 
         let suite = ConformanceSuite {
             id: String::from("gemma4-e4b-cuda-repeat"),
@@ -7427,11 +7933,10 @@ mod tests {
             generate_cases: vec![case],
             embed_cases: Vec::new(),
         };
-        let baseline = RecordedConformanceSubject::new("gemma4-e4b-cuda-run-1")
-            .with_generate_case(
-                "gemma4-e4b-repeat",
-                SubjectObservation::Supported(first_observation),
-            );
+        let baseline = RecordedConformanceSubject::new("gemma4-e4b-cuda-run-1").with_generate_case(
+            "gemma4-e4b-repeat",
+            SubjectObservation::Supported(first_observation),
+        );
         let candidate = RecordedConformanceSubject::new("gemma4-e4b-cuda-run-2")
             .with_generate_case(
                 "gemma4-e4b-repeat",
@@ -7447,8 +7952,14 @@ mod tests {
         assert_eq!(report.summary.unsupported, 0);
         assert_eq!(report.summary.intentional_differences, 0);
         assert!(report.cutover_ready());
-        assert_eq!(second_observation.output_text, third_observation.output_text);
-        assert_eq!(second_observation.done_reason, third_observation.done_reason);
+        assert_eq!(
+            second_observation.output_text,
+            third_observation.output_text
+        );
+        assert_eq!(
+            second_observation.done_reason,
+            third_observation.done_reason
+        );
         assert_eq!(second_observation.eval_count, third_observation.eval_count);
         Ok(())
     }
@@ -12173,13 +12684,7 @@ mod tests {
             GgufMetadataValue::String(gemma4_chat_template().to_string()),
         ));
         metadata.extend(sentencepiece_tokenizer_metadata_entries_with_tokens(vec![
-            "<unk>",
-            "<bos>",
-            "<eos>",
-            "<|turn>",
-            "<turn|>",
-            "hello",
-            "world",
+            "<unk>", "<bos>", "<eos>", "<|turn>", "<turn|>", "hello", "world",
         ]));
         metadata
     }
