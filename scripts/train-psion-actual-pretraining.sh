@@ -10,6 +10,7 @@ Usage:
   ./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
   ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
   ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
+  ./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path> [options]
   ./TRAIN --lane actual_pretraining status --run-root <path>
   ./TRAIN --lane actual_pretraining dashboard --run-root <path>
 
@@ -55,6 +56,11 @@ Options for `backup`:
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --inject-failed-upload   Retain a failed-upload drill receipt instead of a successful durable-backup receipt.
 
+Options for `decide-continue-restart`:
+  --run-root <path>        Existing actual-lane run root containing retained checkpoint, backup, eval, and preflight evidence.
+  --git-ref <ref>          Git ref to resolve for the continue-restart decision provenance. Default: current symbolic ref or HEAD
+  --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
+
 Options for `status` and `dashboard`:
   --run-root <path>        Existing actual-lane run root containing retained status and dashboard surfaces.
 EOF
@@ -69,7 +75,7 @@ command="$1"
 shift
 
 case "${command}" in
-  start|record-checkpoint|backup|resume)
+  start|record-checkpoint|backup|resume|decide-continue-restart)
     exec cargo run -q -p psionic-train --example psion_actual_pretraining_operator -- "${command}" "$@"
     ;;
   status)

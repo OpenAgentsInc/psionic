@@ -47,6 +47,10 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub latest_checkpoint_eval_decision_path: String,
     /// Relative latest checkpoint eval failure path.
     pub latest_checkpoint_eval_failure_path: String,
+    /// Relative latest checkpoint comparison path.
+    pub latest_checkpoint_comparison_path: String,
+    /// Relative latest continue-restart decision path.
+    pub latest_continue_restart_decision_path: String,
     /// Relative retained dashboard path.
     pub current_dashboard_path: String,
     /// Relative hardware-qualification receipt path.
@@ -316,6 +320,16 @@ impl PsionActualPretrainingRetainedPathSet {
             self.latest_checkpoint_eval_failure_path.as_str(),
             "retained_paths.latest_checkpoint_eval_failure_path",
             "evals/latest_checkpoint_eval_failure.json",
+        )?;
+        ensure_exact(
+            self.latest_checkpoint_comparison_path.as_str(),
+            "retained_paths.latest_checkpoint_comparison_path",
+            "decisions/latest_checkpoint_comparison.json",
+        )?;
+        ensure_exact(
+            self.latest_continue_restart_decision_path.as_str(),
+            "retained_paths.latest_continue_restart_decision_path",
+            "decisions/latest_continue_restart_decision.json",
         )?;
         ensure_exact(
             self.current_dashboard_path.as_str(),

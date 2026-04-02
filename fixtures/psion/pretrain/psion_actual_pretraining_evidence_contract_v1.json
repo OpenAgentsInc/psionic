@@ -119,6 +119,18 @@
       "detail": "Most recent automatic checkpoint eval failure retained for retry and alert review."
     },
     {
+      "relative_path": "decisions/latest_checkpoint_comparison.json",
+      "artifact_kind": "latest_checkpoint_comparison",
+      "retention_class": "durable",
+      "detail": "Most recent retained checkpoint comparison against eval, backup, hardware, and run-shape evidence."
+    },
+    {
+      "relative_path": "decisions/latest_continue_restart_decision.json",
+      "artifact_kind": "latest_continue_restart_decision",
+      "retention_class": "durable",
+      "detail": "Most recent retained continue-restart decision for the latest accepted checkpoint."
+    },
+    {
       "relative_path": "dashboard/current_dashboard.json",
       "artifact_kind": "current_dashboard",
       "retention_class": "durable",

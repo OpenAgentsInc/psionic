@@ -15,6 +15,7 @@ The commands are:
 ./TRAIN --lane actual_pretraining start [options]
 ./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
 ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
+./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path> [options]
 ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
 ./TRAIN --lane actual_pretraining status --run-root <path>
 ./TRAIN --lane actual_pretraining dashboard --run-root <path>
@@ -49,6 +50,8 @@ The actual-lane command now does these things for real:
 - writes one retained dashboard packet plus one retained aggregate active-alert
   feed
 - can inject a failed-upload refusal drill without manual artifact editing
+- writes one retained checkpoint-comparison receipt plus one retained
+  continue-restart decision over the latest accepted checkpoint
 - repeats provenance into the provisional closeout bundle
 - exposes the canonical status command
 - exposes the canonical dashboard command
@@ -192,6 +195,45 @@ That drill writes:
 
 It retains declared secret/config source names only. Raw SSH, bucket, or
 service-account payloads are not copied into retained artifacts or logs.
+
+## Decide Continue Or Restart
+
+Canonical long-run decision:
+
+```bash
+./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path>
+```
+
+This command consumes the latest accepted checkpoint pointer, backup receipt,
+checkpoint-eval decision or failure, retained hardware qualification, retained
+run-shape qualification, and the committed systems bundle. It writes:
+
+- `decisions/checkpoint_comparison_step-<optimizer_step>.json`
+- `decisions/latest_checkpoint_comparison.json`
+- `decisions/continue_restart_decision_step-<optimizer_step>.json`
+- `decisions/latest_continue_restart_decision.json`
+- refreshed status, retained-summary, closeout, launcher-log, and dashboard
+  surfaces
+
+The bounded decision states are:
+
+- `continue`
+- `hold_and_investigate`
+- `restart_from_last_accepted_checkpoint`
+
+The continue threshold is intentionally stricter than raw admission:
+
+- eval decision must stay `continue`
+- durable backup must stay `backed_up`
+- hardware and run-shape admission must stay `admitted`
+- throughput must stay at or above `90%` of the trusted-cluster anchor
+- step latency must stay at or below `115%` of the trusted-cluster anchor
+- checkpoint write throughput must stay at or above `90%` of the trusted-cluster
+  anchor
+- dataloader stalls must stay at or below `1`
+
+If those conditions fail, the actual lane retains `hold_and_investigate`
+instead of guessing.
 
 ## Resume Command
 

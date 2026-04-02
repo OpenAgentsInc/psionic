@@ -8,8 +8,8 @@ This document freezes one current-status artifact, one retained-summary
 artifact, and one status command for the actual pretraining lane.
 
 The actual-lane launcher now writes those retained files through
-`./TRAIN --lane actual_pretraining start|resume|record-checkpoint`, and the
-same status command reads them back from a run root.
+`./TRAIN --lane actual_pretraining start|resume|record-checkpoint|decide-continue-restart`,
+and the same status command reads them back from a run root.
 
 ## Canonical Artifacts
 
@@ -92,6 +92,9 @@ family when the operator path advances beyond first launch:
 - `checkpoint_eval_retry_required`
 - `checkpoint_backed_up`
 - `checkpoint_backup_refused`
+- `continue_decision_recorded`
+- `hold_decision_recorded`
+- `restart_decision_recorded`
 - `resume_refused_auto_resume`
 
 ## Why This Matters
@@ -100,8 +103,10 @@ The bounded reference-pilot launcher already had operator-manifest and summary
 surfaces. The actual lane needed the same kind of named retained status surface
 so the actual launcher could materialize one honest operator bundle without
 inventing ad hoc filenames. The same status command now also prints the latest
-checkpoint-eval decision and score when present, plus the latest retry-required
-failure and redacted alert when automatic eval could not run.
+checkpoint-eval decision and score when present, the latest retry-required
+failure and redacted alert when automatic eval could not run, and the latest
+continue-restart decision plus operator action when that retained surface has
+been written.
 
 The remaining hardening work now extends these retained surfaces instead of
 defining them. The companion retained dashboard and active-alert feed now live

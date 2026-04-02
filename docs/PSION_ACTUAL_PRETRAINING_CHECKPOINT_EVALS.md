@@ -125,12 +125,12 @@ It does not yet prove:
 
 - external alert delivery beyond the retained alert artifacts
 - a cluster-connected streaming dashboard
-- the final continue-vs-restart policy packet
 - completed distributed broader-pretraining execution
 
 ## Related Docs
 
 - `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`
+- `docs/PSION_ACTUAL_PRETRAINING_CONTINUE_RESTART_DECISIONS.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_CHECKPOINT_RECOVERY.md`

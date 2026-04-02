@@ -5,13 +5,13 @@ use std::{
 };
 
 use psionic_train::{
-    PsionActualPretrainingArtifactRef, PsionActualPretrainingArtifactSlot,
-    PsionActualPretrainingEvidenceContract, PsionActualPretrainingProvenanceField,
-    PsionActualPretrainingRedactionRule, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_EVIDENCE_FAMILY, PSION_ACTUAL_PRETRAINING_LANE_ID,
     PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RUN_ROOT_FAMILY,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingArtifactSlot, PsionActualPretrainingEvidenceContract,
+    PsionActualPretrainingProvenanceField, PsionActualPretrainingRedactionRule,
 };
 use sha2::{Digest, Sha256};
 
@@ -140,6 +140,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "latest_checkpoint_eval_failure",
                 "durable",
                 "Most recent automatic checkpoint eval failure retained for retry and alert review.",
+            ),
+            slot(
+                "decisions/latest_checkpoint_comparison.json",
+                "latest_checkpoint_comparison",
+                "durable",
+                "Most recent retained checkpoint comparison against eval, backup, hardware, and run-shape evidence.",
+            ),
+            slot(
+                "decisions/latest_continue_restart_decision.json",
+                "latest_continue_restart_decision",
+                "durable",
+                "Most recent retained continue-restart decision for the latest accepted checkpoint.",
             ),
             slot(
                 "dashboard/current_dashboard.json",

@@ -193,6 +193,25 @@ latest-decision path, one retry-required failure path, and one redacted alert
 path so later continue-vs-restart work consumes one real operator receipt
 family instead of side reports.
 
+The repo now also owns the canonical actual-lane checkpoint-comparison and
+continue-restart decision contract in
+`crates/psionic-train/src/psion_actual_pretraining_continue_restart_decisions.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_continue_restart_fixtures.rs`,
+the focused doc
+`docs/PSION_ACTUAL_PRETRAINING_CONTINUE_RESTART_DECISIONS.md`, and the
+committed fixtures:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_comparison_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continue_restart_decision_v1.json`
+
+That surface binds the latest accepted checkpoint to retained eval, backup,
+hardware, run-shape, and systems receipts; freezes one explicit continue
+threshold against the trusted-cluster anchor; and emits one machine-readable
+`continue`, `hold_and_investigate`, or
+`restart_from_last_accepted_checkpoint` posture instead of leaving long-run
+operator decisions implicit.
+
 The repo now also owns the canonical actual-lane dashboard and active-alert
 feed in `crates/psionic-train/src/psion_actual_pretraining_dashboard.rs`, the
 fixture generator
@@ -250,6 +269,7 @@ That surface gives the repo one real operator path for:
 - `./TRAIN --lane actual_pretraining start`
 - `./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref>`
 - `./TRAIN --lane actual_pretraining backup --run-root <path>`
+- `./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path>`
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 - `./TRAIN --lane actual_pretraining dashboard --run-root <path>`
@@ -260,7 +280,8 @@ working trees by default; retains the selected ref plus exact commit SHA; and
 repeats that provenance in the provisional closeout bundle. It now also
 records accepted checkpoint manifests, durable backup receipts, auto-resume
 receipts, automatic checkpoint-eval decisions, retry-required eval failures,
-the retained dashboard packet, the retained aggregate active-alert feed,
+retained checkpoint-comparison and continue-restart decision receipts, the
+retained dashboard packet, the retained aggregate active-alert feed,
 redacted alerts, and stale/corrupt-pointer plus failed-upload drills without
 using destructive git commands or leaking raw secret payloads into retained
 artifacts.

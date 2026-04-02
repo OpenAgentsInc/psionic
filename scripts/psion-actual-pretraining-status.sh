@@ -65,10 +65,12 @@ with open(summary_path, "r", encoding="utf-8") as handle:
 latest_eval_path = os.path.join(run_root, "evals", "latest_checkpoint_eval_decision.json")
 latest_failure_path = os.path.join(run_root, "evals", "latest_checkpoint_eval_failure.json")
 latest_alert_path = os.path.join(run_root, "alerts", "latest_redacted_alert.json")
+latest_decision_path = os.path.join(run_root, "decisions", "latest_continue_restart_decision.json")
 
 latest_eval = None
 latest_failure = None
 latest_alert = None
+latest_decision = None
 if os.path.exists(latest_eval_path):
     with open(latest_eval_path, "r", encoding="utf-8") as handle:
         latest_eval = json.load(handle)
@@ -78,6 +80,9 @@ if os.path.exists(latest_failure_path):
 if os.path.exists(latest_alert_path):
     with open(latest_alert_path, "r", encoding="utf-8") as handle:
         latest_alert = json.load(handle)
+if os.path.exists(latest_decision_path):
+    with open(latest_decision_path, "r", encoding="utf-8") as handle:
+        latest_decision = json.load(handle)
 
 print(f"run_id={status.get('run_id')}")
 print(f"phase={status.get('phase')}")
@@ -96,4 +101,8 @@ if latest_failure is not None:
 if latest_alert is not None:
     print(f"latest_alert_kind={latest_alert.get('alert_kind')}")
     print(f"latest_alert_severity={latest_alert.get('severity')}")
+if latest_decision is not None:
+    print(f"continue_restart_decision_state={latest_decision.get('decision_state')}")
+    print(f"continue_restart_operator_action={latest_decision.get('operator_action')}")
+    print(f"continue_restart_blocking_row_count={len(latest_decision.get('blocking_row_ids', []))}")
 PY

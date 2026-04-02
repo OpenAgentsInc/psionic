@@ -112,6 +112,9 @@ bundle before the launcher or hardening work starts.
 available explicitly through:
 
 - `./TRAIN --lane actual_pretraining start`
+- `./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref>`
+- `./TRAIN --lane actual_pretraining backup --run-root <path>`
+- `./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path>`
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 

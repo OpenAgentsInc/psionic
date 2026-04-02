@@ -74,6 +74,11 @@ psion_actual_pretraining_runs/<run_id>/
     latest_checkpoint_eval_decision.json
     checkpoint_eval_failure_step-<optimizer_step>.json
     latest_checkpoint_eval_failure.json
+  decisions/
+    checkpoint_comparison_step-<optimizer_step>.json
+    latest_checkpoint_comparison.json
+    continue_restart_decision_step-<optimizer_step>.json
+    latest_continue_restart_decision.json
   exports/
     promoted_checkpoint_export_manifest.json
   logs/
@@ -149,10 +154,11 @@ hardware qualification receipt, retained run-shape qualification receipt,
 retained status surfaces, canonical checkpoint pointer, checkpoint manifest,
 checkpoint backup receipt, auto-resume receipt, failure-drill receipts,
 automatic checkpoint-eval decision receipts, checkpoint-eval retry receipts,
-the retained dashboard packet, the retained aggregate active-alert feed, the
-latest redacted alert, launcher log, and a provisional closeout bundle that
-repeats git provenance early. Resume over an accepted checkpoint also writes
-the retained continuation handoff at
+the retained checkpoint-comparison and continue-restart decision receipts, the
+retained dashboard packet, the retained aggregate active-alert feed, the latest
+redacted alert, launcher log, and a provisional closeout bundle that repeats
+git provenance early. Resume over an accepted checkpoint also writes the
+retained continuation handoff at
 `continuation/accepted_checkpoint_handoff.json`, which binds that accepted
 checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
 Later hardening issues extend the same retained family instead of replacing it.

@@ -1,8 +1,8 @@
 {
   "schema_version": "psion.actual_pretraining_run_shape_qualification.v1",
-  "qualification_id": "psion_actual_pretraining_run_shape_qualification::run-psion-actual-20260402t010000z",
+  "qualification_id": "psion_actual_pretraining_run_shape_qualification::run-psion-actual-20260402t090000z",
   "lane_id": "psion_actual_pretraining_v1",
-  "run_id": "run-psion-actual-20260402t010000z",
+  "run_id": "run-psion-actual-20260402t090000z",
   "selected_git_ref": "refs/heads/main",
   "git_commit_sha": "1111222233334444555566667777888899990000",
   "dirty_tree_admission": "refuse_by_default",
@@ -70,5 +70,5 @@
   "refusal_reasons": [],
   "claim_boundary": "This retained run-shape qualification ties throughput, storage, and dataloader admission to the frozen actual-lane systems, data, and baseline-tools bundles. It does not claim that later backup, eval, or alert automation is already finished.",
   "detail": "Run-shape qualification consumes the frozen actual-lane throughput anchor `psion_actual_pretraining_trusted_cluster_anchor`, replay authority `psion_corpus_tokenized@v1`, and evidence family `psion.actual_pretraining.evidence.v1` before admitting a long run.",
-  "receipt_digest": "faa1d1178752963ccda4ce8627c9fe7b93e0d3ecf81e594e12aa6ad57904b25b"
+  "receipt_digest": "ac668f46ad2886b90340494cfca51eef39e5e8485b967e987345400982444321"
 }

@@ -1,8 +1,8 @@
 {
   "schema_version": "psion.actual_pretraining_hardware_qualification.v1",
-  "qualification_id": "psion_actual_pretraining_hardware_qualification::run-psion-actual-20260402t010000z",
+  "qualification_id": "psion_actual_pretraining_hardware_qualification::run-psion-actual-20260402t090000z",
   "lane_id": "psion_actual_pretraining_v1",
-  "run_id": "run-psion-actual-20260402t010000z",
+  "run_id": "run-psion-actual-20260402t090000z",
   "selected_git_ref": "refs/heads/main",
   "git_commit_sha": "1111222233334444555566667777888899990000",
   "dirty_tree_admission": "refuse_by_default",
@@ -120,5 +120,5 @@
   "refusal_reasons": [],
   "claim_boundary": "This hardware qualification binds actual-lane launch admission to one retained preflight receipt under `psion.actual_pretraining.evidence.v1`. It proves backend, worker inventory, free-memory, temperature, ECC, throttling, credential, and checkpoint-restore posture only; it does not claim durable backup, automatic eval triggering, or live run health.",
   "detail": "Actual-lane launch now consumes a retained hardware qualification receipt before non-dry-run start or resume can stage manifests.",
-  "receipt_digest": "21329628d142b72dc6b6b6bfd6142bd338ca78903253b20d796b4d402ac3db11"
+  "receipt_digest": "3251717f85f8c15d866dc8e7df3a5a1af3a49ce913b55ee913f3dd2056b40a34"
 }

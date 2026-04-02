@@ -1,0 +1,40 @@
+{
+  "schema_version": "psion.actual_pretraining_checkpoint_backup_receipt.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t090000z",
+  "checkpoint_label": "broader-pretrain-final",
+  "optimizer_step": 16384,
+  "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
+  "selected_git_ref": "refs/heads/main",
+  "git_commit_sha": "1111222233334444555566667777888899990000",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "primary_pointer": {
+    "path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "sha256": "53ca6440efa778f95ce67627bd55406e73414d8a7eb22bcbf3e57c100fba20fc"
+  },
+  "primary_checkpoint_manifest": {
+    "path": "checkpoints/step-16384/checkpoint_manifest.json",
+    "sha256": "054926dca19cd2e168c7184c9b5b5510611ac9e4f1c9281236554000c887264e"
+  },
+  "backup_pointer": {
+    "path": "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+    "sha256": "53ca6440efa778f95ce67627bd55406e73414d8a7eb22bcbf3e57c100fba20fc"
+  },
+  "backup_checkpoint_manifest": {
+    "path": "checkpoints/backups/step-16384/checkpoint_manifest.backup.json",
+    "sha256": "054926dca19cd2e168c7184c9b5b5510611ac9e4f1c9281236554000c887264e"
+  },
+  "remote_backup_root": "${PSION_ACTUAL_PRETRAINING_BUCKET_URL}/psion_actual_pretraining_runs/run-psion-actual-20260402t090000z/checkpoints/backups",
+  "credential_source_names": [
+    "PSION_ACTUAL_PRETRAINING_GCP_PROJECT_ID",
+    "PSION_ACTUAL_PRETRAINING_BUCKET_URL",
+    "GOOGLE_APPLICATION_CREDENTIALS"
+  ],
+  "backup_state": "backed_up",
+  "upload_outcome": "succeeded",
+  "upload_failure_reason": null,
+  "claim_boundary": "This retained backup receipt binds the actual-lane latest accepted checkpoint to one durable backup contract and redacted credential-source posture. It does not claim that training continued or that automatic checkpoint eval already ran.",
+  "detail": "Fixture checkpoint backup receipt preserves the accepted pointer plus checkpoint manifest under one local backup family and one redacted remote-backup root.",
+  "receipt_digest": "4ef36264d28965a0fc10bb7a65b50a4d54d1983829d31dcf235567131eb59e39"
+}

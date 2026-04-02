@@ -7,21 +7,28 @@ use std::{
 };
 
 use psionic_eval::{
-    build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
     PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
+    build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
 };
 use psionic_train::{
-    build_psion_actual_pretraining_dashboard_packet, checkpoint_eval_decision_relative_path,
-    checkpoint_eval_failure_relative_path, derive_psion_actual_pretraining_hardware_qualification,
-    derive_psion_actual_pretraining_run_shape_qualification,
-    record_psion_actual_pretraining_auto_resume_receipt,
-    record_psion_actual_pretraining_checkpoint_backup_receipt,
-    record_psion_actual_pretraining_checkpoint_eval_decision,
-    record_psion_actual_pretraining_checkpoint_eval_failure,
-    record_psion_actual_pretraining_checkpoint_failure_drill,
-    record_psion_actual_pretraining_checkpoint_manifest,
-    record_psion_actual_pretraining_continuation_handoff,
-    record_psion_actual_pretraining_redacted_alert, PsionActualPretrainingAlertFeed,
+    PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_COMPARISON_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CONTINUE_RESTART_DECISION_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
+    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
+    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingAlertFeed,
     PsionActualPretrainingArtifactRef, PsionActualPretrainingAutoResumeReceipt,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointBackupReceipt,
     PsionActualPretrainingCheckpointEvalDecision, PsionActualPretrainingCheckpointEvalFailure,
@@ -42,23 +49,21 @@ use psionic_train::{
     PsionActualPretrainingRunShapeQualification, PsionActualPretrainingScalingBundle,
     PsionActualPretrainingStorageProbe, PsionActualPretrainingSystemsBundle,
     PsionActualPretrainingThroughputProbe, PsionActualPretrainingTopologyStorageBundle,
-    PsionPluginConditionedSftStageManifest, PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
-    PSION_ACTUAL_PRETRAINING_LANE_ID,
-    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
-    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
-    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PsionPluginConditionedSftStageManifest, build_psion_actual_pretraining_dashboard_packet,
+    checkpoint_comparison_relative_path, checkpoint_eval_decision_relative_path,
+    checkpoint_eval_failure_relative_path, continue_restart_decision_relative_path,
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    record_psion_actual_pretraining_auto_resume_receipt,
+    record_psion_actual_pretraining_checkpoint_backup_receipt,
+    record_psion_actual_pretraining_checkpoint_comparison,
+    record_psion_actual_pretraining_checkpoint_eval_decision,
+    record_psion_actual_pretraining_checkpoint_eval_failure,
+    record_psion_actual_pretraining_checkpoint_failure_drill,
+    record_psion_actual_pretraining_checkpoint_manifest,
+    record_psion_actual_pretraining_continuation_handoff,
+    record_psion_actual_pretraining_continue_restart_decision,
+    record_psion_actual_pretraining_redacted_alert,
 };
 use sha2::{Digest, Sha256};
 use std::time::Instant;
@@ -97,6 +102,11 @@ enum Cli {
         selected_git_ref: String,
         allow_dirty_tree: bool,
         inject_failed_upload: bool,
+    },
+    DecideContinueRestart {
+        run_root: PathBuf,
+        selected_git_ref: String,
+        allow_dirty_tree: bool,
     },
 }
 
@@ -1277,6 +1287,314 @@ fn main() -> Result<(), Box<dyn Error>> {
                 );
             }
         }
+        Cli::DecideContinueRestart {
+            run_root,
+            selected_git_ref,
+            allow_dirty_tree,
+        } => {
+            let git_commit_sha = git_output(repo_root, &["rev-parse", selected_git_ref.as_str()])?;
+            let (dirty_tree_admission, workspace_status_sha256) =
+                dirty_tree_posture(repo_root, allow_dirty_tree)?;
+            let retained_paths = retained_paths();
+            let pointer_path = run_root.join(&retained_paths.latest_checkpoint_pointer_path);
+            let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
+                load_json(&pointer_path)?;
+            checkpoint_pointer.validate()?;
+            let checkpoint_manifest = validate_resume_candidate(&run_root, &checkpoint_pointer)
+                .map_err(std::io::Error::other)?;
+            let checkpoint_manifest_path =
+                run_root.join(&checkpoint_manifest.relative_manifest_path);
+            let checkpoint_manifest_artifact =
+                run_artifact_ref(&run_root, &checkpoint_manifest_path)?;
+            let checkpoint_pointer_artifact = run_artifact_ref(&run_root, &pointer_path)?;
+            let mut current_status: PsionActualPretrainingCurrentRunStatus =
+                load_json(&run_root.join(&retained_paths.current_status_path))?;
+            current_status.validate()?;
+            let mut retained_summary: PsionActualPretrainingRetainedSummary =
+                load_json(&run_root.join(&retained_paths.retained_summary_path))?;
+            retained_summary.validate()?;
+            let hardware_qualification: PsionActualPretrainingHardwareQualification =
+                load_json(&run_root.join(&retained_paths.hardware_qualification_path))?;
+            hardware_qualification.validate()?;
+            let run_shape_qualification: PsionActualPretrainingRunShapeQualification =
+                load_json(&run_root.join(&retained_paths.run_shape_qualification_path))?;
+            run_shape_qualification.validate()?;
+            let checkpoint_backup_receipt: Option<PsionActualPretrainingCheckpointBackupReceipt> =
+                load_optional_json(
+                    &run_root.join(&retained_paths.latest_checkpoint_backup_receipt_path),
+                )?;
+            if let Some(receipt) = &checkpoint_backup_receipt {
+                receipt.validate()?;
+            }
+            let checkpoint_eval_decision: Option<PsionActualPretrainingCheckpointEvalDecision> =
+                load_optional_json(
+                    &run_root.join(&retained_paths.latest_checkpoint_eval_decision_path),
+                )?;
+            if let Some(decision) = &checkpoint_eval_decision {
+                decision.validate()?;
+            }
+            let checkpoint_eval_failure: Option<PsionActualPretrainingCheckpointEvalFailure> =
+                load_optional_json(
+                    &run_root.join(&retained_paths.latest_checkpoint_eval_failure_path),
+                )?;
+            if let Some(failure) = &checkpoint_eval_failure {
+                failure.validate()?;
+            }
+            let latest_redacted_alert: Option<PsionActualPretrainingRedactedAlert> =
+                load_optional_json(&run_root.join(&retained_paths.latest_redacted_alert_path))?;
+            if let Some(alert) = &latest_redacted_alert {
+                alert.validate()?;
+            }
+            let checkpoint_backup_receipt_artifact = if run_root
+                .join(&retained_paths.latest_checkpoint_backup_receipt_path)
+                .is_file()
+            {
+                Some(run_artifact_ref(
+                    &run_root,
+                    &run_root.join(&retained_paths.latest_checkpoint_backup_receipt_path),
+                )?)
+            } else {
+                None
+            };
+            let checkpoint_eval_decision_artifact = if run_root
+                .join(&retained_paths.latest_checkpoint_eval_decision_path)
+                .is_file()
+            {
+                Some(run_artifact_ref(
+                    &run_root,
+                    &run_root.join(&retained_paths.latest_checkpoint_eval_decision_path),
+                )?)
+            } else {
+                None
+            };
+            let checkpoint_eval_failure_artifact = if run_root
+                .join(&retained_paths.latest_checkpoint_eval_failure_path)
+                .is_file()
+            {
+                Some(run_artifact_ref(
+                    &run_root,
+                    &run_root.join(&retained_paths.latest_checkpoint_eval_failure_path),
+                )?)
+            } else {
+                None
+            };
+            let hardware_qualification_artifact = run_artifact_ref(
+                &run_root,
+                &run_root.join(&retained_paths.hardware_qualification_path),
+            )?;
+            let run_shape_qualification_artifact = run_artifact_ref(
+                &run_root,
+                &run_root.join(&retained_paths.run_shape_qualification_path),
+            )?;
+            let checkpoint_comparison = record_psion_actual_pretraining_checkpoint_comparison(
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                workspace_status_sha256.clone(),
+                checkpoint_pointer_artifact,
+                &checkpoint_pointer,
+                checkpoint_manifest_artifact,
+                checkpoint_backup_receipt_artifact.clone(),
+                checkpoint_backup_receipt.as_ref(),
+                checkpoint_eval_decision_artifact.clone(),
+                checkpoint_eval_decision.as_ref(),
+                checkpoint_eval_failure_artifact.clone(),
+                checkpoint_eval_failure.as_ref(),
+                hardware_qualification_artifact.clone(),
+                &hardware_qualification,
+                run_shape_qualification_artifact.clone(),
+                &run_shape_qualification,
+                contracts.systems_bundle_ref.clone(),
+                &contracts.systems_bundle,
+                "This retained checkpoint comparison binds the latest accepted checkpoint to the frozen checkpoint-eval, backup, hardware, run-shape, and systems receipts before the actual lane decides whether to continue, hold, or restart. It does not claim that the operator already performed the chosen action.",
+                "Checkpoint comparison records the explicit continue threshold against the trusted-cluster throughput anchor and the retained actual-lane checkpoint lineage.",
+            )?;
+            let checkpoint_comparison_relative_path =
+                checkpoint_comparison_relative_path(checkpoint_pointer.optimizer_step);
+            write_json_pretty(
+                &run_root.join(&checkpoint_comparison_relative_path),
+                &checkpoint_comparison,
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.latest_checkpoint_comparison_path),
+                &checkpoint_comparison,
+            )?;
+            let checkpoint_comparison_artifact = run_artifact_ref(
+                &run_root,
+                &run_root.join(&checkpoint_comparison_relative_path),
+            )?;
+            let continue_restart_decision =
+                record_psion_actual_pretraining_continue_restart_decision(
+                    &selected_git_ref,
+                    &git_commit_sha,
+                    &dirty_tree_admission,
+                    workspace_status_sha256.clone(),
+                    &checkpoint_pointer,
+                    checkpoint_comparison_artifact,
+                    &checkpoint_comparison,
+                    checkpoint_backup_receipt_artifact,
+                    checkpoint_eval_decision_artifact,
+                    checkpoint_eval_decision.as_ref(),
+                    checkpoint_eval_failure_artifact,
+                    checkpoint_eval_failure.as_ref(),
+                    hardware_qualification_artifact,
+                    run_shape_qualification_artifact,
+                    contracts.systems_bundle_ref.clone(),
+                    "This retained continue-restart decision keeps long-run operator posture machine-readable under the actual-lane evidence family. It does not claim that the operator already restarted or continued the cluster run; it only records the bounded next action.",
+                    "Continue-restart decision consumes retained eval, backup, hardware, run-shape, and systems evidence before the operator chooses the next long-run action.",
+                )?;
+            let continue_restart_decision_relative_path =
+                continue_restart_decision_relative_path(checkpoint_pointer.optimizer_step);
+            write_json_pretty(
+                &run_root.join(&continue_restart_decision_relative_path),
+                &continue_restart_decision,
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.latest_continue_restart_decision_path),
+                &continue_restart_decision,
+            )?;
+            let phase = match continue_restart_decision.decision_state.as_str() {
+                "continue" => "continue_decision_recorded",
+                "restart_from_last_accepted_checkpoint" => "restart_decision_recorded",
+                _ => "hold_decision_recorded",
+            };
+            current_status.phase = String::from(phase);
+            current_status.latest_checkpoint_label = checkpoint_pointer.checkpoint_label.clone();
+            current_status.last_completed_step = checkpoint_pointer.optimizer_step;
+            current_status.updated_at_utc = now_utc(repo_root)?;
+            current_status.detail = String::from(
+                match continue_restart_decision.decision_state.as_str() {
+                    "continue" => {
+                        "Current status records that the latest accepted checkpoint remains admitted for uninterrupted continuation after the actual lane consumed backup, eval, hardware, and run-shape receipts."
+                    }
+                    "restart_from_last_accepted_checkpoint" => {
+                        "Current status records that the latest accepted checkpoint should be used for restart after the actual lane consumed explicit eval, backup, hardware, and run-shape evidence."
+                    }
+                    _ => {
+                        "Current status records that the actual lane is paused for operator investigation because the retained continue-restart comparison found blocking evidence."
+                    }
+                },
+            );
+            current_status.validate()?;
+            retained_summary.last_known_phase = current_status.phase.clone();
+            retained_summary.selected_git_ref = selected_git_ref.clone();
+            retained_summary.git_commit_sha = git_commit_sha.clone();
+            retained_summary.dirty_tree_admission = dirty_tree_admission.clone();
+            retained_summary.detail = String::from(
+                match continue_restart_decision.decision_state.as_str() {
+                    "continue" => {
+                        "Retained summary records that the latest accepted checkpoint is still admitted for continuation after explicit comparison against eval, backup, hardware, and throughput receipts."
+                    }
+                    "restart_from_last_accepted_checkpoint" => {
+                        "Retained summary records that the actual lane should restart from the latest accepted checkpoint after the retained comparison consumed backup and systems evidence."
+                    }
+                    _ => {
+                        "Retained summary records that the actual lane must pause and review the retained comparison before continuing or restarting."
+                    }
+                },
+            );
+            retained_summary.validate()?;
+            let closeout_bundle = PsionActualPretrainingCloseoutBundle {
+                schema_version: String::from(
+                    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+                ),
+                lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+                run_id: checkpoint_pointer.run_id.clone(),
+                closeout_state: current_status.phase.clone(),
+                retained_paths: retained_paths.clone(),
+                selected_git_ref: selected_git_ref.clone(),
+                git_commit_sha: git_commit_sha.clone(),
+                dirty_tree_admission: dirty_tree_admission.clone(),
+                workspace_status_sha256: workspace_status_sha256.clone(),
+                claim_boundary: String::from(
+                    match continue_restart_decision.decision_state.as_str() {
+                        "continue" => {
+                            "This provisional closeout bundle now records one retained continue decision over the latest accepted checkpoint. It does not claim that the operator already advanced the distributed run beyond this decision."
+                        }
+                        "restart_from_last_accepted_checkpoint" => {
+                            "This provisional closeout bundle now records one retained restart decision over the latest accepted checkpoint. It does not claim that the operator already performed the restart."
+                        }
+                        _ => {
+                            "This provisional closeout bundle now records one retained hold-and-investigate decision over the latest accepted checkpoint. It does not claim that the operator already resolved the blocking evidence."
+                        }
+                    },
+                ),
+                detail: String::from(match continue_restart_decision.decision_state.as_str() {
+                    "continue" => {
+                        "Continue-decision closeout bundle repeats launcher provenance after the actual lane compared the latest checkpoint against eval, backup, and system receipts."
+                    }
+                    "restart_from_last_accepted_checkpoint" => {
+                        "Restart-decision closeout bundle repeats launcher provenance after the actual lane compared the latest checkpoint against eval, backup, and system receipts."
+                    }
+                    _ => {
+                        "Hold-decision closeout bundle repeats launcher provenance after the actual lane retained blocking comparison rows for operator review."
+                    }
+                }),
+            };
+            closeout_bundle.validate()?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.current_status_path),
+                &current_status,
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.retained_summary_path),
+                &retained_summary,
+            )?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.closeout_bundle_path),
+                &closeout_bundle,
+            )?;
+            write_dashboard_bundle(
+                &run_root,
+                &current_status,
+                &retained_summary,
+                &checkpoint_pointer,
+                &hardware_qualification,
+                &run_shape_qualification,
+                &contracts.systems_bundle,
+                checkpoint_backup_receipt.as_ref(),
+                checkpoint_eval_decision.as_ref(),
+                checkpoint_eval_failure.as_ref(),
+                latest_redacted_alert.as_ref(),
+            )?;
+            append_launcher_log(
+                &run_root,
+                &format!(
+                    "{} phase={} surface_id={} git_commit_sha={} checkpoint_label={} checkpoint_step={} decision_state={} operator_action={}\n",
+                    now_utc(repo_root)?,
+                    phase,
+                    "psion_actual_pretraining.decide_continue_restart",
+                    git_commit_sha,
+                    checkpoint_pointer.checkpoint_label,
+                    checkpoint_pointer.optimizer_step,
+                    continue_restart_decision.decision_state,
+                    continue_restart_decision.operator_action
+                ),
+            )?;
+            println!("status={phase}");
+            println!("run_id={}", checkpoint_pointer.run_id);
+            println!("run_root={}", run_root.display());
+            println!(
+                "checkpoint_comparison={}",
+                run_root
+                    .join(&retained_paths.latest_checkpoint_comparison_path)
+                    .display()
+            );
+            println!(
+                "continue_restart_decision={}",
+                run_root
+                    .join(&retained_paths.latest_continue_restart_decision_path)
+                    .display()
+            );
+            println!(
+                "decision_state={}",
+                continue_restart_decision.decision_state
+            );
+            println!(
+                "operator_action={}",
+                continue_restart_decision.operator_action
+            );
+        }
     }
 
     Ok(())
@@ -1480,6 +1798,19 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                 inject_failed_upload,
             })
         }
+        "decide-continue-restart" => {
+            if run_root.is_empty() {
+                return Err(std::io::Error::other(
+                    "decide-continue-restart requires --run-root <path>",
+                )
+                .into());
+            }
+            Ok(Cli::DecideContinueRestart {
+                run_root: PathBuf::from(run_root),
+                selected_git_ref,
+                allow_dirty_tree,
+            })
+        }
         _ => {
             usage();
             Err(std::io::Error::other(format!("unsupported subcommand `{command}`")).into())
@@ -1489,7 +1820,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
 
 fn usage() {
     eprintln!(
-        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]"
+        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator decide-continue-restart --run-root <path> [--git-ref <ref>] [--allow-dirty-tree]"
     );
 }
 
@@ -1588,6 +1919,12 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         ),
         latest_checkpoint_eval_failure_path: String::from(
             PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
+        ),
+        latest_checkpoint_comparison_path: String::from(
+            PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_COMPARISON_PATH,
+        ),
+        latest_continue_restart_decision_path: String::from(
+            PSION_ACTUAL_PRETRAINING_LATEST_CONTINUE_RESTART_DECISION_PATH,
         ),
         current_dashboard_path: String::from(PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH),
         hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
@@ -2646,6 +2983,7 @@ fn write_launcher_bundle(
     fs::create_dir_all(run_root.join("checkpoints"))?;
     fs::create_dir_all(run_root.join("preflight"))?;
     fs::create_dir_all(run_root.join("continuation"))?;
+    fs::create_dir_all(run_root.join("decisions"))?;
     fs::create_dir_all(run_root.join("dashboard"))?;
     fs::create_dir_all(run_root.join("closeout"))?;
     fs::create_dir_all(run_root.join("logs"))?;

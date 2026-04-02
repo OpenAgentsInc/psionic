@@ -13,6 +13,8 @@
     "auto_resume_receipt_path": "checkpoints/auto_resume_receipt.json",
     "latest_checkpoint_eval_decision_path": "evals/latest_checkpoint_eval_decision.json",
     "latest_checkpoint_eval_failure_path": "evals/latest_checkpoint_eval_failure.json",
+    "latest_checkpoint_comparison_path": "decisions/latest_checkpoint_comparison.json",
+    "latest_continue_restart_decision_path": "decisions/latest_continue_restart_decision.json",
     "current_dashboard_path": "dashboard/current_dashboard.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
     "run_shape_qualification_path": "preflight/run_shape_qualification.json",
