@@ -153,3 +153,20 @@ The served-mesh role also carries posture and machine-readable reasons such as
 Those roles must not be collapsed back into one enum. A node can honestly be
 `mixed` at the transport layer and `standby` at the served-mesh layer at the
 same time.
+
+## Join Bundle Contract
+
+Mesh setup now depends on one durable join bundle contract above the existing
+admission and introduction types.
+
+That bundle carries:
+
+- mesh label
+- namespace and cluster identity
+- advertised control-plane addresses
+- trust-policy metadata
+- either shared admission material or a signed introduction envelope
+
+Durable network state keeps the last imported join bundle separate from the
+last joined mesh preference. That keeps setup intent and transient transport
+state from collapsing into the same record.

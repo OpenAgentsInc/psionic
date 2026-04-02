@@ -523,7 +523,7 @@ impl SignedClusterIntroductionEnvelope {
 }
 
 /// Verification failure while validating one signed cluster introduction envelope.
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ClusterIntroductionVerificationError {
     /// The envelope was signed by a source not accepted by policy.
     #[error("cluster introduction source `{source_id}` with key `{public_key}` is not accepted")]
@@ -568,6 +568,215 @@ pub enum ClusterIntroductionVerificationError {
     /// The signature did not verify against the payload digest.
     #[error("cluster introduction signature verification failed")]
     SignatureVerificationFailed,
+}
+
+/// Trust-policy metadata carried by one durable mesh join bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterJoinBundleTrustMetadata {
+    /// Stable digest of the effective trust policy.
+    pub trust_policy_digest: String,
+    /// Current trust posture for the exported lane.
+    pub trust_posture: ClusterTrustPosture,
+    /// Current discovery posture for the exported lane.
+    pub discovery_posture: ClusterDiscoveryPosture,
+    /// Current trust-bundle version for the exported lane.
+    pub trust_bundle_version: u64,
+    /// Additional trust-bundle versions accepted during rollout overlap.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accepted_trust_bundle_versions: Vec<u64>,
+    /// Stable digest of the introduction policy, when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub introduction_policy_digest: Option<String>,
+}
+
+impl ClusterJoinBundleTrustMetadata {
+    /// Creates trust metadata from the effective Psionic policies.
+    #[must_use]
+    pub fn from_policies(
+        trust_policy: &ClusterTrustPolicy,
+        introduction_policy: Option<&ClusterIntroductionPolicy>,
+    ) -> Self {
+        Self {
+            trust_policy_digest: trust_policy.stable_digest(),
+            trust_posture: trust_policy.posture,
+            discovery_posture: trust_policy.discovery_posture,
+            trust_bundle_version: trust_policy.trust_bundle_version,
+            accepted_trust_bundle_versions: trust_policy.accepted_trust_bundle_versions.clone(),
+            introduction_policy_digest: introduction_policy
+                .map(ClusterIntroductionPolicy::stable_digest),
+        }
+    }
+}
+
+/// Admission material carried by one durable mesh join bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterJoinAdmissionMaterial {
+    /// Shared-admission material for the first trusted mesh seam.
+    SharedAdmission { admission_token: AdmissionToken },
+    /// Signed introduction envelope for the wider-network candidate seam.
+    SignedIntroduction {
+        envelope: SignedClusterIntroductionEnvelope,
+    },
+}
+
+/// Durable operator-facing join bundle for one mesh lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterJoinBundle {
+    /// Operator-facing mesh label.
+    pub mesh_label: String,
+    /// Namespace carried by the mesh.
+    pub namespace: ClusterNamespace,
+    /// Stable cluster identity for the mesh.
+    pub cluster_id: ClusterId,
+    /// Advertised control-plane addresses for joining.
+    pub advertised_control_plane_addrs: Vec<SocketAddr>,
+    /// Trust metadata carried with the bundle.
+    pub trust_metadata: ClusterJoinBundleTrustMetadata,
+    /// Admission or introduction material used to join the mesh.
+    pub admission: ClusterJoinAdmissionMaterial,
+    /// Inclusive export timestamp in milliseconds since epoch.
+    pub exported_at_ms: u64,
+}
+
+impl ClusterJoinBundle {
+    /// Creates one shared-admission join bundle.
+    #[must_use]
+    pub fn shared_admission(
+        mesh_label: impl Into<String>,
+        admission: &ClusterAdmissionConfig,
+        advertised_control_plane_addrs: Vec<SocketAddr>,
+        trust_metadata: ClusterJoinBundleTrustMetadata,
+        exported_at_ms: u64,
+    ) -> Self {
+        Self {
+            mesh_label: mesh_label.into(),
+            namespace: admission.namespace.clone(),
+            cluster_id: ClusterId::new(&admission.namespace, &admission.admission_token),
+            advertised_control_plane_addrs: normalized_control_plane_addrs(
+                advertised_control_plane_addrs,
+            ),
+            trust_metadata,
+            admission: ClusterJoinAdmissionMaterial::SharedAdmission {
+                admission_token: admission.admission_token.clone(),
+            },
+            exported_at_ms,
+        }
+    }
+
+    /// Creates one signed-introduction join bundle.
+    #[must_use]
+    pub fn signed_introduction(
+        mesh_label: impl Into<String>,
+        envelope: SignedClusterIntroductionEnvelope,
+        advertised_control_plane_addrs: Vec<SocketAddr>,
+        trust_metadata: ClusterJoinBundleTrustMetadata,
+        exported_at_ms: u64,
+    ) -> Self {
+        Self {
+            mesh_label: mesh_label.into(),
+            namespace: envelope.payload.candidate.namespace.clone(),
+            cluster_id: envelope.payload.candidate.cluster_id.clone(),
+            advertised_control_plane_addrs: normalized_control_plane_addrs(
+                advertised_control_plane_addrs,
+            ),
+            trust_metadata,
+            admission: ClusterJoinAdmissionMaterial::SignedIntroduction { envelope },
+            exported_at_ms,
+        }
+    }
+}
+
+/// Persisted operator preference for the last mesh selected through a join bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedJoinedMeshPreference {
+    /// Operator-facing mesh label.
+    pub mesh_label: String,
+    /// Namespace for the mesh.
+    pub namespace: ClusterNamespace,
+    /// Stable cluster identity for the mesh.
+    pub cluster_id: ClusterId,
+    /// Advertised control-plane addresses retained for the mesh.
+    pub advertised_control_plane_addrs: Vec<SocketAddr>,
+    /// Trust-policy digest surfaced by the bundle.
+    pub trust_policy_digest: String,
+    /// Timestamp when the preference was recorded.
+    pub selected_at_ms: u64,
+}
+
+impl PersistedJoinedMeshPreference {
+    fn from_bundle(bundle: &ClusterJoinBundle, selected_at_ms: u64) -> Self {
+        Self {
+            mesh_label: bundle.mesh_label.clone(),
+            namespace: bundle.namespace.clone(),
+            cluster_id: bundle.cluster_id.clone(),
+            advertised_control_plane_addrs: bundle.advertised_control_plane_addrs.clone(),
+            trust_policy_digest: bundle.trust_metadata.trust_policy_digest.clone(),
+            selected_at_ms,
+        }
+    }
+}
+
+/// Persisted import receipt for the most recent join bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedImportedJoinBundle {
+    /// Imported join bundle.
+    pub bundle: ClusterJoinBundle,
+    /// Timestamp when the bundle was imported.
+    pub imported_at_ms: u64,
+}
+
+/// Typed refusal reason for one join-bundle import.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClusterJoinBundleImportRefusalReason {
+    /// Shared admission material did not derive the carried cluster ID.
+    SharedAdmissionClusterIdMismatch {
+        /// Cluster ID derived from the carried namespace and token.
+        expected: ClusterId,
+        /// Cluster ID carried by the bundle.
+        actual: ClusterId,
+    },
+    /// Signed introduction candidate cluster ID did not match the bundle header.
+    IntroductionClusterIdMismatch {
+        /// Cluster ID carried by the signed introduction candidate.
+        expected: ClusterId,
+        /// Cluster ID carried by the bundle.
+        actual: ClusterId,
+    },
+    /// Signed introduction candidate namespace did not match the bundle header.
+    IntroductionNamespaceMismatch {
+        /// Namespace carried by the signed introduction candidate.
+        expected: ClusterNamespace,
+        /// Namespace carried by the bundle.
+        actual: ClusterNamespace,
+    },
+    /// The local node had no introduction policy configured for signed-introduction intake.
+    IntroductionPolicyMissing,
+    /// The signed introduction failed verification under the current introduction policy.
+    IntroductionVerification(ClusterIntroductionVerificationError),
+}
+
+/// Outcome of importing one durable mesh join bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterJoinBundleImportOutcome {
+    /// Shared-admission material was accepted into durable mesh preference state.
+    SharedAdmissionImported {
+        /// Mesh preference recorded from the imported bundle.
+        mesh_preference: PersistedJoinedMeshPreference,
+    },
+    /// Signed-introduction material was accepted and recorded as a candidate.
+    IntroductionImported {
+        /// Mesh preference recorded from the imported bundle.
+        mesh_preference: PersistedJoinedMeshPreference,
+        /// Candidate record imported from the signed introduction.
+        candidate: ClusterCandidateRecord,
+    },
+    /// The bundle was refused under current import policy.
+    Refused {
+        /// Typed refusal reason for the import.
+        reason: ClusterJoinBundleImportRefusalReason,
+    },
 }
 
 /// One explicitly configured peer for the authenticated cluster posture.
@@ -3163,6 +3372,12 @@ pub struct PersistedClusterNetworkState {
     /// Candidate records keyed by node identity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub candidates: BTreeMap<NodeId, ClusterCandidateRecord>,
+    /// Last mesh preference imported through a join bundle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_joined_mesh_preference: Option<PersistedJoinedMeshPreference>,
+    /// Last imported join bundle retained separately from transient transport state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_imported_join_bundle: Option<PersistedImportedJoinBundle>,
 }
 
 impl Default for PersistedClusterNetworkState {
@@ -3180,6 +3395,8 @@ impl PersistedClusterNetworkState {
             schema_version: Self::SCHEMA_VERSION,
             trust_bundles: Vec::new(),
             candidates: BTreeMap::new(),
+            last_joined_mesh_preference: None,
+            last_imported_join_bundle: None,
         }
     }
 
@@ -3224,11 +3441,26 @@ impl PersistedClusterNetworkState {
             superseded_at_ms: None,
         });
     }
+
+    fn record_imported_join_bundle(&mut self, bundle: ClusterJoinBundle, imported_at_ms: u64) {
+        self.last_imported_join_bundle = Some(PersistedImportedJoinBundle {
+            bundle,
+            imported_at_ms,
+        });
+    }
+
+    fn record_joined_mesh_preference(&mut self, bundle: &ClusterJoinBundle, selected_at_ms: u64) {
+        self.last_joined_mesh_preference = Some(PersistedJoinedMeshPreference::from_bundle(
+            bundle,
+            selected_at_ms,
+        ));
+    }
 }
 
 /// Running local-cluster node for the first hello/ping seam.
 pub struct LocalClusterNode {
     local_addr: SocketAddr,
+    admission: ClusterAdmissionConfig,
     local_identity: ClusterNodeIdentity,
     trust_policy: ClusterTrustPolicy,
     introduction_policy: Option<ClusterIntroductionPolicy>,
@@ -3242,6 +3474,7 @@ pub struct LocalClusterNode {
 impl LocalClusterNode {
     /// Starts the first local-cluster hello/ping transport.
     pub async fn spawn(config: LocalClusterConfig) -> Result<Self, ClusterError> {
+        let admission = config.admission.clone();
         let loaded_identity = load_or_create_local_identity(&config)?;
         let local_identity = loaded_identity.identity.clone();
         let transport_config = TransportConfig::from_config(config, loaded_identity);
@@ -3276,6 +3509,7 @@ impl LocalClusterNode {
         ));
         Ok(Self {
             local_addr,
+            admission,
             local_identity,
             trust_policy,
             introduction_policy,
@@ -3297,6 +3531,31 @@ impl LocalClusterNode {
     #[must_use]
     pub fn local_identity(&self) -> &ClusterNodeIdentity {
         &self.local_identity
+    }
+
+    /// Exports one durable shared-admission mesh join bundle for this node.
+    #[must_use]
+    pub fn export_join_bundle(
+        &self,
+        mesh_label: impl Into<String>,
+        advertised_control_plane_addrs: Vec<SocketAddr>,
+        exported_at_ms: u64,
+    ) -> ClusterJoinBundle {
+        let advertised_control_plane_addrs = if advertised_control_plane_addrs.is_empty() {
+            vec![self.local_addr]
+        } else {
+            advertised_control_plane_addrs
+        };
+        ClusterJoinBundle::shared_admission(
+            mesh_label,
+            &self.admission,
+            advertised_control_plane_addrs,
+            ClusterJoinBundleTrustMetadata::from_policies(
+                &self.trust_policy,
+                self.introduction_policy.as_ref(),
+            ),
+            exported_at_ms,
+        )
     }
 
     /// Returns the machine-checkable trust policy for this node.
@@ -3352,6 +3611,20 @@ impl LocalClusterNode {
     /// Returns the full durable wider-network trust and candidate state snapshot.
     pub async fn durable_network_state(&self) -> PersistedClusterNetworkState {
         self.state.lock().await.durable_network_state()
+    }
+
+    /// Imports one durable mesh join bundle into persisted network state.
+    pub async fn import_join_bundle(
+        &self,
+        bundle: ClusterJoinBundle,
+        imported_at_ms: u64,
+    ) -> Result<ClusterJoinBundleImportOutcome, ClusterError> {
+        self.state.lock().await.import_join_bundle(
+            bundle,
+            imported_at_ms,
+            self.introduction_policy.as_ref(),
+            &self.trust_policy,
+        )
     }
 
     /// Returns the durable trust-bundle history for this node configuration.
@@ -3924,6 +4197,84 @@ impl SharedState {
             .values()
             .cloned()
             .collect()
+    }
+
+    fn import_join_bundle(
+        &mut self,
+        bundle: ClusterJoinBundle,
+        imported_at_ms: u64,
+        introduction_policy: Option<&ClusterIntroductionPolicy>,
+        trust_policy: &ClusterTrustPolicy,
+    ) -> Result<ClusterJoinBundleImportOutcome, ClusterError> {
+        self.durable_network_state
+            .record_imported_join_bundle(bundle.clone(), imported_at_ms);
+        let mesh_preference = PersistedJoinedMeshPreference::from_bundle(&bundle, imported_at_ms);
+        let outcome = match &bundle.admission {
+            ClusterJoinAdmissionMaterial::SharedAdmission { admission_token } => {
+                let expected_cluster_id = ClusterId::new(&bundle.namespace, admission_token);
+                if expected_cluster_id != bundle.cluster_id {
+                    ClusterJoinBundleImportOutcome::Refused {
+                        reason:
+                            ClusterJoinBundleImportRefusalReason::SharedAdmissionClusterIdMismatch {
+                                expected: expected_cluster_id,
+                                actual: bundle.cluster_id.clone(),
+                            },
+                    }
+                } else {
+                    self.durable_network_state
+                        .record_joined_mesh_preference(&bundle, imported_at_ms);
+                    ClusterJoinBundleImportOutcome::SharedAdmissionImported { mesh_preference }
+                }
+            }
+            ClusterJoinAdmissionMaterial::SignedIntroduction { envelope } => {
+                if envelope.payload.candidate.cluster_id != bundle.cluster_id {
+                    ClusterJoinBundleImportOutcome::Refused {
+                        reason:
+                            ClusterJoinBundleImportRefusalReason::IntroductionClusterIdMismatch {
+                                expected: envelope.payload.candidate.cluster_id.clone(),
+                                actual: bundle.cluster_id.clone(),
+                            },
+                    }
+                } else if envelope.payload.candidate.namespace != bundle.namespace {
+                    ClusterJoinBundleImportOutcome::Refused {
+                        reason:
+                            ClusterJoinBundleImportRefusalReason::IntroductionNamespaceMismatch {
+                                expected: envelope.payload.candidate.namespace.clone(),
+                                actual: bundle.namespace.clone(),
+                            },
+                    }
+                } else {
+                    let Some(policy) = introduction_policy else {
+                        self.persist_network_state()?;
+                        return Ok(ClusterJoinBundleImportOutcome::Refused {
+                            reason: ClusterJoinBundleImportRefusalReason::IntroductionPolicyMissing,
+                        });
+                    };
+                    if let Err(error) = envelope.verify(policy) {
+                        self.persist_network_state()?;
+                        return Ok(ClusterJoinBundleImportOutcome::Refused {
+                            reason: ClusterJoinBundleImportRefusalReason::IntroductionVerification(
+                                error,
+                            ),
+                        });
+                    }
+                    let candidate = self.apply_verified_introduction(
+                        envelope.clone(),
+                        policy,
+                        imported_at_ms,
+                        trust_policy,
+                    )?;
+                    self.durable_network_state
+                        .record_joined_mesh_preference(&bundle, imported_at_ms);
+                    ClusterJoinBundleImportOutcome::IntroductionImported {
+                        mesh_preference,
+                        candidate,
+                    }
+                }
+            }
+        };
+        self.persist_network_state()?;
+        Ok(outcome)
     }
 
     fn active_logical_streams(&self) -> Vec<ClusterLogicalStreamLease> {
@@ -6839,6 +7190,12 @@ fn admission_digest(admission_token: &AdmissionToken) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn normalized_control_plane_addrs(mut addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
+    addrs.sort_unstable();
+    addrs.dedup();
+    addrs
+}
+
 fn wire_signing_payload(envelope: &WireEnvelope) -> Result<Vec<u8>, serde_json::Error> {
     serde_json::to_vec(&(
         &envelope.namespace,
@@ -8408,5 +8765,266 @@ mod tests {
             replayed_shutdown.is_ok(),
             "replayed node should shut down cleanly"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shared_admission_join_bundle_export_and_import_persist_mesh_preference() {
+        let temp = tempdir().unwrap_or_else(|_| unreachable!("tempdir should succeed"));
+        let network_state_path = temp.path().join("network-state.json");
+
+        let exporter = LocalClusterNode::spawn(LocalClusterConfig::new(
+            "lan-alpha",
+            "shared-secret",
+            loopback_addr(0),
+            NodeRole::Mixed,
+        ))
+        .await
+        .unwrap_or_else(|_| unreachable!("exporter node should start"));
+        let importer = LocalClusterNode::spawn(
+            LocalClusterConfig::new(
+                "lan-beta",
+                "different-secret",
+                loopback_addr(0),
+                NodeRole::CoordinatorOnly,
+            )
+            .with_file_backed_network_state(network_state_path.clone()),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!("importer node should start"));
+
+        let bundle = exporter.export_join_bundle("mesh-alpha", vec![exporter.local_addr()], 40_000);
+        let expected_preference = PersistedJoinedMeshPreference::from_bundle(&bundle, 41_000);
+        let outcome = importer
+            .import_join_bundle(bundle.clone(), 41_000)
+            .await
+            .unwrap_or_else(|_| unreachable!("join bundle import should succeed"));
+        assert_eq!(
+            outcome,
+            ClusterJoinBundleImportOutcome::SharedAdmissionImported {
+                mesh_preference: expected_preference.clone(),
+            }
+        );
+
+        let state = importer.durable_network_state().await;
+        assert_eq!(
+            state.last_joined_mesh_preference,
+            Some(expected_preference.clone())
+        );
+        assert_eq!(
+            state.last_imported_join_bundle,
+            Some(PersistedImportedJoinBundle {
+                bundle: bundle.clone(),
+                imported_at_ms: 41_000,
+            })
+        );
+
+        let loaded = PersistedClusterNetworkState::load_json(&network_state_path)
+            .expect("state should load");
+        assert_eq!(
+            loaded.last_joined_mesh_preference,
+            Some(expected_preference)
+        );
+        assert_eq!(
+            loaded.last_imported_join_bundle,
+            Some(PersistedImportedJoinBundle {
+                bundle,
+                imported_at_ms: 41_000,
+            })
+        );
+
+        exporter
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("exporter should shut down"));
+        importer
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("importer should shut down"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn signed_introduction_join_bundle_import_records_candidate_and_preference() {
+        let temp = tempdir().unwrap_or_else(|_| unreachable!("tempdir should succeed"));
+        let network_state_path = temp.path().join("network-state.json");
+        let introducer_signing_key = sample_signing_key(71);
+        let introduction_policy = ClusterIntroductionPolicy::new(
+            vec![ClusterIntroductionSource::new(
+                "introducer-b",
+                encode_auth_public_key(&introducer_signing_key.verifying_key()),
+            )],
+            30_000,
+        );
+        let candidate_signing_key = sample_signing_key(72);
+        let candidate = sample_discovery_candidate(
+            &sample_admission(),
+            "candidate-b",
+            NodeRole::ExecutorOnly,
+            &candidate_signing_key,
+            vec![loopback_addr(32061)],
+        );
+        let envelope = SignedClusterIntroductionEnvelope::sign(
+            ClusterIntroductionPayload::new(candidate.clone(), 50_000, 60_000),
+            "introducer-b",
+            &introducer_signing_key,
+        );
+        let importer = LocalClusterNode::spawn(
+            LocalClusterConfig::new(
+                "lan-zeta",
+                "alt-secret",
+                loopback_addr(0),
+                NodeRole::CoordinatorOnly,
+            )
+            .with_introduction_policy(introduction_policy)
+            .with_file_backed_network_state(network_state_path.clone()),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!("importer node should start"));
+
+        let bundle = ClusterJoinBundle::signed_introduction(
+            "mesh-intro",
+            envelope,
+            vec![loopback_addr(32061)],
+            ClusterJoinBundleTrustMetadata::from_policies(
+                importer.trust_policy(),
+                importer.introduction_policy(),
+            ),
+            50_500,
+        );
+        let expected_preference = PersistedJoinedMeshPreference::from_bundle(&bundle, 51_000);
+        let outcome = importer
+            .import_join_bundle(bundle.clone(), 51_000)
+            .await
+            .unwrap_or_else(|_| unreachable!("introduction join bundle should import"));
+        match outcome {
+            ClusterJoinBundleImportOutcome::IntroductionImported {
+                mesh_preference,
+                candidate: imported_candidate,
+            } => {
+                assert_eq!(mesh_preference, expected_preference.clone());
+                assert_eq!(imported_candidate.node_id, candidate.node_id);
+                assert_eq!(
+                    imported_candidate.disposition,
+                    ClusterCandidateDisposition::Introduced
+                );
+            }
+            other => panic!("unexpected join bundle import outcome: {other:?}"),
+        }
+
+        let state = importer.durable_network_state().await;
+        assert_eq!(
+            state.last_joined_mesh_preference,
+            Some(expected_preference.clone())
+        );
+        assert_eq!(
+            state.last_imported_join_bundle,
+            Some(PersistedImportedJoinBundle {
+                bundle: bundle.clone(),
+                imported_at_ms: 51_000,
+            })
+        );
+        assert_eq!(
+            state
+                .candidates
+                .get(&candidate.node_id)
+                .map(|record| record.disposition),
+            Some(ClusterCandidateDisposition::Introduced)
+        );
+
+        let loaded = PersistedClusterNetworkState::load_json(&network_state_path)
+            .expect("state should load");
+        assert_eq!(
+            loaded.last_joined_mesh_preference,
+            Some(expected_preference)
+        );
+        assert_eq!(
+            loaded.last_imported_join_bundle,
+            Some(PersistedImportedJoinBundle {
+                bundle,
+                imported_at_ms: 51_000,
+            })
+        );
+
+        importer
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("importer should shut down"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn signed_introduction_join_bundle_without_policy_returns_typed_refusal() {
+        let temp = tempdir().unwrap_or_else(|_| unreachable!("tempdir should succeed"));
+        let network_state_path = temp.path().join("network-state.json");
+        let introducer_signing_key = sample_signing_key(73);
+        let candidate_signing_key = sample_signing_key(74);
+        let candidate = sample_discovery_candidate(
+            &sample_admission(),
+            "candidate-c",
+            NodeRole::ExecutorOnly,
+            &candidate_signing_key,
+            vec![loopback_addr(32071)],
+        );
+        let envelope = SignedClusterIntroductionEnvelope::sign(
+            ClusterIntroductionPayload::new(candidate, 60_000, 70_000),
+            "introducer-c",
+            &introducer_signing_key,
+        );
+        let importer = LocalClusterNode::spawn(
+            LocalClusterConfig::new(
+                "lan-theta",
+                "third-secret",
+                loopback_addr(0),
+                NodeRole::CoordinatorOnly,
+            )
+            .with_file_backed_network_state(network_state_path.clone()),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!("importer node should start"));
+
+        let bundle = ClusterJoinBundle::signed_introduction(
+            "mesh-refused",
+            envelope,
+            vec![loopback_addr(32071)],
+            ClusterJoinBundleTrustMetadata::from_policies(
+                importer.trust_policy(),
+                importer.introduction_policy(),
+            ),
+            60_500,
+        );
+        let outcome = importer
+            .import_join_bundle(bundle.clone(), 61_000)
+            .await
+            .unwrap_or_else(|_| unreachable!("import should return typed outcome"));
+        assert_eq!(
+            outcome,
+            ClusterJoinBundleImportOutcome::Refused {
+                reason: ClusterJoinBundleImportRefusalReason::IntroductionPolicyMissing,
+            }
+        );
+
+        let state = importer.durable_network_state().await;
+        assert_eq!(state.last_joined_mesh_preference, None);
+        assert_eq!(
+            state.last_imported_join_bundle,
+            Some(PersistedImportedJoinBundle {
+                bundle: bundle.clone(),
+                imported_at_ms: 61_000,
+            })
+        );
+
+        let loaded = PersistedClusterNetworkState::load_json(&network_state_path)
+            .expect("state should load");
+        assert_eq!(loaded.last_joined_mesh_preference, None);
+        assert_eq!(
+            loaded.last_imported_join_bundle,
+            Some(PersistedImportedJoinBundle {
+                bundle,
+                imported_at_ms: 61_000,
+            })
+        );
+
+        importer
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("importer should shut down"));
     }
 }
