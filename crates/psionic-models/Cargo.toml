@@ -20,6 +20,7 @@ hex = { workspace = true }
 psionic-catalog = { path = "../psionic-catalog" }
 psionic-core = { path = "../psionic-core" }
 psionic-ir = { path = "../psionic-ir" }
+psionic-nn = { path = "../psionic-nn" }
 psionic-transformer = { path = "../psionic-transformer" }
 openai-harmony = "0.0.8"
 psionic-runtime = { path = "../psionic-runtime" }

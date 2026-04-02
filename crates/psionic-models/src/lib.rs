@@ -2,6 +2,7 @@
 
 mod attnres;
 mod cs336_a1_tokenizer;
+mod cs336_a1_reference_stack;
 mod fixtures;
 mod harmony;
 mod parameter_golf;
@@ -82,6 +83,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub use attnres::*;
+pub use cs336_a1_reference_stack::*;
 pub use cs336_a1_tokenizer::*;
 pub use fixtures::*;
 pub use harmony::*;

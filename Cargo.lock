@@ -4408,6 +4408,7 @@ dependencies = [
  "psionic-catalog",
  "psionic-core",
  "psionic-ir",
+ "psionic-nn",
  "psionic-runtime",
  "psionic-transformer",
  "safetensors",
