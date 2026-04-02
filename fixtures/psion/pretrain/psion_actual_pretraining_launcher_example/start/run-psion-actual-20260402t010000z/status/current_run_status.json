@@ -6,6 +6,7 @@
   "current_status_path": "status/current_run_status.json",
   "retained_summary_path": "status/retained_summary.json",
   "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+  "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
   "latest_checkpoint_label": "pending_first_checkpoint",
   "last_completed_step": 0,
   "launcher_surfaces": {

@@ -99,8 +99,14 @@ Resume refuses when that pointer is missing or still in
 
 - `manifests/resume_manifest.json`
 - refreshed status and retained-summary files
+- `continuation/accepted_checkpoint_handoff.json`
 - refreshed provisional closeout bundle
 - appended `logs/launcher.log`
+
+The continuation handoff binds the accepted checkpoint to the frozen
+`general_sft -> agentic_sft` target and preserves the bounded plugin
+benchmark-pack bindings already attached to that target. It does not claim that
+the continuation stage has already run.
 
 ## Status Command
 
@@ -149,3 +155,4 @@ provisional closeout bundle.
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
+- `docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md`

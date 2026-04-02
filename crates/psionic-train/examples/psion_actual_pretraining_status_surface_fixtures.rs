@@ -1,13 +1,14 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use psionic_train::{
-    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingLauncherSurfaces,
-    PsionActualPretrainingRetainedSummary,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
     PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_LANE_ID,
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
     PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingLauncherSurfaces,
+    PsionActualPretrainingRetainedSummary,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -33,6 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         latest_checkpoint_label: String::from("actual-pretrain-step-4096"),
         last_completed_step: 4096,
         launcher_surfaces: surfaces.clone(),
@@ -55,6 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         launcher_surfaces: surfaces,
         claim_boundary: String::from(
             "The retained summary records actual-lane start, dry-run, resume, and status surfaces plus the last known operator state. It does not claim that cluster execution, automatic eval, or durable backup are finished.",

@@ -8,6 +8,7 @@
   "dirty_tree_admission": "refuse_by_default",
   "current_status_path": "status/current_run_status.json",
   "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+  "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
   "launcher_surfaces": {
     "start_surface_id": "psion_actual_pretraining.start",
     "dry_run_surface_id": "psion_actual_pretraining.dry_run",

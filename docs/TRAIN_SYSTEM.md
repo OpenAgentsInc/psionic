@@ -149,6 +149,20 @@ selected ref plus exact commit SHA; and repeats that provenance in the
 provisional closeout bundle without claiming that later hardening issues are
 already finished.
 
+The repo now also owns the canonical accepted-checkpoint continuation handoff
+contract in
+`crates/psionic-train/src/psion_actual_pretraining_continuation_handoff.rs`,
+the retained-path writer inside
+`crates/psionic-train/examples/psion_actual_pretraining_operator.rs`, the
+focused doc `docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md`, and the
+committed fixture
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_v1.json`.
+That surface binds one accepted actual-lane checkpoint to the frozen
+`pretrain -> general_sft -> agentic_sft` continuation target and carries the
+plugin benchmark-pack bindings already attached to the bounded continuation
+stage without pretending that continuation-stage execution has already been
+proved.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker

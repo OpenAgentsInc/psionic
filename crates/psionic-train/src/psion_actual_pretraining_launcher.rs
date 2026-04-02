@@ -2,11 +2,12 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    PsionActualPretrainingArtifactRef, PsionActualPretrainingLauncherSurfaces,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID, PSION_ACTUAL_PRETRAINING_START_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingLauncherSurfaces,
 };
 
 /// Stable schema version for the canonical actual-lane launch manifest.
@@ -38,6 +39,8 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub retained_summary_path: String,
     /// Relative latest-checkpoint pointer path.
     pub latest_checkpoint_pointer_path: String,
+    /// Relative continuation handoff path.
+    pub continuation_handoff_path: String,
     /// Relative closeout bundle path.
     pub closeout_bundle_path: String,
     /// Relative launcher log path.
@@ -248,6 +251,11 @@ impl PsionActualPretrainingRetainedPathSet {
             self.latest_checkpoint_pointer_path.as_str(),
             "retained_paths.latest_checkpoint_pointer_path",
             "checkpoints/latest_accepted_checkpoint_pointer.json",
+        )?;
+        ensure_exact(
+            self.continuation_handoff_path.as_str(),
+            "retained_paths.continuation_handoff_path",
+            PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
         )?;
         ensure_exact(
             self.closeout_bundle_path.as_str(),

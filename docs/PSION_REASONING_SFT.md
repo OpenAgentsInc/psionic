@@ -20,6 +20,12 @@ handoff between the actual pretrain lane and the later bounded
 plugin-conditioned stage, without implying that broader plugin-conditioned
 cluster operation is already closed.
 
+That declared bridge is now also retained explicitly in
+`docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md` and
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_v1.json`.
+The actual lane therefore closes into this reasoning-SFT bridge through one
+accepted-checkpoint handoff contract instead of only through the recipe prose.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_reasoning_sft.rs` owns the reasoning-SFT

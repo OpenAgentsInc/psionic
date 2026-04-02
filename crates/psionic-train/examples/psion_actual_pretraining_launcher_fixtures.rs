@@ -5,15 +5,9 @@ use std::{
 };
 
 use psionic_train::{
-    PsionActualPretrainingArtifactRef, PsionActualPretrainingCheckpointPointer,
-    PsionActualPretrainingCloseoutBundle, PsionActualPretrainingCredentialBinding,
-    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingLaunchManifest,
-    PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
-    PsionActualPretrainingRecipeBundle, PsionActualPretrainingResumeManifest,
-    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
-    PsionActualPretrainingRunRoots, PsionActualPretrainingTopologyStorageBundle,
     PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
     PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION,
@@ -21,7 +15,15 @@ use psionic_train::{
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
     PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCloseoutBundle,
+    PsionActualPretrainingContinuationHandoff, PsionActualPretrainingCredentialBinding,
+    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingLaunchManifest,
+    PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
+    PsionActualPretrainingRecipeBundle, PsionActualPretrainingResumeManifest,
+    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
+    PsionActualPretrainingRunRoots, PsionActualPretrainingTopologyStorageBundle,
+    PsionPluginConditionedSftStageManifest, record_psion_actual_pretraining_continuation_handoff,
 };
 use sha2::{Digest, Sha256};
 
@@ -41,6 +43,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             "fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json",
         ))?;
     topology.validate()?;
+    let plugin_conditioned_stage_manifest: PsionPluginConditionedSftStageManifest = load_json(
+        &root.join(
+            &recipe
+                .continuation_target
+                .plugin_conditioned_stage_manifest
+                .path,
+        ),
+    )?;
 
     let retained_paths = retained_paths();
     retained_paths.validate()?;
@@ -56,7 +66,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         surface_id: String::from(PSION_ACTUAL_PRETRAINING_START_SURFACE_ID),
         lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
         recipe_id: String::from(PSION_ACTUAL_PRETRAINING_RECIPE_ID),
-        topology_storage_bundle_id: String::from(PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID),
+        topology_storage_bundle_id: String::from(
+            PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+        ),
         evidence_contract_id: String::from(PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID),
         run_id: String::from(launch_run_id),
         retained_paths: retained_paths.clone(),
@@ -102,6 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         latest_checkpoint_label: String::from("pending_first_checkpoint"),
         last_completed_step: 0,
         launcher_surfaces: launcher_surfaces.clone(),
@@ -124,6 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         launcher_surfaces: launcher_surfaces.clone(),
         claim_boundary: String::from(
             "The retained summary records actual-lane start, dry-run, resume, and status surfaces plus the last known operator state. It does not claim that cluster execution, automatic eval, or durable backup are finished.",
@@ -176,7 +190,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         surface_id: String::from(PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID),
         lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
         recipe_id: String::from(PSION_ACTUAL_PRETRAINING_RECIPE_ID),
-        topology_storage_bundle_id: String::from(PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID),
+        topology_storage_bundle_id: String::from(
+            PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+        ),
         evidence_contract_id: String::from(PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID),
         run_id: String::from(resume_run_id),
         retained_paths: retained_paths.clone(),
@@ -212,6 +228,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         latest_checkpoint_label: String::from("broader-pretrain-final"),
         last_completed_step: 16384,
         launcher_surfaces: launcher_surfaces.clone(),
@@ -234,6 +251,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         launcher_surfaces,
         claim_boundary: String::from(
             "The retained summary records actual-lane start, dry-run, resume, and status surfaces plus the last known operator state. It does not claim that cluster execution, automatic eval, or durable backup are finished.",
@@ -243,6 +261,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         ),
     };
     resume_summary.validate()?;
+    let continuation_handoff = record_psion_actual_pretraining_continuation_handoff(
+        &accepted_pointer,
+        &recipe,
+        &plugin_conditioned_stage_manifest,
+    )?;
+    continuation_handoff.validate()?;
 
     fs::write(
         fixtures_dir.join("psion_actual_pretraining_launch_manifest_v1.json"),
@@ -260,6 +284,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         fixtures_dir.join("psion_actual_pretraining_closeout_bundle_v1.json"),
         serde_json::to_string_pretty(&launch_closeout)?,
     )?;
+    fs::write(
+        fixtures_dir.join("psion_actual_pretraining_continuation_handoff_v1.json"),
+        serde_json::to_string_pretty(&continuation_handoff)?,
+    )?;
 
     write_run_root(
         &fixtures_dir
@@ -271,6 +299,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &launch_status,
         &launch_summary,
         &pending_pointer,
+        None,
         &launch_closeout,
         "2026-04-02T15:00:00Z launch_staged surface_id=psion_actual_pretraining.start\n",
     )?;
@@ -284,6 +313,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         &resume_status,
         &resume_summary,
         &accepted_pointer,
+        Some(&continuation_handoff),
         &PsionActualPretrainingCloseoutBundle {
             closeout_state: String::from("resume_staged"),
             run_id: String::from(resume_run_id),
@@ -323,6 +353,7 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         closeout_bundle_path: String::from("closeout/closeout_bundle.json"),
         launcher_log_path: String::from("logs/launcher.log"),
     }
@@ -424,12 +455,14 @@ fn write_run_root(
     current_status: &PsionActualPretrainingCurrentRunStatus,
     retained_summary: &PsionActualPretrainingRetainedSummary,
     checkpoint_pointer: &PsionActualPretrainingCheckpointPointer,
+    continuation_handoff: Option<&PsionActualPretrainingContinuationHandoff>,
     closeout_bundle: &PsionActualPretrainingCloseoutBundle,
     launcher_log: &str,
 ) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(run_root.join("manifests"))?;
     fs::create_dir_all(run_root.join("status"))?;
     fs::create_dir_all(run_root.join("checkpoints"))?;
+    fs::create_dir_all(run_root.join("continuation"))?;
     fs::create_dir_all(run_root.join("closeout"))?;
     fs::create_dir_all(run_root.join("logs"))?;
     if let Some(launch_manifest) = launch_manifest {
@@ -456,6 +489,12 @@ fn write_run_root(
         run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json"),
         serde_json::to_string_pretty(checkpoint_pointer)?,
     )?;
+    if let Some(continuation_handoff) = continuation_handoff {
+        fs::write(
+            run_root.join(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
+            serde_json::to_string_pretty(continuation_handoff)?,
+        )?;
+    }
     fs::write(
         run_root.join("closeout/closeout_bundle.json"),
         serde_json::to_string_pretty(closeout_bundle)?,

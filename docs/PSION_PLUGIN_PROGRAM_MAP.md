@@ -23,6 +23,13 @@ path `pretrain -> general_sft -> agentic_sft` through
 is explicitly subordinate to the frozen actual pretraining lane instead of a
 parallel curriculum track.
 
+The accepted actual-lane checkpoint now also binds into that path through one
+retained handoff contract in
+`docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md` and
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_v1.json`.
+That keeps the continuation target machine-legible before later continuation
+rehearsals land.
+
 This doc exists so the repo can point at one durable dependency-ordered map for
 that convergence tranche instead of reconstructing it from the alpha planning
 note or scattered issue titles.
@@ -68,6 +75,9 @@ The current repo truth is:
    - the current host-native and mixed reference lanes are still bounded
      reference or evidence surfaces and may not be used as the primary proof
      target for Google GPU training claims
+   - the actual-lane checkpoint handoff is now explicit, but continuation-stage
+     execution proof is still later and must not be backfilled from the handoff
+     contract alone
 
 ## Claim Boundary
 

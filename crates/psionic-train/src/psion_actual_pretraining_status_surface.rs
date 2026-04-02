@@ -53,6 +53,8 @@ pub struct PsionActualPretrainingCurrentRunStatus {
     pub retained_summary_path: String,
     /// Relative path to the latest accepted checkpoint pointer.
     pub latest_checkpoint_pointer_path: String,
+    /// Relative path to the accepted-checkpoint continuation handoff.
+    pub continuation_handoff_path: String,
     /// Last known accepted checkpoint label.
     pub latest_checkpoint_label: String,
     /// Last completed optimizer step.
@@ -86,6 +88,8 @@ pub struct PsionActualPretrainingRetainedSummary {
     pub current_status_path: String,
     /// Relative path to the latest accepted checkpoint pointer.
     pub latest_checkpoint_pointer_path: String,
+    /// Relative path to the accepted-checkpoint continuation handoff.
+    pub continuation_handoff_path: String,
     /// Reserved launcher surface ids.
     pub launcher_surfaces: PsionActualPretrainingLauncherSurfaces,
     /// Claim boundary for the retained summary.
@@ -132,6 +136,13 @@ impl PsionActualPretrainingCurrentRunStatus {
                 field: String::from("latest_checkpoint_pointer_path"),
                 expected: String::from("checkpoints/latest_accepted_checkpoint_pointer.json"),
                 actual: self.latest_checkpoint_pointer_path.clone(),
+            });
+        }
+        if self.continuation_handoff_path != "continuation/accepted_checkpoint_handoff.json" {
+            return Err(PsionActualPretrainingStatusSurfaceError::FieldMismatch {
+                field: String::from("continuation_handoff_path"),
+                expected: String::from("continuation/accepted_checkpoint_handoff.json"),
+                actual: self.continuation_handoff_path.clone(),
             });
         }
         ensure_nonempty(
@@ -209,6 +220,13 @@ impl PsionActualPretrainingRetainedSummary {
                 field: String::from("latest_checkpoint_pointer_path"),
                 expected: String::from("checkpoints/latest_accepted_checkpoint_pointer.json"),
                 actual: self.latest_checkpoint_pointer_path.clone(),
+            });
+        }
+        if self.continuation_handoff_path != "continuation/accepted_checkpoint_handoff.json" {
+            return Err(PsionActualPretrainingStatusSurfaceError::FieldMismatch {
+                field: String::from("continuation_handoff_path"),
+                expected: String::from("continuation/accepted_checkpoint_handoff.json"),
+                actual: self.continuation_handoff_path.clone(),
             });
         }
         self.launcher_surfaces.validate()?;

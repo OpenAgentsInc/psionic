@@ -122,6 +122,12 @@ mod parameter_golf_submission_pr;
 mod parameter_golf_submission_runtime;
 mod parameter_golf_xtrain_visualization;
 mod psion_acceptance_matrix;
+mod psion_actual_pretraining_continuation_handoff;
+mod psion_actual_pretraining_evidence_contract;
+mod psion_actual_pretraining_lane;
+mod psion_actual_pretraining_launcher;
+mod psion_actual_pretraining_recipe_bundle;
+mod psion_actual_pretraining_status_surface;
 mod psion_benchmark_label_generation;
 mod psion_benchmark_packages;
 mod psion_checkpoint_recovery;
@@ -176,11 +182,6 @@ mod psion_forge_eval_pack_manifests;
 mod psion_google_single_node_visualization;
 mod psion_google_two_node_swarm_contract;
 mod psion_google_two_node_swarm_runtime;
-mod psion_actual_pretraining_lane;
-mod psion_actual_pretraining_evidence_contract;
-mod psion_actual_pretraining_launcher;
-mod psion_actual_pretraining_recipe_bundle;
-mod psion_actual_pretraining_status_surface;
 mod psion_pilot_pretraining_run;
 mod psion_plugin_argument_construction_benchmark;
 mod psion_plugin_benchmark_packages;
@@ -394,6 +395,12 @@ pub use parameter_golf_submission_pr::*;
 pub use parameter_golf_submission_runtime::*;
 pub use parameter_golf_xtrain_visualization::*;
 pub use psion_acceptance_matrix::*;
+pub use psion_actual_pretraining_continuation_handoff::*;
+pub use psion_actual_pretraining_evidence_contract::*;
+pub use psion_actual_pretraining_lane::*;
+pub use psion_actual_pretraining_launcher::*;
+pub use psion_actual_pretraining_recipe_bundle::*;
+pub use psion_actual_pretraining_status_surface::*;
 pub use psion_benchmark_label_generation::*;
 pub use psion_benchmark_packages::*;
 pub use psion_checkpoint_recovery::*;
@@ -448,11 +455,6 @@ pub use psion_forge_eval_pack_manifests::*;
 pub use psion_google_single_node_visualization::*;
 pub use psion_google_two_node_swarm_contract::*;
 pub use psion_google_two_node_swarm_runtime::*;
-pub use psion_actual_pretraining_lane::*;
-pub use psion_actual_pretraining_evidence_contract::*;
-pub use psion_actual_pretraining_launcher::*;
-pub use psion_actual_pretraining_recipe_bundle::*;
-pub use psion_actual_pretraining_status_surface::*;
 pub use psion_pilot_pretraining_run::*;
 pub use psion_plugin_argument_construction_benchmark::*;
 pub use psion_plugin_benchmark_packages::*;
@@ -1440,8 +1442,8 @@ mod tests {
     }
 
     #[test]
-    fn observe_membership_advances_epoch_only_when_truth_changes(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn observe_membership_advances_epoch_only_when_truth_changes()
+    -> Result<(), Box<dyn std::error::Error>> {
         let stable = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1471,8 +1473,8 @@ mod tests {
     }
 
     #[test]
-    fn live_recovery_plan_exposes_recovery_and_late_join_semantics(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn live_recovery_plan_exposes_recovery_and_late_join_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
         let state = cluster_state(&[
             ("worker-a", ClusterMembershipStatus::Ready),
             ("worker-b", ClusterMembershipStatus::Ready),
@@ -1515,15 +1517,18 @@ mod tests {
             plan.recovery_context.late_joiner_node_ids,
             vec![String::from("worker-c")]
         );
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint));
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners));
-        assert!(plan
-            .actions
-            .contains(&TrainingRecoveryAction::RebalanceWorldSize));
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::ResumeFromDurableCheckpoint)
+        );
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::StageCheckpointForLateJoiners)
+        );
+        assert!(
+            plan.actions
+                .contains(&TrainingRecoveryAction::RebalanceWorldSize)
+        );
         assert_eq!(plan.checkpoint_streams.len(), 1);
         assert!(!plan.plan_digest.is_empty());
         Ok(())

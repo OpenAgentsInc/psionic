@@ -87,3 +87,9 @@ Those commands materialize the actual-lane retained evidence family under
 `psion_actual_pretraining_runs/<run_id>` naming without pretending that later
 hardware qualification, backup, auto-eval, or cluster execution hardening is
 already finished.
+
+When resume selects an accepted checkpoint, the same retained family now also
+writes `continuation/accepted_checkpoint_handoff.json`. That artifact closes
+the actual lane into the bounded `general_sft -> agentic_sft` target without
+claiming continuation-stage execution. See
+`docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md`.

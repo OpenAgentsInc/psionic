@@ -46,6 +46,13 @@ Inside an actual-lane run root, the retained status files are:
 Those paths are already reserved by the evidence contract in
 `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`.
 
+The status artifacts now also retain the reserved continuation handoff path:
+
+- `continuation/accepted_checkpoint_handoff.json`
+
+That keeps the last-known operator state and the accepted-checkpoint handoff in
+the same named family when resume has selected an accepted checkpoint.
+
 ## Status Command
 
 The canonical status command is:

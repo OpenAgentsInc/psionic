@@ -32,6 +32,7 @@ pretraining lane, recipe, and evidence family are frozen separately in:
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 - `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`
+- `docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md`
 
 It does **not** mean:
 
