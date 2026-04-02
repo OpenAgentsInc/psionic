@@ -69,6 +69,17 @@ source report plus one shared `v2` run bundle with explicit bounded-train-to-
 infer proof posture, closed-out local-reference BPB, and a held non-public
 promotion gate.
 
+The repo now also owns one canonical actual-lane identifier for `Psion`
+pretraining in `crates/psionic-train/src/psion_actual_pretraining_lane.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_lane_fixtures.rs`, the
+focused lane doc `docs/PSION_ACTUAL_PRETRAINING_LANE.md`, and the committed
+fixture `fixtures/psion/pretrain/psion_actual_pretraining_lane_spec_v1.json`.
+That surface freezes one named actual lane above the bounded
+`psion_accelerated_reference_pilot` and ties it explicitly to the admitted
+`broader_pretraining` trusted-cluster bundle instead of leaving "actual
+pretraining" as prose.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker
