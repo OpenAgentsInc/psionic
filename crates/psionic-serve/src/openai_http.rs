@@ -44,9 +44,9 @@ use psionic_net::{
 use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
     ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore, RouteSelection,
-    RouteSelectionStrategy, RoutedModelInventory, RoutedWarmState, RoutedWorkerInventory,
-    RoutingDemandLedger, RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest,
-    RoutingTarget,
+    RouteSelectionStrategy, RoutedExecutionLocality, RoutedExecutionProvenance,
+    RoutedModelInventory, RoutedWarmState, RoutedWorkerInventory, RoutingDemandLedger,
+    RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
 };
 use psionic_runtime::{
     ExecutionCapabilityProfile, GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt,
@@ -1067,10 +1067,14 @@ struct MeshManagementRouteStatus {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 struct MeshManagementNodeStatus {
     worker_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mesh_peer_worker_id: Option<String>,
     served_mesh_role: ServedMeshRoleState,
     backend_label: String,
     execution_mode_label: String,
     execution_engine_label: String,
+    execution_locality: RoutedExecutionLocality,
+    execution_provenance: RoutedExecutionProvenance,
     models: Vec<MeshManagementModelStatus>,
     route_inventory: Vec<MeshManagementRouteStatus>,
 }
@@ -1377,6 +1381,12 @@ impl OpenAiCompatLoadedModel {
 impl OpenAiCompatState {
     fn management_status(&self) -> MeshManagementStatusResponse {
         let observed_at_ms = unix_timestamp_ms();
+        let published_models = published_mesh_models(self);
+        let default_model_name = published_models
+            .iter()
+            .find(|model| route_target_matches_published_model(self.router.default_model(), model))
+            .map(|model| model.canonical_name.clone())
+            .unwrap_or_else(|| self.default_model_name.clone());
         let join_state = self
             .management_join_state
             .lock()
@@ -1430,9 +1440,9 @@ impl OpenAiCompatState {
             status: "ok",
             namespace: "psionic_management",
             topology_digest,
-            default_model: self.default_model_name.clone(),
+            default_model: default_model_name,
             node_count: nodes.len(),
-            model_count: self.models_by_key.len(),
+            model_count: published_models.len(),
             event_stream_path: "/psionic/management/events",
             join_state,
             nodes,
@@ -1678,10 +1688,13 @@ fn mesh_management_node_status(worker: &RoutedWorkerInventory) -> MeshManagement
     });
     MeshManagementNodeStatus {
         worker_id: worker.worker_id.clone(),
+        mesh_peer_worker_id: worker.peer_worker_id.clone(),
         served_mesh_role: mesh_management_node_role(worker.worker_id.as_str()),
         backend_label: worker.backend_label.clone(),
         execution_mode_label: worker.execution_mode_label.clone(),
         execution_engine_label: worker.execution_engine_label.clone(),
+        execution_locality: worker.execution_locality,
+        execution_provenance: worker.execution_provenance,
         models,
         route_inventory,
     }
@@ -1806,7 +1819,6 @@ enum OpenAiCompatWorkerCommand {
 impl BootstrapProxyState {
     fn from_remote_status(
         mode: BootstrapProxyMode,
-        models_by_key: &BTreeMap<String, OpenAiCompatLoadedModel>,
     ) -> Result<Option<(Arc<Self>, Vec<RoutedWorkerInventory>, String)>, OpenAiCompatServerError>
     {
         let Some(base_url) = env::var_os("PSIONIC_BOOTSTRAP_PROXY_BASE_URL") else {
@@ -1845,11 +1857,11 @@ impl BootstrapProxyState {
         let remote_workers = status
             .nodes
             .iter()
-            .filter_map(|node| bootstrap_remote_worker_inventory(node, models_by_key))
+            .filter_map(bootstrap_remote_worker_inventory)
             .collect::<Vec<_>>();
         if remote_workers.is_empty() {
             return Err(OpenAiCompatServerError::Config(format!(
-                "bootstrap proxy `{base_url}` did not advertise any warm models matching the local model plan",
+                "bootstrap proxy `{base_url}` did not advertise any warm mesh-visible models",
             )));
         }
 
@@ -1867,15 +1879,11 @@ impl BootstrapProxyState {
 
 fn bootstrap_remote_worker_inventory(
     node: &BootstrapRemoteNodeStatus,
-    models_by_key: &BTreeMap<String, OpenAiCompatLoadedModel>,
 ) -> Option<RoutedWorkerInventory> {
     let models = node
         .models
         .iter()
-        .filter(|model| {
-            models_by_key.contains_key(model.model_key.as_str())
-                && model.warm_state == RoutedWarmState::Warm
-        })
+        .filter(|model| model.warm_state == RoutedWarmState::Warm)
         .filter_map(bootstrap_remote_model_inventory)
         .collect::<Vec<_>>();
     if models.is_empty() {
@@ -1888,6 +1896,8 @@ fn bootstrap_remote_worker_inventory(
             node.execution_mode_label.clone(),
             node.execution_engine_label.clone(),
         )
+        .as_remote_bootstrap_proxy()
+        .with_peer_worker_id(node.worker_id.clone())
         .with_model_entries(models),
     )
 }
@@ -1974,10 +1984,13 @@ fn bootstrap_management_node(
     });
     MeshManagementNodeStatus {
         worker_id: String::from(OPENAI_COMPAT_WORKER_ID),
+        mesh_peer_worker_id: None,
         served_mesh_role: mode.local_role_state(),
         backend_label: String::from("remote"),
         execution_mode_label: String::from("proxy"),
         execution_engine_label: String::from("psionic"),
+        execution_locality: RoutedExecutionLocality::Local,
+        execution_provenance: RoutedExecutionProvenance::LocalExecution,
         models,
         route_inventory,
     }
@@ -2008,7 +2021,6 @@ impl OpenAiCompatServer {
         let mut models_by_key = BTreeMap::new();
         let mut routed_models = Vec::new();
         let mut default_model_key = None;
-        let mut default_canonical_model_name = None;
         let mut load_plans = Vec::new();
         let bootstrap_mode = BootstrapProxyMode::from_env()?;
 
@@ -2051,7 +2063,6 @@ impl OpenAiCompatServer {
             ));
             if default_model_key.is_none() {
                 default_model_key = Some(loaded_model.model_key.clone());
-                default_canonical_model_name = Some(loaded_model.canonical_name.clone());
             }
             load_plans.push(load_plan);
         }
@@ -2071,7 +2082,7 @@ impl OpenAiCompatServer {
         let (workers, router, local_management_node, bootstrap_proxy) =
             if let Some(mode) = bootstrap_mode {
                 let (bootstrap_proxy, remote_workers, remote_default_model) =
-                    BootstrapProxyState::from_remote_status(mode, &models_by_key)?
+                    BootstrapProxyState::from_remote_status(mode)?
                         .expect("bootstrap proxy mode should require a configured base URL");
                 let router_default_model = if remote_workers.iter().any(|worker| {
                     worker
@@ -2109,6 +2120,12 @@ impl OpenAiCompatServer {
                 workers.insert(String::from(OPENAI_COMPAT_WORKER_ID), worker);
                 (workers, router, None, None)
             };
+        let (published_default_model_key, published_default_model_name) =
+            router_default_model_identity(&router).ok_or_else(|| {
+                OpenAiCompatServerError::Config(String::from(
+                    "router default model is not present in routed worker inventory",
+                ))
+            })?;
         Ok(Self {
             state: Arc::new(OpenAiCompatState {
                 workers,
@@ -2116,9 +2133,8 @@ impl OpenAiCompatServer {
                 backend_label: default_model_truth.backend_label,
                 execution_mode_label: default_model_truth.execution_mode_label,
                 execution_engine_label: default_model_truth.execution_engine_label,
-                default_model_key,
-                default_model_name: default_canonical_model_name
-                    .expect("validated non-empty model list"),
+                default_model_key: published_default_model_key,
+                default_model_name: published_default_model_name,
                 models_by_key,
                 include_psionic_fields,
                 request_counter: AtomicU64::new(1),
@@ -2838,6 +2854,18 @@ struct ModelCard {
     owned_by: &'static str,
     psionic_supported_endpoints: Vec<&'static str>,
     psionic_model_family: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_route_workers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_route_backends: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_route_execution_modes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_route_execution_engines: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_route_localities: Vec<RoutedExecutionLocality>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_route_provenances: Vec<RoutedExecutionProvenance>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_served_backend: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2878,6 +2906,429 @@ struct ModelCard {
     psionic_embedding_normalization: Option<EmbeddingNormalization>,
 }
 
+#[derive(Clone, Debug)]
+struct PublishedGenericModelAccumulator {
+    model_key: String,
+    canonical_name: String,
+    aliases: BTreeSet<String>,
+    family: String,
+    supported_endpoints: BTreeSet<RoutingEndpoint>,
+    structured_outputs: bool,
+    tool_calling: bool,
+    response_state: bool,
+    execution_profile: ExecutionCapabilityProfile,
+    scheduler_policy: Option<GenerationSchedulerPolicy>,
+    route_workers: BTreeSet<String>,
+    route_backends: BTreeSet<String>,
+    route_execution_modes: BTreeSet<String>,
+    route_execution_engines: BTreeSet<String>,
+    route_localities: BTreeSet<RoutedExecutionLocality>,
+    route_provenances: BTreeSet<RoutedExecutionProvenance>,
+}
+
+#[derive(Clone, Debug)]
+struct PublishedGenericModel {
+    model_key: String,
+    canonical_name: String,
+    aliases: Vec<String>,
+    family: String,
+    supported_endpoints: Vec<RoutingEndpoint>,
+    structured_outputs: bool,
+    tool_calling: bool,
+    response_state: bool,
+    execution_profile: ExecutionCapabilityProfile,
+    scheduler_policy: Option<GenerationSchedulerPolicy>,
+    route_workers: Vec<String>,
+    route_backends: Vec<String>,
+    route_execution_modes: Vec<String>,
+    route_execution_engines: Vec<String>,
+    route_localities: Vec<RoutedExecutionLocality>,
+    route_provenances: Vec<RoutedExecutionProvenance>,
+}
+
+fn fallback_tool_calling_capability() -> ToolCallingCapability {
+    ToolCallingCapability {
+        support_level: ToolCallingSupportLevel::Fallback,
+        supported_modes: vec!["none", "auto", "required", "named"],
+        parser: "tagged_json_schema",
+        argument_validation: "json_schema_subset",
+    }
+}
+
+fn unsupported_tool_calling_capability() -> ToolCallingCapability {
+    ToolCallingCapability {
+        support_level: ToolCallingSupportLevel::Unsupported,
+        supported_modes: vec!["none"],
+        parser: "not_available",
+        argument_validation: "not_available",
+    }
+}
+
+fn route_target_matches_published_model(target: &str, model: &PublishedGenericModel) -> bool {
+    model.model_key == target
+        || model.canonical_name == target
+        || model.aliases.iter().any(|alias| alias == target)
+}
+
+fn known_backend_label(label: &str) -> Option<&'static str> {
+    match label {
+        "cpu" => Some("cpu"),
+        "cuda" => Some("cuda"),
+        "metal" => Some("metal"),
+        "remote" => Some("remote"),
+        "rocm" => Some("rocm"),
+        "amd" => Some("amd"),
+        "amd_kfd" => Some("amd_kfd"),
+        "amd_userspace" => Some("amd_userspace"),
+        _ => None,
+    }
+}
+
+fn known_execution_mode_label(label: &str) -> Option<&'static str> {
+    match label {
+        "native" => Some("native"),
+        "proxy" => Some("proxy"),
+        _ => None,
+    }
+}
+
+fn known_execution_engine_label(label: &str) -> Option<&'static str> {
+    match label {
+        "psionic" => Some("psionic"),
+        "llama.cpp" => Some("llama.cpp"),
+        _ => None,
+    }
+}
+
+fn single_known_route_label(
+    labels: &[String],
+    mapper: fn(&str) -> Option<&'static str>,
+) -> Option<&'static str> {
+    (labels.len() == 1)
+        .then(|| mapper(labels[0].as_str()))
+        .flatten()
+}
+
+fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel> {
+    let mut published = BTreeMap::<String, PublishedGenericModelAccumulator>::new();
+    for worker in state.router.inventory() {
+        for model in worker.models {
+            let entry = published.entry(model.model_key.clone()).or_insert_with(|| {
+                PublishedGenericModelAccumulator {
+                    model_key: model.model_key.clone(),
+                    canonical_name: model.canonical_name.clone(),
+                    aliases: model.aliases.iter().cloned().collect(),
+                    family: model.family.clone(),
+                    supported_endpoints: BTreeSet::new(),
+                    structured_outputs: false,
+                    tool_calling: false,
+                    response_state: false,
+                    execution_profile: model.execution_profile.clone(),
+                    scheduler_policy: model.scheduler_policy.clone(),
+                    route_workers: BTreeSet::new(),
+                    route_backends: BTreeSet::new(),
+                    route_execution_modes: BTreeSet::new(),
+                    route_execution_engines: BTreeSet::new(),
+                    route_localities: BTreeSet::new(),
+                    route_provenances: BTreeSet::new(),
+                }
+            });
+            entry.aliases.extend(model.aliases.iter().cloned());
+            entry
+                .supported_endpoints
+                .extend(model.supported_endpoints.iter().copied());
+            entry.structured_outputs |= model.structured_outputs;
+            entry.tool_calling |= model.tool_calling;
+            entry.response_state |= model.response_state;
+            entry.route_workers.insert(
+                worker
+                    .peer_worker_id
+                    .clone()
+                    .unwrap_or_else(|| worker.worker_id.clone()),
+            );
+            entry.route_backends.insert(worker.backend_label.clone());
+            entry
+                .route_execution_modes
+                .insert(worker.execution_mode_label.clone());
+            entry
+                .route_execution_engines
+                .insert(worker.execution_engine_label.clone());
+            entry.route_localities.insert(worker.execution_locality);
+            entry.route_provenances.insert(worker.execution_provenance);
+            if entry.scheduler_policy.is_none() {
+                entry.scheduler_policy = model.scheduler_policy.clone();
+            }
+        }
+    }
+
+    let mut models = published
+        .into_values()
+        .map(|entry| {
+            let local_loaded_model = state.models_by_key.get(entry.model_key.as_str());
+            PublishedGenericModel {
+                model_key: entry.model_key,
+                canonical_name: local_loaded_model
+                    .map(|model| model.canonical_name.clone())
+                    .unwrap_or(entry.canonical_name),
+                aliases: entry.aliases.into_iter().collect(),
+                family: local_loaded_model
+                    .map(|model| model.family_label().to_string())
+                    .unwrap_or(entry.family),
+                supported_endpoints: entry.supported_endpoints.into_iter().collect(),
+                structured_outputs: entry.structured_outputs,
+                tool_calling: entry.tool_calling,
+                response_state: entry.response_state,
+                execution_profile: local_loaded_model
+                    .map(|model| model.execution_profile().clone())
+                    .unwrap_or(entry.execution_profile),
+                scheduler_policy: local_loaded_model
+                    .and_then(OpenAiCompatLoadedModel::scheduler_policy)
+                    .cloned()
+                    .or(entry.scheduler_policy),
+                route_workers: entry.route_workers.into_iter().collect(),
+                route_backends: entry.route_backends.into_iter().collect(),
+                route_execution_modes: entry.route_execution_modes.into_iter().collect(),
+                route_execution_engines: entry.route_execution_engines.into_iter().collect(),
+                route_localities: entry.route_localities.into_iter().collect(),
+                route_provenances: entry.route_provenances.into_iter().collect(),
+            }
+        })
+        .collect::<Vec<_>>();
+    models.sort_by(|left, right| {
+        left.canonical_name
+            .cmp(&right.canonical_name)
+            .then_with(|| left.model_key.cmp(&right.model_key))
+    });
+    models
+}
+
+fn published_default_model(state: &OpenAiCompatState) -> Option<PublishedGenericModel> {
+    let target = state.router.default_model();
+    published_mesh_models(state)
+        .into_iter()
+        .find(|model| route_target_matches_published_model(target, model))
+}
+
+fn router_default_model_identity(router: &FleetRouter) -> Option<(String, String)> {
+    let target = router.default_model();
+    router
+        .inventory()
+        .into_iter()
+        .flat_map(|worker| worker.models.into_iter())
+        .find(|model| {
+            model.model_key == target
+                || model.canonical_name == target
+                || model.aliases.iter().any(|alias| alias == target)
+        })
+        .map(|model| (model.model_key, model.canonical_name))
+}
+
+fn published_model_loaded_model<'a>(
+    state: &'a OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<&'a OpenAiCompatLoadedModel> {
+    state.models_by_key.get(model.model_key.as_str())
+}
+
+fn published_model_local_serving_truth(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> LocalServingTruth {
+    if let Some(loaded_model) = published_model_loaded_model(state, model) {
+        loaded_model.local_serving_truth()
+    } else if model
+        .route_provenances
+        .contains(&RoutedExecutionProvenance::BootstrapProxy)
+    {
+        LocalServingTruth::bootstrap_proxy()
+    } else {
+        LocalServingTruth::cpu_reference()
+    }
+}
+
+fn published_model_supported_endpoint_paths(model: &PublishedGenericModel) -> Vec<&'static str> {
+    model
+        .supported_endpoints
+        .iter()
+        .map(|endpoint| endpoint.path())
+        .collect()
+}
+
+fn published_mesh_supported_endpoint_paths(state: &OpenAiCompatState) -> Vec<&'static str> {
+    let mut endpoints = BTreeSet::new();
+    for model in published_mesh_models(state) {
+        for endpoint in model.supported_endpoints {
+            endpoints.insert(endpoint.path());
+        }
+    }
+    endpoints.into_iter().collect()
+}
+
+fn published_model_structured_output_labels(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<Vec<&'static str>> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::structured_output_labels)
+        .or_else(|| {
+            model
+                .structured_outputs
+                .then(structured_output_parser_labels)
+        })
+}
+
+fn published_model_structured_output_capabilities(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<Vec<StructuredOutputCapability>> {
+    Some(
+        published_model_loaded_model(state, model)
+            .map(OpenAiCompatLoadedModel::structured_output_capabilities)
+            .unwrap_or_else(|| {
+                if model.structured_outputs {
+                    local_structured_output_capabilities()
+                } else {
+                    unsupported_structured_output_capabilities(
+                        "structured outputs are unavailable on this routed mesh model",
+                    )
+                }
+            }),
+    )
+}
+
+fn published_model_tool_calling_capability(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<ToolCallingCapability> {
+    Some(
+        published_model_loaded_model(state, model)
+            .map(OpenAiCompatLoadedModel::tool_calling_capability)
+            .unwrap_or_else(|| {
+                if model.tool_calling {
+                    fallback_tool_calling_capability()
+                } else {
+                    unsupported_tool_calling_capability()
+                }
+            }),
+    )
+}
+
+fn published_model_response_state_capability(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<ResponseStateCapability> {
+    published_model_loaded_model(state, model)
+        .and_then(|loaded_model| loaded_model.response_state_capability(state))
+        .or_else(|| {
+            model
+                .response_state
+                .then(|| state.response_state_capability.clone())
+        })
+}
+
+fn published_model_multimodal_projection_mode(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<&'static str> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::multimodal_projection_mode)
+}
+
+fn published_model_multimodal_supported_media(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<Vec<&'static str>> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::multimodal_supported_media)
+}
+
+fn published_model_multimodal_projection_config(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<Qwen35MultimodalProjectionConfig> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::multimodal_projection_config)
+}
+
+fn published_model_embedding_dimensions(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<usize> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::embedding_dimensions)
+}
+
+fn published_model_embedding_normalization(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<EmbeddingNormalization> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::embedding_normalization)
+}
+
+fn published_model_backend_label(model: &PublishedGenericModel) -> Option<&'static str> {
+    single_known_route_label(model.route_backends.as_slice(), known_backend_label)
+}
+
+fn published_model_execution_mode_label(model: &PublishedGenericModel) -> Option<&'static str> {
+    single_known_route_label(
+        model.route_execution_modes.as_slice(),
+        known_execution_mode_label,
+    )
+}
+
+fn published_model_execution_engine_label(model: &PublishedGenericModel) -> Option<&'static str> {
+    single_known_route_label(
+        model.route_execution_engines.as_slice(),
+        known_execution_engine_label,
+    )
+}
+
+fn published_model_served_backend_label(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<&'static str> {
+    published_model_loaded_model(state, model)
+        .map(OpenAiCompatLoadedModel::backend_label)
+        .or_else(|| {
+            model
+                .route_provenances
+                .contains(&RoutedExecutionProvenance::BootstrapProxy)
+                .then_some("remote")
+        })
+        .or_else(|| published_model_backend_label(model))
+}
+
+fn published_model_served_execution_mode_label(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<&'static str> {
+    published_model_loaded_model(state, model)
+        .map(OpenAiCompatLoadedModel::execution_mode_label)
+        .or_else(|| {
+            model
+                .route_provenances
+                .contains(&RoutedExecutionProvenance::BootstrapProxy)
+                .then_some("proxy")
+        })
+        .or_else(|| published_model_execution_mode_label(model))
+}
+
+fn published_model_served_execution_engine_label(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<&'static str> {
+    published_model_loaded_model(state, model)
+        .map(OpenAiCompatLoadedModel::execution_engine_label)
+        .or_else(|| {
+            model
+                .route_provenances
+                .contains(&RoutedExecutionProvenance::BootstrapProxy)
+                .then_some("psionic")
+        })
+        .or_else(|| published_model_execution_engine_label(model))
+}
+
 async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<ModelsResponse> {
     Json(ModelsResponse {
         data: vec![ModelCard {
@@ -2886,6 +3337,12 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             owned_by: "psionic",
             psionic_supported_endpoints: vec![RoutingEndpoint::ChatCompletions.path()],
             psionic_model_family: state.descriptor.model.family.clone(),
+            psionic_route_workers: Vec::new(),
+            psionic_route_backends: Vec::new(),
+            psionic_route_execution_modes: Vec::new(),
+            psionic_route_execution_engines: Vec::new(),
+            psionic_route_localities: Vec::new(),
+            psionic_route_provenances: Vec::new(),
             psionic_served_backend: Some(state.backend_label),
             psionic_execution_mode: Some(state.execution_mode_label),
             psionic_execution_engine: Some(state.execution_engine_label),
@@ -2951,39 +3408,51 @@ struct GenericHealthResponse {
 async fn generic_health(
     State(state): State<Arc<OpenAiCompatState>>,
 ) -> Json<GenericHealthResponse> {
-    let default_model = state
-        .models_by_key
-        .get(&state.default_model_key)
-        .expect("default model should exist");
+    let default_model =
+        published_default_model(state.as_ref()).expect("published default model should exist");
+    let local_serving_truth = published_model_local_serving_truth(state.as_ref(), &default_model);
     Json(GenericHealthResponse {
         status: "ok",
-        backend: default_model.backend_label(),
-        execution_mode: default_model.execution_mode_label(),
-        execution_engine: default_model.execution_engine_label(),
-        default_model: state.default_model_name.clone(),
-        model_count: state.models_by_key.len(),
-        residency_mode: default_model.local_serving_truth().residency_mode,
-        hybrid_offload: default_model.local_serving_truth().hybrid_offload,
-        hybrid_offload_layers: default_model.local_serving_truth().hybrid_offload_layers,
-        fallback_policy: default_model.local_serving_truth().fallback_policy,
-        performance_class: default_model.local_serving_truth().performance_class,
-        load_status: default_model.local_serving_truth().load_status,
-        warm_control: default_model.local_serving_truth().warm_control,
-        unload_control: default_model.local_serving_truth().unload_control,
-        memory_pressure_reporting: default_model
-            .local_serving_truth()
-            .memory_pressure_reporting,
-        default_model_supported_endpoints: model_endpoint_paths(default_model),
-        supported_endpoints: union_supported_endpoint_paths(state.as_ref()),
-        structured_output_fallbacks: default_model.structured_output_labels(),
-        structured_output_capabilities: Some(default_model.structured_output_capabilities()),
-        tool_calling: Some(default_model.tool_calling_capability()),
-        response_state: default_model.response_state_capability(state.as_ref()),
-        execution_profile: default_model.execution_profile().clone(),
-        scheduler_policy: default_model.scheduler_policy().cloned(),
-        multimodal_projection_mode: default_model.multimodal_projection_mode(),
-        multimodal_supported_media: default_model.multimodal_supported_media(),
-        multimodal_projection_config: default_model.multimodal_projection_config(),
+        backend: state.backend_label,
+        execution_mode: state.execution_mode_label,
+        execution_engine: state.execution_engine_label,
+        default_model: default_model.canonical_name.clone(),
+        model_count: published_mesh_models(state.as_ref()).len(),
+        residency_mode: local_serving_truth.residency_mode,
+        hybrid_offload: local_serving_truth.hybrid_offload,
+        hybrid_offload_layers: local_serving_truth.hybrid_offload_layers,
+        fallback_policy: local_serving_truth.fallback_policy,
+        performance_class: local_serving_truth.performance_class,
+        load_status: local_serving_truth.load_status,
+        warm_control: local_serving_truth.warm_control,
+        unload_control: local_serving_truth.unload_control,
+        memory_pressure_reporting: local_serving_truth.memory_pressure_reporting,
+        default_model_supported_endpoints: published_model_supported_endpoint_paths(&default_model),
+        supported_endpoints: published_mesh_supported_endpoint_paths(state.as_ref()),
+        structured_output_fallbacks: published_model_structured_output_labels(
+            state.as_ref(),
+            &default_model,
+        ),
+        structured_output_capabilities: published_model_structured_output_capabilities(
+            state.as_ref(),
+            &default_model,
+        ),
+        tool_calling: published_model_tool_calling_capability(state.as_ref(), &default_model),
+        response_state: published_model_response_state_capability(state.as_ref(), &default_model),
+        execution_profile: default_model.execution_profile.clone(),
+        scheduler_policy: default_model.scheduler_policy.clone(),
+        multimodal_projection_mode: published_model_multimodal_projection_mode(
+            state.as_ref(),
+            &default_model,
+        ),
+        multimodal_supported_media: published_model_multimodal_supported_media(
+            state.as_ref(),
+            &default_model,
+        ),
+        multimodal_projection_config: published_model_multimodal_projection_config(
+            state.as_ref(),
+            &default_model,
+        ),
     })
 }
 
@@ -3016,36 +3485,75 @@ async fn generic_management_events(
 
 async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Json<ModelsResponse> {
     Json(ModelsResponse {
-        data: state
-            .models_by_key
-            .values()
-            .map(|model| ModelCard {
-                id: model.canonical_name.clone(),
-                object: "model",
-                owned_by: "psionic",
-                psionic_supported_endpoints: model_endpoint_paths(model),
-                psionic_model_family: model.family_label().to_string(),
-                psionic_served_backend: Some(model.backend_label()),
-                psionic_execution_mode: Some(model.execution_mode_label()),
-                psionic_execution_engine: Some(model.execution_engine_label()),
-                psionic_residency_mode: Some(model.local_serving_truth().residency_mode),
-                psionic_hybrid_offload: Some(model.local_serving_truth().hybrid_offload),
-                psionic_hybrid_offload_layers: model.local_serving_truth().hybrid_offload_layers,
-                psionic_fallback_policy: Some(model.local_serving_truth().fallback_policy),
-                psionic_performance_class: Some(model.local_serving_truth().performance_class),
-                psionic_structured_outputs: model.structured_output_labels(),
-                psionic_structured_output_capabilities: Some(
-                    model.structured_output_capabilities(),
-                ),
-                psionic_tool_calling: Some(model.tool_calling_capability()),
-                psionic_response_state: model.response_state_capability(state.as_ref()),
-                psionic_execution_profile: Some(model.execution_profile().clone()),
-                psionic_scheduler_policy: model.scheduler_policy().cloned(),
-                psionic_multimodal_projection_mode: model.multimodal_projection_mode(),
-                psionic_multimodal_supported_media: model.multimodal_supported_media(),
-                psionic_multimodal_projection_config: model.multimodal_projection_config(),
-                psionic_embedding_dimensions: model.embedding_dimensions(),
-                psionic_embedding_normalization: model.embedding_normalization(),
+        data: published_mesh_models(state.as_ref())
+            .into_iter()
+            .map(|model| {
+                let local_serving_truth =
+                    published_model_local_serving_truth(state.as_ref(), &model);
+                ModelCard {
+                    id: model.canonical_name.clone(),
+                    object: "model",
+                    owned_by: "psionic",
+                    psionic_supported_endpoints: published_model_supported_endpoint_paths(&model),
+                    psionic_model_family: model.family.clone(),
+                    psionic_route_workers: model.route_workers.clone(),
+                    psionic_route_backends: model.route_backends.clone(),
+                    psionic_route_execution_modes: model.route_execution_modes.clone(),
+                    psionic_route_execution_engines: model.route_execution_engines.clone(),
+                    psionic_route_localities: model.route_localities.clone(),
+                    psionic_route_provenances: model.route_provenances.clone(),
+                    psionic_served_backend: published_model_served_backend_label(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_execution_mode: published_model_served_execution_mode_label(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_execution_engine: published_model_served_execution_engine_label(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_residency_mode: Some(local_serving_truth.residency_mode),
+                    psionic_hybrid_offload: Some(local_serving_truth.hybrid_offload),
+                    psionic_hybrid_offload_layers: local_serving_truth.hybrid_offload_layers,
+                    psionic_fallback_policy: Some(local_serving_truth.fallback_policy),
+                    psionic_performance_class: Some(local_serving_truth.performance_class),
+                    psionic_structured_outputs: published_model_structured_output_labels(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_structured_output_capabilities:
+                        published_model_structured_output_capabilities(state.as_ref(), &model),
+                    psionic_tool_calling: published_model_tool_calling_capability(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_response_state: published_model_response_state_capability(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_execution_profile: Some(model.execution_profile.clone()),
+                    psionic_scheduler_policy: model.scheduler_policy.clone(),
+                    psionic_multimodal_projection_mode: published_model_multimodal_projection_mode(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_multimodal_supported_media: published_model_multimodal_supported_media(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_multimodal_projection_config:
+                        published_model_multimodal_projection_config(state.as_ref(), &model),
+                    psionic_embedding_dimensions: published_model_embedding_dimensions(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_embedding_normalization: published_model_embedding_normalization(
+                        state.as_ref(),
+                        &model,
+                    ),
+                }
             })
             .collect(),
     })
@@ -4481,7 +4989,6 @@ async fn handle_generic_chat_completions(
             route_request
         },
     )?;
-    let loaded_model = route.loaded_model;
     if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
         let route_execution =
             route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
@@ -4490,6 +4997,7 @@ async fn handle_generic_chat_completions(
         state.record_route_execution(route_execution);
         return Ok(response);
     }
+    let loaded_model = local_loaded_model_for_route(&route)?;
     let model = loaded_model.decoder().ok_or_else(|| {
         OpenAiCompatHttpError::Internal(format!(
             "loaded model `{}` is missing decoder metadata",
@@ -4641,7 +5149,7 @@ async fn handle_generic_chat_completions(
         let mut response = Sse::new(iter(events)).into_response();
         insert_generic_execution_headers(
             response.headers_mut(),
-            loaded_model,
+            local_serving_truth_for_route(state.as_ref(), &route),
             &route.selection,
             &route_execution,
             structured_output_report.as_ref(),
@@ -4720,7 +5228,7 @@ async fn handle_generic_chat_completions(
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
         response.headers_mut(),
-        loaded_model,
+        local_serving_truth_for_route(state.as_ref(), &route),
         &route.selection,
         &route_execution,
         structured_output_report.as_ref(),
@@ -4816,7 +5324,6 @@ async fn handle_generic_responses(
             route_request,
         )?,
     };
-    let loaded_model = route.loaded_model;
     if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
         let route_execution =
             route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
@@ -4824,6 +5331,7 @@ async fn handle_generic_responses(
         state.record_route_execution(route_execution);
         return Ok(response);
     }
+    let loaded_model = local_loaded_model_for_route(&route)?;
     if let Some(expected_model_key) = response_state_context.model_key.as_deref()
         && loaded_model.model_key != expected_model_key
     {
@@ -5102,7 +5610,7 @@ async fn handle_generic_responses(
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
         response.headers_mut(),
-        loaded_model,
+        local_serving_truth_for_route(state.as_ref(), &route),
         &route.selection,
         &route_execution,
         structured_output_report.as_ref(),
@@ -5145,7 +5653,6 @@ async fn handle_generic_embeddings(
         RoutingRequest::new(RoutingEndpoint::Embeddings),
     )?;
     let route = loaded_model;
-    let loaded_model = route.loaded_model;
     if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
         let route_execution =
             route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
@@ -5154,6 +5661,7 @@ async fn handle_generic_embeddings(
         state.record_route_execution(route_execution);
         return Ok(response);
     }
+    let loaded_model = local_loaded_model_for_route(&route)?;
     let model = loaded_model.embeddings().ok_or_else(|| {
         OpenAiCompatHttpError::Internal(format!(
             "loaded model `{}` is missing embeddings metadata",
@@ -5214,7 +5722,7 @@ async fn handle_generic_embeddings(
     let mut response = Json(body).into_response();
     insert_generic_execution_headers(
         response.headers_mut(),
-        loaded_model,
+        local_serving_truth_for_route(state.as_ref(), &route),
         &route.selection,
         &route_execution,
         None,
@@ -5890,7 +6398,7 @@ fn next_generic_request_id(state: &OpenAiCompatState, prefix: &str) -> String {
 
 fn insert_generic_execution_headers(
     headers: &mut HeaderMap,
-    loaded_model: &OpenAiCompatLoadedModel,
+    local_serving_truth: LocalServingTruth,
     route_selection: &RouteSelection,
     route_execution: &MeshManagementRouteExecutionStatus,
     structured_output: Option<&StructuredOutputExecutionReport>,
@@ -5922,7 +6430,7 @@ fn insert_generic_execution_headers(
         HeaderValue::from_str(route_selection.execution_engine_label.as_str())
             .unwrap_or_else(|_| HeaderValue::from_static("invalid")),
     );
-    insert_local_serving_truth_headers(headers, loaded_model.local_serving_truth());
+    insert_local_serving_truth_headers(headers, local_serving_truth);
     insert_route_execution_headers(headers, route_execution);
     headers.insert(
         HeaderName::from_static("x-psionic-route-worker"),
@@ -6080,7 +6588,8 @@ struct GenericRenderedPrompt {
 
 struct ResolvedGenericRoute<'a> {
     selection: RouteSelection,
-    loaded_model: &'a OpenAiCompatLoadedModel,
+    routed_model: &'a RoutedModelInventory,
+    loaded_model: Option<&'a OpenAiCompatLoadedModel>,
 }
 
 #[cfg(test)]
@@ -6088,7 +6597,7 @@ fn resolve_generic_model<'a>(
     state: &'a OpenAiCompatState,
     requested: Option<&str>,
 ) -> Result<&'a OpenAiCompatLoadedModel, OpenAiCompatHttpError> {
-    Ok(resolve_generic_route(
+    resolve_generic_route(
         state,
         match requested {
             Some(requested) => RoutingTarget::RequestedModel(requested.to_string()),
@@ -6096,7 +6605,41 @@ fn resolve_generic_model<'a>(
         },
         None,
     )?
-    .loaded_model)
+    .loaded_model
+    .ok_or_else(|| {
+        OpenAiCompatHttpError::Internal(String::from(
+            "resolved route is remote-only and does not have a local loaded model",
+        ))
+    })
+}
+
+fn local_loaded_model_for_route<'a>(
+    route: &'a ResolvedGenericRoute<'_>,
+) -> Result<&'a OpenAiCompatLoadedModel, OpenAiCompatHttpError> {
+    route.loaded_model.ok_or_else(|| {
+        OpenAiCompatHttpError::Internal(format!(
+            "route for model `{}` requires local execution metadata but only remote mesh inventory was available",
+            route.selection.canonical_name
+        ))
+    })
+}
+
+fn local_serving_truth_for_route(
+    state: &OpenAiCompatState,
+    route: &ResolvedGenericRoute<'_>,
+) -> LocalServingTruth {
+    route.loaded_model.map_or_else(
+        || {
+            if route.selection.execution_provenance == RoutedExecutionProvenance::BootstrapProxy
+                || state.bootstrap_proxy.is_some()
+            {
+                LocalServingTruth::bootstrap_proxy()
+            } else {
+                LocalServingTruth::cpu_reference()
+            }
+        },
+        OpenAiCompatLoadedModel::local_serving_truth,
+    )
 }
 
 fn resolve_generic_route<'a>(
@@ -6122,19 +6665,30 @@ fn resolve_generic_route<'a>(
         .router
         .resolve(&request)
         .map_err(openai_http_error_from_routing)?;
-    let loaded_model = state
-        .models_by_key
-        .get(selection.model_key.as_str())
+    state
+        .router
+        .worker(selection.worker_id.as_str())
         .ok_or_else(|| {
             OpenAiCompatHttpError::Internal(format!(
-                "loaded model `{}` selected by router is missing",
-                selection.model_key
+                "routed worker `{}` selected by router is missing",
+                selection.worker_id
             ))
         })?;
+    let routed_model = state
+        .router
+        .routed_model(selection.worker_id.as_str(), selection.model_key.as_str())
+        .ok_or_else(|| {
+            OpenAiCompatHttpError::Internal(format!(
+                "routed model `{}` on worker `{}` selected by router is missing",
+                selection.model_key, selection.worker_id
+            ))
+        })?;
+    let loaded_model = state.models_by_key.get(selection.model_key.as_str());
     state.record_route_demand(&request, &selection);
     state.publish_route_selection_event(&request, &selection);
     Ok(ResolvedGenericRoute {
         selection,
+        routed_model,
         loaded_model,
     })
 }
@@ -6153,14 +6707,20 @@ fn resolve_generic_model_for_endpoint<'a>(
         },
         Some(request),
     )?;
-    if route.loaded_model.supported_endpoints.contains(&endpoint) {
+    if route.routed_model.supported_endpoints.contains(&endpoint) {
         Ok(route)
     } else {
         Err(OpenAiCompatHttpError::BadRequest(format!(
             "model `{}` does not support `{}`; supported endpoints: {}",
-            requested.unwrap_or(route.loaded_model.canonical_name.as_str()),
+            requested.unwrap_or(route.selection.canonical_name.as_str()),
             endpoint.path(),
-            model_endpoint_paths(route.loaded_model).join(", ")
+            route
+                .routed_model
+                .supported_endpoints
+                .iter()
+                .map(|supported| supported.path())
+                .collect::<Vec<_>>()
+                .join(", ")
         )))
     }
 }
@@ -6176,14 +6736,20 @@ fn resolve_generic_model_key_for_endpoint<'a>(
         RoutingTarget::ModelKey(model_key.to_string()),
         Some(request.with_model_key(model_key.to_string())),
     )?;
-    if route.loaded_model.supported_endpoints.contains(&endpoint) {
+    if route.routed_model.supported_endpoints.contains(&endpoint) {
         Ok(route)
     } else {
         Err(OpenAiCompatHttpError::BadRequest(format!(
             "model `{}` does not support `{}`; supported endpoints: {}",
-            route.loaded_model.canonical_name,
+            route.selection.canonical_name,
             endpoint.path(),
-            model_endpoint_paths(route.loaded_model).join(", ")
+            route
+                .routed_model
+                .supported_endpoints
+                .iter()
+                .map(|supported| supported.path())
+                .collect::<Vec<_>>()
+                .join(", ")
         )))
     }
 }
@@ -6225,9 +6791,8 @@ fn bootstrap_proxy_for_route<'a>(
     state: &'a OpenAiCompatState,
     selection: &RouteSelection,
 ) -> Option<&'a BootstrapProxyState> {
-    selection
-        .worker_id
-        .starts_with(BOOTSTRAP_PROXY_WORKER_PREFIX)
+    (selection.execution_locality == RoutedExecutionLocality::RemoteProxy
+        && selection.execution_provenance == RoutedExecutionProvenance::BootstrapProxy)
         .then_some(state.bootstrap_proxy.as_deref())
         .flatten()
 }
@@ -6238,16 +6803,6 @@ fn model_endpoint_paths(model: &OpenAiCompatLoadedModel) -> Vec<&'static str> {
         .iter()
         .map(|endpoint| endpoint.path())
         .collect()
-}
-
-fn union_supported_endpoint_paths(state: &OpenAiCompatState) -> Vec<&'static str> {
-    let mut endpoints = BTreeSet::new();
-    for model in state.models_by_key.values() {
-        for endpoint in &model.supported_endpoints {
-            endpoints.insert(endpoint.path());
-        }
-    }
-    endpoints.into_iter().collect()
 }
 
 fn routed_inventory_for_loaded_model(
@@ -7186,9 +7741,9 @@ mod tests {
         generic_embeddings, generic_health, generic_list_models, generic_management_status,
         gpt_oss_local_serving_truth, handle_generic_chat_completions, handle_generic_embeddings,
         handle_generic_responses, insert_local_serving_truth_headers, load_generic_decoder_model,
-        model_endpoint_paths, prompt_request_cache_key, render_prompt_for_model,
-        required_tool_call_floor_from_chat_messages, resolve_execution_summary,
-        resolve_generic_model, resolve_generic_model_for_endpoint,
+        local_loaded_model_for_route, model_endpoint_paths, prompt_request_cache_key,
+        render_prompt_for_model, required_tool_call_floor_from_chat_messages,
+        resolve_execution_summary, resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
         structured_output_from_tool_contract, surfaced_reasoning_response,
         tool_call_outcome_from_response, tool_contract_from_chat_request,
@@ -7225,6 +7780,7 @@ mod tests {
         ToolLoopError, ToolLoopModelRunner, ToolLoopModelTurn, ToolLoopRequest,
         ToolLoopToolExecutor, ToolLoopToolResult, ToolProviderDescriptor, ToolResultVisibility,
     };
+    use psionic_router::{RoutedExecutionLocality, RoutedExecutionProvenance};
     use psionic_runtime::{
         BatchExecutionPosture, PrefixCacheControl, PrefixCacheMode, QueueDiscipline,
         StructuredGrammarSyntax, StructuredOutputRequest, StructuredOutputValue,
@@ -8323,6 +8879,109 @@ mod tests {
                 .map(|status| status.provenance.as_str()),
             Some("bootstrap_proxy")
         );
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_bootstrap_publishes_and_routes_remote_only_mesh_model()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = bootstrap_proxy_test_lock()
+            .lock()
+            .expect("bootstrap proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-bootstrap-llama.gguf");
+        let gemma_path = temp.path().join("tiny-bootstrap-gemma.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny bootstrap llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template("tiny bootstrap gemma").as_slice(),
+            dense_decoder_tensors_with_vocab(false, 7, 5, 6).as_slice(),
+        )?;
+
+        let mut remote_config = OpenAiCompatConfig::new(&llama_path);
+        remote_config.add_model_path(&gemma_path);
+        let remote_server = OpenAiCompatServer::from_config(&remote_config)?;
+        let (base_url, shutdown_tx) =
+            runtime.block_on(start_openai_compat_test_server(remote_server))?;
+
+        let bootstrap_env =
+            ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_BASE_URL", base_url.as_str());
+        let mode_env = ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_MODE", "thin_client");
+        let local_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        drop(mode_env);
+        drop(bootstrap_env);
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        assert_eq!(models.0.data.len(), 2);
+        let gemma = models
+            .0
+            .data
+            .iter()
+            .find(|model| model.id == "tiny-bootstrap-gemma.gguf")
+            .expect("remote-only gemma model should be listed through the mesh router");
+        assert_eq!(gemma.psionic_model_family, "gemma4");
+        assert_eq!(gemma.psionic_execution_mode, Some("proxy"));
+        assert_eq!(gemma.psionic_execution_engine, Some("psionic"));
+        assert_eq!(
+            gemma.psionic_route_execution_modes,
+            vec![String::from("native")]
+        );
+        assert_eq!(
+            gemma.psionic_route_localities,
+            vec![RoutedExecutionLocality::RemoteProxy]
+        );
+        assert_eq!(
+            gemma.psionic_route_provenances,
+            vec![RoutedExecutionProvenance::BootstrapProxy]
+        );
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&local_server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-bootstrap-gemma.gguf")),
+                messages: vec![
+                    ChatCompletionMessage::text("system", "Be terse."),
+                    ChatCompletionMessage::text("user", "hello"),
+                ],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let headers = response.headers().clone();
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(payload["object"], serde_json::json!("chat.completion"));
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-provenance"),
+            Some(String::from("bootstrap_proxy"))
+        );
+        assert_eq!(
+            payload["model"],
+            serde_json::json!("tiny-bootstrap-gemma.gguf")
+        );
+
+        let management = runtime.block_on(generic_management_status(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        assert_eq!(management.0.model_count, 2);
+        assert!(management.0.nodes.iter().any(|node| {
+            node.mesh_peer_worker_id.as_deref() == Some(OPENAI_COMPAT_WORKER_ID)
+                && node.execution_locality == RoutedExecutionLocality::RemoteProxy
+                && node.execution_provenance == RoutedExecutionProvenance::BootstrapProxy
+        }));
 
         let _ = shutdown_tx.send(());
         Ok(())
@@ -10942,8 +11601,7 @@ mod tests {
             RoutingEndpoint::Responses,
             RoutingRequest::new(RoutingEndpoint::Responses).require_response_state(),
         )?;
-        let model = route
-            .loaded_model
+        let model = local_loaded_model_for_route(&route)?
             .decoder()
             .expect("response route should resolve a decoder");
         let prompt = response_input_to_prompt_messages_with_options(

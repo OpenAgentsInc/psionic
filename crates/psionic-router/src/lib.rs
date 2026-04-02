@@ -208,6 +208,26 @@ impl RoutedWarmState {
     }
 }
 
+/// Locality for one routed worker entry and the selections derived from it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedExecutionLocality {
+    /// Request execution stays on the local Psionic server.
+    Local,
+    /// Request execution is proxied to a remote mesh peer.
+    RemoteProxy,
+}
+
+/// Execution provenance published for one routed worker entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedExecutionProvenance {
+    /// The route is executed directly by the current Psionic server.
+    LocalExecution,
+    /// The route is executed through the Psionic bootstrap proxy path.
+    BootstrapProxy,
+}
+
 /// One cache entry that the router may safely bias toward.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoutedCacheEntry {
@@ -751,12 +771,19 @@ impl RoutedModelInventory {
 pub struct RoutedWorkerInventory {
     /// Stable worker identifier.
     pub worker_id: String,
+    /// Upstream mesh peer identifier when this routed worker is a proxy-backed remote peer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_worker_id: Option<String>,
     /// Worker backend label.
     pub backend_label: String,
     /// Worker execution-mode label.
     pub execution_mode_label: String,
     /// Worker execution-engine label.
     pub execution_engine_label: String,
+    /// Whether execution happens locally or through a remote proxy hop.
+    pub execution_locality: RoutedExecutionLocality,
+    /// Typed provenance for the routed worker path.
+    pub execution_provenance: RoutedExecutionProvenance,
     /// Models exposed by the worker.
     pub models: Vec<RoutedModelInventory>,
 }
@@ -772,11 +799,29 @@ impl RoutedWorkerInventory {
     ) -> Self {
         Self {
             worker_id: worker_id.into(),
+            peer_worker_id: None,
             backend_label: backend_label.into(),
             execution_mode_label: execution_mode_label.into(),
             execution_engine_label: execution_engine_label.into(),
+            execution_locality: RoutedExecutionLocality::Local,
+            execution_provenance: RoutedExecutionProvenance::LocalExecution,
             models: Vec::new(),
         }
+    }
+
+    /// Marks the worker as one remote bootstrap-proxy peer.
+    #[must_use]
+    pub const fn as_remote_bootstrap_proxy(mut self) -> Self {
+        self.execution_locality = RoutedExecutionLocality::RemoteProxy;
+        self.execution_provenance = RoutedExecutionProvenance::BootstrapProxy;
+        self
+    }
+
+    /// Publishes the upstream mesh peer identifier for one proxied remote worker.
+    #[must_use]
+    pub fn with_peer_worker_id(mut self, peer_worker_id: impl Into<String>) -> Self {
+        self.peer_worker_id = Some(peer_worker_id.into());
+        self
     }
 
     /// Appends one model entry.
@@ -836,6 +881,9 @@ pub struct RouteSelectionMetrics {
 pub struct RouteSelection {
     /// Worker chosen for the request.
     pub worker_id: String,
+    /// Upstream mesh peer identifier when the selected worker is proxy-backed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_worker_id: Option<String>,
     /// Stable model key routed to.
     pub model_key: String,
     /// Canonical model name exposed to callers.
@@ -850,6 +898,10 @@ pub struct RouteSelection {
     pub execution_mode_label: String,
     /// Worker execution engine.
     pub execution_engine_label: String,
+    /// Whether execution stays local or crosses the remote-proxy boundary.
+    pub execution_locality: RoutedExecutionLocality,
+    /// Typed provenance for the selected execution path.
+    pub execution_provenance: RoutedExecutionProvenance,
     /// Routed execution profile.
     pub execution_profile: ExecutionCapabilityProfile,
     /// Routed scheduler policy when one exists.
@@ -981,6 +1033,23 @@ impl FleetRouter {
     #[must_use]
     pub fn inventory(&self) -> Vec<RoutedWorkerInventory> {
         self.workers_by_id.values().cloned().collect()
+    }
+
+    /// Returns one worker inventory entry by stable worker identifier.
+    #[must_use]
+    pub fn worker(&self, worker_id: &str) -> Option<&RoutedWorkerInventory> {
+        self.workers_by_id.get(worker_id)
+    }
+
+    /// Returns one routed model entry by stable worker identifier and model key.
+    #[must_use]
+    pub fn routed_model(&self, worker_id: &str, model_key: &str) -> Option<&RoutedModelInventory> {
+        self.worker(worker_id).and_then(|worker| {
+            worker
+                .models
+                .iter()
+                .find(|model| model.model_key == model_key)
+        })
     }
 
     /// Resolves one route request into a concrete worker and model path.
@@ -1343,6 +1412,7 @@ impl FleetRouter {
         }
         RouteSelection {
             worker_id: worker.worker_id.clone(),
+            peer_worker_id: worker.peer_worker_id.clone(),
             model_key: model.model_key.clone(),
             canonical_name: model.canonical_name.clone(),
             endpoint,
@@ -1350,6 +1420,8 @@ impl FleetRouter {
             backend_label: worker.backend_label.clone(),
             execution_mode_label: worker.execution_mode_label.clone(),
             execution_engine_label: worker.execution_engine_label.clone(),
+            execution_locality: worker.execution_locality,
+            execution_provenance: worker.execution_provenance,
             execution_profile: model.execution_profile.clone(),
             scheduler_policy: model.scheduler_policy.clone(),
             kv_cache_encoding_policy: model.kv_cache_encoding_policy.clone(),
@@ -1872,9 +1944,10 @@ fn cache_entry_matches_kv_cache_encoding(
 mod tests {
     use super::{
         FleetRouter, ReliabilityAction, ReliabilityReason, RouteReliabilityController,
-        RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry, RoutedModelInventory,
-        RoutedWarmState, RoutedWorkerInventory, RoutingDemandKey, RoutingDemandLedger,
-        RoutingDemandPolicy, RoutingEndpoint, RoutingError, RoutingRequest, WorkerCircuitState,
+        RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry, RoutedExecutionLocality,
+        RoutedExecutionProvenance, RoutedModelInventory, RoutedWarmState, RoutedWorkerInventory,
+        RoutingDemandKey, RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError,
+        RoutingRequest, WorkerCircuitState,
     };
     use psionic_runtime::{
         ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily, KvCacheEncodingObjective,
@@ -1933,6 +2006,63 @@ mod tests {
             .expect("default route should resolve");
         assert_eq!(selection.worker_id, "worker-a");
         assert_eq!(selection.model_key, "tiny-llama");
+        assert_eq!(selection.execution_locality, RoutedExecutionLocality::Local);
+        assert_eq!(
+            selection.execution_provenance,
+            RoutedExecutionProvenance::LocalExecution
+        );
+    }
+
+    #[test]
+    fn router_publishes_remote_bootstrap_worker_truth() {
+        let router = FleetRouter::new(
+            "tiny-llama",
+            vec![
+                RoutedWorkerInventory::new("mesh-peer-a", "cuda", "proxy", "psionic")
+                    .as_remote_bootstrap_proxy()
+                    .with_model(
+                        RoutedModelInventory::new(
+                            "tiny-llama",
+                            "tiny-llama",
+                            "llama",
+                            sample_profile(),
+                        )
+                        .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                        .with_tool_calling(),
+                    ),
+            ],
+        )
+        .expect("router should build");
+
+        let worker = router
+            .worker("mesh-peer-a")
+            .expect("remote worker should stay addressable by worker id");
+        assert_eq!(
+            worker.execution_locality,
+            RoutedExecutionLocality::RemoteProxy
+        );
+        assert_eq!(
+            worker.execution_provenance,
+            RoutedExecutionProvenance::BootstrapProxy
+        );
+        assert!(router.routed_model("mesh-peer-a", "tiny-llama").is_some());
+
+        let selection = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+                    .with_requested_model("tiny-llama")
+                    .require_tool_calling(),
+            )
+            .expect("remote routed model should still satisfy typed capability filters");
+        assert_eq!(selection.worker_id, "mesh-peer-a");
+        assert_eq!(
+            selection.execution_locality,
+            RoutedExecutionLocality::RemoteProxy
+        );
+        assert_eq!(
+            selection.execution_provenance,
+            RoutedExecutionProvenance::BootstrapProxy
+        );
     }
 
     #[test]

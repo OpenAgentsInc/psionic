@@ -254,8 +254,25 @@ When bootstrap mode is enabled, the local server:
 
 - discovers warm remote inventory from `/psionic/management/status`
 - binds `/v1/chat/completions`, `/v1/responses`, and `/v1/embeddings` locally
-- proxies only to warm remote workers that honestly match the local model plan
+- publishes the routed union of warm mesh-visible models on `/v1/models`
+- proxies only to warm remote workers that honestly satisfy the routed target
 - publishes route execution provenance on both headers and management state
+
+The routed publication contract above that bootstrap path is now:
+
+- one unique routed worker identifier per local worker or proxied remote peer
+- one explicit upstream peer identifier when the routed worker is proxy-backed
+- one explicit routed locality and provenance for every published worker route
+- one local served-truth publication surface for the server itself
+- one separate remote route-truth publication surface for mesh peers
+
+That separation matters because the same local thin client can honestly publish:
+
+- served execution mode `proxy`
+- remote route execution mode `native`
+
+without collapsing those two facts into one misleading model card or one
+ambiguous management node.
 
 The execution proof surface is:
 
