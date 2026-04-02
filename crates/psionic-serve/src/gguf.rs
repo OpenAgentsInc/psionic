@@ -3323,7 +3323,7 @@ fn dense_attention_geometry(
     }
     if value_width != key_width {
         return Err(ModelLoadError::UnsupportedGgufDecoderFamilyFeature {
-            family: family_metadata.family.as_str().to_string(),
+            family: descriptor.model.family.clone(),
             feature: String::from("distinct_layer_value_width"),
         });
     }
