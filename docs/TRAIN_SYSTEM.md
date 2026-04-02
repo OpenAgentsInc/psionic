@@ -93,6 +93,17 @@ That surface freezes one recipe id, one admitted four-node H100 topology and
 storage bundle, env-declared credential sources, and one bounded continuation
 path of `pretrain -> general_sft -> agentic_sft`.
 
+The repo now also owns the canonical actual-lane output and evidence contract
+in `crates/psionic-train/src/psion_actual_pretraining_evidence_contract.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_evidence_contract_fixtures.rs`,
+the focused contract doc
+`docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`, and the committed fixture
+`fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json`.
+That surface freezes one retained output family, one required provenance field
+set, and one redaction policy for manifests, logs, alerts, resume pointers,
+checkpoint manifests, eval receipts, exports, and closeout bundles.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker
