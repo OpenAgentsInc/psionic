@@ -43,9 +43,12 @@ This doc should be read together with:
   - deep subsystem spec for training-class execution
 - `docs/INFERENCE_ENGINE.md`
   - narrower completion criteria for inference-engine behavior
+- `docs/INFERENCE_MESH_OWNERSHIP.md`
+  - canonical owner split for mesh identity, admission, routing, management,
+    and the repo boundary above those contracts
 - `docs/TOKIO_RUNTIME_TELEMETRY.md`
   - Tokio runtime telemetry contract and operator runbook for serving and
-    transport surfaces
+  transport surfaces
 - `docs/LLAMA_VLLM_SGLANG_INFERENCE_SPEC.md`
   - inference-completion plan and issue program
 

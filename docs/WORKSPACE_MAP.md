@@ -15,6 +15,8 @@ Read these first:
   - canonical Psionic-wide system spec
 - `docs/INFERENCE_ENGINE.md`
   - canonical inference and serving completion bar
+- `docs/INFERENCE_MESH_OWNERSHIP.md`
+  - canonical owner split for inference-mesh work
 - `docs/OPTIMIZER_SUBSTRATE.md`
   - canonical optimizer substrate spec for bounded offline search artifacts
 - `docs/TRAIN_SYSTEM.md`
@@ -84,6 +86,7 @@ projection:
 Reference:
 
 - `docs/INFERENCE_ENGINE.md`
+- `docs/INFERENCE_MESH_OWNERSHIP.md`
 - `docs/GPT_OSS_LOCAL_SERVING.md`
 - `docs/LLAMA_VLLM_SGLANG_INFERENCE_SPEC.md`
 - `docs/NON_GPT_OSS_QWEN_PILOT.md`
@@ -104,6 +107,7 @@ runtime truth:
 Reference:
 
 - `docs/ROADMAP_CLUSTER.md`
+- `docs/INFERENCE_MESH_OWNERSHIP.md`
 - `docs/CLUSTER_VALIDATION_RUNBOOK.md`
 - `docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md`
 - `docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md`
