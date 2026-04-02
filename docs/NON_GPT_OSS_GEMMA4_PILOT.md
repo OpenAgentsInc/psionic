@@ -1,7 +1,8 @@
 # Non-GPT-OSS Gemma 4 Pilot
 
-> Status: `partial` on 2026-04-02 after issue `#862`; the first native CUDA
-> runtime exists, but conformance and publication remain gated on later issues.
+> Status: `partial` on 2026-04-02 after issue `#863`; the first native CUDA
+> runtime plus bounded server and conformance coverage exist, but broader
+> publication remains gated on later issues.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 tracks the first bounded implementation state.
@@ -57,8 +58,8 @@ complete the first published `Gemma 4` milestone.
 
 ## Current Repo State
 
-After issues `#861` and `#862`, the repo now has the first honest `Gemma 4`
-admission and runtime work:
+After issues `#861` through `#863`, the repo now has the first honest
+`Gemma 4` admission, runtime, and bounded conformance work:
 
 - `psionic-models` now classifies `general.architecture = gemma4` as its own
   decoder family instead of silently aliasing it to `llama`, `qwen`, or
@@ -78,13 +79,20 @@ admission and runtime work:
   `backend = cuda`, `execution_mode = native`, and
   `execution_engine = psionic`, but the bounded `#862` surface is still
   chat-only on `/v1/chat/completions`.
+- the repo now has bounded prompt-render, health/model publication, and
+  refusal coverage for the `Gemma 4` CUDA lane, including explicit fail-closed
+  checks for tools, structured outputs, multimodal inputs, and
+  `/v1/responses`.
+- the conformance harness now accepts the real `gemma4:e4b` fixture shape and
+  the repo now carries one repeatable `gemma4:e4b` CUDA conformance repeat
+  test that runs when both the pilot GGUF and a CUDA host are available.
 
 What still does not exist:
 
-- no repeated CUDA conformance receipt for `gemma4:e4b`
 - no tool-calling or `/v1/responses` Gemma semantics
 - no image, video, or audio Gemma lane
-- no published support claim beyond the bounded runtime and server admission
+- no broad published support claim beyond the bounded runtime, server
+  admission, and repo-owned conformance coverage
 
 ## Why The Claim Is Narrow
 

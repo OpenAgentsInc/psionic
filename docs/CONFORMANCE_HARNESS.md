@@ -53,13 +53,14 @@ non-streaming prompt-render case from the real golden prompt corpus in
 Today that builder intentionally accepts only the subset of fixture cases that
 can map honestly onto `/api/generate`:
 
-- optional leading `system`
+- optional leading `system` or `developer`
 - one `user` turn
 - `add_generation_prompt = true`
 
-That is enough to anchor single-turn families such as `phi3`, `qwen2`, and the
-first `qwen35` prompt-projection pilot without pretending that multi-turn or
-raw content-part multimodal chat-template parity is already solved.
+That is enough to anchor single-turn families such as `phi3`, `qwen2`, the
+first `qwen35` prompt-projection pilot, and the bounded `gemma4:e4b`
+instruction-plus-user lane without pretending that multi-turn or raw
+content-part multimodal chat-template parity is already solved.
 
 Embeddings cases also carry an explicit `EmbeddingParityBudget` from
 `psionic-runtime` so vector comparisons use the shared drift-budget policy instead
@@ -121,22 +122,35 @@ evidence is missing.
 
 ## Documented Run
 
-Repeatable CI-stable harness run for a supported model family:
+Repeatable repo-owned harness coverage:
 
 ```bash
-cargo test -p psionic-serve generate_case_builder_uses_real_qwen2_fixture \
-  generate_case_builder_uses_real_qwen35_fixture \
-  conformance_suite_records_intentional_candidate_gap \
-  ollama_http_subject_normalizes_live_http_responses
+cargo test -p psionic-serve conformance --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve gemma4 --manifest-path Cargo.toml --no-default-features
 ```
 
-Those tests cover:
+Those runs cover:
 
-- real `qwen2` prompt-fixture case construction from the golden corpus
-- real `qwen35` prompt-fixture case construction from the golden corpus
-- structured `intentional_difference` reporting for the current Psionic prompt gap
+- real `qwen2`, `qwen35`, and `gemma4` prompt-fixture case construction from
+  the golden corpus
+- matching conformance-suite coverage for bounded prompt-render cases,
+  including the real `gemma4:e4b` instruction-first fixture shape
+- structured `intentional_difference` reporting for surfaces that still fail
+  closed honestly
 - live HTTP normalization of Ollama `tags` / `show` / `ps` / `generate(stream)`
   / `embed` semantics via a local test server
+- bounded Gemma 4 server smoke and refusal coverage on the native CUDA lane
+
+The real-artifact repeat lane for `gemma4:e4b` is:
+
+```bash
+PSIONIC_GEMMA4_PILOT_GGUF_PATH=/abs/path/to/gemma4-e4b-ollama.gguf \
+  cargo test -p psionic-serve \
+  gemma4_e4b_cuda_conformance_repeat_is_machine_checkable_when_available \
+  --manifest-path Cargo.toml --no-default-features
+```
+
+That test skips cleanly when the pilot GGUF or a CUDA backend is unavailable.
 
 ## Controlled Local Validation
 

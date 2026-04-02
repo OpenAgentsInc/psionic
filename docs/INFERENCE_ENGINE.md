@@ -37,6 +37,8 @@ than just run tensor math.
   - `execution_mode = native`
   - `execution_engine = psionic`
   - `/v1/chat/completions` on the generic OpenAI-compatible server
+  - bounded prompt-render, server-smoke, refusal, and repeatable CUDA
+    conformance coverage for `gemma4:e4b`
 - The first bounded `Gemma 4` claim must stay explicit about its unsupported
   regions:
   - image
