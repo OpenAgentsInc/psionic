@@ -1,11 +1,13 @@
 # Non-GPT-OSS Gemma 4 Pilot
 
-> Status: `planned` on 2026-04-02 for the first Psionic-owned `Gemma 4` lane.
+> Status: `partial` on 2026-04-02 after issue `#862`; the first native CUDA
+> runtime exists, but conformance and publication remain gated on later issues.
 
-This document freezes what the first honest `Gemma 4` claim means before the
-runtime work starts.
+This document freezes what the first honest `Gemma 4` claim means and now
+tracks the first bounded implementation state.
 
-It does not mean that `Gemma 4` is already implemented on this checkout.
+It still does not mean that the whole `Gemma 4` family is implemented on this
+checkout.
 
 ## Frozen First Target
 
@@ -55,7 +57,8 @@ complete the first published `Gemma 4` milestone.
 
 ## Current Repo State
 
-After issue `#861`, the repo now has the first honest `Gemma 4` admission work:
+After issues `#861` and `#862`, the repo now has the first honest `Gemma 4`
+admission and runtime work:
 
 - `psionic-models` now classifies `general.architecture = gemma4` as its own
   decoder family instead of silently aliasing it to `llama`, `qwen`, or
@@ -68,13 +71,20 @@ After issue `#861`, the repo now has the first honest `Gemma 4` admission work:
 - the local `e4b` GGUF does not currently embed `tokenizer.chat_template`, so
   the repo now carries one checked-in bounded text template fixture at
   `crates/psionic-models/src/testdata/gemma4_chat_template.jinja`.
+- `psionic-serve` now has a first bounded native `Gemma 4` CUDA runtime for
+  quantized dense projection artifacts, using the Psionic-owned tokenizer,
+  prompt, KV-cache, and decode loop instead of routing through `llama.cpp`.
+- the generic OpenAI-compatible server now admits `Gemma 4` on CUDA with
+  `backend = cuda`, `execution_mode = native`, and
+  `execution_engine = psionic`, but the bounded `#862` surface is still
+  chat-only on `/v1/chat/completions`.
 
 What still does not exist:
 
-- no Gemma 4 CUDA runtime
-- no generic-server Gemma lane
-- no tool-calling or `/v1/responses` Gemma contract
-- no published support claim beyond classification and prompt-fixture truth
+- no repeated CUDA conformance receipt for `gemma4:e4b`
+- no tool-calling or `/v1/responses` Gemma semantics
+- no image, video, or audio Gemma lane
+- no published support claim beyond the bounded runtime and server admission
 
 ## Why The Claim Is Narrow
 

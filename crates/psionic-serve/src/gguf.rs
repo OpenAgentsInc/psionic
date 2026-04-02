@@ -13,6 +13,7 @@ use psionic_adapters::{
     AdapterArtifactIdentity, AdapterResidencyMode, AdapterServingBinding, AdapterTargetFamily,
     LmHeadLoraAdapterArtifact,
 };
+use psionic_backend_cuda::{CudaBackend, CudaBuffer};
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::QuantizationMode;
@@ -154,7 +155,10 @@ impl CpuGgufTextGenerationService {
             GgufDecoderFamily::GptOss => CpuGgufServiceKind::GptOss(
                 CpuGgufGptOssTextGenerationService::from_gguf_path(path)?,
             ),
-            GgufDecoderFamily::Llama | GgufDecoderFamily::Qwen | GgufDecoderFamily::Mistral => {
+            GgufDecoderFamily::Llama
+            | GgufDecoderFamily::Qwen
+            | GgufDecoderFamily::Mistral
+            | GgufDecoderFamily::Gemma4 => {
                 CpuGgufServiceKind::Dense(CpuDenseGgufTextGenerationService::from_gguf_path(path)?)
             }
             GgufDecoderFamily::Qwen35 => CpuGgufServiceKind::Qwen35(
@@ -1965,6 +1969,743 @@ struct DenseGgufForwardStep {
     bytes_moved: u64,
 }
 
+pub struct CudaGemma4TextGenerationService {
+    backend: CudaBackend,
+    models: InMemoryGenerationModelRegistry<CudaGemma4GenerationModel>,
+    sessions: InMemoryGenerationSessionStore,
+    shared_prefixes: SharedPrefixStore,
+    backend_health: super::BackendHealthTracker,
+    model_descriptor: DecoderModelDescriptor,
+    runtime_support: GgufDecoderRuntimeSupport,
+}
+
+impl CudaGemma4TextGenerationService {
+    pub fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
+        let mut backend = CudaBackend::new();
+        let model = CudaGemma4GenerationModel::from_gguf_path(path, &mut backend)?;
+        let model_descriptor = model.descriptor().clone();
+        let runtime_support = model.runtime_support();
+        let mut models = InMemoryGenerationModelRegistry::new();
+        let now_millis = super::current_time_millis();
+        models.warm_with_metadata(
+            model,
+            now_millis,
+            super::DEFAULT_MODEL_KEEPALIVE_MILLIS,
+            None,
+            Some(String::from("cuda")),
+            None,
+        )?;
+        let mut backend_health = super::BackendHealthTracker::default();
+        backend_health.observe("cuda", backend.health(), now_millis);
+        Ok(Self {
+            backend,
+            models,
+            sessions: InMemoryGenerationSessionStore::new(),
+            shared_prefixes: SharedPrefixStore::default(),
+            backend_health,
+            model_descriptor,
+            runtime_support,
+        })
+    }
+
+    #[must_use]
+    pub fn model_descriptor(&self) -> &DecoderModelDescriptor {
+        &self.model_descriptor
+    }
+
+    #[must_use]
+    pub fn runtime_support(&self) -> GgufDecoderRuntimeSupport {
+        self.runtime_support.clone()
+    }
+
+    #[must_use]
+    pub fn loaded_model_views(&mut self) -> Vec<LoadedModelView> {
+        self.loaded_model_views_at(super::current_time_millis())
+    }
+
+    #[must_use]
+    pub fn loaded_models(&mut self) -> LoadedModelsObservation {
+        self.loaded_models_at(super::current_time_millis())
+    }
+
+    #[must_use]
+    pub fn observability(&mut self) -> LocalRuntimeObservability {
+        self.observability_at(super::current_time_millis())
+    }
+
+    pub fn warm_model(
+        &mut self,
+        model_id: &str,
+        keep_alive_millis: u64,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Ok(self
+            .models
+            .warm_loaded(model_id, super::current_time_millis(), keep_alive_millis)?)
+    }
+
+    pub fn unload_model(
+        &mut self,
+        model_id: &str,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Ok(self
+            .models
+            .unload_view(model_id, super::current_time_millis())?)
+    }
+
+    pub fn create_session(
+        &mut self,
+        model_id: &str,
+    ) -> Result<crate::GenerationSession, ReferenceTextGenerationError> {
+        let model = self
+            .models
+            .active(model_id)
+            .ok_or_else(|| ReferenceTextGenerationError::UnsupportedModel(model_id.to_string()))?;
+        Ok(self.sessions.create(
+            model,
+            super::served_artifact_identity_for_decoder_backend(model.descriptor(), "cuda", &[])
+                .served_artifact_digest,
+        ))
+    }
+
+    pub fn reset_session(
+        &mut self,
+        session_id: &SessionId,
+    ) -> Result<crate::GenerationSession, ReferenceTextGenerationError> {
+        Ok(self.sessions.reset(session_id)?)
+    }
+
+    pub fn close_session(
+        &mut self,
+        session_id: &SessionId,
+    ) -> Result<crate::GenerationSession, ReferenceTextGenerationError> {
+        Ok(self.sessions.close(session_id)?)
+    }
+
+    pub fn generate_continuous_batch(
+        &mut self,
+        requests: Vec<GenerationRequest>,
+    ) -> ContinuousBatchGenerationResult {
+        super::run_continuous_batch_generation_requests(
+            &mut self.backend,
+            &mut self.models,
+            &mut self.sessions,
+            &mut self.shared_prefixes,
+            requests,
+            default_generation_scheduler_policy(),
+        )
+    }
+
+    #[must_use]
+    fn loaded_models_at(&mut self, now_millis: u64) -> LoadedModelsObservation {
+        self.models.expire_idle(now_millis);
+        self.models.loaded_models_observation()
+    }
+
+    #[must_use]
+    fn observability_at(&mut self, now_millis: u64) -> LocalRuntimeObservability {
+        self.models.expire_idle(now_millis);
+        self.backend_health
+            .observe("cuda", self.backend.health(), now_millis);
+        super::generation_runtime_observability(
+            &self.models,
+            &self.sessions,
+            &self.backend_health,
+            super::default_text_generation_execution_profile(),
+        )
+    }
+
+    #[must_use]
+    fn loaded_model_views_at(&mut self, now_millis: u64) -> Vec<LoadedModelView> {
+        self.models.expire_idle(now_millis);
+        self.models.loaded_model_views()
+    }
+}
+
+impl TextGenerationExecutor for CudaGemma4TextGenerationService {
+    type Error = ReferenceTextGenerationError;
+
+    fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
+        super::run_generation_request(
+            &mut self.backend,
+            &mut self.models,
+            &mut self.sessions,
+            &mut self.shared_prefixes,
+            request,
+        )
+    }
+}
+
+impl StreamingTextGenerationExecutor for CudaGemma4TextGenerationService {
+    type Stream<'a> = Box<dyn GenerationEventStream + 'a>;
+
+    fn generate_stream<'a>(
+        &'a mut self,
+        request: &GenerationRequest,
+    ) -> Result<Self::Stream<'a>, ReferenceTextGenerationError> {
+        let response = self.generate(request)?;
+        Ok(Box::new(CompletedGenerationStream::new(response)))
+    }
+}
+
+impl ManagedTextGenerationRuntime for CudaGemma4TextGenerationService {
+    fn loaded_models(&mut self) -> LoadedModelsObservation {
+        Self::loaded_models(self)
+    }
+
+    fn observability(&mut self) -> LocalRuntimeObservability {
+        Self::observability(self)
+    }
+
+    fn warm_model(
+        &mut self,
+        model_id: &str,
+        keep_alive_millis: u64,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Self::warm_model(self, model_id, keep_alive_millis)
+    }
+
+    fn unload_model(
+        &mut self,
+        model_id: &str,
+    ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
+        Self::unload_model(self, model_id)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4GenerationModel {
+    inner: Arc<CudaGemma4ModelInner>,
+}
+
+impl CudaGemma4GenerationModel {
+    fn from_gguf_path(
+        path: impl AsRef<Path>,
+        backend: &mut CudaBackend,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let artifact = GgufBlobArtifact::open_path(path, gguf_local_blob_open_options())?;
+        Self::from_blob_artifact(artifact, backend)
+    }
+
+    fn from_blob_artifact(
+        artifact: GgufBlobArtifact,
+        backend: &mut CudaBackend,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let load_start = Instant::now();
+        let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
+        if adapter.family_metadata().family != GgufDecoderFamily::Gemma4 {
+            return Err(ModelLoadError::UnsupportedModel(
+                adapter.descriptor().model.model_id.clone(),
+            )
+            .into());
+        }
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(adapter.tokenizer()).map_err(|error| {
+            ModelLoadError::ArtifactFormat {
+                format: String::from("gguf"),
+                message: format!("failed to build runtime tokenizer: {error}"),
+            }
+        })?;
+        let token_embedding =
+            ProjectionMatrix::load(&artifact, adapter.tensor_layout().token_embedding.as_str())?;
+        let output_name = adapter
+            .tensor_layout()
+            .output
+            .as_deref()
+            .unwrap_or(adapter.tensor_layout().token_embedding.as_str());
+        let output = CudaQuantizedProjectionMatrix::load(backend, &artifact, output_name)?;
+        let layers = adapter
+            .tensor_layout()
+            .layers
+            .iter()
+            .map(|layout| CudaGemma4Layer::load(backend, &artifact, layout))
+            .collect::<Result<Vec<_>, _>>()?;
+        let descriptor = adapter.descriptor().clone();
+        let inner = CudaGemma4ModelInner {
+            descriptor: descriptor.clone(),
+            family_metadata: adapter.family_metadata().clone(),
+            tokenizer,
+            token_embedding,
+            output_norm: load_dense_vector(
+                &artifact,
+                adapter.tensor_layout().output_norm.as_str(),
+            )?,
+            output,
+            layers,
+            plan_digest: digest_gemma4_cuda_plan(&descriptor, adapter.family_metadata()),
+            load_duration_ns: load_start
+                .elapsed()
+                .as_nanos()
+                .try_into()
+                .unwrap_or(u64::MAX),
+        };
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
+    }
+
+    #[must_use]
+    fn plan_digest(&self) -> &str {
+        self.inner.plan_digest.as_str()
+    }
+
+    #[must_use]
+    fn runtime_support(&self) -> GgufDecoderRuntimeSupport {
+        let mut support = runtime_support_for_descriptor(
+            &self.inner.descriptor,
+            GgufDecoderFamily::Gemma4,
+            vec![String::from("cuda")],
+            vec![String::from("cpu"), String::from("metal")],
+            unsupported_adapter_runtime_support(
+                "LM-head LoRA serving is not implemented on the native gemma4 cuda runtime",
+            ),
+        );
+        support.unsupported_features = vec![
+            String::from("image_inputs"),
+            String::from("video_inputs"),
+            String::from("audio_inputs"),
+            String::from("tool_calling"),
+            String::from("response_state"),
+            String::from("adapter_serving"),
+        ];
+        support
+    }
+}
+
+impl crate::GenerationModelHandle for CudaGemma4GenerationModel {
+    fn descriptor(&self) -> &DecoderModelDescriptor {
+        &self.inner.descriptor
+    }
+}
+
+impl super::CompiledWordGenerationModel for CudaGemma4GenerationModel {
+    type Backend = CudaBackend;
+
+    fn tokenizer(&self) -> &dyn TokenizerBoundary {
+        &self.inner.tokenizer
+    }
+
+    fn encode_prompt_input(
+        &self,
+        input: &GenerationInput,
+    ) -> Result<TokenSequence, ReferenceTextGenerationError> {
+        Ok(match input {
+            GenerationInput::Text(text) => self.inner.tokenizer.encode_with_defaults(text),
+            GenerationInput::Tokens(tokens) => tokens.clone(),
+        })
+    }
+
+    fn is_end_of_sequence(&self, token: TokenId) -> bool {
+        self.inner.tokenizer.is_end_of_sequence(token)
+    }
+
+    fn execute_step(
+        &self,
+        backend: &mut Self::Backend,
+        token: TokenId,
+        position: usize,
+        cache: &crate::InMemoryKvCache,
+    ) -> Result<GenerationStepOutput, ReferenceTextGenerationError> {
+        let config = &self.inner.descriptor.config;
+        if token.as_u32() as usize >= config.vocab_size {
+            return Err(ReferenceTextGenerationError::InvalidToken {
+                token: token.as_u32(),
+                vocab_size: config.vocab_size,
+            });
+        }
+        if position >= config.max_context {
+            return Err(ReferenceTextGenerationError::InvalidPosition {
+                position,
+                max_context: config.max_context,
+            });
+        }
+        if cache.width() != self.inner.cache_width() {
+            return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+                expected_kv_width: self.inner.cache_width(),
+                kv_width: cache.width(),
+            });
+        }
+        let step = self.inner.forward_step(backend, token, position, cache)?;
+        Ok(GenerationStepOutput {
+            key: step.key,
+            value: step.value,
+            logits: step.logits,
+            hidden: Some(step.final_hidden),
+            execution_plan_digest: Some(self.inner.plan_digest.clone()),
+            compile_path: None,
+            kernel_count: step.kernel_count,
+            bytes_moved: step.bytes_moved,
+            plan_cache_hits: 0,
+            plan_cache_misses: 0,
+            gpt_oss_perf: None,
+        })
+    }
+
+    fn plan_digest(&self) -> &str {
+        self.plan_digest()
+    }
+
+    fn load_duration_ns(&self) -> u64 {
+        self.inner.load_duration_ns
+    }
+
+    fn backend_compatibility(&self) -> &'static str {
+        "cuda"
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4ModelInner {
+    descriptor: DecoderModelDescriptor,
+    family_metadata: GgufDecoderFamilyMetadata,
+    tokenizer: GgufRuntimeTokenizer,
+    token_embedding: ProjectionMatrix,
+    output_norm: Vec<f32>,
+    output: CudaQuantizedProjectionMatrix,
+    layers: Vec<CudaGemma4Layer>,
+    plan_digest: String,
+    load_duration_ns: u64,
+}
+
+impl CudaGemma4ModelInner {
+    fn cache_width(&self) -> usize {
+        self.descriptor
+            .config
+            .layer_count
+            .saturating_mul(self.descriptor.config.kv_width())
+    }
+
+    fn forward_step(
+        &self,
+        backend: &mut CudaBackend,
+        token: TokenId,
+        position: usize,
+        cache: &crate::InMemoryKvCache,
+    ) -> Result<CudaGemma4ForwardStep, ReferenceTextGenerationError> {
+        let kv_width = self.descriptor.config.kv_width();
+        let mut bytes_moved = self.token_embedding.byte_length() as u64;
+        let mut kernel_count = 1usize;
+        let mut hidden = self
+            .token_embedding
+            .decode_row(token.as_u32() as usize)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let mut cache_key = vec![0.0; self.cache_width()];
+        let mut cache_value = vec![0.0; self.cache_width()];
+
+        for (layer_index, layer) in self.layers.iter().enumerate() {
+            let residual = hidden.clone();
+            let hidden_norm = rms_norm(
+                hidden.as_slice(),
+                layer.attention_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+
+            let mut q = layer
+                .attention_query_weight
+                .matvec(backend, hidden_norm.as_slice())?;
+            if let Some(bias) = layer.attention_query_bias.as_ref() {
+                add_bias_in_place(&mut q.values, bias.as_slice());
+            }
+
+            let mut k = layer
+                .attention_key_weight
+                .matvec(backend, hidden_norm.as_slice())?;
+            if let Some(bias) = layer.attention_key_bias.as_ref() {
+                add_bias_in_place(&mut k.values, bias.as_slice());
+            }
+
+            let mut v = layer
+                .attention_value_weight
+                .matvec(backend, hidden_norm.as_slice())?;
+            if let Some(bias) = layer.attention_value_bias.as_ref() {
+                add_bias_in_place(&mut v.values, bias.as_slice());
+            }
+
+            apply_rope_neox(
+                &mut q.values,
+                self.descriptor.config.block.attention.head_count,
+                self.descriptor.config.block.attention.head_dim,
+                self.descriptor.config.block.attention.rotary_dim,
+                position,
+                &self.family_metadata,
+            );
+            apply_rope_neox(
+                &mut k.values,
+                self.descriptor.config.block.attention.kv_head_count,
+                self.descriptor.config.block.attention.head_dim,
+                self.descriptor.config.block.attention.rotary_dim,
+                position,
+                &self.family_metadata,
+            );
+
+            let cache_offset = layer_index.saturating_mul(kv_width);
+            cache_key[cache_offset..cache_offset + kv_width].copy_from_slice(k.values.as_slice());
+            cache_value[cache_offset..cache_offset + kv_width].copy_from_slice(v.values.as_slice());
+
+            let attention = attend_impl(
+                layer_index,
+                q.values.as_slice(),
+                k.values.as_slice(),
+                v.values.as_slice(),
+                cache,
+                &self.descriptor,
+                self.family_metadata.sliding_window,
+            );
+            let mut attention_out = layer
+                .attention_output_weight
+                .matvec(backend, attention.as_slice())?;
+            if let Some(bias) = layer.attention_output_bias.as_ref() {
+                add_bias_in_place(&mut attention_out.values, bias.as_slice());
+            }
+            hidden = add_vectors(attention_out.values.as_slice(), residual.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+
+            let ffn_residual = hidden.clone();
+            let ffn_input = rms_norm(
+                hidden.as_slice(),
+                layer.feed_forward_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+            let gate = layer
+                .feed_forward_gate_weight
+                .matvec(backend, ffn_input.as_slice())?;
+            let up = layer
+                .feed_forward_up_weight
+                .matvec(backend, ffn_input.as_slice())?;
+            let activated = silu_glu(gate.values.as_slice(), up.values.as_slice());
+            let ffn_out = layer
+                .feed_forward_down_weight
+                .matvec(backend, activated.as_slice())?;
+            hidden = add_vectors(ffn_out.values.as_slice(), ffn_residual.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+
+            bytes_moved = bytes_moved
+                .saturating_add(q.bytes_moved)
+                .saturating_add(k.bytes_moved)
+                .saturating_add(v.bytes_moved)
+                .saturating_add(attention_out.bytes_moved)
+                .saturating_add(gate.bytes_moved)
+                .saturating_add(up.bytes_moved)
+                .saturating_add(ffn_out.bytes_moved);
+            kernel_count = kernel_count
+                .saturating_add(q.kernel_count)
+                .saturating_add(k.kernel_count)
+                .saturating_add(v.kernel_count)
+                .saturating_add(attention_out.kernel_count)
+                .saturating_add(gate.kernel_count)
+                .saturating_add(up.kernel_count)
+                .saturating_add(ffn_out.kernel_count);
+        }
+
+        let final_hidden = rms_norm(
+            hidden.as_slice(),
+            self.output_norm.as_slice(),
+            self.family_metadata.rms_norm_epsilon,
+        );
+        let logits = self.output.matvec(backend, final_hidden.as_slice())?;
+        bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
+        kernel_count = kernel_count.saturating_add(logits.kernel_count);
+
+        Ok(CudaGemma4ForwardStep {
+            key: cache_key,
+            value: cache_value,
+            logits: logits.values,
+            final_hidden,
+            kernel_count,
+            bytes_moved,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4Layer {
+    attention_norm: Vec<f32>,
+    attention_query_weight: CudaQuantizedProjectionMatrix,
+    attention_query_bias: Option<Vec<f32>>,
+    attention_key_weight: CudaQuantizedProjectionMatrix,
+    attention_key_bias: Option<Vec<f32>>,
+    attention_value_weight: CudaQuantizedProjectionMatrix,
+    attention_value_bias: Option<Vec<f32>>,
+    attention_output_weight: CudaQuantizedProjectionMatrix,
+    attention_output_bias: Option<Vec<f32>>,
+    feed_forward_norm: Vec<f32>,
+    feed_forward_gate_weight: CudaQuantizedProjectionMatrix,
+    feed_forward_up_weight: CudaQuantizedProjectionMatrix,
+    feed_forward_down_weight: CudaQuantizedProjectionMatrix,
+}
+
+impl CudaGemma4Layer {
+    fn load(
+        backend: &mut CudaBackend,
+        artifact: &GgufBlobArtifact,
+        layout: &GgufDecoderLayerTensorLayout,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        Ok(Self {
+            attention_norm: load_dense_vector(artifact, layout.attention_norm.as_str())?,
+            attention_query_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.attention_query_weight.as_deref(),
+                    "attention_query_weight",
+                )?,
+            )?,
+            attention_query_bias: load_optional_dense_vector(
+                artifact,
+                layout.attention_query_bias.as_deref(),
+            )?,
+            attention_key_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.attention_key_weight.as_deref(),
+                    "attention_key_weight",
+                )?,
+            )?,
+            attention_key_bias: load_optional_dense_vector(
+                artifact,
+                layout.attention_key_bias.as_deref(),
+            )?,
+            attention_value_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.attention_value_weight.as_deref(),
+                    "attention_value_weight",
+                )?,
+            )?,
+            attention_value_bias: load_optional_dense_vector(
+                artifact,
+                layout.attention_value_bias.as_deref(),
+            )?,
+            attention_output_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.attention_output_weight.as_deref(),
+                    "attention_output_weight",
+                )?,
+            )?,
+            attention_output_bias: load_optional_dense_vector(
+                artifact,
+                layout.attention_output_bias.as_deref(),
+            )?,
+            feed_forward_norm: load_dense_vector(
+                artifact,
+                required_tensor_name(layout.feed_forward_norm.as_deref(), "feed_forward_norm")?,
+            )?,
+            feed_forward_gate_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.feed_forward_gate_weight.as_deref(),
+                    "feed_forward_gate_weight",
+                )?,
+            )?,
+            feed_forward_up_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.feed_forward_up_weight.as_deref(),
+                    "feed_forward_up_weight",
+                )?,
+            )?,
+            feed_forward_down_weight: CudaQuantizedProjectionMatrix::load(
+                backend,
+                artifact,
+                required_tensor_name(
+                    layout.feed_forward_down_weight.as_deref(),
+                    "feed_forward_down_weight",
+                )?,
+            )?,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaQuantizedProjectionMatrix {
+    mode: QuantizationMode,
+    rows: usize,
+    columns: usize,
+    weights: Arc<CudaBuffer>,
+}
+
+impl CudaQuantizedProjectionMatrix {
+    fn load(
+        backend: &mut CudaBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let storage = artifact.paged_tensor(name)?;
+        let metadata = storage.metadata();
+        if metadata.quantized_layout.is_none() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "native gemma4 cuda runtime currently requires quantized projection tensor `{name}`",
+                )),
+            ));
+        }
+        let [rows, columns] = metadata.shape.dims() else {
+            return Err(ModelLoadError::InvalidTensorShape {
+                name: metadata.name.clone(),
+                expected: vec![0, 0],
+                actual: metadata.shape.dims().to_vec(),
+            }
+            .into());
+        };
+        let weights = backend.byte_buffer(storage.bytes()?).map_err(|error| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                "failed to upload `{name}` to cuda: {error}",
+            )))
+        })?;
+        Ok(Self {
+            mode: metadata.quantization,
+            rows: *rows,
+            columns: *columns,
+            weights: Arc::new(weights),
+        })
+    }
+
+    fn matvec(
+        &self,
+        backend: &mut CudaBackend,
+        input: &[f32],
+    ) -> Result<CudaProjectionStep, ReferenceTextGenerationError> {
+        let result = backend
+            .quantized_matvec_profiled(
+                self.weights.as_ref(),
+                self.mode,
+                self.rows,
+                self.columns,
+                input,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        Ok(CudaProjectionStep {
+            values: result.values,
+            kernel_count: result.stats.kernel_launches as usize,
+            bytes_moved: result
+                .stats
+                .host_to_device_bytes
+                .saturating_add(result.stats.device_to_host_bytes),
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaProjectionStep {
+    values: Vec<f32>,
+    kernel_count: usize,
+    bytes_moved: u64,
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4ForwardStep {
+    key: Vec<f32>,
+    value: Vec<f32>,
+    logits: Vec<f32>,
+    final_hidden: Vec<f32>,
+    kernel_count: usize,
+    bytes_moved: u64,
+}
+
 fn gguf_local_blob_open_options() -> LocalBlobOpenOptions {
     LocalBlobOpenOptions::default().with_integrity_policy(BlobIntegrityPolicy::LocalUnverifiedLabel)
 }
@@ -2122,6 +2863,24 @@ fn digest_dense_gguf_plan(
     hasher.update(b"|");
     hasher.update(metadata.architecture.as_bytes());
     hasher.update(b"|dense-gguf-cpu|v1");
+    hex::encode(hasher.finalize())
+}
+
+fn digest_gemma4_cuda_plan(
+    descriptor: &DecoderModelDescriptor,
+    metadata: &GgufDecoderFamilyMetadata,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(descriptor.model.model_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.model.revision.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.weights.digest.as_bytes());
+    hasher.update(b"|");
+    hasher.update(descriptor.model.family.as_bytes());
+    hasher.update(b"|");
+    hasher.update(metadata.architecture.as_bytes());
+    hasher.update(b"|gemma4-native-cuda|v1");
     hex::encode(hasher.finalize())
 }
 
@@ -2647,6 +3406,19 @@ mod tests {
     }
 
     #[test]
+    fn cpu_gguf_service_executes_gemma4_family() -> Result<(), Box<dyn std::error::Error>> {
+        run_dense_family_case(
+            "gemma4",
+            GgufDecoderFamily::Gemma4,
+            dense_gemma4_metadata("tiny psionic gemma4"),
+            false,
+            3,
+            4,
+            "hello",
+        )
+    }
+
+    #[test]
     fn cpu_gguf_service_executes_qwen35_proxy_family() -> Result<(), Box<dyn std::error::Error>> {
         let _proxy_lock = qwen35_proxy_test_lock()
             .lock()
@@ -2947,6 +3719,7 @@ mod tests {
             GgufDecoderFamily::Llama => "llama",
             GgufDecoderFamily::Qwen => "qwen",
             GgufDecoderFamily::Qwen35 => "qwen35",
+            GgufDecoderFamily::Gemma4 => "gemma4",
             GgufDecoderFamily::Mistral => "mistral",
             GgufDecoderFamily::GptOss => "gpt_oss",
         }
@@ -3049,6 +3822,16 @@ mod tests {
     fn dense_qwen_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
         let mut metadata = dense_family_header("qwen2", name);
         metadata.extend(qwen_tokenizer_metadata_entries());
+        metadata
+    }
+
+    fn dense_gemma4_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = dense_family_header("gemma4", name);
+        metadata.push((
+            String::from("tokenizer.ggml.pre"),
+            GgufMetadataValue::String(String::from("gemma4")),
+        ));
+        metadata.extend(sentencepiece_tokenizer_metadata_entries());
         metadata
     }
 

@@ -55,14 +55,15 @@ use tokio::{
 use tokio_stream::iter;
 
 use crate::{
-    CpuGgufTextGenerationService, CpuModelEmbeddingsService, CudaGgufGptOssTextGenerationService,
-    CudaGgufQwen35TextGenerationService, CudaGptOssTextGenerationError, DecodeStrategy,
-    DecoderModelDescriptor, EmbeddingMetrics, EmbeddingNormalization, EmbeddingProvenance,
-    EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor, GenerationMetrics, GenerationOptions,
-    GenerationRequest, GgufDecoderAdapterLoader, GptOssPerformanceMetrics,
-    MetalGgufGptOssTextGenerationService, MetalGptOssTextGenerationError, ModelEmbeddingsError,
-    PromptRenderError, ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor,
-    TokenSequence, continuous_batch_text_generation_execution_profile,
+    CpuGgufTextGenerationService, CpuModelEmbeddingsService, CudaGemma4TextGenerationService,
+    CudaGgufGptOssTextGenerationService, CudaGgufQwen35TextGenerationService,
+    CudaGptOssTextGenerationError, DecodeStrategy, DecoderModelDescriptor, EmbeddingMetrics,
+    EmbeddingNormalization, EmbeddingProvenance, EmbeddingRequest, EmbeddingResponse,
+    EmbeddingsExecutor, GenerationMetrics, GenerationOptions, GenerationRequest,
+    GgufDecoderAdapterLoader, GptOssPerformanceMetrics, MetalGgufGptOssTextGenerationService,
+    MetalGptOssTextGenerationError, ModelEmbeddingsError, PromptRenderError,
+    ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor, TokenSequence,
+    continuous_batch_text_generation_execution_profile,
     default_embeddings_execution_profile, default_generation_scheduler_policy,
     default_text_generation_execution_profile,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
@@ -848,6 +849,7 @@ struct OpenAiCompatState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OpenAiCompatRuntimeKind {
     GgufDecoderCpu,
+    GgufDecoderCudaGemma4,
     GgufDecoderCudaQwen35,
     SafetensorsEmbeddings,
 }
@@ -946,6 +948,9 @@ impl OpenAiCompatLoadedModel {
 
     fn supports_tool_calling(&self) -> bool {
         self.decoder().is_some_and(|model| {
+            if matches!(model.family, GgufDecoderFamily::Gemma4) {
+                return false;
+            }
             !matches!(model.family, GgufDecoderFamily::Qwen35)
                 || self.execution_engine_label() == "psionic"
         })
@@ -953,6 +958,9 @@ impl OpenAiCompatLoadedModel {
 
     fn supports_response_state(&self) -> bool {
         self.decoder().is_some()
+            && self
+                .supported_endpoints
+                .contains(&RoutingEndpoint::Responses)
     }
 
     fn publishes_kv_cache_policies(&self) -> bool {
@@ -984,10 +992,7 @@ impl OpenAiCompatLoadedModel {
 
     fn tool_calling_capability(&self) -> ToolCallingCapability {
         match self.decoder() {
-            Some(model)
-                if matches!(model.family, GgufDecoderFamily::Qwen35)
-                    && self.execution_engine_label() != "psionic" =>
-            {
+            Some(_) if !self.supports_tool_calling() => {
                 ToolCallingCapability {
                     support_level: ToolCallingSupportLevel::Unsupported,
                     supported_modes: vec!["none"],
@@ -1064,6 +1069,7 @@ fn qwen35_structured_output_unavailable_detail(execution_engine_label: &str) -> 
 
 enum OpenAiCompatGenerationService {
     Cpu(CpuGgufTextGenerationService),
+    Gemma4Cuda(CudaGemma4TextGenerationService),
     Qwen35Cuda(CudaGgufQwen35TextGenerationService),
 }
 
@@ -1258,6 +1264,24 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
+                        OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4 => {
+                            match CudaGemma4TextGenerationService::from_gguf_path(
+                                &load_plan.path,
+                            ) {
+                                Ok(service) => {
+                                    let model_key =
+                                        service.model_descriptor().model.model_id.clone();
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Gemma4Cuda(service),
+                                    );
+                                }
+                                Err(error) => {
+                                    let _ = ready_tx.send(Err::<(), String>(error.to_string()));
+                                    return;
+                                }
+                            }
+                        }
                         OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35 => {
                             match CudaGgufQwen35TextGenerationService::from_gguf_path(
                                 &load_plan.path,
@@ -1375,6 +1399,9 @@ impl OpenAiCompatWorker {
                         .collect::<Vec<_>>();
                     let results = match service {
                         OpenAiCompatGenerationService::Cpu(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
+                        OpenAiCompatGenerationService::Gemma4Cuda(service) => {
                             service.generate_continuous_batch(requests)
                         }
                         OpenAiCompatGenerationService::Qwen35Cuda(service) => {
@@ -2579,6 +2606,7 @@ fn decoder_family_label(family: GgufDecoderFamily) -> &'static str {
         GgufDecoderFamily::Llama => "llama",
         GgufDecoderFamily::Qwen => "qwen",
         GgufDecoderFamily::Qwen35 => "qwen35",
+        GgufDecoderFamily::Gemma4 => "gemma4",
         GgufDecoderFamily::Mistral => "mistral",
         GgufDecoderFamily::GptOss => "gpt_oss",
     }
@@ -5200,21 +5228,32 @@ fn load_generic_decoder_model(
     let family = adapter.family_metadata().family;
     let runtime_kind = match (backend, family) {
         (OpenAiCompatBackend::Cpu, _) => OpenAiCompatRuntimeKind::GgufDecoderCpu,
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4) => {
+            OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4
+        }
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35) => {
             OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35
         }
         (OpenAiCompatBackend::Cuda, _) => {
             return Err(format!(
-                "generic OpenAI cuda backend currently supports only qwen35 GGUF decoders; `{}` resolved to `{}`",
+                "generic OpenAI cuda backend currently supports only gemma4 and qwen35 GGUF decoders; `{}` resolved to `{}`",
                 model_path.display(),
                 decoder_family_label(family),
             ));
         }
     };
+    let supported_endpoints = if matches!(
+        (backend, family),
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
+    ) {
+        vec![RoutingEndpoint::ChatCompletions]
+    } else {
+        vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses]
+    };
     let loaded_model = OpenAiCompatLoadedModel {
         model_key: descriptor.model.model_id.clone(),
         canonical_name: default_model_name(model_path, descriptor.model.model_id.as_str()),
-        supported_endpoints: vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses],
+        supported_endpoints,
         serving_truth: generic_decoder_serving_truth(family, backend),
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
@@ -5278,7 +5317,8 @@ fn generic_decoder_serving_truth(
 ) -> OpenAiCompatServingTruth {
     if matches!(
         (backend, family),
-        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
+            | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
     ) {
         OpenAiCompatServingTruth::cuda_native()
     } else if matches!(family, GgufDecoderFamily::Qwen35) {
@@ -5290,9 +5330,13 @@ fn generic_decoder_serving_truth(
 
 fn generic_decoder_execution_profile(
     family: GgufDecoderFamily,
-    _backend: OpenAiCompatBackend,
+    backend: OpenAiCompatBackend,
 ) -> ExecutionCapabilityProfile {
-    if matches!(family, GgufDecoderFamily::Qwen35) {
+    if matches!(
+        (backend, family),
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
+            | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
+    ) {
         default_text_generation_execution_profile()
     } else {
         continuous_batch_text_generation_execution_profile()
@@ -6014,18 +6058,20 @@ mod tests {
         LOCAL_SERVER_MEMORY_PRESSURE_REPORTING, LOCAL_SERVER_UNLOAD_CONTROL,
         LOCAL_SERVER_WARM_CONTROL, LocalServingTruth, NamedToolChoiceFunction,
         NamedToolChoiceRequest, OpenAiCompatConfig, OpenAiCompatServer, PromptTokenCache,
-        PsionicGrammarRequest, PsionicReasoningMode, PsionicReasoningRequest,
-        PsionicResponseStateRequest, ResolvedReasoningRequest, ResolvedToolCall,
-        ResponseContinuationMode, ResponsesInput, ResponsesRequest, RoutingEndpoint,
-        RoutingRequest, StopSequences, ToolCallingContract, ToolChoiceMode, ToolChoiceRequest,
-        ToolDefinitionEnvelope, ToolDefinitionRequest, apply_tool_contract_to_prompt_messages,
-        assistant_prompt_message_for_tool_loop, chat_messages_to_prompt_messages,
-        chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
-        completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
+        OpenAiCompatRuntimeKind, PsionicGrammarRequest, PsionicReasoningMode,
+        PsionicReasoningRequest, PsionicResponseStateRequest, ResolvedReasoningRequest,
+        ResolvedToolCall, ResponseContinuationMode, ResponsesInput, ResponsesRequest,
+        RoutingEndpoint, RoutingRequest, StopSequences, ToolCallingContract, ToolChoiceMode,
+        ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
+        apply_tool_contract_to_prompt_messages, assistant_prompt_message_for_tool_loop,
+        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
+        chat_messages_to_prompt_messages_generic, completion_choice,
+        ensure_harmony_stop_sequences, generation_options_from_chat_request,
         generation_options_from_chat_request_for_family, generation_options_from_responses_request,
         generic_embeddings, generic_health, generic_list_models, gpt_oss_local_serving_truth,
         handle_generic_chat_completions, handle_generic_responses,
-        insert_local_serving_truth_headers, prompt_request_cache_key, render_prompt_for_model,
+        insert_local_serving_truth_headers, load_generic_decoder_model, model_endpoint_paths,
+        prompt_request_cache_key, render_prompt_for_model,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
         resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
@@ -6885,6 +6931,38 @@ mod tests {
             serde_json::json!("world")
         );
         assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_cuda_gemma4_load_plan_keeps_the_first_claim_bounded()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata("tiny pilot gemma4").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let (loaded_model, accepted_names, load_plan) =
+            load_generic_decoder_model(&gemma_path, 0, OpenAiCompatBackend::Cuda)?;
+
+        assert_eq!(
+            load_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4
+        );
+        assert_eq!(loaded_model.backend_label(), "cuda");
+        assert_eq!(loaded_model.execution_mode_label(), "native");
+        assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(model_endpoint_paths(&loaded_model), vec!["/v1/chat/completions"]);
+        assert!(!loaded_model.supports_tool_calling());
+        assert!(!loaded_model.supports_response_state());
+        assert_eq!(
+            loaded_model.decoder().map(|decoder| decoder.family),
+            Some(GgufDecoderFamily::Gemma4)
+        );
+        assert!(accepted_names.contains("tiny-gemma4.gguf"));
         Ok(())
     }
 
@@ -11583,6 +11661,16 @@ mod tests {
 
     fn dense_llama_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
         let mut metadata = dense_family_header("llama", name);
+        metadata.extend(sentencepiece_tokenizer_metadata_entries());
+        metadata
+    }
+
+    fn dense_gemma4_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = dense_family_header("gemma4", name);
+        metadata.push((
+            String::from("tokenizer.ggml.pre"),
+            GgufMetadataValue::String(String::from("gemma4")),
+        ));
         metadata.extend(sentencepiece_tokenizer_metadata_entries());
         metadata
     }
