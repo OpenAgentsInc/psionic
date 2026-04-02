@@ -399,19 +399,6 @@ The right relationship is:
 `probe` needs stronger session and policy semantics than `mesh-llm` is trying
 to provide.
 
-## 3. Dataroom And Other Workspace Product Surfaces
-
-There is effectively no direct overlap with `dataroom`.
-
-`mesh-llm` does not address:
-
-- investor access control
-- allowlists
-- private portal UX
-- WorkOS flows
-
-This repo is not relevant in that lane.
-
 ## Capability Matrix
 
 | Capability | mesh-llm | Psionic | OpenAgents / Probe |
@@ -451,6 +438,126 @@ This repo is not relevant in that lane.
 - blackboard-style shared coordination as an optional adjunct surface
 - easier attach flows to pooled inference backends
 - possibly a simple mesh-backed profile for narrow distributed inference use
+
+## GitHub Issue Roadmap
+
+If we want to absorb the full useful `mesh-llm` surface into our own codebase
+without keeping `mesh-llm` as a parallel product, the work should be staged as
+one explicit GitHub issue sequence.
+
+The sequence should be:
+
+1. `psionic`: "Freeze mesh-integration target and owner split"
+   This issue should lock the porting boundary before code spreads. It should
+   state directly that `psionic` owns runtime, transport, topology, and mesh
+   truth, `openagents` owns compute-market and provider productization above
+   that truth, and `probe` owns agent-runtime integration above the inference
+   backend.
+
+2. `psionic`: "Add mesh node-role contract"
+   Port the explicit `host`, `worker`, `standby`, and `thin_client` role model
+   into a typed Psionic contract with machine-readable status publication,
+   refusal states, and upgrade or downgrade reasons.
+
+3. `psionic`: "Add mesh identity, invite, and join contract"
+   Port the mesh identity and join semantics into Psionic-owned manifests and
+   receipts. This should cover private mesh identity, named mesh identity,
+   invite-token or join-package format, and last-joined mesh preference
+   tracking without inheriting `mesh-llm`'s exact external contract blindly.
+
+4. `psionic`: "Add inference-mesh management API"
+   Port the small operator API shape into Psionic. The minimum useful surface
+   is a Psionic-owned equivalent of status, event stream, discoverable meshes,
+   and join status, with runtime truth and capability publication folded into
+   the same surface instead of sitting beside it.
+
+5. `psionic`: "Add bootstrap proxy and thin-client mode"
+   Port the join-before-load experience. A thin client or joining worker should
+   be able to attach to an existing mesh and serve requests through a bootstrap
+   proxy before local warmup is complete, while keeping runtime identity and
+   fallback posture explicit.
+
+6. `psionic`: "Add QUIC mesh transport for remote inference lanes"
+   Port the tunnel and peer-management class of behavior into Psionic-owned
+   transport instead of a llama.cpp sidecar. This issue should cover stream
+   families, admission model, peer lifecycle, reconnect or death handling, and
+   direct worker-to-worker transfer rules for native Psionic execution lanes.
+
+7. `psionic`: "Add per-model host election and standby promotion"
+   Port the simple operational control loop that makes the mesh usable:
+   per-model election groups, standby promotion, and demotion or reassignment
+   when topology or model availability changes.
+
+8. `psionic`: "Add demand gossip and hot-model rebalance"
+   Port request-rate and demand propagation into native Psionic mesh status so
+   large or idle nodes can promote the right model family without operator
+   guesswork. This issue should stay tied to explicit receipts and not become
+   hidden heuristics.
+
+9. `psionic`: "Add multi-model mesh router"
+   Port model-aware routing above the native Psionic serving lanes so a mesh
+   can host several models at once and route by request `model` field while
+   keeping per-model capability envelopes explicit.
+
+10. `psionic`: "Add operator console surface for inference mesh"
+    Port the best part of the `mesh-llm` user story: a live topology and model
+    view that makes the system legible. This can start as a thin web console or
+    equivalent operator surface backed entirely by the Psionic management API.
+
+11. `psionic`: "Add published install and service mode for mesh lanes"
+    Port the operational packaging layer: install script, background service
+    posture, cold-start rules, and upgrade-safe runtime layout. This matters
+    because the current gap is not only runtime logic. It is operator
+    repeatability.
+
+12. `psionic`: "Port MoE mesh orchestration into native model-family contracts"
+    Port the useful orchestration ideas from `mesh-llm`'s expert-sharding lane
+    into Psionic-owned model-family logic. Do not import llama.cpp-specific
+    assumptions. Keep the port focused on the control plane, assignment logic,
+    and zero-cross-node-traffic design where it remains valid.
+
+13. `psionic`: "Port blackboard-class shared coordination surface"
+    Port the blackboard idea into a Psionic-adjacent coordination primitive
+    only if it is defined as a clear optional surface and not as hidden runtime
+    state. This issue should focus on message propagation, search, retention,
+    privacy posture, and machine-readable transport semantics.
+
+14. `probe`: "Add mesh-backed backend profile and attach flow"
+    Once the Psionic mesh API exists, `probe` should get a first-class backend
+    profile that can target a Psionic mesh directly, including attach, health,
+    model selection, and explicit degraded-mode messaging.
+
+15. `probe`: "Integrate shared blackboard or mesh coordination adjunct"
+    If the blackboard-class surface lands, `probe` should expose it as an
+    optional adjunct to sessions instead of building a second agent-runtime
+    abstraction for the same problem.
+
+16. `openagents`: "Add pooled inference surface to compute-provider product"
+    Once Psionic mesh lanes are real, `openagents` should expose pooled
+    inference as part of the Compute Market provider story, not as a detached
+    engineering demo. This issue should cover provider inventory, operator
+    visibility, and "what is my machine contributing right now?" product
+    surfaces.
+
+17. `openagents`: "Bind pooled inference to compute-market product identity"
+    This issue should connect the new mesh substrate to actual Compute Market
+    product identities, capability envelopes, receipts, and settlement-facing
+    provider truth.
+
+18. `openagents`: "Add multi-machine join and invite UX above Psionic mesh"
+    Port the good human-facing join flow into Autopilot. The product layer
+    should let a user add another trusted machine quickly, but the underlying
+    truth must remain Psionic-owned.
+
+19. `openagents`: "Connect pooled inference to wallet, earnings, and market receipts"
+    This is where the absorbed mesh work stops being only infra. The pooled
+    inference surface should feed actual provider, payout, and compute-market
+    receipts rather than staying a local-serving convenience layer.
+
+20. `psionic` plus `openagents`: "Retire standalone mesh sidecar posture"
+    The final issue in the sequence should remove any residual dependency on a
+    parallel `mesh-llm`-style sidecar product and declare the owned mesh lane
+    complete inside our own runtime, product, and market boundaries.
 
 ## What We Should Not Port
 
