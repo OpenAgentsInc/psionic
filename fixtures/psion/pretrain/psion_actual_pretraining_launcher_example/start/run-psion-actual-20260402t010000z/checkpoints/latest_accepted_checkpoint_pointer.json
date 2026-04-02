@@ -1,0 +1,11 @@
+{
+  "schema_version": "psion.actual_pretraining_checkpoint_pointer.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t010000z",
+  "pointer_state": "pending_first_checkpoint",
+  "checkpoint_label": "pending_first_checkpoint",
+  "optimizer_step": 0,
+  "checkpoint_ref": null,
+  "checkpoint_manifest_relative_path": null,
+  "detail": "Launch-time checkpoint pointer records that the actual lane has not yet admitted the first durable checkpoint."
+}

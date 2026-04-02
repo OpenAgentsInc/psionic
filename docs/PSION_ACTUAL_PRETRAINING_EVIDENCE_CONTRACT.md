@@ -120,3 +120,10 @@ fields, and redaction rules.
 
 This contract prevents that drift before the actual-lane launcher starts
 writing those retained artifacts for real.
+
+The first concrete writer for this family now exists in
+`./TRAIN --lane actual_pretraining start|resume`. It currently writes the
+launch or resume manifest, retained status surfaces, canonical checkpoint
+pointer, launcher log, and a provisional closeout bundle that repeats git
+provenance early. Later hardening issues extend the same retained family
+instead of replacing it.

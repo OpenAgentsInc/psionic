@@ -1,0 +1,21 @@
+{
+  "schema_version": "psion.actual_pretraining_closeout_bundle.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t020000z",
+  "closeout_state": "resume_staged",
+  "retained_paths": {
+    "launch_manifest_path": "manifests/launch_manifest.json",
+    "resume_manifest_path": "manifests/resume_manifest.json",
+    "current_status_path": "status/current_run_status.json",
+    "retained_summary_path": "status/retained_summary.json",
+    "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "closeout_bundle_path": "closeout/closeout_bundle.json",
+    "launcher_log_path": "logs/launcher.log"
+  },
+  "selected_git_ref": "refs/heads/main",
+  "git_commit_sha": "1111222233334444555566667777888899990000",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "claim_boundary": "This provisional closeout bundle repeats launcher provenance early so later closeout work can extend the same evidence family without losing source-state identity. It does not claim completed training.",
+  "detail": "Resume-staged closeout bundle repeats launcher provenance after selecting an accepted checkpoint pointer."
+}

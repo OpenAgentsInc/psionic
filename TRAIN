@@ -2,4 +2,23 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec "${script_dir}/scripts/train-psion-reference-pilot.sh" "$@"
+lane="reference_pilot"
+
+if [[ $# -ge 2 && "$1" == "--lane" ]]; then
+  lane="$2"
+  shift 2
+fi
+
+case "${lane}" in
+  reference_pilot)
+    exec "${script_dir}/scripts/train-psion-reference-pilot.sh" "$@"
+    ;;
+  actual_pretraining)
+    exec "${script_dir}/scripts/train-psion-actual-pretraining.sh" "$@"
+    ;;
+  *)
+    echo "error: unsupported lane ${lane}" >&2
+    echo "supported lanes: reference_pilot, actual_pretraining" >&2
+    exit 1
+    ;;
+esac

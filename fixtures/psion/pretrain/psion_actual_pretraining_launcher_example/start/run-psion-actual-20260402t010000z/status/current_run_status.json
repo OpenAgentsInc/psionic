@@ -1,0 +1,19 @@
+{
+  "schema_version": "psion.actual_pretraining_current_run_status.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t010000z",
+  "phase": "launch_staged",
+  "current_status_path": "status/current_run_status.json",
+  "retained_summary_path": "status/retained_summary.json",
+  "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+  "latest_checkpoint_label": "pending_first_checkpoint",
+  "last_completed_step": 0,
+  "launcher_surfaces": {
+    "start_surface_id": "psion_actual_pretraining.start",
+    "dry_run_surface_id": "psion_actual_pretraining.dry_run",
+    "resume_surface_id": "psion_actual_pretraining.resume",
+    "status_surface_id": "psion_actual_pretraining.status"
+  },
+  "updated_at_utc": "2026-04-02T15:00:00Z",
+  "detail": "Launch-staged status records that the operator contract is materialized and waiting for the first admitted checkpoint."
+}

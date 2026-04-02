@@ -31,6 +31,7 @@ pretraining lane, recipe, and evidence family are frozen separately in:
 - `docs/PSION_ACTUAL_PRETRAINING_LANE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
+- `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`
 
 It does **not** mean:
 
@@ -223,3 +224,23 @@ ambiguous.
 
 This runbook closes that ambiguity by binding `TRAIN` to the public Psion lane
 that matters most for user-facing Psion progress.
+
+## Actual-Lane Escape Hatch
+
+The actual broader-pretraining lane now has its own explicit operator path:
+
+```bash
+./TRAIN --lane actual_pretraining start --dry-run
+```
+
+Resume and status use the same lane selector:
+
+```bash
+./TRAIN --lane actual_pretraining resume --run-root <path>
+./TRAIN --lane actual_pretraining status --run-root <path>
+```
+
+Those commands do not replace the bounded local-first reference runbook. They
+materialize the actual-lane retained evidence family and enforce the
+dirty-tree/ref provenance contract described in
+`docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`.

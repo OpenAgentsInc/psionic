@@ -76,8 +76,14 @@ nearby.
 This doc prevents that drift by fixing one lane id and one admitted anchor
 bundle before the launcher or hardening work starts.
 
-The current `./TRAIN` command does not launch this lane. After the bounded
-reference-pilot separation work, `./TRAIN` writes under
-`psion_reference_pilot_runs/<run_id>` naming and emits
-`reference_pilot_operator_manifest.json`, making the distinction from this
-lane's `psion_actual_pretraining_runs/<run_id>` family explicit.
+`./TRAIN` still defaults to the bounded reference pilot. The actual lane is now
+available explicitly through:
+
+- `./TRAIN --lane actual_pretraining start`
+- `./TRAIN --lane actual_pretraining resume --run-root <path>`
+- `./TRAIN --lane actual_pretraining status --run-root <path>`
+
+Those commands materialize the actual-lane retained evidence family under
+`psion_actual_pretraining_runs/<run_id>` naming without pretending that later
+hardware qualification, backup, auto-eval, or cluster execution hardening is
+already finished.

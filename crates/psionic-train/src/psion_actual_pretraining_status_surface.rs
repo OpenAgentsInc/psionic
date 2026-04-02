@@ -15,8 +15,7 @@ pub const PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION: &str =
 pub const PSION_ACTUAL_PRETRAINING_START_SURFACE_ID: &str = "psion_actual_pretraining.start";
 
 /// Stable launcher surface id for dry-running the actual pretraining lane.
-pub const PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID: &str =
-    "psion_actual_pretraining.dry_run";
+pub const PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID: &str = "psion_actual_pretraining.dry_run";
 
 /// Stable launcher surface id for resuming the actual pretraining lane.
 pub const PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID: &str = "psion_actual_pretraining.resume";
@@ -98,7 +97,10 @@ pub struct PsionActualPretrainingRetainedSummary {
 impl PsionActualPretrainingCurrentRunStatus {
     /// Validates the current-run status artifact.
     pub fn validate(&self) -> Result<(), PsionActualPretrainingStatusSurfaceError> {
-        ensure_nonempty(self.schema_version.as_str(), "current_status.schema_version")?;
+        ensure_nonempty(
+            self.schema_version.as_str(),
+            "current_status.schema_version",
+        )?;
         if self.schema_version != PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION {
             return Err(PsionActualPretrainingStatusSurfaceError::FieldMismatch {
                 field: String::from("schema_version"),
@@ -136,13 +138,26 @@ impl PsionActualPretrainingCurrentRunStatus {
             self.latest_checkpoint_label.as_str(),
             "current_status.latest_checkpoint_label",
         )?;
-        if self.last_completed_step == 0 {
+        let zero_step_phase = matches!(self.phase.as_str(), "dry_run_planned" | "launch_staged");
+        if self.last_completed_step == 0 && !zero_step_phase {
             return Err(PsionActualPretrainingStatusSurfaceError::MissingField {
                 field: String::from("current_status.last_completed_step"),
             });
         }
+        if self.last_completed_step == 0
+            && self.latest_checkpoint_label != "pending_first_checkpoint"
+        {
+            return Err(PsionActualPretrainingStatusSurfaceError::FieldMismatch {
+                field: String::from("current_status.latest_checkpoint_label"),
+                expected: String::from("pending_first_checkpoint"),
+                actual: self.latest_checkpoint_label.clone(),
+            });
+        }
         self.launcher_surfaces.validate()?;
-        ensure_nonempty(self.updated_at_utc.as_str(), "current_status.updated_at_utc")?;
+        ensure_nonempty(
+            self.updated_at_utc.as_str(),
+            "current_status.updated_at_utc",
+        )?;
         ensure_nonempty(self.detail.as_str(), "current_status.detail")?;
         Ok(())
     }
@@ -151,7 +166,10 @@ impl PsionActualPretrainingCurrentRunStatus {
 impl PsionActualPretrainingRetainedSummary {
     /// Validates the retained summary artifact.
     pub fn validate(&self) -> Result<(), PsionActualPretrainingStatusSurfaceError> {
-        ensure_nonempty(self.schema_version.as_str(), "retained_summary.schema_version")?;
+        ensure_nonempty(
+            self.schema_version.as_str(),
+            "retained_summary.schema_version",
+        )?;
         if self.schema_version != PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION {
             return Err(PsionActualPretrainingStatusSurfaceError::FieldMismatch {
                 field: String::from("schema_version"),
@@ -278,9 +296,7 @@ fn ensure_nonempty(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingRetainedSummary,
-    };
+    use super::{PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingRetainedSummary};
 
     fn current_status() -> PsionActualPretrainingCurrentRunStatus {
         serde_json::from_str(include_str!(
@@ -325,5 +341,16 @@ mod tests {
                 actual: String::from("wrong.status.surface"),
             }
         );
+    }
+
+    #[test]
+    fn actual_pretraining_current_status_accepts_precheckpoint_launch_phase() {
+        let mut status = current_status();
+        status.phase = String::from("launch_staged");
+        status.latest_checkpoint_label = String::from("pending_first_checkpoint");
+        status.last_completed_step = 0;
+        status
+            .validate()
+            .expect("launch-staged status should allow zero-step pending checkpoint state");
     }
 }

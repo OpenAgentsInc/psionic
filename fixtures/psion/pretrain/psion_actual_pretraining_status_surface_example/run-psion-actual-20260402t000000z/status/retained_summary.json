@@ -14,6 +14,6 @@
     "resume_surface_id": "psion_actual_pretraining.resume",
     "status_surface_id": "psion_actual_pretraining.status"
   },
-  "claim_boundary": "The retained summary records the last known state of the actual pretraining lane and the reserved launcher surfaces. It does not itself claim that the start or resume surfaces are implemented yet.",
-  "detail": "Retained summary freezes the launcher contract names and the minimal last-known operator state the later actual launcher must write."
+  "claim_boundary": "The retained summary records actual-lane start, dry-run, resume, and status surfaces plus the last known operator state. It does not claim that cluster execution, automatic eval, or durable backup are finished.",
+  "detail": "Retained summary freezes the launcher contract names and the minimal last-known operator state the actual launcher writes."
 }

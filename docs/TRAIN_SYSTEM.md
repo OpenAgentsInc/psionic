@@ -119,8 +119,35 @@ the operator helper `scripts/psion-actual-pretraining-status.sh`, the focused
 doc `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`, and the committed
 fixtures `fixtures/psion/pretrain/psion_actual_pretraining_current_run_status_v1.json`
 plus `fixtures/psion/pretrain/psion_actual_pretraining_retained_summary_v1.json`.
-That surface freezes the reserved launcher surface ids for start, dry-run,
-resume, and status before the real actual-lane launcher is implemented.
+That surface now carries the real actual-lane status contract used by the
+launcher, including explicit pre-first-checkpoint phases such as
+`dry_run_planned` and `launch_staged`.
+
+The repo now also owns the canonical actual-lane launcher and resume contract
+in `crates/psionic-train/src/psion_actual_pretraining_launcher.rs`, the
+fixture generators
+`crates/psionic-train/examples/psion_actual_pretraining_launcher_fixtures.rs`
+and `crates/psionic-train/examples/psion_actual_pretraining_operator.rs`, the
+entrypoint wrapper `scripts/train-psion-actual-pretraining.sh`, the explicit
+lane dispatch in `psionic/TRAIN`, the focused runbook
+`docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`, and the committed fixtures:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_launch_manifest_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_resume_manifest_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_pointer_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_closeout_bundle_v1.json`
+
+That surface gives the repo one real operator path for:
+
+- `./TRAIN --lane actual_pretraining start`
+- `./TRAIN --lane actual_pretraining resume --run-root <path>`
+- `./TRAIN --lane actual_pretraining status --run-root <path>`
+
+It consumes the frozen lane, recipe, topology/storage, evidence, and status
+contracts directly; refuses dirty working trees by default; retains the
+selected ref plus exact commit SHA; and repeats that provenance in the
+provisional closeout bundle without claiming that later hardening issues are
+already finished.
 
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the

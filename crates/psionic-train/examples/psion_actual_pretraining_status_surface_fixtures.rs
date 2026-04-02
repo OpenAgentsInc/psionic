@@ -2,11 +2,12 @@ use std::{error::Error, fs, path::PathBuf};
 
 use psionic_train::{
     PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingLauncherSurfaces,
-    PsionActualPretrainingRetainedSummary, PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PsionActualPretrainingRetainedSummary,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_LANE_ID,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
     PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID, PSION_ACTUAL_PRETRAINING_START_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -56,10 +57,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         ),
         launcher_surfaces: surfaces,
         claim_boundary: String::from(
-            "The retained summary records the last known state of the actual pretraining lane and the reserved launcher surfaces. It does not itself claim that the start or resume surfaces are implemented yet.",
+            "The retained summary records actual-lane start, dry-run, resume, and status surfaces plus the last known operator state. It does not claim that cluster execution, automatic eval, or durable backup are finished.",
         ),
         detail: String::from(
-            "Retained summary freezes the launcher contract names and the minimal last-known operator state the later actual launcher must write.",
+            "Retained summary freezes the launcher contract names and the minimal last-known operator state the actual launcher writes.",
         ),
     };
     retained_summary.validate()?;
