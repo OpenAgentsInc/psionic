@@ -15,8 +15,8 @@ use crate::{
     ClusterComputeMarketTrustAssessment, ClusterComputeMarketTrustDisposition,
     ClusterDiscoveryCandidate, ClusterId, ClusterIntroductionPolicy,
     ClusterIntroductionVerificationError, ClusterJoinRefusal, ClusterNodeIdentity,
-    ClusterTrustPolicy, ConfiguredClusterPeer, NodeAttestationRequirement, NodeId, NodeRole,
-    PeerSnapshot, ServedMeshRoleState, SignedClusterIntroductionEnvelope,
+    ClusterReplicaLaneKey, ClusterTrustPolicy, ConfiguredClusterPeer, NodeAttestationRequirement,
+    NodeId, NodeRole, PeerSnapshot, ServedMeshRoleState, SignedClusterIntroductionEnvelope,
 };
 
 /// Monotonic cluster-election term for the first ordered-control seam.
@@ -1355,6 +1355,145 @@ impl ClusterLeadershipRecord {
     }
 }
 
+/// Machine-checkable reason for one per-lane active-host election outcome.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterReplicaHostElectionReason {
+    /// First active host was assigned for the lane.
+    InitialAssignment,
+    /// Previous active-host lease expired and one standby was promoted.
+    LeaseExpired,
+    /// Previous active host was not present in the current replica snapshot.
+    ActiveHostMissing,
+    /// Previous active host was present but no longer warm.
+    ActiveHostNotWarm,
+    /// Previous active host was explicitly draining.
+    ActiveHostDraining,
+    /// Previous active host was explicitly refused.
+    ActiveHostRefused,
+}
+
+/// Split-brain diagnostic for one same-term per-lane active-host conflict.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterReplicaHostElectionConflictDiagnostic {
+    /// Replica lane that observed the same-term conflict.
+    pub lane: ClusterReplicaLaneKey,
+    /// Election term that observed two different active hosts.
+    pub term: ClusterTerm,
+    /// Active host already recorded for the lane/term.
+    pub current_active_host_node_id: NodeId,
+    /// Active host attempted after the first claim.
+    pub attempted_active_host_node_id: NodeId,
+}
+
+/// Ordered active-host and standby truth for one replicated serving lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterReplicaHostElectionRecord {
+    /// Replica lane this election belongs to.
+    pub lane: ClusterReplicaLaneKey,
+    /// Election term that fences this host epoch.
+    pub term: ClusterTerm,
+    /// Node currently elected as the active host for the lane.
+    pub active_host_node_id: NodeId,
+    /// Warm standby nodes retained for promotion.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub standby_node_ids: Vec<NodeId>,
+    /// Previous active host, when this record reflects one promotion.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub promoted_from_node_id: Option<NodeId>,
+    /// Explicit reason for the current host election outcome.
+    pub reason: ClusterReplicaHostElectionReason,
+    /// Explicit lease for the current host record.
+    #[serde(default)]
+    pub lease: ClusterLeadershipLease,
+    /// Plain-language detail, when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+impl ClusterReplicaHostElectionRecord {
+    /// Creates one active-host record for one replicated serving lane.
+    #[must_use]
+    pub fn new(
+        lane: ClusterReplicaLaneKey,
+        term: ClusterTerm,
+        active_host_node_id: NodeId,
+        reason: ClusterReplicaHostElectionReason,
+    ) -> Self {
+        Self {
+            lane,
+            term,
+            active_host_node_id,
+            standby_node_ids: Vec::new(),
+            promoted_from_node_id: None,
+            reason,
+            lease: ClusterLeadershipLease::default(),
+            detail: None,
+        }
+    }
+
+    /// Replaces the warm-standby set for this lane.
+    #[must_use]
+    pub fn with_standby_node_ids(mut self, mut standby_node_ids: Vec<NodeId>) -> Self {
+        standby_node_ids.sort_unstable();
+        standby_node_ids.dedup();
+        standby_node_ids.retain(|node_id| *node_id != self.active_host_node_id);
+        self.standby_node_ids = standby_node_ids;
+        self
+    }
+
+    /// Records which previous active host was promoted away from.
+    #[must_use]
+    pub fn with_promoted_from_node_id(mut self, node_id: NodeId) -> Self {
+        self.promoted_from_node_id = Some(node_id);
+        self
+    }
+
+    /// Applies one explicit lease policy at the observed tick.
+    #[must_use]
+    pub fn with_lease_policy(
+        mut self,
+        heartbeat_observed_tick: ClusterLeaseTick,
+        lease_policy: ClusterLeadershipLeasePolicy,
+    ) -> Self {
+        self.lease = ClusterLeadershipLease::from_policy(heartbeat_observed_tick, lease_policy);
+        self
+    }
+
+    /// Renews the current lane-host lease at one later observed tick.
+    #[must_use]
+    pub fn renewed_at(
+        mut self,
+        heartbeat_observed_tick: ClusterLeaseTick,
+        lease_policy: ClusterLeadershipLeasePolicy,
+    ) -> Self {
+        self.lease = ClusterLeadershipLease::from_policy(heartbeat_observed_tick, lease_policy);
+        self
+    }
+
+    /// Attaches plain-language detail to the election record.
+    #[must_use]
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    /// Returns the current lease status for this active-host record.
+    #[must_use]
+    pub const fn lease_status_at(
+        &self,
+        observed_tick: ClusterLeaseTick,
+    ) -> ClusterLeadershipLeaseStatus {
+        self.lease.status_at(observed_tick)
+    }
+
+    /// Returns a stable digest for the record.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_json_digest("cluster_replica_host_election_record", self)
+    }
+}
+
 /// Recovery and compaction policy for the first authoritative cluster seam.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClusterRecoveryPolicy {
@@ -1803,6 +1942,10 @@ pub enum ClusterCommand {
     ReconcileArtifactResidency {
         residency: ClusterArtifactResidencyRecord,
     },
+    /// Request that the leader reconcile one per-lane active-host election record.
+    ReconcileReplicaHostElection {
+        election: ClusterReplicaHostElectionRecord,
+    },
     /// Request that the leader advance authoritative leadership truth.
     UpdateLeadership {
         leader_id: NodeId,
@@ -2006,6 +2149,7 @@ impl ClusterCommand {
             | Self::ExpireDiscoveryCandidate { .. }
             | Self::AdmitDiscoveryCandidate { .. }
             | Self::RevokeDiscoveryCandidate { .. }
+            | Self::ReconcileReplicaHostElection { .. }
             | Self::RemoveMember { .. } => ClusterCommandAuthorityScope::CoordinatorOnly,
             Self::ReconcileConnection { .. } => ClusterCommandAuthorityScope::LinkPeer,
             Self::UpdateLeadership { .. } => ClusterCommandAuthorityScope::ProposedLeader,
@@ -2314,6 +2458,10 @@ pub enum ClusterEvent {
     },
     /// Remove one artifact-residency fact.
     ArtifactResidencyRemoved { key: ClusterArtifactResidencyKey },
+    /// Insert or replace one per-lane active-host election fact.
+    ReplicaHostElectionReconciled {
+        election: ClusterReplicaHostElectionRecord,
+    },
     /// Insert or replace leader/coordinator truth.
     LeadershipReconciled { leadership: ClusterLeadershipRecord },
 }
@@ -2406,6 +2554,13 @@ pub struct ClusterSnapshot {
     /// Command provenance for the current leader/coordinator fact, when one exists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leadership_provenance: Option<ClusterCommandAuthorization>,
+    /// Current per-lane active-host election truth.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub replica_host_elections: BTreeMap<ClusterReplicaLaneKey, ClusterReplicaHostElectionRecord>,
+    /// Command provenance for current per-lane active-host election truth.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub replica_host_election_provenance:
+        BTreeMap<ClusterReplicaLaneKey, ClusterCommandAuthorization>,
 }
 
 impl ClusterSnapshot {
@@ -2436,6 +2591,8 @@ impl ClusterSnapshot {
             artifact_residency_provenance: BTreeMap::new(),
             leadership: None,
             leadership_provenance: None,
+            replica_host_elections: BTreeMap::new(),
+            replica_host_election_provenance: BTreeMap::new(),
         }
     }
 
@@ -2646,6 +2803,44 @@ impl ClusterSnapshot {
                     .to_string()
                     .as_bytes(),
             );
+        }
+        for (lane, election) in &self.replica_host_elections {
+            hasher.update(b"|replica_host_election|");
+            hasher.update(lane.product_id.as_bytes());
+            hasher.update(b"|");
+            hasher.update(lane.model_id.as_bytes());
+            hasher.update(b"|");
+            hasher.update(lane.runtime_backend.as_bytes());
+            hasher.update(b"|");
+            hasher.update(lane.served_artifact_digest.as_bytes());
+            hasher.update(b"|");
+            hasher.update(
+                lane.sharded_model_manifest_digest
+                    .as_deref()
+                    .unwrap_or_default()
+                    .as_bytes(),
+            );
+            hasher.update(b"|");
+            hasher.update(election.stable_digest().as_bytes());
+        }
+        for (lane, authorization) in &self.replica_host_election_provenance {
+            hasher.update(b"|replica_host_election_provenance|");
+            hasher.update(lane.product_id.as_bytes());
+            hasher.update(b"|");
+            hasher.update(lane.model_id.as_bytes());
+            hasher.update(b"|");
+            hasher.update(lane.runtime_backend.as_bytes());
+            hasher.update(b"|");
+            hasher.update(lane.served_artifact_digest.as_bytes());
+            hasher.update(b"|");
+            hasher.update(
+                lane.sharded_model_manifest_digest
+                    .as_deref()
+                    .unwrap_or_default()
+                    .as_bytes(),
+            );
+            hasher.update(b"|");
+            hasher.update(authorization.stable_digest().as_bytes());
         }
         hex::encode(hasher.finalize())
     }
@@ -2879,6 +3074,24 @@ impl ClusterState {
     #[must_use]
     pub fn leadership_provenance(&self) -> Option<&ClusterCommandAuthorization> {
         self.snapshot.leadership_provenance.as_ref()
+    }
+
+    /// Returns one per-lane active-host election record, when one exists.
+    #[must_use]
+    pub fn replica_host_election(
+        &self,
+        lane: &ClusterReplicaLaneKey,
+    ) -> Option<&ClusterReplicaHostElectionRecord> {
+        self.snapshot.replica_host_elections.get(lane)
+    }
+
+    /// Returns the command provenance for one per-lane active-host election record.
+    #[must_use]
+    pub fn replica_host_election_provenance(
+        &self,
+        lane: &ClusterReplicaLaneKey,
+    ) -> Option<&ClusterCommandAuthorization> {
+        self.snapshot.replica_host_election_provenance.get(lane)
     }
 
     /// Returns the current leadership lease status, when one leader exists.
@@ -3146,7 +3359,8 @@ impl ClusterState {
             | ClusterCommand::RemoveDiscoveryCandidate { .. }
             | ClusterCommand::ExpireDiscoveryCandidate { .. }
             | ClusterCommand::AdmitDiscoveryCandidate { .. }
-            | ClusterCommand::RevokeDiscoveryCandidate { .. } => {
+            | ClusterCommand::RevokeDiscoveryCandidate { .. }
+            | ClusterCommand::ReconcileReplicaHostElection { .. } => {
                 return Err(refused_command_authorization(
                     ClusterCommandAuthorizationRefusalCode::CoordinatorRequired,
                     submitter_node_id.clone(),
@@ -3483,6 +3697,35 @@ impl ClusterState {
             ClusterEvent::ArtifactResidencyRemoved { key } => {
                 self.snapshot.artifact_residency.remove(&key);
                 self.snapshot.artifact_residency_provenance.remove(&key);
+            }
+            ClusterEvent::ReplicaHostElectionReconciled { election } => {
+                if let Some(current_election) =
+                    self.snapshot.replica_host_elections.get(&election.lane)
+                    && current_election.term == election.term
+                    && current_election.active_host_node_id != election.active_host_node_id
+                {
+                    return Err(ClusterHistoryError::SplitBrainReplicaHostElection {
+                        diagnostic: ClusterReplicaHostElectionConflictDiagnostic {
+                            lane: election.lane,
+                            term: election.term,
+                            current_active_host_node_id: current_election
+                                .active_host_node_id
+                                .clone(),
+                            attempted_active_host_node_id: election.active_host_node_id,
+                        },
+                    });
+                }
+                let lane = election.lane.clone();
+                self.snapshot
+                    .replica_host_elections
+                    .insert(lane.clone(), election);
+                if let Some(command_authorization) = command_authorization {
+                    self.snapshot
+                        .replica_host_election_provenance
+                        .insert(lane, command_authorization);
+                } else {
+                    self.snapshot.replica_host_election_provenance.remove(&lane);
+                }
             }
             ClusterEvent::LeadershipReconciled { leadership } => {
                 if let Some(current_leadership) = &self.snapshot.leadership
@@ -3893,6 +4136,12 @@ pub enum ClusterHistoryError {
         /// Machine-checkable split-brain detail.
         diagnostic: ClusterSplitBrainDiagnostic,
     },
+    /// Same term attempted to reconcile two different active hosts for one replica lane.
+    #[error("conflicting replica host-election claim in authoritative state: {diagnostic:?}")]
+    SplitBrainReplicaHostElection {
+        /// Machine-checkable same-term conflicting-host detail.
+        diagnostic: ClusterReplicaHostElectionConflictDiagnostic,
+    },
     /// Discovery-candidate admission referenced a node not present in the candidate ledger.
     #[error("discovery candidate `{node_id:?}` is not present in authoritative state")]
     DiscoveryCandidateMissing {
@@ -4239,9 +4488,10 @@ mod tests {
         ClusterLinkClass, ClusterLinkStatus, ClusterMembershipRecord, ClusterMembershipStatus,
         ClusterNodeTelemetry, ClusterRecoveryDisposition, ClusterRecoveryEnvelopeError,
         ClusterRecoveryPolicy, ClusterRecoveryReason, ClusterRecoveryReplayWindow,
-        ClusterSchemaVersion, ClusterSnapshot, ClusterSplitBrainDiagnostic,
-        ClusterStabilityPosture, ClusterState, ClusterTerm, ClusterTransportClass,
-        ClusterTrustPolicy, ConfiguredClusterPeer, IndexedClusterEvent,
+        ClusterReplicaHostElectionConflictDiagnostic, ClusterReplicaHostElectionReason,
+        ClusterReplicaHostElectionRecord, ClusterSchemaVersion, ClusterSnapshot,
+        ClusterSplitBrainDiagnostic, ClusterStabilityPosture, ClusterState, ClusterTerm,
+        ClusterTransportClass, ClusterTrustPolicy, ConfiguredClusterPeer, IndexedClusterEvent,
     };
 
     fn sample_cluster_id() -> crate::ClusterId {
@@ -4268,6 +4518,15 @@ mod tests {
             },
             Some(SocketAddr::from(([127, 0, 0, 1], port))),
             status,
+        )
+    }
+
+    fn sample_replica_lane() -> crate::ClusterReplicaLaneKey {
+        crate::ClusterReplicaLaneKey::new(
+            "psionic.text_generation",
+            "gpt-oss-demo",
+            "cuda",
+            "artifact-1",
         )
     }
 
@@ -4879,6 +5138,60 @@ mod tests {
                     }
             ),
             "authoritative state should refuse conflicting same-term leadership"
+        );
+    }
+
+    #[test]
+    fn authoritative_state_refuses_conflicting_same_term_replica_host_election() {
+        let cluster_id = sample_cluster_id();
+        let lane = sample_replica_lane();
+        let worker_alpha = crate::NodeId::new("worker-alpha");
+        let worker_beta = crate::NodeId::new("worker-beta");
+        let mut state = ClusterState::new(cluster_id.clone());
+
+        state
+            .apply(IndexedClusterEvent::new(
+                cluster_id.clone(),
+                ClusterEventIndex::initial(),
+                ClusterEvent::ReplicaHostElectionReconciled {
+                    election: ClusterReplicaHostElectionRecord::new(
+                        lane.clone(),
+                        ClusterTerm::initial(),
+                        worker_alpha.clone(),
+                        ClusterReplicaHostElectionReason::InitialAssignment,
+                    )
+                    .with_standby_node_ids(vec![worker_beta.clone()])
+                    .with_lease_policy(ClusterLeaseTick::new(1), sample_leadership_lease_policy()),
+                },
+            ))
+            .expect("first host-election event should apply");
+
+        let conflicting = state.apply(IndexedClusterEvent::new(
+            cluster_id,
+            ClusterEventIndex::initial().next(),
+            ClusterEvent::ReplicaHostElectionReconciled {
+                election: ClusterReplicaHostElectionRecord::new(
+                    lane.clone(),
+                    ClusterTerm::initial(),
+                    worker_beta.clone(),
+                    ClusterReplicaHostElectionReason::ActiveHostDraining,
+                )
+                .with_standby_node_ids(vec![worker_alpha.clone()])
+                .with_lease_policy(ClusterLeaseTick::new(2), sample_leadership_lease_policy()),
+            },
+        ));
+        assert!(
+            matches!(
+                conflicting,
+                Err(ClusterHistoryError::SplitBrainReplicaHostElection { diagnostic })
+                    if diagnostic == ClusterReplicaHostElectionConflictDiagnostic {
+                        lane,
+                        term: ClusterTerm::initial(),
+                        current_active_host_node_id: worker_alpha,
+                        attempted_active_host_node_id: worker_beta,
+                    }
+            ),
+            "authoritative state should refuse conflicting same-term host elections"
         );
     }
 

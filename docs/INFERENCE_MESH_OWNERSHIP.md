@@ -154,6 +154,31 @@ Those roles must not be collapsed back into one enum. A node can honestly be
 `mixed` at the transport layer and `standby` at the served-mesh layer at the
 same time.
 
+## Per-Lane Host Election
+
+Replicated serving now depends on one ordered host-election record per replica
+lane.
+
+That record lives in `psionic-cluster` ordered state and carries:
+
+- election `term`
+- `active_host_node_id`
+- `standby_node_ids`
+- `promoted_from_node_id`
+- explicit promotion `reason`
+- explicit lease state for the current host epoch
+
+That means active-host truth is no longer an implicit byproduct of local serve
+memory. It is replayable cluster truth with split-brain protection.
+
+The execution contract above that ordered record is:
+
+- same-lane same-term conflicting active hosts are refused
+- one warm standby is promoted with one explicit next-term transition
+- replicated routing only admits the elected active host for the lane
+- management state can explain the current term, promotion reason, and standby
+  set without inferring them from traffic
+
 ## Join Bundle Contract
 
 Mesh setup now depends on one durable join bundle contract above the existing

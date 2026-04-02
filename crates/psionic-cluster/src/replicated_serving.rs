@@ -12,10 +12,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    ClusterId, ClusterServingDecision, ClusterServingFailure, ClusterServingLoadSnapshot,
-    ClusterServingPolicy, ClusterServingRequest, ClusterState, NodeId,
-    WholeRequestSchedulingRequest, plan_cluster_serving_admission,
-    replica_routing_communication_eligibility,
+    ClusterId, ClusterLeadershipLeasePolicy, ClusterLeadershipLeaseStatus, ClusterLeaseTick,
+    ClusterReplicaHostElectionReason, ClusterReplicaHostElectionRecord, ClusterServingDecision,
+    ClusterServingFailure, ClusterServingLoadSnapshot, ClusterServingPolicy, ClusterServingRequest,
+    ClusterState, ClusterTerm, NodeId, WholeRequestSchedulingRequest,
+    plan_cluster_serving_admission, replica_routing_communication_eligibility,
 };
 
 /// Stable identity for one replicated serving lane.
@@ -212,6 +213,172 @@ impl Default for ClusterReplicaLifecyclePolicy {
     }
 }
 
+/// Stable failure code for per-lane active-host election reconciliation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterReplicaHostElectionFailureCode {
+    /// Current ordered host-election record belongs to another lane.
+    LaneMismatch,
+    /// No warm replica exists to seed or maintain the active host.
+    NoWarmReplicaHost,
+    /// Active host needs promotion but no warm standby exists.
+    NoWarmStandbyPromotionCandidate,
+}
+
+/// Machine-checkable failure returned when reconciling one lane host-election record.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClusterReplicaHostElectionFailure {
+    /// Stable failure code.
+    pub code: ClusterReplicaHostElectionFailureCode,
+    /// Replica lane that failed reconciliation.
+    pub lane: ClusterReplicaLaneKey,
+    /// Plain-language failure detail.
+    pub detail: String,
+    /// Current election term, when one was already recorded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_term: Option<ClusterTerm>,
+    /// Current active host, when one was already recorded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_active_host_node_id: Option<NodeId>,
+}
+
+/// Reconciles one per-lane active-host election record from current warm replica truth.
+pub fn reconcile_replica_host_election(
+    replica_snapshot: &ClusterReplicaSnapshot,
+    current_election: Option<&ClusterReplicaHostElectionRecord>,
+    observed_tick: ClusterLeaseTick,
+    lease_policy: ClusterLeadershipLeasePolicy,
+) -> Result<ClusterReplicaHostElectionRecord, Box<ClusterReplicaHostElectionFailure>> {
+    if let Some(current_election) = current_election
+        && current_election.lane != replica_snapshot.lane
+    {
+        return Err(Box::new(ClusterReplicaHostElectionFailure {
+            code: ClusterReplicaHostElectionFailureCode::LaneMismatch,
+            lane: replica_snapshot.lane.clone(),
+            detail: String::from("current host election belongs to another replica lane"),
+            current_term: Some(current_election.term),
+            current_active_host_node_id: Some(current_election.active_host_node_id.clone()),
+        }));
+    }
+
+    let warm_replica_node_ids = replica_snapshot
+        .replicas
+        .values()
+        .filter(|replica| replica.warm_state == ClusterReplicaWarmState::Warm)
+        .map(|replica| replica.node_id.clone())
+        .collect::<Vec<_>>();
+    let Some(initial_active_host_node_id) = warm_replica_node_ids.first().cloned() else {
+        return Err(Box::new(ClusterReplicaHostElectionFailure {
+            code: ClusterReplicaHostElectionFailureCode::NoWarmReplicaHost,
+            lane: replica_snapshot.lane.clone(),
+            detail: String::from("replica lane has no warm node eligible to host traffic"),
+            current_term: current_election.map(|election| election.term),
+            current_active_host_node_id: current_election
+                .map(|election| election.active_host_node_id.clone()),
+        }));
+    };
+
+    let Some(current_election) = current_election else {
+        return Ok(ClusterReplicaHostElectionRecord::new(
+            replica_snapshot.lane.clone(),
+            ClusterTerm::initial(),
+            initial_active_host_node_id.clone(),
+            ClusterReplicaHostElectionReason::InitialAssignment,
+        )
+        .with_standby_node_ids(
+            warm_replica_node_ids
+                .into_iter()
+                .filter(|node_id| *node_id != initial_active_host_node_id)
+                .collect(),
+        )
+        .with_lease_policy(observed_tick, lease_policy)
+        .with_detail(format!(
+            "assigned initial active host `{}` from current warm replica set",
+            initial_active_host_node_id.as_str()
+        )));
+    };
+
+    let current_replica = replica_snapshot
+        .replicas
+        .get(&current_election.active_host_node_id);
+    let failover_reason = match current_replica {
+        None => Some(ClusterReplicaHostElectionReason::ActiveHostMissing),
+        Some(replica) => match replica.warm_state {
+            ClusterReplicaWarmState::Warm => {
+                match current_election.lease_status_at(observed_tick) {
+                    ClusterLeadershipLeaseStatus::Active { .. } => None,
+                    ClusterLeadershipLeaseStatus::Stale { .. }
+                        if warm_replica_node_ids
+                            .iter()
+                            .any(|node_id| *node_id != current_election.active_host_node_id) =>
+                    {
+                        Some(ClusterReplicaHostElectionReason::LeaseExpired)
+                    }
+                    ClusterLeadershipLeaseStatus::Stale { .. } => None,
+                }
+            }
+            ClusterReplicaWarmState::Draining => {
+                Some(ClusterReplicaHostElectionReason::ActiveHostDraining)
+            }
+            ClusterReplicaWarmState::Refused => {
+                Some(ClusterReplicaHostElectionReason::ActiveHostRefused)
+            }
+            ClusterReplicaWarmState::Cold | ClusterReplicaWarmState::Warming => {
+                Some(ClusterReplicaHostElectionReason::ActiveHostNotWarm)
+            }
+        },
+    };
+
+    if let Some(failover_reason) = failover_reason {
+        let promotion_candidate = warm_replica_node_ids
+            .iter()
+            .find(|node_id| **node_id != current_election.active_host_node_id)
+            .cloned();
+        let Some(next_active_host_node_id) = promotion_candidate else {
+            return Err(Box::new(ClusterReplicaHostElectionFailure {
+                code: ClusterReplicaHostElectionFailureCode::NoWarmStandbyPromotionCandidate,
+                lane: replica_snapshot.lane.clone(),
+                detail: format!(
+                    "lane `{}` could not promote a standby away from active host `{}`",
+                    replica_snapshot.lane.model_id,
+                    current_election.active_host_node_id.as_str()
+                ),
+                current_term: Some(current_election.term),
+                current_active_host_node_id: Some(current_election.active_host_node_id.clone()),
+            }));
+        };
+        return Ok(ClusterReplicaHostElectionRecord::new(
+            replica_snapshot.lane.clone(),
+            current_election.term.next(),
+            next_active_host_node_id.clone(),
+            failover_reason,
+        )
+        .with_standby_node_ids(
+            warm_replica_node_ids
+                .into_iter()
+                .filter(|node_id| *node_id != next_active_host_node_id)
+                .collect(),
+        )
+        .with_promoted_from_node_id(current_election.active_host_node_id.clone())
+        .with_lease_policy(observed_tick, lease_policy)
+        .with_detail(format!(
+            "promoted standby `{}` after `{}` stopped qualifying as active host",
+            next_active_host_node_id.as_str(),
+            current_election.active_host_node_id.as_str()
+        )));
+    }
+
+    Ok(current_election
+        .clone()
+        .with_standby_node_ids(
+            warm_replica_node_ids
+                .into_iter()
+                .filter(|node_id| *node_id != current_election.active_host_node_id)
+                .collect(),
+        )
+        .renewed_at(observed_tick, lease_policy))
+}
+
 /// Successful replicated serving decision for one request.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClusterReplicatedServingDecision {
@@ -235,6 +402,8 @@ pub enum ClusterReplicatedServingFailureCode {
     LaneMismatch,
     /// The lane lacks enough warm replicas to claim replication honestly.
     InsufficientWarmReplicas,
+    /// Ordered host-election truth points at one active host that is not currently warm.
+    ActiveHostUnavailable,
     /// Replica routing failed inside the serving-policy planner.
     ServingFailure,
 }
@@ -324,8 +493,30 @@ pub fn plan_replicated_serving(
         }));
     }
 
+    let elected_host = state.replica_host_election(&replica_snapshot.lane);
+    let routeable_replica_nodes = if let Some(elected_host) = elected_host {
+        if !warm_replica_nodes.contains(&elected_host.active_host_node_id) {
+            return Err(Box::new(ClusterReplicatedServingFailure {
+                code: ClusterReplicatedServingFailureCode::ActiveHostUnavailable,
+                detail: format!(
+                    "lane `{}` elected active host `{}` in term {} but that host is not currently warm",
+                    replica_snapshot.lane.model_id,
+                    elected_host.active_host_node_id.as_str(),
+                    elected_host.term.as_u64()
+                ),
+                lane: replica_snapshot.lane.clone(),
+                replica_state_digest,
+                lifecycle_policy_digest,
+                serving_failure: None,
+            }));
+        }
+        BTreeSet::from([elected_host.active_host_node_id.clone()])
+    } else {
+        warm_replica_nodes.clone()
+    };
+
     let route_request =
-        restricted_replica_scheduling_request(state, scheduling_request, &warm_replica_nodes);
+        restricted_replica_scheduling_request(state, scheduling_request, &routeable_replica_nodes);
     let mut serving_decision = plan_cluster_serving_admission(
         state,
         load_snapshot,
@@ -352,6 +543,7 @@ pub fn plan_replicated_serving(
         load_snapshot,
         replica_snapshot,
         &serving_decision.schedule.selected_node_id,
+        elected_host,
     );
     let replica_devices = replica_nodes
         .iter()
@@ -462,6 +654,7 @@ fn build_replica_nodes(
     load_snapshot: &ClusterServingLoadSnapshot,
     replica_snapshot: &ClusterReplicaSnapshot,
     selected_node_id: &NodeId,
+    host_election: Option<&ClusterReplicaHostElectionRecord>,
 ) -> Vec<ClusterReplicaNode> {
     replica_snapshot
         .replicas
@@ -507,11 +700,30 @@ fn build_replica_nodes(
                     replica_node.with_load(node_load.active_requests, node_load.queued_requests);
             }
             let detail = match routing {
-                ClusterReplicaRoutingDisposition::Selected => None,
-                ClusterReplicaRoutingDisposition::WarmStandby => Some(format!(
-                    "warm replica `{}` is available but not selected for this request",
-                    replica.node_id.as_str()
-                )),
+                ClusterReplicaRoutingDisposition::Selected => host_election.map(|election| {
+                    format!(
+                        "active host for lane `{}` in term {} because {:?}",
+                        election.lane.model_id,
+                        election.term.as_u64(),
+                        election.reason
+                    )
+                }),
+                ClusterReplicaRoutingDisposition::WarmStandby => host_election
+                    .filter(|election| election.standby_node_ids.contains(&replica.node_id))
+                    .map(|election| {
+                        format!(
+                            "warm standby `{}` retained behind active host `{}` in term {}",
+                            replica.node_id.as_str(),
+                            election.active_host_node_id.as_str(),
+                            election.term.as_u64()
+                        )
+                    })
+                    .or_else(|| {
+                        Some(format!(
+                            "warm replica `{}` is available but not selected for this request",
+                            replica.node_id.as_str()
+                        ))
+                    }),
                 ClusterReplicaRoutingDisposition::Refused => Some(
                     replica
                         .detail
@@ -937,6 +1149,10 @@ mod tests {
             .requiring_accelerator()
     }
 
+    fn replica_host_lease_policy() -> ClusterLeadershipLeasePolicy {
+        ClusterLeadershipLeasePolicy::new(4)
+    }
+
     #[test]
     fn replicated_serving_builds_replicated_topology_and_selects_best_warm_replica()
     -> Result<(), Box<dyn std::error::Error>> {
@@ -1217,6 +1433,229 @@ mod tests {
                 .as_deref(),
             Some("replica-manifest-digest")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn reconcile_replica_host_election_promotes_warm_standby_with_next_term_and_reason()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = replica_state();
+        let initial_snapshot =
+            ClusterReplicaSnapshot::new(state.cluster_id().clone(), replica_lane())
+                .with_replica(ClusterReplicaRecord::new(
+                    replica_lane(),
+                    NodeId::new("worker-a"),
+                    ClusterReplicaWarmState::Warm,
+                ))
+                .with_replica(ClusterReplicaRecord::new(
+                    replica_lane(),
+                    NodeId::new("worker-b"),
+                    ClusterReplicaWarmState::Warm,
+                ));
+
+        let initial_election = reconcile_replica_host_election(
+            &initial_snapshot,
+            None,
+            ClusterLeaseTick::new(10),
+            replica_host_lease_policy(),
+        )
+        .map_err(|err| fixture_error(&format!("initial host election should succeed: {err:?}")))?;
+        assert_eq!(initial_election.term, ClusterTerm::initial());
+        assert_eq!(
+            initial_election.active_host_node_id,
+            NodeId::new("worker-a")
+        );
+        assert_eq!(
+            initial_election.reason,
+            ClusterReplicaHostElectionReason::InitialAssignment
+        );
+
+        let draining_snapshot =
+            ClusterReplicaSnapshot::new(state.cluster_id().clone(), replica_lane())
+                .with_replica(
+                    ClusterReplicaRecord::new(
+                        replica_lane(),
+                        NodeId::new("worker-a"),
+                        ClusterReplicaWarmState::Draining,
+                    )
+                    .with_detail("operator requested drain"),
+                )
+                .with_replica(ClusterReplicaRecord::new(
+                    replica_lane(),
+                    NodeId::new("worker-b"),
+                    ClusterReplicaWarmState::Warm,
+                ));
+
+        let promoted_election = reconcile_replica_host_election(
+            &draining_snapshot,
+            Some(&initial_election),
+            ClusterLeaseTick::new(11),
+            replica_host_lease_policy(),
+        )
+        .map_err(|err| fixture_error(&format!("standby promotion should succeed: {err:?}")))?;
+
+        assert_eq!(promoted_election.term, ClusterTerm::initial().next());
+        assert_eq!(
+            promoted_election.active_host_node_id,
+            NodeId::new("worker-b")
+        );
+        assert_eq!(
+            promoted_election.promoted_from_node_id,
+            Some(NodeId::new("worker-a"))
+        );
+        assert_eq!(
+            promoted_election.reason,
+            ClusterReplicaHostElectionReason::ActiveHostDraining
+        );
+        assert!(promoted_election.standby_node_ids.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn replicated_serving_respects_ordered_active_host_election()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut snapshot = replica_state().snapshot();
+        let lane = replica_lane();
+        snapshot.replica_host_elections.insert(
+            lane.clone(),
+            ClusterReplicaHostElectionRecord::new(
+                lane.clone(),
+                ClusterTerm::initial(),
+                NodeId::new("worker-b"),
+                ClusterReplicaHostElectionReason::InitialAssignment,
+            )
+            .with_standby_node_ids(vec![NodeId::new("worker-a")])
+            .with_lease_policy(ClusterLeaseTick::new(12), replica_host_lease_policy())
+            .with_detail("worker-b is the elected active host"),
+        );
+        let state = ClusterState::from_snapshot(snapshot);
+        let replica_snapshot =
+            ClusterReplicaSnapshot::new(state.cluster_id().clone(), lane.clone())
+                .with_replica(ClusterReplicaRecord::new(
+                    lane.clone(),
+                    NodeId::new("worker-a"),
+                    ClusterReplicaWarmState::Warm,
+                ))
+                .with_replica(ClusterReplicaRecord::new(
+                    lane,
+                    NodeId::new("worker-b"),
+                    ClusterReplicaWarmState::Warm,
+                ));
+        let load_snapshot = ClusterServingLoadSnapshot::new(state.cluster_id().clone())
+            .with_node_load(crate::ClusterNodeServiceLoad::new(NodeId::new("worker-a")))
+            .with_node_load(crate::ClusterNodeServiceLoad::new(NodeId::new("worker-b")));
+
+        let decision = plan_replicated_serving(
+            &state,
+            &load_snapshot,
+            &replica_snapshot,
+            &ClusterReplicaLifecyclePolicy::replicated_lane(),
+            &ClusterServingPolicy::direct_caller_latency_first(),
+            &ClusterServingRequest::new("req-replica-election-1", ClusterServingWorkClass::Decode),
+            &scheduling_request(),
+        )
+        .map_err(|err| {
+            fixture_error(&format!(
+                "ordered host-election route should succeed: {err:?}"
+            ))
+        })?;
+
+        assert_eq!(
+            decision.serving_decision.schedule.selected_node_id,
+            NodeId::new("worker-b")
+        );
+        assert!(
+            decision
+                .serving_decision
+                .schedule
+                .cluster_execution
+                .replica_nodes
+                .iter()
+                .any(|replica| {
+                    replica.node.node_id == "worker-b"
+                        && replica.routing == ClusterReplicaRoutingDisposition::Selected
+                        && replica
+                            .detail
+                            .as_deref()
+                            .is_some_and(|detail| detail.contains("active host for lane"))
+                })
+        );
+        assert!(
+            decision
+                .serving_decision
+                .schedule
+                .cluster_execution
+                .replica_nodes
+                .iter()
+                .any(|replica| {
+                    replica.node.node_id == "worker-a"
+                        && replica.routing == ClusterReplicaRoutingDisposition::WarmStandby
+                        && replica
+                            .detail
+                            .as_deref()
+                            .is_some_and(|detail| detail.contains("warm standby `worker-a`"))
+                })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replicated_serving_refuses_when_elected_active_host_is_not_warm()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut snapshot = replica_state().snapshot();
+        let lane = replica_lane();
+        snapshot.replica_host_elections.insert(
+            lane.clone(),
+            ClusterReplicaHostElectionRecord::new(
+                lane.clone(),
+                ClusterTerm::initial(),
+                NodeId::new("worker-c"),
+                ClusterReplicaHostElectionReason::LeaseExpired,
+            )
+            .with_standby_node_ids(vec![NodeId::new("worker-a"), NodeId::new("worker-b")])
+            .with_lease_policy(ClusterLeaseTick::new(12), replica_host_lease_policy())
+            .with_detail("worker-c was previously active but is no longer warm"),
+        );
+        let state = ClusterState::from_snapshot(snapshot);
+        let replica_snapshot =
+            ClusterReplicaSnapshot::new(state.cluster_id().clone(), lane.clone())
+                .with_replica(ClusterReplicaRecord::new(
+                    lane.clone(),
+                    NodeId::new("worker-a"),
+                    ClusterReplicaWarmState::Warm,
+                ))
+                .with_replica(ClusterReplicaRecord::new(
+                    lane,
+                    NodeId::new("worker-b"),
+                    ClusterReplicaWarmState::Warm,
+                ));
+        let load_snapshot = ClusterServingLoadSnapshot::new(state.cluster_id().clone())
+            .with_node_load(crate::ClusterNodeServiceLoad::new(NodeId::new("worker-a")))
+            .with_node_load(crate::ClusterNodeServiceLoad::new(NodeId::new("worker-b")));
+
+        let failure = match plan_replicated_serving(
+            &state,
+            &load_snapshot,
+            &replica_snapshot,
+            &ClusterReplicaLifecyclePolicy::replicated_lane(),
+            &ClusterServingPolicy::direct_caller_latency_first(),
+            &ClusterServingRequest::new("req-replica-election-2", ClusterServingWorkClass::Decode),
+            &scheduling_request(),
+        ) {
+            Ok(decision) => {
+                return Err(fixture_error(&format!(
+                    "expected active-host-unavailable failure, got {decision:?}"
+                ))
+                .into());
+            }
+            Err(failure) => failure,
+        };
+
+        assert_eq!(
+            failure.code,
+            ClusterReplicatedServingFailureCode::ActiveHostUnavailable
+        );
+        assert!(failure.detail.contains("worker-c"));
         Ok(())
     }
 
