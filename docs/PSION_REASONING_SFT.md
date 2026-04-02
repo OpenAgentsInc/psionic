@@ -37,6 +37,16 @@ plugin-conditioned stage and the current repo-owned post-training reference
 surface without backfilling a claim that the actual lane already executes
 plugin-conditioned RL.
 
+The actual lane now also retains one separate continuation-handoff rehearsal
+bundle and one mismatched-alignment refusal packet:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_bundle_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_refusal_packet_v1.json`
+
+Those two surfaces keep the reasoning bridge grounded to the accepted
+checkpoint from the base-lane proof and prove that a mismatched continuation
+candidate is refused instead of silently widening the continuation claim.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_reasoning_sft.rs` owns the reasoning-SFT

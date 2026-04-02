@@ -153,7 +153,7 @@
       "artifact_kind": "continuation_handoff",
       "artifact": {
         "path": "continuation/accepted_checkpoint_handoff.json",
-        "sha256": "7d18afb24f9abd8785ec9768ffaf8e27bbbf02818f11a54d80ddcd05f29b10d3"
+        "sha256": "0f0db6ccb565386948d39109a34e0d45f186fd81899b1a995f9e81efb1f2ffb6"
       },
       "detail": "Continuation handoff proves the base lane ends in one explicit bounded continuation target without claiming continuation execution."
     }

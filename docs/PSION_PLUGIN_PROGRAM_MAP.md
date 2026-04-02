@@ -34,12 +34,15 @@ The same actual-lane continuation path now also carries:
 
 - `fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json`
 - `fixtures/psion/pretrain/psion_actual_pretraining_continuation_alignment_bundle_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_bundle_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_refusal_packet_v1.json`
 
 Those retained artifacts do not claim continuation execution. They do keep the
 repo-owned continuation review surface explicit by tying the accepted
 checkpoint handoff to the frozen reasoning bridge, the bounded
 plugin-conditioned `agentic_sft` stage, and the current `agentic_sft -> rl`
-reference-program lineage.
+reference-program lineage, and by proving that one mismatched continuation
+candidate is explicitly refused.
 
 This doc exists so the repo can point at one durable dependency-ordered map for
 that convergence tranche instead of reconstructing it from the alpha planning

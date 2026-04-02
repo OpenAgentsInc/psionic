@@ -16,10 +16,20 @@ in one named target instead of an unnamed generic checkpoint.
   owns the typed handoff contract.
 - `crates/psionic-train/examples/psion_actual_pretraining_launcher_fixtures.rs`
   regenerates the committed handoff fixture and the retained resume example.
+- `crates/psionic-train/examples/psion_actual_pretraining_continuation_handoff_rehearsal_fixtures.rs`
+  regenerates the committed continuation-handoff rehearsal proof, refusal
+  packet, and retained rehearsal example.
 - `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_v1.json`
   is the canonical committed handoff contract.
 - `fixtures/psion/pretrain/psion_actual_pretraining_launcher_example/resume/run-psion-actual-20260402t020000z/continuation/accepted_checkpoint_handoff.json`
   is the retained example under the actual-lane evidence family.
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_bundle_v1.json`
+  is the canonical retained continuation-handoff rehearsal bundle.
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_refusal_packet_v1.json`
+  is the canonical retained mismatched-handoff refusal packet.
+- `fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_example/run-psion-actual-20260402t160000z/`
+  is the retained continuation-handoff rehearsal example rooted in the
+  accepted checkpoint from the base-lane proof.
 
 Stable schema version:
 
@@ -77,6 +87,14 @@ lives in
 That alignment bundle keeps the reasoning bridge, bounded plugin-conditioned
 stage, and current `agentic_sft -> rl` reference-program lineage together for
 later review, but it still does not claim actual continuation execution.
+
+The repo now also retains one separate continuation-handoff rehearsal packet at
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_bundle_v1.json`.
+That bundle consumes the accepted checkpoint from the retained base-lane
+closeout proof, binds it to the exact plugin-conditioned stage manifest and
+continuation alignment for the reviewed run, and cites one retained refusal
+packet for a mismatched alignment candidate. It keeps the continuation proof
+separate from the base-lane proof while still refusing stale lineage.
 
 ## Related Docs
 

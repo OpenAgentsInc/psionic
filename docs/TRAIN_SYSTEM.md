@@ -347,6 +347,21 @@ current repo-owned `agentic_sft -> rl` reference surface together for later
 continuation rehearsal work without backfilling a claim that the actual lane
 already executes continuation.
 
+The repo now also owns the separate continuation-handoff proof gate in
+`crates/psionic-train/src/psion_actual_pretraining_continuation_handoff_rehearsal.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_continuation_handoff_rehearsal_fixtures.rs`,
+the committed rehearsal bundle
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_bundle_v1.json`,
+the committed refusal packet
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_refusal_packet_v1.json`,
+and the retained example rooted in the accepted base-lane checkpoint under
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_example/run-psion-actual-20260402t160000z/`.
+That proof gate stays separate from the base-lane closeout, binds exact
+checkpoint lineage into the canonical plugin-conditioned stage manifest, and
+retains one mismatched-alignment refusal packet instead of widening the claim
+boundary by implication.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker

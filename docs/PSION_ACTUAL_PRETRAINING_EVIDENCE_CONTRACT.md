@@ -166,4 +166,10 @@ claim-boundary sections. Resume over an accepted checkpoint also writes the
 retained continuation handoff at
 `continuation/accepted_checkpoint_handoff.json`, which binds that accepted
 checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
+The separate continuation-handoff rehearsal now extends the same retained
+family with
+`psion_actual_pretraining_continuation_handoff_rehearsal_bundle_v1.json`,
+`psion_actual_pretraining_continuation_handoff_refusal_packet_v1.json`, and
+the retained rehearsal example under
+`fixtures/psion/pretrain/psion_actual_pretraining_continuation_handoff_rehearsal_example/`.
 Later hardening issues extend the same retained family instead of replacing it.

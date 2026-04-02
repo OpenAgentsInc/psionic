@@ -28,6 +28,10 @@
     "path": "fixtures/psion/plugins/training/psion_plugin_conditioned_sft_v1/psion_plugin_conditioned_sft_run_bundle.json",
     "sha256": "bde69724339d47a49b6e1c82d472072cb557834b260fa78064a7cee4a67d4a9d"
   },
+  "continuation_eval_pack": {
+    "path": "fixtures/psion/pretrain/psion_actual_pretraining_continuation_eval_benchmark_pack_v1.json",
+    "sha256": "eb9d9810d82b4a6b3b545ad3a6e1f012c358c80fc91d143f25d7b6d91b83724e"
+  },
   "benchmark_bindings": [
     {
       "benchmark_family": "discovery_selection",
