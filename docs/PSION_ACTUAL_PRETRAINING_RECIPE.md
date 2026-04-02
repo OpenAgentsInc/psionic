@@ -21,6 +21,8 @@ bounded continuation path that later launcher and hardening work must consume.
   carries the canonical actual-lane recipe bundle.
 - `fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json`
   carries the canonical actual-lane topology/storage bundle.
+- `docs/PSION_ACTUAL_PRETRAINING_SCALING_BUNDLE.md` freezes the scaling and
+  budget-selection bundle that the actual recipe cites directly.
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md` freezes the data
   transformation, filter, deduplication, replay, and mixture authority the
   actual recipe consumes directly.
@@ -56,6 +58,9 @@ bundle instead of inventing a second synthetic recipe.
 The recipe now consumes its data authority through a separate frozen bundle
 instead of leaving filtering, deduplication, replay, and production-mixture
 truth implicit.
+
+The recipe now also consumes a separate frozen scaling bundle instead of
+leaving model-size, token-budget, and stage-length discipline implicit.
 
 ## Frozen Topology And Storage Authority
 

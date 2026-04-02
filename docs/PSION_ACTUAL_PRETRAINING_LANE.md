@@ -20,6 +20,8 @@ work must target.
   canonical machine-readable actual-lane spec.
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md` freezes the canonical recipe and
   admitted topology/storage bundle consumed by this lane.
+- `docs/PSION_ACTUAL_PRETRAINING_SCALING_BUNDLE.md` freezes the canonical
+  scaling and budget-selection authority consumed by this lane.
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md` freezes the canonical
   filtering, deduplication, replay, and mixture authority consumed by this
   lane.
@@ -68,6 +70,12 @@ The same lane now also carries one explicit data authority surface covering
 transformation order, filtering, deduplication, deterministic replay, frozen
 mixture weights, and recipe-change eval bindings. That keeps CS336 A4 work
 subordinate to the real lane instead of a detached data track.
+
+The same lane now also carries one explicit scaling authority surface covering
+the bounded 64M/128M/256M recipe family, tokens-per-parameter discipline, and
+largest-eligible budget-selection rule that keeps the current actual recipe
+anchored to retained scaling evidence. That keeps CS336 A3 work subordinate to
+the real lane instead of a detached scaling study.
 
 ## What Does Not Count
 
