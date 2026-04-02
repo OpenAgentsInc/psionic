@@ -13,8 +13,8 @@ use psionic_adapters::{
     AdapterArtifactIdentity, AdapterResidencyMode, AdapterServingBinding, AdapterTargetFamily,
     LmHeadLoraAdapterArtifact,
 };
-use psionic_backend_cuda::{CudaBackend, CudaBuffer};
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot};
+use psionic_backend_cuda::{CudaBackend, CudaBuffer};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::QuantizationMode;
 use psionic_models::{
@@ -1413,6 +1413,10 @@ impl crate::GenerationModelHandle for CpuDenseGgufGenerationModel {
     fn descriptor(&self) -> &DecoderModelDescriptor {
         &self.inner.descriptor
     }
+
+    fn cache_width(&self) -> usize {
+        self.inner.cache_width()
+    }
 }
 
 impl super::CompiledWordGenerationModel for CpuDenseGgufGenerationModel {
@@ -2273,6 +2277,10 @@ impl CudaGemma4GenerationModel {
 impl crate::GenerationModelHandle for CudaGemma4GenerationModel {
     fn descriptor(&self) -> &DecoderModelDescriptor {
         &self.inner.descriptor
+    }
+
+    fn cache_width(&self) -> usize {
+        self.inner.cache_width()
     }
 }
 
@@ -3419,6 +3427,52 @@ mod tests {
     }
 
     #[test]
+    fn cpu_dense_generation_handle_uses_whole_model_cache_width_for_multi_layer_models()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("gemma4_two_layer_cache_width.gguf");
+        write_test_gguf(
+            &path,
+            dense_gemma4_metadata_with_block_count("tiny psionic gemma4 two layer", 2).as_slice(),
+            dense_decoder_tensors_with_layers(false, 3, 4, 2).as_slice(),
+        )?;
+
+        let mut service = CpuGgufTextGenerationService::from_gguf_path(&path)?;
+        let descriptor = service.model_descriptor().clone();
+        {
+            let CpuGgufServiceKind::Dense(dense) = &mut service.inner else {
+                panic!("expected dense GGUF runtime");
+            };
+            let model_id = dense.model_descriptor.model.model_id.clone();
+            let loaded = dense
+                .models
+                .active(model_id.as_str())
+                .expect("dense model should be active")
+                .clone();
+            let per_layer_width = loaded.descriptor().config.kv_width();
+            assert!(
+                loaded.descriptor().config.layer_count > 1,
+                "regression fixture must stay multi-layer"
+            );
+            assert_eq!(
+                loaded.cache_width(),
+                loaded.descriptor().config.layer_count * per_layer_width
+            );
+            assert!(loaded.cache_width() > per_layer_width);
+        }
+
+        let response = service.generate(&GenerationRequest::new_text(
+            String::from("gguf-gemma4-two-layer"),
+            descriptor,
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        ))?;
+        assert_eq!(response.output.text, "world");
+        Ok(())
+    }
+
+    #[test]
     fn cpu_gguf_service_executes_qwen35_proxy_family() -> Result<(), Box<dyn std::error::Error>> {
         let _proxy_lock = qwen35_proxy_test_lock()
             .lock()
@@ -3835,6 +3889,19 @@ mod tests {
         metadata
     }
 
+    fn dense_gemma4_metadata_with_block_count(
+        name: &str,
+        block_count: u32,
+    ) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = dense_family_header_with_block_count("gemma4", name, block_count);
+        metadata.push((
+            String::from("tokenizer.ggml.pre"),
+            GgufMetadataValue::String(String::from("gemma4")),
+        ));
+        metadata.extend(sentencepiece_tokenizer_metadata_entries());
+        metadata
+    }
+
     fn qwen35_chat_template() -> &'static str {
         include_str!("../../psionic-models/src/testdata/qwen35_chat_template.jinja")
             .trim_end_matches('\n')
@@ -3953,6 +4020,14 @@ mod tests {
     }
 
     fn dense_family_header(architecture: &str, name: &str) -> Vec<(String, GgufMetadataValue)> {
+        dense_family_header_with_block_count(architecture, name, 1)
+    }
+
+    fn dense_family_header_with_block_count(
+        architecture: &str,
+        name: &str,
+        block_count: u32,
+    ) -> Vec<(String, GgufMetadataValue)> {
         vec![
             (
                 String::from("general.architecture"),
@@ -3976,7 +4051,7 @@ mod tests {
             ),
             (
                 format!("{architecture}.block_count"),
-                GgufMetadataValue::U32(1),
+                GgufMetadataValue::U32(block_count),
             ),
             (
                 format!("{architecture}.attention.head_count"),
@@ -4143,6 +4218,15 @@ mod tests {
         hello_token_index: usize,
         world_token_index: usize,
     ) -> Vec<TestGgufTensor> {
+        dense_decoder_tensors_with_layers(include_qkv_bias, hello_token_index, world_token_index, 1)
+    }
+
+    fn dense_decoder_tensors_with_layers(
+        include_qkv_bias: bool,
+        hello_token_index: usize,
+        world_token_index: usize,
+        layer_count: usize,
+    ) -> Vec<TestGgufTensor> {
         let mut tensors = vec![
             dense_tensor(
                 "token_embd.weight",
@@ -4155,20 +4239,71 @@ mod tests {
                 vec![6, 4],
                 output_values(world_token_index),
             ),
-            dense_tensor("blk.0.attn_norm.weight", vec![4], vec![1.0, 1.0, 1.0, 1.0]),
-            dense_tensor("blk.0.attn_q.weight", vec![4, 4], vec![0.0; 16]),
-            dense_tensor("blk.0.attn_k.weight", vec![2, 4], vec![0.0; 8]),
-            dense_tensor("blk.0.attn_v.weight", vec![2, 4], vec![0.0; 8]),
-            dense_tensor("blk.0.attn_output.weight", vec![4, 4], vec![0.0; 16]),
-            dense_tensor("blk.0.ffn_gate.weight", vec![8, 4], vec![0.0; 32]),
-            dense_tensor("blk.0.ffn_down.weight", vec![4, 8], vec![0.0; 32]),
-            dense_tensor("blk.0.ffn_up.weight", vec![8, 4], vec![0.0; 32]),
-            dense_tensor("blk.0.ffn_norm.weight", vec![4], vec![1.0, 1.0, 1.0, 1.0]),
         ];
-        if include_qkv_bias {
-            tensors.push(dense_tensor("blk.0.attn_q.bias", vec![4], vec![0.0; 4]));
-            tensors.push(dense_tensor("blk.0.attn_k.bias", vec![2], vec![0.0; 2]));
-            tensors.push(dense_tensor("blk.0.attn_v.bias", vec![2], vec![0.0; 2]));
+        for layer_index in 0..layer_count {
+            let prefix = format!("blk.{layer_index}");
+            tensors.push(dense_tensor(
+                &format!("{prefix}.attn_norm.weight"),
+                vec![4],
+                vec![1.0, 1.0, 1.0, 1.0],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.attn_q.weight"),
+                vec![4, 4],
+                vec![0.0; 16],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.attn_k.weight"),
+                vec![2, 4],
+                vec![0.0; 8],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.attn_v.weight"),
+                vec![2, 4],
+                vec![0.0; 8],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.attn_output.weight"),
+                vec![4, 4],
+                vec![0.0; 16],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_gate.weight"),
+                vec![8, 4],
+                vec![0.0; 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_down.weight"),
+                vec![4, 8],
+                vec![0.0; 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_up.weight"),
+                vec![8, 4],
+                vec![0.0; 32],
+            ));
+            tensors.push(dense_tensor(
+                &format!("{prefix}.ffn_norm.weight"),
+                vec![4],
+                vec![1.0, 1.0, 1.0, 1.0],
+            ));
+            if include_qkv_bias {
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_q.bias"),
+                    vec![4],
+                    vec![0.0; 4],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_k.bias"),
+                    vec![2],
+                    vec![0.0; 2],
+                ));
+                tensors.push(dense_tensor(
+                    &format!("{prefix}.attn_v.bias"),
+                    vec![2],
+                    vec![0.0; 2],
+                ));
+            }
         }
         tensors
     }

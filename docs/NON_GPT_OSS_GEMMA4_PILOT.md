@@ -86,6 +86,9 @@ After issues `#861` through `#863`, the repo now has the first honest
 - the conformance harness now accepts the real `gemma4:e4b` fixture shape and
   the repo now carries one repeatable `gemma4:e4b` CUDA conformance repeat
   test that runs when both the pilot GGUF and a CUDA host are available.
+- the managed dense-GGUF lane now allocates whole-model KV-cache width instead
+  of silently falling back to one-layer fixture geometry, and the repo now
+  carries a multi-layer regression that keeps that boundary explicit.
 
 What still does not exist:
 
