@@ -53,6 +53,29 @@ The first `Gemma 4` claim does not include:
 CPU-only bring-up may still be useful as a debug lane, but CPU alone does not
 complete the first published `Gemma 4` milestone.
 
+## Current Repo State
+
+After issue `#861`, the repo now has the first honest `Gemma 4` admission work:
+
+- `psionic-models` now classifies `general.architecture = gemma4` as its own
+  decoder family instead of silently aliasing it to `llama`, `qwen`, or
+  another generic family.
+- the local `gemma4:e4b` GGUF tokenizer facts are now fixture-covered,
+  including the Gemma-specific turn, tool-call, tool-response, and channel
+  tags.
+- dense `Gemma 4` artifacts classify cleanly, while expert-bearing `Gemma 4`
+  artifacts still fail closed at the current non-`GptOss` MoE gate.
+- the local `e4b` GGUF does not currently embed `tokenizer.chat_template`, so
+  the repo now carries one checked-in bounded text template fixture at
+  `crates/psionic-models/src/testdata/gemma4_chat_template.jinja`.
+
+What still does not exist:
+
+- no Gemma 4 CUDA runtime
+- no generic-server Gemma lane
+- no tool-calling or `/v1/responses` Gemma contract
+- no published support claim beyond classification and prompt-fixture truth
+
 ## Why The Claim Is Narrow
 
 `Gemma 4` is a family, not one model. The first useful Psionic result is not

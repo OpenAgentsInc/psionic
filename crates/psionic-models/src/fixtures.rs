@@ -218,6 +218,33 @@ const LLAMA_SPM_SAMPLES: [GoldenTokenizerSample; 6] = [
     },
 ];
 
+const GEMMA4_SAMPLES: [GoldenTokenizerSample; 6] = [
+    GoldenTokenizerSample {
+        token_id: TokenId(0),
+        token: "<pad>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(1),
+        token: "<eos>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(2),
+        token: "<bos>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(3),
+        token: "<unk>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(48),
+        token: "<|tool_call>",
+    },
+    GoldenTokenizerSample {
+        token_id: TokenId(106),
+        token: "<turn|>",
+    },
+];
+
 const QWEN2_SAMPLES: [GoldenTokenizerSample; 4] = [
     GoldenTokenizerSample {
         token_id: TokenId(0),
@@ -280,7 +307,7 @@ const GPT_OSS_SAMPLES: [GoldenTokenizerSample; 3] = [
 ];
 
 /// Golden tokenizer fixtures sourced from local real GGUF artifacts.
-pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 4] = [
+pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 5] = [
     GoldenTokenizerFixture {
         id: "llama_spm",
         family: "llama_spm",
@@ -297,6 +324,23 @@ pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 4] = [
         add_eos: false,
         sample_tokens: &LLAMA_SPM_SAMPLES,
         notes: "SentencePiece baseline from llama.cpp's redistributable vocab-only GGUF.",
+    },
+    GoldenTokenizerFixture {
+        id: "gemma4_e4b",
+        family: "gemma4",
+        source_path: "/Users/christopherdavid/models/gemma4/gemma4-e4b-ollama.gguf",
+        source_sha256: None,
+        vocabulary_len: 262144,
+        model: GgufTokenizerModel::SentencePiece,
+        pretokenizer: Some("gemma4"),
+        bos_token_id: Some(TokenId(2)),
+        eos_token_ids: &[TokenId(1), TokenId(106), TokenId(50)],
+        pad_token_id: Some(TokenId(0)),
+        unknown_token_id: Some(TokenId(3)),
+        add_bos: false,
+        add_eos: false,
+        sample_tokens: &GEMMA4_SAMPLES,
+        notes: "Real Gemma 4 e4b GGUF tokenizer facts from the local Ollama artifact, including the Gemma-specific turn and tool tags.",
     },
     GoldenTokenizerFixture {
         id: "qwen2",
@@ -353,6 +397,8 @@ pub const GOLDEN_TOKENIZER_FIXTURES: [GoldenTokenizerFixture; 4] = [
 
 const PHI3_TEMPLATE: &str = "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}{{'<|user|>' + '\n' + message['content'] + '<|end|>' + '\n' + '<|assistant|>' + '\n'}}{% elif (message['role'] == 'assistant') %}{{message['content'] + '<|end|>' + '\n'}}{% endif %}{% endfor %}";
 
+const GEMMA4_TEMPLATE: &str = include_str!("testdata/gemma4_chat_template.jinja");
+
 const QWEN2_TEMPLATE: &str = "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful assistant<|im_end|>\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}";
 
 const COMMAND_R_TEMPLATE: &str = "{{ bos_token }}{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% elif false == true %}{% set loop_messages = messages %}{% set system_message = 'You are Command-R, a brilliant, sophisticated, AI-assistant trained to assist human users by providing thorough responses. You are trained by Cohere.' %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% if system_message != false %}{{ '<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>' + system_message + '<|END_OF_TURN_TOKEN|>' }}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% set content = message['content'] %}{% if message['role'] == 'user' %}{{ '<|START_OF_TURN_TOKEN|><|USER_TOKEN|>' + content.strip() + '<|END_OF_TURN_TOKEN|>' }}{% elif message['role'] == 'assistant' %}{{ '<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>'  + content.strip() + '<|END_OF_TURN_TOKEN|>' }}{% endif %}{% endfor %}{% if add_generation_prompt %}{{ '<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>' }}{% endif %}";
@@ -398,6 +444,36 @@ const QWEN2_MESSAGES_WITH_SYSTEM: [GoldenPromptMessage; 4] = [
     GoldenPromptMessage {
         role: GoldenPromptRole::User,
         content: "Summarize.",
+    },
+];
+
+const GEMMA4_MESSAGES_DEFAULT_DEVELOPER: [GoldenPromptMessage; 2] = [
+    GoldenPromptMessage {
+        role: GoldenPromptRole::System,
+        content: "Be terse.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "Summarize the lane.",
+    },
+];
+
+const GEMMA4_MESSAGES_WITH_HISTORY: [GoldenPromptMessage; 4] = [
+    GoldenPromptMessage {
+        role: GoldenPromptRole::Developer,
+        content: "Use one sentence.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "What remains unsupported?",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::Assistant,
+        content: "Image and audio lanes are separate.",
+    },
+    GoldenPromptMessage {
+        role: GoldenPromptRole::User,
+        content: "And MoE?",
     },
 ];
 
@@ -502,6 +578,23 @@ const PHI3_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
     },
 ];
 
+const GEMMA4_RENDER_CASES: [GoldenPromptRenderCase; 2] = [
+    GoldenPromptRenderCase {
+        id: "gemma4_e4b.default_developer",
+        messages: &GEMMA4_MESSAGES_DEFAULT_DEVELOPER,
+        harmony_context: None,
+        add_generation_prompt: true,
+        expected_rendered: "<bos><|turn>developer\nBe terse.<turn|>\n<|turn>user\nSummarize the lane.<turn|>\n<|turn>model\n",
+    },
+    GoldenPromptRenderCase {
+        id: "gemma4_e4b.with_history",
+        messages: &GEMMA4_MESSAGES_WITH_HISTORY,
+        harmony_context: None,
+        add_generation_prompt: true,
+        expected_rendered: "<bos><|turn>developer\nUse one sentence.<turn|>\n<|turn>user\nWhat remains unsupported?<turn|>\n<|turn>model\nImage and audio lanes are separate.<turn|>\n<|turn>user\nAnd MoE?<turn|>\n<|turn>model\n",
+    },
+];
+
 const QWEN2_RENDER_CASES: [GoldenPromptRenderCase; 3] = [
     GoldenPromptRenderCase {
         id: "qwen2.default_system",
@@ -586,10 +679,24 @@ const PHI3_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVar
     ollama_stop_source: Some("/home/christopherdavid/code/ollama/template/phi-3.json"),
     template_digest: "268b6082ceb7176dc6ed80557a2f7837f9f0339592fbee677d405a553af15f88",
     raw_template: Some(PHI3_TEMPLATE),
-    template_excerpt: "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}...",
+    template_excerpt:
+        "{{ bos_token }}{% for message in messages %}{% if (message['role'] == 'user') %}...",
     stop_sequences: &["<|end|>", "<|system|>", "<|user|>", "<|assistant|>"],
     render_cases: &PHI3_RENDER_CASES,
     notes: "Small redistributable prompt family with real BOS insertion and Ollama stop defaults.",
+}];
+
+const GEMMA4_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVariant {
+    id: "gemma4_e4b.default",
+    gguf_key: "tokenizer.chat_template",
+    ollama_template_name: None,
+    ollama_stop_source: None,
+    template_digest: "b41f8277605dd25c150524d580ccfa8f351608a385c01a4211fa0eadec4382c3",
+    raw_template: Some(GEMMA4_TEMPLATE),
+    template_excerpt: "{{ bos_token }}{% for message in messages %}{% if message['role'] == 'assistant' %}...",
+    stop_sequences: &["<turn|>"],
+    render_cases: &GEMMA4_RENDER_CASES,
+    notes: "Checked-in bounded Gemma 4 text template aligned to the local e4b tokenizer because the current local GGUF does not embed tokenizer.chat_template.",
 }];
 
 const QWEN2_VARIANTS: [GoldenPromptTemplateVariant; 1] = [GoldenPromptTemplateVariant {
@@ -680,6 +787,27 @@ const PHI3_WINDOW_CASES: [GoldenPromptWindowCase; 1] = [GoldenPromptWindowCase {
     note: "Small rendered-byte budget for later context-window conformance checks.",
 }];
 
+const GEMMA4_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
+    GoldenPromptWindowCase {
+        id: "gemma4_e4b.default_developer_within_medium_window",
+        surface: GoldenPromptSurface::Generate,
+        template_variant_id: "gemma4_e4b.default",
+        render_case_id: "gemma4_e4b.default_developer",
+        max_rendered_bytes: 128,
+        expected_over_budget: false,
+        note: "Keeps the first bounded Gemma 4 text prompt inside a moderate render budget.",
+    },
+    GoldenPromptWindowCase {
+        id: "gemma4_e4b.history_over_small_window",
+        surface: GoldenPromptSurface::Generate,
+        template_variant_id: "gemma4_e4b.default",
+        render_case_id: "gemma4_e4b.with_history",
+        max_rendered_bytes: 160,
+        expected_over_budget: true,
+        note: "Forces a multi-turn Gemma 4 prompt over a small render budget while preserving the checked-in text template.",
+    },
+];
+
 const QWEN2_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
     GoldenPromptWindowCase {
         id: "qwen2.default_system_within_medium_window",
@@ -746,7 +874,7 @@ const COMMAND_R_WINDOW_CASES: [GoldenPromptWindowCase; 2] = [
 const GPT_OSS_WINDOW_CASES: [GoldenPromptWindowCase; 0] = [];
 
 /// Golden prompt fixtures sourced from local real GGUF artifacts.
-pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 5] = [
+pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 6] = [
     GoldenPromptFixture {
         id: "phi3",
         family: "phi3",
@@ -755,6 +883,15 @@ pub const GOLDEN_PROMPT_FIXTURES: [GoldenPromptFixture; 5] = [
         template_variants: &PHI3_VARIANTS,
         window_cases: &PHI3_WINDOW_CASES,
         notes: "SentencePiece prompt family with real BOS injection and direct Ollama stop defaults.",
+    },
+    GoldenPromptFixture {
+        id: "gemma4_e4b",
+        family: "gemma4",
+        source_path: "/Users/christopherdavid/models/gemma4/gemma4-e4b-ollama.gguf",
+        source_sha256: None,
+        template_variants: &GEMMA4_VARIANTS,
+        window_cases: &GEMMA4_WINDOW_CASES,
+        notes: "Gemma 4 prompt-family bootstrap anchored to the real e4b tokenizer and a checked-in bounded text template because the current local GGUF does not embed tokenizer.chat_template.",
     },
     GoldenPromptFixture {
         id: "qwen2",
@@ -994,6 +1131,7 @@ fn pretokenizer_fixture_label(pretokenizer: &GgufTokenizerPretokenizer) -> Cow<'
     match pretokenizer {
         GgufTokenizerPretokenizer::Default => Cow::Borrowed("default"),
         GgufTokenizerPretokenizer::Llama => Cow::Borrowed("llama"),
+        GgufTokenizerPretokenizer::Gemma4 => Cow::Borrowed("gemma4"),
         GgufTokenizerPretokenizer::Qwen2 => Cow::Borrowed("qwen2"),
         GgufTokenizerPretokenizer::Qwen35 => Cow::Borrowed("qwen35"),
         GgufTokenizerPretokenizer::Refact => Cow::Borrowed("refact"),

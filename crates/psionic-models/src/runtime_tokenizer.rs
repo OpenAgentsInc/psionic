@@ -673,6 +673,7 @@ fn byte_level_bpe_pattern(
         None
         | Some(GgufTokenizerPretokenizer::Default)
         | Some(GgufTokenizerPretokenizer::Llama)
+        | Some(GgufTokenizerPretokenizer::Gemma4)
         | Some(GgufTokenizerPretokenizer::Qwen2)
         | Some(GgufTokenizerPretokenizer::Qwen35)
         | Some(GgufTokenizerPretokenizer::Refact)
