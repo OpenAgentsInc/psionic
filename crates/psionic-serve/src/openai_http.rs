@@ -86,12 +86,20 @@ const CPU_SERVER_PERFORMANCE_CLASS: &str = "portable_cpu_degraded";
 const LLAMA_CPP_PROXY_RESIDENCY_MODE: &str = "llama_cpp_proxy";
 const PROXY_ONLY_FALLBACK_POLICY: &str = "proxy_only";
 const CPU_PROXY_PERFORMANCE_CLASS: &str = "portable_cpu_proxy";
+const BOOTSTRAP_PROXY_RESIDENCY_MODE: &str = "bootstrap_proxy";
+const BOOTSTRAP_PROXY_FALLBACK_POLICY: &str = "remote_bootstrap";
+const BOOTSTRAP_PROXY_PERFORMANCE_CLASS: &str = "bootstrap_proxy";
 const LOCAL_SERVER_LOAD_STATUS: &str = "loaded";
 const LOCAL_SERVER_WARM_CONTROL: &str = "not_implemented";
 const LOCAL_SERVER_UNLOAD_CONTROL: &str = "not_implemented";
 const LOCAL_SERVER_MEMORY_PRESSURE_REPORTING: &str = "not_implemented";
 const OPENAI_COMPAT_WORKER_ID: &str = "local_cpu_0";
 const STREAMING_TEXT_DELTA_MAX_CHARS: usize = 8;
+const BOOTSTRAP_PROXY_WORKER_PREFIX: &str = "bootstrap:";
+const BOOTSTRAP_PROXY_PROVENANCE: &str = "bootstrap_proxy";
+const LOCAL_EXECUTION_PROVENANCE: &str = "local_execution";
+const THIN_CLIENT_FALLBACK_POSTURE: &str = "thin_client_remote_only";
+const WARMING_FALLBACK_POSTURE: &str = "warming_until_local_ready";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct LocalServingTruth {
@@ -128,6 +136,20 @@ impl LocalServingTruth {
             hybrid_offload_layers: None,
             fallback_policy: PROXY_ONLY_FALLBACK_POLICY,
             performance_class: CPU_PROXY_PERFORMANCE_CLASS,
+            load_status: LOCAL_SERVER_LOAD_STATUS,
+            warm_control: LOCAL_SERVER_WARM_CONTROL,
+            unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
+            memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
+        }
+    }
+
+    const fn bootstrap_proxy() -> Self {
+        Self {
+            residency_mode: BOOTSTRAP_PROXY_RESIDENCY_MODE,
+            hybrid_offload: CPU_SERVER_HYBRID_OFFLOAD_MODE,
+            hybrid_offload_layers: None,
+            fallback_policy: BOOTSTRAP_PROXY_FALLBACK_POLICY,
+            performance_class: BOOTSTRAP_PROXY_PERFORMANCE_CLASS,
             load_status: LOCAL_SERVER_LOAD_STATUS,
             warm_control: LOCAL_SERVER_WARM_CONTROL,
             unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
@@ -174,6 +196,15 @@ impl OpenAiCompatServingTruth {
             execution_mode_label: "proxy",
             execution_engine_label: "llama.cpp",
             local_serving_truth: LocalServingTruth::cpu_proxy(),
+        }
+    }
+
+    const fn bootstrap_proxy() -> Self {
+        Self {
+            backend_label: "remote",
+            execution_mode_label: "proxy",
+            execution_engine_label: "psionic",
+            local_serving_truth: LocalServingTruth::bootstrap_proxy(),
         }
     }
 
@@ -850,6 +881,109 @@ struct OpenAiCompatState {
     management_join_state: Mutex<MeshManagementJoinState>,
     management_event_counter: AtomicU64,
     management_events: broadcast::Sender<MeshManagementEventEnvelope>,
+    local_management_node: Option<MeshManagementNodeStatus>,
+    last_route_execution: Mutex<Option<MeshManagementRouteExecutionStatus>>,
+    bootstrap_proxy: Option<Arc<BootstrapProxyState>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BootstrapProxyMode {
+    ThinClient,
+    Warming,
+}
+
+impl BootstrapProxyMode {
+    fn from_env() -> Result<Option<Self>, OpenAiCompatServerError> {
+        let Some(_) = env::var_os("PSIONIC_BOOTSTRAP_PROXY_BASE_URL") else {
+            return Ok(None);
+        };
+        match env::var("PSIONIC_BOOTSTRAP_PROXY_MODE") {
+            Ok(value) if value.eq_ignore_ascii_case("warming") => Ok(Some(Self::Warming)),
+            Ok(value)
+                if value.eq_ignore_ascii_case("thin_client")
+                    || value.eq_ignore_ascii_case("thin-client") =>
+            {
+                Ok(Some(Self::ThinClient))
+            }
+            Ok(value) => Err(OpenAiCompatServerError::Config(format!(
+                "unsupported `PSIONIC_BOOTSTRAP_PROXY_MODE` `{value}`; expected `thin_client` or `warming`",
+            ))),
+            Err(_) => Ok(Some(Self::ThinClient)),
+        }
+    }
+
+    const fn serving_truth(self) -> OpenAiCompatServingTruth {
+        OpenAiCompatServingTruth::bootstrap_proxy()
+    }
+
+    fn local_role_state(self) -> ServedMeshRoleState {
+        match self {
+            Self::ThinClient => ServedMeshRoleState::new(ServedMeshRole::ThinClient)
+                .with_reason(psionic_net::ServedMeshRoleReason::RemoteOnly),
+            Self::Warming => ServedMeshRoleState::new(ServedMeshRole::Host)
+                .with_posture(psionic_net::ServedMeshRolePosture::Downgraded)
+                .with_reason(psionic_net::ServedMeshRoleReason::Warming),
+        }
+    }
+
+    const fn local_warm_state(self) -> RoutedWarmState {
+        match self {
+            Self::ThinClient => RoutedWarmState::Cold,
+            Self::Warming => RoutedWarmState::Warming,
+        }
+    }
+
+    const fn warm_state_reason(self) -> &'static str {
+        match self {
+            Self::ThinClient => "remote_only",
+            Self::Warming => "warming",
+        }
+    }
+
+    const fn fallback_posture(self) -> &'static str {
+        match self {
+            Self::ThinClient => THIN_CLIENT_FALLBACK_POSTURE,
+            Self::Warming => WARMING_FALLBACK_POSTURE,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct BootstrapProxyState {
+    base_url: String,
+    client: reqwest::Client,
+    mode: BootstrapProxyMode,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct BootstrapRemoteManagementStatus {
+    default_model: String,
+    nodes: Vec<BootstrapRemoteNodeStatus>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct BootstrapRemoteNodeStatus {
+    worker_id: String,
+    backend_label: String,
+    execution_mode_label: String,
+    execution_engine_label: String,
+    models: Vec<BootstrapRemoteModelStatus>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct BootstrapRemoteModelStatus {
+    model_key: String,
+    canonical_name: String,
+    family: String,
+    supported_endpoints: Vec<String>,
+    warm_state: RoutedWarmState,
+    active_requests: usize,
+    structured_outputs: bool,
+    tool_calling: bool,
+    response_state: bool,
+    execution_profile: ExecutionCapabilityProfile,
+    #[serde(default)]
+    scheduler_policy: Option<GenerationSchedulerPolicy>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -938,6 +1072,7 @@ struct MeshManagementStatusDigestInput {
     join_state: MeshManagementJoinStateResponse,
     nodes: Vec<MeshManagementNodeStatus>,
     routes: Vec<MeshManagementRouteStatus>,
+    last_route_execution: Option<MeshManagementRouteExecutionStatus>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -952,6 +1087,27 @@ struct MeshManagementStatusResponse {
     join_state: MeshManagementJoinStateResponse,
     nodes: Vec<MeshManagementNodeStatus>,
     routes: Vec<MeshManagementRouteStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_route_execution: Option<MeshManagementRouteExecutionStatus>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshManagementRouteExecutionLocality {
+    Local,
+    RemoteProxy,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct MeshManagementRouteExecutionStatus {
+    worker_id: String,
+    locality: MeshManagementRouteExecutionLocality,
+    provenance: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warm_state_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fallback_posture: Option<String>,
+    executed_at_ms: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -1212,11 +1368,19 @@ impl OpenAiCompatState {
             .expect("management join state should not be poisoned")
             .clone()
             .into_response();
+        let last_route_execution = self
+            .last_route_execution
+            .lock()
+            .expect("last route execution should not be poisoned")
+            .clone();
         let inventories = self.router.inventory();
         let mut nodes = inventories
             .iter()
             .map(mesh_management_node_status)
             .collect::<Vec<_>>();
+        if let Some(local_management_node) = self.local_management_node.clone() {
+            nodes.push(local_management_node);
+        }
         nodes.sort_by(|left, right| left.worker_id.cmp(&right.worker_id));
         let mut routes = nodes
             .iter()
@@ -1232,6 +1396,7 @@ impl OpenAiCompatState {
             join_state: join_state.clone(),
             nodes: nodes.clone(),
             routes: routes.clone(),
+            last_route_execution: last_route_execution.clone(),
         });
         MeshManagementStatusResponse {
             status: "ok",
@@ -1244,6 +1409,7 @@ impl OpenAiCompatState {
             join_state,
             nodes,
             routes,
+            last_route_execution,
         }
     }
 
@@ -1278,6 +1444,13 @@ impl OpenAiCompatState {
             topology_digest: status.topology_digest.clone(),
             payload: MeshManagementEventPayload::TopologySnapshot { status },
         }
+    }
+
+    fn record_route_execution(&self, status: MeshManagementRouteExecutionStatus) {
+        *self
+            .last_route_execution
+            .lock()
+            .expect("last route execution should not be poisoned") = Some(status);
     }
 }
 
@@ -1380,6 +1553,74 @@ fn mesh_management_event_to_sse(event: &MeshManagementEventEnvelope) -> Event {
         .expect("mesh management event should serialize")
 }
 
+fn route_execution_status_for_local_route(
+    selection: &RouteSelection,
+) -> MeshManagementRouteExecutionStatus {
+    MeshManagementRouteExecutionStatus {
+        worker_id: selection.worker_id.clone(),
+        locality: MeshManagementRouteExecutionLocality::Local,
+        provenance: String::from(LOCAL_EXECUTION_PROVENANCE),
+        warm_state_reason: None,
+        fallback_posture: None,
+        executed_at_ms: unix_timestamp_ms(),
+    }
+}
+
+fn route_execution_status_for_bootstrap_proxy(
+    selection: &RouteSelection,
+    mode: BootstrapProxyMode,
+) -> MeshManagementRouteExecutionStatus {
+    MeshManagementRouteExecutionStatus {
+        worker_id: selection.worker_id.clone(),
+        locality: MeshManagementRouteExecutionLocality::RemoteProxy,
+        provenance: String::from(BOOTSTRAP_PROXY_PROVENANCE),
+        warm_state_reason: Some(String::from(mode.warm_state_reason())),
+        fallback_posture: Some(String::from(mode.fallback_posture())),
+        executed_at_ms: unix_timestamp_ms(),
+    }
+}
+
+fn insert_route_execution_headers(
+    headers: &mut HeaderMap,
+    route_execution: &MeshManagementRouteExecutionStatus,
+) {
+    headers.insert(
+        HeaderName::from_static("x-psionic-route-locality"),
+        HeaderValue::from_static(match route_execution.locality {
+            MeshManagementRouteExecutionLocality::Local => "local",
+            MeshManagementRouteExecutionLocality::RemoteProxy => "remote_proxy",
+        }),
+    );
+    if let Ok(value) = HeaderValue::from_str(route_execution.provenance.as_str()) {
+        headers.insert(HeaderName::from_static("x-psionic-route-provenance"), value);
+    }
+    if let Some(warm_state_reason) = route_execution.warm_state_reason.as_deref()
+        && let Ok(value) = HeaderValue::from_str(warm_state_reason)
+    {
+        headers.insert(
+            HeaderName::from_static("x-psionic-route-warm-state-reason"),
+            value,
+        );
+    }
+    if let Some(fallback_posture) = route_execution.fallback_posture.as_deref()
+        && let Ok(value) = HeaderValue::from_str(fallback_posture)
+    {
+        headers.insert(
+            HeaderName::from_static("x-psionic-route-fallback-posture"),
+            value,
+        );
+    }
+}
+
+fn routing_endpoint_from_path(path: &str) -> Option<RoutingEndpoint> {
+    match path {
+        "/v1/chat/completions" => Some(RoutingEndpoint::ChatCompletions),
+        "/v1/responses" => Some(RoutingEndpoint::Responses),
+        "/v1/embeddings" => Some(RoutingEndpoint::Embeddings),
+        _ => None,
+    }
+}
+
 fn qwen35_structured_output_unavailable_detail(execution_engine_label: &str) -> &'static str {
     if execution_engine_label == "psionic" {
         "structured outputs are unavailable on the native qwen35 text-only runtime"
@@ -1412,6 +1653,186 @@ enum OpenAiCompatWorkerCommand {
     },
 }
 
+impl BootstrapProxyState {
+    fn from_remote_status(
+        mode: BootstrapProxyMode,
+        models_by_key: &BTreeMap<String, OpenAiCompatLoadedModel>,
+    ) -> Result<Option<(Arc<Self>, Vec<RoutedWorkerInventory>, String)>, OpenAiCompatServerError>
+    {
+        let Some(base_url) = env::var_os("PSIONIC_BOOTSTRAP_PROXY_BASE_URL") else {
+            return Ok(None);
+        };
+        let base_url = base_url.to_string_lossy().trim_end_matches('/').to_string();
+        let blocking_client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|error| {
+                OpenAiCompatServerError::Config(format!(
+                    "failed to build bootstrap proxy discovery client: {error}"
+                ))
+            })?;
+        let status = blocking_client
+            .get(format!("{base_url}/psionic/management/status"))
+            .send()
+            .map_err(|error| {
+                OpenAiCompatServerError::Config(format!(
+                    "failed to fetch bootstrap proxy management status from `{base_url}`: {error}"
+                ))
+            })?
+            .error_for_status()
+            .map_err(|error| {
+                OpenAiCompatServerError::Config(format!(
+                    "bootstrap proxy management status request failed for `{base_url}`: {error}"
+                ))
+            })?
+            .json::<BootstrapRemoteManagementStatus>()
+            .map_err(|error| {
+                OpenAiCompatServerError::Config(format!(
+                    "failed to decode bootstrap proxy management status from `{base_url}`: {error}"
+                ))
+            })?;
+
+        let remote_workers = status
+            .nodes
+            .iter()
+            .filter_map(|node| bootstrap_remote_worker_inventory(node, models_by_key))
+            .collect::<Vec<_>>();
+        if remote_workers.is_empty() {
+            return Err(OpenAiCompatServerError::Config(format!(
+                "bootstrap proxy `{base_url}` did not advertise any warm models matching the local model plan",
+            )));
+        }
+
+        Ok(Some((
+            Arc::new(Self {
+                base_url,
+                client: reqwest::Client::new(),
+                mode,
+            }),
+            remote_workers,
+            status.default_model,
+        )))
+    }
+}
+
+fn bootstrap_remote_worker_inventory(
+    node: &BootstrapRemoteNodeStatus,
+    models_by_key: &BTreeMap<String, OpenAiCompatLoadedModel>,
+) -> Option<RoutedWorkerInventory> {
+    let models = node
+        .models
+        .iter()
+        .filter(|model| {
+            models_by_key.contains_key(model.model_key.as_str())
+                && model.warm_state == RoutedWarmState::Warm
+        })
+        .filter_map(bootstrap_remote_model_inventory)
+        .collect::<Vec<_>>();
+    if models.is_empty() {
+        return None;
+    }
+    Some(
+        RoutedWorkerInventory::new(
+            format!("{BOOTSTRAP_PROXY_WORKER_PREFIX}{}", node.worker_id),
+            node.backend_label.clone(),
+            node.execution_mode_label.clone(),
+            node.execution_engine_label.clone(),
+        )
+        .with_model_entries(models),
+    )
+}
+
+fn bootstrap_remote_model_inventory(
+    model: &BootstrapRemoteModelStatus,
+) -> Option<RoutedModelInventory> {
+    let mut inventory = RoutedModelInventory::new(
+        model.model_key.clone(),
+        model.canonical_name.clone(),
+        model.family.clone(),
+        model.execution_profile.clone(),
+    )
+    .with_warm_state(model.warm_state)
+    .with_active_requests(model.active_requests);
+    if let Some(stem) = Path::new(model.canonical_name.as_str())
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+    {
+        inventory = inventory.with_alias(stem.to_string());
+    }
+    for endpoint in &model.supported_endpoints {
+        inventory = inventory.with_supported_endpoint(routing_endpoint_from_path(endpoint)?);
+    }
+    if model.structured_outputs {
+        inventory = inventory.with_structured_outputs();
+    }
+    if model.tool_calling {
+        inventory = inventory.with_tool_calling();
+    }
+    if model.response_state {
+        inventory = inventory.with_response_state();
+    }
+    if let Some(policy) = model.scheduler_policy.clone() {
+        inventory = inventory.with_scheduler_policy(policy);
+    }
+    Some(inventory)
+}
+
+fn bootstrap_management_node(
+    models_by_key: &BTreeMap<String, OpenAiCompatLoadedModel>,
+    mode: BootstrapProxyMode,
+) -> MeshManagementNodeStatus {
+    let mut models = models_by_key
+        .values()
+        .map(|model| MeshManagementModelStatus {
+            model_key: model.model_key.clone(),
+            canonical_name: model.canonical_name.clone(),
+            family: model.family_label().to_string(),
+            supported_endpoints: model_endpoint_paths(model),
+            warm_state: mode.local_warm_state(),
+            active_requests: 0,
+            structured_outputs: model.supports_structured_outputs(),
+            tool_calling: model.supports_tool_calling(),
+            response_state: model.supports_response_state(),
+            execution_profile: model.execution_profile().clone(),
+            scheduler_policy: model.scheduler_policy().cloned(),
+        })
+        .collect::<Vec<_>>();
+    models.sort_by(|left, right| left.model_key.cmp(&right.model_key));
+    let mut route_inventory = models
+        .iter()
+        .flat_map(|model| {
+            model
+                .supported_endpoints
+                .iter()
+                .map(|endpoint| MeshManagementRouteStatus {
+                    worker_id: String::from(OPENAI_COMPAT_WORKER_ID),
+                    model_key: model.model_key.clone(),
+                    canonical_name: model.canonical_name.clone(),
+                    family: model.family.clone(),
+                    endpoint,
+                    warm_state: model.warm_state,
+                    active_requests: model.active_requests,
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    route_inventory.sort_by(|left, right| {
+        left.model_key
+            .cmp(&right.model_key)
+            .then_with(|| left.endpoint.cmp(right.endpoint))
+    });
+    MeshManagementNodeStatus {
+        worker_id: String::from(OPENAI_COMPAT_WORKER_ID),
+        served_mesh_role: mode.local_role_state(),
+        backend_label: String::from("remote"),
+        execution_mode_label: String::from("proxy"),
+        execution_engine_label: String::from("psionic"),
+        models,
+        route_inventory,
+    }
+}
+
 impl OpenAiCompatServer {
     pub fn from_config(config: &OpenAiCompatConfig) -> Result<Self, OpenAiCompatServerError> {
         Self::from_config_with_response_state_store(
@@ -1439,6 +1860,7 @@ impl OpenAiCompatServer {
         let mut default_model_key = None;
         let mut default_canonical_model_name = None;
         let mut load_plans = Vec::new();
+        let bootstrap_mode = BootstrapProxyMode::from_env()?;
 
         for model_path in &config.model_paths {
             let decoder_attempt =
@@ -1484,29 +1906,59 @@ impl OpenAiCompatServer {
             load_plans.push(load_plan);
         }
 
-        let worker = OpenAiCompatWorker::spawn(load_plans)?;
         let default_model_key = default_model_key.expect("validated non-empty model list");
+        if let Some(mode) = bootstrap_mode {
+            for model in models_by_key.values_mut() {
+                model.serving_truth = mode.serving_truth();
+            }
+        }
         let default_model_truth = models_by_key
             .get(&default_model_key)
             .expect("default model should exist")
             .serving_truth();
         let response_state_capability = response_state.capability();
         let (management_events, _) = broadcast::channel(64);
-        let router = FleetRouter::new(
-            default_model_key.clone(),
-            vec![
-                RoutedWorkerInventory::new(
-                    OPENAI_COMPAT_WORKER_ID,
-                    default_model_truth.backend_label,
-                    default_model_truth.execution_mode_label,
-                    default_model_truth.execution_engine_label,
+        let (workers, router, local_management_node, bootstrap_proxy) =
+            if let Some(mode) = bootstrap_mode {
+                let (bootstrap_proxy, remote_workers, remote_default_model) =
+                    BootstrapProxyState::from_remote_status(mode, &models_by_key)?
+                        .expect("bootstrap proxy mode should require a configured base URL");
+                let router_default_model = if remote_workers.iter().any(|worker| {
+                    worker
+                        .models
+                        .iter()
+                        .any(|model| model.aliases.contains(&default_model_key))
+                }) {
+                    default_model_key.clone()
+                } else {
+                    remote_default_model
+                };
+                (
+                    BTreeMap::new(),
+                    FleetRouter::new(router_default_model, remote_workers)
+                        .map_err(|error| OpenAiCompatServerError::Config(error.to_string()))?,
+                    Some(bootstrap_management_node(&models_by_key, mode)),
+                    Some(bootstrap_proxy),
                 )
-                .with_model_entries(routed_models),
-            ],
-        )
-        .map_err(|error| OpenAiCompatServerError::Config(error.to_string()))?;
-        let mut workers = BTreeMap::new();
-        workers.insert(String::from(OPENAI_COMPAT_WORKER_ID), worker);
+            } else {
+                let worker = OpenAiCompatWorker::spawn(load_plans)?;
+                let router = FleetRouter::new(
+                    default_model_key.clone(),
+                    vec![
+                        RoutedWorkerInventory::new(
+                            OPENAI_COMPAT_WORKER_ID,
+                            default_model_truth.backend_label,
+                            default_model_truth.execution_mode_label,
+                            default_model_truth.execution_engine_label,
+                        )
+                        .with_model_entries(routed_models),
+                    ],
+                )
+                .map_err(|error| OpenAiCompatServerError::Config(error.to_string()))?;
+                let mut workers = BTreeMap::new();
+                workers.insert(String::from(OPENAI_COMPAT_WORKER_ID), worker);
+                (workers, router, None, None)
+            };
         Ok(Self {
             state: Arc::new(OpenAiCompatState {
                 workers,
@@ -1526,6 +1978,9 @@ impl OpenAiCompatServer {
                 management_join_state: Mutex::new(MeshManagementJoinState::default()),
                 management_event_counter: AtomicU64::new(1),
                 management_events,
+                local_management_node,
+                last_route_execution: Mutex::new(None),
+                bootstrap_proxy,
             }),
         })
     }
@@ -3875,6 +4330,14 @@ async fn handle_generic_chat_completions(
         },
     )?;
     let loaded_model = route.loaded_model;
+    if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
+        let route_execution =
+            route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
+        let response =
+            proxy_bootstrap_chat_completions(proxy, &route, &request, &route_execution).await?;
+        state.record_route_execution(route_execution);
+        return Ok(response);
+    }
     let model = loaded_model.decoder().ok_or_else(|| {
         OpenAiCompatHttpError::Internal(format!(
             "loaded model `{}` is missing decoder metadata",
@@ -3925,6 +4388,8 @@ async fn handle_generic_chat_completions(
         .map_err(|error| {
             OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
         })?;
+    let route_execution = route_execution_status_for_local_route(&route.selection);
+    state.record_route_execution(route_execution.clone());
     let parsed_reasoning = if reasoning_parser_for_decoder_family(model.family).is_some() {
         parse_reasoning_response_for_family(model.family, response.output.text.as_str())
             .ok()
@@ -4026,6 +4491,7 @@ async fn handle_generic_chat_completions(
             response.headers_mut(),
             loaded_model,
             &route.selection,
+            &route_execution,
             structured_output_report.as_ref(),
             scheduler_receipt.as_ref(),
             prefill_decode_mode,
@@ -4104,6 +4570,7 @@ async fn handle_generic_chat_completions(
         response.headers_mut(),
         loaded_model,
         &route.selection,
+        &route_execution,
         structured_output_report.as_ref(),
         scheduler_receipt.as_ref(),
         prefill_decode_mode,
@@ -4198,6 +4665,13 @@ async fn handle_generic_responses(
         )?,
     };
     let loaded_model = route.loaded_model;
+    if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
+        let route_execution =
+            route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
+        let response = proxy_bootstrap_responses(proxy, &route, &request, &route_execution).await?;
+        state.record_route_execution(route_execution);
+        return Ok(response);
+    }
     if let Some(expected_model_key) = response_state_context.model_key.as_deref()
         && loaded_model.model_key != expected_model_key
     {
@@ -4261,6 +4735,8 @@ async fn handle_generic_responses(
         .map_err(|error| {
             OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
         })?;
+    let route_execution = route_execution_status_for_local_route(&route.selection);
+    state.record_route_execution(route_execution.clone());
     let parsed_reasoning = if reasoning_parser_for_decoder_family(model.family).is_some() {
         parse_reasoning_response_for_family(model.family, response.output.text.as_str())
             .ok()
@@ -4476,6 +4952,7 @@ async fn handle_generic_responses(
         response.headers_mut(),
         loaded_model,
         &route.selection,
+        &route_execution,
         structured_output_report.as_ref(),
         scheduler_receipt.as_ref(),
         prefill_decode_mode,
@@ -4517,6 +4994,14 @@ async fn handle_generic_embeddings(
     )?;
     let route = loaded_model;
     let loaded_model = route.loaded_model;
+    if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
+        let route_execution =
+            route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
+        let response =
+            proxy_bootstrap_embeddings(proxy, &route, &request, &route_execution).await?;
+        state.record_route_execution(route_execution);
+        return Ok(response);
+    }
     let model = loaded_model.embeddings().ok_or_else(|| {
         OpenAiCompatHttpError::Internal(format!(
             "loaded model `{}` is missing embeddings metadata",
@@ -4545,6 +5030,8 @@ async fn handle_generic_embeddings(
     let response = worker_for_route(state.as_ref(), &route.selection)?
         .embed(route.selection.model_key.clone(), embedding_request)
         .await?;
+    let route_execution = route_execution_status_for_local_route(&route.selection);
+    state.record_route_execution(route_execution.clone());
     let body = EmbeddingsResponse {
         object: "list",
         data: response
@@ -4577,6 +5064,7 @@ async fn handle_generic_embeddings(
         response.headers_mut(),
         loaded_model,
         &route.selection,
+        &route_execution,
         None,
         None,
         None,
@@ -4627,6 +5115,90 @@ async fn proxy_chat_completions(
         .body(axum::body::Body::from(body))
         .map_err(|error| OpenAiCompatHttpError::BadRequest(error.to_string()))?;
     insert_execution_headers(response.headers_mut(), state);
+    Ok(response)
+}
+
+async fn proxy_bootstrap_json_request<T: Serialize>(
+    proxy: &BootstrapProxyState,
+    endpoint: &str,
+    request: &T,
+) -> Result<Response, OpenAiCompatHttpError> {
+    let upstream = proxy
+        .client
+        .post(format!(
+            "{}/{}",
+            proxy.base_url,
+            endpoint.trim_start_matches('/')
+        ))
+        .json(request)
+        .send()
+        .await
+        .map_err(|error| {
+            OpenAiCompatHttpError::Internal(format!(
+                "bootstrap proxy request to `{}` failed: {error}",
+                proxy.base_url
+            ))
+        })?;
+    let status = upstream.status();
+    let upstream_headers = upstream.headers().clone();
+    let body = upstream.bytes().await.map_err(|error| {
+        OpenAiCompatHttpError::Internal(format!(
+            "bootstrap proxy response read failed for `{}`: {error}",
+            proxy.base_url
+        ))
+    })?;
+    let mut response = Response::builder()
+        .status(status)
+        .body(axum::body::Body::from(body))
+        .map_err(|error| OpenAiCompatHttpError::BadRequest(error.to_string()))?;
+    for (name, value) in &upstream_headers {
+        if name != axum::http::header::CONTENT_LENGTH {
+            response.headers_mut().insert(name, value.clone());
+        }
+    }
+    Ok(response)
+}
+
+async fn proxy_bootstrap_chat_completions(
+    proxy: &BootstrapProxyState,
+    route: &ResolvedGenericRoute<'_>,
+    request: &ChatCompletionRequest,
+    route_execution: &MeshManagementRouteExecutionStatus,
+) -> Result<Response, OpenAiCompatHttpError> {
+    let mut proxied = request.clone();
+    proxied.model = Some(route.selection.canonical_name.clone());
+    let mut response =
+        proxy_bootstrap_json_request(proxy, RoutingEndpoint::ChatCompletions.path(), &proxied)
+            .await?;
+    insert_route_execution_headers(response.headers_mut(), route_execution);
+    Ok(response)
+}
+
+async fn proxy_bootstrap_responses(
+    proxy: &BootstrapProxyState,
+    route: &ResolvedGenericRoute<'_>,
+    request: &ResponsesRequest,
+    route_execution: &MeshManagementRouteExecutionStatus,
+) -> Result<Response, OpenAiCompatHttpError> {
+    let mut proxied = request.clone();
+    proxied.model = Some(route.selection.canonical_name.clone());
+    let mut response =
+        proxy_bootstrap_json_request(proxy, RoutingEndpoint::Responses.path(), &proxied).await?;
+    insert_route_execution_headers(response.headers_mut(), route_execution);
+    Ok(response)
+}
+
+async fn proxy_bootstrap_embeddings(
+    proxy: &BootstrapProxyState,
+    route: &ResolvedGenericRoute<'_>,
+    request: &EmbeddingsRequest,
+    route_execution: &MeshManagementRouteExecutionStatus,
+) -> Result<Response, OpenAiCompatHttpError> {
+    let mut proxied = request.clone();
+    proxied.model = Some(route.selection.canonical_name.clone());
+    let mut response =
+        proxy_bootstrap_json_request(proxy, RoutingEndpoint::Embeddings.path(), &proxied).await?;
+    insert_route_execution_headers(response.headers_mut(), route_execution);
     Ok(response)
 }
 
@@ -5168,6 +5740,7 @@ fn insert_generic_execution_headers(
     headers: &mut HeaderMap,
     loaded_model: &OpenAiCompatLoadedModel,
     route_selection: &RouteSelection,
+    route_execution: &MeshManagementRouteExecutionStatus,
     structured_output: Option<&StructuredOutputExecutionReport>,
     scheduler: Option<&GenerationSchedulerRequestReceipt>,
     prefill_decode_mode: Option<psionic_runtime::PrefillDecodeExecutionMode>,
@@ -5179,21 +5752,26 @@ fn insert_generic_execution_headers(
 ) {
     headers.insert(
         HeaderName::from_static("x-psionic-backend"),
-        HeaderValue::from_static(loaded_model.backend_label()),
+        HeaderValue::from_str(route_selection.backend_label.as_str())
+            .unwrap_or_else(|_| HeaderValue::from_static("invalid")),
     );
     headers.insert(
         HeaderName::from_static("x-psionic-served-backend"),
-        HeaderValue::from_static(loaded_model.backend_label()),
+        HeaderValue::from_str(route_selection.backend_label.as_str())
+            .unwrap_or_else(|_| HeaderValue::from_static("invalid")),
     );
     headers.insert(
         HeaderName::from_static("x-psionic-execution-mode"),
-        HeaderValue::from_static(loaded_model.execution_mode_label()),
+        HeaderValue::from_str(route_selection.execution_mode_label.as_str())
+            .unwrap_or_else(|_| HeaderValue::from_static("invalid")),
     );
     headers.insert(
         HeaderName::from_static("x-psionic-execution-engine"),
-        HeaderValue::from_static(loaded_model.execution_engine_label()),
+        HeaderValue::from_str(route_selection.execution_engine_label.as_str())
+            .unwrap_or_else(|_| HeaderValue::from_static("invalid")),
     );
     insert_local_serving_truth_headers(headers, loaded_model.local_serving_truth());
+    insert_route_execution_headers(headers, route_execution);
     headers.insert(
         HeaderName::from_static("x-psionic-route-worker"),
         HeaderValue::from_str(route_selection.worker_id.as_str())
@@ -5485,6 +6063,17 @@ fn worker_for_route<'a>(
                 selection.worker_id
             ))
         })
+}
+
+fn bootstrap_proxy_for_route<'a>(
+    state: &'a OpenAiCompatState,
+    selection: &RouteSelection,
+) -> Option<&'a BootstrapProxyState> {
+    selection
+        .worker_id
+        .starts_with(BOOTSTRAP_PROXY_WORKER_PREFIX)
+        .then_some(state.bootstrap_proxy.as_deref())
+        .flatten()
 }
 
 fn model_endpoint_paths(model: &OpenAiCompatLoadedModel) -> Vec<&'static str> {
@@ -6417,10 +7006,11 @@ struct OpenAiErrorBody {
 #[cfg(test)]
 mod tests {
     use super::{
-        CPU_SERVER_FALLBACK_POLICY, CPU_SERVER_HYBRID_OFFLOAD_MODE, CPU_SERVER_RESIDENCY_MODE,
-        ChatCompletionContentPart, ChatCompletionJsonSchemaRequest, ChatCompletionMessage,
-        ChatCompletionMessageContent, ChatCompletionRequest, ChatCompletionResponseFormatRequest,
-        ChatCompletionToolCall, ChatCompletionToolCallFunction, EmbeddingsInput, EmbeddingsRequest,
+        BOOTSTRAP_PROXY_RESIDENCY_MODE, CPU_SERVER_FALLBACK_POLICY, CPU_SERVER_HYBRID_OFFLOAD_MODE,
+        CPU_SERVER_RESIDENCY_MODE, ChatCompletionContentPart, ChatCompletionJsonSchemaRequest,
+        ChatCompletionMessage, ChatCompletionMessageContent, ChatCompletionRequest,
+        ChatCompletionResponseFormatRequest, ChatCompletionToolCall,
+        ChatCompletionToolCallFunction, EmbeddingsInput, EmbeddingsRequest,
         GptOssMetalExecutionMode, GptOssOpenAiCompatBackend, GptOssOpenAiCompatConfig,
         HARMONY_CALL_STOP, HARMONY_RETURN_STOP, LOCAL_SERVER_LOAD_STATUS,
         LOCAL_SERVER_MEMORY_PRESSURE_REPORTING, LOCAL_SERVER_UNLOAD_CONTROL,
@@ -6429,15 +7019,16 @@ mod tests {
         OpenAiCompatRuntimeKind, OpenAiCompatServer, PromptTokenCache, PsionicGrammarRequest,
         PsionicReasoningMode, PsionicReasoningRequest, PsionicResponseStateRequest,
         ResolvedReasoningRequest, ResolvedToolCall, ResponseContinuationMode, ResponsesInput,
-        ResponsesRequest, RoutingEndpoint, RoutingRequest, StopSequences, ToolCallingContract,
-        ToolChoiceMode, ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
+        ResponsesRequest, RoutingEndpoint, RoutingRequest, StopSequences,
+        THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract, ToolChoiceMode, ToolChoiceRequest,
+        ToolDefinitionEnvelope, ToolDefinitionRequest, WARMING_FALLBACK_POSTURE,
         apply_tool_contract_to_prompt_messages, assistant_prompt_message_for_tool_loop,
         chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
         chat_messages_to_prompt_messages_generic, completion_choice, ensure_harmony_stop_sequences,
         generation_options_from_chat_request, generation_options_from_chat_request_for_family,
         generation_options_from_responses_request, generic_embeddings, generic_health,
         generic_list_models, generic_management_status, gpt_oss_local_serving_truth,
-        handle_generic_chat_completions, handle_generic_responses,
+        handle_generic_chat_completions, handle_generic_embeddings, handle_generic_responses,
         insert_local_serving_truth_headers, load_generic_decoder_model, model_endpoint_paths,
         prompt_request_cache_key, render_prompt_for_model,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
@@ -6470,6 +7061,7 @@ mod tests {
         ReasoningParser, TokenId, TokenSequence, golden_prompt_fixture, parse_gpt_oss_harmony_text,
         render_gpt_oss_harmony_prompt,
     };
+    use psionic_net::{ServedMeshRole, ServedMeshRolePosture, ServedMeshRoleReason};
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
         ToolExecutionRequest, ToolGateway, ToolHistoryVisibility, ToolLoopController,
@@ -7340,6 +7932,285 @@ mod tests {
             }
             other => panic!("unexpected management event payload: {other:?}"),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_bootstrap_thin_client_proxies_chat_and_management_reports_remote_execution()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = bootstrap_proxy_test_lock()
+            .lock()
+            .expect("bootstrap proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-bootstrap-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny bootstrap llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let remote_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        let (base_url, shutdown_tx) =
+            runtime.block_on(start_openai_compat_test_server(remote_server))?;
+
+        let bootstrap_env =
+            ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_BASE_URL", base_url.as_str());
+        let mode_env = ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_MODE", "thin_client");
+        let local_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        drop(mode_env);
+        drop(bootstrap_env);
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        assert_eq!(health.0.execution_mode, "proxy");
+        assert_eq!(health.0.residency_mode, BOOTSTRAP_PROXY_RESIDENCY_MODE);
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&local_server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-bootstrap-llama")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let headers = response.headers().clone();
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(payload["object"], serde_json::json!("chat.completion"));
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-provenance"),
+            Some(String::from("bootstrap_proxy"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-warm-state-reason"),
+            Some(String::from("remote_only"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-fallback-posture"),
+            Some(String::from(THIN_CLIENT_FALLBACK_POSTURE))
+        );
+
+        let management = runtime.block_on(generic_management_status(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        let local_node = management
+            .0
+            .nodes
+            .iter()
+            .find(|node| node.worker_id == OPENAI_COMPAT_WORKER_ID)
+            .expect("local thin-client node should be present");
+        assert_eq!(local_node.served_mesh_role.role, ServedMeshRole::ThinClient);
+        assert_eq!(
+            local_node.served_mesh_role.reasons,
+            vec![ServedMeshRoleReason::RemoteOnly]
+        );
+        assert_eq!(
+            management
+                .0
+                .last_route_execution
+                .as_ref()
+                .map(|status| status.locality),
+            Some(super::MeshManagementRouteExecutionLocality::RemoteProxy)
+        );
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_bootstrap_thin_client_proxies_responses_and_embeddings()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = bootstrap_proxy_test_lock()
+            .lock()
+            .expect("bootstrap proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-bootstrap-llama.gguf");
+        let embeddings_path = temp.path().join("tiny-bootstrap-embed.safetensors");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny bootstrap llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        ByteProjectionEmbedder::write_default_safetensors_artifact(&embeddings_path)?;
+
+        let mut remote_config = OpenAiCompatConfig::new(&llama_path);
+        remote_config.add_model_path(&embeddings_path);
+        let remote_server = OpenAiCompatServer::from_config(&remote_config)?;
+        let (base_url, shutdown_tx) =
+            runtime.block_on(start_openai_compat_test_server(remote_server))?;
+
+        let bootstrap_env =
+            ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_BASE_URL", base_url.as_str());
+        let mode_env = ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_MODE", "thin_client");
+        let mut local_config = OpenAiCompatConfig::new(&llama_path);
+        local_config.add_model_path(&embeddings_path);
+        let local_server = OpenAiCompatServer::from_config(&local_config)?;
+        drop(mode_env);
+        drop(bootstrap_env);
+
+        let responses = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&local_server.state),
+            ResponsesRequest {
+                model: Some(String::from("tiny-bootstrap-llama")),
+                instructions: Some(String::from("Be brief.")),
+                conversation: None,
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let responses_headers = responses.headers().clone();
+        let responses_payload = runtime.block_on(response_json(responses))?;
+        assert_eq!(responses_payload["object"], serde_json::json!("response"));
+        assert_eq!(
+            header_value(&responses_headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&responses_headers, "x-psionic-route-provenance"),
+            Some(String::from("bootstrap_proxy"))
+        );
+
+        let embeddings = runtime.block_on(handle_generic_embeddings(
+            std::sync::Arc::clone(&local_server.state),
+            EmbeddingsRequest {
+                model: Some(String::from("tiny-bootstrap-embed")),
+                input: EmbeddingsInput::One(String::from("hello")),
+                dimensions: Some(4),
+                encoding_format: Some(String::from("float")),
+            },
+        ))?;
+        let embeddings_headers = embeddings.headers().clone();
+        let embeddings_payload = runtime.block_on(response_json(embeddings))?;
+        assert_eq!(embeddings_payload["object"], serde_json::json!("list"));
+        assert_eq!(
+            embeddings_payload["data"][0]["embedding"]
+                .as_array()
+                .map(Vec::len),
+            Some(4)
+        );
+        assert_eq!(
+            header_value(&embeddings_headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&embeddings_headers, "x-psionic-route-fallback-posture"),
+            Some(String::from(THIN_CLIENT_FALLBACK_POSTURE))
+        );
+
+        let management = runtime.block_on(generic_management_status(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        assert_eq!(
+            management
+                .0
+                .last_route_execution
+                .as_ref()
+                .map(|status| status.provenance.as_str()),
+            Some("bootstrap_proxy")
+        );
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_bootstrap_warming_reports_host_role_and_remote_execution()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = bootstrap_proxy_test_lock()
+            .lock()
+            .expect("bootstrap proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-bootstrap-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny bootstrap llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let remote_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        let (base_url, shutdown_tx) =
+            runtime.block_on(start_openai_compat_test_server(remote_server))?;
+
+        let bootstrap_env =
+            ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_BASE_URL", base_url.as_str());
+        let mode_env = ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_MODE", "warming");
+        let local_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        drop(mode_env);
+        drop(bootstrap_env);
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&local_server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-bootstrap-llama")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let headers = response.headers().clone();
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(payload["object"], serde_json::json!("chat.completion"));
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-warm-state-reason"),
+            Some(String::from("warming"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-route-fallback-posture"),
+            Some(String::from(WARMING_FALLBACK_POSTURE))
+        );
+
+        let management = runtime.block_on(generic_management_status(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        let local_node = management
+            .0
+            .nodes
+            .iter()
+            .find(|node| node.worker_id == OPENAI_COMPAT_WORKER_ID)
+            .expect("local warming node should be present");
+        assert_eq!(local_node.served_mesh_role.role, ServedMeshRole::Host);
+        assert_eq!(
+            local_node.served_mesh_role.posture,
+            ServedMeshRolePosture::Downgraded
+        );
+        assert_eq!(
+            local_node.served_mesh_role.reasons,
+            vec![ServedMeshRoleReason::Warming]
+        );
+        assert_eq!(
+            management
+                .0
+                .last_route_execution
+                .as_ref()
+                .map(|status| status.locality),
+            Some(super::MeshManagementRouteExecutionLocality::RemoteProxy)
+        );
+        assert_eq!(
+            management
+                .0
+                .last_route_execution
+                .as_ref()
+                .and_then(|status| status.fallback_posture.as_deref()),
+            Some(WARMING_FALLBACK_POSTURE)
+        );
+
+        let _ = shutdown_tx.send(());
         Ok(())
     }
 
@@ -12566,6 +13437,11 @@ mod tests {
         LOCK.get_or_init(|| std::sync::Mutex::new(()))
     }
 
+    fn bootstrap_proxy_test_lock() -> &'static std::sync::Mutex<()> {
+        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
+
     async fn start_qwen35_proxy_test_server() -> Result<
         (
             String,
@@ -12608,6 +13484,36 @@ mod tests {
                 .await;
         });
         Ok((format!("http://{address}"), shutdown_tx, observed_requests))
+    }
+
+    async fn start_openai_compat_test_server(
+        server: OpenAiCompatServer,
+    ) -> Result<(String, tokio::sync::oneshot::Sender<()>), Box<dyn std::error::Error>> {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let base_url = format!("http://{address}");
+        let router = server.router();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                })
+                .await;
+        });
+        let client = reqwest::Client::new();
+        for _ in 0..50 {
+            if client
+                .get(format!("{base_url}/health"))
+                .send()
+                .await
+                .is_ok()
+            {
+                return Ok((base_url, shutdown_tx));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        Err(format!("OpenAI compat test server did not become ready at {base_url}").into())
     }
 
     fn test_generation_response(text: &str) -> GenerationResponse {

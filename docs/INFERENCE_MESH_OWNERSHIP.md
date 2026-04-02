@@ -187,3 +187,44 @@ The first published paths are:
 
 Those responses must stay backed by typed router and network truth. They are
 not allowed to depend on scraping logs or inferring topology from user traffic.
+
+## Bootstrap Proxy Runtime
+
+Bootstrap proxy mode is now configured directly on the Psionic OpenAI-compatible
+server.
+
+The current operator knobs are:
+
+- `PSIONIC_BOOTSTRAP_PROXY_BASE_URL`
+  - remote Psionic base URL used for bootstrap discovery and request proxying
+- `PSIONIC_BOOTSTRAP_PROXY_MODE`
+  - `thin_client` or `warming`
+
+When bootstrap mode is enabled, the local server:
+
+- discovers warm remote inventory from `/psionic/management/status`
+- binds `/v1/chat/completions`, `/v1/responses`, and `/v1/embeddings` locally
+- proxies only to warm remote workers that honestly match the local model plan
+- publishes route execution provenance on both headers and management state
+
+The execution proof surface is:
+
+- response headers
+  - `x-psionic-route-locality`
+  - `x-psionic-route-provenance`
+  - `x-psionic-route-warm-state-reason`
+  - `x-psionic-route-fallback-posture`
+- management status
+  - `last_route_execution`
+
+The local node truth differs by mode:
+
+- `thin_client`
+  - served-mesh role `thin_client`
+  - reason `remote_only`
+  - fallback posture `thin_client_remote_only`
+- `warming`
+  - served-mesh role `host`
+  - posture `downgraded`
+  - reason `warming`
+  - fallback posture `warming_until_local_ready`
