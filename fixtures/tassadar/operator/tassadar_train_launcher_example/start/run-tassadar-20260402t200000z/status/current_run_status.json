@@ -1,0 +1,11 @@
+{
+  "schema_version": "tassadar.train_current_run_status.v1",
+  "status_surface_id": "tassadar_train_status_surface_v1",
+  "run_id": "run-tassadar-20260402t200000z",
+  "run_root": "fixtures/tassadar/operator/tassadar_train_launcher_example/start/run-tassadar-20260402t200000z",
+  "lane_id": "tassadar_article_transformer_trace_bound_trained_v0",
+  "phase": "launch_staged",
+  "checker_command": "scripts/check-tassadar-default-train-lane.sh",
+  "retained_summary_ref": "status/retained_summary.json",
+  "claim_boundary": "The current status records the chosen Tassadar lane, checker path, and operator phase. It does not claim that the benchmark, promotion, or article-parity surfaces already changed."
+}

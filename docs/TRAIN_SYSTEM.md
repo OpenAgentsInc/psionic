@@ -310,6 +310,26 @@ the broad acceptance checker, and states directly that the older 4x4/9x9
 learned bundles, the separate Hungarian-10x10 exact learned benchmark lane,
 and the later 4080 executor candidate are not the default launcher meaning.
 
+The repo now also owns the canonical Tassadar operator launcher in
+`crates/psionic-train/src/tassadar_train_launcher.rs`, the fixture generators
+`crates/psionic-train/examples/tassadar_train_launcher_fixtures.rs` and
+`crates/psionic-train/examples/tassadar_train_operator.rs`, the operator
+entrypoint `./TRAIN_TASSADAR`, the focused doc
+`docs/TASSADAR_TRAIN_LAUNCHER.md`, and the committed fixtures:
+
+- `fixtures/tassadar/operator/tassadar_train_launch_manifest_v1.json`
+- `fixtures/tassadar/operator/tassadar_train_current_run_status_v1.json`
+- `fixtures/tassadar/operator/tassadar_train_retained_summary_v1.json`
+
+That launcher now supports explicit `start`, `dry-run`, and `status` commands,
+explicit `--lane` selection across the retained Tassadar lanes that already
+have frozen checker paths, and one retained operator output family with
+`manifests/launch_manifest.json`, `status/current_run_status.json`, and
+`status/retained_summary.json` under the selected run root. The current
+launcher deliberately excludes the 9x9 learned reference lane and later 4080
+candidate tracks from the supported table because they do not yet have the
+same operator-owned checker parity.
+
 The repo now also owns the canonical actual-lane hardware observation and
 hardware qualification receipt in
 `crates/psionic-train/src/psion_actual_pretraining_hardware_qualification.rs`,

@@ -2,25 +2,16 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+rustflags="${RUSTFLAGS:-}"
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  cat <<'EOF'
-Usage: ./TRAIN_TASSADAR
-
-Default lane:
-  tassadar_article_transformer_trace_bound_trained_v0
-
-Meaning:
-  Runs the bounded trace-bound article-transformer weight-production lane that
-  produces the retained `tassadar-article-transformer-trace-bound-trained-v0`
-  model family under `fixtures/tassadar/runs/tassadar_article_transformer_weight_production_v1`.
-
-This default does not mean:
-  - the older 4x4 or 9x9 learned benchmark lanes
-  - the Hungarian-10x10 learned article benchmark lane
-  - the later 4080 executor candidate or replacement tracks
-EOF
-  exit 0
+if [[ -n "${rustflags}" ]]; then
+  rustflags="${rustflags} -Awarnings"
+else
+  rustflags="-Awarnings"
 fi
 
-exec cargo run -q -p psionic-train --example tassadar_article_transformer_weight_production
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  exec env RUSTFLAGS="${rustflags}" cargo run -q -p psionic-train --example tassadar_train_operator -- --help
+fi
+
+exec env RUSTFLAGS="${rustflags}" cargo run -q -p psionic-train --example tassadar_train_operator -- "$@"

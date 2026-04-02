@@ -86,6 +86,9 @@ weight-production lane that produces the retained
 The lane contract lives in
 [docs/TASSADAR_DEFAULT_TRAIN_LANE.md](docs/TASSADAR_DEFAULT_TRAIN_LANE.md).
 
+The operator launcher lives in
+[docs/TASSADAR_TRAIN_LAUNCHER.md](docs/TASSADAR_TRAIN_LAUNCHER.md).
+
 ## Tassadar Executor Lane
 
 Executor-class research and runtime work for exact computation starts with
