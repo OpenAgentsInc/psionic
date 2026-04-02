@@ -85,5 +85,7 @@ It does not yet claim:
 - a final end-to-end actual-lane rehearsal
 
 The launcher now does consume those preflight items through one retained
-hardware qualification receipt. What remains unfinished is the later live
-monitoring and long-run failure-handling stack above that admission gate.
+hardware qualification receipt plus one retained run-shape qualification
+receipt in `preflight/run_shape_qualification.json`. What remains unfinished
+is the later live monitoring and long-run failure-handling stack above those
+admission gates.

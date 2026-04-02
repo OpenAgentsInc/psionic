@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
+    PsionActualPretrainingArtifactRef, PsionActualPretrainingLauncherSurfaces,
     PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID, PSION_ACTUAL_PRETRAINING_START_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
-    PsionActualPretrainingLauncherSurfaces,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 
 /// Stable schema version for the canonical actual-lane launch manifest.
@@ -41,6 +41,8 @@ pub struct PsionActualPretrainingRetainedPathSet {
     pub latest_checkpoint_pointer_path: String,
     /// Relative hardware-qualification receipt path.
     pub hardware_qualification_path: String,
+    /// Relative run-shape qualification receipt path.
+    pub run_shape_qualification_path: String,
     /// Relative continuation handoff path.
     pub continuation_handoff_path: String,
     /// Relative closeout bundle path.
@@ -132,6 +134,8 @@ pub struct PsionActualPretrainingLaunchManifest {
     pub run_roots: PsionActualPretrainingRunRoots,
     /// Run-local preflight receipt consumed by launch.
     pub preflight_receipt: PsionActualPretrainingPreflightRef,
+    /// Run-local run-shape qualification consumed by launch.
+    pub run_shape_receipt: PsionActualPretrainingPreflightRef,
     /// Committed contract refs this launch consumes directly.
     pub contract_refs: PsionActualPretrainingLauncherContractRefs,
     /// Selected git ref.
@@ -175,6 +179,8 @@ pub struct PsionActualPretrainingResumeManifest {
     pub run_roots: PsionActualPretrainingRunRoots,
     /// Run-local preflight receipt consumed by resume.
     pub preflight_receipt: PsionActualPretrainingPreflightRef,
+    /// Run-local run-shape qualification consumed by resume.
+    pub run_shape_receipt: PsionActualPretrainingPreflightRef,
     /// Committed contract refs this resume consumes directly.
     pub contract_refs: PsionActualPretrainingLauncherContractRefs,
     /// Selected git ref.
@@ -283,6 +289,11 @@ impl PsionActualPretrainingRetainedPathSet {
             "preflight/hardware_qualification.json",
         )?;
         ensure_exact(
+            self.run_shape_qualification_path.as_str(),
+            "retained_paths.run_shape_qualification_path",
+            "preflight/run_shape_qualification.json",
+        )?;
+        ensure_exact(
             self.continuation_handoff_path.as_str(),
             "retained_paths.continuation_handoff_path",
             PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
@@ -304,19 +315,28 @@ impl PsionActualPretrainingRetainedPathSet {
 impl PsionActualPretrainingPreflightRef {
     /// Validates the retained preflight receipt reference.
     pub fn validate(&self) -> Result<(), PsionActualPretrainingLauncherError> {
+        self.validate_for("preflight_receipt", "preflight/hardware_qualification.json")
+    }
+
+    /// Validates the retained preflight receipt reference for a specific path.
+    pub fn validate_for(
+        &self,
+        field_prefix: &str,
+        expected_relative_path: &str,
+    ) -> Result<(), PsionActualPretrainingLauncherError> {
         ensure_exact(
             self.relative_path.as_str(),
-            "preflight_receipt.relative_path",
-            "preflight/hardware_qualification.json",
+            &format!("{field_prefix}.relative_path"),
+            expected_relative_path,
         )?;
         ensure_nonempty(
             self.receipt_digest.as_str(),
-            "preflight_receipt.receipt_digest",
+            &format!("{field_prefix}.receipt_digest"),
         )?;
         match self.admission_state.as_str() {
             "admitted" | "refused" => Ok(()),
             _ => Err(PsionActualPretrainingLauncherError::UnsupportedValue {
-                field: String::from("preflight_receipt.admission_state"),
+                field: format!("{field_prefix}.admission_state"),
                 detail: String::from("preflight receipt must be admitted or refused"),
             }),
         }
@@ -390,6 +410,7 @@ impl PsionActualPretrainingLaunchManifest {
             &self.launcher_surfaces,
             &self.run_roots,
             &self.preflight_receipt,
+            &self.run_shape_receipt,
             &self.contract_refs,
             self.selected_git_ref.as_str(),
             self.git_commit_sha.as_str(),
@@ -426,6 +447,7 @@ impl PsionActualPretrainingResumeManifest {
             &self.launcher_surfaces,
             &self.run_roots,
             &self.preflight_receipt,
+            &self.run_shape_receipt,
             &self.contract_refs,
             self.selected_git_ref.as_str(),
             self.git_commit_sha.as_str(),
@@ -582,6 +604,7 @@ fn validate_launcher_common(
     launcher_surfaces: &PsionActualPretrainingLauncherSurfaces,
     run_roots: &PsionActualPretrainingRunRoots,
     preflight_receipt: &PsionActualPretrainingPreflightRef,
+    run_shape_receipt: &PsionActualPretrainingPreflightRef,
     contract_refs: &PsionActualPretrainingLauncherContractRefs,
     selected_git_ref: &str,
     git_commit_sha: &str,
@@ -613,6 +636,10 @@ fn validate_launcher_common(
     })?;
     run_roots.validate()?;
     preflight_receipt.validate()?;
+    run_shape_receipt.validate_for(
+        "run_shape_receipt",
+        "preflight/run_shape_qualification.json",
+    )?;
     contract_refs.validate()?;
     ensure_nonempty(selected_git_ref, "selected_git_ref")?;
     ensure_git_sha(git_commit_sha, "git_commit_sha")?;

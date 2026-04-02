@@ -29,8 +29,9 @@ The actual-lane command now does these things for real:
   evidence contract, and status surface contract directly from committed repo
   artifacts
 - writes `preflight/hardware_qualification.json` before launch or resume
-- refuses non-dry-run start or resume when the retained hardware qualification
-  receipt is not admitted
+- writes `preflight/run_shape_qualification.json` before launch or resume
+- refuses non-dry-run start or resume when either retained preflight receipt is
+  not admitted
 - refuses dirty launches by default unless `--allow-dirty-tree` is supplied
 - resolves and retains the selected git ref plus exact commit SHA
 - writes the canonical launch or resume manifest under the retained evidence
@@ -63,7 +64,8 @@ Dry-run with an admitted retained observation snapshot:
 ```bash
 ./TRAIN --lane actual_pretraining start \
   --dry-run \
-  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json
+  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
+  --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json
 ```
 
 Start with an explicit run id and output root:
@@ -85,11 +87,12 @@ The start path writes:
 - `status/retained_summary.json`
 - `checkpoints/latest_accepted_checkpoint_pointer.json`
 - `preflight/hardware_qualification.json`
+- `preflight/run_shape_qualification.json`
 - `closeout/closeout_bundle.json`
 - `logs/launcher.log`
 
-Non-dry-run `start` now refuses when `preflight/hardware_qualification.json`
-lands with `admission_state = refused`.
+Non-dry-run `start` now refuses when either preflight receipt lands with
+`admission_state = refused`.
 
 Before the first accepted checkpoint exists, the retained state is explicit:
 
@@ -111,8 +114,9 @@ Resume reads exactly:
 
 Resume refuses when that pointer is missing or still in
 `pending_first_checkpoint` state. Resume also writes and consumes
-`preflight/hardware_qualification.json`, and non-dry-run resume refuses when
-that receipt is not admitted. When it succeeds, it writes:
+`preflight/hardware_qualification.json` plus
+`preflight/run_shape_qualification.json`, and non-dry-run resume refuses when
+either receipt is not admitted. When it succeeds, it writes:
 
 - `manifests/resume_manifest.json`
 - refreshed status and retained-summary files
@@ -175,6 +179,7 @@ provisional closeout bundle.
 - `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 - `docs/PSION_ACTUAL_PRETRAINING_HARDWARE_QUALIFICATION.md`
+- `docs/PSION_ACTUAL_PRETRAINING_RUN_SHAPE_QUALIFICATION.md`
 - `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_SYSTEMS_BUNDLE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF.md`

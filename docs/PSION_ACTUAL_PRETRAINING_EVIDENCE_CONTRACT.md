@@ -47,6 +47,7 @@ psion_actual_pretraining_runs/<run_id>/
     resume_manifest.json
   preflight/
     hardware_qualification.json
+    run_shape_qualification.json
   status/
     current_run_status.json
     retained_summary.json
@@ -128,9 +129,10 @@ writing those retained artifacts for real.
 The first concrete writer for this family now exists in
 `./TRAIN --lane actual_pretraining start|resume`. It currently writes the
 launch or resume manifest, retained hardware qualification receipt, retained
-status surfaces, canonical checkpoint pointer, launcher log, and a provisional
-closeout bundle that repeats git provenance early. Resume over an accepted
-checkpoint also writes the retained continuation handoff at
+run-shape qualification receipt, retained status surfaces, canonical
+checkpoint pointer, launcher log, and a provisional closeout bundle that
+repeats git provenance early. Resume over an accepted checkpoint also writes
+the retained continuation handoff at
 `continuation/accepted_checkpoint_handoff.json`, which binds that accepted
 checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
 Later hardening issues extend the same retained family instead of replacing

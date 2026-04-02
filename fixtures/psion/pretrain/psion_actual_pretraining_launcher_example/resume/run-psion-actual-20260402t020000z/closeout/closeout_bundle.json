@@ -10,6 +10,7 @@
     "retained_summary_path": "status/retained_summary.json",
     "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
+    "run_shape_qualification_path": "preflight/run_shape_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
     "closeout_bundle_path": "closeout/closeout_bundle.json",
     "launcher_log_path": "logs/launcher.log"

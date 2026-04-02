@@ -7,6 +7,25 @@ use std::{
 };
 
 use psionic_train::{
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    record_psion_actual_pretraining_continuation_handoff, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointPointer,
+    PsionActualPretrainingCloseoutBundle, PsionActualPretrainingContinuationHandoff,
+    PsionActualPretrainingCredentialBinding, PsionActualPretrainingCurrentRunStatus,
+    PsionActualPretrainingDataBundle, PsionActualPretrainingDataloaderProbe,
+    PsionActualPretrainingEvidenceContract, PsionActualPretrainingEvidenceContractError,
+    PsionActualPretrainingHardwareObservation, PsionActualPretrainingHardwareQualification,
+    PsionActualPretrainingLaneSpec, PsionActualPretrainingLaunchManifest,
+    PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
+    PsionActualPretrainingObservedCredentialSource, PsionActualPretrainingObservedWorker,
+    PsionActualPretrainingPreflightRef, PsionActualPretrainingRecipeBundle,
+    PsionActualPretrainingResumeManifest, PsionActualPretrainingRetainedPathSet,
+    PsionActualPretrainingRetainedSummary, PsionActualPretrainingRunRoots,
+    PsionActualPretrainingRunShapeObservation, PsionActualPretrainingRunShapeQualification,
+    PsionActualPretrainingScalingBundle, PsionActualPretrainingStorageProbe,
+    PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
+    PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
     PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
@@ -17,25 +36,10 @@ use psionic_train::{
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
     PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
-    PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointPointer,
-    PsionActualPretrainingCloseoutBundle, PsionActualPretrainingContinuationHandoff,
-    PsionActualPretrainingCredentialBinding, PsionActualPretrainingCurrentRunStatus,
-    PsionActualPretrainingDataBundle, PsionActualPretrainingEvidenceContract,
-    PsionActualPretrainingEvidenceContractError, PsionActualPretrainingLaneSpec,
-    PsionActualPretrainingHardwareObservation, PsionActualPretrainingHardwareQualification,
-    PsionActualPretrainingObservedCredentialSource, PsionActualPretrainingObservedWorker,
-    PsionActualPretrainingLaunchManifest, PsionActualPretrainingLauncherContractRefs,
-    PsionActualPretrainingLauncherSurfaces, PsionActualPretrainingPreflightRef,
-    PsionActualPretrainingRecipeBundle, PsionActualPretrainingResumeManifest,
-    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
-    PsionActualPretrainingRunRoots, PsionActualPretrainingScalingBundle,
-    PsionActualPretrainingSystemsBundle,
-    PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    derive_psion_actual_pretraining_hardware_qualification,
-    record_psion_actual_pretraining_continuation_handoff,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 use sha2::{Digest, Sha256};
+use std::time::Instant;
 
 enum Cli {
     Start {
@@ -43,6 +47,7 @@ enum Cli {
         run_root: PathBuf,
         selected_git_ref: String,
         hardware_observation_path: Option<PathBuf>,
+        run_shape_observation_path: Option<PathBuf>,
         allow_dirty_tree: bool,
         dry_run: bool,
     },
@@ -50,6 +55,7 @@ enum Cli {
         run_root: PathBuf,
         selected_git_ref: String,
         hardware_observation_path: Option<PathBuf>,
+        run_shape_observation_path: Option<PathBuf>,
         allow_dirty_tree: bool,
         dry_run: bool,
     },
@@ -64,6 +70,8 @@ struct FrozenContracts {
     systems_bundle_ref: PsionActualPretrainingArtifactRef,
     topology_storage_bundle_ref: PsionActualPretrainingArtifactRef,
     evidence_contract_ref: PsionActualPretrainingArtifactRef,
+    baseline_tools_bundle: PsionActualPretrainingBaselineToolsBundle,
+    data_bundle: PsionActualPretrainingDataBundle,
     recipe_bundle: PsionActualPretrainingRecipeBundle,
     plugin_conditioned_stage_manifest: PsionPluginConditionedSftStageManifest,
     topology: PsionActualPretrainingTopologyStorageBundle,
@@ -87,6 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             run_root,
             selected_git_ref,
             hardware_observation_path,
+            run_shape_observation_path,
             allow_dirty_tree,
             dry_run,
         } => {
@@ -103,8 +112,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 hardware_observation_path.as_deref(),
                 &contracts,
             )?;
+            let run_shape_qualification = build_run_shape_qualification(
+                repo_root,
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                run_shape_observation_path.as_deref(),
+                &contracts,
+            )?;
             let preflight_receipt =
                 preflight_ref_from_qualification(&hardware_qualification, &retained_paths_set);
+            let run_shape_receipt =
+                run_shape_ref_from_qualification(&run_shape_qualification, &retained_paths_set);
             let contract_refs = PsionActualPretrainingLauncherContractRefs {
                 lane_spec: contracts.lane_spec_ref.clone(),
                 recipe_bundle: contracts.recipe_bundle_ref.clone(),
@@ -115,21 +136,31 @@ fn main() -> Result<(), Box<dyn Error>> {
                 topology_storage_bundle: contracts.topology_storage_bundle_ref.clone(),
                 evidence_contract: contracts.evidence_contract_ref.clone(),
             };
-            if !dry_run && preflight_receipt.admission_state != "admitted" {
-                write_preflight_receipt(
+            if !dry_run
+                && (preflight_receipt.admission_state != "admitted"
+                    || run_shape_receipt.admission_state != "admitted")
+            {
+                write_preflight_receipts(
                     &run_root,
                     &hardware_qualification,
+                    &run_shape_qualification,
                     &format!(
-                        "{} phase=launch_refused_hardware surface_id={} git_commit_sha={} hardware_admission_state={}\n",
+                        "{} phase=launch_refused_preflight surface_id={} git_commit_sha={} hardware_admission_state={} run_shape_admission_state={}\n",
                         now_utc(repo_root)?,
                         PSION_ACTUAL_PRETRAINING_START_SURFACE_ID,
                         git_commit_sha,
                         preflight_receipt.admission_state,
+                        run_shape_receipt.admission_state,
                     ),
                 )?;
                 return Err(std::io::Error::other(format!(
-                    "actual pretraining launch refused unhealthy hardware; see {}",
-                    run_root.join(&retained_paths_set.hardware_qualification_path).display()
+                    "actual pretraining launch refused preflight admission; see {} and {}",
+                    run_root
+                        .join(&retained_paths_set.hardware_qualification_path)
+                        .display(),
+                    run_root
+                        .join(&retained_paths_set.run_shape_qualification_path)
+                        .display()
                 ))
                 .into());
             }
@@ -154,6 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 launcher_surfaces: launcher_surfaces.clone(),
                 run_roots: run_roots.clone(),
                 preflight_receipt: preflight_receipt.clone(),
+                run_shape_receipt: run_shape_receipt.clone(),
                 contract_refs,
                 selected_git_ref: selected_git_ref.clone(),
                 git_commit_sha: git_commit_sha.clone(),
@@ -263,6 +295,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             write_launcher_bundle(
                 &run_root,
                 &hardware_qualification,
+                &run_shape_qualification,
                 Some(&launch_manifest),
                 None,
                 &current_status,
@@ -271,12 +304,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None,
                 &closeout_bundle,
                 &format!(
-                    "{} phase={} surface_id={} git_commit_sha={} hardware_admission_state={}\n",
+                    "{} phase={} surface_id={} git_commit_sha={} hardware_admission_state={} run_shape_admission_state={}\n",
                     now_utc(repo_root)?,
                     phase,
                     launch_manifest.surface_id,
                     launch_manifest.git_commit_sha,
                     preflight_receipt.admission_state,
+                    run_shape_receipt.admission_state,
                 ),
             )?;
 
@@ -319,6 +353,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 preflight_receipt.admission_state
             );
             println!(
+                "run_shape_qualification={}",
+                run_root
+                    .join(&retained_paths_set.run_shape_qualification_path)
+                    .display()
+            );
+            println!(
+                "run_shape_admission_state={}",
+                run_shape_receipt.admission_state
+            );
+            println!(
                 "closeout_bundle={}",
                 run_root
                     .join(&retained_paths_set.closeout_bundle_path)
@@ -335,6 +379,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             run_root,
             selected_git_ref,
             hardware_observation_path,
+            run_shape_observation_path,
             allow_dirty_tree,
             dry_run,
         } => {
@@ -362,23 +407,45 @@ fn main() -> Result<(), Box<dyn Error>> {
                 hardware_observation_path.as_deref(),
                 &contracts,
             )?;
+            let run_shape_qualification = build_run_shape_qualification(
+                repo_root,
+                &checkpoint_pointer.run_id,
+                &run_root,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                run_shape_observation_path.as_deref(),
+                &contracts,
+            )?;
             let preflight_receipt =
                 preflight_ref_from_qualification(&hardware_qualification, &retained_paths);
-            if !dry_run && preflight_receipt.admission_state != "admitted" {
-                write_preflight_receipt(
+            let run_shape_receipt =
+                run_shape_ref_from_qualification(&run_shape_qualification, &retained_paths);
+            if !dry_run
+                && (preflight_receipt.admission_state != "admitted"
+                    || run_shape_receipt.admission_state != "admitted")
+            {
+                write_preflight_receipts(
                     &run_root,
                     &hardware_qualification,
+                    &run_shape_qualification,
                     &format!(
-                        "{} phase=resume_refused_hardware surface_id={} git_commit_sha={} hardware_admission_state={}\n",
+                        "{} phase=resume_refused_preflight surface_id={} git_commit_sha={} hardware_admission_state={} run_shape_admission_state={}\n",
                         now_utc(repo_root)?,
                         PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
                         git_commit_sha,
                         preflight_receipt.admission_state,
+                        run_shape_receipt.admission_state,
                     ),
                 )?;
                 return Err(std::io::Error::other(format!(
-                    "actual pretraining resume refused unhealthy hardware; see {}",
-                    run_root.join(&retained_paths.hardware_qualification_path).display()
+                    "actual pretraining resume refused preflight admission; see {} and {}",
+                    run_root
+                        .join(&retained_paths.hardware_qualification_path)
+                        .display(),
+                    run_root
+                        .join(&retained_paths.run_shape_qualification_path)
+                        .display()
                 ))
                 .into());
             }
@@ -398,6 +465,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 launcher_surfaces: launcher_surfaces.clone(),
                 run_roots: run_roots.clone(),
                 preflight_receipt: preflight_receipt.clone(),
+                run_shape_receipt: run_shape_receipt.clone(),
                 contract_refs: PsionActualPretrainingLauncherContractRefs {
                     lane_spec: contracts.lane_spec_ref.clone(),
                     recipe_bundle: contracts.recipe_bundle_ref.clone(),
@@ -512,6 +580,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             write_launcher_bundle(
                 &run_root,
                 &hardware_qualification,
+                &run_shape_qualification,
                 None,
                 Some(&resume_manifest),
                 &current_status,
@@ -520,12 +589,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some(&continuation_handoff),
                 &closeout_bundle,
                 &format!(
-                    "{} phase={} surface_id={} git_commit_sha={} hardware_admission_state={}\n",
+                    "{} phase={} surface_id={} git_commit_sha={} hardware_admission_state={} run_shape_admission_state={}\n",
                     now_utc(repo_root)?,
                     phase,
                     resume_manifest.surface_id,
                     resume_manifest.git_commit_sha,
                     preflight_receipt.admission_state,
+                    run_shape_receipt.admission_state,
                 ),
             )?;
 
@@ -566,6 +636,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 preflight_receipt.admission_state
             );
             println!(
+                "run_shape_qualification={}",
+                run_root
+                    .join(&retained_paths.run_shape_qualification_path)
+                    .display()
+            );
+            println!(
+                "run_shape_admission_state={}",
+                run_shape_receipt.admission_state
+            );
+            println!(
                 "continuation_handoff={}",
                 run_root
                     .join(&retained_paths.continuation_handoff_path)
@@ -599,6 +679,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
     let mut run_root = String::new();
     let mut git_ref = String::new();
     let mut hardware_observation_path: Option<PathBuf> = None;
+    let mut run_shape_observation_path: Option<PathBuf> = None;
     let mut allow_dirty_tree = false;
     let mut dry_run = false;
 
@@ -625,11 +706,14 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                     .ok_or_else(|| std::io::Error::other("--git-ref requires a value"))?;
             }
             "--hardware-observation" => {
-                hardware_observation_path = Some(PathBuf::from(
-                    args.next().ok_or_else(|| {
-                        std::io::Error::other("--hardware-observation requires a value")
-                    })?,
-                ));
+                hardware_observation_path = Some(PathBuf::from(args.next().ok_or_else(|| {
+                    std::io::Error::other("--hardware-observation requires a value")
+                })?));
+            }
+            "--run-shape-observation" => {
+                run_shape_observation_path = Some(PathBuf::from(args.next().ok_or_else(|| {
+                    std::io::Error::other("--run-shape-observation requires a value")
+                })?));
             }
             "--allow-dirty-tree" => allow_dirty_tree = true,
             "--dry-run" => dry_run = true,
@@ -675,6 +759,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                 run_root,
                 selected_git_ref,
                 hardware_observation_path,
+                run_shape_observation_path,
                 allow_dirty_tree,
                 dry_run,
             })
@@ -687,6 +772,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                 run_root: PathBuf::from(run_root),
                 selected_git_ref,
                 hardware_observation_path,
+                run_shape_observation_path,
                 allow_dirty_tree,
                 dry_run,
             })
@@ -700,7 +786,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
 
 fn usage() {
     eprintln!(
-        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--allow-dirty-tree] [--dry-run]"
+        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]"
     );
 }
 
@@ -760,6 +846,8 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
         systems_bundle_ref: artifact_ref(repo_root, &systems_path)?,
         topology_storage_bundle_ref: artifact_ref(repo_root, &topology_path)?,
         evidence_contract_ref: artifact_ref(repo_root, &evidence_path)?,
+        baseline_tools_bundle,
+        data_bundle,
         recipe_bundle: recipe,
         plugin_conditioned_stage_manifest,
         topology,
@@ -782,6 +870,7 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
         hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
+        run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
         continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         closeout_bundle_path: String::from("closeout/closeout_bundle.json"),
         launcher_log_path: String::from("logs/launcher.log"),
@@ -904,8 +993,8 @@ fn build_hardware_qualification(
     hardware_observation_path: Option<&Path>,
     contracts: &FrozenContracts,
 ) -> Result<PsionActualPretrainingHardwareQualification, Box<dyn Error>> {
-    let resolved_hardware_observation_path = hardware_observation_path
-        .map(|path| resolve_repo_path(repo_root, path));
+    let resolved_hardware_observation_path =
+        hardware_observation_path.map(|path| resolve_repo_path(repo_root, path));
     let observation_artifact = resolved_hardware_observation_path
         .as_deref()
         .map(|path| artifact_ref(repo_root, path))
@@ -916,7 +1005,11 @@ fn build_hardware_qualification(
             observation.validate()?;
             observation
         }
-        None => probe_local_hardware_observation(repo_root, &contracts.topology, &contracts.systems_bundle)?,
+        None => probe_local_hardware_observation(
+            repo_root,
+            &contracts.topology,
+            &contracts.systems_bundle,
+        )?,
     };
     Ok(derive_psion_actual_pretraining_hardware_qualification(
         run_id,
@@ -929,6 +1022,54 @@ fn build_hardware_qualification(
         contracts.systems_bundle_ref.clone(),
         contracts.evidence_contract_ref.clone(),
         &contracts.topology,
+        &contracts.systems_bundle,
+        &contracts.evidence_contract,
+    )?)
+}
+
+fn build_run_shape_qualification(
+    repo_root: &Path,
+    run_id: &str,
+    run_root: &Path,
+    selected_git_ref: &str,
+    git_commit_sha: &str,
+    dirty_tree_admission: &str,
+    run_shape_observation_path: Option<&Path>,
+    contracts: &FrozenContracts,
+) -> Result<PsionActualPretrainingRunShapeQualification, Box<dyn Error>> {
+    let resolved_run_shape_observation_path =
+        run_shape_observation_path.map(|path| resolve_repo_path(repo_root, path));
+    let observation_artifact = resolved_run_shape_observation_path
+        .as_deref()
+        .map(|path| artifact_ref(repo_root, path))
+        .transpose()?;
+    let observation = match resolved_run_shape_observation_path.as_deref() {
+        Some(path) => {
+            let observation: PsionActualPretrainingRunShapeObservation = load_json(path)?;
+            observation.validate()?;
+            observation
+        }
+        None => probe_local_run_shape_observation(
+            repo_root,
+            run_root,
+            &contracts.baseline_tools_bundle,
+            &contracts.data_bundle,
+            &contracts.systems_bundle,
+        )?,
+    };
+    Ok(derive_psion_actual_pretraining_run_shape_qualification(
+        run_id,
+        selected_git_ref,
+        git_commit_sha,
+        dirty_tree_admission,
+        &observation,
+        observation_artifact,
+        contracts.baseline_tools_bundle_ref.clone(),
+        contracts.data_bundle_ref.clone(),
+        contracts.systems_bundle_ref.clone(),
+        contracts.evidence_contract_ref.clone(),
+        &contracts.baseline_tools_bundle,
+        &contracts.data_bundle,
         &contracts.systems_bundle,
         &contracts.evidence_contract,
     )?)
@@ -985,7 +1126,109 @@ fn probe_local_hardware_observation(
     Ok(observation)
 }
 
-fn probe_local_workers(repo_root: &Path) -> Result<Vec<PsionActualPretrainingObservedWorker>, Box<dyn Error>> {
+fn probe_local_run_shape_observation(
+    repo_root: &Path,
+    run_root: &Path,
+    baseline_tools_bundle: &PsionActualPretrainingBaselineToolsBundle,
+    data_bundle: &PsionActualPretrainingDataBundle,
+    systems_bundle: &PsionActualPretrainingSystemsBundle,
+) -> Result<PsionActualPretrainingRunShapeObservation, Box<dyn Error>> {
+    let now = now_utc(repo_root)?;
+    let actual_lane_accounting = baseline_tools_bundle
+        .resource_accounting_rows
+        .iter()
+        .find(|row| row.scope_kind == "actual_lane")
+        .ok_or_else(|| {
+            std::io::Error::other(
+                "baseline-tools bundle is missing the actual_lane resource-accounting row",
+            )
+        })?;
+    let throughput_source = systems_bundle
+        .throughput_baselines
+        .iter()
+        .find(|baseline| baseline.baseline_kind == "trusted_cluster_anchor")
+        .ok_or_else(|| {
+            std::io::Error::other(
+                "systems bundle is missing the trusted_cluster_anchor throughput baseline",
+            )
+        })?;
+    let storage_probe = probe_local_storage_probe(run_root)?;
+    let mut observation = PsionActualPretrainingRunShapeObservation {
+        schema_version: String::from(
+            psionic_train::PSION_ACTUAL_PRETRAINING_RUN_SHAPE_OBSERVATION_SCHEMA_VERSION,
+        ),
+        observation_id: format!("psion_actual_pretraining_local_run_shape_probe::{now}"),
+        lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+        observation_kind: String::from("local_runtime_probe"),
+        observed_at_utc: now,
+        observed_run_root: run_root.display().to_string(),
+        throughput_probe: PsionActualPretrainingThroughputProbe {
+            source_receipt_id: String::from("local_runtime_probe_unmeasured"),
+            source_receipt_digest: String::from("local_runtime_probe_unmeasured"),
+            observed_tokens_per_second: 0,
+            observed_step_latency_ms: u64::MAX,
+            observed_checkpoint_write_throughput_bytes_per_second: storage_probe
+                .observed_write_bytes_per_second,
+            detail: format!(
+                "Local probe does not claim admitted training throughput. It retains only an unmeasured placeholder against the frozen trusted-cluster anchor `{}` so non-dry-run launch can refuse honestly without a retained benchmark receipt.",
+                throughput_source.baseline_id
+            ),
+        },
+        storage_probe,
+        dataloader_probe: PsionActualPretrainingDataloaderProbe {
+            dataset_identity: data_bundle.replay_authority.dataset_identity.clone(),
+            max_sequence_tokens: data_bundle.replay_authority.max_sequence_tokens,
+            planned_optimizer_steps: actual_lane_accounting.optimizer_steps,
+            planned_tokens_per_step: actual_lane_accounting.tokens_per_step,
+            observed_horizon_steps: 0,
+            observed_horizon_tokens: 0,
+            observed_batches_per_second: 0,
+            observed_stall_count: 0,
+            deterministic_replay_observed: false,
+            detail: String::from(
+                "Local probe retains the frozen dataloader plan but does not claim admitted replay or horizon coverage without a retained actual-lane measurement bundle.",
+            ),
+        },
+        summary: String::from(
+            "Local run-shape probe retains storage writeability plus the frozen dataloader plan, but refuses long-run admission until retained actual-lane throughput and dataloader evidence is supplied.",
+        ),
+        observation_digest: String::new(),
+    };
+    observation.observation_digest =
+        psionic_train::stable_run_shape_observation_digest(&observation)?;
+    observation.validate()?;
+    Ok(observation)
+}
+
+fn probe_local_storage_probe(
+    run_root: &Path,
+) -> Result<PsionActualPretrainingStorageProbe, Box<dyn Error>> {
+    fs::create_dir_all(run_root)?;
+    let available_bytes = filesystem_available_bytes(run_root).unwrap_or(0);
+    let temp_path = run_root.join(".psion_run_shape_probe");
+    let payload = vec![0u8; 4 * 1024 * 1024];
+    let write_started = Instant::now();
+    fs::write(&temp_path, &payload)?;
+    let write_elapsed = write_started.elapsed().as_nanos();
+    let read_started = Instant::now();
+    let bytes = fs::read(&temp_path)?;
+    let read_elapsed = read_started.elapsed().as_nanos();
+    let _ = fs::remove_file(&temp_path);
+    Ok(PsionActualPretrainingStorageProbe {
+        storage_path: run_root.display().to_string(),
+        available_bytes,
+        observed_read_bytes_per_second: bytes_per_second(bytes.len() as u64, read_elapsed),
+        observed_write_bytes_per_second: bytes_per_second(payload.len() as u64, write_elapsed),
+        writable: true,
+        detail: String::from(
+            "Local storage probe retains one bounded read/write measurement against the selected run root before the actual lane is admitted.",
+        ),
+    })
+}
+
+fn probe_local_workers(
+    repo_root: &Path,
+) -> Result<Vec<PsionActualPretrainingObservedWorker>, Box<dyn Error>> {
     let host_label = hostname_short(repo_root)?;
     let gpu_rows = run_optional_command(
         repo_root,
@@ -1027,9 +1270,7 @@ fn probe_local_workers(repo_root: &Path) -> Result<Vec<PsionActualPretrainingObs
         let free_memory_bytes = parse_nvidia_memory_mebibytes(parts[3]).unwrap_or(0);
         let temperature_celsius = parts[4].parse::<u64>().ok();
         let ecc_uncorrected_error_count = parse_optional_nvidia_u64(parts[5]);
-        let mig_partitioned = parts[7]
-            .to_ascii_lowercase()
-            .contains("enabled");
+        let mig_partitioned = parts[7].to_ascii_lowercase().contains("enabled");
         workers.push(PsionActualPretrainingObservedWorker {
             worker_label: format!("{host_label}-gpu{gpu_index}"),
             backend: String::from("cuda"),
@@ -1084,16 +1325,32 @@ fn preflight_ref_from_qualification(
     }
 }
 
-fn write_preflight_receipt(
+fn run_shape_ref_from_qualification(
+    qualification: &PsionActualPretrainingRunShapeQualification,
+    retained_paths: &PsionActualPretrainingRetainedPathSet,
+) -> PsionActualPretrainingPreflightRef {
+    PsionActualPretrainingPreflightRef {
+        relative_path: retained_paths.run_shape_qualification_path.clone(),
+        receipt_digest: qualification.receipt_digest.clone(),
+        admission_state: qualification.admission_state.clone(),
+    }
+}
+
+fn write_preflight_receipts(
     run_root: &Path,
-    qualification: &PsionActualPretrainingHardwareQualification,
+    hardware_qualification: &PsionActualPretrainingHardwareQualification,
+    run_shape_qualification: &PsionActualPretrainingRunShapeQualification,
     launcher_log_line: &str,
 ) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(run_root.join("preflight"))?;
     fs::create_dir_all(run_root.join("logs"))?;
     fs::write(
         run_root.join("preflight/hardware_qualification.json"),
-        serde_json::to_string_pretty(qualification)?,
+        serde_json::to_string_pretty(hardware_qualification)?,
+    )?;
+    fs::write(
+        run_root.join("preflight/run_shape_qualification.json"),
+        serde_json::to_string_pretty(run_shape_qualification)?,
     )?;
     fs::write(run_root.join("logs/launcher.log"), launcher_log_line)?;
     Ok(())
@@ -1126,9 +1383,7 @@ fn hostname_short(repo_root: &Path) -> Result<String, Box<dyn Error>> {
     if output.status.success() {
         return Ok(String::from_utf8(output.stdout)?.trim().to_string());
     }
-    let fallback = Command::new("hostname")
-        .current_dir(repo_root)
-        .output()?;
+    let fallback = Command::new("hostname").current_dir(repo_root).output()?;
     if !fallback.status.success() {
         return Err(std::io::Error::other("failed to resolve hostname").into());
     }
@@ -1140,7 +1395,10 @@ fn split_csv_fields(line: &str) -> Vec<&str> {
 }
 
 fn parse_nvidia_memory_mebibytes(value: &str) -> Option<u64> {
-    value.parse::<u64>().ok().map(|mib| mib.saturating_mul(1024 * 1024))
+    value
+        .parse::<u64>()
+        .ok()
+        .map(|mib| mib.saturating_mul(1024 * 1024))
 }
 
 fn parse_optional_nvidia_u64(value: &str) -> Option<u64> {
@@ -1152,6 +1410,33 @@ fn parse_optional_nvidia_u64(value: &str) -> Option<u64> {
         return None;
     }
     normalized.parse::<u64>().ok()
+}
+
+fn filesystem_available_bytes(path: &Path) -> Result<u64, Box<dyn Error>> {
+    let output = Command::new("df").arg("-Pk").arg(path).output()?;
+    if !output.status.success() {
+        return Err(std::io::Error::other("failed to read filesystem capacity").into());
+    }
+    let stdout = String::from_utf8(output.stdout)?;
+    let line = stdout
+        .lines()
+        .nth(1)
+        .ok_or_else(|| std::io::Error::other("df output missing filesystem row"))?;
+    let fields: Vec<&str> = line.split_whitespace().collect();
+    let available_kib = fields
+        .get(3)
+        .ok_or_else(|| std::io::Error::other("df output missing available column"))?
+        .parse::<u64>()?;
+    Ok(available_kib.saturating_mul(1024))
+}
+
+fn bytes_per_second(bytes: u64, elapsed_nanos: u128) -> u64 {
+    if elapsed_nanos == 0 {
+        return bytes;
+    }
+    let bytes = bytes as u128;
+    let per_second = bytes.saturating_mul(1_000_000_000u128) / elapsed_nanos;
+    per_second.min(u64::MAX as u128) as u64
 }
 
 fn load_json<T>(path: &Path) -> Result<T, Box<dyn Error>>
@@ -1189,6 +1474,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 fn write_launcher_bundle(
     run_root: &Path,
     hardware_qualification: &PsionActualPretrainingHardwareQualification,
+    run_shape_qualification: &PsionActualPretrainingRunShapeQualification,
     launch_manifest: Option<&PsionActualPretrainingLaunchManifest>,
     resume_manifest: Option<&PsionActualPretrainingResumeManifest>,
     current_status: &PsionActualPretrainingCurrentRunStatus,
@@ -1232,6 +1518,10 @@ fn write_launcher_bundle(
     fs::write(
         run_root.join("preflight/hardware_qualification.json"),
         serde_json::to_string_pretty(hardware_qualification)?,
+    )?;
+    fs::write(
+        run_root.join("preflight/run_shape_qualification.json"),
+        serde_json::to_string_pretty(run_shape_qualification)?,
     )?;
     if let Some(continuation_handoff) = continuation_handoff {
         fs::write(

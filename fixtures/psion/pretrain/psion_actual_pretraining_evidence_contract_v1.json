@@ -53,6 +53,12 @@
       "detail": "Retained hardware admission receipt consumed by non-dry-run actual-lane launch and resume."
     },
     {
+      "relative_path": "preflight/run_shape_qualification.json",
+      "artifact_kind": "run_shape_qualification_receipt",
+      "retention_class": "durable",
+      "detail": "Retained throughput, storage, and dataloader qualification receipt consumed by non-dry-run actual-lane launch and resume."
+    },
+    {
       "relative_path": "checkpoints/step-<optimizer_step>/checkpoint_manifest.json",
       "artifact_kind": "checkpoint_manifest",
       "retention_class": "durable",
@@ -171,7 +177,7 @@
         "ssh_target",
         "credential_file_path"
       ],
-      "detail": "Hardware qualification receipts retain redacted worker labels, device health signals, and credential digests only."
+      "detail": "Preflight qualification receipts retain redacted worker labels, device health signals, throughput and storage digests, and credential digests only."
     },
     {
       "retained_surface": "logs",

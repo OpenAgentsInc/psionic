@@ -16,6 +16,8 @@ Options for `start`:
   --git-ref <ref>          Git ref to resolve for the run. Default: current symbolic ref or HEAD
   --hardware-observation <path>
                            Optional retained hardware observation snapshot to consume instead of probing the local host.
+  --run-shape-observation <path>
+                           Optional retained throughput/storage/dataloader observation snapshot to consume instead of probing the local host.
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --dry-run                Materialize the retained launcher bundle without claiming cluster execution.
 
@@ -24,6 +26,8 @@ Options for `resume`:
   --git-ref <ref>          Git ref to resolve for the resumed run. Default: current symbolic ref or HEAD
   --hardware-observation <path>
                            Optional retained hardware observation snapshot to consume instead of probing the local host.
+  --run-shape-observation <path>
+                           Optional retained throughput/storage/dataloader observation snapshot to consume instead of probing the local host.
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --dry-run                Materialize the retained resume bundle without claiming cluster execution.
 EOF

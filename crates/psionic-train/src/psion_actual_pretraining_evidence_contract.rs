@@ -18,8 +18,7 @@ pub const PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID: &str =
 pub const PSION_ACTUAL_PRETRAINING_EVIDENCE_FAMILY: &str = "psion.actual_pretraining.evidence.v1";
 
 /// Stable run-root family for the canonical actual pretraining lane.
-pub const PSION_ACTUAL_PRETRAINING_RUN_ROOT_FAMILY: &str =
-    "psion_actual_pretraining_runs/<run_id>";
+pub const PSION_ACTUAL_PRETRAINING_RUN_ROOT_FAMILY: &str = "psion_actual_pretraining_runs/<run_id>";
 
 /// Stable artifact slot under the actual-lane retained output family.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +170,7 @@ impl PsionActualPretrainingEvidenceContract {
             "status/retained_summary.json",
             "checkpoints/latest_accepted_checkpoint_pointer.json",
             "preflight/hardware_qualification.json",
+            "preflight/run_shape_qualification.json",
             "closeout/closeout_bundle.json",
         ] {
             if !self
@@ -178,9 +178,11 @@ impl PsionActualPretrainingEvidenceContract {
                 .iter()
                 .any(|slot| slot.relative_path == required_path)
             {
-                return Err(PsionActualPretrainingEvidenceContractError::MissingArtifactPath {
-                    relative_path: String::from(required_path),
-                });
+                return Err(
+                    PsionActualPretrainingEvidenceContractError::MissingArtifactPath {
+                        relative_path: String::from(required_path),
+                    },
+                );
             }
         }
         if self.provenance_fields.is_empty() {
@@ -211,9 +213,11 @@ impl PsionActualPretrainingEvidenceContract {
             ensure_nonempty(rule.retained_surface.as_str(), "redaction.retained_surface")?;
             ensure_nonempty(rule.detail.as_str(), "redaction.detail")?;
             if rule.allowed_value_classes.is_empty() || rule.forbidden_value_classes.is_empty() {
-                return Err(PsionActualPretrainingEvidenceContractError::IncompleteRedactionRule {
-                    retained_surface: rule.retained_surface.clone(),
-                });
+                return Err(
+                    PsionActualPretrainingEvidenceContractError::IncompleteRedactionRule {
+                        retained_surface: rule.retained_surface.clone(),
+                    },
+                );
             }
         }
         ensure_nonempty(self.summary.as_str(), "contract.summary")?;

@@ -92,3 +92,7 @@ It does not yet claim:
 - automatic device replacement or topology replanning
 - dashboard or alert fan-out
 - post-launch checkpoint backup or auto-eval closure
+
+The companion systems admission receipt now lives in
+`docs/PSION_ACTUAL_PRETRAINING_RUN_SHAPE_QUALIFICATION.md`. Non-dry-run launch
+and resume require both retained preflight receipts to be green.

@@ -13,6 +13,7 @@
     "retained_summary_path": "status/retained_summary.json",
     "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
     "hardware_qualification_path": "preflight/hardware_qualification.json",
+    "run_shape_qualification_path": "preflight/run_shape_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
     "closeout_bundle_path": "closeout/closeout_bundle.json",
     "launcher_log_path": "logs/launcher.log"
@@ -32,7 +33,12 @@
   },
   "preflight_receipt": {
     "relative_path": "preflight/hardware_qualification.json",
-    "receipt_digest": "8e45a23df513421457b74279c54d6aa68b623599cf22698257abb59a03a2cdba",
+    "receipt_digest": "384a135f73955b5d9da41637884e559f5cc4a932ad79695fc228f70b0af73791",
+    "admission_state": "admitted"
+  },
+  "run_shape_receipt": {
+    "relative_path": "preflight/run_shape_qualification.json",
+    "receipt_digest": "b87976ef99a50d1424d5f50d27c61e3d148bcc3666ef5f32f054593c689dc072",
     "admission_state": "admitted"
   },
   "contract_refs": {
@@ -66,7 +72,7 @@
     },
     "evidence_contract": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json",
-      "sha256": "b3e26f038561a51fcc18bb02a920a8ff5029af566e75175633f70152696286f3"
+      "sha256": "9375bc213096aa5c667c070d9ee5dc1a82513037144fbaa8d7a648dc28d6b80b"
     }
   },
   "selected_git_ref": "refs/heads/main",

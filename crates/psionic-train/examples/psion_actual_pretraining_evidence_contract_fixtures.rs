@@ -74,6 +74,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Retained hardware admission receipt consumed by non-dry-run actual-lane launch and resume.",
             ),
             slot(
+                "preflight/run_shape_qualification.json",
+                "run_shape_qualification_receipt",
+                "durable",
+                "Retained throughput, storage, and dataloader qualification receipt consumed by non-dry-run actual-lane launch and resume.",
+            ),
+            slot(
                 "checkpoints/step-<optimizer_step>/checkpoint_manifest.json",
                 "checkpoint_manifest",
                 "durable",
@@ -165,7 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "preflight",
                 &["redacted_host_label", "digest", "device_name", "health_signal", "env_var_name"],
                 &["credential_payload", "access_token", "private_key", "service_account_json", "tailnet_ip", "ssh_target", "credential_file_path"],
-                "Hardware qualification receipts retain redacted worker labels, device health signals, and credential digests only.",
+                "Preflight qualification receipts retain redacted worker labels, device health signals, throughput and storage digests, and credential digests only.",
             ),
             redaction(
                 "logs",
@@ -259,7 +265,10 @@ fn redaction(
 ) -> PsionActualPretrainingRedactionRule {
     PsionActualPretrainingRedactionRule {
         retained_surface: String::from(retained_surface),
-        allowed_value_classes: allowed_value_classes.iter().map(|value| String::from(*value)).collect(),
+        allowed_value_classes: allowed_value_classes
+            .iter()
+            .map(|value| String::from(*value))
+            .collect(),
         forbidden_value_classes: forbidden_value_classes
             .iter()
             .map(|value| String::from(*value))

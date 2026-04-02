@@ -217,6 +217,23 @@ into one retained preflight receipt under the actual evidence family, and the
 launcher now fails closed on non-dry-run start or resume when that receipt is
 not admitted.
 
+The repo now also owns the canonical actual-lane run-shape observation and
+run-shape qualification receipt in
+`crates/psionic-train/src/psion_actual_pretraining_run_shape_qualification.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_run_shape_qualification_fixtures.rs`,
+the focused doc
+`docs/PSION_ACTUAL_PRETRAINING_RUN_SHAPE_QUALIFICATION.md`, and the committed
+fixtures
+`fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json`
+plus
+`fixtures/psion/pretrain/psion_actual_pretraining_run_shape_qualification_v1.json`.
+That surface binds throughput floor, checkpoint-write bandwidth, run-root
+storage headroom, dataset identity, max-sequence-token match, deterministic
+replay, and planned-horizon dataloader truth into one retained preflight
+receipt under the same actual evidence family, and the launcher now fails
+closed on non-dry-run start or resume when that receipt is not admitted.
+
 The repo now also owns the canonical accepted-checkpoint continuation handoff
 contract in
 `crates/psionic-train/src/psion_actual_pretraining_continuation_handoff.rs`,
