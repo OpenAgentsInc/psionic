@@ -37,7 +37,13 @@ than just run tensor math.
   - `backend = cuda`
   - `execution_mode = native`
   - `execution_engine = psionic`
-  - `/v1/chat/completions` on the generic OpenAI-compatible server
+  - `/v1/chat/completions` and `/v1/responses` on the generic
+    OpenAI-compatible server
+  - Gemma-native tool calling through explicit
+    `<|tool_call>call:<tool>{...}<tool_call|>` blocks with JSON-schema-subset
+    argument validation
+  - replayable `/v1/responses` state across assistant tool turns and replayed
+    tool results
   - bounded prompt-render, server-smoke, refusal, and repeatable CUDA
     conformance coverage for `gemma4:e4b`
 - The first distributed `Gemma 4` mesh validation now rides the bootstrap path
@@ -48,8 +54,8 @@ than just run tensor math.
     `route_execution_engine = psionic`
   - thin-client served truth stays separate and honest with
     `served_backend = remote` and `execution_mode = proxy`
-  - unsupported `Gemma 4` surfaces such as `/v1/responses` remain refused
-    across the mesh rather than borrowing a local model's wider endpoint claim
+  - routed remote publication now keeps the same admitted endpoint set as the
+    local dense lane instead of silently narrowing back to chat-only
 - The first bounded `Gemma 4` claim must stay explicit about its unsupported
   regions:
   - image
@@ -58,8 +64,8 @@ than just run tensor math.
   - `31B`
   - `26B A4B`
   - Metal
-  - tool calling
-  - `/v1/responses`
+  - generic structured outputs
+  - multimodal request admission
   - unquantized projection tensors on the native CUDA lane
   - full parity with `llama.cpp` or `ollama`
 - CPU-only debug bring-up may still be useful while the lane is under active

@@ -1,8 +1,8 @@
 # Non-GPT-OSS Gemma 4 Pilot
 
-> Status: `published_bounded_lane` on 2026-04-02 after issues `#864` and
-> `#865`; Psionic now publishes one narrow dense `Gemma 4` CUDA lane and keeps
-> the rest of the family explicitly out of scope.
+> Status: `published_bounded_lane` on 2026-04-02 after issues `#864`,
+> `#865`, and `#866`; Psionic now publishes one narrow dense `Gemma 4` CUDA
+> lane and keeps the rest of the family explicitly out of scope.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -38,6 +38,7 @@ The first bounded `Gemma 4` claim for Psionic is:
 - one exact artifact target: `gemma4:e4b`
 - one accelerator target: CUDA
 - one server surface: the generic OpenAI-compatible server
+- one bounded Gemma-native tool-call and response-state contract
 
 When this lane is implemented, the publication bar is:
 
@@ -56,9 +57,12 @@ Psionic now publishes exactly one bounded dense `Gemma 4` lane:
 - accelerator = CUDA
 - runtime = native Psionic GGUF runtime
 - local server surface = generic OpenAI-compatible server
-- admitted request surface = `/v1/chat/completions`
+- admitted request surfaces = `/v1/chat/completions` and `/v1/responses`
 - admitted publication surfaces = `/health`, `/v1/models`, and response
   headers
+- bounded tool contract = Gemma-native `<|tool_call>call:<tool>{...}<tool_call|>`
+  blocks with JSON-schema-subset argument validation and replayable tool-result
+  state on `/v1/responses`
 - distributed proof surface = one bootstrap-routed remote `gemma4:e4b` lane
   with honest proxy publication
 
@@ -86,7 +90,7 @@ complete the first published `Gemma 4` milestone.
 
 ## Current Repo State
 
-After issues `#861` through `#865`, the repo now has the first honest
+After issues `#861` through `#866`, the repo now has the first honest
 published `Gemma 4` admission, runtime, bounded mesh validation, and
 conformance work:
 
@@ -108,12 +112,16 @@ conformance work:
   `backend = cuda`, `execution_mode = native`, and
   `execution_engine = psionic`, and the bounded lane now stamps both
   `x-psionic-backend` and `x-psionic-served-backend` as machine-checkable
-  backend labels, but the bounded `#862` surface is still chat-only on
-  `/v1/chat/completions`.
+  backend labels across both `/v1/chat/completions` and `/v1/responses`.
+- the same bounded lane now admits Gemma-native tool calling on both server
+  surfaces through explicit `<|tool_call>call:<tool>{...}<tool_call|>` blocks
+  instead of borrowing the tagged-JSON Qwen or GPT-OSS contract.
+- `/v1/responses` now stores replayable Gemma assistant tool-call turns and
+  projects replayed tool results back into one explicit user-side
+  `tool_responses` turn instead of failing the continuation surface closed.
 - the repo now has bounded prompt-render, health/model publication, and
   refusal coverage for the `Gemma 4` CUDA lane, including explicit fail-closed
-  checks for tools, structured outputs, multimodal inputs, and
-  `/v1/responses`.
+  checks for structured outputs and multimodal inputs.
 - the conformance harness now accepts the real `gemma4:e4b` fixture shape and
   the repo now carries one repeatable `gemma4:e4b` CUDA conformance repeat
   test that runs when both the pilot GGUF and a CUDA host are available.
@@ -130,8 +138,9 @@ conformance work:
 
 What still does not exist:
 
-- no tool-calling or `/v1/responses` Gemma semantics
 - no image, video, or audio Gemma lane
+- no generic structured-output Gemma surface
+- no multimodal Gemma request surface
 - no broader published support claim beyond the bounded dense CUDA lane,
   server admission, routed mesh validation, and repo-owned conformance
   coverage
@@ -167,12 +176,13 @@ Those runs are the current publication bar. They prove:
   - `backend = cuda`
   - `execution_mode = native`
   - `execution_engine = psionic`
-- admitted `/v1/chat/completions` execution on the bounded lane
+- admitted `/v1/chat/completions` and `/v1/responses` execution on the bounded
+  lane
+- admitted Gemma-native tool calling with JSON-schema-subset argument
+  validation and replayable response-state storage
 - explicit refusal for:
-  - tool calling
   - structured outputs
   - multimodal inputs
-  - `/v1/responses`
 - repeatable real-artifact CUDA conformance against the local `e4b` GGUF when
   both the artifact and a usable CUDA host are present
 - bootstrap-routed mesh publication that keeps remote `Gemma 4` route truth
@@ -188,9 +198,11 @@ The pilot stays green only if all of the following remain true:
   degrading to another family or engine
 - the generic server still publishes truthful backend, execution-mode, and
   execution-engine metadata
-- the generic server still admits `/v1/chat/completions`
-- `/v1/responses`, tool calling, structured outputs, and multimodal inputs
-  still fail closed on the published lane
+- the generic server still admits `/v1/chat/completions` and `/v1/responses`
+- Gemma-native tool calling still produces machine-checkable tool calls on the
+  admitted lane
+- structured outputs and multimodal inputs still fail closed on the published
+  lane
 - mesh bootstrap publication keeps routed remote truth explicit and does not
   borrow a local host's wider endpoint claim
 
@@ -204,9 +216,9 @@ unsupported.
 
 That bounded claim keeps later work cleanly separated:
 
-- tool calling and `/v1/responses`
 - image and video processing
 - audio support for `E2B` and `E4B`
+- generic structured outputs
 - `31B Dense`
 - `26B A4B` and wider non-`GptOss` MoE admission
 - Metal and other accelerator parity

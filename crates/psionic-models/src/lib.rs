@@ -1,8 +1,8 @@
 //! Model abstractions for Psionic.
 
 mod attnres;
-mod cs336_a1_tokenizer;
 mod cs336_a1_reference_stack;
+mod cs336_a1_tokenizer;
 mod fixtures;
 mod harmony;
 mod parameter_golf;
@@ -77,7 +77,7 @@ pub use psionic_transformer::{
     AttnResExecutionError, AttnResTensor3, AttnResTensorError, DecoderAttentionConfig,
     DecoderBlockConfig, DecoderConfig, DecoderFeedForwardConfig,
 };
-use safetensors::{serialize_to_file, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
+use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize_to_file, tensor::TensorView};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -2956,6 +2956,34 @@ impl GgufPromptTemplateRenderer {
         Ok(rendered)
     }
 
+    fn gemma4_tool_result_user_turn(
+        &self,
+        tool_results: &[PromptMessage],
+    ) -> Result<String, PromptRenderError> {
+        let mut responses = Vec::with_capacity(tool_results.len());
+        for message in tool_results {
+            let Some(tool_name) = message.author_name.as_deref() else {
+                return Err(PromptRenderError::InvalidConversation {
+                    message: String::from(
+                        "gemma4 tool replay requires each tool result to include an author name",
+                    ),
+                });
+            };
+            let response = serde_json::from_str::<serde_json::Value>(message.content.as_str())
+                .unwrap_or_else(|_| serde_json::Value::String(message.content.clone()));
+            responses.push(serde_json::json!({
+                "name": tool_name,
+                "response": response,
+            }));
+        }
+        serde_json::to_string(&serde_json::json!({
+            "tool_responses": responses,
+        }))
+        .map_err(|error| PromptRenderError::InvalidConversation {
+            message: format!("failed to serialize gemma4 tool-response replay: {error}"),
+        })
+    }
+
     fn render_gemma4(
         &self,
         messages: &[PromptMessage],
@@ -2968,24 +2996,35 @@ impl GgufPromptTemplateRenderer {
         }
 
         let mut rendered = self.bos_token().unwrap_or_default().to_string();
-        for message in messages {
+        let mut index = 0usize;
+        while index < messages.len() {
+            if messages[index].role == PromptMessageRole::Tool {
+                let start = index;
+                while index < messages.len() && messages[index].role == PromptMessageRole::Tool {
+                    index += 1;
+                }
+                rendered.push_str("<|turn>user\n");
+                rendered.push_str(
+                    self.gemma4_tool_result_user_turn(&messages[start..index])?
+                        .trim(),
+                );
+                rendered.push_str("<turn|>\n");
+                continue;
+            }
+
+            let message = &messages[index];
             let role = match message.role {
                 PromptMessageRole::System | PromptMessageRole::Developer => "developer",
                 PromptMessageRole::User => "user",
                 PromptMessageRole::Assistant => "model",
-                PromptMessageRole::Tool => {
-                    return Err(PromptRenderError::InvalidConversation {
-                        message: String::from(
-                            "gemma4 tool messages are not supported on the bounded text template",
-                        ),
-                    });
-                }
+                PromptMessageRole::Tool => unreachable!("tool messages are handled above"),
             };
             rendered.push_str("<|turn>");
             rendered.push_str(role);
             rendered.push('\n');
             rendered.push_str(message.content.trim());
             rendered.push_str("<turn|>\n");
+            index += 1;
         }
         if add_generation_prompt {
             rendered.push_str("<|turn>model\n");
@@ -8291,18 +8330,12 @@ mod tests {
 
     use psionic_catalog::{BlobReadPreference, OllamaCatalogSurface, OllamaModelCatalog};
     use psionic_core::{DType, QuantizationMode, QuantizedBlockLayout, Shape};
-    use safetensors::{serialize_to_file, tensor::TensorView, Dtype as SafeTensorsDType};
+    use safetensors::{Dtype as SafeTensorsDType, serialize_to_file, tensor::TensorView};
     use serde_json::json;
     use sha2::{Digest, Sha256};
     use tempfile::tempdir;
 
     use super::{
-        apply_context_window, apply_special_token_defaults, assert_prompt_template_fixture_matches,
-        assert_prompt_window_case, assert_rendered_prompt_case, assert_tokenizer_fixture_matches,
-        collect_decoder_family_facts, digest_chat_template, golden_prompt_fixture,
-        golden_prompt_fixtures, golden_tokenizer_fixture, golden_tokenizer_fixtures,
-        parse_gpt_oss_harmony_text, parse_gpt_oss_harmony_tokens,
-        parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
         ActivationFunction, ByteProjectionEmbedder, ContextOverflowPolicy, ContextWindowError,
         DecoderModelDescriptor, DecoderWeightLoader, FixtureDecoderLoader, FixtureWordTokenizer,
         GgufBlobArtifact, GgufContent, GgufDecoderAdapterLoader, GgufDecoderFamily,
@@ -8317,6 +8350,12 @@ mod tests {
         ReferenceWordDecoder, SafeTensorsDecoderLoader, SafeTensorsWeightBundleLoader,
         SmokeByteEmbedder, TokenId, TokenSequence, TokenizerBoundary, WeightArtifactBlobKind,
         WeightArtifactReadPath, WeightFormat, WeightSource, WeightTensorStorage,
+        apply_context_window, apply_special_token_defaults, assert_prompt_template_fixture_matches,
+        assert_prompt_window_case, assert_rendered_prompt_case, assert_tokenizer_fixture_matches,
+        collect_decoder_family_facts, digest_chat_template, golden_prompt_fixture,
+        golden_prompt_fixtures, golden_tokenizer_fixture, golden_tokenizer_fixtures,
+        parse_gpt_oss_harmony_text, parse_gpt_oss_harmony_tokens,
+        parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
     };
 
     fn qwen35_chat_template() -> &'static str {
@@ -8502,8 +8541,8 @@ mod tests {
     }
 
     #[test]
-    fn safetensors_bundle_loader_reports_external_artifact_metadata(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn safetensors_bundle_loader_reports_external_artifact_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model = ReferenceWordDecoder::new();
         let temp = tempdir()?;
         let path = temp.path().join("reference_decoder.safetensors");
@@ -8553,8 +8592,8 @@ mod tests {
     }
 
     #[test]
-    fn safetensors_loader_reports_and_dequantizes_int8_weights(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn safetensors_loader_reports_and_dequantizes_int8_weights()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("quantized.safetensors");
         let tensors = BTreeMap::from([
@@ -8653,8 +8692,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_content_loads_sentencepiece_tokenizer_metadata(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_content_loads_sentencepiece_tokenizer_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("sentencepiece.gguf");
         write_test_gguf(
@@ -8741,8 +8780,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_content_loads_gpt_style_bpe_tokenizer_metadata(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_content_loads_gpt_style_bpe_tokenizer_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("gpt2.gguf");
         write_test_gguf(
@@ -8836,8 +8875,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_content_loads_bert_wordpiece_tokenizer_metadata(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_content_loads_bert_wordpiece_tokenizer_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("bert_tokenizer.gguf");
         write_test_gguf(
@@ -8938,8 +8977,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_content_loads_chat_template_metadata_and_named_variants(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_content_loads_chat_template_metadata_and_named_variants()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("chat_templates.gguf");
         write_test_gguf(
@@ -9060,8 +9099,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_matches_gemma4_fixture_render_case(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_matches_gemma4_fixture_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("gemma4_e4b").expect("gemma4 fixture");
         let variant = fixture
             .template_variant("gemma4_e4b.default")
@@ -9097,8 +9136,8 @@ mod tests {
     }
 
     #[test]
-    fn golden_prompt_window_cases_reference_real_render_cases(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn golden_prompt_window_cases_reference_real_render_cases()
+    -> Result<(), Box<dyn std::error::Error>> {
         for fixture in golden_prompt_fixtures() {
             for window_case in fixture.window_cases {
                 let variant = fixture
@@ -9115,8 +9154,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_matches_phi3_fixture_render_case(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_matches_phi3_fixture_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("phi3").expect("phi3 fixture");
         let variant = fixture.template_variant("phi3.default").expect("variant");
         let render_case = variant.render_case("phi3.multi_turn").expect("render case");
@@ -9148,8 +9187,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_matches_command_r_fixture_render_case(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_matches_command_r_fixture_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("command_r").expect("command-r fixture");
         let variant = fixture
             .template_variant("command_r.default")
@@ -9177,8 +9216,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_render_prompt_matches_qwen2_fixture(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_render_prompt_matches_qwen2_fixture()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_qwen2.gguf");
         write_test_gguf(
@@ -9212,8 +9251,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_matches_qwen35_text_only_render_case(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_matches_qwen35_text_only_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(
             digest_chat_template(qwen35_chat_template()),
             "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80"
@@ -9248,8 +9287,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_merges_qwen35_instruction_roles_and_tool_results(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_merges_qwen35_instruction_roles_and_tool_results()
+    -> Result<(), Box<dyn std::error::Error>> {
         let renderer = GgufPromptTemplateRenderer::new(
             qwen35_prompt_tokenizer_metadata(),
             super::GgufChatTemplateMetadata::new(
@@ -9296,8 +9335,48 @@ mod tests {
     }
 
     #[test]
-    fn gemma4_dense_family_classifies_and_sparse_is_refused(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_projects_gemma4_tool_call_history_and_tool_results()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let renderer = GgufPromptTemplateRenderer::new(
+            gemma4_prompt_tokenizer_metadata(),
+            super::GgufChatTemplateMetadata::new(
+                Some(String::from(gemma4_chat_template())),
+                BTreeMap::new(),
+            ),
+        );
+        let messages = vec![
+            PromptMessage::new(PromptMessageRole::Developer, "Tool contract guidance."),
+            PromptMessage::new(PromptMessageRole::User, "What's the weather?"),
+            PromptMessage::new(
+                PromptMessageRole::Assistant,
+                "<|tool_call>call:get_weather{city:<|\"|>Paris<|\"|>}<tool_call|>",
+            ),
+            PromptMessage::new(PromptMessageRole::Tool, "{\"forecast\":\"sunny\"}")
+                .with_author_name("get_weather"),
+            PromptMessage::new(PromptMessageRole::User, "And tomorrow?"),
+        ];
+
+        let rendered = renderer.render(None, messages.as_slice(), true)?;
+
+        assert_eq!(rendered.family, GgufPromptTemplateFamily::Gemma4);
+        assert_eq!(
+            rendered.text,
+            concat!(
+                "<bos>",
+                "<|turn>developer\nTool contract guidance.<turn|>\n",
+                "<|turn>user\nWhat's the weather?<turn|>\n",
+                "<|turn>model\n<|tool_call>call:get_weather{city:<|\"|>Paris<|\"|>}<tool_call|><turn|>\n",
+                "<|turn>user\n{\"tool_responses\":[{\"name\":\"get_weather\",\"response\":{\"forecast\":\"sunny\"}}]}<turn|>\n",
+                "<|turn>user\nAnd tomorrow?<turn|>\n",
+                "<|turn>model\n",
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gemma4_dense_family_classifies_and_sparse_is_refused()
+    -> Result<(), Box<dyn std::error::Error>> {
         let dense = BTreeMap::from([(
             String::from("general.architecture"),
             GgufMetadataValue::String(String::from("gemma4")),
@@ -9342,8 +9421,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_real_gemma4_family_facts_capture_dense_multimodal_shape(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_real_gemma4_family_facts_capture_dense_multimodal_shape()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_tokenizer_fixture("gemma4_e4b").expect("gemma4 fixture");
         let path = gemma4_pilot_fixture_path(fixture.source_path);
         let content = GgufContent::read_path(Path::new(path.as_str()))?;
@@ -9388,8 +9467,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_matches_qwen35_fixture_render_case(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_matches_qwen35_fixture_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("qwen35_0_8b").expect("qwen35 fixture");
         let variant = fixture
             .template_variant("qwen35_0_8b.default")
@@ -9416,8 +9495,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_real_qwen35_family_metadata_exposes_multimodal_projection_config(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_real_qwen35_family_metadata_exposes_multimodal_projection_config()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_tokenizer_fixture("qwen35_0_8b").expect("qwen35 fixture");
         let path = qwen35_pilot_fixture_path(fixture.source_path);
         let content = GgufContent::read_path(Path::new(path.as_str()))?;
@@ -9464,8 +9543,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_prompt_template_renderer_matches_gpt_oss_fixture_render_case(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_prompt_template_renderer_matches_gpt_oss_fixture_render_case()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("gpt_oss").expect("gpt-oss fixture");
         let variant = fixture
             .template_variant("gpt_oss.default")
@@ -9520,8 +9599,8 @@ mod tests {
     }
 
     #[test]
-    fn gpt_oss_harmony_parser_parses_analysis_then_final_output(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gpt_oss_harmony_parser_parses_analysis_then_final_output()
+    -> Result<(), Box<dyn std::error::Error>> {
         let text = "<|channel|>analysis<|message|>working<|end|><|start|>assistant<|channel|>final<|message|>323";
         let parsed = parse_gpt_oss_harmony_text(
             text,
@@ -9551,20 +9630,22 @@ mod tests {
 
         assert_eq!(
             parsed.messages,
-            vec![PromptMessage::new(
-                PromptMessageRole::Assistant,
-                "{\"latitude\":48.8566,\"longitude\":2.3522}",
-            )
-            .with_recipient("functions.get_weather")
-            .with_channel("commentary")
-            .with_content_type("<|constrain|>json"),]
+            vec![
+                PromptMessage::new(
+                    PromptMessageRole::Assistant,
+                    "{\"latitude\":48.8566,\"longitude\":2.3522}",
+                )
+                .with_recipient("functions.get_weather")
+                .with_channel("commentary")
+                .with_content_type("<|constrain|>json"),
+            ]
         );
         Ok(())
     }
 
     #[test]
-    fn gpt_oss_harmony_reasoning_response_separates_final_reasoning_and_tool_calls(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gpt_oss_harmony_reasoning_response_separates_final_reasoning_and_tool_calls()
+    -> Result<(), Box<dyn std::error::Error>> {
         let parsed = parse_gpt_oss_harmony_text(
             concat!(
                 "<|channel|>analysis<|message|>thinking<|end|>",
@@ -9601,8 +9682,8 @@ mod tests {
     }
 
     #[test]
-    fn gpt_oss_harmony_reasoning_response_can_suppress_reasoning(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gpt_oss_harmony_reasoning_response_can_suppress_reasoning()
+    -> Result<(), Box<dyn std::error::Error>> {
         let parsed = parse_gpt_oss_harmony_text(
             "<|channel|>analysis<|message|>thinking<|end|><|start|>assistant<|channel|>final<|message|>323",
             GptOssHarmonyParseOptions {
@@ -9614,10 +9695,12 @@ mod tests {
         let suppressed: ParsedReasoningResponse = parsed.reasoning_response().suppress_reasoning();
         assert_eq!(suppressed.reasoning_content, None);
         assert_eq!(suppressed.final_content.as_deref(), Some("323"));
-        assert!(suppressed
-            .parts
-            .iter()
-            .all(|part| part.kind != ReasoningResponsePartKind::Reasoning));
+        assert!(
+            suppressed
+                .parts
+                .iter()
+                .all(|part| part.kind != ReasoningResponsePartKind::Reasoning)
+        );
         Ok(())
     }
 
@@ -9654,8 +9737,8 @@ mod tests {
     }
 
     #[test]
-    fn gpt_oss_harmony_stream_parser_tracks_partial_output(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gpt_oss_harmony_stream_parser_tracks_partial_output()
+    -> Result<(), Box<dyn std::error::Error>> {
         let text = "<|channel|>analysis<|message|>thinking<|end|><|start|>assistant<|channel|>final<|message|>323";
         let tokens = openai_harmony::load_harmony_encoding(
             openai_harmony::HarmonyEncodingName::HarmonyGptOss,
@@ -9725,8 +9808,8 @@ mod tests {
     }
 
     #[test]
-    fn tokenizer_fixture_assertion_helper_reports_expected_fields(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn tokenizer_fixture_assertion_helper_reports_expected_fields()
+    -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_tokenizer_fixture("llama_spm").expect("llama fixture");
         let metadata = GgufTokenizerMetadata {
             model: GgufTokenizerModel::SentencePiece,
@@ -9761,8 +9844,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_weight_bundle_loader_loads_dense_half_and_quantized_tensors(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_weight_bundle_loader_loads_dense_half_and_quantized_tensors()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("bundle.gguf");
         let q8_bytes = std::iter::once(0x00)
@@ -9828,8 +9911,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_weight_bundle_loader_rejects_unsupported_tensor_types(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_weight_bundle_loader_rejects_unsupported_tensor_types()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("unsupported.gguf");
         write_test_gguf(
@@ -9858,8 +9941,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_blob_artifact_pages_tensor_bytes_and_reports_buffered_fallback(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_blob_artifact_pages_tensor_bytes_and_reports_buffered_fallback()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("paged.gguf");
         let dense_bytes = super::encode_f32_bytes(&[1.0, 2.0, 3.0, 4.0]);
@@ -9910,8 +9993,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_blob_artifact_supports_memory_mapped_open_path(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_blob_artifact_supports_memory_mapped_open_path()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("mapped.gguf");
         write_test_gguf(
@@ -9943,8 +10026,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_weight_bundle_loader_loads_ollama_blob_with_storage_truth(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_weight_bundle_loader_loads_ollama_blob_with_storage_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let bytes = build_test_gguf(
             GgufVersion::V3,
@@ -9990,8 +10073,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_weight_bundle_loader_loads_from_resolved_ollama_manifest(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_weight_bundle_loader_loads_from_resolved_ollama_manifest()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let bytes = build_test_gguf(
             GgufVersion::V3,
@@ -10048,8 +10131,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_weight_bundle_loader_rejects_corrupt_primary_model_blob_from_ollama_manifest(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_weight_bundle_loader_rejects_corrupt_primary_model_blob_from_ollama_manifest()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let bytes = build_test_gguf(
             GgufVersion::V3,
@@ -10098,8 +10181,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_weight_bundle_loader_refuses_adapter_bearing_ollama_manifest(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_weight_bundle_loader_refuses_adapter_bearing_ollama_manifest()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let bytes = build_test_gguf(
             GgufVersion::V3,
@@ -10157,8 +10240,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_blob_artifact_reports_missing_and_corrupt_blob_failures(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_blob_artifact_reports_missing_and_corrupt_blob_failures()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let missing = temp.path().join("missing.gguf");
         let error = GgufBlobArtifact::open_path(
@@ -10188,8 +10271,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_maps_llama_family_and_layout(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_maps_llama_family_and_layout()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_llama.gguf");
         write_test_gguf(
@@ -10236,9 +10319,11 @@ mod tests {
                 .as_deref(),
             Some("blk.0.attn_q.weight")
         );
-        assert!(adapter.tensor_layout().layers[0]
-            .attention_query_bias
-            .is_none());
+        assert!(
+            adapter.tensor_layout().layers[0]
+                .attention_query_bias
+                .is_none()
+        );
         assert!(adapter.chat_templates().is_empty());
         let governance = adapter
             .descriptor()
@@ -10269,8 +10354,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_maps_qwen_family_with_biases_and_tied_output(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_maps_qwen_family_with_biases_and_tied_output()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_qwen2.gguf");
         write_test_gguf(
@@ -10303,8 +10388,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_maps_qwen35_family_and_hybrid_layout(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_maps_qwen35_family_and_hybrid_layout()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_qwen35.gguf");
         write_test_gguf(
@@ -10399,8 +10484,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_render_prompt_matches_qwen35_text_only_template(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_render_prompt_matches_qwen35_text_only_template()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_qwen35.gguf");
         write_test_gguf(
@@ -10451,8 +10536,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_classifies_sliding_window_llama_as_mistral(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_classifies_sliding_window_llama_as_mistral()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_mistral.gguf");
         write_test_gguf(
@@ -10471,8 +10556,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_rejects_moe_llama_artifacts(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_rejects_moe_llama_artifacts()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("moe_llama.gguf");
         write_test_gguf(
@@ -10503,8 +10588,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_maps_gpt_oss_family_and_layout(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_maps_gpt_oss_family_and_layout()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_gpt_oss.gguf");
         write_test_gguf(
@@ -10596,8 +10681,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_decoder_adapter_loader_loads_ollama_manifest_with_governance(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_decoder_adapter_loader_loads_ollama_manifest_with_governance()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let model_path = temp.path().join("tiny_qwen2.gguf");
         write_test_gguf(
@@ -10716,8 +10801,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_embedding_adapter_loader_maps_bert_family_and_layout(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_embedding_adapter_loader_maps_bert_family_and_layout()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("bert_embed.gguf");
         write_test_gguf(
@@ -10763,18 +10848,22 @@ mod tests {
                 .as_deref(),
             Some("blk.0.attn_q.bias")
         );
-        assert!(adapter.tensor_layout().layers[0]
-            .attention_qkv_weight
-            .is_none());
-        assert!(adapter.tensor_layout().layers[0]
-            .feed_forward_gate_weight
-            .is_none());
+        assert!(
+            adapter.tensor_layout().layers[0]
+                .attention_qkv_weight
+                .is_none()
+        );
+        assert!(
+            adapter.tensor_layout().layers[0]
+                .feed_forward_gate_weight
+                .is_none()
+        );
         Ok(())
     }
 
     #[test]
-    fn gguf_embedding_adapter_loader_maps_nomic_bert_family_and_layout(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_embedding_adapter_loader_maps_nomic_bert_family_and_layout()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("nomic_bert_embed.gguf");
         write_test_gguf(
@@ -10812,9 +10901,11 @@ mod tests {
                 .as_deref(),
             Some("blk.0.attn_qkv.bias")
         );
-        assert!(adapter.tensor_layout().layers[0]
-            .attention_query_weight
-            .is_none());
+        assert!(
+            adapter.tensor_layout().layers[0]
+                .attention_query_weight
+                .is_none()
+        );
         assert_eq!(
             adapter.tensor_layout().layers[0]
                 .feed_forward_gate_weight
@@ -10825,8 +10916,8 @@ mod tests {
     }
 
     #[test]
-    fn gguf_embedding_adapter_loader_rejects_moe_nomic_bert_artifacts(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn gguf_embedding_adapter_loader_rejects_moe_nomic_bert_artifacts()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("nomic_bert_moe.gguf");
         write_test_gguf(
@@ -12198,8 +12289,8 @@ mod tests {
     }
 
     #[test]
-    fn ggml_quantized_storage_is_digest_stable_across_reloads(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn ggml_quantized_storage_is_digest_stable_across_reloads()
+    -> Result<(), Box<dyn std::error::Error>> {
         let bytes = [0x00_u8, 0x40]
             .into_iter()
             .chain((1_i8..=32).map(|value| value.to_le_bytes()[0]))

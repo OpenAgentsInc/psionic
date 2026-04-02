@@ -107,6 +107,9 @@ const LOCAL_EXECUTION_PROVENANCE: &str = "local_execution";
 const THIN_CLIENT_FALLBACK_POSTURE: &str = "thin_client_remote_only";
 const WARMING_FALLBACK_POSTURE: &str = "warming_until_local_ready";
 const OPENAI_COMPAT_PRODUCT_ID: &str = "psionic.openai_compat";
+const GEMMA4_TOOL_CALL_START: &str = "<|tool_call>";
+const GEMMA4_TOOL_CALL_END: &str = "<tool_call|>";
+const GEMMA4_CUSTOM_STRING_QUOTE: &str = "<|\"|>";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct LocalServingTruth {
@@ -410,6 +413,71 @@ fn assistant_prompt_message_for_tool_loop(content: Option<String>) -> Option<Pro
 #[cfg(test)]
 fn tool_result_prompt_message(tool_name: &str, content: impl Into<String>) -> PromptMessage {
     PromptMessage::new(PromptMessageRole::Tool, content).with_author_name(tool_name)
+}
+
+fn gemma4_tool_argument_text(value: &serde_json::Value) -> Result<String, OpenAiCompatHttpError> {
+    match value {
+        serde_json::Value::String(value) => Ok(format!(
+            "{quote}{value}{quote}",
+            quote = GEMMA4_CUSTOM_STRING_QUOTE
+        )),
+        serde_json::Value::Number(_) | serde_json::Value::Bool(_) | serde_json::Value::Null => {
+            serde_json::to_string(value).map_err(|error| {
+                OpenAiCompatHttpError::Internal(format!(
+                    "failed to serialize gemma4 tool argument value: {error}"
+                ))
+            })
+        }
+        other => Err(OpenAiCompatHttpError::BadRequest(format!(
+            "gemma4 tool-call replay only supports scalar arguments today; found `{}`",
+            other
+        ))),
+    }
+}
+
+fn gemma4_tool_call_block(
+    tool_name: &str,
+    arguments: &serde_json::Value,
+) -> Result<String, OpenAiCompatHttpError> {
+    let arguments = arguments.as_object().ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(format!(
+            "assistant tool call `{tool_name}` arguments must be a JSON object"
+        ))
+    })?;
+    let mut rendered_arguments = Vec::with_capacity(arguments.len());
+    for (key, value) in arguments {
+        rendered_arguments.push(format!(
+            "{key}:{value}",
+            value = gemma4_tool_argument_text(value)?
+        ));
+    }
+    rendered_arguments.sort();
+    Ok(format!(
+        "{start}call:{tool_name}{{{arguments}}}{end}",
+        start = GEMMA4_TOOL_CALL_START,
+        arguments = rendered_arguments.join(","),
+        end = GEMMA4_TOOL_CALL_END,
+    ))
+}
+
+fn gemma4_assistant_tool_call_text(
+    tool_calls: &[ChatCompletionToolCall],
+) -> Result<String, OpenAiCompatHttpError> {
+    let mut rendered_calls = Vec::with_capacity(tool_calls.len());
+    for tool_call in tool_calls {
+        let arguments = serde_json::from_str::<serde_json::Value>(&tool_call.function.arguments)
+            .map_err(|error| {
+                OpenAiCompatHttpError::BadRequest(format!(
+                    "assistant tool call `{}` arguments are not valid JSON: {error}",
+                    tool_call.function.name
+                ))
+            })?;
+        rendered_calls.push(gemma4_tool_call_block(
+            tool_call.function.name.as_str(),
+            &arguments,
+        )?);
+    }
+    Ok(rendered_calls.join("\n"))
 }
 
 fn gpt_oss_local_blob_open_options() -> LocalBlobOpenOptions {
@@ -1292,6 +1360,9 @@ impl OpenAiCompatLoadedModel {
 
     fn supports_structured_outputs(&self) -> bool {
         self.decoder().is_some_and(|model| {
+            if matches!(model.family, GgufDecoderFamily::Gemma4) {
+                return false;
+            }
             !matches!(model.family, GgufDecoderFamily::Qwen35)
                 || self.execution_engine_label() == "psionic"
         })
@@ -1299,9 +1370,6 @@ impl OpenAiCompatLoadedModel {
 
     fn supports_tool_calling(&self) -> bool {
         self.decoder().is_some_and(|model| {
-            if matches!(model.family, GgufDecoderFamily::Gemma4) {
-                return false;
-            }
             !matches!(model.family, GgufDecoderFamily::Qwen35)
                 || self.execution_engine_label() == "psionic"
         })
@@ -1349,6 +1417,14 @@ impl OpenAiCompatLoadedModel {
                 parser: "not_available",
                 argument_validation: "not_available",
             },
+            Some(model) if matches!(model.family, GgufDecoderFamily::Gemma4) => {
+                ToolCallingCapability {
+                    support_level: ToolCallingSupportLevel::Fallback,
+                    supported_modes: vec!["none", "auto", "required", "named"],
+                    parser: "gemma4_tool_call_dict",
+                    argument_validation: "json_schema_subset",
+                }
+            }
             Some(_) => ToolCallingCapability {
                 support_level: ToolCallingSupportLevel::Fallback,
                 supported_modes: vec!["none", "auto", "required", "named"],
@@ -3107,6 +3183,15 @@ fn fallback_tool_calling_capability() -> ToolCallingCapability {
     }
 }
 
+fn gemma4_fallback_tool_calling_capability() -> ToolCallingCapability {
+    ToolCallingCapability {
+        support_level: ToolCallingSupportLevel::Fallback,
+        supported_modes: vec!["none", "auto", "required", "named"],
+        parser: "gemma4_tool_call_dict",
+        argument_validation: "json_schema_subset",
+    }
+}
+
 fn unsupported_tool_calling_capability() -> ToolCallingCapability {
     ToolCallingCapability {
         support_level: ToolCallingSupportLevel::Unsupported,
@@ -3357,7 +3442,11 @@ fn published_model_tool_calling_capability(
             .map(OpenAiCompatLoadedModel::tool_calling_capability)
             .unwrap_or_else(|| {
                 if model.tool_calling {
-                    fallback_tool_calling_capability()
+                    if model.family == "gemma4" {
+                        gemma4_fallback_tool_calling_capability()
+                    } else {
+                        fallback_tool_calling_capability()
+                    }
                 } else {
                     unsupported_tool_calling_capability()
                 }
@@ -4994,7 +5083,14 @@ fn required_tool_call_floor_from_chat_messages(
     Ok(distinct.len().max(1))
 }
 
-fn tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
+fn tool_prompt_message(contract: &ToolCallingContract, family: GgufDecoderFamily) -> PromptMessage {
+    if matches!(family, GgufDecoderFamily::Gemma4) {
+        return gemma4_tool_prompt_message(contract);
+    }
+    generic_json_tool_prompt_message(contract)
+}
+
+fn generic_json_tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
     let mut lines = vec![String::from(
         "When tools are enabled, respond with exactly one JSON object that matches the declared Psionic tool contract.",
     )];
@@ -5054,6 +5150,65 @@ fn tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
     PromptMessage::new(PromptMessageRole::Developer, lines.join("\n"))
 }
 
+fn gemma4_tool_prompt_message(contract: &ToolCallingContract) -> PromptMessage {
+    let mut lines = vec![String::from(
+        "When tools are enabled on gemma4, emit raw tool-call blocks instead of JSON envelopes.",
+    )];
+    match contract.mode {
+        ToolChoiceMode::None => lines.push(String::from(
+            "Tool use is disabled for this request. Answer normally.",
+        )),
+        ToolChoiceMode::Auto => lines.push(String::from(
+            "For a normal answer, reply with plain assistant text. To call a tool, emit one or more blocks like `<|tool_call>call:<tool>{arg:value}<tool_call|>` with no JSON wrapper.",
+        )),
+        ToolChoiceMode::Required => {
+            if contract.allows_parallel_tool_calls() && contract.minimum_required_tool_calls > 1 {
+                lines.push(format!(
+                    "You must call at least {} tools by emitting one `<|tool_call>call:<tool>{{...}}<tool_call|>` block per tool in order.",
+                    contract.minimum_required_tool_calls
+                ));
+            } else if contract.allows_parallel_tool_calls() {
+                lines.push(String::from(
+                    "You must call one or more tools by emitting one `<|tool_call>call:<tool>{...}<tool_call|>` block per tool in order.",
+                ));
+            } else {
+                lines.push(String::from(
+                    "You must call exactly one tool by emitting exactly one `<|tool_call>call:<tool>{...}<tool_call|>` block and no prose.",
+                ));
+            }
+        }
+        ToolChoiceMode::Named => lines.push(format!(
+            "You must call exactly one tool by emitting exactly one `<|tool_call>call:{}{{...}}<tool_call|>` block and no prose.",
+            contract.named_tool.as_deref().unwrap_or_default()
+        )),
+    }
+    lines.push(String::from(
+        "Argument syntax: strings use `<|\"|>value<|\"|>`. Numbers, booleans, and null stay unquoted. Separate arguments with commas and sort argument keys alphabetically.",
+    ));
+    if contract.allows_parallel_tool_calls()
+        && let Some(example) = gemma4_parallel_tool_call_example(contract)
+    {
+        lines.push(example);
+        lines.push(String::from(
+            "When the user explicitly asks for multiple declared tools in the same turn, include each requested tool exactly once in one ordered tool-call block sequence before any answer. Do not omit a requested tool or repeat one tool instead of another.",
+        ));
+    }
+    lines.push(String::from("Declared tools:"));
+    for tool in contract.tools.values() {
+        let schema =
+            normalized_tool_parameters_schema(tool).unwrap_or_else(|_| serde_json::json!({}));
+        lines.push(format!(
+            "- {}: {} | schema={}",
+            tool.name,
+            tool.description
+                .clone()
+                .unwrap_or_else(|| String::from("no description")),
+            schema
+        ));
+    }
+    PromptMessage::new(PromptMessageRole::Developer, lines.join("\n"))
+}
+
 fn parallel_tool_call_example(contract: &ToolCallingContract) -> Option<String> {
     let tool_names = contract
         .tools
@@ -5070,25 +5225,49 @@ fn parallel_tool_call_example(contract: &ToolCallingContract) -> Option<String> 
     ))
 }
 
+fn gemma4_parallel_tool_call_example(contract: &ToolCallingContract) -> Option<String> {
+    let tool_names = contract
+        .tools
+        .values()
+        .take(2)
+        .map(|tool| tool.name.as_str())
+        .collect::<Vec<_>>();
+    if tool_names.len() < 2 {
+        return None;
+    }
+    Some(format!(
+        "If multiple tools are needed in the same turn, emit them as sequential blocks like `{start}call:{first}{{...}}{end} {start}call:{second}{{...}}{end}`.",
+        start = GEMMA4_TOOL_CALL_START,
+        end = GEMMA4_TOOL_CALL_END,
+        first = tool_names[0],
+        second = tool_names[1],
+    ))
+}
+
 fn apply_tool_contract_to_prompt_messages(
     mut messages: Vec<PromptMessage>,
     contract: Option<&ToolCallingContract>,
+    family: GgufDecoderFamily,
 ) -> Vec<PromptMessage> {
     if let Some(contract) = contract
         && !matches!(contract.mode, ToolChoiceMode::None)
     {
-        messages.insert(0, tool_prompt_message(contract));
+        messages.insert(0, tool_prompt_message(contract, family));
     }
     messages
 }
 
 fn structured_output_from_tool_contract(
     contract: Option<&ToolCallingContract>,
+    family: GgufDecoderFamily,
 ) -> Result<Option<StructuredOutputRequest>, OpenAiCompatHttpError> {
     let Some(contract) = contract else {
         return Ok(None);
     };
     if matches!(contract.mode, ToolChoiceMode::None) {
+        return Ok(None);
+    }
+    if matches!(family, GgufDecoderFamily::Gemma4) {
         return Ok(None);
     }
 
@@ -5209,6 +5388,7 @@ fn tool_call_item_schema(
 
 fn tool_call_outcome_from_response(
     request_id: &str,
+    family: GgufDecoderFamily,
     response: &crate::GenerationResponse,
     contract: Option<&ToolCallingContract>,
 ) -> Result<Option<ToolCallOutcome>, OpenAiCompatHttpError> {
@@ -5220,6 +5400,15 @@ fn tool_call_outcome_from_response(
     }
 
     let Some(structured) = response.output.structured.clone() else {
+        if matches!(family, GgufDecoderFamily::Gemma4) {
+            if let Some(outcome) = gemma4_tool_call_outcome_from_text(
+                request_id,
+                response.output.text.as_str(),
+                contract,
+            )? {
+                return Ok(Some(outcome));
+            }
+        }
         if matches!(contract.mode, ToolChoiceMode::Auto) {
             if response.output.text.is_empty() {
                 return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -5312,6 +5501,189 @@ fn tool_call_outcome_from_response(
             )));
         }
     }
+}
+
+fn gemma4_tool_call_outcome_from_text(
+    request_id: &str,
+    text: &str,
+    contract: &ToolCallingContract,
+) -> Result<Option<ToolCallOutcome>, OpenAiCompatHttpError> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let Some(first_tool_offset) = trimmed.find(GEMMA4_TOOL_CALL_START) else {
+        return Ok(None);
+    };
+
+    let content = trimmed[..first_tool_offset].trim();
+    let mut cursor = first_tool_offset;
+    let mut tool_calls = Vec::new();
+    while cursor < trimmed.len() {
+        if trimmed[cursor..].trim().is_empty() {
+            break;
+        }
+        if !trimmed[cursor..].starts_with(GEMMA4_TOOL_CALL_START) {
+            return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                "gemma4 tool-call reply mixed trailing assistant text after tool blocks",
+            )));
+        }
+        cursor += GEMMA4_TOOL_CALL_START.len();
+        let end_offset = trimmed[cursor..]
+            .find(GEMMA4_TOOL_CALL_END)
+            .ok_or_else(|| {
+                OpenAiCompatHttpError::BadRequest(String::from(
+                    "gemma4 tool-call reply is missing `<tool_call|>`",
+                ))
+            })?;
+        let inner = trimmed[cursor..cursor + end_offset].trim();
+        tool_calls.push(parse_gemma4_tool_call_block(
+            request_id,
+            tool_calls.len(),
+            inner,
+            contract,
+        )?);
+        cursor += end_offset + GEMMA4_TOOL_CALL_END.len();
+        while let Some(ch) = trimmed[cursor..].chars().next() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            cursor += ch.len_utf8();
+        }
+    }
+    if tool_calls.is_empty() {
+        return Ok(None);
+    }
+    if !contract.allows_parallel_tool_calls() && tool_calls.len() != 1 {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "gemma4 tool-call reply returned more than one tool call while `parallel_tool_calls` is disabled",
+        )));
+    }
+    Ok(Some(ToolCallOutcome {
+        content: (!content.is_empty()).then_some(content.to_string()),
+        tool_calls,
+    }))
+}
+
+fn parse_gemma4_tool_call_block(
+    request_id: &str,
+    index: usize,
+    block: &str,
+    contract: &ToolCallingContract,
+) -> Result<ResolvedToolCall, OpenAiCompatHttpError> {
+    let Some(call_body) = block.strip_prefix("call:") else {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "gemma4 tool-call reply must start each block with `call:`",
+        )));
+    };
+    let brace_offset = call_body.find('{').ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(String::from(
+            "gemma4 tool-call reply is missing the argument object opener",
+        ))
+    })?;
+    let tool_name = call_body[..brace_offset].trim();
+    let tool = contract.tools.get(tool_name).ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(format!("model selected undeclared tool `{tool_name}`"))
+    })?;
+    let arguments_body = call_body[brace_offset + 1..].trim_end();
+    let arguments_body = arguments_body.strip_suffix('}').ok_or_else(|| {
+        OpenAiCompatHttpError::BadRequest(format!(
+            "gemma4 tool call `{tool_name}` is missing the closing `}}`"
+        ))
+    })?;
+    let arguments = serde_json::Value::Object(parse_gemma4_tool_arguments(arguments_body)?);
+    validate_tool_arguments(tool, &arguments)?;
+    Ok(ResolvedToolCall {
+        id: format!("{request_id}-tool-{index}"),
+        name: tool_name.to_string(),
+        arguments,
+    })
+}
+
+fn parse_gemma4_tool_arguments(
+    text: &str,
+) -> Result<serde_json::Map<String, serde_json::Value>, OpenAiCompatHttpError> {
+    let mut arguments = serde_json::Map::new();
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(arguments);
+    }
+
+    let mut cursor = 0usize;
+    while cursor < trimmed.len() {
+        let tail = &trimmed[cursor..];
+        let colon = tail.find(':').ok_or_else(|| {
+            OpenAiCompatHttpError::BadRequest(String::from(
+                "gemma4 tool-call argument is missing `:`",
+            ))
+        })?;
+        let key = tail[..colon].trim();
+        if key.is_empty() {
+            return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                "gemma4 tool-call argument name cannot be empty",
+            )));
+        }
+        cursor += colon + 1;
+        let (value, consumed) = parse_gemma4_tool_argument_value(&trimmed[cursor..])?;
+        arguments.insert(key.to_string(), value);
+        cursor += consumed;
+        if cursor >= trimmed.len() {
+            break;
+        }
+        let delimiter = trimmed[cursor..].chars().next().ok_or_else(|| {
+            OpenAiCompatHttpError::BadRequest(String::from(
+                "gemma4 tool-call argument list ended unexpectedly",
+            ))
+        })?;
+        if delimiter != ',' {
+            return Err(OpenAiCompatHttpError::BadRequest(format!(
+                "gemma4 tool-call arguments must be comma-separated; found `{delimiter}`",
+            )));
+        }
+        cursor += delimiter.len_utf8();
+    }
+
+    Ok(arguments)
+}
+
+fn parse_gemma4_tool_argument_value(
+    text: &str,
+) -> Result<(serde_json::Value, usize), OpenAiCompatHttpError> {
+    if let Some(rest) = text.strip_prefix(GEMMA4_CUSTOM_STRING_QUOTE) {
+        let end = rest.find(GEMMA4_CUSTOM_STRING_QUOTE).ok_or_else(|| {
+            OpenAiCompatHttpError::BadRequest(String::from(
+                "gemma4 tool-call string argument is missing the closing quote token",
+            ))
+        })?;
+        return Ok((
+            serde_json::Value::String(rest[..end].to_string()),
+            GEMMA4_CUSTOM_STRING_QUOTE.len() + end + GEMMA4_CUSTOM_STRING_QUOTE.len(),
+        ));
+    }
+
+    let end = text.find(',').unwrap_or(text.len());
+    let raw = text[..end].trim();
+    if raw.is_empty() {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "gemma4 tool-call argument value cannot be empty",
+        )));
+    }
+    let parsed = match raw {
+        "null" => serde_json::Value::Null,
+        "true" => serde_json::Value::Bool(true),
+        "false" => serde_json::Value::Bool(false),
+        _ => serde_json::from_str::<serde_json::Value>(raw).map_err(|error| {
+            OpenAiCompatHttpError::BadRequest(format!(
+                "gemma4 tool-call argument value `{raw}` is not valid: {error}"
+            ))
+        })?,
+    };
+    let consumed = text[..end]
+        .char_indices()
+        .last()
+        .map(|(offset, ch)| offset + ch.len_utf8())
+        .unwrap_or(0);
+    Ok((parsed, consumed))
 }
 
 fn resolved_tool_calls_from_json_value(
@@ -5648,6 +6020,7 @@ async fn handle_generic_chat_completions(
     let prompt_messages = apply_tool_contract_to_prompt_messages(
         chat_messages_to_prompt_messages_for_decoder(&request.messages, model)?,
         tool_contract.as_ref(),
+        model.family,
     );
     let rendered = render_prompt_for_model(loaded_model, prompt_messages.as_slice())?;
     let request_id = next_generic_request_id(&state, "psionic-chatcmpl");
@@ -5662,7 +6035,8 @@ async fn handle_generic_chat_completions(
     );
     let mut options = options;
     options.structured_output =
-        structured_output_from_tool_contract(tool_contract.as_ref())?.or(structured_output);
+        structured_output_from_tool_contract(tool_contract.as_ref(), model.family)?
+            .or(structured_output);
     let generation_request = GenerationRequest::new_text(
         request_id.clone(),
         model.descriptor.clone(),
@@ -5700,8 +6074,12 @@ async fn handle_generic_chat_completions(
         } else {
             None
         };
-    let tool_outcome =
-        tool_call_outcome_from_response(request_id.as_str(), &response, tool_contract.as_ref())?;
+    let tool_outcome = tool_call_outcome_from_response(
+        request_id.as_str(),
+        model.family,
+        &response,
+        tool_contract.as_ref(),
+    )?;
     let choice = completion_choice_for_family(
         model.family,
         &response,
@@ -5995,8 +6373,11 @@ async fn handle_generic_responses(
     )?;
     let mut prompt_history = response_state_context.prompt_history.clone();
     prompt_history.extend(appended_prompt_messages.clone());
-    let prompt_messages =
-        apply_tool_contract_to_prompt_messages(prompt_history.clone(), tool_contract.as_ref());
+    let prompt_messages = apply_tool_contract_to_prompt_messages(
+        prompt_history.clone(),
+        tool_contract.as_ref(),
+        model.family,
+    );
     let rendered = render_prompt_for_model(loaded_model, prompt_messages.as_slice())?;
     let request_id = next_generic_request_id(&state, "psionic-resp");
     let response_model_name = request
@@ -6009,7 +6390,8 @@ async fn handle_generic_responses(
         rendered.stop_sequences.as_slice(),
     );
     options.structured_output =
-        structured_output_from_tool_contract(tool_contract.as_ref())?.or(structured_output);
+        structured_output_from_tool_contract(tool_contract.as_ref(), model.family)?
+            .or(structured_output);
     let generation_request = GenerationRequest::new_text(
         request_id.clone(),
         model.descriptor.clone(),
@@ -6047,8 +6429,12 @@ async fn handle_generic_responses(
         } else {
             None
         };
-    let tool_outcome =
-        tool_call_outcome_from_response(request_id.as_str(), &response, tool_contract.as_ref())?;
+    let tool_outcome = tool_call_outcome_from_response(
+        request_id.as_str(),
+        model.family,
+        &response,
+        tool_contract.as_ref(),
+    )?;
     let choice = completion_choice_for_family(
         model.family,
         &response,
@@ -7533,14 +7919,7 @@ fn load_generic_decoder_model(
             ));
         }
     };
-    let supported_endpoints = if matches!(
-        (backend, family),
-        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
-    ) {
-        vec![RoutingEndpoint::ChatCompletions]
-    } else {
-        vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses]
-    };
+    let supported_endpoints = vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses];
     let loaded_model = OpenAiCompatLoadedModel {
         model_key: descriptor.model.model_id.clone(),
         canonical_name: default_model_name(model_path, descriptor.model.model_id.as_str()),
@@ -8141,7 +8520,7 @@ fn chat_messages_to_prompt_messages_generic(
             }
             prompt_messages.push(PromptMessage::new(
                 PromptMessageRole::Assistant,
-                assistant_tool_call_envelope_json(tool_calls)?,
+                assistant_tool_call_text(tool_calls, family)?,
             ));
             continue;
         }
@@ -8171,6 +8550,16 @@ fn chat_messages_to_prompt_messages_generic(
         prompt_messages.push(prompt);
     }
     Ok(prompt_messages)
+}
+
+fn assistant_tool_call_text(
+    tool_calls: &[ChatCompletionToolCall],
+    family: GgufDecoderFamily,
+) -> Result<String, OpenAiCompatHttpError> {
+    if matches!(family, GgufDecoderFamily::Gemma4) {
+        return gemma4_assistant_tool_call_text(tool_calls);
+    }
+    assistant_tool_call_envelope_json(tool_calls)
 }
 
 fn assistant_tool_call_envelope_json(
@@ -9943,7 +10332,7 @@ mod tests {
         assert_eq!(gemma.psionic_model_family, "gemma4");
         assert_eq!(
             gemma.psionic_supported_endpoints,
-            vec!["/v1/chat/completions"]
+            vec!["/v1/chat/completions", "/v1/responses"]
         );
         assert_eq!(gemma.psionic_served_backend, Some("remote"));
         assert_eq!(gemma.psionic_execution_mode, Some("proxy"));
@@ -9965,12 +10354,13 @@ mod tests {
             gemma.psionic_route_provenances,
             vec![RoutedExecutionProvenance::BootstrapProxy]
         );
-        assert!(gemma.psionic_response_state.is_none());
-        assert!(
+        assert!(gemma.psionic_response_state.is_some());
+        assert_eq!(
             gemma
                 .psionic_tool_calling
                 .as_ref()
-                .is_some_and(|capability| capability.support_level.label() == "unsupported")
+                .map(|capability| (capability.support_level.label(), capability.parser,)),
+            Some(("fallback", "gemma4_tool_call_dict"))
         );
 
         let local_response = runtime.block_on(handle_generic_responses(
@@ -10046,35 +10436,40 @@ mod tests {
             Some(String::from("bootstrap_proxy"))
         );
 
-        let responses_error = runtime
-            .block_on(handle_generic_responses(
-                std::sync::Arc::clone(&local_server.state),
-                ResponsesRequest {
-                    model: Some(String::from("gemma4-e4b-bootstrap-cuda.gguf")),
-                    instructions: None,
-                    conversation: None,
-                    input: ResponsesInput::Text(String::from("hello")),
-                    temperature: Some(0.0),
-                    max_output_tokens: Some(1),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    previous_response_id: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_response_state: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("remote gemma route should keep unsupported responses explicit");
-        let responses_payload = runtime.block_on(response_json(responses_error.into_response()))?;
-        assert!(
-            responses_payload["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("/v1/chat/completions")
+        let gemma_response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&local_server.state),
+            ResponsesRequest {
+                model: Some(String::from("gemma4-e4b-bootstrap-cuda.gguf")),
+                instructions: None,
+                conversation: None,
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let gemma_response_headers = gemma_response.headers().clone();
+        let gemma_response_payload = runtime.block_on(response_json(gemma_response))?;
+        assert_eq!(
+            gemma_response_payload["object"],
+            serde_json::json!("response")
+        );
+        assert_eq!(
+            header_value(&gemma_response_headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&gemma_response_headers, "x-psionic-route-provenance"),
+            Some(String::from("bootstrap_proxy"))
         );
 
         let management = runtime.block_on(generic_management_status(State(std::sync::Arc::clone(
@@ -10094,6 +10489,11 @@ mod tests {
             route.model_key == "gemma4-e4b-bootstrap-cuda.gguf"
                 && route.family == "gemma4"
                 && route.endpoint == "/v1/chat/completions"
+        }));
+        assert!(management.0.routes.iter().any(|route| {
+            route.model_key == "gemma4-e4b-bootstrap-cuda.gguf"
+                && route.family == "gemma4"
+                && route.endpoint == "/v1/responses"
         }));
 
         let _ = shutdown_tx.send(());
@@ -10310,10 +10710,10 @@ mod tests {
         assert_eq!(loaded_model.execution_engine_label(), "psionic");
         assert_eq!(
             model_endpoint_paths(&loaded_model),
-            vec!["/v1/chat/completions"]
+            vec!["/v1/chat/completions", "/v1/responses"]
         );
-        assert!(!loaded_model.supports_tool_calling());
-        assert!(!loaded_model.supports_response_state());
+        assert!(loaded_model.supports_tool_calling());
+        assert!(loaded_model.supports_response_state());
         assert_eq!(
             loaded_model.decoder().map(|decoder| decoder.family),
             Some(GgufDecoderFamily::Gemma4)
@@ -10357,6 +10757,472 @@ mod tests {
     }
 
     #[test]
+    fn generic_responses_gemma4_tool_result_messages_preserve_role_and_name_through_prompt_conversion()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-response-prompt-replay.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template("tiny gemma4 response prompt replay")
+                .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab(7, 5).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let route = resolve_generic_model_for_endpoint(
+            server.state.as_ref(),
+            Some("tiny-gemma4-response-prompt-replay"),
+            RoutingEndpoint::Responses,
+            RoutingRequest::new(RoutingEndpoint::Responses).require_response_state(),
+        )?;
+        let model = local_loaded_model_for_route(&route)?
+            .decoder()
+            .expect("response route should resolve a decoder");
+        let tool_call_text =
+            "<|tool_call>call:get_weather{latitude:48.8566,longitude:2.3522}<tool_call|>";
+        let prompt = response_input_to_prompt_messages_with_options(
+            &ResponsesRequest {
+                model: Some(String::from("tiny-gemma4-response-prompt-replay")),
+                instructions: None,
+                conversation: None,
+                input: ResponsesInput::Messages(vec![
+                    ChatCompletionMessage::text("assistant", tool_call_text),
+                    ChatCompletionMessage::named_text(
+                        "tool",
+                        "{\"forecast\":\"sunny\",\"tomorrow\":\"sunny\"}",
+                        "get_weather",
+                    ),
+                    ChatCompletionMessage::text("user", "what about tomorrow?"),
+                ]),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+            model,
+            false,
+            false,
+        )?;
+        assert_eq!(prompt.len(), 3);
+        assert_eq!(prompt[0].role, PromptMessageRole::Assistant);
+        assert_eq!(prompt[0].content, tool_call_text);
+        assert_eq!(prompt[1].role, PromptMessageRole::Tool);
+        assert_eq!(prompt[1].author_name.as_deref(), Some("get_weather"));
+        assert_eq!(
+            prompt[1].content,
+            "{\"forecast\":\"sunny\",\"tomorrow\":\"sunny\"}"
+        );
+        assert_eq!(prompt[2].role, PromptMessageRole::User);
+        assert_eq!(prompt[2].content, "what about tomorrow?");
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_native_gemma4_required_tool_call_is_machine_checkable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let tool_call_text =
+            "<|tool_call>call:get_weather{latitude:48.8566,longitude:2.3522}<tool_call|>";
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-required-tool.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template_and_tokens(
+                "tiny gemma4 required tool",
+                vec![
+                    "<unk>",
+                    "<bos>",
+                    "<eos>",
+                    "<|turn>",
+                    "<turn|>",
+                    "hello",
+                    tool_call_text,
+                    "world",
+                ],
+            )
+            .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(8, 5, 6).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-gemma4-required-tool")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: vec![weather_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["finish_reason"],
+            serde_json::json!("tool_calls")
+        );
+        assert_eq!(
+            payload["choices"][0]["message"]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            payload["psionic_tool_calls"][0]["arguments"],
+            serde_json::json!({
+                "latitude": 48.8566,
+                "longitude": 2.3522
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_native_gemma4_tool_call_validation_refuses_invalid_arguments()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let invalid_tool_call_text =
+            "<|tool_call>call:get_weather{latitude:<|\"|>oops<|\"|>,longitude:2.3522}<tool_call|>";
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-invalid-tool.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template_and_tokens(
+                "tiny gemma4 invalid tool",
+                vec![
+                    "<unk>",
+                    "<bos>",
+                    "<eos>",
+                    "<|turn>",
+                    "<turn|>",
+                    "hello",
+                    invalid_tool_call_text,
+                    "world",
+                ],
+            )
+            .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(8, 5, 6).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-gemma4-invalid-tool")),
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: vec![weather_tool_definition()],
+                    tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                    parallel_tool_calls: Some(false),
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("native gemma4 invalid tool arguments should be refused");
+        let payload = runtime.block_on(response_json(error.into_response()))?;
+        assert!(
+            payload["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("arguments for tool `get_weather` did not satisfy the declared schema")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_responses_native_gemma4_tool_turn_stores_replayable_response_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let tool_call_text =
+            "<|tool_call>call:get_weather{latitude:48.8566,longitude:2.3522}<tool_call|>";
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-response-tool-turn.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template_and_tokens(
+                "tiny gemma4 response tool turn",
+                vec![
+                    "<unk>",
+                    "<bos>",
+                    "<eos>",
+                    "<|turn>",
+                    "<turn|>",
+                    "hello",
+                    tool_call_text,
+                    "Tomorrow will also be sunny.",
+                ],
+            )
+            .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(8, 5, 6).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&server.state),
+            ResponsesRequest {
+                model: Some(String::from("tiny-gemma4-response-tool-turn")),
+                instructions: None,
+                conversation: None,
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: vec![weather_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(payload["output_text"], serde_json::json!(""));
+        assert_eq!(
+            payload["psionic_tool_calls"][0]["name"],
+            serde_json::json!("get_weather")
+        );
+        assert_eq!(
+            payload["psionic_response_state"]["stored"],
+            serde_json::json!(true)
+        );
+        let response_id = payload["id"]
+            .as_str()
+            .expect("stored gemma response id should be present")
+            .to_string();
+        let stored_context = server
+            .state
+            .response_state
+            .lock()
+            .expect("response-state store should be readable")
+            .load_context(Some(response_id.as_str()), None)?;
+        assert_eq!(
+            stored_context.model_key.as_deref(),
+            Some(server.state.default_model_key.as_str())
+        );
+        assert_eq!(stored_context.prompt_history.len(), 2);
+        assert_eq!(
+            stored_context.prompt_history[0].role,
+            PromptMessageRole::User
+        );
+        assert_eq!(stored_context.prompt_history[0].content, "hello");
+        assert_eq!(
+            stored_context.prompt_history[1].role,
+            PromptMessageRole::Assistant
+        );
+        assert_eq!(stored_context.prompt_history[1].content, tool_call_text);
+        Ok(())
+    }
+
+    #[test]
+    fn generic_responses_native_gemma4_tool_result_replay_reaches_final_assistant_answer()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let tool_call_text =
+            "<|tool_call>call:get_weather{latitude:48.8566,longitude:2.3522}<tool_call|>";
+        let tool_result_json = "{\"forecast\":\"sunny\",\"tomorrow\":\"sunny\"}";
+        let final_answer = "Tomorrow will also be sunny.";
+
+        let temp = tempfile::tempdir()?;
+        let gemma_tool_path = temp.path().join("tiny-gemma4-response-tool-source.gguf");
+        write_test_gguf(
+            &gemma_tool_path,
+            dense_gemma4_metadata_with_chat_template_and_tokens(
+                "tiny gemma4 response tool source",
+                vec![
+                    "<unk>",
+                    "<bos>",
+                    "<eos>",
+                    "<|turn>",
+                    "<turn|>",
+                    "hello",
+                    tool_call_text,
+                    final_answer,
+                ],
+            )
+            .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(8, 5, 6).as_slice(),
+        )?;
+
+        let mut tool_config = OpenAiCompatConfig::new(&gemma_tool_path);
+        tool_config.backend = OpenAiCompatBackend::Cuda;
+        let tool_server = OpenAiCompatServer::from_config(&tool_config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let first_response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&tool_server.state),
+            ResponsesRequest {
+                model: Some(String::from("tiny-gemma4-response-tool-source")),
+                instructions: None,
+                conversation: None,
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: vec![weather_tool_definition()],
+                tool_choice: Some(ToolChoiceRequest::Mode(String::from("required"))),
+                parallel_tool_calls: Some(false),
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let first_payload = runtime.block_on(response_json(first_response))?;
+        let first_response_id = first_payload["id"]
+            .as_str()
+            .expect("tool-turn gemma response id should be present")
+            .to_string();
+        let first_context = tool_server
+            .state
+            .response_state
+            .lock()
+            .expect("source response-state store should be readable")
+            .load_context(Some(first_response_id.as_str()), None)?;
+
+        let gemma_final_path = temp.path().join("tiny-gemma4-response-final-answer.gguf");
+        write_test_gguf(
+            &gemma_final_path,
+            dense_gemma4_metadata_with_chat_template_and_tokens(
+                "tiny gemma4 response final answer",
+                vec![
+                    "<unk>",
+                    "<bos>",
+                    "<eos>",
+                    "<|turn>",
+                    "<turn|>",
+                    "hello",
+                    final_answer,
+                    tool_result_json,
+                    "what about tomorrow?",
+                ],
+            )
+            .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(9, 5, 6).as_slice(),
+        )?;
+
+        let mut final_config = OpenAiCompatConfig::new(&gemma_final_path);
+        final_config.backend = OpenAiCompatBackend::Cuda;
+        let final_server = OpenAiCompatServer::from_config(&final_config)?;
+        let seeded_conversation_id = String::from("conv-gemma4-tool-loop");
+        let seeded_response_id = String::from("resp-gemma4-tool-loop-seeded");
+        let mut seeded_prompt_history = first_context.prompt_history.clone();
+        seeded_prompt_history.push(tool_result_prompt_message("get_weather", tool_result_json));
+        final_server
+            .state
+            .response_state
+            .lock()
+            .expect("final response-state store should be writable")
+            .record_response(ResponseStateRecord {
+                response_id: seeded_response_id.clone(),
+                model_key: final_server.state.default_model_key.clone(),
+                worker_id: String::from(super::OPENAI_COMPAT_WORKER_ID),
+                conversation_id: Some(seeded_conversation_id.clone()),
+                prompt_history: seeded_prompt_history,
+            })?;
+
+        let continued_response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&final_server.state),
+            ResponsesRequest {
+                model: None,
+                instructions: None,
+                conversation: Some(seeded_conversation_id.clone()),
+                input: ResponsesInput::Text(String::from("what about tomorrow?")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let continued_payload = runtime.block_on(response_json(continued_response))?;
+        assert_eq!(
+            continued_payload["output_text"],
+            serde_json::json!(final_answer)
+        );
+        assert_eq!(
+            continued_payload["previous_response_id"],
+            serde_json::json!(seeded_response_id)
+        );
+        assert_eq!(
+            continued_payload["conversation"]["id"],
+            serde_json::json!(seeded_conversation_id)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_gemma4_cuda_publication_and_generation_are_honest_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let backend = psionic_backend_cuda::CudaBackend::new();
@@ -10384,15 +11250,18 @@ mod tests {
         assert_eq!(health.0.execution_engine, "psionic");
         assert_eq!(
             health.0.default_model_supported_endpoints,
-            vec!["/v1/chat/completions"]
+            vec!["/v1/chat/completions", "/v1/responses"]
         );
-        assert_eq!(health.0.supported_endpoints, vec!["/v1/chat/completions"]);
+        assert_eq!(
+            health.0.supported_endpoints,
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
         assert_eq!(
             health.0.execution_profile.batch_posture,
             BatchExecutionPosture::SingleRequestOnly
         );
         assert!(health.0.scheduler_policy.is_none());
-        assert_eq!(health.0.response_state, None);
+        assert!(health.0.response_state.is_some());
         assert_eq!(
             health.0.tool_calling.as_ref().map(|capability| (
                 capability.support_level.label(),
@@ -10401,10 +11270,10 @@ mod tests {
                 capability.argument_validation,
             )),
             Some((
-                "unsupported",
-                vec!["none"],
-                "not_available",
-                "not_available",
+                "fallback",
+                vec!["none", "auto", "required", "named"],
+                "gemma4_tool_call_dict",
+                "json_schema_subset",
             ))
         );
         assert!(
@@ -10431,12 +11300,19 @@ mod tests {
         assert_eq!(model.psionic_model_family, "gemma4");
         assert_eq!(
             model.psionic_supported_endpoints,
-            vec!["/v1/chat/completions"]
+            vec!["/v1/chat/completions", "/v1/responses"]
         );
         assert_eq!(model.psionic_served_backend, Some("cuda"));
         assert_eq!(model.psionic_execution_mode, Some("native"));
         assert_eq!(model.psionic_execution_engine, Some("psionic"));
-        assert_eq!(model.psionic_response_state, None);
+        assert!(model.psionic_response_state.is_some());
+        assert_eq!(
+            model
+                .psionic_tool_calling
+                .as_ref()
+                .map(|capability| (capability.support_level.label(), capability.parser,)),
+            Some(("fallback", "gemma4_tool_call_dict"))
+        );
         assert!(
             model
                 .psionic_structured_output_capabilities
@@ -10495,7 +11371,7 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_gemma4_cuda_fails_closed_for_unsupported_surfaces_when_available()
+    fn generic_server_gemma4_cuda_keeps_structured_and_multimodal_refusals_explicit_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let backend = psionic_backend_cuda::CudaBackend::new();
         if !backend.quantized_kernels_available() {
@@ -10518,35 +11394,6 @@ mod tests {
             .block_on(generic_health(State(std::sync::Arc::clone(&server.state))))
             .0
             .default_model;
-
-        let tool_error = runtime
-            .block_on(handle_generic_chat_completions(
-                std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(model_id.clone()),
-                    messages: vec![ChatCompletionMessage::text("user", "hello")],
-                    temperature: Some(0.0),
-                    max_tokens: Some(1),
-                    stop: None,
-                    stream: false,
-                    tools: vec![weather_tool_definition()],
-                    tool_choice: None,
-                    response_format: None,
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("gemma4 tool calling should fail closed");
-        let tool_payload = runtime.block_on(response_json(tool_error.into_response()))?;
-        assert!(
-            tool_payload["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("lacks tool-calling support")
-        );
 
         let structured_output_error = runtime
             .block_on(handle_generic_chat_completions(
@@ -10616,39 +11463,6 @@ mod tests {
             serde_json::json!(
                 "multimodal inputs are unavailable on the current `gemma4` generic prompt-render path"
             )
-        );
-
-        let responses_error = runtime
-            .block_on(handle_generic_responses(
-                std::sync::Arc::clone(&server.state),
-                ResponsesRequest {
-                    model: Some(model_id),
-                    instructions: None,
-                    conversation: None,
-                    input: ResponsesInput::Text(String::from("hello")),
-                    temperature: Some(0.0),
-                    max_output_tokens: Some(1),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    previous_response_id: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_response_state: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("gemma4 should refuse responses");
-        let response = responses_error.into_response();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-        let payload = runtime.block_on(response_json(response))?;
-        assert!(
-            payload["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("/v1/chat/completions")
         );
         Ok(())
     }
@@ -11832,6 +12646,7 @@ mod tests {
                 GgufDecoderFamily::Qwen35,
             )?,
             tool_contract_from_chat_request(&request, false)?.as_ref(),
+            GgufDecoderFamily::Qwen35,
         );
         let content = GgufContent::read_path(&qwen35_path)?;
         let renderer = GgufPromptTemplateRenderer::new(
@@ -11889,6 +12704,7 @@ mod tests {
                 GgufDecoderFamily::Qwen35,
             )?,
             tool_contract_from_chat_request(&request, false)?.as_ref(),
+            GgufDecoderFamily::Qwen35,
         );
         let content = GgufContent::read_path(&qwen35_path)?;
         let renderer = GgufPromptTemplateRenderer::new(
@@ -15556,6 +16372,18 @@ mod tests {
     }
 
     fn dense_gemma4_metadata_with_chat_template(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        dense_gemma4_metadata_with_chat_template_and_tokens(
+            name,
+            vec![
+                "<unk>", "<bos>", "<eos>", "<|turn>", "<turn|>", "hello", "world",
+            ],
+        )
+    }
+
+    fn dense_gemma4_metadata_with_chat_template_and_tokens(
+        name: &str,
+        tokens: Vec<&str>,
+    ) -> Vec<(String, GgufMetadataValue)> {
         let mut metadata = dense_family_header("gemma4", name);
         metadata.push((
             String::from("tokenizer.ggml.pre"),
@@ -15565,9 +16393,7 @@ mod tests {
             String::from("tokenizer.chat_template"),
             GgufMetadataValue::String(gemma4_chat_template().to_string()),
         ));
-        metadata.extend(sentencepiece_tokenizer_metadata_entries_with_tokens(vec![
-            "<unk>", "<bos>", "<eos>", "<|turn>", "<turn|>", "hello", "world",
-        ]));
+        metadata.extend(sentencepiece_tokenizer_metadata_entries_with_tokens(tokens));
         metadata
     }
 
@@ -15664,13 +16490,16 @@ mod tests {
         );
         tools.insert(String::from("get_time"), time_tool_definition().function);
 
-        let structured = structured_output_from_tool_contract(Some(&ToolCallingContract {
-            tools,
-            mode: ToolChoiceMode::Required,
-            named_tool: None,
-            parallel_tool_calls: true,
-            minimum_required_tool_calls: 1,
-        }))
+        let structured = structured_output_from_tool_contract(
+            Some(&ToolCallingContract {
+                tools,
+                mode: ToolChoiceMode::Required,
+                named_tool: None,
+                parallel_tool_calls: true,
+                minimum_required_tool_calls: 1,
+            }),
+            GgufDecoderFamily::Llama,
+        )
         .expect("tool contract should compile")
         .expect("required tool contract should surface a schema");
 
@@ -15720,9 +16549,14 @@ mod tests {
             }),
         });
 
-        let outcome = tool_call_outcome_from_response("req-test", &response, Some(&contract))
-            .expect("json schema tool batch should parse")
-            .expect("tool outcome should exist");
+        let outcome = tool_call_outcome_from_response(
+            "req-test",
+            GgufDecoderFamily::Llama,
+            &response,
+            Some(&contract),
+        )
+        .expect("json schema tool batch should parse")
+        .expect("tool outcome should exist");
 
         assert_eq!(outcome.tool_calls.len(), 2);
         assert_eq!(outcome.tool_calls[0].name, "get_weather");
@@ -15747,9 +16581,14 @@ mod tests {
         };
         let response = test_generation_response("plain assistant answer");
 
-        let outcome = tool_call_outcome_from_response("req-test", &response, Some(&contract))
-            .expect("auto tool mode should accept plain assistant text")
-            .expect("tool outcome should exist");
+        let outcome = tool_call_outcome_from_response(
+            "req-test",
+            GgufDecoderFamily::Llama,
+            &response,
+            Some(&contract),
+        )
+        .expect("auto tool mode should accept plain assistant text")
+        .expect("tool outcome should exist");
 
         assert_eq!(outcome.content.as_deref(), Some("plain assistant answer"));
         assert!(outcome.tool_calls.is_empty());
@@ -15800,13 +16639,16 @@ mod tests {
             weather_tool_definition().function,
         );
         tools.insert(String::from("get_time"), time_tool_definition().function);
-        let prompt = tool_prompt_message(&ToolCallingContract {
-            tools,
-            mode: ToolChoiceMode::Required,
-            named_tool: None,
-            parallel_tool_calls: true,
-            minimum_required_tool_calls: 1,
-        });
+        let prompt = tool_prompt_message(
+            &ToolCallingContract {
+                tools,
+                mode: ToolChoiceMode::Required,
+                named_tool: None,
+                parallel_tool_calls: true,
+                minimum_required_tool_calls: 1,
+            },
+            GgufDecoderFamily::Llama,
+        );
         assert_eq!(prompt.role, PromptMessageRole::Developer);
         assert!(
             prompt
@@ -15819,6 +16661,30 @@ mod tests {
                 .content
                 .contains("repeat one tool instead of another")
         );
+    }
+
+    #[test]
+    fn gemma4_parallel_tool_prompt_uses_explicit_block_contract() {
+        let mut tools = BTreeMap::new();
+        tools.insert(
+            String::from("get_weather"),
+            weather_tool_definition().function,
+        );
+        tools.insert(String::from("get_time"), time_tool_definition().function);
+        let prompt = tool_prompt_message(
+            &ToolCallingContract {
+                tools,
+                mode: ToolChoiceMode::Required,
+                named_tool: None,
+                parallel_tool_calls: true,
+                minimum_required_tool_calls: 1,
+            },
+            GgufDecoderFamily::Gemma4,
+        );
+        assert_eq!(prompt.role, PromptMessageRole::Developer);
+        assert!(prompt.content.contains(super::GEMMA4_TOOL_CALL_START));
+        assert!(prompt.content.contains(super::GEMMA4_TOOL_CALL_END));
+        assert!(prompt.content.contains("sort argument keys alphabetically"));
     }
 
     #[test]
@@ -16340,6 +17206,14 @@ mod tests {
         vocab_size: usize,
         hello_token_index: usize,
     ) -> Vec<TestGgufTensor> {
+        dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(vocab_size, hello_token_index, 0)
+    }
+
+    fn dense_gemma4_cuda_decoder_tensors_with_vocab_and_output(
+        vocab_size: usize,
+        hello_token_index: usize,
+        output_token_index: usize,
+    ) -> Vec<TestGgufTensor> {
         vec![
             dense_tensor(
                 "token_embd.weight",
@@ -16347,7 +17221,11 @@ mod tests {
                 token_embedding_values(vocab_size, hello_token_index),
             ),
             dense_tensor("output_norm.weight", vec![4], vec![1.0, 1.0, 1.0, 1.0]),
-            quantized_q8_0_tensor("output.weight", vec![vocab_size, 4]),
+            dense_tensor(
+                "output.weight",
+                vec![vocab_size, 4],
+                output_values(vocab_size, output_token_index),
+            ),
             dense_tensor("blk.0.attn_norm.weight", vec![4], vec![1.0, 1.0, 1.0, 1.0]),
             quantized_q8_0_tensor("blk.0.attn_q.weight", vec![4, 4]),
             quantized_q8_0_tensor("blk.0.attn_k.weight", vec![2, 4]),

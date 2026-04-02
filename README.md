@@ -30,6 +30,8 @@ evidence.
   - local GPT-OSS server and benchmark harness
   - generic OpenAI-compatible server surfaces
   - hardware validation and backend truth
+  - bounded non-`GptOss` lanes including `qwen35` and dense `gemma4:e4b`
+    with model-specific admitted endpoint and tool-state truth
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
   - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
 - Hermes agent backend
