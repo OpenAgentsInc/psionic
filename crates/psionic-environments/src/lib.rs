@@ -6,6 +6,7 @@
 )]
 
 mod apple_adapter;
+mod runtime_service;
 mod tassadar;
 mod tassadar_delegation_benchmark;
 mod tassadar_universality_witness_suite;
@@ -21,6 +22,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub use apple_adapter::*;
+pub use runtime_service::*;
 pub use tassadar::*;
 pub use tassadar_delegation_benchmark::*;
 pub use tassadar_universality_witness_suite::*;
@@ -1151,6 +1153,30 @@ impl EnvironmentRuntimeSession {
         &self.package.key
     }
 
+    /// Returns the stable session identifier.
+    #[must_use]
+    pub fn session_id(&self) -> &str {
+        self.session_id.as_str()
+    }
+
+    /// Returns the stable task identifier.
+    #[must_use]
+    pub fn task_id(&self) -> &str {
+        self.task_id.as_str()
+    }
+
+    /// Returns the current completed turn count.
+    #[must_use]
+    pub const fn turn_count(&self) -> u32 {
+        self.turn_count
+    }
+
+    /// Returns the current tool invocation count.
+    #[must_use]
+    pub const fn tool_invocation_count(&self) -> u32 {
+        self.tool_invocation_count
+    }
+
     /// Starts a new turn.
     pub fn begin_turn(
         &mut self,
@@ -1849,6 +1875,12 @@ pub struct EnvironmentRegistry {
 }
 
 impl EnvironmentRegistry {
+    /// Returns the number of installed package versions tracked by the registry.
+    #[must_use]
+    pub fn installed_package_count(&self) -> usize {
+        self.installs.len()
+    }
+
     /// Installs one validated package into the registry.
     pub fn install_package(
         &mut self,
@@ -2036,6 +2068,14 @@ impl EnvironmentRegistry {
                 .unwrap_or_default(),
             supported_workloads: package.supported_workloads.clone(),
         })
+    }
+
+    /// Resolves one installed package version directly by immutable key.
+    pub fn resolve_package(
+        &self,
+        package_key: &EnvironmentPackageKey,
+    ) -> Result<EnvironmentPackageContract, EnvironmentRegistryError> {
+        Ok(self.require_installed_package(package_key)?.clone())
     }
 
     /// Resolves one composition group for the selected surface.

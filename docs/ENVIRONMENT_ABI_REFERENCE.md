@@ -18,6 +18,15 @@ The issue landed the `psionic-environments` crate with:
 - a deterministic in-memory `EnvironmentRuntimeSession`
 - session receipts and final session summaries
 
+On 2026-04-01, the crate also gained the first bounded live runtime service
+above that session machine:
+
+- a reusable `EnvironmentRuntimeService`
+- bounded worker-pool and queue policy
+- typed submission, activation, and completion receipts
+- explicit RL and eval workload admission
+- dataset/sample cursor tracking for deterministic task iteration
+
 On 2026-03-15, issue `#3622` extended that same crate with a repo-owned Apple
 adapter environment bundle:
 
@@ -82,15 +91,16 @@ The current harness should prove:
 
 ## Current Limitations
 
-This issue intentionally does not claim:
+The environment layer still does not claim:
 
-- eval runtime implementation
-- rollout worker or sandbox pooling protocols
+- remote multi-process worker execution
+- sandbox-pool implementation beyond the runtime contract boundary
 - broader benchmark adjudication beyond the package contract itself
 
 Package-shape metadata for workload classes, policy refs, difficulty metadata,
 and benchmark profiles now live in
 `ENVIRONMENT_PACKAGE_CONTRACT_REFERENCE.md`. Registry install, pinning,
 composition, and train/eval parity now live in
-`ENVIRONMENT_REGISTRY_REFERENCE.md`. This issue makes the reusable ABI and
-runtime session contract real first.
+`ENVIRONMENT_REGISTRY_REFERENCE.md`. The live runtime-service layer now lives
+in `ENVIRONMENT_RUNTIME_SERVICE_REFERENCE.md`. This doc remains the canonical
+ABI and session-state reference.
