@@ -22,15 +22,16 @@ than just run tensor math.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
-- `Gemma 4` is now a partially implemented Psionic serving lane on this
-  checkout.
-  The first frozen `Gemma 4` target remains:
+- `Gemma 4` now has one published bounded Psionic lane on this checkout.
+  The canonical publication doc is
+  `docs/NON_GPT_OSS_GEMMA4_PILOT.md`.
+  The first frozen target remains:
   - artifact = `gemma4:e4b`
   - family shape = dense `Gemma 4`
   - first claim = one bounded text-generation lane on CUDA
   - first publication bar = truthful backend, execution mode, execution
     engine, and refusal metadata on the generic OpenAI-compatible server
-- The current bounded `Gemma 4` implementation now provides:
+- The published bounded `Gemma 4` lane now provides:
   - native Psionic CUDA runtime admission for dense quantized GGUF projection
     artifacts
   - `backend = cuda`

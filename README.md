@@ -31,6 +31,7 @@ evidence.
   - generic OpenAI-compatible server surfaces
   - hardware validation and backend truth
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
+  - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
 - Hermes agent backend
   - use Psionic as a real Hermes backend over the OpenAI-compatible
     `chat.completions` path

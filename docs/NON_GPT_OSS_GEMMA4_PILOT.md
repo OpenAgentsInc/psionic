@@ -1,14 +1,21 @@
 # Non-GPT-OSS Gemma 4 Pilot
 
-> Status: `partial` on 2026-04-02 after issue `#863`; the first native CUDA
-> runtime plus bounded server and conformance coverage exist, but broader
-> publication remains gated on later issues.
+> Status: `published_bounded_lane` on 2026-04-02 after issues `#864` and
+> `#865`; Psionic now publishes one narrow dense `Gemma 4` CUDA lane and keeps
+> the rest of the family explicitly out of scope.
 
 This document freezes what the first honest `Gemma 4` claim means and now
-tracks the first bounded implementation state.
+records the published first lane.
 
 It still does not mean that the whole `Gemma 4` family is implemented on this
 checkout.
+
+The pilot row is the local `e4b` artifact at:
+
+- default path:
+  `/Users/christopherdavid/models/gemma4/gemma4-e4b-ollama.gguf`
+- canonical model id:
+  `gemma4:e4b`
 
 ## Frozen First Target
 
@@ -40,6 +47,27 @@ When this lane is implemented, the publication bar is:
 - refusal-required unsupported regions stay explicit in capability and health
   publication
 
+## Published Lane
+
+Psionic now publishes exactly one bounded dense `Gemma 4` lane:
+
+- artifact = `gemma4:e4b`
+- family shape = dense only
+- accelerator = CUDA
+- runtime = native Psionic GGUF runtime
+- local server surface = generic OpenAI-compatible server
+- admitted request surface = `/v1/chat/completions`
+- admitted publication surfaces = `/health`, `/v1/models`, and response
+  headers
+- distributed proof surface = one bootstrap-routed remote `gemma4:e4b` lane
+  with honest proxy publication
+
+This published lane is not the claim "Psionic supports Gemma 4" in the broad
+sense. It is the smaller claim that Psionic can admit one dense `Gemma 4`
+artifact, execute it natively on CUDA, route to the same family through the
+mesh bootstrap path, and keep unsupported regions refused instead of widening
+the claim by implication.
+
 ## Explicit Non-Goals
 
 The first `Gemma 4` claim does not include:
@@ -58,8 +86,9 @@ complete the first published `Gemma 4` milestone.
 
 ## Current Repo State
 
-After issues `#861` through `#863`, the repo now has the first honest
-`Gemma 4` admission, runtime, and bounded conformance work:
+After issues `#861` through `#865`, the repo now has the first honest
+published `Gemma 4` admission, runtime, bounded mesh validation, and
+conformance work:
 
 - `psionic-models` now classifies `general.architecture = gemma4` as its own
   decoder family instead of silently aliasing it to `llama`, `qwen`, or
@@ -88,6 +117,9 @@ After issues `#861` through `#863`, the repo now has the first honest
 - the conformance harness now accepts the real `gemma4:e4b` fixture shape and
   the repo now carries one repeatable `gemma4:e4b` CUDA conformance repeat
   test that runs when both the pilot GGUF and a CUDA host are available.
+- the same `gemma4:e4b` lane now also has one first distributed bootstrap-mesh
+  validation path, keeping routed remote publication explicit instead of
+  silently widening the thin-client lane.
 - the managed dense-GGUF lane now allocates whole-model KV-cache width instead
   of silently falling back to one-layer fixture geometry, and the repo now
   carries a multi-layer regression that keeps that boundary explicit.
@@ -100,8 +132,67 @@ What still does not exist:
 
 - no tool-calling or `/v1/responses` Gemma semantics
 - no image, video, or audio Gemma lane
-- no broad published support claim beyond the bounded runtime, server
-  admission, and repo-owned conformance coverage
+- no broader published support claim beyond the bounded dense CUDA lane,
+  server admission, routed mesh validation, and repo-owned conformance
+  coverage
+
+## Canonical Repeat
+
+The published lane is repeatable through repo-owned tests.
+
+Documented local validation:
+
+```bash
+cargo test -p psionic-serve conformance --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve gemma4 --manifest-path Cargo.toml --no-default-features
+```
+
+Real-artifact repeat lane:
+
+```bash
+PSIONIC_GEMMA4_PILOT_GGUF_PATH=/abs/path/to/gemma4-e4b-ollama.gguf \
+  cargo test -p psionic-serve \
+  gemma4_e4b_cuda_conformance_repeat_is_machine_checkable_when_available \
+  --manifest-path Cargo.toml --no-default-features
+```
+
+Those runs are the current publication bar. They prove:
+
+- bounded prompt-render and fixture alignment for the real `gemma4:e4b`
+  instruction-first shape
+- dense `Gemma 4` family admission and fail-closed refusal for expert-bearing
+  `Gemma 4` artifacts
+- native CUDA load planning for quantized dense projection artifacts
+- honest generic-server publication with:
+  - `backend = cuda`
+  - `execution_mode = native`
+  - `execution_engine = psionic`
+- admitted `/v1/chat/completions` execution on the bounded lane
+- explicit refusal for:
+  - tool calling
+  - structured outputs
+  - multimodal inputs
+  - `/v1/responses`
+- repeatable real-artifact CUDA conformance against the local `e4b` GGUF when
+  both the artifact and a usable CUDA host are present
+- bootstrap-routed mesh publication that keeps remote `Gemma 4` route truth
+  explicit instead of widening the thin-client claim
+
+## Pass Criteria
+
+The pilot stays green only if all of the following remain true:
+
+- `gemma4:e4b` is still admitted as dense `gemma4`
+- the bounded text template remains aligned to the real `e4b` tokenizer facts
+- the native CUDA runtime still loads the dense GGUF lane without silently
+  degrading to another family or engine
+- the generic server still publishes truthful backend, execution-mode, and
+  execution-engine metadata
+- the generic server still admits `/v1/chat/completions`
+- `/v1/responses`, tool calling, structured outputs, and multimodal inputs
+  still fail closed on the published lane
+- mesh bootstrap publication keeps routed remote truth explicit and does not
+  borrow a local host's wider endpoint claim
 
 ## Why The Claim Is Narrow
 
