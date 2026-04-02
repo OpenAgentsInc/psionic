@@ -445,119 +445,359 @@ If we want to absorb the full useful `mesh-llm` surface into our own codebase
 without keeping `mesh-llm` as a parallel product, the work should be staged as
 one explicit GitHub issue sequence.
 
+I re-checked the current code before expanding this sequence. The relevant
+anchors are:
+
+- `competition/repos/mesh-llm/mesh-llm/src/api.rs`
+- `competition/repos/mesh-llm/mesh-llm/src/mesh.rs`
+- `competition/repos/mesh-llm/mesh-llm/src/proxy.rs`
+- `competition/repos/mesh-llm/mesh-llm/src/plugin.rs`
+- `competition/repos/mesh-llm/mesh-llm/src/plugin_mcp.rs`
+- `crates/psionic-net/src/lib.rs`
+- `crates/psionic-cluster/src/ordered_state.rs`
+- `crates/psionic-cluster/src/replicated_serving.rs`
+- `crates/psionic-router/src/lib.rs`
+- `crates/psionic-serve/src/openai_http.rs`
+- `crates/psionic-serve/src/bin/psionic-gpt-oss-server.rs`
+- `../openagents/apps/autopilot-desktop/src/desktop_control.rs`
+- `../openagents/apps/autopilot-desktop/src/bin/autopilotctl.rs`
+- `../openagents/crates/openagents-provider-substrate/src/lib.rs`
+- `../probe/crates/probe-protocol/src/backend.rs`
+- `../probe/crates/probe-core/src/backend_profiles.rs`
+- `../probe/crates/probe-server/src/server.rs`
+- `../probe/docs/11-server-attach-and-launch.md`
+
 The sequence should be:
 
 1. `psionic`: "Freeze mesh-integration target and owner split"
-   This issue should lock the porting boundary before code spreads. It should
-   state directly that `psionic` owns runtime, transport, topology, and mesh
-   truth, `openagents` owns compute-market and provider productization above
-   that truth, and `probe` owns agent-runtime integration above the inference
-   backend.
+   Current anchors already show the natural boundaries. `psionic-serve` owns
+   the serving API, `psionic-net` owns identity, admission, discovery, and
+   tunnels, `psionic-cluster` owns ordered topology and warm-replica truth,
+   `openagents` owns the operator and market surfaces, and `probe` owns backend
+   attach semantics. This issue should turn that into one short canonical spec
+   under `psionic/docs/`.
+   Scope: define the owned terms for `mesh`, `join`, `invite`, `bootstrap
+   proxy`, `thin client`, `standby`, and `pooled inference`. State explicitly
+   that market product IDs, receipts, payout, and provider UI remain outside
+   `psionic`.
+   Acceptance: later issues may add new crates or types, but they may not move
+   wallet or settlement logic into `psionic`, and they may not move transport
+   or topology truth into `openagents` or `probe`.
+   Depends on: none.
 
 2. `psionic`: "Add mesh node-role contract"
-   Port the explicit `host`, `worker`, `standby`, and `thin_client` role model
-   into a typed Psionic contract with machine-readable status publication,
-   refusal states, and upgrade or downgrade reasons.
+   `mesh-llm` has a serving-facing `NodeRole` of `worker`, `host`, and
+   `client`. `psionic-net` already has a transport-facing `NodeRole` of
+   `CoordinatorOnly`, `ExecutorOnly`, and `Mixed`. Those are not the same
+   contract. This issue should add a second typed role layer instead of
+   overloading the existing transport enum.
+   Scope: introduce a served-mesh role contract that can express `host`,
+   `worker`, `standby`, and `thin_client`, plus machine-readable transition or
+   refusal reasons such as `warming`, `artifact_missing`, `admission_refused`,
+   `draining`, and `remote_only`. Publish both the transport role and the
+   served-mesh role in management state.
+   Likely landing points: `psionic-net` for identity publication shape,
+   `psionic-cluster` for role transitions, and `psionic-serve` for operator
+   serialization.
+   Acceptance: one node can honestly report "mixed transport role, standby
+   serving role" without inventing ambiguous hybrid labels.
+   Depends on: 1.
 
 3. `psionic`: "Add mesh identity, invite, and join contract"
-   Port the mesh identity and join semantics into Psionic-owned manifests and
-   receipts. This should cover private mesh identity, named mesh identity,
-   invite-token or join-package format, and last-joined mesh preference
-   tracking without inheriting `mesh-llm`'s exact external contract blindly.
+   `psionic-net` already has most of the low-level pieces: `ClusterAdmissionConfig`,
+   `LocalClusterConfig`, `ClusterDiscoveryCandidate`,
+   `ClusterIntroductionPolicy`, `SignedClusterIntroductionEnvelope`,
+   `ClusterCandidateAdmissionDecision`, and file-backed network-state
+   persistence. `mesh-llm` adds the operator experience around those facts.
+   Scope: define one durable join bundle that carries a mesh label, namespace,
+   admission material or signed introduction envelope, advertised control-plane
+   addresses, and the minimum trust-policy metadata required for honest import.
+   Persist last-joined mesh preference and last-imported join bundle separately
+   from transient transport state.
+   Non-goal: do not copy `mesh-llm`'s invite token format byte-for-byte. The
+   contract should be built on top of Psionic admission and introduction types.
+   Acceptance: a node can export a join bundle, another node can import it into
+   file-backed network state, and the resulting admission decision is visible
+   as typed refusal reasons or acceptance state.
+   Depends on: 1, 2.
 
 4. `psionic`: "Add inference-mesh management API"
-   Port the small operator API shape into Psionic. The minimum useful surface
-   is a Psionic-owned equivalent of status, event stream, discoverable meshes,
-   and join status, with runtime truth and capability publication folded into
-   the same surface instead of sitting beside it.
+   `mesh-llm/src/api.rs` exposes `/api/status`, `/api/runtime`,
+   `/api/runtime/processes`, `/api/events`, `/api/discover`, and local
+   model-control routes. `psionic-serve/src/openai_http.rs` currently exposes
+   `/health`, `/v1/models`, `/v1/chat/completions`, `/v1/responses`, and
+   `/v1/embeddings`. `openagents` already expects a separate operator API shape
+   through `desktop_control.rs` with `/v1/snapshot`, `/v1/events`, and
+   `/v1/action`.
+   Scope: add a separate Psionic management namespace rather than bloating the
+   OpenAI-compatible paths. The minimum useful surface is status, event stream,
+   discovery state, join state, loaded model state, replica warm state, and
+   per-node route inventory.
+   Likely response sources: `ClusterMembershipRecord`,
+   `ClusterCandidateAdmissionDecision`, `ClusterReplicaSnapshot`,
+   `ClusterReplicaLifecyclePolicy`, `FleetRouter::inventory`, and explicit
+   local backend truth from `openai_http.rs`.
+   Acceptance: a single management request can answer "what nodes exist, what
+   role each node is in, what models are warm, what join state is pending, and
+   what routes are available" without scraping logs.
+   Depends on: 1, 2, 3.
 
 5. `psionic`: "Add bootstrap proxy and thin-client mode"
-   Port the join-before-load experience. A thin client or joining worker should
-   be able to attach to an existing mesh and serve requests through a bootstrap
-   proxy before local warmup is complete, while keeping runtime identity and
-   fallback posture explicit.
+   `mesh-llm/src/proxy.rs` already proves the useful behavior: buffer one HTTP
+   request, inspect the requested `model`, and forward early while the local
+   node is cold. `psionic-serve` already has `RoutingRequest`, `RouteSelection`,
+   `RoutedWarmState`, and worker inventory. The missing piece is the join-time
+   experience.
+   Scope: allow a thin client or joining worker to bind the normal
+   OpenAI-compatible API locally while routing to an existing warm peer until
+   local artifact load completes. Support `/v1/chat/completions`,
+   `/v1/responses`, and `/v1/embeddings` where the selected remote worker can
+   honestly satisfy the route.
+   Important constraint: proxied service must still publish explicit route
+   provenance, warm-state reason, and fallback posture. A cold node cannot
+   pretend it executed locally.
+   Acceptance: a node in `thin_client` or `warming` role can answer requests
+   immediately, and the operator API shows that the traffic was proxied rather
+   than locally served.
+   Depends on: 2, 4.
 
 6. `psionic`: "Add QUIC mesh transport for remote inference lanes"
-   Port the tunnel and peer-management class of behavior into Psionic-owned
-   transport instead of a llama.cpp sidecar. This issue should cover stream
-   families, admission model, peer lifecycle, reconnect or death handling, and
-   direct worker-to-worker transfer rules for native Psionic execution lanes.
+   `mesh-llm/src/mesh.rs` uses iroh QUIC with multiplexed control and tunnel
+   streams. `psionic-net` already has trusted-LAN admission, signed identity,
+   tunnel policy, and file-backed wider-network trust state, but it is still
+   shaped around the current local cluster seam. This issue should add the
+   remote transport seam without breaking the existing evidence model.
+   Scope: add one remote-capable transport class for gossip, join control,
+   management subscription, and request forwarding. Reuse Psionic admission,
+   trust, and attestation checks. Preserve explicit tunnel policy and bounded
+   service exposure rather than creating an untyped "mesh connection".
+   Design rule: transport choice is an implementation detail. The public truth
+   is membership, trust, tunnel policy, and route availability.
+   Acceptance: two nodes can form a mesh across non-LAN boundaries, preserve
+   node identity and admission truth, and survive disconnect or reconnect with
+   deterministic membership transitions.
+   Depends on: 3, 4, 5.
 
 7. `psionic`: "Add per-model host election and standby promotion"
-   Port the simple operational control loop that makes the mesh usable:
-   per-model election groups, standby promotion, and demotion or reassignment
-   when topology or model availability changes.
+   `psionic-cluster/src/ordered_state.rs` already contains the right building
+   blocks: `ClusterTerm`, `ClusterLeaseTick`, `ClusterEventIndex`, and typed
+   membership state. `psionic-cluster/src/replicated_serving.rs` already has
+   `ClusterReplicaSnapshot` and `ClusterReplicaLifecyclePolicy`. What is still
+   missing is the operator-facing host-election loop from `mesh-llm`.
+   Scope: add one ordered per-model lease or election record that decides which
+   node is the active host, which nodes are standby, and when promotion or
+   demotion occurs. Keep the election state in ordered cluster truth rather
+   than in transient serve-layer memory.
+   Acceptance: failover from active host to standby produces one explicit term
+   change, one explicit reason, and one updated management snapshot. No two
+   nodes may both claim to be the active host for the same model lane under the
+   same term.
+   Depends on: 2, 4, 6.
 
 8. `psionic`: "Add demand gossip and hot-model rebalance"
-   Port request-rate and demand propagation into native Psionic mesh status so
-   large or idle nodes can promote the right model family without operator
-   guesswork. This issue should stay tied to explicit receipts and not become
-   hidden heuristics.
+   `mesh-llm/src/mesh.rs` has a simple `ModelDemand` map with TTL, request
+   counts, requested-model declarations, and an RTT gate. `psionic-router`
+   already has `RoutingRequest`, `RouteSelectionMetrics`, and warm-aware or
+   cache-aware policies. `psionic-cluster` already has replica lifecycle truth.
+   Scope: add a Psionic-native demand snapshot keyed by product ID, model ID,
+   and maybe route alias. Feed that snapshot into `ClusterReplicaLifecyclePolicy`
+   so target warm-replica counts and standby promotions respond to real use.
+   Keep the policy legible. This should emit state like "promoted because
+   demand_count rose above threshold" rather than opaque heuristics.
+   Acceptance: stale demand expires predictably, hot demand increases target
+   warm capacity, and management state shows the policy reason for every
+   promotion or unload.
+   Depends on: 4, 6, 7.
 
 9. `psionic`: "Add multi-model mesh router"
-   Port model-aware routing above the native Psionic serving lanes so a mesh
-   can host several models at once and route by request `model` field while
-   keeping per-model capability envelopes explicit.
+   `psionic-router` is already close. `RoutingEndpoint`, `RoutingTarget`,
+   `RoutedModelInventory`, `RoutedWorkerInventory`, `RouteSelection`, and
+   `FleetRouter` already capture most of the routing truth. Today that
+   inventory is still mostly local-serving oriented.
+   Scope: make the router inventory mesh-native. One worker inventory entry
+   should be able to represent a remote peer, its served models, its endpoint
+   support, its warm state, and its execution truth. Route selection should be
+   able to choose between local and remote workers without changing the public
+   request schema.
+   Important detail: `/v1/models` must return the routed union of mesh-visible
+   models, and route selection should preserve capability filters for tool
+   calling, structured outputs, and response-state support.
+   Acceptance: one mesh can serve several model families at once, and route
+   selection stays typed and explainable instead of falling back to ad hoc
+   proxy logic.
+   Depends on: 4, 5, 6, 8.
 
 10. `psionic`: "Add operator console surface for inference mesh"
-    Port the best part of the `mesh-llm` user story: a live topology and model
-    view that makes the system legible. This can start as a thin web console or
-    equivalent operator surface backed entirely by the Psionic management API.
+    `mesh-llm`'s strongest product move is the embedded dashboard. `psionic`
+    does not need to copy the exact UI, but it does need a first-party operator
+    surface that makes the mesh legible before `openagents` layers product UX
+    on top.
+    Scope: add a thin console that consumes only the Psionic management API and
+    shows peers, roles, join state, demand, per-model host election, warm
+    replicas, routed endpoints, and refusal reasons. Keep mutation narrow at
+    first: join, leave, load, unload, and maybe standby or drain controls.
+    Likely landing point: `psionic-serve` web assets plus the new management
+    routes, not `openagents`.
+    Acceptance: an operator can diagnose "why is this model not serving" and
+    "which node is hot standby right now" from the console without opening
+    logs or source.
+    Depends on: 4, 7, 8, 9.
 
 11. `psionic`: "Add published install and service mode for mesh lanes"
-    Port the operational packaging layer: install script, background service
-    posture, cold-start rules, and upgrade-safe runtime layout. This matters
-    because the current gap is not only runtime logic. It is operator
-    repeatability.
+    `psionic-gpt-oss-server` currently exposes a low-level binary with explicit
+    flags for model path, backend, host, port, context length, GPU layers, and
+    reasoning budget. That is useful for development. It is not the same as a
+    stable operator install story.
+    Scope: add one supported mesh-service entrypoint with a durable runtime
+    layout for identity, network state, model cache, logs, and config. Provide
+    one service-mode story for macOS and Linux, plus a documented upgrade path
+    that preserves node identity and join state.
+    Design rule: the service wrapper should compose existing `psionic-serve`,
+    `psionic-net`, and management API contracts instead of hiding them behind
+    opaque shell scripts.
+    Acceptance: a new machine can install the mesh lane, restart it after a
+    reboot, and come back with the same node identity and trusted mesh
+    membership.
+    Depends on: 3, 4, 6, 10.
 
 12. `psionic`: "Port MoE mesh orchestration into native model-family contracts"
-    Port the useful orchestration ideas from `mesh-llm`'s expert-sharding lane
-    into Psionic-owned model-family logic. Do not import llama.cpp-specific
-    assumptions. Keep the port focused on the control plane, assignment logic,
-    and zero-cross-node-traffic design where it remains valid.
+    `mesh-llm` has useful control-plane ideas around expert placement and
+    low-cross-node-traffic execution. `psionic-cluster` already has native
+    distributed execution surfaces in `tensor_sharded.rs`, `pipeline_sharded.rs`,
+    and `replicated_serving.rs`. The port should land there, not in a
+    `llama.cpp`-style RPC wrapper.
+    Scope: add model-family contracts for expert placement, expert-host
+    inventory, assignment digests, and execution topology truth. Reuse
+    `ExecutionTopologyPlan` and the existing sharded-lane evidence patterns.
+    Non-goal: do not import `mesh-llm`'s backend assumptions, GGUF-specific
+    process topology, or direct llama.cpp RPC orchestration.
+    Acceptance: Psionic can describe an MoE lane with native topology truth,
+    explicit artifact identity, and honest refusal when the required expert
+    placement cannot be satisfied.
+    Depends on: 6, 7, 8, 9.
 
 13. `psionic`: "Port blackboard-class shared coordination surface"
-    Port the blackboard idea into a Psionic-adjacent coordination primitive
-    only if it is defined as a clear optional surface and not as hidden runtime
-    state. This issue should focus on message propagation, search, retention,
-    privacy posture, and machine-readable transport semantics.
+    `mesh-llm` exposes `/api/blackboard/feed`, `/api/blackboard/search`, and
+    `/api/blackboard/post`, backed by the built-in `blackboard` plugin and MCP
+    bridge. The useful part is the cross-node coordination seam. The risky part
+    is letting it become hidden runtime state.
+    Scope: add an optional coordination surface with typed post, feed, search,
+    TTL, provenance, visibility, and redaction semantics. Keep it outside the
+    critical execution path. A dedicated crate is likely cleaner than pushing
+    this into `psionic-serve` or `psionic-router` directly.
+    Important boundary: this is shared mesh coordination, not task truth,
+    approval truth, or transcript truth.
+    Acceptance: a mesh can share short-lived findings or status across nodes,
+    and operators can disable the feature entirely without affecting inference
+    correctness.
+    Depends on: 4, 6.
 
 14. `probe`: "Add mesh-backed backend profile and attach flow"
-    Once the Psionic mesh API exists, `probe` should get a first-class backend
-    profile that can target a Psionic mesh directly, including attach, health,
-    model selection, and explicit degraded-mode messaging.
+    `probe-protocol/src/backend.rs` currently has `OpenAiChatCompletions`,
+    `OpenAiCodexSubscription`, and `AppleFmBridge`. `probe-core` has named
+    local profiles like `psionic-qwen35-2b-q8-registry`. `probe/docs/11-server-attach-and-launch.md`
+    already defines the attach-versus-launch boundary. The new mesh lane should
+    fit that model cleanly.
+    Scope: add one Probe-owned backend profile that targets a Psionic mesh
+    control plane and one attach flow that resolves the effective OpenAI base
+    URL plus available model inventory from the management API. Preserve the
+    rule that Probe does not own backend startup semantics for the mesh.
+    Design choice: either add a new `BackendKind` such as `PsionicMesh`, or
+    extend the OpenAI-compatible profile with an explicit control-plane URL and
+    discovery mode. The issue should settle that shape deliberately.
+    Acceptance: Probe can attach to a mesh, list targetable models, surface
+    degraded or proxied-mode truth, and continue to use typed session metadata.
+    Depends on: 4, 5, 9.
 
 15. `probe`: "Integrate shared blackboard or mesh coordination adjunct"
-    If the blackboard-class surface lands, `probe` should expose it as an
-    optional adjunct to sessions instead of building a second agent-runtime
-    abstraction for the same problem.
+    `probe-server` already owns detached sessions, runtime events, and durable
+    transcript state. The mesh coordination surface should plug in as an
+    optional adjunct, not as a replacement for session history.
+    Scope: add optional read or post tools, or a small session-side panel, that
+    consume the coordination API from issue 13. Keep usage outside transcript
+    invariants and do not treat coordination messages as authoritative task
+    state.
+    Acceptance: a Probe session can query or post shared mesh coordination
+    state while preserving its current transcript, approval, and replay model.
+    Depends on: 13, 14.
 
 16. `openagents`: "Add pooled inference surface to compute-provider product"
-    Once Psionic mesh lanes are real, `openagents` should expose pooled
-    inference as part of the Compute Market provider story, not as a detached
-    engineering demo. This issue should cover provider inventory, operator
-    visibility, and "what is my machine contributing right now?" product
-    surfaces.
+    `openagents/apps/autopilot-desktop/src/desktop_control.rs` already exposes
+    `DesktopControlSnapshot` with `provider`, `local_runtime`, `gpt_oss`,
+    `tailnet`, `tunnels`, and `cluster` sections, plus `/v1/snapshot`,
+    `/v1/events`, and `/v1/action`. The shape is already there. It is still
+    missing pooled inference truth.
+    Scope: extend the desktop-control snapshot and `autopilotctl` surfaces to
+    show mesh membership, served-mesh role, local versus proxied serving state,
+    warm replicas, standby posture, routed model inventory, and demand-driven
+    contribution state. Add new pane or subcommand surfaces rather than burying
+    the mesh inside generic GPT-OSS status.
+    Acceptance: an operator can answer "what is this machine contributing right
+    now" and "am I serving locally, standing by, or proxying into the pool"
+    from Autopilot without using Psionic-only tooling.
+    Depends on: 4, 7, 8, 9, 10.
 
 17. `openagents`: "Bind pooled inference to compute-market product identity"
-    This issue should connect the new mesh substrate to actual Compute Market
-    product identities, capability envelopes, receipts, and settlement-facing
-    provider truth.
+    `openagents-provider-substrate` currently has `ProviderComputeProduct`
+    values such as `psionic.local.inference.gpt_oss.single_node`,
+    `psionic.local.embeddings.gpt_oss.single_node`, and the cluster-attached
+    adapter-training product. The current enum has no first-class pooled
+    inference product family.
+    Scope: add cluster-capable inference products and map them to the existing
+    compute truth vocabulary: `ComputeTopologyKind`, `ComputeProvisioningKind`,
+    backend family, capability summary, and provider health. Expected new
+    product IDs should follow the current naming pattern, for example
+    `psionic.cluster.inference.gpt_oss.remote_whole_request`,
+    `psionic.cluster.inference.gpt_oss.replicated`, and later
+    `psionic.cluster.inference.gpt_oss.tensor_sharded` if the lane is actually
+    marketable.
+    Acceptance: OpenAgents can quote and advertise pooled inference with typed
+    topology and provisioning truth instead of pretending every lane is a
+    single-node product.
+    Depends on: 9, 16.
 
 18. `openagents`: "Add multi-machine join and invite UX above Psionic mesh"
-    Port the good human-facing join flow into Autopilot. The product layer
-    should let a user add another trusted machine quickly, but the underlying
-    truth must remain Psionic-owned.
+    `desktop_control.rs` already has `tailnet`, `tunnels`, and `cluster`
+    sections, and `autopilotctl` already exposes operator subcommands for those
+    surfaces. The missing layer is a human-oriented join flow above Psionic's
+    join contract.
+    Scope: add actions and UI for exporting join packages, importing them on a
+    second machine, showing trust or refusal reasons, and confirming membership
+    state after the join. Tailnet status can help operators discover devices,
+    but Psionic remains the source of truth for actual mesh admission.
+    Acceptance: a user can bring a second machine into the pool from the
+    existing Autopilot operator flow without dropping into raw Psionic config
+    files or manually editing admission state.
+    Depends on: 3, 4, 10, 16, 17.
 
 19. `openagents`: "Connect pooled inference to wallet, earnings, and market receipts"
-    This is where the absorbed mesh work stops being only infra. The pooled
-    inference surface should feed actual provider, payout, and compute-market
-    receipts rather than staying a local-serving convenience layer.
+    This is where the port stops being only an infra improvement. `openagents`
+    already has provider, buyer-procurement, proof, challenge, and wallet
+    surfaces in `desktop_control.rs`, plus Compute Market authority types in
+    the kernel and provider substrate. Pooled inference needs to feed that
+    truth.
+    Scope: add contribution accounting, route or window receipts, and provider
+    earnings semantics for pooled inference. Settlement should understand the
+    difference between single-node serving, remote whole-request serving,
+    replicated standby capacity, and any later sharded lane that is actually
+    sellable.
+    Acceptance: pooled inference produces market-facing provider truth instead
+    of staying a private operator convenience feature, and the product can
+    explain why one contribution earned or did not earn revenue.
+    Depends on: 16, 17.
 
 20. `psionic` plus `openagents`: "Retire standalone mesh sidecar posture"
-    The final issue in the sequence should remove any residual dependency on a
-    parallel `mesh-llm`-style sidecar product and declare the owned mesh lane
-    complete inside our own runtime, product, and market boundaries.
+    The last issue is cleanup, not invention. By this point the owned stack
+    should already have native join flows, management API, routing, operator
+    UI, provider products, and Probe attach support.
+    Scope: remove any remaining sidecar-specific docs, compatibility shims, or
+    operator instructions that imply `mesh-llm` remains a required parallel
+    runtime. Keep the upstream repo only as a read-only harvest reference under
+    `competition/`.
+    Acceptance: the supported path for pooled inference runs entirely through
+    Psionic, OpenAgents, and Probe contracts, and there is no leftover
+    ambiguity about whether the mesh lane belongs to an external sidecar.
+    Depends on: 11, 14, 15, 18, 19.
 
 ## What We Should Not Port
 
