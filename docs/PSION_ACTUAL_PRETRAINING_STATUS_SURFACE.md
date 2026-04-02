@@ -8,7 +8,7 @@ This document freezes one current-status artifact, one retained-summary
 artifact, and one status command for the actual pretraining lane.
 
 The actual-lane launcher now writes those retained files through
-`./TRAIN --lane actual_pretraining start|resume|record-checkpoint|decide-continue-restart`,
+`./TRAIN --lane actual_pretraining start|resume|record-checkpoint|decide-continue-restart|rehearse-base-lane`,
 and the same status command reads them back from a run root.
 
 ## Canonical Artifacts
@@ -95,6 +95,7 @@ family when the operator path advances beyond first launch:
 - `continue_decision_recorded`
 - `hold_decision_recorded`
 - `restart_decision_recorded`
+- `base_lane_rehearsal_complete`
 - `resume_refused_auto_resume`
 
 ## Why This Matters
@@ -106,7 +107,9 @@ inventing ad hoc filenames. The same status command now also prints the latest
 checkpoint-eval decision and score when present, the latest retry-required
 failure and redacted alert when automatic eval could not run, and the latest
 continue-restart decision plus operator action when that retained surface has
-been written.
+been written. When the base-lane proof gate runs, the same status surface ends
+at `phase = base_lane_rehearsal_complete` instead of leaving closeout state
+hidden inside the closeout bundle only.
 
 The remaining hardening work now extends these retained surfaces instead of
 defining them. The companion retained dashboard and active-alert feed now live

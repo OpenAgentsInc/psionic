@@ -270,6 +270,7 @@ That surface gives the repo one real operator path for:
 - `./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref>`
 - `./TRAIN --lane actual_pretraining backup --run-root <path>`
 - `./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path>`
+- `./TRAIN --lane actual_pretraining rehearse-base-lane`
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 - `./TRAIN --lane actual_pretraining dashboard --run-root <path>`
@@ -277,14 +278,17 @@ That surface gives the repo one real operator path for:
 It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty
 working trees by default; retains the selected ref plus exact commit SHA; and
-repeats that provenance in the provisional closeout bundle. It now also
+repeats that provenance in the closeout bundle. It now also
 records accepted checkpoint manifests, durable backup receipts, auto-resume
 receipts, automatic checkpoint-eval decisions, retry-required eval failures,
 retained checkpoint-comparison and continue-restart decision receipts, the
 retained dashboard packet, the retained aggregate active-alert feed,
 redacted alerts, and stale/corrupt-pointer plus failed-upload drills without
 using destructive git commands or leaking raw secret payloads into retained
-artifacts.
+artifacts. The `rehearse-base-lane` path now closes the base lane itself by
+upgrading `closeout/closeout_bundle.json` into a retained proof packet with
+explicit evidence refs, closeout gates, failure-drill recovery evidence, and
+claim-boundary sections.
 
 The repo now also owns the canonical actual-lane hardware observation and
 hardware qualification receipt in

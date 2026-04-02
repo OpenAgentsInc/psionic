@@ -11,6 +11,7 @@ Usage:
   ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
   ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
   ./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path> [options]
+  ./TRAIN --lane actual_pretraining rehearse-base-lane [options]
   ./TRAIN --lane actual_pretraining status --run-root <path>
   ./TRAIN --lane actual_pretraining dashboard --run-root <path>
 
@@ -61,6 +62,16 @@ Options for `decide-continue-restart`:
   --git-ref <ref>          Git ref to resolve for the continue-restart decision provenance. Default: current symbolic ref or HEAD
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
 
+Options for `rehearse-base-lane`:
+  --run-id <id>            Stable run identifier. Default: psion-actual-pretraining-rehearsal-<timestamp>
+  --output-root <path>     Local actual-lane run root. Default: ~/scratch/psion_actual_pretraining_runs/<run_id>
+  --git-ref <ref>          Git ref to resolve for the rehearsal provenance. Default: current symbolic ref or HEAD
+  --hardware-observation <path>
+                           Optional retained hardware observation snapshot to consume instead of probing the local host.
+  --run-shape-observation <path>
+                           Optional retained throughput/storage/dataloader observation snapshot to consume instead of probing the local host.
+  --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
+
 Options for `status` and `dashboard`:
   --run-root <path>        Existing actual-lane run root containing retained status and dashboard surfaces.
 EOF
@@ -75,7 +86,7 @@ command="$1"
 shift
 
 case "${command}" in
-  start|record-checkpoint|backup|resume|decide-continue-restart)
+  start|record-checkpoint|backup|resume|decide-continue-restart|rehearse-base-lane)
     exec cargo run -q -p psionic-train --example psion_actual_pretraining_operator -- "${command}" "$@"
     ;;
   status)

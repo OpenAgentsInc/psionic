@@ -31,9 +31,13 @@ use psionic_train::{
     PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingAlertFeed,
     PsionActualPretrainingArtifactRef, PsionActualPretrainingAutoResumeReceipt,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointBackupReceipt,
+    PsionActualPretrainingCheckpointComparison,
     PsionActualPretrainingCheckpointEvalDecision, PsionActualPretrainingCheckpointEvalFailure,
     PsionActualPretrainingCheckpointFailureDrill, PsionActualPretrainingCheckpointManifest,
     PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCloseoutBundle,
+    PsionActualPretrainingCloseoutArtifact, PsionActualPretrainingCloseoutFailureDrill,
+    PsionActualPretrainingCloseoutGate,
+    PsionActualPretrainingContinueRestartDecision,
     PsionActualPretrainingContinuationHandoff, PsionActualPretrainingCredentialBinding,
     PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingDashboardPacket,
     PsionActualPretrainingDataBundle, PsionActualPretrainingDataloaderProbe,
@@ -106,6 +110,14 @@ enum Cli {
     DecideContinueRestart {
         run_root: PathBuf,
         selected_git_ref: String,
+        allow_dirty_tree: bool,
+    },
+    RehearseBaseLane {
+        run_id: String,
+        run_root: PathBuf,
+        selected_git_ref: String,
+        hardware_observation_path: Option<PathBuf>,
+        run_shape_observation_path: Option<PathBuf>,
         allow_dirty_tree: bool,
     },
 }
@@ -339,6 +351,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 git_commit_sha,
                 dirty_tree_admission,
                 workspace_status_sha256,
+                evidence_artifacts: Vec::new(),
+                closeout_gates: Vec::new(),
+                failure_drills: Vec::new(),
+                can_now_claim: Vec::new(),
+                still_out_of_scope: Vec::new(),
                 claim_boundary: String::from(
                     "This provisional closeout bundle repeats launcher provenance early so later closeout work can extend the same evidence family without losing source-state identity. It does not claim completed training.",
                 ),
@@ -661,6 +678,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 git_commit_sha,
                 dirty_tree_admission,
                 workspace_status_sha256,
+                evidence_artifacts: Vec::new(),
+                closeout_gates: Vec::new(),
+                failure_drills: Vec::new(),
+                can_now_claim: Vec::new(),
+                still_out_of_scope: Vec::new(),
                 claim_boundary: String::from(
                     "This provisional closeout bundle repeats launcher provenance early so later closeout work can extend the same evidence family without losing source-state identity. It does not claim completed training.",
                 ),
@@ -989,6 +1011,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 git_commit_sha: git_commit_sha.clone(),
                 dirty_tree_admission: dirty_tree_admission.clone(),
                 workspace_status_sha256: workspace_status_sha256.clone(),
+                evidence_artifacts: Vec::new(),
+                closeout_gates: Vec::new(),
+                failure_drills: Vec::new(),
+                can_now_claim: Vec::new(),
+                still_out_of_scope: Vec::new(),
                 claim_boundary: String::from(if checkpoint_eval_decision.is_some() {
                     "This provisional closeout bundle now records accepted-checkpoint, backup, and automatic checkpoint-eval progress under the actual-lane evidence family. It does not claim dashboard alerting fan-out or final closeout completion."
                 } else {
@@ -1203,6 +1230,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 git_commit_sha: git_commit_sha.clone(),
                 dirty_tree_admission: dirty_tree_admission.clone(),
                 workspace_status_sha256: workspace_status_sha256.clone(),
+                evidence_artifacts: Vec::new(),
+                closeout_gates: Vec::new(),
+                failure_drills: Vec::new(),
+                can_now_claim: Vec::new(),
+                still_out_of_scope: Vec::new(),
                 claim_boundary: String::from(if backup_receipt.backup_state == "backed_up" {
                     "This provisional closeout bundle records that the latest accepted checkpoint now has retained backup evidence plus a retained dashboard and alert surface. It does not yet claim external alert delivery, streaming dashboards, or final closeout completion."
                 } else {
@@ -1506,6 +1538,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 git_commit_sha: git_commit_sha.clone(),
                 dirty_tree_admission: dirty_tree_admission.clone(),
                 workspace_status_sha256: workspace_status_sha256.clone(),
+                evidence_artifacts: Vec::new(),
+                closeout_gates: Vec::new(),
+                failure_drills: Vec::new(),
+                can_now_claim: Vec::new(),
+                still_out_of_scope: Vec::new(),
                 claim_boundary: String::from(
                     match continue_restart_decision.decision_state.as_str() {
                         "continue" => {
@@ -1593,6 +1630,242 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!(
                 "operator_action={}",
                 continue_restart_decision.operator_action
+            );
+        }
+        Cli::RehearseBaseLane {
+            run_id,
+            run_root,
+            selected_git_ref,
+            hardware_observation_path,
+            run_shape_observation_path,
+            allow_dirty_tree,
+        } => {
+            let current_exe = env::current_exe()?;
+            run_rehearsal_subcommand(
+                &current_exe,
+                "start",
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                hardware_observation_path.as_deref(),
+                run_shape_observation_path.as_deref(),
+                allow_dirty_tree,
+                &[],
+            )?;
+            run_rehearsal_subcommand(
+                &current_exe,
+                "record-checkpoint",
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                None,
+                None,
+                allow_dirty_tree,
+                &[
+                    "--checkpoint-label",
+                    "broader-pretrain-final",
+                    "--optimizer-step",
+                    "16384",
+                    "--checkpoint-ref",
+                    "checkpoint://psion/actual-pretraining/broader-pretrain-final",
+                ],
+            )?;
+            run_rehearsal_subcommand(
+                &current_exe,
+                "backup",
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                None,
+                None,
+                allow_dirty_tree,
+                &["--inject-failed-upload"],
+            )?;
+            run_rehearsal_subcommand(
+                &current_exe,
+                "backup",
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                None,
+                None,
+                allow_dirty_tree,
+                &[],
+            )?;
+            run_rehearsal_subcommand(
+                &current_exe,
+                "decide-continue-restart",
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                None,
+                None,
+                allow_dirty_tree,
+                &[],
+            )?;
+            run_rehearsal_subcommand(
+                &current_exe,
+                "resume",
+                &run_id,
+                &run_root,
+                &selected_git_ref,
+                hardware_observation_path.as_deref(),
+                run_shape_observation_path.as_deref(),
+                allow_dirty_tree,
+                &[],
+            )?;
+
+            let git_commit_sha = git_output(repo_root, &["rev-parse", selected_git_ref.as_str()])?;
+            let (dirty_tree_admission, workspace_status_sha256) =
+                dirty_tree_posture(repo_root, allow_dirty_tree)?;
+            let retained_paths = retained_paths();
+            let mut current_status: PsionActualPretrainingCurrentRunStatus =
+                load_json(&run_root.join(&retained_paths.current_status_path))?;
+            current_status.phase = String::from("base_lane_rehearsal_complete");
+            current_status.detail = String::from(
+                "Base-lane rehearsal completed one retained launch, accepted checkpoint, backup recovery drill, continue decision, and resume cycle for the actual pretraining lane.",
+            );
+            current_status.updated_at_utc = now_utc(repo_root)?;
+            current_status.validate()?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.current_status_path),
+                &current_status,
+            )?;
+
+            let mut retained_summary: PsionActualPretrainingRetainedSummary =
+                load_json(&run_root.join(&retained_paths.retained_summary_path))?;
+            retained_summary.last_known_phase = current_status.phase.clone();
+            retained_summary.claim_boundary = String::from(
+                "The retained summary now proves one full base-lane rehearsal for the actual pretraining operator path, including launch, accepted checkpoint retention, backup recovery drill, continue-vs-restart decision, and resume. It does not claim external alert delivery, streaming dashboard publication, distributed cluster execution, or plugin-conditioned continuation execution.",
+            );
+            retained_summary.detail = String::from(
+                "Retained summary now points at the exact base-lane rehearsal closeout state for operator review.",
+            );
+            retained_summary.validate()?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.retained_summary_path),
+                &retained_summary,
+            )?;
+
+            let hardware_qualification: PsionActualPretrainingHardwareQualification =
+                load_json(&run_root.join(&retained_paths.hardware_qualification_path))?;
+            let run_shape_qualification: PsionActualPretrainingRunShapeQualification =
+                load_json(&run_root.join(&retained_paths.run_shape_qualification_path))?;
+            let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
+                load_json(&run_root.join(&retained_paths.latest_checkpoint_pointer_path))?;
+            let checkpoint_manifest_path = run_root.join(
+                checkpoint_pointer
+                    .checkpoint_manifest_relative_path
+                    .as_deref()
+                    .ok_or_else(|| {
+                        std::io::Error::other(
+                            "base-lane rehearsal closeout requires checkpoint manifest path",
+                        )
+                    })?,
+            );
+            let checkpoint_backup_receipt: PsionActualPretrainingCheckpointBackupReceipt =
+                load_json(&run_root.join(&retained_paths.latest_checkpoint_backup_receipt_path))?;
+            let checkpoint_eval_decision: PsionActualPretrainingCheckpointEvalDecision =
+                load_json(&run_root.join(&retained_paths.latest_checkpoint_eval_decision_path))?;
+            let checkpoint_comparison: PsionActualPretrainingCheckpointComparison =
+                load_json(&run_root.join(&retained_paths.latest_checkpoint_comparison_path))?;
+            let continue_restart_decision: PsionActualPretrainingContinueRestartDecision =
+                load_json(&run_root.join(&retained_paths.latest_continue_restart_decision_path))?;
+            let auto_resume_receipt: PsionActualPretrainingAutoResumeReceipt =
+                load_json(&run_root.join(&retained_paths.auto_resume_receipt_path))?;
+            let continuation_handoff: PsionActualPretrainingContinuationHandoff =
+                load_json(&run_root.join(&retained_paths.continuation_handoff_path))?;
+            checkpoint_backup_receipt.validate()?;
+            checkpoint_eval_decision.validate()?;
+            checkpoint_comparison.validate()?;
+            continue_restart_decision.validate()?;
+            auto_resume_receipt.validate()?;
+            continuation_handoff.validate()?;
+            if checkpoint_backup_receipt.backup_state != "backed_up" {
+                return Err(std::io::Error::other(
+                    "base-lane rehearsal closeout requires a successful final backup receipt",
+                )
+                .into());
+            }
+            if checkpoint_eval_decision.decision_state != "continue" {
+                return Err(std::io::Error::other(
+                    "base-lane rehearsal closeout requires a `continue` checkpoint eval decision",
+                )
+                .into());
+            }
+            if continue_restart_decision.decision_state != "continue" {
+                return Err(std::io::Error::other(
+                    "base-lane rehearsal closeout requires a `continue` long-run decision",
+                )
+                .into());
+            }
+            if auto_resume_receipt.resolution_state == "refused" {
+                return Err(std::io::Error::other(
+                    "base-lane rehearsal closeout requires a successful auto-resume receipt",
+                )
+                .into());
+            }
+            write_dashboard_bundle(
+                &run_root,
+                &current_status,
+                &retained_summary,
+                &checkpoint_pointer,
+                &hardware_qualification,
+                &run_shape_qualification,
+                &contracts.systems_bundle,
+                Some(&checkpoint_backup_receipt),
+                Some(&checkpoint_eval_decision),
+                None,
+                None,
+            )?;
+
+            let failed_upload_drill_path =
+                checkpoint_failure_drill_path(&run_root, "failed_upload");
+            let closeout_bundle = build_base_lane_rehearsal_closeout_bundle(
+                &run_root,
+                &retained_paths,
+                &checkpoint_pointer.run_id,
+                &selected_git_ref,
+                &git_commit_sha,
+                &dirty_tree_admission,
+                workspace_status_sha256.clone(),
+                &checkpoint_manifest_path,
+                failed_upload_drill_path.as_path(),
+            )?;
+            closeout_bundle.validate()?;
+            write_json_pretty(
+                &run_root.join(&retained_paths.closeout_bundle_path),
+                &closeout_bundle,
+            )?;
+            append_launcher_log(
+                &run_root,
+                &format!(
+                    "{} phase=base_lane_rehearsal_complete surface_id=psion_actual_pretraining.rehearse_base_lane git_commit_sha={} run_id={}\n",
+                    now_utc(repo_root)?,
+                    git_commit_sha,
+                    checkpoint_pointer.run_id
+                ),
+            )?;
+            println!("status=base_lane_rehearsal_complete");
+            println!("run_id={}", checkpoint_pointer.run_id);
+            println!("run_root={}", run_root.display());
+            println!(
+                "closeout_bundle={}",
+                run_root
+                    .join(&retained_paths.closeout_bundle_path)
+                    .display()
+            );
+            println!(
+                "checkpoint_eval_decision={}",
+                checkpoint_eval_decision.decision_state
+            );
+            println!(
+                "continue_restart_decision={}",
+                continue_restart_decision.decision_state
+            );
+            println!(
+                "failure_drill={}",
+                failed_upload_drill_path.display()
             );
         }
     }
@@ -1811,6 +2084,31 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
                 allow_dirty_tree,
             })
         }
+        "rehearse-base-lane" => {
+            let run_id = if run_id.is_empty() {
+                format!(
+                    "psion-actual-pretraining-rehearsal-{}",
+                    timestamp_utc(repo_root.as_path())?
+                )
+            } else {
+                run_id
+            };
+            let run_root = if output_root.is_empty() {
+                PathBuf::from(env::var("HOME").unwrap_or_else(|_| String::from(".")))
+                    .join("scratch/psion_actual_pretraining_runs")
+                    .join(&run_id)
+            } else {
+                PathBuf::from(output_root)
+            };
+            Ok(Cli::RehearseBaseLane {
+                run_id,
+                run_root,
+                selected_git_ref,
+                hardware_observation_path,
+                run_shape_observation_path,
+                allow_dirty_tree,
+            })
+        }
         _ => {
             usage();
             Err(std::io::Error::other(format!("unsupported subcommand `{command}`")).into())
@@ -1820,7 +2118,7 @@ fn parse_cli() -> Result<Cli, Box<dyn Error>> {
 
 fn usage() {
     eprintln!(
-        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator decide-continue-restart --run-root <path> [--git-ref <ref>] [--allow-dirty-tree]"
+        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator decide-continue-restart --run-root <path> [--git-ref <ref>] [--allow-dirty-tree]\n  psion_actual_pretraining_operator rehearse-base-lane [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree]"
     );
 }
 
@@ -2556,6 +2854,272 @@ fn write_json_pretty<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), 
     }
     fs::write(path, serde_json::to_string_pretty(value)?)?;
     Ok(())
+}
+
+fn run_rehearsal_subcommand(
+    current_exe: &Path,
+    subcommand: &str,
+    run_id: &str,
+    run_root: &Path,
+    selected_git_ref: &str,
+    hardware_observation_path: Option<&Path>,
+    run_shape_observation_path: Option<&Path>,
+    allow_dirty_tree: bool,
+    extra_args: &[&str],
+) -> Result<(), Box<dyn Error>> {
+    let mut command = Command::new(current_exe);
+    command.arg(subcommand);
+    match subcommand {
+        "start" => {
+            command.arg("--run-id").arg(run_id);
+            command.arg("--output-root").arg(run_root);
+        }
+        _ => {
+            command.arg("--run-root").arg(run_root);
+        }
+    }
+    command.arg("--git-ref").arg(selected_git_ref);
+    if let Some(path) = hardware_observation_path {
+        command.arg("--hardware-observation").arg(path);
+    }
+    if let Some(path) = run_shape_observation_path {
+        command.arg("--run-shape-observation").arg(path);
+    }
+    if allow_dirty_tree {
+        command.arg("--allow-dirty-tree");
+    }
+    command.args(extra_args);
+    let output = command.output()?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(std::io::Error::other(format!(
+        "rehearsal subcommand `{subcommand}` failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    ))
+    .into())
+}
+
+fn build_base_lane_rehearsal_closeout_bundle(
+    run_root: &Path,
+    retained_paths: &PsionActualPretrainingRetainedPathSet,
+    run_id: &str,
+    selected_git_ref: &str,
+    git_commit_sha: &str,
+    dirty_tree_admission: &str,
+    workspace_status_sha256: Option<String>,
+    checkpoint_manifest_path: &Path,
+    failed_upload_drill_path: &Path,
+) -> Result<PsionActualPretrainingCloseoutBundle, Box<dyn Error>> {
+    let evidence_artifacts = vec![
+        closeout_artifact(
+            run_root,
+            "launch_manifest",
+            &run_root.join(&retained_paths.launch_manifest_path),
+            "Launch manifest proves the actual lane started against the frozen lane, recipe, topology, and evidence contract.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "hardware_qualification",
+            &run_root.join(&retained_paths.hardware_qualification_path),
+            "Hardware qualification proves the admitted machine class and provenance used for the rehearsal.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "run_shape_qualification",
+            &run_root.join(&retained_paths.run_shape_qualification_path),
+            "Run-shape qualification proves the admitted throughput, storage, and dataloader shape consumed by the rehearsal.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "checkpoint_pointer",
+            &run_root.join(&retained_paths.latest_checkpoint_pointer_path),
+            "Latest accepted checkpoint pointer proves the base lane retained one accepted checkpoint lineage.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "checkpoint_manifest",
+            checkpoint_manifest_path,
+            "Checkpoint manifest proves the exact accepted checkpoint family selected for backup, eval, resume, and continuation handoff.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "checkpoint_backup_receipt",
+            &run_root.join(&retained_paths.latest_checkpoint_backup_receipt_path),
+            "Backup receipt proves the latest accepted checkpoint ended in a durable retained backup after the drill replay.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "checkpoint_eval_decision",
+            &run_root.join(&retained_paths.latest_checkpoint_eval_decision_path),
+            "Checkpoint eval decision proves the accepted checkpoint reached the automatic evaluation family.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "checkpoint_comparison",
+            &run_root.join(&retained_paths.latest_checkpoint_comparison_path),
+            "Checkpoint comparison proves the accepted checkpoint was compared against eval, backup, and systems receipts before the long-run decision.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "continue_restart_decision",
+            &run_root.join(&retained_paths.latest_continue_restart_decision_path),
+            "Continue-restart decision proves the base lane retained one machine-readable continue decision over the accepted checkpoint.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "auto_resume_receipt",
+            &run_root.join(&retained_paths.auto_resume_receipt_path),
+            "Auto-resume receipt proves the canonical resume command reselected the accepted checkpoint from the retained family.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "resume_manifest",
+            &run_root.join(&retained_paths.resume_manifest_path),
+            "Resume manifest proves the lane can re-enter the same frozen operator contract from retained checkpoint truth.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "retained_summary",
+            &run_root.join(&retained_paths.retained_summary_path),
+            "Retained summary proves the final rehearsal phase and provenance stayed operator-legible.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "current_status",
+            &run_root.join(&retained_paths.current_status_path),
+            "Current status proves the final rehearsal phase is retained under the canonical status surface.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "dashboard_packet",
+            &run_root.join(&retained_paths.current_dashboard_path),
+            "Dashboard packet proves the retained operator dashboard stayed aligned with the final rehearsal summary.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "active_alert_feed",
+            &run_root.join(&retained_paths.active_alert_feed_path),
+            "Active-alert feed proves the drill alert posture returned to a clean retained state after recovery.",
+        )?,
+        closeout_artifact(
+            run_root,
+            "continuation_handoff",
+            &run_root.join(&retained_paths.continuation_handoff_path),
+            "Continuation handoff proves the base lane ends in one explicit bounded continuation target without claiming continuation execution.",
+        )?,
+    ];
+    let closeout_gates = vec![
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("launch_preflight_admitted"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal started through the actual-lane operator command with admitted hardware and run-shape receipts.",
+            ),
+        },
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("accepted_checkpoint_retained"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal retained one accepted checkpoint pointer plus the matching checkpoint manifest.",
+            ),
+        },
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("automatic_checkpoint_eval_retained"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal retained one automatic checkpoint eval decision for the accepted checkpoint.",
+            ),
+        },
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("checkpoint_backup_success_retained"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal ended with a successful backup receipt after replaying the failed-upload drill.",
+            ),
+        },
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("continue_decision_retained"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal retained a machine-readable `continue` decision over the accepted checkpoint.",
+            ),
+        },
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("resume_manifest_retained"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal retained a resume manifest plus auto-resume receipt for the accepted checkpoint lineage.",
+            ),
+        },
+        PsionActualPretrainingCloseoutGate {
+            gate_id: String::from("failure_drill_retained"),
+            satisfied: true,
+            detail: String::from(
+                "The rehearsal retained one injected failed-upload drill and then recovered to a successful backup state.",
+            ),
+        },
+    ];
+    let failure_drills = vec![PsionActualPretrainingCloseoutFailureDrill {
+        drill_id: String::from("failed_upload_drill"),
+        resolution_state: String::from("retained_and_recovered"),
+        artifact: run_artifact_ref(run_root, failed_upload_drill_path)?,
+        detail: String::from(
+            "The base-lane rehearsal injected a failed checkpoint upload, retained the drill packet, and then replayed backup successfully without manual artifact edits.",
+        ),
+    }];
+
+    Ok(PsionActualPretrainingCloseoutBundle {
+        schema_version: String::from(PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION),
+        lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+        run_id: String::from(run_id),
+        closeout_state: String::from("base_lane_rehearsal_complete"),
+        retained_paths: retained_paths.clone(),
+        selected_git_ref: String::from(selected_git_ref),
+        git_commit_sha: String::from(git_commit_sha),
+        dirty_tree_admission: String::from(dirty_tree_admission),
+        workspace_status_sha256,
+        evidence_artifacts,
+        closeout_gates,
+        failure_drills,
+        can_now_claim: vec![
+            String::from(
+                "The actual pretraining lane now has one retained operator proof that launch, accepted checkpoint retention, backup, automatic checkpoint eval, continue-vs-restart decision, and resume all compose into one base-lane path.",
+            ),
+            String::from(
+                "The retained evidence family now carries one injected failed-upload drill plus recovery without manual artifact edits.",
+            ),
+            String::from(
+                "The accepted checkpoint lineage now feeds one explicit continuation handoff target, even though continuation execution remains separately unproved.",
+            ),
+        ],
+        still_out_of_scope: vec![
+            String::from("External alert delivery or paging for actual-lane failures."),
+            String::from("Streaming or cluster-connected dashboard publication."),
+            String::from("Completed distributed broader-pretraining execution on the trusted cluster."),
+            String::from("Plugin-conditioned continuation execution beyond the declared handoff artifact."),
+        ],
+        claim_boundary: String::from(
+            "This closeout bundle proves one retained base-lane rehearsal for the actual pretraining operator path, including launch, accepted checkpoint retention, backup recovery drill, automatic checkpoint eval, continue-vs-restart decision, and resume. It does not claim external alert delivery, streaming dashboard publication, distributed broader-pretraining execution, or plugin-conditioned continuation execution.",
+        ),
+        detail: String::from(
+            "Base-lane closeout bundle ties the exact retained rehearsal artifacts, one injected backup failure drill, and one explicit claim boundary into a single operator-readable proof packet.",
+        ),
+    })
+}
+
+fn closeout_artifact(
+    run_root: &Path,
+    artifact_kind: &str,
+    path: &Path,
+    detail: &str,
+) -> Result<PsionActualPretrainingCloseoutArtifact, Box<dyn Error>> {
+    Ok(PsionActualPretrainingCloseoutArtifact {
+        artifact_kind: String::from(artifact_kind),
+        artifact: run_artifact_ref(run_root, path)?,
+        detail: String::from(detail),
+    })
 }
 
 fn remove_if_exists(path: &Path) -> Result<(), Box<dyn Error>> {

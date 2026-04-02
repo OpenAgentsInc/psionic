@@ -278,6 +278,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         git_commit_sha: String::from(FIXTURE_GIT_SHA),
         dirty_tree_admission: String::from("refuse_by_default"),
         workspace_status_sha256: None,
+        evidence_artifacts: Vec::new(),
+        closeout_gates: Vec::new(),
+        failure_drills: Vec::new(),
+        can_now_claim: Vec::new(),
+        still_out_of_scope: Vec::new(),
         claim_boundary: String::from(
             "This provisional closeout bundle repeats launcher provenance early so later closeout work can extend the same evidence family without losing source-state identity. It does not claim completed training.",
         ),
@@ -475,10 +480,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::write(
         fixtures_dir.join("psion_actual_pretraining_checkpoint_pointer_v1.json"),
         serde_json::to_string_pretty(&accepted_pointer)?,
-    )?;
-    fs::write(
-        fixtures_dir.join("psion_actual_pretraining_closeout_bundle_v1.json"),
-        serde_json::to_string_pretty(&launch_closeout)?,
     )?;
     fs::write(
         fixtures_dir.join("psion_actual_pretraining_continuation_handoff_v1.json"),

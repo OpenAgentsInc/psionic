@@ -241,6 +241,7 @@ Resume and status use the same lane selector:
 
 ```bash
 ./TRAIN --lane actual_pretraining resume --run-root <path>
+./TRAIN --lane actual_pretraining rehearse-base-lane --run-id <id>
 ./TRAIN --lane actual_pretraining status --run-root <path>
 ```
 

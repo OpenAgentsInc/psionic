@@ -108,6 +108,9 @@ The contract requires at least these fields:
 
 Those fields must appear in the retained launch manifest and repeat in the
 closeout bundle so final operator claims stay tied to one exact source state.
+When the base-lane rehearsal runs, the same closeout bundle must also carry
+explicit `can_now_claim` and `still_out_of_scope` sections so the operator
+proof stays honest about what the lane now proves and what it still does not.
 
 An optional `workspace_status_sha256` field is also reserved for launchers that
 materialize from a local checkout and want to retain a digest of the status
@@ -148,7 +151,7 @@ This contract prevents that drift before the actual-lane launcher starts
 writing those retained artifacts for real.
 
 The first concrete writer for this family now exists in
-`./TRAIN --lane actual_pretraining start|record-checkpoint|backup|resume`.
+`./TRAIN --lane actual_pretraining start|record-checkpoint|backup|resume|rehearse-base-lane`.
 Those surfaces currently write the launch or resume manifest, retained
 hardware qualification receipt, retained run-shape qualification receipt,
 retained status surfaces, canonical checkpoint pointer, checkpoint manifest,
@@ -156,8 +159,10 @@ checkpoint backup receipt, auto-resume receipt, failure-drill receipts,
 automatic checkpoint-eval decision receipts, checkpoint-eval retry receipts,
 the retained checkpoint-comparison and continue-restart decision receipts, the
 retained dashboard packet, the retained aggregate active-alert feed, the latest
-redacted alert, launcher log, and a provisional closeout bundle that repeats
-git provenance early. Resume over an accepted checkpoint also writes the
+redacted alert, launcher log, and the closeout bundle. The base-lane rehearsal
+upgrades that closeout bundle from provisional provenance into the retained
+proof packet with explicit evidence refs, closeout gates, drill evidence, and
+claim-boundary sections. Resume over an accepted checkpoint also writes the
 retained continuation handoff at
 `continuation/accepted_checkpoint_handoff.json`, which binds that accepted
 checkpoint to the frozen `general_sft -> agentic_sft` continuation target.

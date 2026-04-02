@@ -246,6 +246,41 @@ pub struct PsionActualPretrainingCheckpointPointer {
     pub detail: String,
 }
 
+/// One retained artifact explicitly cited by the actual-lane closeout bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionActualPretrainingCloseoutArtifact {
+    /// Stable artifact kind identifier.
+    pub artifact_kind: String,
+    /// Retained artifact ref.
+    pub artifact: PsionActualPretrainingArtifactRef,
+    /// Short detail.
+    pub detail: String,
+}
+
+/// One explicit gate checked during actual-lane closeout.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionActualPretrainingCloseoutGate {
+    /// Stable gate identifier.
+    pub gate_id: String,
+    /// Whether the gate was satisfied.
+    pub satisfied: bool,
+    /// Short detail.
+    pub detail: String,
+}
+
+/// One retained failure drill carried into the actual-lane closeout bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionActualPretrainingCloseoutFailureDrill {
+    /// Stable drill identifier.
+    pub drill_id: String,
+    /// Stable drill resolution state.
+    pub resolution_state: String,
+    /// Retained drill artifact.
+    pub artifact: PsionActualPretrainingArtifactRef,
+    /// Short detail.
+    pub detail: String,
+}
+
 /// Provisional closeout bundle emitted by the actual-lane launcher.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionActualPretrainingCloseoutBundle {
@@ -267,6 +302,21 @@ pub struct PsionActualPretrainingCloseoutBundle {
     pub dirty_tree_admission: String,
     /// Optional digest of the status snapshot when dirty-tree override is used.
     pub workspace_status_sha256: Option<String>,
+    /// Explicit retained artifacts cited by the closeout bundle.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_artifacts: Vec<PsionActualPretrainingCloseoutArtifact>,
+    /// Explicit gates checked during closeout.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closeout_gates: Vec<PsionActualPretrainingCloseoutGate>,
+    /// Explicit failure drills retained during closeout.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failure_drills: Vec<PsionActualPretrainingCloseoutFailureDrill>,
+    /// Things the operator can now honestly claim.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub can_now_claim: Vec<String>,
+    /// Things that remain explicitly out of scope.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub still_out_of_scope: Vec<String>,
     /// Narrow claim boundary.
     pub claim_boundary: String,
     /// Short detail.
@@ -648,6 +698,124 @@ impl PsionActualPretrainingCloseoutBundle {
             self.workspace_status_sha256.as_deref(),
             "closeout_bundle",
         )?;
+        for artifact in &self.evidence_artifacts {
+            ensure_nonempty(
+                artifact.artifact_kind.as_str(),
+                "closeout_bundle.evidence_artifacts[].artifact_kind",
+            )?;
+            ensure_artifact_ref(
+                &artifact.artifact,
+                "closeout_bundle.evidence_artifacts[].artifact",
+            )?;
+            ensure_nonempty(
+                artifact.detail.as_str(),
+                "closeout_bundle.evidence_artifacts[].detail",
+            )?;
+        }
+        for gate in &self.closeout_gates {
+            ensure_nonempty(gate.gate_id.as_str(), "closeout_bundle.closeout_gates[].gate_id")?;
+            ensure_nonempty(gate.detail.as_str(), "closeout_bundle.closeout_gates[].detail")?;
+        }
+        for drill in &self.failure_drills {
+            ensure_nonempty(
+                drill.drill_id.as_str(),
+                "closeout_bundle.failure_drills[].drill_id",
+            )?;
+            ensure_nonempty(
+                drill.resolution_state.as_str(),
+                "closeout_bundle.failure_drills[].resolution_state",
+            )?;
+            ensure_artifact_ref(
+                &drill.artifact,
+                "closeout_bundle.failure_drills[].artifact",
+            )?;
+            ensure_nonempty(
+                drill.detail.as_str(),
+                "closeout_bundle.failure_drills[].detail",
+            )?;
+        }
+        for claim in &self.can_now_claim {
+            ensure_nonempty(claim.as_str(), "closeout_bundle.can_now_claim[]")?;
+        }
+        for item in &self.still_out_of_scope {
+            ensure_nonempty(item.as_str(), "closeout_bundle.still_out_of_scope[]")?;
+        }
+        if self.closeout_state == "base_lane_rehearsal_complete" {
+            if self.evidence_artifacts.is_empty() {
+                return Err(PsionActualPretrainingLauncherError::MissingField {
+                    field: String::from("closeout_bundle.evidence_artifacts"),
+                });
+            }
+            if self.closeout_gates.is_empty() {
+                return Err(PsionActualPretrainingLauncherError::MissingField {
+                    field: String::from("closeout_bundle.closeout_gates"),
+                });
+            }
+            if self.failure_drills.is_empty() {
+                return Err(PsionActualPretrainingLauncherError::MissingField {
+                    field: String::from("closeout_bundle.failure_drills"),
+                });
+            }
+            if self.can_now_claim.is_empty() {
+                return Err(PsionActualPretrainingLauncherError::MissingField {
+                    field: String::from("closeout_bundle.can_now_claim"),
+                });
+            }
+            if self.still_out_of_scope.is_empty() {
+                return Err(PsionActualPretrainingLauncherError::MissingField {
+                    field: String::from("closeout_bundle.still_out_of_scope"),
+                });
+            }
+            for required_kind in [
+                "launch_manifest",
+                "hardware_qualification",
+                "run_shape_qualification",
+                "checkpoint_pointer",
+                "checkpoint_manifest",
+                "checkpoint_backup_receipt",
+                "checkpoint_eval_decision",
+                "checkpoint_comparison",
+                "continue_restart_decision",
+                "auto_resume_receipt",
+                "resume_manifest",
+                "retained_summary",
+                "current_status",
+                "dashboard_packet",
+                "active_alert_feed",
+                "continuation_handoff",
+            ] {
+                if !self
+                    .evidence_artifacts
+                    .iter()
+                    .any(|artifact| artifact.artifact_kind == required_kind)
+                {
+                    return Err(PsionActualPretrainingLauncherError::MissingField {
+                        field: format!(
+                            "closeout_bundle.evidence_artifacts[{required_kind}]"
+                        ),
+                    });
+                }
+            }
+            for required_gate in [
+                "launch_preflight_admitted",
+                "accepted_checkpoint_retained",
+                "automatic_checkpoint_eval_retained",
+                "checkpoint_backup_success_retained",
+                "continue_decision_retained",
+                "resume_manifest_retained",
+                "failure_drill_retained",
+            ] {
+                if !self
+                    .closeout_gates
+                    .iter()
+                    .any(|gate| gate.gate_id == required_gate)
+                {
+                    return Err(PsionActualPretrainingLauncherError::MissingField {
+                        field: format!("closeout_bundle.closeout_gates[{required_gate}]"),
+                    });
+                }
+            }
+        }
         ensure_nonempty(
             self.claim_boundary.as_str(),
             "closeout_bundle.claim_boundary",

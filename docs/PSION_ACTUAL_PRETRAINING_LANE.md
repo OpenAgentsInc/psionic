@@ -115,13 +115,15 @@ available explicitly through:
 - `./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref>`
 - `./TRAIN --lane actual_pretraining backup --run-root <path>`
 - `./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path>`
+- `./TRAIN --lane actual_pretraining rehearse-base-lane`
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 
 Those commands materialize the actual-lane retained evidence family under
 `psion_actual_pretraining_runs/<run_id>` naming without pretending that later
 hardware qualification, backup, auto-eval, or cluster execution hardening is
-already finished.
+already finished. The `rehearse-base-lane` proof gate now closes the base lane
+itself without widening the claim boundary to later continuation execution.
 
 When resume selects an accepted checkpoint, the same retained family now also
 writes `continuation/accepted_checkpoint_handoff.json`. That artifact closes

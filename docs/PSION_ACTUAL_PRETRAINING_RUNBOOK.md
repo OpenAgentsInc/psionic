@@ -16,6 +16,7 @@ The commands are:
 ./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
 ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
 ./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path> [options]
+./TRAIN --lane actual_pretraining rehearse-base-lane [options]
 ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
 ./TRAIN --lane actual_pretraining status --run-root <path>
 ./TRAIN --lane actual_pretraining dashboard --run-root <path>
@@ -52,7 +53,10 @@ The actual-lane command now does these things for real:
 - can inject a failed-upload refusal drill without manual artifact editing
 - writes one retained checkpoint-comparison receipt plus one retained
   continue-restart decision over the latest accepted checkpoint
-- repeats provenance into the provisional closeout bundle
+- can run one end-to-end base-lane rehearsal that upgrades
+  `closeout/closeout_bundle.json` from provisional provenance to a final
+  closeout packet with proof gates, retained drill evidence, and explicit
+  claim-boundary sections
 - exposes the canonical status command
 - exposes the canonical dashboard command
 
@@ -271,7 +275,7 @@ When resume succeeds, it writes:
 - `manifests/resume_manifest.json`
 - refreshed status and retained-summary files
 - `continuation/accepted_checkpoint_handoff.json`
-- refreshed provisional closeout bundle
+- refreshed closeout bundle
 - appended `logs/launcher.log`
 
 The continuation handoff binds the accepted checkpoint to the frozen
@@ -282,6 +286,37 @@ the continuation stage has already run.
 If auto-resume cannot select a valid checkpoint, the command still retains an
 explicit `auto_resume_receipt.json` with `resolution_state = refused` and logs
 `phase=resume_refused_auto_resume` instead of leaving the run root ambiguous.
+
+## Base-Lane Rehearsal Command
+
+Canonical base-lane proof gate:
+
+```bash
+./TRAIN --lane actual_pretraining rehearse-base-lane \
+  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
+  --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json
+```
+
+This command replays the actual operator path in one retained sequence:
+
+- `start`
+- `record-checkpoint`
+- `backup --inject-failed-upload`
+- `backup`
+- `decide-continue-restart`
+- `resume`
+
+It then upgrades `closeout/closeout_bundle.json` into the final base-lane
+proof packet. That closeout bundle now carries:
+
+- exact git/ref provenance
+- explicit retained artifact refs for launch, checkpoint, backup, eval,
+  continue-decision, resume, dashboard, and handoff truth
+- one retained failed-upload drill plus its recovered end state
+- explicit closeout gates
+- `can_now_claim` and `still_out_of_scope` sections
+
+The final retained phase becomes `base_lane_rehearsal_complete`.
 
 ## Dashboard Command
 
@@ -348,7 +383,7 @@ It still retains:
 - `git_commit_sha`
 
 Those fields appear in the launch or resume manifest and repeat in the
-provisional closeout bundle.
+closeout bundle.
 
 ## Related Docs
 
