@@ -68,6 +68,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "Zero-guess pointer to the latest accepted checkpoint for resume.",
             ),
             slot(
+                "preflight/hardware_qualification.json",
+                "hardware_qualification_receipt",
+                "durable",
+                "Retained hardware admission receipt consumed by non-dry-run actual-lane launch and resume.",
+            ),
+            slot(
                 "checkpoints/step-<optimizer_step>/checkpoint_manifest.json",
                 "checkpoint_manifest",
                 "durable",
@@ -154,6 +160,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &["artifact_ref", "digest", "env_var_name", "cluster_label", "topology_digest"],
                 &["credential_payload", "access_token", "service_account_json", "private_key", "tailnet_ip", "ssh_target"],
                 "Retained manifests keep refs, digests, and redacted connection metadata only.",
+            ),
+            redaction(
+                "preflight",
+                &["redacted_host_label", "digest", "device_name", "health_signal", "env_var_name"],
+                &["credential_payload", "access_token", "private_key", "service_account_json", "tailnet_ip", "ssh_target", "credential_file_path"],
+                "Hardware qualification receipts retain redacted worker labels, device health signals, and credential digests only.",
             ),
             redaction(
                 "logs",

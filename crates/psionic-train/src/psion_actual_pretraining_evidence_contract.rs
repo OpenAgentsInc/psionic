@@ -170,6 +170,7 @@ impl PsionActualPretrainingEvidenceContract {
             "status/current_run_status.json",
             "status/retained_summary.json",
             "checkpoints/latest_accepted_checkpoint_pointer.json",
+            "preflight/hardware_qualification.json",
             "closeout/closeout_bundle.json",
         ] {
             if !self

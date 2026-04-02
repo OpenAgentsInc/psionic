@@ -45,6 +45,8 @@ psion_actual_pretraining_runs/<run_id>/
   manifests/
     launch_manifest.json
     resume_manifest.json
+  preflight/
+    hardware_qualification.json
   status/
     current_run_status.json
     retained_summary.json
@@ -110,9 +112,9 @@ Retained artifacts must not keep:
 - raw SSH targets
 - raw secret bucket material
 
-That applies to manifests, logs, and alerts. The retained surfaces should point
-to credentials by declared source name and digest, not by copying secret
-content or raw connection details.
+That applies to manifests, preflight receipts, logs, and alerts. The retained
+surfaces should point to credentials by declared source name and digest, not by
+copying secret content or raw connection details.
 
 ## Why This Matters
 
@@ -125,10 +127,10 @@ writing those retained artifacts for real.
 
 The first concrete writer for this family now exists in
 `./TRAIN --lane actual_pretraining start|resume`. It currently writes the
-launch or resume manifest, retained status surfaces, canonical checkpoint
-pointer, launcher log, and a provisional closeout bundle that repeats git
-provenance early. Resume over an accepted checkpoint also writes the retained
-continuation handoff at
+launch or resume manifest, retained hardware qualification receipt, retained
+status surfaces, canonical checkpoint pointer, launcher log, and a provisional
+closeout bundle that repeats git provenance early. Resume over an accepted
+checkpoint also writes the retained continuation handoff at
 `continuation/accepted_checkpoint_handoff.json`, which binds that accepted
 checkpoint to the frozen `general_sft -> agentic_sft` continuation target.
 Later hardening issues extend the same retained family instead of replacing

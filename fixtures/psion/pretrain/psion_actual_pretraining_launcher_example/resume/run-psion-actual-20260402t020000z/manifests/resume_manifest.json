@@ -12,6 +12,7 @@
     "current_status_path": "status/current_run_status.json",
     "retained_summary_path": "status/retained_summary.json",
     "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "hardware_qualification_path": "preflight/hardware_qualification.json",
     "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
     "closeout_bundle_path": "closeout/closeout_bundle.json",
     "launcher_log_path": "logs/launcher.log"
@@ -28,6 +29,11 @@
     "remote_checkpoint_root": "${PSION_ACTUAL_PRETRAINING_BUCKET_URL}/psion_actual_pretraining_runs/run-psion-actual-20260402t020000z/checkpoints",
     "remote_manifest_root": "${PSION_ACTUAL_PRETRAINING_BUCKET_URL}/psion_actual_pretraining_runs/run-psion-actual-20260402t020000z/manifests",
     "remote_log_root": "${PSION_ACTUAL_PRETRAINING_BUCKET_URL}/psion_actual_pretraining_runs/run-psion-actual-20260402t020000z/logs"
+  },
+  "preflight_receipt": {
+    "relative_path": "preflight/hardware_qualification.json",
+    "receipt_digest": "d9d3e2993a110bcbc7a2c969023269446b1e31e1337b82ea81d0d312b6c6fb1b",
+    "admission_state": "admitted"
   },
   "contract_refs": {
     "lane_spec": {
@@ -60,7 +66,7 @@
     },
     "evidence_contract": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json",
-      "sha256": "1666a09cdc0aa64cce07ffdad0064b5c96fb71bc43ab31c5325cd0a1599591bd"
+      "sha256": "b3e26f038561a51fcc18bb02a920a8ff5029af566e75175633f70152696286f3"
     }
   },
   "selected_git_ref": "refs/heads/main",

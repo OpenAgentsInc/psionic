@@ -201,6 +201,22 @@ working trees by default; retains the selected ref plus exact commit SHA; and
 repeats that provenance in the provisional closeout bundle without claiming
 that later hardening issues are already finished.
 
+The repo now also owns the canonical actual-lane hardware observation and
+hardware qualification receipt in
+`crates/psionic-train/src/psion_actual_pretraining_hardware_qualification.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_hardware_qualification_fixtures.rs`,
+the focused doc `docs/PSION_ACTUAL_PRETRAINING_HARDWARE_QUALIFICATION.md`, and
+the committed fixtures
+`fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json`
+plus
+`fixtures/psion/pretrain/psion_actual_pretraining_hardware_qualification_v1.json`.
+That surface binds backend, worker inventory, free-memory, temperature, ECC,
+throttling, resident-compute, credential-source, and checkpoint-restore truth
+into one retained preflight receipt under the actual evidence family, and the
+launcher now fails closed on non-dry-run start or resume when that receipt is
+not admitted.
+
 The repo now also owns the canonical accepted-checkpoint continuation handoff
 contract in
 `crates/psionic-train/src/psion_actual_pretraining_continuation_handoff.rs`,

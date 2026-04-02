@@ -79,8 +79,11 @@ This bundle honestly claims:
 
 It does not yet claim:
 
-- live launch refusal based on those preflight items
 - automatic backup or auto-resume closure
 - automatic checkpoint eval triggering
 - dashboards or alert routing
 - a final end-to-end actual-lane rehearsal
+
+The launcher now does consume those preflight items through one retained
+hardware qualification receipt. What remains unfinished is the later live
+monitoring and long-run failure-handling stack above that admission gate.

@@ -14,12 +14,16 @@ Options for `start`:
   --run-id <id>            Stable run identifier.
   --output-root <path>     Local actual-lane run root. Default: ~/scratch/psion_actual_pretraining_runs/<run_id>
   --git-ref <ref>          Git ref to resolve for the run. Default: current symbolic ref or HEAD
+  --hardware-observation <path>
+                           Optional retained hardware observation snapshot to consume instead of probing the local host.
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --dry-run                Materialize the retained launcher bundle without claiming cluster execution.
 
 Options for `resume`:
   --run-root <path>        Existing actual-lane run root containing checkpoints/latest_accepted_checkpoint_pointer.json
   --git-ref <ref>          Git ref to resolve for the resumed run. Default: current symbolic ref or HEAD
+  --hardware-observation <path>
+                           Optional retained hardware observation snapshot to consume instead of probing the local host.
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
   --dry-run                Materialize the retained resume bundle without claiming cluster execution.
 EOF

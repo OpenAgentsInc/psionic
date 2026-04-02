@@ -47,6 +47,12 @@
       "detail": "Zero-guess pointer to the latest accepted checkpoint for resume."
     },
     {
+      "relative_path": "preflight/hardware_qualification.json",
+      "artifact_kind": "hardware_qualification_receipt",
+      "retention_class": "durable",
+      "detail": "Retained hardware admission receipt consumed by non-dry-run actual-lane launch and resume."
+    },
+    {
       "relative_path": "checkpoints/step-<optimizer_step>/checkpoint_manifest.json",
       "artifact_kind": "checkpoint_manifest",
       "retention_class": "durable",
@@ -146,6 +152,26 @@
         "ssh_target"
       ],
       "detail": "Retained manifests keep refs, digests, and redacted connection metadata only."
+    },
+    {
+      "retained_surface": "preflight",
+      "allowed_value_classes": [
+        "redacted_host_label",
+        "digest",
+        "device_name",
+        "health_signal",
+        "env_var_name"
+      ],
+      "forbidden_value_classes": [
+        "credential_payload",
+        "access_token",
+        "private_key",
+        "service_account_json",
+        "tailnet_ip",
+        "ssh_target",
+        "credential_file_path"
+      ],
+      "detail": "Hardware qualification receipts retain redacted worker labels, device health signals, and credential digests only."
     },
     {
       "retained_surface": "logs",

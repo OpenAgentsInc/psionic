@@ -19,13 +19,16 @@ use psionic_train::{
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointPointer,
     PsionActualPretrainingCloseoutBundle, PsionActualPretrainingContinuationHandoff,
     PsionActualPretrainingCredentialBinding, PsionActualPretrainingCurrentRunStatus,
-    PsionActualPretrainingDataBundle, PsionActualPretrainingLaunchManifest,
+    PsionActualPretrainingDataBundle, PsionActualPretrainingEvidenceContract,
+    PsionActualPretrainingHardwareObservation, PsionActualPretrainingLaunchManifest,
     PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
-    PsionActualPretrainingRecipeBundle, PsionActualPretrainingResumeManifest,
-    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
-    PsionActualPretrainingRunRoots, PsionActualPretrainingScalingBundle,
-    PsionActualPretrainingSystemsBundle, PsionActualPretrainingTopologyStorageBundle,
-    PsionPluginConditionedSftStageManifest, record_psion_actual_pretraining_continuation_handoff,
+    PsionActualPretrainingPreflightRef, PsionActualPretrainingRecipeBundle,
+    PsionActualPretrainingResumeManifest, PsionActualPretrainingRetainedPathSet,
+    PsionActualPretrainingRetainedSummary, PsionActualPretrainingRunRoots,
+    PsionActualPretrainingScalingBundle, PsionActualPretrainingSystemsBundle,
+    PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
+    derive_psion_actual_pretraining_hardware_qualification,
+    record_psion_actual_pretraining_continuation_handoff,
 };
 use sha2::{Digest, Sha256};
 
@@ -62,6 +65,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         &root.join("fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json"),
     )?;
     systems_bundle.validate()?;
+    let evidence_contract: PsionActualPretrainingEvidenceContract = load_json(
+        &root.join("fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json"),
+    )?;
+    evidence_contract.validate()?;
+    let hardware_observation: PsionActualPretrainingHardwareObservation = load_json(
+        &root.join(
+            "fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json",
+        ),
+    )?;
+    hardware_observation.validate()?;
     let plugin_conditioned_stage_manifest: PsionPluginConditionedSftStageManifest = load_json(
         &root.join(
             &recipe
@@ -80,6 +93,39 @@ fn main() -> Result<(), Box<dyn Error>> {
     let credential_sources = credential_sources(&topology);
 
     let launch_run_id = "run-psion-actual-20260402t010000z";
+    let launch_hardware_qualification = derive_psion_actual_pretraining_hardware_qualification(
+        launch_run_id,
+        "refs/heads/main",
+        FIXTURE_GIT_SHA,
+        "refuse_by_default",
+        &hardware_observation,
+        Some(artifact_ref(
+            &root,
+            &root.join(
+                "fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json",
+            ),
+        )?),
+        artifact_ref(
+            &root,
+            &root.join("fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json"),
+        )?,
+        artifact_ref(
+            &root,
+            &root.join("fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json"),
+        )?,
+        artifact_ref(
+            &root,
+            &root.join("fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json"),
+        )?,
+        &topology,
+        &systems_bundle,
+        &evidence_contract,
+    )?;
+    let launch_preflight_receipt = PsionActualPretrainingPreflightRef {
+        relative_path: retained_paths.hardware_qualification_path.clone(),
+        receipt_digest: launch_hardware_qualification.receipt_digest.clone(),
+        admission_state: launch_hardware_qualification.admission_state.clone(),
+    };
     let launch_manifest = PsionActualPretrainingLaunchManifest {
         schema_version: String::from(PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION),
         surface_id: String::from(PSION_ACTUAL_PRETRAINING_START_SURFACE_ID),
@@ -93,6 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         retained_paths: retained_paths.clone(),
         launcher_surfaces: launcher_surfaces.clone(),
         run_roots: run_roots(launch_run_id, &topology),
+        preflight_receipt: launch_preflight_receipt.clone(),
         contract_refs: contract_refs.clone(),
         selected_git_ref: String::from("refs/heads/main"),
         git_commit_sha: String::from(FIXTURE_GIT_SHA),
@@ -187,6 +234,39 @@ fn main() -> Result<(), Box<dyn Error>> {
     launch_closeout.validate()?;
 
     let resume_run_id = "run-psion-actual-20260402t020000z";
+    let resume_hardware_qualification = derive_psion_actual_pretraining_hardware_qualification(
+        resume_run_id,
+        "refs/heads/main",
+        FIXTURE_GIT_SHA,
+        "refuse_by_default",
+        &hardware_observation,
+        Some(artifact_ref(
+            &root,
+            &root.join(
+                "fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json",
+            ),
+        )?),
+        artifact_ref(
+            &root,
+            &root.join("fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json"),
+        )?,
+        artifact_ref(
+            &root,
+            &root.join("fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json"),
+        )?,
+        artifact_ref(
+            &root,
+            &root.join("fixtures/psion/pretrain/psion_actual_pretraining_evidence_contract_v1.json"),
+        )?,
+        &topology,
+        &systems_bundle,
+        &evidence_contract,
+    )?;
+    let resume_preflight_receipt = PsionActualPretrainingPreflightRef {
+        relative_path: retained_paths.hardware_qualification_path.clone(),
+        receipt_digest: resume_hardware_qualification.receipt_digest.clone(),
+        admission_state: resume_hardware_qualification.admission_state.clone(),
+    };
     let accepted_pointer = PsionActualPretrainingCheckpointPointer {
         schema_version: String::from(PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION),
         lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
@@ -217,6 +297,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         retained_paths: retained_paths.clone(),
         launcher_surfaces: launcher_surfaces.clone(),
         run_roots: run_roots(resume_run_id, &topology),
+        preflight_receipt: resume_preflight_receipt.clone(),
         contract_refs,
         selected_git_ref: String::from("refs/heads/main"),
         git_commit_sha: String::from(FIXTURE_GIT_SHA),
@@ -313,6 +394,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .join("psion_actual_pretraining_launcher_example")
             .join("start")
             .join(launch_run_id),
+        &launch_hardware_qualification,
         Some(&launch_manifest),
         None,
         &launch_status,
@@ -327,6 +409,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .join("psion_actual_pretraining_launcher_example")
             .join("resume")
             .join(resume_run_id),
+        &resume_hardware_qualification,
         None,
         Some(&resume_manifest),
         &resume_status,
@@ -372,6 +455,7 @@ fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
         latest_checkpoint_pointer_path: String::from(
             "checkpoints/latest_accepted_checkpoint_pointer.json",
         ),
+        hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
         continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
         closeout_bundle_path: String::from("closeout/closeout_bundle.json"),
         launcher_log_path: String::from("logs/launcher.log"),
@@ -485,6 +569,7 @@ fn file_sha256(path: &Path) -> Result<String, Box<dyn Error>> {
 
 fn write_run_root(
     run_root: &Path,
+    hardware_qualification: &psionic_train::PsionActualPretrainingHardwareQualification,
     launch_manifest: Option<&PsionActualPretrainingLaunchManifest>,
     resume_manifest: Option<&PsionActualPretrainingResumeManifest>,
     current_status: &PsionActualPretrainingCurrentRunStatus,
@@ -497,6 +582,7 @@ fn write_run_root(
     fs::create_dir_all(run_root.join("manifests"))?;
     fs::create_dir_all(run_root.join("status"))?;
     fs::create_dir_all(run_root.join("checkpoints"))?;
+    fs::create_dir_all(run_root.join("preflight"))?;
     fs::create_dir_all(run_root.join("continuation"))?;
     fs::create_dir_all(run_root.join("closeout"))?;
     fs::create_dir_all(run_root.join("logs"))?;
@@ -523,6 +609,10 @@ fn write_run_root(
     fs::write(
         run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json"),
         serde_json::to_string_pretty(checkpoint_pointer)?,
+    )?;
+    fs::write(
+        run_root.join("preflight/hardware_qualification.json"),
+        serde_json::to_string_pretty(hardware_qualification)?,
     )?;
     if let Some(continuation_handoff) = continuation_handoff {
         fs::write(
