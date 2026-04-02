@@ -111,6 +111,17 @@ actual-lane truth. It writes bounded reference-pilot artifacts under
 `reference_pilot_operator_summary.json`, and states directly that it is not the
 `psion_actual_pretraining_v1` launcher.
 
+The repo now also owns the canonical actual-lane status and retained-summary
+surface in `crates/psionic-train/src/psion_actual_pretraining_status_surface.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_status_surface_fixtures.rs`,
+the operator helper `scripts/psion-actual-pretraining-status.sh`, the focused
+doc `docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`, and the committed
+fixtures `fixtures/psion/pretrain/psion_actual_pretraining_current_run_status_v1.json`
+plus `fixtures/psion/pretrain/psion_actual_pretraining_retained_summary_v1.json`.
+That surface freezes the reserved launcher surface ids for start, dry-run,
+resume, and status before the real actual-lane launcher is implemented.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker

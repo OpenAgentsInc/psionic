@@ -68,6 +68,10 @@ The point is not that every later issue writes every file immediately. The
 point is that later launcher, backup, eval, export, alerting, and closeout
 work all write into one shared family.
 
+The typed status and retained-summary surfaces that occupy the `status/`
+directory are now frozen separately in
+`docs/PSION_ACTUAL_PRETRAINING_STATUS_SURFACE.md`.
+
 ## Required Provenance
 
 The contract requires at least these fields:
