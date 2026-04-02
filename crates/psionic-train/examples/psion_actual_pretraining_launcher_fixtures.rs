@@ -18,13 +18,13 @@ use psionic_train::{
     PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
     PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCloseoutBundle,
     PsionActualPretrainingContinuationHandoff, PsionActualPretrainingCredentialBinding,
-    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingLaunchManifest,
-    PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
-    PsionActualPretrainingRecipeBundle, PsionActualPretrainingResumeManifest,
-    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
-    PsionActualPretrainingRunRoots, PsionActualPretrainingSystemsBundle,
-    PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    record_psion_actual_pretraining_continuation_handoff,
+    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingDataBundle,
+    PsionActualPretrainingLaunchManifest, PsionActualPretrainingLauncherContractRefs,
+    PsionActualPretrainingLauncherSurfaces, PsionActualPretrainingRecipeBundle,
+    PsionActualPretrainingResumeManifest, PsionActualPretrainingRetainedPathSet,
+    PsionActualPretrainingRetainedSummary, PsionActualPretrainingRunRoots,
+    PsionActualPretrainingSystemsBundle, PsionActualPretrainingTopologyStorageBundle,
+    PsionPluginConditionedSftStageManifest, record_psion_actual_pretraining_continuation_handoff,
 };
 use sha2::{Digest, Sha256};
 
@@ -39,14 +39,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         &root.join("fixtures/psion/pretrain/psion_actual_pretraining_recipe_bundle_v1.json"),
     )?;
     recipe.validate()?;
+    let data_bundle: PsionActualPretrainingDataBundle = load_json(
+        &root.join("fixtures/psion/pretrain/psion_actual_pretraining_data_bundle_v1.json"),
+    )?;
+    data_bundle.validate()?;
     let topology: PsionActualPretrainingTopologyStorageBundle =
         load_json(&root.join(
             "fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json",
         ))?;
     topology.validate()?;
-    let systems_bundle: PsionActualPretrainingSystemsBundle = load_json(&root.join(
-        "fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json",
-    ))?;
+    let systems_bundle: PsionActualPretrainingSystemsBundle = load_json(
+        &root.join("fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json"),
+    )?;
     systems_bundle.validate()?;
     let plugin_conditioned_stage_manifest: PsionPluginConditionedSftStageManifest = load_json(
         &root.join(
@@ -89,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "The actual-lane launcher materializes the frozen launch manifest, retained status surfaces, checkpoint pointer, and provisional closeout bundle. It does not by itself execute the distributed broader-pretraining run.",
         ),
         detail: String::from(
-            "Launch manifest binds the actual pretraining operator command to the frozen lane, recipe, systems, topology/storage, evidence, and git-provenance surfaces.",
+            "Launch manifest binds the actual pretraining operator command to the frozen lane, recipe, data, systems, topology/storage, evidence, and git-provenance surfaces.",
         ),
     };
     launch_manifest.validate()?;
@@ -218,7 +222,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "The actual-lane resume manifest binds the canonical resume command to the accepted checkpoint pointer inside the frozen evidence family. It does not claim post-resume training success by itself.",
         ),
         detail: String::from(
-            "Resume manifest records the exact accepted checkpoint selection and repeats launcher provenance plus the frozen systems bundle for restart decisions.",
+            "Resume manifest records the exact accepted checkpoint selection and repeats launcher provenance plus the frozen data and systems bundles for restart decisions.",
         ),
     };
     resume_manifest.validate()?;
@@ -406,6 +410,10 @@ fn contract_refs(
         recipe_bundle: artifact_ref(
             root,
             &pretrain_dir.join("psion_actual_pretraining_recipe_bundle_v1.json"),
+        )?,
+        data_bundle: artifact_ref(
+            root,
+            &pretrain_dir.join("psion_actual_pretraining_data_bundle_v1.json"),
         )?,
         systems_bundle: artifact_ref(
             root,

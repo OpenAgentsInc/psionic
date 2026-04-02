@@ -38,6 +38,10 @@
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_recipe_bundle_v1.json",
       "sha256": "37f3a4580a5bd7ea48bfad63ce996162d4c76d24c3044032eceae233a9406007"
     },
+    "data_bundle": {
+      "path": "fixtures/psion/pretrain/psion_actual_pretraining_data_bundle_v1.json",
+      "sha256": "8e0d15306d1cd4c438bb27b4057f05d0923bc1cafd2f3c73452c612b85098319"
+    },
     "systems_bundle": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json",
       "sha256": "529d4a31e04f8594b032569311c84e591b6d95ae6511111ba36399f9b5ff3268"
@@ -73,5 +77,5 @@
     }
   ],
   "claim_boundary": "The actual-lane launcher materializes the frozen launch manifest, retained status surfaces, checkpoint pointer, and provisional closeout bundle. It does not by itself execute the distributed broader-pretraining run.",
-  "detail": "Launch manifest binds the actual pretraining operator command to the frozen lane, recipe, systems, topology/storage, evidence, and git-provenance surfaces."
+  "detail": "Launch manifest binds the actual pretraining operator command to the frozen lane, recipe, data, systems, topology/storage, evidence, and git-provenance surfaces."
 }

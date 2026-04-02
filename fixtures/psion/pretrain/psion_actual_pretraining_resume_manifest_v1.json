@@ -38,6 +38,10 @@
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_recipe_bundle_v1.json",
       "sha256": "37f3a4580a5bd7ea48bfad63ce996162d4c76d24c3044032eceae233a9406007"
     },
+    "data_bundle": {
+      "path": "fixtures/psion/pretrain/psion_actual_pretraining_data_bundle_v1.json",
+      "sha256": "8e0d15306d1cd4c438bb27b4057f05d0923bc1cafd2f3c73452c612b85098319"
+    },
     "systems_bundle": {
       "path": "fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json",
       "sha256": "529d4a31e04f8594b032569311c84e591b6d95ae6511111ba36399f9b5ff3268"
@@ -60,5 +64,5 @@
   "optimizer_step": 16384,
   "checkpoint_ref": "checkpoint://psion/broad/pretrain/final",
   "claim_boundary": "The actual-lane resume manifest binds the canonical resume command to the accepted checkpoint pointer inside the frozen evidence family. It does not claim post-resume training success by itself.",
-  "detail": "Resume manifest records the exact accepted checkpoint selection and repeats launcher provenance plus the frozen systems bundle for restart decisions."
+  "detail": "Resume manifest records the exact accepted checkpoint selection and repeats launcher provenance plus the frozen data and systems bundles for restart decisions."
 }

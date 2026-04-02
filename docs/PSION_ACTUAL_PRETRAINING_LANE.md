@@ -20,6 +20,9 @@ work must target.
   canonical machine-readable actual-lane spec.
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md` freezes the canonical recipe and
   admitted topology/storage bundle consumed by this lane.
+- `docs/PSION_ACTUAL_PRETRAINING_DATA_BUNDLE.md` freezes the canonical
+  filtering, deduplication, replay, and mixture authority consumed by this
+  lane.
 - `docs/PSION_ACTUAL_PRETRAINING_SYSTEMS_BUNDLE.md` freezes the canonical
   A2-shaped systems bundle consumed by this lane.
 
@@ -60,6 +63,11 @@ The same lane now also carries one explicit systems authority surface covering
 throughput baselines, memory headroom, distributed-runtime qualification,
 hardware-preflight blockers, and resume-support drills. That keeps CS336 A2
 work subordinate to the real lane instead of a detached study track.
+
+The same lane now also carries one explicit data authority surface covering
+transformation order, filtering, deduplication, deterministic replay, frozen
+mixture weights, and recipe-change eval bindings. That keeps CS336 A4 work
+subordinate to the real lane instead of a detached data track.
 
 ## What Does Not Count
 

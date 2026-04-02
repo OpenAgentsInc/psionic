@@ -20,14 +20,15 @@ use psionic_train::{
     PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
     PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCloseoutBundle,
     PsionActualPretrainingContinuationHandoff, PsionActualPretrainingCredentialBinding,
-    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingEvidenceContract,
-    PsionActualPretrainingEvidenceContractError, PsionActualPretrainingLaneSpec,
-    PsionActualPretrainingLaunchManifest, PsionActualPretrainingLauncherContractRefs,
-    PsionActualPretrainingLauncherSurfaces, PsionActualPretrainingRecipeBundle,
-    PsionActualPretrainingResumeManifest, PsionActualPretrainingRetainedPathSet,
-    PsionActualPretrainingRetainedSummary, PsionActualPretrainingRunRoots,
-    PsionActualPretrainingSystemsBundle, PsionActualPretrainingTopologyStorageBundle,
-    PsionPluginConditionedSftStageManifest, record_psion_actual_pretraining_continuation_handoff,
+    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingDataBundle,
+    PsionActualPretrainingEvidenceContract, PsionActualPretrainingEvidenceContractError,
+    PsionActualPretrainingLaneSpec, PsionActualPretrainingLaunchManifest,
+    PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
+    PsionActualPretrainingRecipeBundle, PsionActualPretrainingResumeManifest,
+    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
+    PsionActualPretrainingRunRoots, PsionActualPretrainingSystemsBundle,
+    PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
+    record_psion_actual_pretraining_continuation_handoff,
 };
 use sha2::{Digest, Sha256};
 
@@ -50,6 +51,7 @@ enum Cli {
 struct FrozenContracts {
     lane_spec_ref: PsionActualPretrainingArtifactRef,
     recipe_bundle_ref: PsionActualPretrainingArtifactRef,
+    data_bundle_ref: PsionActualPretrainingArtifactRef,
     systems_bundle_ref: PsionActualPretrainingArtifactRef,
     topology_storage_bundle_ref: PsionActualPretrainingArtifactRef,
     evidence_contract_ref: PsionActualPretrainingArtifactRef,
@@ -83,6 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let contract_refs = PsionActualPretrainingLauncherContractRefs {
                 lane_spec: contracts.lane_spec_ref.clone(),
                 recipe_bundle: contracts.recipe_bundle_ref.clone(),
+                data_bundle: contracts.data_bundle_ref.clone(),
                 systems_bundle: contracts.systems_bundle_ref.clone(),
                 topology_storage_bundle: contracts.topology_storage_bundle_ref.clone(),
                 evidence_contract: contracts.evidence_contract_ref.clone(),
@@ -117,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "The actual-lane launcher materializes the frozen launch manifest, retained status surfaces, checkpoint pointer, and provisional closeout bundle. It does not by itself execute the distributed broader-pretraining run.",
                 ),
                 detail: String::from(
-                    "Launch manifest binds the actual pretraining operator command to the frozen lane, recipe, systems, topology/storage, evidence, and git-provenance surfaces.",
+                    "Launch manifest binds the actual pretraining operator command to the frozen lane, recipe, data, systems, topology/storage, evidence, and git-provenance surfaces.",
                 ),
             };
             launch_manifest.validate()?;
@@ -311,6 +314,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 contract_refs: PsionActualPretrainingLauncherContractRefs {
                     lane_spec: contracts.lane_spec_ref.clone(),
                     recipe_bundle: contracts.recipe_bundle_ref.clone(),
+                    data_bundle: contracts.data_bundle_ref.clone(),
                     systems_bundle: contracts.systems_bundle_ref.clone(),
                     topology_storage_bundle: contracts.topology_storage_bundle_ref.clone(),
                     evidence_contract: contracts.evidence_contract_ref.clone(),
@@ -332,7 +336,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "The actual-lane resume manifest binds the canonical resume command to the accepted checkpoint pointer inside the frozen evidence family. It does not claim post-resume training success by itself.",
                 ),
                 detail: String::from(
-                    "Resume manifest records the exact accepted checkpoint selection and repeats launcher provenance plus the frozen systems bundle for restart decisions.",
+                    "Resume manifest records the exact accepted checkpoint selection and repeats launcher provenance plus the frozen data and systems bundles for restart decisions.",
                 ),
             };
             resume_manifest.validate()?;
@@ -602,6 +606,7 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
     let pretrain_dir = repo_root.join("fixtures/psion/pretrain");
     let lane_spec_path = pretrain_dir.join("psion_actual_pretraining_lane_spec_v1.json");
     let recipe_path = pretrain_dir.join("psion_actual_pretraining_recipe_bundle_v1.json");
+    let data_path = pretrain_dir.join("psion_actual_pretraining_data_bundle_v1.json");
     let topology_path =
         pretrain_dir.join("psion_actual_pretraining_topology_storage_bundle_v1.json");
     let systems_path = pretrain_dir.join("psion_actual_pretraining_systems_bundle_v1.json");
@@ -610,6 +615,8 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
     lane_spec.validate()?;
     let recipe: PsionActualPretrainingRecipeBundle = load_json(&recipe_path)?;
     recipe.validate()?;
+    let data_bundle: PsionActualPretrainingDataBundle = load_json(&data_path)?;
+    data_bundle.validate()?;
     let plugin_stage_manifest_path = repo_root.join(
         &recipe
             .continuation_target
@@ -628,6 +635,7 @@ fn load_frozen_contracts(repo_root: &Path) -> Result<FrozenContracts, Box<dyn Er
     Ok(FrozenContracts {
         lane_spec_ref: artifact_ref(repo_root, &lane_spec_path)?,
         recipe_bundle_ref: artifact_ref(repo_root, &recipe_path)?,
+        data_bundle_ref: artifact_ref(repo_root, &data_path)?,
         systems_bundle_ref: artifact_ref(repo_root, &systems_path)?,
         topology_storage_bundle_ref: artifact_ref(repo_root, &topology_path)?,
         evidence_contract_ref: artifact_ref(repo_root, &evidence_path)?,
