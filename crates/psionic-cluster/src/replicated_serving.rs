@@ -1371,11 +1371,17 @@ mod tests {
         ClusterState::from_snapshot(snapshot)
     }
 
-    fn scheduling_request() -> WholeRequestSchedulingRequest {
+    fn scheduling_request_for_served_artifact(
+        served_artifact_digest: &str,
+    ) -> WholeRequestSchedulingRequest {
         WholeRequestSchedulingRequest::new(NodeId::new("scheduler"), "cuda")
             .with_capability_profile(cuda_replica_routed_capability_profile())
-            .with_served_artifact_digest("artifact-1")
+            .with_served_artifact_digest(served_artifact_digest)
             .requiring_accelerator()
+    }
+
+    fn scheduling_request() -> WholeRequestSchedulingRequest {
+        scheduling_request_for_served_artifact("artifact-1")
     }
 
     fn replica_host_lease_policy() -> ClusterLeadershipLeasePolicy {
@@ -1483,6 +1489,87 @@ mod tests {
                 .as_ref()
                 .map(|semantics| semantics.warm_route_posture),
             Some(ClusterWarmRoutePosture::RoutePinned)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replicated_serving_keeps_cuda_gemma4_lane_identity_machine_legible()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut snapshot = replica_state().snapshot();
+        snapshot.artifact_residency.insert(
+            crate::ClusterArtifactResidencyKey::new(NodeId::new("worker-a"), "gemma4-e4b-artifact"),
+            ClusterArtifactResidencyRecord::new(
+                NodeId::new("worker-a"),
+                ClusterArtifactReference::new("decoder", "gemma4-e4b-artifact"),
+                ClusterArtifactResidencyStatus::Resident,
+            ),
+        );
+        snapshot.artifact_residency.insert(
+            crate::ClusterArtifactResidencyKey::new(NodeId::new("worker-b"), "gemma4-e4b-artifact"),
+            ClusterArtifactResidencyRecord::new(
+                NodeId::new("worker-b"),
+                ClusterArtifactReference::new("decoder", "gemma4-e4b-artifact"),
+                ClusterArtifactResidencyStatus::Resident,
+            ),
+        );
+        let state = ClusterState::from_snapshot(snapshot);
+        let lane = ClusterReplicaLaneKey::new(
+            "psionic.openai_compat",
+            "gemma4:e4b",
+            "cuda",
+            "gemma4-e4b-artifact",
+        );
+        let replica_snapshot =
+            ClusterReplicaSnapshot::new(state.cluster_id().clone(), lane.clone())
+                .with_replica(ClusterReplicaRecord::new(
+                    lane.clone(),
+                    NodeId::new("worker-a"),
+                    ClusterReplicaWarmState::Warm,
+                ))
+                .with_replica(ClusterReplicaRecord::new(
+                    lane.clone(),
+                    NodeId::new("worker-b"),
+                    ClusterReplicaWarmState::Warm,
+                ));
+        let load_snapshot = ClusterServingLoadSnapshot::new(state.cluster_id().clone())
+            .with_node_load(crate::ClusterNodeServiceLoad::new(NodeId::new("worker-a")))
+            .with_node_load(crate::ClusterNodeServiceLoad::new(NodeId::new("worker-b")));
+
+        let decision = plan_replicated_serving(
+            &state,
+            &load_snapshot,
+            &replica_snapshot,
+            &ClusterReplicaLifecyclePolicy::replicated_lane(),
+            &ClusterServingPolicy::direct_caller_latency_first(),
+            &ClusterServingRequest::new("req-gemma4-replica-1", ClusterServingWorkClass::Decode),
+            &scheduling_request_for_served_artifact("gemma4-e4b-artifact"),
+        )
+        .map_err(|err| {
+            fixture_error(&format!(
+                "gemma4 replicated serving should keep lane identity intact: {err:?}"
+            ))
+        })?;
+
+        assert_eq!(decision.lane, lane);
+        assert_eq!(decision.lane.model_id, "gemma4:e4b");
+        assert_eq!(decision.lane.runtime_backend, "cuda");
+        assert_eq!(decision.lane.served_artifact_digest, "gemma4-e4b-artifact");
+        assert_eq!(
+            decision.replica_state_digest,
+            replica_snapshot.stable_digest()
+        );
+        assert_eq!(
+            decision.serving_decision.schedule.selected_node_id,
+            NodeId::new("worker-a")
+        );
+        assert_eq!(
+            decision
+                .serving_decision
+                .schedule
+                .cluster_execution
+                .disposition,
+            ClusterExecutionDisposition::ReplicaRouted
         );
         Ok(())
     }

@@ -2066,6 +2066,79 @@ mod tests {
     }
 
     #[test]
+    fn router_routes_remote_cuda_gemma_mesh_lane_honestly() {
+        let router = FleetRouter::new(
+            "tiny-local-llama",
+            vec![
+                RoutedWorkerInventory::new("worker-local", "cpu", "native", "psionic").with_model(
+                    RoutedModelInventory::new(
+                        "tiny-local-llama",
+                        "tiny-local-llama",
+                        "llama",
+                        sample_profile(),
+                    )
+                    .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                    .with_supported_endpoint(RoutingEndpoint::Responses)
+                    .with_response_state(),
+                ),
+                RoutedWorkerInventory::new(
+                    "bootstrap:worker-gemma4-e4b",
+                    "cuda",
+                    "native",
+                    "psionic",
+                )
+                .as_remote_bootstrap_proxy()
+                .with_peer_worker_id("worker-gemma4-e4b")
+                .with_model(
+                    RoutedModelInventory::new(
+                        "gemma4:e4b",
+                        "gemma4:e4b",
+                        "gemma4",
+                        sample_profile(),
+                    )
+                    .with_supported_endpoint(RoutingEndpoint::ChatCompletions),
+                ),
+            ],
+        )
+        .expect("router should build");
+
+        let selection = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::ChatCompletions)
+                    .with_requested_model("gemma4:e4b"),
+            )
+            .expect("remote gemma lane should resolve through the mesh");
+        assert_eq!(selection.worker_id, "bootstrap:worker-gemma4-e4b");
+        assert_eq!(
+            selection.peer_worker_id.as_deref(),
+            Some("worker-gemma4-e4b")
+        );
+        assert_eq!(selection.model_key, "gemma4:e4b");
+        assert_eq!(selection.backend_label, "cuda");
+        assert_eq!(
+            selection.execution_locality,
+            RoutedExecutionLocality::RemoteProxy
+        );
+        assert_eq!(
+            selection.execution_provenance,
+            RoutedExecutionProvenance::BootstrapProxy
+        );
+
+        let error = router
+            .resolve(
+                &RoutingRequest::new(RoutingEndpoint::Responses)
+                    .with_requested_model("gemma4:e4b")
+                    .require_response_state(),
+            )
+            .expect_err("mesh should refuse unsupported gemma responses endpoint");
+        assert!(matches!(error, RoutingError::NoEligibleRoute { .. }));
+        assert!(
+            error.to_string().contains("/v1/responses"),
+            "refusal should keep the unsupported endpoint explicit"
+        );
+    }
+
+    #[test]
     fn router_prefers_requested_worker_for_shared_model() {
         let worker_model =
             RoutedModelInventory::new("tiny-llama", "tiny-llama", "llama", sample_profile())

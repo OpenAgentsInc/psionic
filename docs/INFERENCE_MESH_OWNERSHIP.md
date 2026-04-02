@@ -258,6 +258,13 @@ When bootstrap mode is enabled, the local server:
 - proxies only to warm remote workers that honestly satisfy the routed target
 - publishes route execution provenance on both headers and management state
 
+The current cross-family validation lane for that contract pairs one local
+decoder with one remote CUDA `gemma4:e4b` worker. That lane proves the mesh can
+publish one routed `/v1/models` union, keep local served truth separate from
+remote route truth, and still refuse unsupported `Gemma 4` surfaces such as
+`/v1/responses` across the proxy path instead of inheriting local-model
+capabilities by accident.
+
 The routed publication contract above that bootstrap path is now:
 
 - one unique routed worker identifier per local worker or proxied remote peer

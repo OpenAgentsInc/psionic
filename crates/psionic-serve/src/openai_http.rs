@@ -8988,6 +8988,239 @@ mod tests {
     }
 
     #[test]
+    fn generic_server_bootstrap_routes_cuda_gemma4_mesh_family_honestly_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let _proxy_lock = bootstrap_proxy_test_lock()
+            .lock()
+            .expect("bootstrap proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-bootstrap-local-llama.gguf");
+        let gemma_path = temp.path().join("gemma4-e4b-bootstrap-cuda.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny bootstrap local llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template("tiny bootstrap gemma4 e4b cuda").as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab(7, 5).as_slice(),
+        )?;
+
+        let mut remote_config = OpenAiCompatConfig::new(&gemma_path);
+        remote_config.backend = OpenAiCompatBackend::Cuda;
+        let remote_server = OpenAiCompatServer::from_config(&remote_config)?;
+        let (base_url, shutdown_tx) =
+            runtime.block_on(start_openai_compat_test_server(remote_server))?;
+
+        let bootstrap_env =
+            ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_BASE_URL", base_url.as_str());
+        let mode_env = ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_MODE", "thin_client");
+        let local_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        drop(mode_env);
+        drop(bootstrap_env);
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        assert_eq!(models.0.data.len(), 2);
+
+        let llama = models
+            .0
+            .data
+            .iter()
+            .find(|model| model.id == "tiny-bootstrap-local-llama.gguf")
+            .expect("local llama model should still be listed");
+        assert_eq!(llama.psionic_model_family, "llama");
+        assert_eq!(llama.psionic_served_backend, Some("cpu"));
+        assert_eq!(llama.psionic_execution_mode, Some("native"));
+        assert_eq!(llama.psionic_route_backends, vec![String::from("cpu")]);
+        assert_eq!(
+            llama.psionic_supported_endpoints,
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        assert_eq!(
+            llama.psionic_route_localities,
+            vec![RoutedExecutionLocality::Local]
+        );
+        assert_eq!(
+            llama.psionic_route_provenances,
+            vec![RoutedExecutionProvenance::LocalExecution]
+        );
+
+        let gemma = models
+            .0
+            .data
+            .iter()
+            .find(|model| model.id == "gemma4-e4b-bootstrap-cuda.gguf")
+            .expect("remote cuda gemma model should be listed through the mesh router");
+        assert_eq!(gemma.psionic_model_family, "gemma4");
+        assert_eq!(
+            gemma.psionic_supported_endpoints,
+            vec!["/v1/chat/completions"]
+        );
+        assert_eq!(gemma.psionic_served_backend, Some("remote"));
+        assert_eq!(gemma.psionic_execution_mode, Some("proxy"));
+        assert_eq!(gemma.psionic_execution_engine, Some("psionic"));
+        assert_eq!(gemma.psionic_route_backends, vec![String::from("cuda")]);
+        assert_eq!(
+            gemma.psionic_route_execution_modes,
+            vec![String::from("native")]
+        );
+        assert_eq!(
+            gemma.psionic_route_execution_engines,
+            vec![String::from("psionic")]
+        );
+        assert_eq!(
+            gemma.psionic_route_localities,
+            vec![RoutedExecutionLocality::RemoteProxy]
+        );
+        assert_eq!(
+            gemma.psionic_route_provenances,
+            vec![RoutedExecutionProvenance::BootstrapProxy]
+        );
+        assert!(gemma.psionic_response_state.is_none());
+        assert!(
+            gemma
+                .psionic_tool_calling
+                .as_ref()
+                .is_some_and(|capability| capability.support_level.label() == "unsupported")
+        );
+
+        let local_response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&local_server.state),
+            ResponsesRequest {
+                model: Some(String::from("tiny-bootstrap-local-llama.gguf")),
+                instructions: Some(String::from("Be terse.")),
+                conversation: None,
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                previous_response_id: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_response_state: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        let local_headers = local_response.headers().clone();
+        let local_payload = runtime.block_on(response_json(local_response))?;
+        assert_eq!(local_payload["object"], serde_json::json!("response"));
+        assert_eq!(
+            header_value(&local_headers, "x-psionic-route-locality"),
+            Some(String::from("local"))
+        );
+        assert_eq!(
+            header_value(&local_headers, "x-psionic-route-provenance"),
+            Some(String::from("local_execution"))
+        );
+
+        let gemma_chat = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&local_server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("gemma4-e4b-bootstrap-cuda.gguf")),
+                messages: vec![
+                    ChatCompletionMessage::text("system", "Be terse."),
+                    ChatCompletionMessage::text("user", "hello"),
+                ],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let gemma_chat_headers = gemma_chat.headers().clone();
+        let gemma_chat_payload = runtime.block_on(response_json(gemma_chat))?;
+        assert_eq!(
+            gemma_chat_payload["model"],
+            serde_json::json!("gemma4-e4b-bootstrap-cuda.gguf")
+        );
+        assert_eq!(
+            header_value(&gemma_chat_headers, "x-psionic-served-backend"),
+            Some(String::from("remote"))
+        );
+        assert_eq!(
+            header_value(&gemma_chat_headers, "x-psionic-execution-mode"),
+            Some(String::from("proxy"))
+        );
+        assert_eq!(
+            header_value(&gemma_chat_headers, "x-psionic-execution-engine"),
+            Some(String::from("psionic"))
+        );
+        assert_eq!(
+            header_value(&gemma_chat_headers, "x-psionic-route-locality"),
+            Some(String::from("remote_proxy"))
+        );
+        assert_eq!(
+            header_value(&gemma_chat_headers, "x-psionic-route-provenance"),
+            Some(String::from("bootstrap_proxy"))
+        );
+
+        let responses_error = runtime
+            .block_on(handle_generic_responses(
+                std::sync::Arc::clone(&local_server.state),
+                ResponsesRequest {
+                    model: Some(String::from("gemma4-e4b-bootstrap-cuda.gguf")),
+                    instructions: None,
+                    conversation: None,
+                    input: ResponsesInput::Text(String::from("hello")),
+                    temperature: Some(0.0),
+                    max_output_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    previous_response_id: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_response_state: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("remote gemma route should keep unsupported responses explicit");
+        let responses_payload = runtime.block_on(response_json(responses_error.into_response()))?;
+        assert!(
+            responses_payload["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("/v1/chat/completions")
+        );
+
+        let management = runtime.block_on(generic_management_status(State(std::sync::Arc::clone(
+            &local_server.state,
+        ))));
+        assert_eq!(management.0.node_count, 2);
+        assert_eq!(management.0.model_count, 2);
+        assert!(management.0.nodes.iter().any(|node| {
+            node.mesh_peer_worker_id.as_deref() == Some(OPENAI_COMPAT_WORKER_ID)
+                && node.backend_label == "cuda"
+                && node.execution_mode_label == "native"
+                && node.execution_engine_label == "psionic"
+                && node.execution_locality == RoutedExecutionLocality::RemoteProxy
+                && node.execution_provenance == RoutedExecutionProvenance::BootstrapProxy
+        }));
+        assert!(management.0.routes.iter().any(|route| {
+            route.model_key == "gemma4-e4b-bootstrap-cuda.gguf"
+                && route.family == "gemma4"
+                && route.endpoint == "/v1/chat/completions"
+        }));
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_bootstrap_warming_reports_host_role_and_remote_execution()
     -> Result<(), Box<dyn std::error::Error>> {
         let _proxy_lock = bootstrap_proxy_test_lock()

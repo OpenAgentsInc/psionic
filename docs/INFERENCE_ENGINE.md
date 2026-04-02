@@ -39,6 +39,16 @@ than just run tensor math.
   - `/v1/chat/completions` on the generic OpenAI-compatible server
   - bounded prompt-render, server-smoke, refusal, and repeatable CUDA
     conformance coverage for `gemma4:e4b`
+- The first distributed `Gemma 4` mesh validation now rides the bootstrap path
+  too:
+  - remote execution target = CUDA-backed `gemma4:e4b`
+  - routed publication keeps remote route truth explicit on `/v1/models` with
+    `route_backend = cuda`, `route_execution_mode = native`, and
+    `route_execution_engine = psionic`
+  - thin-client served truth stays separate and honest with
+    `served_backend = remote` and `execution_mode = proxy`
+  - unsupported `Gemma 4` surfaces such as `/v1/responses` remain refused
+    across the mesh rather than borrowing a local model's wider endpoint claim
 - The first bounded `Gemma 4` claim must stay explicit about its unsupported
   regions:
   - image
