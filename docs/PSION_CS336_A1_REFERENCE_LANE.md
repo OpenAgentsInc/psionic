@@ -1,8 +1,8 @@
 # Psion CS336 A1 Reference Lane
 
-> Status: partial full-port program, updated 2026-04-02 after landing the
-> bounded CS336 A1 tokenizer train/runtime pair, the forward-only reference
-> stack, and the bounded end-to-end training/checkpoint tranche.
+> Status: bounded full port complete, updated 2026-04-02 after landing the
+> tokenizer train/runtime pair, the forward/model stack, the end-to-end
+> training/checkpoint tranche, and the full A1 conformance harness.
 
 This document records the owned `psionic` surfaces for the full Stanford CS336
 Assignment 1 port program.
@@ -10,11 +10,11 @@ Assignment 1 port program.
 It exists so the repo can distinguish between:
 
 - the older selective actual-lane baseline-tools bundle, and
-- the newer bounded full-port reference lane work needed to cover all of A1.
+- the newer bounded full-port reference lane work that now covers all of A1.
 
 ## What Landed So Far
 
-The first full-port tranches now own:
+The bounded full-port lane now owns:
 
 - one real CS336-style byte-level BPE trainer
 - one matching runtime tokenizer
@@ -23,6 +23,9 @@ The first full-port tranches now own:
 - one bounded end-to-end CS336 A1 training loop with deterministic batching,
   softmax, cross-entropy, gradient clipping, AdamW, cosine schedule,
   checkpoint save/load, and exact resume proof on a tiny admitted corpus
+- one typed conformance harness, one retained conformance report, and one
+  checked-in completion matrix that map every Stanford A1 adapter family to an
+  owned `psionic` proof surface
 
 Primary landing surfaces:
 
@@ -30,7 +33,11 @@ Primary landing surfaces:
 - `crates/psionic-models/src/cs336_a1_tokenizer.rs`
 - `crates/psionic-models/src/cs336_a1_reference_stack.rs`
 - `crates/psionic-train/src/cs336_a1_reference_training.rs`
+- `crates/psionic-train/src/cs336_a1_full_port_conformance.rs`
 - `crates/psionic-train/examples/psion_cs336_a1_reference_training_bundle.rs`
+- `crates/psionic-train/examples/psion_cs336_a1_full_port_conformance_report.rs`
+- `docs/PSION_CS336_A1_FULL_PORT_MATRIX.md`
+- `fixtures/training/cs336_a1_full_port_conformance_report_v1.json`
 - `fixtures/training/cs336_a1_reference_tiny_training_bundle_v1.json`
 
 That implementation now provides:
@@ -56,6 +63,11 @@ That implementation now provides:
   and proves resumed execution matches an uninterrupted four-step run
 - committed retained fixtures for the tiny corpus, the step-2 checkpoint, the
   step-4 checkpoint, and the end-to-end training bundle
+- a typed conformance report that refuses to go green unless every Stanford A1
+  adapter family maps to an owned implementation surface plus an in-repo proof
+  surface
+- a checked-in markdown matrix that makes the bounded completion bar legible in
+  docs instead of leaving “full port” as a vague claim
 
 ## Current Claim Boundary
 
@@ -70,16 +82,21 @@ This lane now honestly claims:
 - `psionic` owns a bounded end-to-end CS336 A1 trainer that covers the
   Stanford A1 training-side helper surfaces in owned Rust and emits retained
   bundle/checkpoint artifacts
+- `psionic` owns a full Stanford CS336 A1 adapter-coverage matrix with an
+  in-repo retained conformance report and direct proof rows for every adapter
+  family in the bounded reference lane
 - tokenizer reproducibility for the A1 reference lane is now machine-legible
   and test-covered inside owned Rust code
 
 It does not yet claim:
 
-- full Assignment 1 conformance proof coverage across every Stanford adapter
-  surface
 - scalable broader-pretraining backward support beyond the tiny reference lane,
   because the bounded trainer currently uses finite-difference reference math
   for gradients on the tiny model rather than a production autograd path
+- that the bounded A1 lane is the same thing as the actual `Psion`
+  pretraining operator lane
 
-The remaining surface stays in the follow-on conformance issue for the bounded
-full-port program.
+The canonical completion matrix lives in
+`docs/PSION_CS336_A1_FULL_PORT_MATRIX.md`, and the retained machine-readable
+report lives in
+`fixtures/training/cs336_a1_full_port_conformance_report_v1.json`.

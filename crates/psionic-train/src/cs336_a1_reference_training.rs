@@ -948,12 +948,16 @@ fn normalize_dim(rank: usize, dim: isize) -> Result<usize, Cs336A1ReferenceTrain
 #[cfg(test)]
 mod tests {
     use super::{
-        Cs336A1ReferenceTrainer, Cs336A1ReferenceTrainingConfig, cs336_a1_cross_entropy,
-        cs336_a1_get_batch, cs336_a1_get_lr_cosine_schedule, cs336_a1_softmax,
+        Cs336A1ReferenceTrainer, Cs336A1ReferenceTrainingConfig, cs336_a1_adamw_config,
+        cs336_a1_cross_entropy, cs336_a1_get_batch, cs336_a1_get_lr_cosine_schedule,
+        cs336_a1_gradient_clipping, cs336_a1_softmax, load_cs336_a1_reference_checkpoint,
         write_cs336_a1_reference_tiny_training_bundle,
     };
-    use psionic_core::Shape;
-    use psionic_nn::NnTensor;
+    use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
+    use psionic_nn::{
+        ModuleStateDict, ModuleStateEntry, ModuleStateEntryKind, ModuleStateView, NnTensor,
+    };
+    use std::collections::BTreeMap;
     use tempfile::tempdir;
 
     #[test]
@@ -984,6 +988,67 @@ mod tests {
         let loss = cs336_a1_cross_entropy(&logits, &[0, 1])?;
         assert!(loss > 0.0);
         assert!(loss < 1.0);
+        Ok(())
+    }
+
+    #[test]
+    fn gradient_clipping_enforces_global_norm_bound() -> Result<(), Box<dyn std::error::Error>> {
+        let spec = TensorSpec::new(Shape::new(vec![2]), DType::F32, Device::cpu());
+        let mut gradients = ModuleStateDict::new(
+            "cs336_a1_gradients",
+            "test_gradients",
+            ModuleStateView::PersistentOnly,
+            BTreeMap::from([
+                (
+                    String::from("layer0.weight"),
+                    ModuleStateEntry {
+                        path: String::from("layer0.weight"),
+                        kind: ModuleStateEntryKind::Parameter,
+                        spec: spec.clone(),
+                        data: TensorData::F32(vec![3.0, 4.0]),
+                        requires_grad: true,
+                        persistent: true,
+                    },
+                ),
+                (
+                    String::from("layer1.weight"),
+                    ModuleStateEntry {
+                        path: String::from("layer1.weight"),
+                        kind: ModuleStateEntryKind::Parameter,
+                        spec,
+                        data: TensorData::F32(vec![12.0, 0.0]),
+                        requires_grad: true,
+                        persistent: true,
+                    },
+                ),
+            ]),
+        )?;
+        let report = cs336_a1_gradient_clipping(&mut gradients, 1.0)?;
+        let values = gradients
+            .entries
+            .values()
+            .flat_map(|entry| match &entry.data {
+                TensorData::F32(values) => values.clone(),
+                _ => Vec::new(),
+            })
+            .collect::<Vec<_>>();
+        let l2_norm = values.iter().map(|value| value.powi(2)).sum::<f32>().sqrt();
+        assert!(report.clipping_ratio.is_some());
+        assert!(report.gradient_norm_l2_before > 1.0);
+        assert!(report.gradient_norm_l2_after <= 1.0 + 1e-5);
+        assert!((l2_norm - 1.0).abs() < 1e-5);
+        Ok(())
+    }
+
+    #[test]
+    fn adamw_config_updates_parameters_on_first_step() -> Result<(), Box<dyn std::error::Error>> {
+        let optimizer = cs336_a1_adamw_config(0.1, 0.9, 0.95, 1e-8, 0.0);
+        let mut parameters = vec![1.0, -2.0];
+        let gradients = vec![0.5, -0.25];
+        let mut state = optimizer.initialize_state(parameters.len());
+        optimizer.apply_step(&mut parameters, gradients.as_slice(), &mut state, 1)?;
+        assert!((parameters[0] - 0.9).abs() < 1e-5);
+        assert!((parameters[1] + 1.9).abs() < 1e-5);
         Ok(())
     }
 
@@ -1026,6 +1091,35 @@ mod tests {
         );
         assert_eq!(resumed_reports.len(), 2);
         assert_eq!(uninterrupted_reports.len(), 4);
+        Ok(())
+    }
+
+    #[test]
+    fn checkpoint_round_trip_preserves_iteration_and_state_digests()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let corpus = "the cat sat on the mat.\nthe cat saw the mat.\n";
+        let mut trainer = Cs336A1ReferenceTrainer::from_corpus_text(
+            corpus,
+            Cs336A1ReferenceTrainingConfig::tiny(),
+        )?;
+        let _ = trainer.run_steps(2)?;
+        let expected_model_digest = trainer.model_state_digest();
+        let expected_optimizer_digest = trainer.optimizer_state_digest()?;
+        let tempdir = tempdir()?;
+        let checkpoint_path = tempdir.path().join("checkpoint.json");
+        trainer.save_checkpoint(&checkpoint_path)?;
+        let checkpoint = load_cs336_a1_reference_checkpoint(&checkpoint_path)?;
+        let restored = Cs336A1ReferenceTrainer::load_checkpoint(&checkpoint_path)?;
+        assert_eq!(checkpoint.iteration, 2);
+        assert_eq!(
+            checkpoint.model_state.state_dict_digest,
+            expected_model_digest
+        );
+        assert_eq!(restored.model_state_digest(), expected_model_digest);
+        assert_eq!(
+            restored.optimizer_state_digest()?,
+            expected_optimizer_digest
+        );
         Ok(())
     }
 

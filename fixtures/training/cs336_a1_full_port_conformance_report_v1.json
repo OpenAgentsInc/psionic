@@ -1,0 +1,410 @@
+{
+  "schema_version": "psion.cs336_a1.full_port_conformance_report.v1",
+  "completion_matrix_path": "docs/PSION_CS336_A1_FULL_PORT_MATRIX.md",
+  "retained_training_bundle_path": "fixtures/training/cs336_a1_reference_tiny_training_bundle_v1.json",
+  "row_count": 21,
+  "green_row_count": 21,
+  "fully_green": true,
+  "rows": [
+    {
+      "stanford_adapter_name": "run_linear",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "linear_matches_manual_projection",
+          "detail": "Direct unit test for the A1 linear helper."
+        }
+      ],
+      "detail": "Linear projection is covered by the bounded reference stack test surface."
+    },
+    {
+      "stanford_adapter_name": "run_embedding",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "embedding_matches_table_lookup",
+          "detail": "Direct unit test for the A1 embedding helper."
+        }
+      ],
+      "detail": "Embedding table lookup is covered by the bounded reference stack test surface."
+    },
+    {
+      "stanford_adapter_name": "run_swiglu",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "swiglu_composes_gate_and_value_paths",
+          "detail": "Direct unit test for the A1 SwiGLU helper."
+        }
+      ],
+      "detail": "SwiGLU is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_scaled_dot_product_attention",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "scaled_dot_product_attention_matches_manual_example",
+          "detail": "Direct unit test for scaled dot-product attention."
+        }
+      ],
+      "detail": "Scaled dot-product attention is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_multihead_self_attention",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "multihead_self_attention_supports_identity_projection_path",
+          "detail": "Direct unit test for batched multi-head self-attention."
+        }
+      ],
+      "detail": "Batched multi-head self-attention is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_multihead_self_attention_with_rope",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "multihead_self_attention_with_rope_executes_end_to_end",
+          "detail": "Direct unit test for RoPE-enabled multi-head self-attention."
+        }
+      ],
+      "detail": "RoPE-enabled multi-head self-attention is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_rope",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "rope_rotates_even_odd_pairs",
+          "detail": "Direct unit test for the RoPE helper."
+        }
+      ],
+      "detail": "RoPE is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_transformer_block",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "transformer_block_with_zero_submodules_is_identity",
+          "detail": "Direct unit test for the bounded transformer block."
+        }
+      ],
+      "detail": "The pre-norm transformer block is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_transformer_lm",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "transformer_lm_executes_end_to_end_and_exposes_expected_state_dict_keys",
+          "detail": "Direct unit test for the bounded transformer LM."
+        }
+      ],
+      "detail": "The bounded transformer LM is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_rmsnorm",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "rms_norm_scales_by_root_mean_square",
+          "detail": "Direct unit test for RMSNorm."
+        }
+      ],
+      "detail": "RMSNorm is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_silu",
+      "category": "model",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_reference_stack.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_reference_stack.rs",
+          "selector": "silu_matches_reference_formula",
+          "detail": "Direct unit test for SiLU."
+        }
+      ],
+      "detail": "SiLU is covered directly by the reference stack tests."
+    },
+    {
+      "stanford_adapter_name": "run_get_batch",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "get_batch_cycles_deterministically",
+          "detail": "Direct unit test for deterministic batch construction."
+        }
+      ],
+      "detail": "The bounded trainer exposes deterministic next-token batch construction."
+    },
+    {
+      "stanford_adapter_name": "run_softmax",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "softmax_normalizes_requested_dimension",
+          "detail": "Direct unit test for the softmax helper."
+        }
+      ],
+      "detail": "Softmax is covered directly by the bounded training helper tests."
+    },
+    {
+      "stanford_adapter_name": "run_cross_entropy",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "cross_entropy_matches_expected_average",
+          "detail": "Direct unit test for cross-entropy loss."
+        }
+      ],
+      "detail": "Cross-entropy is covered directly by the bounded training helper tests."
+    },
+    {
+      "stanford_adapter_name": "run_gradient_clipping",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "gradient_clipping_enforces_global_norm_bound",
+          "detail": "Direct unit test for global gradient clipping."
+        }
+      ],
+      "detail": "Global gradient clipping is covered directly by the bounded training helper tests."
+    },
+    {
+      "stanford_adapter_name": "get_adamw_cls",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "adamw_config_updates_parameters_on_first_step",
+          "detail": "Direct unit test for the bounded AdamW helper."
+        }
+      ],
+      "detail": "AdamW update behavior is covered directly by the bounded training helper tests."
+    },
+    {
+      "stanford_adapter_name": "run_get_lr_cosine_schedule",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "cosine_schedule_warms_up_and_decays",
+          "detail": "Direct unit test for the cosine learning-rate schedule."
+        }
+      ],
+      "detail": "The cosine schedule is covered directly by the bounded training helper tests."
+    },
+    {
+      "stanford_adapter_name": "run_save_checkpoint",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "checkpoint_round_trip_preserves_iteration_and_state_digests",
+          "detail": "Direct unit test for checkpoint save/load round-trip behavior."
+        },
+        {
+          "proof_kind": "retained_artifact",
+          "repo_relative_path": "fixtures/training/cs336_a1_reference_tiny_checkpoint_step2.json",
+          "selector": null,
+          "detail": "Committed retained checkpoint proving the step-2 save surface."
+        },
+        {
+          "proof_kind": "retained_artifact",
+          "repo_relative_path": "fixtures/training/cs336_a1_reference_tiny_training_bundle_v1.json",
+          "selector": null,
+          "detail": "Committed retained training bundle proving save/load/resume behavior."
+        }
+      ],
+      "detail": "Checkpoint save is covered by the direct round-trip test plus retained bundle artifacts."
+    },
+    {
+      "stanford_adapter_name": "run_load_checkpoint",
+      "category": "training",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a1_reference_training.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a1_reference_training.rs",
+          "selector": "checkpoint_round_trip_preserves_iteration_and_state_digests",
+          "detail": "Direct unit test for checkpoint save/load round-trip behavior."
+        },
+        {
+          "proof_kind": "retained_artifact",
+          "repo_relative_path": "fixtures/training/cs336_a1_reference_tiny_checkpoint_step4.json",
+          "selector": null,
+          "detail": "Committed retained checkpoint proving the resumed load surface."
+        },
+        {
+          "proof_kind": "retained_artifact",
+          "repo_relative_path": "fixtures/training/cs336_a1_reference_tiny_training_bundle_v1.json",
+          "selector": null,
+          "detail": "Committed retained training bundle proving load/resume exactness."
+        }
+      ],
+      "detail": "Checkpoint load is covered by the direct round-trip test plus retained bundle artifacts."
+    },
+    {
+      "stanford_adapter_name": "get_tokenizer",
+      "category": "tokenizer",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-models/src/cs336_a1_tokenizer.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_tokenizer.rs",
+          "selector": "tokenizer_round_trips_text_and_special_tokens",
+          "detail": "Direct unit test for tokenizer construction and round-trip behavior."
+        },
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_tokenizer.rs",
+          "selector": "tokenizer_prefers_the_longest_special_token",
+          "detail": "Direct unit test for longest-match special-token preservation."
+        },
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-models/src/cs336_a1_tokenizer.rs",
+          "selector": "tokenizer_streaming_surface_matches_direct_encoding",
+          "detail": "Direct unit test for the bounded streaming tokenizer surface."
+        }
+      ],
+      "detail": "Tokenizer construction from vocab, merges, and special tokens is covered directly by the runtime tokenizer tests."
+    },
+    {
+      "stanford_adapter_name": "run_train_bpe",
+      "category": "tokenizer",
+      "status": "green",
+      "implementation_surfaces": [
+        "crates/psionic-data/src/cs336_a1_bpe.rs"
+      ],
+      "proof_surfaces": [
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-data/src/cs336_a1_bpe.rs",
+          "selector": "trainer_uses_lexicographically_greatest_pair_for_ties",
+          "detail": "Direct unit test for the Stanford tie-break rule."
+        },
+        {
+          "proof_kind": "unit_test",
+          "repo_relative_path": "crates/psionic-data/src/cs336_a1_bpe.rs",
+          "selector": "trainer_emits_reconstructible_artifacts",
+          "detail": "Direct unit test for retained BPE artifact reconstruction."
+        }
+      ],
+      "detail": "Byte-level BPE training is covered directly by the owned trainer tests."
+    }
+  ],
+  "claim_boundary": "This report closes Stanford CS336 Assignment 1 only as a bounded psionic reference lane. It proves every Stanford adapter family is mapped to owned Rust code plus in-repo proof surfaces. It does not promote the bounded lane into the actual pretraining operator lane, and it does not claim scalable broader-pretraining backward support beyond the tiny finite-difference reference trainer."
+}

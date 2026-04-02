@@ -135,9 +135,15 @@ generator `crates/psionic-train/examples/psion_cs336_a1_reference_training_bundl
 and the committed retained bundle under
 `fixtures/training/cs336_a1_reference_tiny_training_bundle_v1.json`. That
 improves the earlier selective A1 posture and now covers the Stanford A1
-training-side helper surfaces in a bounded owned lane, but it still does not
-by itself mean full conformance coverage across every Stanford adapter surface
-is already fully ported.
+training-side helper surfaces in a bounded owned lane. The closing tranche is
+the typed conformance harness in
+`crates/psionic-train/src/cs336_a1_full_port_conformance.rs`, the fixture
+generator `crates/psionic-train/examples/psion_cs336_a1_full_port_conformance_report.rs`,
+the checked-in completion matrix `docs/PSION_CS336_A1_FULL_PORT_MATRIX.md`,
+and the retained report
+`fixtures/training/cs336_a1_full_port_conformance_report_v1.json`. That
+combination is the repo-owned completion bar for saying “full Stanford A1 port”
+inside the bounded reference lane.
 
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
