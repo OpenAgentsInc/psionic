@@ -4658,6 +4658,7 @@ dependencies = [
  "psionic-eval",
  "psionic-ir",
  "psionic-models",
+ "psionic-nn",
  "psionic-runtime",
  "psionic-sandbox",
  "psionic-transformer",

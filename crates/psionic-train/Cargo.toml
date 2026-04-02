@@ -34,6 +34,7 @@ psionic-environments = { path = "../psionic-environments" }
 psionic-eval = { path = "../psionic-eval" }
 psionic-ir = { path = "../psionic-ir" }
 psionic-models = { path = "../psionic-models" }
+psionic-nn = { path = "../psionic-nn" }
 psionic-runtime = { path = "../psionic-runtime" }
 psionic-sandbox = { path = "../psionic-sandbox" }
 psionic-transformer = { path = "../psionic-transformer" }

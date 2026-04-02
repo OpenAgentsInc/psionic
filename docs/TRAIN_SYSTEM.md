@@ -129,9 +129,15 @@ the real byte-level BPE train/runtime pair in
 the bounded forward-only reference stack in
 `crates/psionic-models/src/cs336_a1_reference_stack.rs`, which now covers the
 Stanford A1 model-side forward surfaces above existing `psionic` primitives.
-That improves the earlier selective A1 posture, but it still does not by
-itself mean the trainer, optimizer, scheduler, checkpoint, and conformance
-surfaces are already fully ported.
+The third landed tranche is the bounded training/checkpoint surface in
+`crates/psionic-train/src/cs336_a1_reference_training.rs` plus the fixture
+generator `crates/psionic-train/examples/psion_cs336_a1_reference_training_bundle.rs`
+and the committed retained bundle under
+`fixtures/training/cs336_a1_reference_tiny_training_bundle_v1.json`. That
+improves the earlier selective A1 posture and now covers the Stanford A1
+training-side helper surfaces in a bounded owned lane, but it still does not
+by itself mean full conformance coverage across every Stanford adapter surface
+is already fully ported.
 
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
