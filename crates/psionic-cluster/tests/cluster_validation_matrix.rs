@@ -630,7 +630,7 @@ fn fault_injection_covers_mesh_refusal_for_sharded_paths() -> Result<(), Box<dyn
             psionic_cluster::ClusterLink::new(
                 NodeId::new(left),
                 NodeId::new(right),
-                psionic_cluster::ClusterTransportClass::Tcp,
+                psionic_cluster::ClusterTransportClass::WiderNetworkStream,
                 psionic_cluster::ClusterLinkStatus::Healthy,
             )
             .with_link_class(psionic_cluster::ClusterLinkClass::Ethernet)

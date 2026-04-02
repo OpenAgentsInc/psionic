@@ -690,8 +690,10 @@ pub enum ClusterTransportClass {
     LoopbackUdp,
     /// Same-network UDP transport.
     LanUdp,
-    /// Generic TCP transport.
+    /// Generic TCP stream transport on a trusted local network.
     Tcp,
+    /// Explicit wider-network stream transport for remote mesh lanes.
+    WiderNetworkStream,
     /// Explicit low-latency/RDMA-class transport.
     Rdma,
     /// Unknown or not-yet-classified transport.
@@ -4010,6 +4012,7 @@ fn default_link_class(transport: ClusterTransportClass) -> ClusterLinkClass {
         ClusterTransportClass::LoopbackUdp => ClusterLinkClass::Loopback,
         ClusterTransportClass::LanUdp => ClusterLinkClass::Ethernet,
         ClusterTransportClass::Tcp => ClusterLinkClass::Ethernet,
+        ClusterTransportClass::WiderNetworkStream => ClusterLinkClass::Unknown,
         ClusterTransportClass::Rdma => ClusterLinkClass::Rdma,
         ClusterTransportClass::Unknown => ClusterLinkClass::Unknown,
     }
@@ -4072,6 +4075,7 @@ fn transport_class_label(transport: ClusterTransportClass) -> &'static [u8] {
         ClusterTransportClass::LoopbackUdp => b"loopback_udp",
         ClusterTransportClass::LanUdp => b"lan_udp",
         ClusterTransportClass::Tcp => b"tcp",
+        ClusterTransportClass::WiderNetworkStream => b"wider_network_stream",
         ClusterTransportClass::Rdma => b"rdma",
         ClusterTransportClass::Unknown => b"unknown",
     }

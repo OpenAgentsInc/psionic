@@ -179,7 +179,7 @@ impl ClusterValidationFixture {
                 ClusterLink::new(
                     NodeId::new("scheduler"),
                     NodeId::new(worker),
-                    ClusterTransportClass::Tcp,
+                    ClusterTransportClass::WiderNetworkStream,
                     ClusterLinkStatus::Healthy,
                 )
                 .with_link_class(ClusterLinkClass::Ethernet)
@@ -197,7 +197,7 @@ impl ClusterValidationFixture {
                 ClusterLink::new(
                     NodeId::new(left),
                     NodeId::new(right),
-                    ClusterTransportClass::Tcp,
+                    ClusterTransportClass::WiderNetworkStream,
                     ClusterLinkStatus::Healthy,
                 )
                 .with_link_class(ClusterLinkClass::Ethernet)

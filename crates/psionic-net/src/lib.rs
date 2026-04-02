@@ -816,6 +816,12 @@ pub enum ClusterTransportPathKind {
     NatTraversalDatagram,
     /// The peer was reached through one relay-forwarded datagram path.
     RelayedDatagram,
+    /// The peer was reached directly over one multiplexed stream lane.
+    DirectStream,
+    /// The peer was reached directly over one stream lane after relay-assisted rendezvous / NAT traversal.
+    NatTraversalStream,
+    /// The peer was reached through one relay-forwarded multiplexed stream lane.
+    RelayedStream,
 }
 
 /// Machine-checkable transport path selected for one peer.
@@ -853,6 +859,78 @@ impl ClusterTransportPath {
             peer_addr,
             relay: Some(relay),
         }
+    }
+
+    fn direct_stream(peer_addr: SocketAddr) -> Self {
+        Self {
+            kind: ClusterTransportPathKind::DirectStream,
+            peer_addr,
+            relay: None,
+        }
+    }
+
+    fn nat_traversal_stream(peer_addr: SocketAddr, relay: ClusterRelayEndpoint) -> Self {
+        Self {
+            kind: ClusterTransportPathKind::NatTraversalStream,
+            peer_addr,
+            relay: Some(relay),
+        }
+    }
+
+    fn relayed_stream(peer_addr: SocketAddr, relay: ClusterRelayEndpoint) -> Self {
+        Self {
+            kind: ClusterTransportPathKind::RelayedStream,
+            peer_addr,
+            relay: Some(relay),
+        }
+    }
+}
+
+/// Explicit remote-stream capability that a configured peer must advertise for
+/// wider-network mesh claims.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterRemoteStreamCapability {
+    /// Peer can exchange route and demand gossip on the remote lane.
+    Gossip,
+    /// Peer can carry join control and admission follow-up on the remote lane.
+    JoinControl,
+    /// Peer can carry management subscription traffic on the remote lane.
+    ManagementSubscription,
+    /// Peer can forward bounded inference or management requests on the remote lane.
+    RequestForwarding,
+}
+
+/// Explicit remote stream lane advertised for one configured peer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfiguredPeerRemoteStreamPolicy {
+    /// Declared capabilities for the stream lane.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capabilities: Vec<ClusterRemoteStreamCapability>,
+}
+
+impl ConfiguredPeerRemoteStreamPolicy {
+    /// Creates one explicit remote stream policy.
+    #[must_use]
+    pub fn new(mut capabilities: Vec<ClusterRemoteStreamCapability>) -> Self {
+        capabilities.sort_unstable();
+        capabilities.dedup();
+        Self { capabilities }
+    }
+
+    /// Creates the default mesh-ready remote stream policy.
+    #[must_use]
+    pub fn mesh_default() -> Self {
+        Self::new(vec![
+            ClusterRemoteStreamCapability::Gossip,
+            ClusterRemoteStreamCapability::JoinControl,
+            ClusterRemoteStreamCapability::ManagementSubscription,
+            ClusterRemoteStreamCapability::RequestForwarding,
+        ])
+    }
+
+    fn supports(&self, capability: ClusterRemoteStreamCapability) -> bool {
+        self.capabilities.contains(&capability)
     }
 }
 
@@ -1016,7 +1094,7 @@ impl SessionClaimsBundle {
             });
         }
         match path.kind {
-            ClusterTransportPathKind::RelayedDatagram => {
+            ClusterTransportPathKind::RelayedDatagram | ClusterTransportPathKind::RelayedStream => {
                 let relay = path
                     .relay
                     .as_ref()
@@ -1033,7 +1111,9 @@ impl SessionClaimsBundle {
                 }
             }
             ClusterTransportPathKind::DirectDatagram
-            | ClusterTransportPathKind::NatTraversalDatagram => {
+            | ClusterTransportPathKind::NatTraversalDatagram
+            | ClusterTransportPathKind::DirectStream
+            | ClusterTransportPathKind::NatTraversalStream => {
                 if self.binding.relay_id.is_some() || self.binding.session_tag.is_some() {
                     return Err(SessionClaimsVerificationError::RelayBindingMismatch {
                         expected_relay_id: None,
@@ -1200,6 +1280,8 @@ pub enum ClusterSessionFailureReason {
     NatTraversalTimedOut,
     /// Relay forwarding could not reach the target peer.
     RelayTargetUnavailable,
+    /// One previously established peer session went idle long enough to be fenced.
+    SessionIdleTimedOut,
     /// The peer was refused by transport or trust policy.
     PeerRefused,
 }
@@ -1794,6 +1876,9 @@ pub struct ConfiguredClusterPeer {
     /// Relay endpoints that may carry the session when direct paths fail.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub relay_fallback_relays: Vec<ClusterRelayEndpoint>,
+    /// Optional remote stream lane required for explicit wider-network mesh claims.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote_stream_policy: Option<ConfiguredPeerRemoteStreamPolicy>,
     /// Honest logical stream capacity surfaced for this peer.
     #[serde(default = "default_max_concurrent_transport_streams")]
     pub max_concurrent_streams: u16,
@@ -1815,6 +1900,7 @@ impl ConfiguredClusterPeer {
             attestation_requirement: None,
             nat_rendezvous_relays: Vec::new(),
             relay_fallback_relays: Vec::new(),
+            remote_stream_policy: None,
             max_concurrent_streams: default_max_concurrent_transport_streams(),
         }
     }
@@ -1859,6 +1945,16 @@ impl ConfiguredClusterPeer {
         self
     }
 
+    /// Attaches one explicit remote stream policy for wider-network mesh lanes.
+    #[must_use]
+    pub fn with_remote_stream_policy(
+        mut self,
+        remote_stream_policy: ConfiguredPeerRemoteStreamPolicy,
+    ) -> Self {
+        self.remote_stream_policy = Some(remote_stream_policy);
+        self
+    }
+
     /// Overrides the logical stream capacity surfaced for this peer.
     #[must_use]
     pub fn with_max_concurrent_streams(mut self, max_concurrent_streams: u16) -> Self {
@@ -1868,6 +1964,42 @@ impl ConfiguredClusterPeer {
 
     fn multiplex_profile(&self) -> ClusterSessionMultiplexProfile {
         ClusterSessionMultiplexProfile::new(self.max_concurrent_streams.max(1))
+    }
+
+    fn remote_stream_enabled(&self) -> bool {
+        self.remote_stream_policy.is_some()
+    }
+
+    fn direct_path(&self, peer_addr: SocketAddr) -> ClusterTransportPath {
+        if self.remote_stream_enabled() {
+            ClusterTransportPath::direct_stream(peer_addr)
+        } else {
+            ClusterTransportPath::direct(peer_addr)
+        }
+    }
+
+    fn nat_traversal_path(
+        &self,
+        peer_addr: SocketAddr,
+        relay: ClusterRelayEndpoint,
+    ) -> ClusterTransportPath {
+        if self.remote_stream_enabled() {
+            ClusterTransportPath::nat_traversal_stream(peer_addr, relay)
+        } else {
+            ClusterTransportPath::nat_traversal(peer_addr, relay)
+        }
+    }
+
+    fn relayed_path(
+        &self,
+        peer_addr: SocketAddr,
+        relay: ClusterRelayEndpoint,
+    ) -> ClusterTransportPath {
+        if self.remote_stream_enabled() {
+            ClusterTransportPath::relayed_stream(peer_addr, relay)
+        } else {
+            ClusterTransportPath::relayed(peer_addr, relay)
+        }
     }
 
     fn key_match(&self, auth_public_key: &str) -> Option<ConfiguredPeerKeyMatch> {
@@ -1959,10 +2091,17 @@ pub struct ConfiguredPeerHealthSnapshot {
     /// Transport path currently carrying the session, when one is established.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_transport: Option<ClusterTransportPath>,
+    /// Optional remote stream policy attached to the configured peer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote_stream_policy: Option<ConfiguredPeerRemoteStreamPolicy>,
     /// Honest logical stream capacity exposed for the peer.
     pub multiplex_profile: ClusterSessionMultiplexProfile,
     /// Currently reserved logical stream count.
     pub active_streams: u16,
+    /// Current peer-session generation observed for this peer.
+    pub session_generation: u64,
+    /// Count of explicit disconnect transitions recorded for this peer.
+    pub disconnect_count: u64,
     /// Approximate hello round-trip latency when one was measured.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_round_trip_latency_ms: Option<u64>,
@@ -1974,6 +2113,9 @@ pub struct ConfiguredPeerHealthSnapshot {
     pub bytes_sent: u64,
     /// Bytes received while trying or maintaining the session.
     pub bytes_received: u64,
+    /// Last activity timestamp observed for this peer, when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity_ms: Option<u64>,
     /// Most recent machine-checkable establishment failure, when one was observed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_establishment_failure: Option<ClusterSessionFailure>,
@@ -1989,13 +2131,17 @@ impl ConfiguredPeerHealthSnapshot {
             remaining_backoff_ticks: 0,
             successful_handshakes: 0,
             active_transport: None,
+            remote_stream_policy: peer.remote_stream_policy.clone(),
             multiplex_profile: peer.multiplex_profile(),
             active_streams: 0,
+            session_generation: 0,
+            disconnect_count: 0,
             last_round_trip_latency_ms: None,
             messages_sent: 0,
             messages_received: 0,
             bytes_sent: 0,
             bytes_received: 0,
+            last_activity_ms: None,
             last_establishment_failure: None,
         }
     }
@@ -2048,8 +2194,18 @@ pub enum ClusterNonLanDiscoveryRefusalReason {
     TrustedLanSeedPeersOnly,
     /// Discovery remains tied to operator-managed configured peers.
     OperatorManagedConfiguredPeersOnly,
-    /// A wider-network discovery posture was requested, but the transport/runtime seam is not implemented yet.
-    WiderNetworkDiscoveryUnimplemented,
+    /// A wider-network discovery posture was requested without any configured peers.
+    MissingConfiguredPeers,
+    /// At least one configured peer is missing the required remote stream lane.
+    MissingRemoteStreamPolicy,
+    /// At least one configured peer is missing gossip capability on the remote stream lane.
+    MissingRemoteStreamGossip,
+    /// At least one configured peer is missing join-control capability on the remote stream lane.
+    MissingRemoteStreamJoinControl,
+    /// At least one configured peer is missing management-subscription capability on the remote stream lane.
+    MissingRemoteStreamManagementSubscription,
+    /// At least one configured peer is missing request-forwarding capability on the remote stream lane.
+    MissingRemoteStreamRequestForwarding,
 }
 
 /// Machine-checkable assessment for whether a cluster policy supports non-LAN discovery claims.
@@ -2109,8 +2265,23 @@ impl ClusterNonLanDiscoveryAssessment {
                 ClusterNonLanDiscoveryRefusalReason::OperatorManagedConfiguredPeersOnly => {
                     b"operator_managed_configured_peers_only".as_slice()
                 }
-                ClusterNonLanDiscoveryRefusalReason::WiderNetworkDiscoveryUnimplemented => {
-                    b"wider_network_discovery_unimplemented".as_slice()
+                ClusterNonLanDiscoveryRefusalReason::MissingConfiguredPeers => {
+                    b"missing_configured_peers".as_slice()
+                }
+                ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamPolicy => {
+                    b"missing_remote_stream_policy".as_slice()
+                }
+                ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamGossip => {
+                    b"missing_remote_stream_gossip".as_slice()
+                }
+                ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamJoinControl => {
+                    b"missing_remote_stream_join_control".as_slice()
+                }
+                ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamManagementSubscription => {
+                    b"missing_remote_stream_management_subscription".as_slice()
+                }
+                ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamRequestForwarding => {
+                    b"missing_remote_stream_request_forwarding".as_slice()
                 }
             });
         }
@@ -2383,6 +2554,21 @@ impl ClusterTrustPolicy {
                 hasher.update(b"|");
                 hasher.update(relay.session_tag.as_bytes());
             }
+            if let Some(remote_stream_policy) = &peer.remote_stream_policy {
+                for capability in &remote_stream_policy.capabilities {
+                    hasher.update(b"|remote_stream_capability|");
+                    hasher.update(match capability {
+                        ClusterRemoteStreamCapability::Gossip => b"gossip".as_slice(),
+                        ClusterRemoteStreamCapability::JoinControl => b"join_control".as_slice(),
+                        ClusterRemoteStreamCapability::ManagementSubscription => {
+                            b"management_subscription".as_slice()
+                        }
+                        ClusterRemoteStreamCapability::RequestForwarding => {
+                            b"request_forwarding".as_slice()
+                        }
+                    });
+                }
+            }
         }
         hasher.update(b"|dial_policy|");
         hasher.update(
@@ -2426,7 +2612,46 @@ impl ClusterTrustPolicy {
                 vec![ClusterNonLanDiscoveryRefusalReason::OperatorManagedConfiguredPeersOnly]
             }
             ClusterDiscoveryPosture::ExplicitWiderNetworkRequested => {
-                vec![ClusterNonLanDiscoveryRefusalReason::WiderNetworkDiscoveryUnimplemented]
+                let mut refusal_reasons = Vec::new();
+                if self.configured_peers.is_empty() {
+                    refusal_reasons
+                        .push(ClusterNonLanDiscoveryRefusalReason::MissingConfiguredPeers);
+                }
+                for peer in &self.configured_peers {
+                    let Some(remote_stream_policy) = peer.remote_stream_policy.as_ref() else {
+                        refusal_reasons
+                            .push(ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamPolicy);
+                        continue;
+                    };
+                    if !remote_stream_policy.supports(ClusterRemoteStreamCapability::Gossip) {
+                        refusal_reasons
+                            .push(ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamGossip);
+                    }
+                    if !remote_stream_policy.supports(ClusterRemoteStreamCapability::JoinControl) {
+                        refusal_reasons.push(
+                            ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamJoinControl,
+                        );
+                    }
+                    if !remote_stream_policy
+                        .supports(ClusterRemoteStreamCapability::ManagementSubscription)
+                    {
+                        refusal_reasons.push(
+                            ClusterNonLanDiscoveryRefusalReason::
+                                MissingRemoteStreamManagementSubscription,
+                        );
+                    }
+                    if !remote_stream_policy
+                        .supports(ClusterRemoteStreamCapability::RequestForwarding)
+                    {
+                        refusal_reasons.push(
+                            ClusterNonLanDiscoveryRefusalReason::
+                                MissingRemoteStreamRequestForwarding,
+                        );
+                    }
+                }
+                refusal_reasons.sort_unstable();
+                refusal_reasons.dedup();
+                refusal_reasons
             }
         };
         ClusterNonLanDiscoveryAssessment {
@@ -3114,10 +3339,15 @@ pub struct PeerSnapshot {
     /// Served inference-mesh role reported for the peer.
     #[serde(default)]
     pub served_mesh_role: ServedMeshRoleState,
+    /// Current peer-session generation observed for this peer.
+    pub session_generation: u64,
     /// Hello/ping handshake facts observed so far.
     pub handshake: PeerHandshakeState,
     /// Selected path and observed transport metrics for the peer.
     pub transport: ClusterTransportObservation,
+    /// Last activity timestamp observed for this peer, when one exists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity_ms: Option<u64>,
     /// Latest session-claims posture observed for the peer, when one exists.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_claims: Option<PeerSessionClaimsSnapshot>,
@@ -4076,6 +4306,7 @@ struct PendingTunnelClosureDispatch {
 
 struct SharedState {
     peers: BTreeMap<NodeId, PeerSnapshot>,
+    peer_session_generations: BTreeMap<NodeId, u64>,
     peer_session_claims: BTreeMap<NodeId, PeerSessionClaimsSnapshot>,
     configured_peers: BTreeMap<NodeId, ConfiguredClusterPeer>,
     configured_peer_health: BTreeMap<NodeId, ConfiguredPeerHealthSnapshot>,
@@ -4135,6 +4366,7 @@ impl SharedState {
             .collect();
         Self {
             peers: BTreeMap::new(),
+            peer_session_generations: BTreeMap::new(),
             peer_session_claims: BTreeMap::new(),
             configured_peers,
             configured_peer_health,
@@ -4941,6 +5173,21 @@ impl SharedState {
         counter
     }
 
+    fn next_peer_session_generation(&mut self, node_id: &NodeId) -> u64 {
+        let generation = self
+            .peer_session_generations
+            .get(node_id)
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+        self.peer_session_generations
+            .insert(node_id.clone(), generation);
+        if let Some(health) = self.configured_peer_health.get_mut(node_id) {
+            health.session_generation = generation;
+        }
+        generation
+    }
+
     fn undiscovered_seed_peers(&self) -> Vec<SocketAddr> {
         self.seed_peers
             .iter()
@@ -4954,10 +5201,31 @@ impl SharedState {
         trust_policy: &ClusterTrustPolicy,
     ) -> Vec<ConfiguredPeerDialAction> {
         let mut actions = Vec::new();
+        let now_ms = current_time_ms();
+        let idle_timeout_ms =
+            configured_peer_idle_timeout_ms(trust_policy.configured_peer_dial_policy);
         for peer in &trust_policy.configured_peers {
-            if self.peers.contains_key(&peer.node_id) {
-                self.mark_configured_peer_reachable(&peer.node_id, None, None);
-                continue;
+            let peer_is_connected = self.peers.contains_key(&peer.node_id);
+            if peer_is_connected {
+                let last_activity_ms = self
+                    .peers
+                    .get(&peer.node_id)
+                    .and_then(|snapshot| snapshot.last_activity_ms);
+                if let Some(last_activity_ms) = last_activity_ms
+                    && now_ms.saturating_sub(last_activity_ms) > idle_timeout_ms
+                {
+                    self.disconnect_configured_peer_session(
+                        &peer.node_id,
+                        ClusterSessionFailureReason::SessionIdleTimedOut,
+                        format!(
+                            "no peer traffic observed for {} ms on configured remote lane",
+                            now_ms.saturating_sub(last_activity_ms)
+                        ),
+                    );
+                } else {
+                    self.mark_configured_peer_reachable(&peer.node_id, None, None);
+                    continue;
+                }
             }
             let Some(health) = self.configured_peer_health.get_mut(&peer.node_id) else {
                 continue;
@@ -4979,7 +5247,7 @@ impl SharedState {
             actions.push(ConfiguredPeerDialAction::DirectHello {
                 peer_node_id: peer.node_id.clone(),
                 remote_addr: peer.remote_addr,
-                path: ClusterTransportPath::direct(peer.remote_addr),
+                path: peer.direct_path(peer.remote_addr),
             });
 
             if health.unanswered_hello_attempts
@@ -4989,7 +5257,7 @@ impl SharedState {
             {
                 health.last_establishment_failure = Some(
                     ClusterSessionFailure::new(
-                        ClusterTransportPathKind::DirectDatagram,
+                        peer.direct_path(peer.remote_addr).kind,
                         ClusterSessionFailureReason::DirectConnectTimedOut,
                     )
                     .with_detail(format!(
@@ -5015,10 +5283,8 @@ impl SharedState {
                     actions.push(ConfiguredPeerDialAction::DirectHello {
                         peer_node_id: peer.node_id.clone(),
                         remote_addr: introduction.peer_addr,
-                        path: ClusterTransportPath::nat_traversal(
-                            introduction.peer_addr,
-                            introduction.relay.clone(),
-                        ),
+                        path: peer
+                            .nat_traversal_path(introduction.peer_addr, introduction.relay.clone()),
                     });
                 }
             }
@@ -5033,7 +5299,11 @@ impl SharedState {
                 {
                     health.last_establishment_failure = Some(
                         ClusterSessionFailure::new(
-                            ClusterTransportPathKind::NatTraversalDatagram,
+                            peer.nat_traversal_path(
+                                peer.remote_addr,
+                                peer.nat_rendezvous_relays[0].clone(),
+                            )
+                            .kind,
                             ClusterSessionFailureReason::NatTraversalTimedOut,
                         )
                         .with_detail(String::from(
@@ -5050,7 +5320,7 @@ impl SharedState {
                     actions.push(ConfiguredPeerDialAction::RelayHello {
                         peer_node_id: peer.node_id.clone(),
                         relay: relay.clone(),
-                        path: ClusterTransportPath::relayed(peer.remote_addr, relay.clone()),
+                        path: peer.relayed_path(peer.remote_addr, relay.clone()),
                     });
                 }
             }
@@ -5094,6 +5364,41 @@ impl SharedState {
                     && relay.session_tag == session_tag
             })
             .cloned()
+    }
+
+    fn configured_peer_direct_path(
+        &self,
+        node_id: &NodeId,
+        remote_addr: SocketAddr,
+    ) -> ClusterTransportPath {
+        self.configured_peers
+            .get(node_id)
+            .map(|peer| peer.direct_path(remote_addr))
+            .unwrap_or_else(|| ClusterTransportPath::direct(remote_addr))
+    }
+
+    fn configured_peer_nat_traversal_path(
+        &self,
+        node_id: &NodeId,
+        remote_addr: SocketAddr,
+        relay: ClusterRelayEndpoint,
+    ) -> ClusterTransportPath {
+        self.configured_peers
+            .get(node_id)
+            .map(|peer| peer.nat_traversal_path(remote_addr, relay.clone()))
+            .unwrap_or_else(|| ClusterTransportPath::nat_traversal(remote_addr, relay))
+    }
+
+    fn configured_peer_relay_path(
+        &self,
+        node_id: &NodeId,
+        remote_addr: SocketAddr,
+        relay: ClusterRelayEndpoint,
+    ) -> ClusterTransportPath {
+        self.configured_peers
+            .get(node_id)
+            .map(|peer| peer.relayed_path(remote_addr, relay.clone()))
+            .unwrap_or_else(|| ClusterTransportPath::relayed(remote_addr, relay))
     }
 
     fn record_nat_introduction(
@@ -5160,6 +5465,7 @@ impl SharedState {
         if let Some(health) = self.configured_peer_health.get_mut(&identity.node_id) {
             health.messages_received = health.messages_received.saturating_add(1);
             health.bytes_received = health.bytes_received.saturating_add(message_bytes as u64);
+            health.last_activity_ms = Some(current_time_ms());
             if let Some(latency_ms) = last_round_trip_latency_ms {
                 health.last_round_trip_latency_ms = Some(latency_ms);
             }
@@ -5196,6 +5502,7 @@ impl SharedState {
         if let Some(health) = self.configured_peer_health.get_mut(&identity.node_id) {
             health.messages_received = health.messages_received.saturating_add(1);
             health.bytes_received = health.bytes_received.saturating_add(message_bytes as u64);
+            health.last_activity_ms = Some(current_time_ms());
         }
         let snapshot = self.ensure_peer_snapshot(remote_addr, identity, path);
         snapshot.handshake.last_ping_sequence = Some(sequence);
@@ -5216,6 +5523,21 @@ impl SharedState {
     ) -> &mut PeerSnapshot {
         let multiplex_profile = self.configured_peer_multiplex_profile(&identity.node_id);
         let active_streams = self.active_stream_count(&identity.node_id);
+        let observed_at_ms = current_time_ms();
+        let previous_epoch = self
+            .peers
+            .get(&identity.node_id)
+            .map(|snapshot| snapshot.identity.node_epoch);
+        let session_reset =
+            previous_epoch.is_none_or(|previous_epoch| identity.node_epoch > previous_epoch);
+        let session_generation = if session_reset {
+            self.next_peer_session_generation(&identity.node_id)
+        } else {
+            self.peer_session_generations
+                .get(&identity.node_id)
+                .copied()
+                .unwrap_or(1)
+        };
         let entry = self
             .peers
             .entry(identity.node_id.clone())
@@ -5223,11 +5545,13 @@ impl SharedState {
                 remote_addr,
                 identity: identity.clone(),
                 served_mesh_role: ServedMeshRoleState::from_transport_role(identity.role),
+                session_generation,
                 handshake: PeerHandshakeState {
                     saw_hello: false,
                     last_ping_sequence: None,
                 },
                 transport: ClusterTransportObservation::new(path.clone(), multiplex_profile),
+                last_activity_ms: Some(observed_at_ms),
                 session_claims: self.peer_session_claims.get(&identity.node_id).cloned(),
             });
         if identity.node_epoch > entry.identity.node_epoch {
@@ -5240,10 +5564,16 @@ impl SharedState {
         entry.remote_addr = remote_addr;
         entry.identity = identity.clone();
         entry.served_mesh_role = ServedMeshRoleState::from_transport_role(identity.role);
+        entry.session_generation = session_generation;
         entry.transport.path = path;
         entry.transport.multiplex_profile = multiplex_profile;
         entry.transport.active_streams = active_streams;
+        entry.last_activity_ms = Some(observed_at_ms);
         entry.session_claims = self.peer_session_claims.get(&identity.node_id).cloned();
+        if let Some(health) = self.configured_peer_health.get_mut(&identity.node_id) {
+            health.session_generation = session_generation;
+            health.last_activity_ms = Some(observed_at_ms);
+        }
         entry
     }
 
@@ -5271,6 +5601,61 @@ impl SharedState {
             if !was_reachable {
                 health.successful_handshakes = health.successful_handshakes.saturating_add(1);
             }
+        }
+    }
+
+    fn disconnect_configured_peer_session(
+        &mut self,
+        node_id: &NodeId,
+        reason: ClusterSessionFailureReason,
+        detail: String,
+    ) {
+        let path_kind = self
+            .peers
+            .get(node_id)
+            .map(|peer| peer.transport.path.kind)
+            .or_else(|| {
+                self.configured_peer_health
+                    .get(node_id)
+                    .and_then(|health| health.active_transport.as_ref().map(|path| path.kind))
+            })
+            .unwrap_or_else(|| {
+                self.configured_peers
+                    .get(node_id)
+                    .map(|peer| peer.direct_path(peer.remote_addr).kind)
+                    .unwrap_or(ClusterTransportPathKind::DirectDatagram)
+            });
+        let affected_tunnels = self
+            .tunnels
+            .iter()
+            .filter_map(|(tunnel_id, record)| {
+                (record.snapshot.peer_node_id == *node_id
+                    && matches!(
+                        record.snapshot.state,
+                        ClusterTunnelState::Pending | ClusterTunnelState::Open
+                    ))
+                .then_some(*tunnel_id)
+            })
+            .collect::<Vec<_>>();
+        for tunnel_id in affected_tunnels {
+            self.close_tunnel_record(
+                tunnel_id,
+                ClusterTunnelState::Closed,
+                Some(ClusterTunnelCloseReason::TransportUnavailable),
+                Some(detail.clone()),
+            );
+        }
+        self.peers.remove(node_id);
+        self.pending_hello_probes.remove(node_id);
+        self.active_logical_streams.remove(node_id);
+        self.refresh_active_stream_count(node_id);
+        if let Some(health) = self.configured_peer_health.get_mut(node_id) {
+            health.reachability = ConfiguredPeerReachability::Unreachable;
+            health.active_transport = None;
+            health.remaining_backoff_ticks = 0;
+            health.disconnect_count = health.disconnect_count.saturating_add(1);
+            health.last_establishment_failure =
+                Some(ClusterSessionFailure::new(path_kind, reason).with_detail(detail));
         }
     }
 
@@ -6107,9 +6492,18 @@ async fn handle_incoming_message(
                     .get(&envelope.message.sender().node_id)
                     .filter(|introduction| introduction.peer_addr == remote_addr)
                     .map(|introduction| {
-                        ClusterTransportPath::nat_traversal(remote_addr, introduction.relay.clone())
+                        guard.configured_peer_nat_traversal_path(
+                            &envelope.message.sender().node_id,
+                            remote_addr,
+                            introduction.relay.clone(),
+                        )
                     })
-                    .unwrap_or_else(|| ClusterTransportPath::direct(remote_addr))
+                    .unwrap_or_else(|| {
+                        guard.configured_peer_direct_path(
+                            &envelope.message.sender().node_id,
+                            remote_addr,
+                        )
+                    })
             };
             handle_wire_envelope(
                 socket,
@@ -6133,13 +6527,20 @@ async fn handle_incoming_message(
         } => {
             let relay = ClusterRelayEndpoint::new(relay_id, remote_addr, session_tag);
             let _ = source_node_id;
+            let path = {
+                state.lock().await.configured_peer_relay_path(
+                    &envelope.message.sender().node_id,
+                    source_addr,
+                    relay,
+                )
+            };
             handle_wire_envelope(
                 socket,
                 state,
                 config,
                 InboundTransportContext {
                     socket_remote_addr: remote_addr,
-                    path: ClusterTransportPath::relayed(source_addr, relay),
+                    path,
                 },
                 envelope,
                 payload.len(),
@@ -6170,12 +6571,19 @@ async fn handle_incoming_message(
                 peer_addr,
                 relay.clone(),
             );
+            let path = {
+                state.lock().await.configured_peer_nat_traversal_path(
+                    &peer_node_id,
+                    peer_addr,
+                    relay,
+                )
+            };
             send_wire_message_to_path(
                 socket,
                 state,
                 config,
                 Some(&peer_node_id),
-                &ClusterTransportPath::nat_traversal(peer_addr, relay),
+                &path,
                 peer_addr,
                 WireMessage::Hello(HelloMessage {
                     sender: config.local_identity.clone(),
@@ -6201,12 +6609,26 @@ async fn handle_incoming_message(
             };
             if let Some(relay) = relay {
                 let mut guard = state.lock().await;
+                let active_transport =
+                    guard
+                        .configured_peer_health
+                        .get(&target_node_id)
+                        .map(|health| {
+                            guard.configured_peer_relay_path(
+                                &target_node_id,
+                                health.remote_addr,
+                                relay,
+                            )
+                        });
                 if let Some(health) = guard.configured_peer_health.get_mut(&target_node_id) {
-                    health.active_transport =
-                        Some(ClusterTransportPath::relayed(health.remote_addr, relay));
+                    let path_kind = active_transport
+                        .as_ref()
+                        .map(|path| path.kind)
+                        .unwrap_or(ClusterTransportPathKind::RelayedDatagram);
+                    health.active_transport = active_transport;
                     health.last_establishment_failure = Some(
                         ClusterSessionFailure::new(
-                            ClusterTransportPathKind::RelayedDatagram,
+                            path_kind,
                             ClusterSessionFailureReason::RelayTargetUnavailable,
                         )
                         .with_detail(String::from(
@@ -6782,8 +7204,10 @@ async fn send_wire_message_to_path(
     let envelope = outbound_envelope(state, config, &path, message).await?;
     let datagram = match path.kind {
         ClusterTransportPathKind::DirectDatagram
-        | ClusterTransportPathKind::NatTraversalDatagram => TransportDatagram::Direct { envelope },
-        ClusterTransportPathKind::RelayedDatagram => {
+        | ClusterTransportPathKind::NatTraversalDatagram
+        | ClusterTransportPathKind::DirectStream
+        | ClusterTransportPathKind::NatTraversalStream => TransportDatagram::Direct { envelope },
+        ClusterTransportPathKind::RelayedDatagram | ClusterTransportPathKind::RelayedStream => {
             let relay = path
                 .relay
                 .as_ref()
@@ -6809,8 +7233,10 @@ async fn send_wire_message_to_path(
     }
     let outbound_addr = match path.kind {
         ClusterTransportPathKind::DirectDatagram
-        | ClusterTransportPathKind::NatTraversalDatagram => path.peer_addr,
-        ClusterTransportPathKind::RelayedDatagram => {
+        | ClusterTransportPathKind::NatTraversalDatagram
+        | ClusterTransportPathKind::DirectStream
+        | ClusterTransportPathKind::NatTraversalStream => path.peer_addr,
+        ClusterTransportPathKind::RelayedDatagram | ClusterTransportPathKind::RelayedStream => {
             path.relay
                 .as_ref()
                 .ok_or_else(|| String::from("relayed transport path requires relay metadata"))?
@@ -6909,7 +7335,7 @@ fn authenticate_incoming_envelope(
             return Err(ClusterJoinRefusalReason::ConfiguredPeerUnknown);
         };
         match transport.path.kind {
-            ClusterTransportPathKind::DirectDatagram => {
+            ClusterTransportPathKind::DirectDatagram | ClusterTransportPathKind::DirectStream => {
                 if configured_peer.remote_addr != transport.path.peer_addr {
                     return Err(ClusterJoinRefusalReason::ConfiguredPeerAddressMismatch {
                         expected: configured_peer.remote_addr,
@@ -6917,7 +7343,8 @@ fn authenticate_incoming_envelope(
                     });
                 }
             }
-            ClusterTransportPathKind::NatTraversalDatagram => {
+            ClusterTransportPathKind::NatTraversalDatagram
+            | ClusterTransportPathKind::NatTraversalStream => {
                 let Some(introduction) = state
                     .nat_introductions
                     .get(&envelope.message.sender().node_id)
@@ -6934,7 +7361,7 @@ fn authenticate_incoming_envelope(
                     });
                 }
             }
-            ClusterTransportPathKind::RelayedDatagram => {
+            ClusterTransportPathKind::RelayedDatagram | ClusterTransportPathKind::RelayedStream => {
                 let relay = transport.path.relay.as_ref().ok_or(
                     ClusterJoinRefusalReason::ConfiguredPeerAddressMismatch {
                         expected: configured_peer.remote_addr,
@@ -7235,6 +7662,22 @@ fn next_configured_peer_backoff_ticks(
         .min(dial_policy.max_backoff_ticks)
 }
 
+fn configured_peer_idle_timeout_ms(dial_policy: ConfiguredPeerDialPolicy) -> u64 {
+    let ping_budget_ms = PING_INTERVAL
+        .as_millis()
+        .saturating_mul(4)
+        .try_into()
+        .unwrap_or(u64::MAX);
+    let dial_budget_ms = HELLO_INTERVAL
+        .as_millis()
+        .saturating_mul(
+            u128::from(dial_policy.unreachable_after_unanswered_hellos.max(1)).saturating_add(1),
+        )
+        .try_into()
+        .unwrap_or(u64::MAX);
+    ping_budget_ms.max(dial_budget_ms)
+}
+
 fn trust_rollout_diagnostic_from_refusal(
     envelope: &WireEnvelope,
     remote_addr: SocketAddr,
@@ -7265,6 +7708,11 @@ mod tests {
 
     use super::*;
     use tempfile::tempdir;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        time::{Duration, Instant, sleep},
+    };
 
     fn loopback_addr(port: u16) -> SocketAddr {
         SocketAddr::from(([127, 0, 0, 1], port))
@@ -7319,6 +7767,166 @@ mod tests {
             socket_remote_addr: remote_addr,
             path: ClusterTransportPath::direct(remote_addr),
         }
+    }
+
+    fn write_file_backed_identity(
+        path: &std::path::Path,
+        admission: &ClusterAdmissionConfig,
+        node_id: &str,
+        signing_key: &SigningKey,
+    ) {
+        let record = PersistedNodeIdentityRecord {
+            cluster_id: ClusterId::new(&admission.namespace, &admission.admission_token),
+            node_id: NodeId::new(node_id),
+            last_epoch: NodeEpoch::initial(),
+            auth_secret_key_hex: Some(hex::encode(signing_key.to_bytes())),
+            node_attestation: None,
+        };
+        let parent = path
+            .parent()
+            .unwrap_or_else(|| unreachable!("identity path should have parent"));
+        std::fs::create_dir_all(parent)
+            .unwrap_or_else(|_| unreachable!("identity parent should be creatable"));
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(&record)
+                .unwrap_or_else(|_| unreachable!("identity record should serialize")),
+        )
+        .unwrap_or_else(|_| unreachable!("identity record should write"));
+    }
+
+    fn mesh_remote_stream_policy() -> ConfiguredPeerRemoteStreamPolicy {
+        ConfiguredPeerRemoteStreamPolicy::mesh_default()
+    }
+
+    fn mesh_remote_stream_peer(
+        node_id: &str,
+        remote_addr: SocketAddr,
+        auth_public_key: String,
+        relay: ClusterRelayEndpoint,
+    ) -> ConfiguredClusterPeer {
+        ConfiguredClusterPeer::new(NodeId::new(node_id), remote_addr, auth_public_key)
+            .with_relay_fallback_relays(vec![relay])
+            .with_remote_stream_policy(mesh_remote_stream_policy())
+    }
+
+    fn explicit_wider_network_trust(peer: ConfiguredClusterPeer) -> ClusterTrustPolicy {
+        ClusterTrustPolicy::authenticated_configured_peers(vec![peer])
+            .with_discovery_posture(ClusterDiscoveryPosture::ExplicitWiderNetworkRequested)
+            .with_configured_peer_dial_policy(ConfiguredPeerDialPolicy {
+                base_backoff_ticks: 0,
+                max_backoff_ticks: 0,
+                degraded_after_unanswered_hellos: 1,
+                unreachable_after_unanswered_hellos: 1,
+            })
+    }
+
+    async fn wait_for_peer_snapshot(
+        node: &LocalClusterNode,
+        node_id: &NodeId,
+        timeout: Duration,
+    ) -> PeerSnapshot {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Some(snapshot) = node
+                .peer_snapshots()
+                .await
+                .into_iter()
+                .find(|snapshot| snapshot.identity.node_id == *node_id)
+            {
+                return snapshot;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for peer snapshot"
+            );
+            sleep(Duration::from_millis(25)).await;
+        }
+    }
+
+    async fn wait_for_peer_absent(node: &LocalClusterNode, node_id: &NodeId, timeout: Duration) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let still_present = node
+                .peer_snapshots()
+                .await
+                .into_iter()
+                .any(|snapshot| snapshot.identity.node_id == *node_id);
+            if !still_present {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for peer removal"
+            );
+            sleep(Duration::from_millis(25)).await;
+        }
+    }
+
+    async fn wait_for_configured_peer_health(
+        node: &LocalClusterNode,
+        node_id: &NodeId,
+        timeout: Duration,
+    ) -> ConfiguredPeerHealthSnapshot {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Some(health) = node
+                .configured_peer_health_snapshots()
+                .await
+                .into_iter()
+                .find(|health| health.node_id == *node_id)
+            {
+                return health;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for configured peer health"
+            );
+            sleep(Duration::from_millis(25)).await;
+        }
+    }
+
+    async fn wait_for_http_fixture(
+        response_body: &'static str,
+        request_count: usize,
+    ) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind(loopback_addr(0))
+            .await
+            .unwrap_or_else(|_| unreachable!("fixture listener should bind"));
+        let local_addr = listener
+            .local_addr()
+            .unwrap_or_else(|_| unreachable!("fixture listener should expose local addr"));
+        let task = tokio::spawn(async move {
+            for _ in 0..request_count {
+                let (mut stream, _) = listener
+                    .accept()
+                    .await
+                    .unwrap_or_else(|_| unreachable!("fixture listener should accept"));
+                let mut request = Vec::new();
+                stream
+                    .read_to_end(&mut request)
+                    .await
+                    .unwrap_or_else(|_| unreachable!("fixture request should read"));
+                assert!(
+                    request.starts_with(b"GET /mesh HTTP/1.1\r\n"),
+                    "fixture should observe tunneled mesh request"
+                );
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: text/plain; charset=utf-8\r\ncontent-length: {}\r\n\r\n{}",
+                    response_body.len(),
+                    response_body,
+                );
+                stream
+                    .write_all(response.as_bytes())
+                    .await
+                    .unwrap_or_else(|_| unreachable!("fixture response should write"));
+                stream
+                    .shutdown()
+                    .await
+                    .unwrap_or_else(|_| unreachable!("fixture stream should shut down"));
+            }
+        });
+        (local_addr, task)
     }
 
     fn sample_discovery_candidate(
@@ -7549,7 +8157,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_wider_network_discovery_request_is_bounded_until_implemented() {
+    fn explicit_wider_network_discovery_request_refuses_missing_remote_stream_policy() {
         let assessment = ClusterTrustPolicy::attested_configured_peers(vec![
             ConfiguredClusterPeer::new(NodeId::new("node-b"), loopback_addr(31003), "peer-key-a")
                 .with_attestation_requirement(
@@ -7570,7 +8178,135 @@ mod tests {
         );
         assert_eq!(
             assessment.refusal_reasons,
-            vec![ClusterNonLanDiscoveryRefusalReason::WiderNetworkDiscoveryUnimplemented]
+            vec![ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamPolicy]
+        );
+    }
+
+    #[test]
+    fn explicit_wider_network_discovery_request_accepts_mesh_ready_remote_stream_peers() {
+        let assessment = ClusterTrustPolicy::attested_configured_peers(vec![
+            ConfiguredClusterPeer::new(NodeId::new("node-b"), loopback_addr(31003), "peer-key-a")
+                .with_attestation_requirement(
+                    NodeAttestationRequirement::new("issuer-b", "attestation-b")
+                        .with_device_identity_digest("device-b"),
+                )
+                .with_remote_stream_policy(mesh_remote_stream_policy()),
+        ])
+        .with_discovery_posture(ClusterDiscoveryPosture::ExplicitWiderNetworkRequested)
+        .non_lan_discovery_assessment();
+
+        assert_eq!(
+            assessment.discovery_posture,
+            ClusterDiscoveryPosture::ExplicitWiderNetworkRequested
+        );
+        assert_eq!(
+            assessment.disposition,
+            ClusterNonLanDiscoveryDisposition::Eligible
+        );
+        assert!(assessment.refusal_reasons.is_empty());
+    }
+
+    #[test]
+    fn explicit_wider_network_discovery_request_refuses_missing_request_forwarding_capability() {
+        let assessment = ClusterTrustPolicy::attested_configured_peers(vec![
+            ConfiguredClusterPeer::new(NodeId::new("node-b"), loopback_addr(31003), "peer-key-a")
+                .with_attestation_requirement(
+                    NodeAttestationRequirement::new("issuer-b", "attestation-b")
+                        .with_device_identity_digest("device-b"),
+                )
+                .with_remote_stream_policy(ConfiguredPeerRemoteStreamPolicy::new(vec![
+                    ClusterRemoteStreamCapability::Gossip,
+                    ClusterRemoteStreamCapability::JoinControl,
+                    ClusterRemoteStreamCapability::ManagementSubscription,
+                ])),
+        ])
+        .with_discovery_posture(ClusterDiscoveryPosture::ExplicitWiderNetworkRequested)
+        .non_lan_discovery_assessment();
+
+        assert_eq!(
+            assessment.disposition,
+            ClusterNonLanDiscoveryDisposition::Refused
+        );
+        assert_eq!(
+            assessment.refusal_reasons,
+            vec![ClusterNonLanDiscoveryRefusalReason::MissingRemoteStreamRequestForwarding]
+        );
+    }
+
+    #[test]
+    fn configured_peer_dial_disconnects_idle_remote_stream_session_before_redial() {
+        let admission = sample_admission();
+        let remote_signing_key = sample_signing_key(83);
+        let remote_identity = sample_identity(
+            &admission,
+            "remote",
+            NodeRole::ExecutorOnly,
+            &remote_signing_key,
+        );
+        let relay = ClusterRelayEndpoint::new("relay-a", loopback_addr(32340), "pair-a");
+        let trust_policy = ClusterTrustPolicy::authenticated_configured_peers(vec![
+            ConfiguredClusterPeer::new(
+                remote_identity.node_id.clone(),
+                loopback_addr(32940),
+                remote_identity.auth_public_key.clone(),
+            )
+            .with_relay_fallback_relays(vec![relay])
+            .with_remote_stream_policy(mesh_remote_stream_policy()),
+        ]);
+        let mut state = SharedState::new(
+            BTreeSet::new(),
+            &trust_policy,
+            &ClusterTunnelPolicy::default(),
+            PersistedClusterNetworkState::empty(),
+            ClusterNetworkStatePersistence::Ephemeral,
+        );
+        let hello = state.record_hello(
+            loopback_addr(32341),
+            remote_identity.clone(),
+            ClusterTransportPath::relayed_stream(
+                loopback_addr(32341),
+                ClusterRelayEndpoint::new("relay-a", loopback_addr(32340), "pair-a"),
+            ),
+            64,
+            Some(1),
+            8,
+        );
+        assert!(hello.is_ok(), "initial remote-stream hello should connect");
+        if let Some(peer) = state.peers.get_mut(&remote_identity.node_id) {
+            peer.last_activity_ms = Some(
+                current_time_ms()
+                    .saturating_sub(configured_peer_idle_timeout_ms(
+                        trust_policy.configured_peer_dial_policy,
+                    ))
+                    .saturating_sub(1),
+            );
+        }
+
+        let actions = state.configured_peers_due_for_dial(&trust_policy);
+
+        assert!(
+            state.peers.get(&remote_identity.node_id).is_none(),
+            "idle configured peer should be removed before redial"
+        );
+        let health = state
+            .configured_peer_health
+            .get(&remote_identity.node_id)
+            .unwrap_or_else(|| unreachable!("configured peer health should exist"));
+        assert_eq!(health.disconnect_count, 1);
+        assert_eq!(
+            health
+                .last_establishment_failure
+                .as_ref()
+                .map(|failure| failure.reason),
+            Some(ClusterSessionFailureReason::SessionIdleTimedOut)
+        );
+        assert!(
+            actions.iter().any(|action| matches!(
+                action,
+                ConfiguredPeerDialAction::DirectHello { path, .. }
+                    if path.kind == ClusterTransportPathKind::DirectStream
+            )),
+            "redial should preserve remote stream path selection"
         );
     }
 
@@ -9026,5 +9762,268 @@ mod tests {
             .shutdown()
             .await
             .unwrap_or_else(|_| unreachable!("importer should shut down"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn explicit_wider_network_remote_stream_lane_supports_tunnels_and_reconnects_without_ghost_peers()
+     {
+        let temp = tempdir().unwrap_or_else(|_| unreachable!("tempdir should succeed"));
+        let admission = sample_admission();
+        let relay = ClusterRelayEndpoint::new("relay-mesh", loopback_addr(32330), "mesh-pair");
+        let node_a_bind = loopback_addr(32331);
+        let node_b_bind = loopback_addr(32332);
+        let node_a_dummy_remote = loopback_addr(32931);
+        let node_b_dummy_remote = loopback_addr(32932);
+        let node_a_identity_path = temp.path().join("mesh-a.identity.json");
+        let node_b_identity_path = temp.path().join("mesh-b.identity.json");
+        let node_a_signing_key = sample_signing_key(81);
+        let node_b_signing_key = sample_signing_key(82);
+        let node_a_id = NodeId::new("mesh-a");
+        let node_b_id = NodeId::new("mesh-b");
+        let node_a_auth_public_key = encode_auth_public_key(&node_a_signing_key.verifying_key());
+        let node_b_auth_public_key = encode_auth_public_key(&node_b_signing_key.verifying_key());
+        write_file_backed_identity(
+            &node_a_identity_path,
+            &admission,
+            node_a_id.as_str(),
+            &node_a_signing_key,
+        );
+        write_file_backed_identity(
+            &node_b_identity_path,
+            &admission,
+            node_b_id.as_str(),
+            &node_b_signing_key,
+        );
+
+        let relay_server = ClusterRelayServer::spawn(relay.relay_addr)
+            .await
+            .unwrap_or_else(|_| unreachable!("relay server should start"));
+        let (service_addr, http_fixture) = wait_for_http_fixture("mesh-ok", 2).await;
+        let tunnel_policy = ClusterTunnelPolicy::new(vec![
+            ClusterTunnelServicePolicy::new_http(
+                "mesh-http",
+                ClusterTunnelServiceKind::InferenceHttp,
+                service_addr,
+            )
+            .with_allowed_peer_node_ids(vec![node_a_id.clone()]),
+        ]);
+
+        let node_a = LocalClusterNode::spawn(
+            LocalClusterConfig::new(
+                admission.namespace.as_str(),
+                admission.admission_token.as_str(),
+                node_a_bind,
+                NodeRole::CoordinatorOnly,
+            )
+            .with_file_backed_identity(node_a_identity_path.clone())
+            .with_trust_policy(explicit_wider_network_trust(mesh_remote_stream_peer(
+                node_b_id.as_str(),
+                node_a_dummy_remote,
+                node_b_auth_public_key.clone(),
+                relay.clone(),
+            ))),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!("node A should start"));
+        let node_b = LocalClusterNode::spawn(
+            LocalClusterConfig::new(
+                admission.namespace.as_str(),
+                admission.admission_token.as_str(),
+                node_b_bind,
+                NodeRole::ExecutorOnly,
+            )
+            .with_file_backed_identity(node_b_identity_path.clone())
+            .with_tunnel_policy(tunnel_policy.clone())
+            .with_trust_policy(explicit_wider_network_trust(mesh_remote_stream_peer(
+                node_a_id.as_str(),
+                node_b_dummy_remote,
+                node_a_auth_public_key.clone(),
+                relay.clone(),
+            ))),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!("node B should start"));
+
+        node_b
+            .activate_tunnel_service("mesh-http")
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh-http should activate"));
+
+        let node_a_snapshot =
+            wait_for_peer_snapshot(&node_a, &node_b_id, Duration::from_secs(3)).await;
+        let node_b_snapshot =
+            wait_for_peer_snapshot(&node_b, &node_a_id, Duration::from_secs(3)).await;
+        assert_eq!(
+            node_a_snapshot.transport.path.kind,
+            ClusterTransportPathKind::RelayedStream
+        );
+        assert_eq!(
+            node_b_snapshot.transport.path.kind,
+            ClusterTransportPathKind::RelayedStream
+        );
+        assert_eq!(node_a_snapshot.session_generation, 1);
+        assert_eq!(node_b_snapshot.session_generation, 1);
+
+        let initial_health =
+            wait_for_configured_peer_health(&node_a, &node_b_id, Duration::from_secs(1)).await;
+        assert_eq!(
+            initial_health.remote_stream_policy,
+            Some(mesh_remote_stream_policy())
+        );
+        assert_eq!(initial_health.session_generation, 1);
+        assert_eq!(initial_health.disconnect_count, 0);
+        assert_eq!(
+            initial_health
+                .active_transport
+                .as_ref()
+                .map(|path| path.kind),
+            Some(ClusterTransportPathKind::RelayedStream)
+        );
+        assert_eq!(
+            node_a.non_lan_discovery_assessment().disposition,
+            ClusterNonLanDiscoveryDisposition::Eligible
+        );
+
+        let lease = node_a
+            .open_http_tunnel(&node_b_id, "mesh-http")
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh tunnel should open"));
+        let response = node_a
+            .send_tunneled_http_request(&lease, ClusterTunnelHttpRequest::new("GET", "/mesh"))
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh tunnel request should succeed"));
+        assert_eq!(response.status_code, 200);
+        assert_eq!(
+            String::from_utf8(
+                response
+                    .body_bytes()
+                    .unwrap_or_else(|_| unreachable!("response body should decode"))
+            )
+            .unwrap_or_else(|_| unreachable!("response body should be utf-8")),
+            String::from("mesh-ok")
+        );
+        node_a
+            .close_tunnel(&lease)
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh tunnel should close"));
+
+        node_b
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("node B should shut down"));
+
+        let disconnected_health_deadline = Instant::now() + Duration::from_secs(4);
+        let disconnected_health = loop {
+            let health =
+                wait_for_configured_peer_health(&node_a, &node_b_id, Duration::from_secs(1)).await;
+            if health.disconnect_count >= 1 {
+                break health;
+            }
+            assert!(
+                Instant::now() < disconnected_health_deadline,
+                "timed out waiting for disconnected mesh health"
+            );
+            sleep(Duration::from_millis(25)).await;
+        };
+        assert!(
+            disconnected_health.last_establishment_failure.is_some(),
+            "disconnected mesh health should retain a machine-checkable failure"
+        );
+        wait_for_peer_absent(&node_a, &node_b_id, Duration::from_secs(1)).await;
+
+        let restarted_b = LocalClusterNode::spawn(
+            LocalClusterConfig::new(
+                admission.namespace.as_str(),
+                admission.admission_token.as_str(),
+                node_b_bind,
+                NodeRole::ExecutorOnly,
+            )
+            .with_file_backed_identity(node_b_identity_path)
+            .with_tunnel_policy(tunnel_policy)
+            .with_trust_policy(explicit_wider_network_trust(mesh_remote_stream_peer(
+                node_a_id.as_str(),
+                node_b_dummy_remote,
+                node_a_auth_public_key,
+                relay.clone(),
+            ))),
+        )
+        .await
+        .unwrap_or_else(|_| unreachable!("restarted node B should start"));
+        restarted_b
+            .activate_tunnel_service("mesh-http")
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh-http should reactivate"));
+
+        let reconnected_snapshot =
+            wait_for_peer_snapshot(&node_a, &node_b_id, Duration::from_secs(3)).await;
+        assert_eq!(
+            reconnected_snapshot.transport.path.kind,
+            ClusterTransportPathKind::RelayedStream
+        );
+        assert!(
+            reconnected_snapshot.identity.node_epoch > node_a_snapshot.identity.node_epoch,
+            "restarted peer should advance node epoch"
+        );
+        assert!(
+            reconnected_snapshot.session_generation > node_a_snapshot.session_generation,
+            "restarted peer should advance session generation"
+        );
+
+        let reconnected_health =
+            wait_for_configured_peer_health(&node_a, &node_b_id, Duration::from_secs(1)).await;
+        assert_eq!(
+            reconnected_health
+                .active_transport
+                .as_ref()
+                .map(|path| path.kind),
+            Some(ClusterTransportPathKind::RelayedStream)
+        );
+        assert!(
+            reconnected_health.session_generation > initial_health.session_generation,
+            "reconnected health should advance session generation"
+        );
+        assert_eq!(reconnected_health.disconnect_count, 1);
+
+        let second_lease = node_a
+            .open_http_tunnel(&node_b_id, "mesh-http")
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh tunnel should reopen"));
+        let second_response = node_a
+            .send_tunneled_http_request(
+                &second_lease,
+                ClusterTunnelHttpRequest::new("GET", "/mesh"),
+            )
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh tunnel request should succeed after restart"));
+        assert_eq!(second_response.status_code, 200);
+        assert_eq!(
+            String::from_utf8(
+                second_response
+                    .body_bytes()
+                    .unwrap_or_else(|_| unreachable!("response body should decode"))
+            )
+            .unwrap_or_else(|_| unreachable!("response body should be utf-8")),
+            String::from("mesh-ok")
+        );
+        node_a
+            .close_tunnel(&second_lease)
+            .await
+            .unwrap_or_else(|_| unreachable!("mesh tunnel should close after restart"));
+
+        node_a
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("node A should shut down"));
+        restarted_b
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("restarted node B should shut down"));
+        relay_server
+            .shutdown()
+            .await
+            .unwrap_or_else(|_| unreachable!("relay server should shut down"));
+        http_fixture
+            .await
+            .unwrap_or_else(|_| unreachable!("http fixture task should finish"));
     }
 }

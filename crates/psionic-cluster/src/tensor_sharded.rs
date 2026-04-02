@@ -989,6 +989,9 @@ fn runtime_transport_class(transport: ClusterTransportClass) -> RuntimeClusterTr
         ClusterTransportClass::Tcp | ClusterTransportClass::Rdma => {
             RuntimeClusterTransportClass::TrustedLanStream
         }
+        ClusterTransportClass::WiderNetworkStream => {
+            RuntimeClusterTransportClass::WiderNetworkStream
+        }
         ClusterTransportClass::Unknown => RuntimeClusterTransportClass::Mixed,
     }
 }
@@ -1048,6 +1051,7 @@ const fn transport_name(transport: ClusterTransportClass) -> &'static str {
         ClusterTransportClass::LoopbackUdp => "loopback_udp",
         ClusterTransportClass::LanUdp => "lan_udp",
         ClusterTransportClass::Tcp => "tcp",
+        ClusterTransportClass::WiderNetworkStream => "wider_network_stream",
         ClusterTransportClass::Rdma => "rdma",
         ClusterTransportClass::Unknown => "unknown",
     }

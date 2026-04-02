@@ -803,7 +803,9 @@ fn validate_stage_link<'a>(
             ),
         ));
     }
-    if policy.require_public_stream_transport && link.transport != ClusterTransportClass::Tcp {
+    if policy.require_public_stream_transport
+        && link.transport != ClusterTransportClass::WiderNetworkStream
+    {
         return Err((
             PipelineShardedSchedulingFailureCode::StageLinkUnsuitable,
             format!(
@@ -1074,8 +1076,12 @@ fn runtime_transport_class(transport: ClusterTransportClass) -> RuntimeClusterTr
     match transport {
         ClusterTransportClass::LoopbackUdp => RuntimeClusterTransportClass::Loopback,
         ClusterTransportClass::LanUdp => RuntimeClusterTransportClass::TrustedLanDatagram,
-        ClusterTransportClass::Tcp => RuntimeClusterTransportClass::WiderNetworkStream,
-        ClusterTransportClass::Rdma => RuntimeClusterTransportClass::TrustedLanStream,
+        ClusterTransportClass::Tcp | ClusterTransportClass::Rdma => {
+            RuntimeClusterTransportClass::TrustedLanStream
+        }
+        ClusterTransportClass::WiderNetworkStream => {
+            RuntimeClusterTransportClass::WiderNetworkStream
+        }
         ClusterTransportClass::Unknown => RuntimeClusterTransportClass::Mixed,
     }
 }
@@ -1139,6 +1145,7 @@ const fn transport_name(transport: ClusterTransportClass) -> &'static str {
         ClusterTransportClass::LoopbackUdp => "loopback_udp",
         ClusterTransportClass::LanUdp => "lan_udp",
         ClusterTransportClass::Tcp => "tcp",
+        ClusterTransportClass::WiderNetworkStream => "wider_network_stream",
         ClusterTransportClass::Rdma => "rdma",
         ClusterTransportClass::Unknown => "unknown",
     }
@@ -1214,7 +1221,7 @@ mod tests {
         ClusterLink::new(
             crate::NodeId::new("scheduler"),
             crate::NodeId::new(right),
-            ClusterTransportClass::Tcp,
+            ClusterTransportClass::WiderNetworkStream,
             ClusterLinkStatus::Healthy,
         )
         .with_latency_us(18_000)
@@ -1225,7 +1232,7 @@ mod tests {
         ClusterLink::new(
             crate::NodeId::new(left),
             crate::NodeId::new(right),
-            ClusterTransportClass::Tcp,
+            ClusterTransportClass::WiderNetworkStream,
             ClusterLinkStatus::Healthy,
         )
         .with_latency_us(32_000)

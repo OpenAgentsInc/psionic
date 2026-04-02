@@ -1190,8 +1190,12 @@ fn runtime_transport_class(transport: ClusterTransportClass) -> RuntimeClusterTr
     match transport {
         ClusterTransportClass::LoopbackUdp => RuntimeClusterTransportClass::Loopback,
         ClusterTransportClass::LanUdp => RuntimeClusterTransportClass::TrustedLanDatagram,
-        ClusterTransportClass::Tcp => RuntimeClusterTransportClass::WiderNetworkStream,
-        ClusterTransportClass::Rdma => RuntimeClusterTransportClass::TrustedLanStream,
+        ClusterTransportClass::Tcp | ClusterTransportClass::Rdma => {
+            RuntimeClusterTransportClass::TrustedLanStream
+        }
+        ClusterTransportClass::WiderNetworkStream => {
+            RuntimeClusterTransportClass::WiderNetworkStream
+        }
         ClusterTransportClass::Unknown => RuntimeClusterTransportClass::Mixed,
     }
 }

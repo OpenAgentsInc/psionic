@@ -228,3 +228,51 @@ The local node truth differs by mode:
   - posture `downgraded`
   - reason `warming`
   - fallback posture `warming_until_local_ready`
+
+## Wider-Network Stream Transport
+
+Explicit wider-network discovery is no longer a placeholder claim. It is now
+gated by one typed remote-stream lane contract on each configured peer.
+
+That lane must publish all four capabilities:
+
+- `gossip`
+- `join_control`
+- `management_subscription`
+- `request_forwarding`
+
+When those capabilities are present, Psionic can honestly mark
+`explicit_wider_network_requested` as eligible. When any capability is missing,
+the refusal is machine-checkable and specific instead of falling back to one
+generic "not implemented" posture.
+
+The public cluster transport truth for those lanes is:
+
+- `psionic-net`
+  - direct, NAT-assisted, and relay-forwarded stream paths
+- `psionic-cluster`
+  - `wider_network_stream` transport class
+
+The internal transport implementation remains replaceable. The public contract
+is the wider-network stream lane and its admission, routing, and management
+behavior.
+
+## Session Generation And Ghost-Peer Fencing
+
+Configured wider-network peers now carry explicit reconnect bookkeeping:
+
+- peer `session_generation`
+- peer `disconnect_count`
+- peer `last_activity_ms`
+
+If a configured remote lane stops answering long enough to be considered idle,
+Psionic tears down the peer snapshot, closes any open tunnels with
+`transport_unavailable`, and forces the next observation to land as a new
+session generation.
+
+That keeps membership transitions deterministic across restart or relay loss:
+
+- stale peers are removed instead of lingering as ghost members
+- restarts advance node epoch and peer session generation
+- remote tunnels and health snapshots show one explicit disconnect before
+  reconnect
