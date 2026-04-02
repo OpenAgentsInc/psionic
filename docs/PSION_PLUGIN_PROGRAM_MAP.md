@@ -17,6 +17,12 @@ more standalone plugin-runtime work. It is the convergence lane that turns real
 plugin traces, receipts, schemas, and admissibility posture into training and
 evaluation truth for a learned plugin-conditioned model.
 
+The canonical actual-pretraining recipe now declares the bounded continuation
+path `pretrain -> general_sft -> agentic_sft` through
+`docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`. That means plugin-conditioned work
+is explicitly subordinate to the frozen actual pretraining lane instead of a
+parallel curriculum track.
+
 This doc exists so the repo can point at one durable dependency-ordered map for
 that convergence tranche instead of reconstructing it from the alpha planning
 note or scattered issue titles.

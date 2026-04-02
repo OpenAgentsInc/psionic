@@ -80,6 +80,19 @@ That surface freezes one named actual lane above the bounded
 `broader_pretraining` trusted-cluster bundle instead of leaving "actual
 pretraining" as prose.
 
+The repo now also owns the canonical actual-lane recipe and admitted
+topology/storage bundles in
+`crates/psionic-train/src/psion_actual_pretraining_recipe_bundle.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_recipe_bundle_fixtures.rs`,
+the focused recipe doc `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`, and the
+committed fixtures
+`fixtures/psion/pretrain/psion_actual_pretraining_recipe_bundle_v1.json` and
+`fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json`.
+That surface freezes one recipe id, one admitted four-node H100 topology and
+storage bundle, env-declared credential sources, and one bounded continuation
+path of `pretrain -> general_sft -> agentic_sft`.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker

@@ -18,6 +18,8 @@ work must target.
   regenerates the canonical lane fixture.
 - `fixtures/psion/pretrain/psion_actual_pretraining_lane_spec_v1.json` is the
   canonical machine-readable actual-lane spec.
+- `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md` freezes the canonical recipe and
+  admitted topology/storage bundle consumed by this lane.
 
 The stable schema version is:
 

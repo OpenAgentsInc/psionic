@@ -12,6 +12,14 @@ starts from the canonical `Psion` pretrain receipt, keeps assumptions and
 uncertainty explicit, and preserves multiple valid reasoning styles instead of
 rewarding one canned narration shape.
 
+The actual-lane recipe freeze in `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md` now
+declares this reasoning-SFT bundle as the canonical bounded `general_sft`
+bridge on the actual-lane continuation path
+`pretrain -> general_sft -> agentic_sft`. That makes this bundle the declared
+handoff between the actual pretrain lane and the later bounded
+plugin-conditioned stage, without implying that broader plugin-conditioned
+cluster operation is already closed.
+
 ## Canonical Artifacts
 
 - `crates/psionic-train/src/psion_reasoning_sft.rs` owns the reasoning-SFT
