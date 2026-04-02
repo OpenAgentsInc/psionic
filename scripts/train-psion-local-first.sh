@@ -36,27 +36,28 @@ usage() {
 Usage: ./TRAIN [options]
 
 Default behavior:
-  - prefers the canonical Psion accelerator-backed reference lane
+  - launches the bounded Psion reference-pilot lane, not the actual broader-pretraining lane
+  - prefers the accelerator-backed bounded reference pilot
   - stages the current committed git ref to the admitted Tailnet CUDA host
   - runs the accelerated reference pilot there
-  - copies the retained artifacts back to the local machine
+  - copies the retained reference-pilot artifacts back to the local machine
 
 Options:
   --mode <auto|accelerated_reference|local_reference>
                                  Training mode. Default: auto
   --remote-host <host>           Tailnet SSH target for accelerated runs. Default: archlinux
   --run-id <id>                  Stable run identifier.
-  --output-root <path>           Local run root. Default: ~/scratch/psion_train_runs/<run_id>
-  --remote-worktree-dir <path>   Remote staged repo root. Default: $HOME/code/psion-local-first/<run_id>/repo
-  --remote-output-dir <path>     Remote artifact root. Default: $HOME/code/psion-local-first/<run_id>/output
+  --output-root <path>           Local reference-pilot run root. Default: ~/scratch/psion_reference_pilot_runs/<run_id>
+  --remote-worktree-dir <path>   Remote staged repo root. Default: $HOME/code/psion-reference-pilot/<run_id>/repo
+  --remote-output-dir <path>     Remote artifact root. Default: $HOME/code/psion-reference-pilot/<run_id>/output
   --git-ref <ref>                Git ref to stage remotely. Default: local HEAD
   --sync-local-main              Run git pull --ff-only before launch when local checkout is clean.
   --allow-local-reference-fallback
-                                 In auto mode, fall back to the CPU reference lane if the remote accelerated lane is unavailable.
+                                 In auto mode, fall back to the bounded CPU reference lane if the remote accelerated lane is unavailable.
   --local-tailnet-ip <ip>        Override local Tailnet IPv4 in the operator manifest.
   --remote-tailnet-ip <ip>       Override remote Tailnet IPv4 in the operator manifest.
   --cleanup-remote               Remove the staged remote worktree and output after copying artifacts back.
-  --dry-run                      Print the selected plan and write the operator manifest without launching training.
+  --dry-run                      Print the bounded reference-pilot plan and write the operator manifest without launching training.
   --help|-h                      Show this help text.
 EOF
 }
@@ -141,11 +142,11 @@ now_utc() {
 }
 
 if [[ -z "${run_id}" ]]; then
-  run_id="psion-train-$(date -u +%Y%m%dT%H%M%SZ)"
+  run_id="psion-reference-pilot-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 
 if [[ -z "${output_root}" ]]; then
-  output_root="${HOME}/scratch/psion_train_runs/${run_id}"
+  output_root="${HOME}/scratch/psion_reference_pilot_runs/${run_id}"
 fi
 mkdir -p "${output_root}"
 output_root="$(cd "${output_root}" && pwd)"
@@ -155,10 +156,10 @@ if [[ -z "${git_ref}" ]]; then
 fi
 
 if [[ -z "${remote_worktree_dir}" ]]; then
-  remote_worktree_dir="\$HOME/code/psion-local-first/${run_id}/repo"
+  remote_worktree_dir="\$HOME/code/psion-reference-pilot/${run_id}/repo"
 fi
 if [[ -z "${remote_output_dir}" ]]; then
-  remote_output_dir="\$HOME/code/psion-local-first/${run_id}/output"
+  remote_output_dir="\$HOME/code/psion-reference-pilot/${run_id}/output"
 fi
 
 if [[ "${sync_local_main}" == "1" ]]; then
@@ -289,10 +290,10 @@ fi
 
 detect_remote_stage_strategy
 
-operator_manifest_path="${output_root}/operator_manifest.json"
-summary_path="${output_root}/operator_summary.json"
-local_log_path="${output_root}/train.log"
-local_artifact_dir="${output_root}/artifacts"
+operator_manifest_path="${output_root}/reference_pilot_operator_manifest.json"
+summary_path="${output_root}/reference_pilot_operator_summary.json"
+local_log_path="${output_root}/reference_pilot_train.log"
+local_artifact_dir="${output_root}/reference_pilot_artifacts"
 
 python3 - <<'PY' \
   "${operator_manifest_path}" "${run_id}" "${selected_mode}" "${git_ref}" \
@@ -332,9 +333,11 @@ from datetime import datetime
 ) = sys.argv[1:]
 
 doc = {
-    "schema_version": "psionic.psion_local_first_train_manifest.v1",
+    "schema_version": "psionic.psion_reference_pilot_operator_manifest.v1",
     "created_at_utc": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
     "run_id": run_id,
+    "truth_surface_kind": "bounded_reference_pilot",
+    "actual_lane_relation": "not_actual_pretraining_lane",
     "selected_mode": selected_mode,
     "git_ref": git_ref,
     "local_output_root": output_root,
@@ -356,7 +359,7 @@ doc = {
     "remote_stage_reason": remote_stage_reason or None,
     "remote_worktree_dir": remote_worktree_dir,
     "remote_output_dir": remote_output_dir,
-    "claim_boundary": "This manifest records one local-first Psion operator run. The accelerator-backed mode targets the canonical accelerated reference pilot on the admitted Tailnet CUDA host. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
+    "claim_boundary": "This manifest records one bounded Psion reference-pilot operator run. It does not claim the actual broader-pretraining lane. The accelerator-backed mode targets the admitted accelerated reference pilot on the Tailnet CUDA host. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
 }
 
 with open(path, "w", encoding="utf-8") as handle:
@@ -374,7 +377,7 @@ if [[ "${dry_run}" == "1" ]]; then
   echo "worker_host=${worker_host}"
   echo "worker_count=${worker_count}"
   echo "execution_location=${execution_location}"
-  echo "operator_manifest=${operator_manifest_path}"
+  echo "reference_pilot_operator_manifest=${operator_manifest_path}"
   if [[ "${selected_mode}" == "accelerated_reference" ]]; then
     echo "remote_host=${remote_host}"
     echo "remote_tailnet_ip=${remote_tailnet_ip}"
@@ -417,8 +420,10 @@ if os.path.exists(manifest_path):
         manifest = json.load(handle)
 
 summary = {
-    "schema_version": "psionic.psion_local_first_train_summary.v1",
+    "schema_version": "psionic.psion_reference_pilot_operator_summary.v1",
     "recorded_at_utc": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    "truth_surface_kind": "bounded_reference_pilot",
+    "actual_lane_relation": "not_actual_pretraining_lane",
     "operator_manifest_path": os.path.abspath(manifest_path),
     "operator_manifest_sha256": sha256_file(manifest_path),
     "selected_mode": mode,
@@ -576,9 +581,9 @@ if [[ "${selected_mode}" == "local_reference" ]]; then
   echo "mode=${selected_mode}"
   echo "run_id=${run_id}"
   echo "output_root=${output_root}"
-  echo "artifact_dir=${local_artifact_dir}"
-  echo "operator_manifest=${operator_manifest_path}"
-  echo "operator_summary=${summary_path}"
+  echo "reference_pilot_artifact_dir=${local_artifact_dir}"
+  echo "reference_pilot_operator_manifest=${operator_manifest_path}"
+  echo "reference_pilot_operator_summary=${summary_path}"
   trap - EXIT
   exit 0
 fi
@@ -619,8 +624,8 @@ echo "status=completed"
 echo "mode=${selected_mode}"
 echo "run_id=${run_id}"
 echo "output_root=${output_root}"
-echo "artifact_dir=${local_artifact_dir}"
+echo "reference_pilot_artifact_dir=${local_artifact_dir}"
 echo "log_path=${local_log_path}"
-echo "operator_manifest=${operator_manifest_path}"
-echo "operator_summary=${summary_path}"
+echo "reference_pilot_operator_manifest=${operator_manifest_path}"
+echo "reference_pilot_operator_summary=${summary_path}"
 trap - EXIT

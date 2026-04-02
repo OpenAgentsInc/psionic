@@ -1,14 +1,15 @@
 # Psion Local-First Train Runbook
 
-Status: canonical local-first operator runbook for the public Psion training
-lane, written 2026-03-30 after landing the first repo-owned `TRAIN` entrypoint
-that targets the actual bounded Psion lane instead of the adjacent HOMEGOLF and
-swarm lanes.
+Status: canonical local-first operator runbook for the bounded Psion
+reference-pilot lane, written 2026-03-30 and updated 2026-04-02 after
+separating bounded reference-pilot truth from the actual broader-pretraining
+lane.
 
 ## What This Runbook Is For
 
-This runbook exists so one operator command can launch the **current top Psion
-training lane** without guessing between unrelated training systems.
+This runbook exists so one operator command can launch the **current bounded
+reference-pilot Psion lane** without guessing between unrelated training
+systems.
 
 The command is:
 
@@ -18,11 +19,18 @@ The command is:
 
 From the Psionic repo root, that now means:
 
-- prefer the canonical accelerator-backed Psion lane
+- prefer the canonical accelerator-backed bounded reference pilot
 - stage the current committed git revision to the admitted Tailnet CUDA host
 - run `psion_accelerated_reference_pilot` there
 - copy the retained artifacts back locally
 - write one local operator manifest and one local operator summary
+
+It does not launch `psion_actual_pretraining_v1`. The actual broader-
+pretraining lane, recipe, and evidence family are frozen separately in:
+
+- `docs/PSION_ACTUAL_PRETRAINING_LANE.md`
+- `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`
+- `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md`
 
 It does **not** mean:
 
@@ -71,7 +79,7 @@ Default result:
 - mode: `accelerated_reference`
 - remote host: `archlinux`
 - local run root:
-  `~/scratch/psion_train_runs/<run_id>`
+  `~/scratch/psion_reference_pilot_runs/<run_id>`
 
 The accelerated claim is still narrow:
 
@@ -118,14 +126,15 @@ reference lane when the remote accelerated lane is unavailable.
 
 ## Output Layout
 
-Every run writes:
+Every bounded reference-pilot run writes:
 
-- `operator_manifest.json`
-- `operator_summary.json`
-- `train.log`
+- `reference_pilot_operator_manifest.json`
+- `reference_pilot_operator_summary.json`
+- `reference_pilot_train.log`
 
-`operator_summary.json` is the canonical operator-side topology and cost
-surface. It now records at least:
+`reference_pilot_operator_summary.json` is the canonical operator-side topology
+and cost surface for the bounded reference-pilot lane. It now records at
+least:
 
 - `control_plane_host`
 - `worker_host`
@@ -134,19 +143,21 @@ surface. It now records at least:
 - `execution_topology_classification`
 - `delivered_backend`
 - `total_cost_microusd`
+- `truth_surface_kind`
+- `actual_lane_relation`
 
-Every completed run also writes:
+Every completed bounded reference-pilot run also writes:
 
-- `artifacts/`
+- `reference_pilot_artifacts/`
 
-For accelerated runs, `artifacts/` should contain:
+For accelerated runs, `reference_pilot_artifacts/` should contain:
 
 - `psion_accelerated_reference_pilot_stage_receipt.json`
 - `psion_accelerated_reference_pilot_observability_receipt.json`
 - `psion_accelerated_reference_pilot_checkpoint_manifest.json`
 - the related checkpoint and visualization artifacts emitted by the example
 
-For local reference runs, `artifacts/` should contain:
+For local reference runs, `reference_pilot_artifacts/` should contain:
 
 - `psion_reference_pilot_stage_receipt.json`
 - `psion_reference_pilot_observability_receipt.json`
@@ -163,7 +174,8 @@ For local reference runs, `artifacts/` should contain:
 - the remote GPU already has resident compute processes
 
 That is deliberate. The command should fail loudly instead of pretending that a
-different lane counted as the same thing.
+different lane counted as the same thing, and it should not read as though the
+bounded reference pilot were the actual broader-pretraining lane.
 
 If staging or launch fails, `train.log` is also the canonical failure trace. It
 records the selected staging strategy and the last completed launcher step so a

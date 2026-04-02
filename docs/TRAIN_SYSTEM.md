@@ -104,6 +104,13 @@ That surface freezes one retained output family, one required provenance field
 set, and one redaction policy for manifests, logs, alerts, resume pointers,
 checkpoint manifests, eval receipts, exports, and closeout bundles.
 
+The bounded `./TRAIN` operator path is now also explicitly separated from that
+actual-lane truth. It writes bounded reference-pilot artifacts under
+`psion_reference_pilot_runs/<run_id>` naming, uses
+`reference_pilot_operator_manifest.json` and
+`reference_pilot_operator_summary.json`, and states directly that it is not the
+`psion_actual_pretraining_v1` launcher.
+
 The repo now also owns a canonical provider-neutral training-program manifest in
 `crates/psionic-train/src/cross_provider_training_program_manifest.rs`, the
 binary `cross_provider_training_program_manifest`, the checker

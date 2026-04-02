@@ -75,3 +75,9 @@ nearby.
 
 This doc prevents that drift by fixing one lane id and one admitted anchor
 bundle before the launcher or hardening work starts.
+
+The current `./TRAIN` command does not launch this lane. After the bounded
+reference-pilot separation work, `./TRAIN` writes under
+`psion_reference_pilot_runs/<run_id>` naming and emits
+`reference_pilot_operator_manifest.json`, making the distinction from this
+lane's `psion_actual_pretraining_runs/<run_id>` family explicit.
