@@ -242,6 +242,38 @@ The first published paths are:
 Those responses must stay backed by typed router and network truth. They are
 not allowed to depend on scraping logs or inferring topology from user traffic.
 
+## Published Service Mode
+
+The published install and restart contract for a durable mesh lane now lands in
+`crates/psionic-serve/src/bin/psionic-mesh-lane.rs`.
+
+That entrypoint owns one stable root layout:
+
+- `config/mesh-lane.json`
+- `state/node.identity.json`
+- `state/network-state.json`
+- `logs/`
+- `models/`
+- `service/`
+
+It also emits one generated wrapper plus platform service artifacts for:
+
+- macOS `launchd`
+- Linux `systemd --user`
+
+The restart and upgrade contract is now explicit:
+
+- reinstalling against the same root refreshes service artifacts and serving
+  config without rotating mesh identity
+- node identity survives restart through file-backed identity material
+- last imported join bundle and last joined mesh preference survive restart
+  through durable network state
+- attempts to change namespace or admission token after durable state exists are
+  refused because that would invalidate cluster identity
+
+The current published service mode is intentionally bounded to shared-admission
+join bundles. Signed-introduction bootstrap remains a later mesh issue.
+
 ## Bootstrap Proxy Runtime
 
 Bootstrap proxy mode is now configured directly on the Psionic OpenAI-compatible

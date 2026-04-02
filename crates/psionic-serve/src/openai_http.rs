@@ -39,7 +39,8 @@ use psionic_models::{
     reasoning_parser_for_decoder_family, render_gpt_oss_harmony_prompt,
 };
 use psionic_net::{
-    PersistedImportedJoinBundle, PersistedJoinedMeshPreference, ServedMeshRole, ServedMeshRoleState,
+    PersistedClusterNetworkState, PersistedImportedJoinBundle, PersistedJoinedMeshPreference,
+    ServedMeshRole, ServedMeshRoleState,
 };
 use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
@@ -2297,6 +2298,22 @@ impl OpenAiCompatServer {
     #[must_use]
     pub fn execution_engine_label(&self) -> &'static str {
         self.state.execution_engine_label
+    }
+
+    pub fn apply_persisted_mesh_network_state(
+        &self,
+        persisted_network_state: &PersistedClusterNetworkState,
+    ) {
+        *self
+            .state
+            .management_join_state
+            .lock()
+            .expect("management join state should not be poisoned") = MeshManagementJoinState {
+            last_joined_mesh_preference: persisted_network_state
+                .last_joined_mesh_preference
+                .clone(),
+            last_imported_join_bundle: persisted_network_state.last_imported_join_bundle.clone(),
+        };
     }
 
     pub fn router(&self) -> Router {
@@ -8389,7 +8406,10 @@ mod tests {
         render_gpt_oss_harmony_prompt,
     };
     use psionic_net::{
-        ServedMeshRole, ServedMeshRolePosture, ServedMeshRoleReason, ServedMeshRoleState,
+        AdmissionToken, ClusterJoinBundle, ClusterJoinBundleTrustMetadata, ClusterNamespace,
+        ClusterTrustPolicy, PersistedClusterNetworkState, PersistedImportedJoinBundle,
+        PersistedJoinedMeshPreference, ServedMeshRole, ServedMeshRolePosture, ServedMeshRoleReason,
+        ServedMeshRoleState,
     };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
@@ -8405,6 +8425,7 @@ mod tests {
     };
     use std::{
         collections::BTreeMap,
+        net::SocketAddr,
         path::Path,
         sync::{Mutex, OnceLock},
     };
@@ -9364,6 +9385,69 @@ mod tests {
         );
         assert_eq!(management.0.rebalance_plan[0].target_warm_replicas, 3);
         assert_eq!(management.0.rebalance_plan[0].promote_replicas, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_status_can_publish_persisted_mesh_join_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-joined-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny joined llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        let namespace = ClusterNamespace::new("mesh-home");
+        let admission_token = AdmissionToken::new("shared-secret");
+        let bundle = ClusterJoinBundle::shared_admission(
+            "mesh-home",
+            &psionic_net::ClusterAdmissionConfig::new(namespace.as_str(), admission_token.as_str()),
+            vec![SocketAddr::from(([127, 0, 0, 1], 47_470))],
+            ClusterJoinBundleTrustMetadata::from_policies(&ClusterTrustPolicy::trusted_lan(), None),
+            40_000,
+        );
+        let mut persisted = PersistedClusterNetworkState::default();
+        persisted.last_imported_join_bundle = Some(PersistedImportedJoinBundle {
+            bundle: bundle.clone(),
+            imported_at_ms: 40_000,
+        });
+        persisted.last_joined_mesh_preference = Some(PersistedJoinedMeshPreference {
+            mesh_label: bundle.mesh_label.clone(),
+            namespace: bundle.namespace.clone(),
+            cluster_id: bundle.cluster_id.clone(),
+            advertised_control_plane_addrs: bundle.advertised_control_plane_addrs.clone(),
+            trust_policy_digest: bundle.trust_metadata.trust_policy_digest.clone(),
+            selected_at_ms: 40_000,
+        });
+        server.apply_persisted_mesh_network_state(&persisted);
+
+        let management = tokio::runtime::Runtime::new()?.block_on(generic_management_status(
+            State(std::sync::Arc::clone(&server.state)),
+        ));
+        assert_eq!(
+            management.0.join_state.posture,
+            super::MeshManagementJoinPosture::Joined
+        );
+        assert_eq!(
+            management
+                .0
+                .join_state
+                .last_joined_mesh_preference
+                .as_ref()
+                .map(|preference| preference.mesh_label.as_str()),
+            Some("mesh-home")
+        );
+        assert_eq!(
+            management
+                .0
+                .join_state
+                .last_imported_join_bundle
+                .as_ref()
+                .map(|record| record.imported_at_ms),
+            Some(40_000)
+        );
         Ok(())
     }
 

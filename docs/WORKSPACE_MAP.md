@@ -17,6 +17,8 @@ Read these first:
   - canonical inference and serving completion bar
 - `docs/INFERENCE_MESH_OWNERSHIP.md`
   - canonical owner split for inference-mesh work
+- `docs/MESH_LANE_SERVICE_MODE.md`
+  - published install and restart contract for durable mesh lanes
 - `docs/OPTIMIZER_SUBSTRATE.md`
   - canonical optimizer substrate spec for bounded offline search artifacts
 - `docs/TRAIN_SYSTEM.md`
@@ -87,6 +89,7 @@ Reference:
 
 - `docs/INFERENCE_ENGINE.md`
 - `docs/INFERENCE_MESH_OWNERSHIP.md`
+- `docs/MESH_LANE_SERVICE_MODE.md`
 - `docs/GPT_OSS_LOCAL_SERVING.md`
 - `docs/LLAMA_VLLM_SGLANG_INFERENCE_SPEC.md`
 - `docs/NON_GPT_OSS_QWEN_PILOT.md`
@@ -156,6 +159,8 @@ Current entrypoints:
 
 - local GPT-OSS server:
   `crates/psionic-serve/src/bin/psionic-gpt-oss-server.rs`
+- installable mesh-lane service entrypoint:
+  `crates/psionic-serve/src/bin/psionic-mesh-lane.rs`
 - benchmark harness:
   `scripts/benchmark-gpt-oss-vs-llama.sh`
 - generic OpenAI-compatible server surface:
@@ -165,6 +170,7 @@ Start with:
 
 - `docs/GPT_OSS_LOCAL_SERVING.md`
 - `docs/INFERENCE_ENGINE.md`
+- `docs/MESH_LANE_SERVICE_MODE.md`
 - `docs/HARDWARE_VALIDATION_MATRIX.md`
 
 ### Parameter Golf

@@ -14,6 +14,7 @@ evidence.
 - Detailed workspace map: [docs/WORKSPACE_MAP.md](docs/WORKSPACE_MAP.md)
 - Inference and serving: [docs/INFERENCE_ENGINE.md](docs/INFERENCE_ENGINE.md)
 - Inference mesh ownership: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md)
+- Mesh lane service mode: [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md)
 - Optimizer substrate: [docs/OPTIMIZER_SUBSTRATE.md](docs/OPTIMIZER_SUBSTRATE.md)
 - Forge-facing eval pack publication: [docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md](docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
@@ -42,7 +43,7 @@ evidence.
 - Cluster, swarm, and cross-provider compute
   - local mixed-hardware swarm, Google dual-node swarm, cross-provider training contracts
   - start with [docs/ROADMAP_CLUSTER.md](docs/ROADMAP_CLUSTER.md)
-  - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
+  - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
 - Psion learned-model program
   - corpus, tokenizer, pretrain, trusted-cluster, and decentralized contribution work
   - start with [docs/PSION_PROGRAM_MAP.md](docs/PSION_PROGRAM_MAP.md)
@@ -173,6 +174,16 @@ scripts/benchmark-gpt-oss-vs-llama.sh \
 ```
 
 More detail lives in [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md).
+
+## Installable Mesh Lanes
+
+Psionic also ships `crates/psionic-serve/src/bin/psionic-mesh-lane.rs` as the
+supported service-mode entrypoint for durable inference-mesh nodes.
+
+It materializes one lane root with config, file-backed node identity, durable
+network state, logs, model paths, and generated `launchd` / `systemd` service
+artifacts. The full operator runbook lives in
+[docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md).
 
 ## GPT-OSS Benchmark Proof
 
