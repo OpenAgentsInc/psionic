@@ -234,6 +234,10 @@ The first published paths are:
 - `/psionic/management/events`
   - one SSE stream that emits an initial topology snapshot and live
     route-selection events
+- `/psionic/management/console`
+  - one read-only first-party operator surface backed only by the typed status
+    snapshot and SSE event stream; join, leave, load, unload, standby, and
+    drain mutations remain unpublished
 
 Those responses must stay backed by typed router and network truth. They are
 not allowed to depend on scraping logs or inferring topology from user traffic.

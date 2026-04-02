@@ -19,7 +19,7 @@ use axum::{
     extract::State,
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
     response::{
-        IntoResponse, Response,
+        Html, IntoResponse, Response,
         sse::{Event, Sse},
     },
     routing::{get, post},
@@ -27,8 +27,8 @@ use axum::{
 use futures_util::stream::{self, Stream, StreamExt};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_cluster::{
-    ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandSnapshot,
-    ClusterReplicaLifecyclePolicy,
+    ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandRebalanceReason,
+    ClusterReplicaDemandSnapshot, ClusterReplicaLifecyclePolicy,
 };
 use psionic_models::{
     GgufBlobArtifact, GgufDecoderFamily, GgufPromptTemplateRenderer, GptOssHarmonyParseOptions,
@@ -1098,15 +1098,44 @@ struct MeshManagementStatusResponse {
     node_count: usize,
     model_count: usize,
     event_stream_path: &'static str,
+    console_path: &'static str,
     join_state: MeshManagementJoinStateResponse,
     nodes: Vec<MeshManagementNodeStatus>,
     routes: Vec<MeshManagementRouteStatus>,
+    host_view: Vec<MeshManagementHostViewStatus>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     demand: Vec<RoutingDemandSnapshot>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     rebalance_plan: Vec<ClusterReplicaDemandRebalanceDecision>,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_route_execution: Option<MeshManagementRouteExecutionStatus>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct MeshManagementHostViewStatus {
+    model_key: String,
+    canonical_name: String,
+    family: String,
+    supported_endpoints: Vec<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_host_worker_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    standby_worker_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    non_warm_worker_details: Vec<String>,
+    current_warm_replicas: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hot_standby_worker_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rebalance_reason: Option<ClusterReplicaDemandRebalanceReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rebalance_detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_warm_replicas: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    promote_replicas: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unload_replicas: Option<usize>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -1428,6 +1457,7 @@ impl OpenAiCompatState {
             &self.replica_lifecycle_policy,
             observed_at_ms,
         );
+        let host_view = mesh_management_host_view(nodes.as_slice(), rebalance_plan.as_slice());
         let topology_digest = mesh_management_topology_digest(&MeshManagementStatusDigestInput {
             join_state: join_state.clone(),
             nodes: nodes.clone(),
@@ -1444,9 +1474,11 @@ impl OpenAiCompatState {
             node_count: nodes.len(),
             model_count: published_models.len(),
             event_stream_path: "/psionic/management/events",
+            console_path: "/psionic/management/console",
             join_state,
             nodes,
             routes,
+            host_view,
             demand,
             rebalance_plan,
             last_route_execution,
@@ -1698,6 +1730,105 @@ fn mesh_management_node_status(worker: &RoutedWorkerInventory) -> MeshManagement
         models,
         route_inventory,
     }
+}
+
+fn mesh_management_display_worker_id(node: &MeshManagementNodeStatus) -> String {
+    match node.mesh_peer_worker_id.as_deref() {
+        Some(peer_worker_id) => format!("{peer_worker_id} via bootstrap"),
+        None => node.worker_id.clone(),
+    }
+}
+
+fn mesh_management_warm_state_label(warm_state: RoutedWarmState) -> &'static str {
+    match warm_state {
+        RoutedWarmState::Warm => "warm",
+        RoutedWarmState::Warming => "warming",
+        RoutedWarmState::Cold => "cold",
+    }
+}
+
+#[derive(Default)]
+struct MeshManagementHostViewAccumulator {
+    canonical_name: String,
+    family: String,
+    supported_endpoints: BTreeSet<&'static str>,
+    warm_workers: Vec<(String, usize)>,
+    non_warm_worker_details: Vec<String>,
+}
+
+fn mesh_management_host_view(
+    nodes: &[MeshManagementNodeStatus],
+    rebalance_plan: &[ClusterReplicaDemandRebalanceDecision],
+) -> Vec<MeshManagementHostViewStatus> {
+    let mut host_view = BTreeMap::<String, MeshManagementHostViewAccumulator>::new();
+    for node in nodes {
+        let worker_label = mesh_management_display_worker_id(node);
+        for model in &node.models {
+            let entry = host_view.entry(model.model_key.clone()).or_insert_with(|| {
+                MeshManagementHostViewAccumulator {
+                    canonical_name: model.canonical_name.clone(),
+                    family: model.family.clone(),
+                    ..Default::default()
+                }
+            });
+            entry
+                .supported_endpoints
+                .extend(model.supported_endpoints.iter().copied());
+            if model.warm_state == RoutedWarmState::Warm {
+                entry
+                    .warm_workers
+                    .push((worker_label.clone(), model.active_requests));
+            } else {
+                entry.non_warm_worker_details.push(format!(
+                    "{} ({})",
+                    worker_label,
+                    mesh_management_warm_state_label(model.warm_state)
+                ));
+            }
+        }
+    }
+
+    let rebalance_by_model = rebalance_plan
+        .iter()
+        .map(|decision| (decision.model_id.as_str(), decision))
+        .collect::<BTreeMap<_, _>>();
+
+    let mut lanes = host_view
+        .into_iter()
+        .map(|(model_key, mut entry)| {
+            entry
+                .warm_workers
+                .sort_by(|left, right| left.1.cmp(&right.1).then_with(|| left.0.cmp(&right.0)));
+            entry.non_warm_worker_details.sort();
+            let current_host_worker_id = entry.warm_workers.first().map(|worker| worker.0.clone());
+            let standby_worker_ids = entry
+                .warm_workers
+                .iter()
+                .skip(1)
+                .map(|worker| worker.0.clone())
+                .collect::<Vec<_>>();
+            let hot_standby_worker_id = standby_worker_ids.first().cloned();
+            let rebalance = rebalance_by_model.get(model_key.as_str()).copied();
+            MeshManagementHostViewStatus {
+                model_key,
+                canonical_name: entry.canonical_name,
+                family: entry.family,
+                supported_endpoints: entry.supported_endpoints.into_iter().collect(),
+                current_host_worker_id: current_host_worker_id.clone(),
+                standby_worker_ids,
+                non_warm_worker_details: entry.non_warm_worker_details.clone(),
+                current_warm_replicas: entry.warm_workers.len(),
+                hot_standby_worker_id,
+                rebalance_reason: rebalance.map(|decision| decision.reason),
+                rebalance_detail: rebalance.map(|decision| decision.detail.clone()),
+                target_warm_replicas: rebalance.map(|decision| decision.target_warm_replicas),
+                promote_replicas: rebalance.map(|decision| decision.promote_replicas),
+                unload_replicas: rebalance.map(|decision| decision.unload_replicas),
+            }
+        })
+        .collect::<Vec<_>>();
+    lanes.sort_by(|left, right| left.model_key.cmp(&right.model_key));
+    lanes
 }
 
 fn mesh_management_topology_digest(input: &MeshManagementStatusDigestInput) -> String {
@@ -2173,6 +2304,10 @@ impl OpenAiCompatServer {
             .route("/health", get(generic_health))
             .route("/psionic/management/status", get(generic_management_status))
             .route("/psionic/management/events", get(generic_management_events))
+            .route(
+                "/psionic/management/console",
+                get(generic_management_console),
+            )
             .route("/v1/models", get(generic_list_models))
             .route("/v1/chat/completions", post(generic_chat_completions))
             .route("/v1/responses", post(generic_responses))
@@ -3456,10 +3591,488 @@ async fn generic_health(
     })
 }
 
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn mesh_management_console_badge_class(value: &str) -> &'static str {
+    match value {
+        "warm" | "host" | "live" | "steady_state" => "badge badge-good",
+        "warming" | "standby" | "thin_client" | "hot_demand_scale_out" | "idle_keepalive" => {
+            "badge badge-warn"
+        }
+        "cold" | "draining" | "refused" | "remote_proxy" | "idle_unload" => "badge badge-danger",
+        _ => "badge",
+    }
+}
+
+fn mesh_management_console_html(status: &MeshManagementStatusResponse) -> String {
+    let initial_json = serde_json::to_string(status)
+        .expect("mesh management console bootstrap state should serialize")
+        .replace("</", "<\\/");
+    let last_route_execution = status
+        .last_route_execution
+        .as_ref()
+        .map(|route| {
+            format!(
+                "{} on {} via {}",
+                route.provenance,
+                route.worker_id,
+                match route.locality {
+                    MeshManagementRouteExecutionLocality::Local => "local",
+                    MeshManagementRouteExecutionLocality::RemoteProxy => "remote_proxy",
+                }
+            )
+        })
+        .unwrap_or_else(|| String::from("none yet"));
+    let host_view_cards = if status.host_view.is_empty() {
+        String::from(
+            "<article class=\"panel empty\">No routed host view is available yet.</article>",
+        )
+    } else {
+        status
+            .host_view
+            .iter()
+            .map(|lane| {
+                let active = lane
+                    .current_host_worker_id
+                    .as_deref()
+                    .map(html_escape)
+                    .unwrap_or_else(|| String::from("none"));
+                let standby = if lane.standby_worker_ids.is_empty() {
+                    String::from("none")
+                } else {
+                    lane.standby_worker_ids
+                        .iter()
+                        .map(|worker| html_escape(worker))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                let non_warm = if lane.non_warm_worker_details.is_empty() {
+                    String::from("none")
+                } else {
+                    lane.non_warm_worker_details
+                        .iter()
+                        .map(|detail| html_escape(detail))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                let rebalance_reason = lane
+                    .rebalance_reason
+                    .map(|reason| serde_json::to_string(&reason).unwrap_or_default())
+                    .unwrap_or_else(|| String::from("\"steady_state\""))
+                    .trim_matches('"')
+                    .to_string();
+                let rebalance_detail = lane
+                    .rebalance_detail
+                    .as_deref()
+                    .map(html_escape)
+                    .unwrap_or_else(|| String::from("no rebalance decision published"));
+                let endpoints = lane
+                    .supported_endpoints
+                    .iter()
+                    .map(|endpoint| format!("<code>{}</code>", html_escape(endpoint)))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                format!(
+                    "<article class=\"panel host-card\">\
+                        <div class=\"panel-head\">\
+                            <div>\
+                                <h3>{}</h3>\
+                                <p>{}</p>\
+                            </div>\
+                            <span class=\"{}\">{}</span>\
+                        </div>\
+                        <dl class=\"host-grid\">\
+                            <div><dt>Current Host</dt><dd>{}</dd></div>\
+                            <div><dt>Hot Standby</dt><dd>{}</dd></div>\
+                            <div><dt>Warm Replicas</dt><dd>{}</dd></div>\
+                            <div><dt>Target Warm</dt><dd>{}</dd></div>\
+                            <div><dt>Promote</dt><dd>{}</dd></div>\
+                            <div><dt>Unload</dt><dd>{}</dd></div>\
+                        </dl>\
+                        <p class=\"muted\">Endpoints: {}</p>\
+                        <p class=\"muted\">Non-warm replicas: {}</p>\
+                        <p class=\"muted\">{}</p>\
+                    </article>",
+                    html_escape(lane.canonical_name.as_str()),
+                    html_escape(lane.family.as_str()),
+                    mesh_management_console_badge_class(rebalance_reason.as_str()),
+                    html_escape(rebalance_reason.as_str()),
+                    active,
+                    html_escape(
+                        lane.hot_standby_worker_id
+                            .as_deref()
+                            .unwrap_or(standby.as_str())
+                    ),
+                    lane.current_warm_replicas,
+                    lane.target_warm_replicas
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| String::from("n/a")),
+                    lane.promote_replicas
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| String::from("n/a")),
+                    lane.unload_replicas
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| String::from("n/a")),
+                    endpoints,
+                    non_warm,
+                    rebalance_detail,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    };
+    let node_rows = status
+        .nodes
+        .iter()
+        .map(|node| {
+            let worker_label = mesh_management_display_worker_id(node);
+            let models = node
+                .models
+                .iter()
+                .map(|model| {
+                    format!(
+                        "{} <span class=\"{}\">{}</span>",
+                        html_escape(model.model_key.as_str()),
+                        mesh_management_console_badge_class(mesh_management_warm_state_label(
+                            model.warm_state
+                        )),
+                        mesh_management_warm_state_label(model.warm_state)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("<br>");
+            format!(
+                "<tr>\
+                    <td>{}</td>\
+                    <td>{}</td>\
+                    <td>{}</td>\
+                    <td>{}</td>\
+                    <td>{}</td>\
+                    <td>{}</td>\
+                </tr>",
+                html_escape(worker_label.as_str()),
+                html_escape(
+                    format!("{:?}", node.served_mesh_role.role)
+                        .to_lowercase()
+                        .as_str()
+                ),
+                html_escape(
+                    format!("{:?}", node.served_mesh_role.posture)
+                        .to_lowercase()
+                        .as_str()
+                ),
+                html_escape(
+                    format!(
+                        "{}/{}/{}",
+                        node.backend_label, node.execution_mode_label, node.execution_engine_label
+                    )
+                    .as_str()
+                ),
+                html_escape(match node.execution_locality {
+                    RoutedExecutionLocality::Local => "local",
+                    RoutedExecutionLocality::RemoteProxy => "remote_proxy",
+                }),
+                models,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    let route_rows = status
+        .routes
+        .iter()
+        .map(|route| {
+            format!(
+                "<tr>\
+                    <td>{}</td>\
+                    <td>{}</td>\
+                    <td><code>{}</code></td>\
+                    <td>{}</td>\
+                    <td><span class=\"{}\">{}</span></td>\
+                    <td>{}</td>\
+                </tr>",
+                html_escape(route.family.as_str()),
+                html_escape(route.worker_id.as_str()),
+                html_escape(route.endpoint),
+                html_escape(route.model_key.as_str()),
+                mesh_management_console_badge_class(mesh_management_warm_state_label(
+                    route.warm_state
+                )),
+                mesh_management_warm_state_label(route.warm_state),
+                route.active_requests,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    let demand_rows = if status.demand.is_empty() {
+        String::from("<tr><td colspan=\"5\" class=\"muted\">No active demand windows.</td></tr>")
+    } else {
+        status
+            .demand
+            .iter()
+            .map(|demand| {
+                format!(
+                    "<tr>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                    </tr>",
+                    html_escape(demand.key.product_id.as_str()),
+                    html_escape(demand.key.model_id.as_str()),
+                    html_escape(demand.key.route_alias.as_deref().unwrap_or("-")),
+                    demand.request_count,
+                    demand.peak_selected_active_requests,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    };
+    let rebalance_rows = if status.rebalance_plan.is_empty() {
+        String::from("<tr><td colspan=\"6\" class=\"muted\">No rebalance decisions.</td></tr>")
+    } else {
+        status
+            .rebalance_plan
+            .iter()
+            .map(|decision| {
+                let reason = serde_json::to_string(&decision.reason)
+                    .unwrap_or_default()
+                    .trim_matches('"')
+                    .to_string();
+                format!(
+                    "<tr>\
+                        <td>{}</td>\
+                        <td><span class=\"{}\">{}</span></td>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                        <td>{}</td>\
+                    </tr>",
+                    html_escape(decision.model_id.as_str()),
+                    mesh_management_console_badge_class(reason.as_str()),
+                    html_escape(reason.as_str()),
+                    decision.current_warm_replicas,
+                    decision.target_warm_replicas,
+                    decision.promote_replicas,
+                    decision.unload_replicas,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    };
+
+    format!(
+        "<!doctype html>\
+        <html lang=\"en\">\
+        <head>\
+            <meta charset=\"utf-8\">\
+            <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
+            <title>Psionic Inference Mesh Console</title>\
+            <style>\
+                :root {{\
+                    --bg: #f3efe4;\
+                    --bg-ink: #111316;\
+                    --panel: rgba(255,255,255,0.82);\
+                    --line: rgba(17,19,22,0.12);\
+                    --muted: #5a6470;\
+                    --good: #1e6b52;\
+                    --warn: #8a5b1f;\
+                    --danger: #9b2d2d;\
+                    --accent: #1d5f74;\
+                }}\
+                * {{ box-sizing: border-box; }}\
+                body {{\
+                    margin: 0;\
+                    font-family: Optima, Candara, \"Trebuchet MS\", sans-serif;\
+                    color: var(--bg-ink);\
+                    background: radial-gradient(circle at top left, rgba(29,95,116,0.18), transparent 32%),\
+                        radial-gradient(circle at top right, rgba(138,91,31,0.16), transparent 28%),\
+                        linear-gradient(180deg, #f8f3e8 0%, var(--bg) 100%);\
+                }}\
+                .shell {{ max-width: 1320px; margin: 0 auto; padding: 32px 24px 56px; }}\
+                .hero {{ display: grid; gap: 12px; margin-bottom: 24px; }}\
+                .hero h1 {{\
+                    margin: 0;\
+                    font-family: \"Iowan Old Style\", \"Palatino Linotype\", serif;\
+                    font-size: clamp(2rem, 3vw, 3.4rem);\
+                    line-height: 0.95;\
+                }}\
+                .hero p {{ margin: 0; color: var(--muted); max-width: 78ch; }}\
+                .hero-bar {{ display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }}\
+                .hero-bar a, .hero-bar button {{\
+                    border: 1px solid var(--line);\
+                    background: rgba(255,255,255,0.7);\
+                    color: var(--bg-ink);\
+                    text-decoration: none;\
+                    padding: 10px 14px;\
+                    border-radius: 999px;\
+                    cursor: pointer;\
+                    font: inherit;\
+                }}\
+                .summary-grid, .host-grid-wrap {{\
+                    display: grid;\
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));\
+                    gap: 14px;\
+                    margin-bottom: 20px;\
+                }}\
+                .panel {{\
+                    background: var(--panel);\
+                    border: 1px solid var(--line);\
+                    border-radius: 20px;\
+                    padding: 16px 18px;\
+                    box-shadow: 0 14px 34px rgba(17,19,22,0.08);\
+                    backdrop-filter: blur(10px);\
+                }}\
+                .panel h2, .panel h3 {{ margin: 0 0 8px; }}\
+                .panel-head {{ display: flex; justify-content: space-between; gap: 12px; align-items: start; }}\
+                .muted {{ color: var(--muted); }}\
+                .badge {{\
+                    display: inline-flex;\
+                    align-items: center;\
+                    gap: 6px;\
+                    border-radius: 999px;\
+                    padding: 4px 10px;\
+                    font-size: 0.82rem;\
+                    border: 1px solid var(--line);\
+                    background: rgba(255,255,255,0.86);\
+                }}\
+                .badge-good {{ color: var(--good); border-color: rgba(30,107,82,0.22); }}\
+                .badge-warn {{ color: var(--warn); border-color: rgba(138,91,31,0.24); }}\
+                .badge-danger {{ color: var(--danger); border-color: rgba(155,45,45,0.24); }}\
+                .stack {{ display: grid; gap: 18px; }}\
+                .host-grid {{\
+                    display: grid;\
+                    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));\
+                    gap: 10px 14px;\
+                    margin: 14px 0;\
+                }}\
+                .host-grid dt {{ font-size: 0.82rem; color: var(--muted); }}\
+                .host-grid dd {{ margin: 4px 0 0; font-weight: 600; }}\
+                table {{ width: 100%; border-collapse: collapse; font-size: 0.95rem; }}\
+                th, td {{ padding: 10px 12px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }}\
+                th {{ color: var(--muted); font-weight: 600; border-top: 0; }}\
+                code {{ font-family: Menlo, Monaco, monospace; font-size: 0.9em; }}\
+                .section-title {{ display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 8px; }}\
+                .empty {{ text-align: center; color: var(--muted); }}\
+                @media (max-width: 720px) {{\
+                    .shell {{ padding: 20px 16px 40px; }}\
+                    .hero-bar {{ align-items: stretch; }}\
+                    .hero-bar a, .hero-bar button {{ width: 100%; text-align: center; }}\
+                }}\
+            </style>\
+        </head>\
+        <body>\
+            <main class=\"shell stack\">\
+                <section class=\"hero\">\
+                    <h1>Psionic Inference Mesh Console</h1>\
+                    <p>Read-only operator surface above the typed management API. This page shows current host view, warm standby lanes, demand, rebalance posture, join state, and routed endpoint truth without asking the operator to inspect logs.</p>\
+                    <div class=\"hero-bar\">\
+                        <span id=\"mesh-console-connection\" class=\"badge\">connecting</span>\
+                        <a href=\"/psionic/management/status\">Raw Status JSON</a>\
+                        <a href=\"/psionic/management/events\">Raw Event Stream</a>\
+                        <button id=\"mesh-console-refresh\" type=\"button\">Refresh Snapshot</button>\
+                        <span class=\"badge\">topology {}</span>\
+                    </div>\
+                </section>\
+                <section class=\"summary-grid\">\
+                    <article class=\"panel\"><h2>Join Posture</h2><p>{}</p></article>\
+                    <article class=\"panel\"><h2>Default Model</h2><p>{}</p></article>\
+                    <article class=\"panel\"><h2>Nodes / Models</h2><p>{} nodes / {} models</p></article>\
+                    <article class=\"panel\"><h2>Last Route</h2><p>{}</p></article>\
+                </section>\
+                <section class=\"panel\">\
+                    <div class=\"section-title\"><h2>Current Host View</h2><p class=\"muted\">Derived from routed warm state and rebalance decisions. Exact ordered host-election records are not published on this surface yet.</p></div>\
+                    <div class=\"host-grid-wrap\">{}</div>\
+                </section>\
+                <section class=\"panel\">\
+                    <div class=\"section-title\"><h2>Nodes</h2><p class=\"muted\">Served role, execution posture, and published model inventory.</p></div>\
+                    <table><thead><tr><th>Worker</th><th>Role</th><th>Posture</th><th>Execution</th><th>Locality</th><th>Models</th></tr></thead><tbody>{}</tbody></table>\
+                </section>\
+                <section class=\"panel\">\
+                    <div class=\"section-title\"><h2>Routes</h2><p class=\"muted\">Endpoint-level routed inventory and warm-state truth.</p></div>\
+                    <table><thead><tr><th>Family</th><th>Worker</th><th>Endpoint</th><th>Model</th><th>Warm State</th><th>Active</th></tr></thead><tbody>{}</tbody></table>\
+                </section>\
+                <section class=\"panel\">\
+                    <div class=\"section-title\"><h2>Demand</h2><p class=\"muted\">Observed route demand keyed by product, model, and alias.</p></div>\
+                    <table><thead><tr><th>Product</th><th>Model</th><th>Alias</th><th>Requests</th><th>Peak Active</th></tr></thead><tbody>{}</tbody></table>\
+                </section>\
+                <section class=\"panel\">\
+                    <div class=\"section-title\"><h2>Rebalance Plan</h2><p class=\"muted\">Current warm-capacity guidance derived from the demand window.</p></div>\
+                    <table><thead><tr><th>Model</th><th>Reason</th><th>Current Warm</th><th>Target Warm</th><th>Promote</th><th>Unload</th></tr></thead><tbody>{}</tbody></table>\
+                </section>\
+                <section class=\"panel\"><p class=\"muted\">Read-only operator surface. Join, leave, load, unload, standby, and drain mutation routes are not published yet.</p></section>\
+            </main>\
+            <script id=\"mesh-console-initial\" type=\"application/json\">{}</script>\
+            <script>\
+                (() => {{\
+                    const connection = document.getElementById('mesh-console-connection');\
+                    const refreshButton = document.getElementById('mesh-console-refresh');\
+                    const status = JSON.parse(document.getElementById('mesh-console-initial').textContent);\
+                    let reloading = false;\
+                    const scheduleReload = () => {{\
+                        if (reloading) return;\
+                        reloading = true;\
+                        connection.textContent = 'refreshing';\
+                        connection.className = 'badge badge-warn';\
+                        window.setTimeout(() => window.location.reload(), 120);\
+                    }};\
+                    refreshButton.addEventListener('click', scheduleReload);\
+                    try {{\
+                        const source = new EventSource(status.event_stream_path);\
+                        source.onopen = () => {{\
+                            connection.textContent = 'live';\
+                            connection.className = 'badge badge-good';\
+                        }};\
+                        source.addEventListener('topology_snapshot', scheduleReload);\
+                        source.addEventListener('route_selection', scheduleReload);\
+                        source.onerror = () => {{\
+                            if (!reloading) {{\
+                                connection.textContent = 'disconnected';\
+                                connection.className = 'badge badge-danger';\
+                            }}\
+                        }};\
+                    }} catch (_error) {{\
+                        connection.textContent = 'offline';\
+                        connection.className = 'badge badge-danger';\
+                    }}\
+                }})();\
+            </script>\
+        </body>\
+        </html>",
+        html_escape(status.topology_digest.as_str()),
+        html_escape(
+            format!("{:?}", status.join_state.posture)
+                .to_lowercase()
+                .as_str()
+        ),
+        html_escape(status.default_model.as_str()),
+        status.node_count,
+        status.model_count,
+        html_escape(last_route_execution.as_str()),
+        host_view_cards,
+        node_rows,
+        route_rows,
+        demand_rows,
+        rebalance_rows,
+        initial_json,
+    )
+}
+
 async fn generic_management_status(
     State(state): State<Arc<OpenAiCompatState>>,
 ) -> Json<MeshManagementStatusResponse> {
     Json(state.management_status())
+}
+
+async fn generic_management_console(State(state): State<Arc<OpenAiCompatState>>) -> Html<String> {
+    Html(mesh_management_console_html(&state.management_status()))
 }
 
 async fn generic_management_events(
@@ -7764,7 +8377,9 @@ mod tests {
         http::{HeaderMap, Request, StatusCode},
         response::{IntoResponse, Response},
     };
-    use psionic_cluster::ClusterReplicaDemandRebalanceReason;
+    use psionic_cluster::{
+        ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandRebalanceReason,
+    };
     use psionic_models::{
         ByteProjectionEmbedder, GgufContent, GgufDecoderFamily, GgufMetadataValue,
         GgufPromptTemplateRenderer, GgufTensorType, GptOssHarmonyParseOptions,
@@ -7773,7 +8388,9 @@ mod tests {
         ReasoningParser, TokenId, TokenSequence, golden_prompt_fixture, parse_gpt_oss_harmony_text,
         render_gpt_oss_harmony_prompt,
     };
-    use psionic_net::{ServedMeshRole, ServedMeshRolePosture, ServedMeshRoleReason};
+    use psionic_net::{
+        ServedMeshRole, ServedMeshRolePosture, ServedMeshRoleReason, ServedMeshRoleState,
+    };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
         ToolExecutionRequest, ToolGateway, ToolHistoryVisibility, ToolLoopController,
@@ -7782,8 +8399,8 @@ mod tests {
     };
     use psionic_router::{RoutedExecutionLocality, RoutedExecutionProvenance};
     use psionic_runtime::{
-        BatchExecutionPosture, PrefixCacheControl, PrefixCacheMode, QueueDiscipline,
-        StructuredGrammarSyntax, StructuredOutputRequest, StructuredOutputValue,
+        BatchExecutionPosture, ExecutionCapabilityProfile, PrefixCacheControl, PrefixCacheMode,
+        QueueDiscipline, StructuredGrammarSyntax, StructuredOutputRequest, StructuredOutputValue,
         StructuredTaggedVariant,
     };
     use std::{
@@ -8565,6 +9182,10 @@ mod tests {
         assert_eq!(payload["node_count"], serde_json::json!(1));
         assert_eq!(payload["model_count"], serde_json::json!(2));
         assert_eq!(
+            payload["console_path"],
+            serde_json::json!("/psionic/management/console")
+        );
+        assert_eq!(
             payload["nodes"][0]["worker_id"],
             serde_json::json!(OPENAI_COMPAT_WORKER_ID)
         );
@@ -8582,15 +9203,65 @@ mod tests {
                 .iter()
                 .any(|route| route["endpoint"] == RoutingEndpoint::ChatCompletions.path())
         }));
+        assert!(payload["host_view"].as_array().is_some_and(|lanes| {
+            lanes.iter().any(|lane| {
+                lane["current_host_worker_id"] == serde_json::json!(OPENAI_COMPAT_WORKER_ID)
+                    && lane["current_warm_replicas"].as_u64().unwrap_or_default() >= 1
+            })
+        }));
 
         let direct = tokio::runtime::Runtime::new()?.block_on(generic_management_status(State(
             std::sync::Arc::clone(&server.state),
         )));
         assert_eq!(direct.0.node_count, 1);
+        assert_eq!(direct.0.console_path, "/psionic/management/console");
         assert_eq!(
             direct.0.join_state.posture,
             super::MeshManagementJoinPosture::Standalone
         );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_console_renders_operator_surface()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-console-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny console llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+
+        let response = tokio::runtime::Runtime::new()?.block_on(async {
+            server
+                .router()
+                .oneshot(
+                    Request::builder()
+                        .uri("/psionic/management/console")
+                        .body(Body::empty())
+                        .expect("management console request"),
+                )
+                .await
+        })?;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            response
+                .headers()
+                .get("content-type")
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("text/html"))
+        );
+        let body = tokio::runtime::Runtime::new()?
+            .block_on(async { to_bytes(response.into_body(), usize::MAX).await })?;
+        let html = String::from_utf8(body.to_vec())?;
+
+        assert!(html.contains("Psionic Inference Mesh Console"));
+        assert!(html.contains("/psionic/management/status"));
+        assert!(html.contains("/psionic/management/events"));
+        assert!(html.contains("Current Host View"));
+        assert!(html.contains("Read-only operator surface"));
         Ok(())
     }
 
@@ -8693,6 +9364,131 @@ mod tests {
         );
         assert_eq!(management.0.rebalance_plan[0].target_warm_replicas, 3);
         assert_eq!(management.0.rebalance_plan[0].promote_replicas, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_host_view_prefers_lowest_load_warm_host_and_surfaces_rebalance()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let nodes = vec![
+            super::MeshManagementNodeStatus {
+                worker_id: String::from("worker-alpha"),
+                mesh_peer_worker_id: None,
+                served_mesh_role: ServedMeshRoleState::new(ServedMeshRole::Host),
+                backend_label: String::from("cpu"),
+                execution_mode_label: String::from("native"),
+                execution_engine_label: String::from("psionic"),
+                execution_locality: RoutedExecutionLocality::Local,
+                execution_provenance: RoutedExecutionProvenance::LocalExecution,
+                models: vec![super::MeshManagementModelStatus {
+                    model_key: String::from("mesh-gemma4"),
+                    canonical_name: String::from("mesh-gemma4.gguf"),
+                    family: String::from("gemma4"),
+                    supported_endpoints: vec![
+                        RoutingEndpoint::ChatCompletions.path(),
+                        RoutingEndpoint::Responses.path(),
+                    ],
+                    warm_state: psionic_router::RoutedWarmState::Warm,
+                    active_requests: 4,
+                    structured_outputs: false,
+                    tool_calling: false,
+                    response_state: false,
+                    execution_profile: ExecutionCapabilityProfile::default(),
+                    scheduler_policy: None,
+                }],
+                route_inventory: Vec::new(),
+            },
+            super::MeshManagementNodeStatus {
+                worker_id: String::from("bootstrap-worker-beta"),
+                mesh_peer_worker_id: Some(String::from("peer-beta")),
+                served_mesh_role: ServedMeshRoleState::new(ServedMeshRole::Worker),
+                backend_label: String::from("cuda"),
+                execution_mode_label: String::from("native"),
+                execution_engine_label: String::from("psionic"),
+                execution_locality: RoutedExecutionLocality::RemoteProxy,
+                execution_provenance: RoutedExecutionProvenance::BootstrapProxy,
+                models: vec![super::MeshManagementModelStatus {
+                    model_key: String::from("mesh-gemma4"),
+                    canonical_name: String::from("mesh-gemma4.gguf"),
+                    family: String::from("gemma4"),
+                    supported_endpoints: vec![RoutingEndpoint::ChatCompletions.path()],
+                    warm_state: psionic_router::RoutedWarmState::Warm,
+                    active_requests: 1,
+                    structured_outputs: false,
+                    tool_calling: false,
+                    response_state: false,
+                    execution_profile: ExecutionCapabilityProfile::default(),
+                    scheduler_policy: None,
+                }],
+                route_inventory: Vec::new(),
+            },
+            super::MeshManagementNodeStatus {
+                worker_id: String::from("worker-gamma"),
+                mesh_peer_worker_id: None,
+                served_mesh_role: ServedMeshRoleState::new(ServedMeshRole::Worker)
+                    .with_posture(ServedMeshRolePosture::Downgraded)
+                    .with_reason(ServedMeshRoleReason::Warming),
+                backend_label: String::from("cuda"),
+                execution_mode_label: String::from("native"),
+                execution_engine_label: String::from("psionic"),
+                execution_locality: RoutedExecutionLocality::Local,
+                execution_provenance: RoutedExecutionProvenance::LocalExecution,
+                models: vec![super::MeshManagementModelStatus {
+                    model_key: String::from("mesh-gemma4"),
+                    canonical_name: String::from("mesh-gemma4.gguf"),
+                    family: String::from("gemma4"),
+                    supported_endpoints: vec![RoutingEndpoint::ChatCompletions.path()],
+                    warm_state: psionic_router::RoutedWarmState::Warming,
+                    active_requests: 0,
+                    structured_outputs: false,
+                    tool_calling: false,
+                    response_state: false,
+                    execution_profile: ExecutionCapabilityProfile::default(),
+                    scheduler_policy: None,
+                }],
+                route_inventory: Vec::new(),
+            },
+        ];
+        let rebalance_plan = vec![ClusterReplicaDemandRebalanceDecision {
+            product_id: String::from(OPENAI_COMPAT_PRODUCT_ID),
+            model_id: String::from("mesh-gemma4"),
+            route_alias: Some(String::from("mesh-gemma4.gguf")),
+            current_warm_replicas: 2,
+            target_warm_replicas: 3,
+            promote_replicas: 1,
+            unload_replicas: 0,
+            reason: ClusterReplicaDemandRebalanceReason::HotDemandScaleOut,
+            detail: String::from("fresh demand now exceeds two warm replicas"),
+        }];
+
+        let host_view =
+            super::mesh_management_host_view(nodes.as_slice(), rebalance_plan.as_slice());
+        assert_eq!(host_view.len(), 1);
+        assert_eq!(host_view[0].model_key, "mesh-gemma4");
+        assert_eq!(
+            host_view[0].current_host_worker_id.as_deref(),
+            Some("peer-beta via bootstrap")
+        );
+        assert_eq!(
+            host_view[0].standby_worker_ids,
+            vec![String::from("worker-alpha")]
+        );
+        assert_eq!(
+            host_view[0].hot_standby_worker_id.as_deref(),
+            Some("worker-alpha")
+        );
+        assert_eq!(host_view[0].current_warm_replicas, 2);
+        assert_eq!(
+            host_view[0].non_warm_worker_details,
+            vec![String::from("worker-gamma (warming)")]
+        );
+        assert_eq!(
+            host_view[0].rebalance_reason,
+            Some(ClusterReplicaDemandRebalanceReason::HotDemandScaleOut)
+        );
+        assert_eq!(host_view[0].target_warm_replicas, Some(3));
+        assert_eq!(host_view[0].promote_replicas, Some(1));
+        assert_eq!(host_view[0].unload_replicas, Some(0));
         Ok(())
     }
 
