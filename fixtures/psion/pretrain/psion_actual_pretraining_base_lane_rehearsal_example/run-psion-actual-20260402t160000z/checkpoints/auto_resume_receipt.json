@@ -1,0 +1,27 @@
+{
+  "schema_version": "psion.actual_pretraining_auto_resume_receipt.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t160000z",
+  "selected_git_ref": "7fead59c",
+  "git_commit_sha": "7fead59c86d6e80ce6e14b53f1e48c6b1e79252b",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "requested_primary_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+  "backup_receipt_path": "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+  "backup_pointer_path": "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+  "primary_pointer_state": "accepted",
+  "resolution_state": "accepted_primary_pointer",
+  "resume_source_kind": "primary_pointer",
+  "restored_primary_pointer": false,
+  "chosen_checkpoint_label": "broader-pretrain-final",
+  "chosen_optimizer_step": 16384,
+  "chosen_checkpoint_ref": "checkpoint://psion/actual-pretraining/broader-pretrain-final",
+  "chosen_checkpoint_manifest": {
+    "path": "checkpoints/step-16384/checkpoint_manifest.json",
+    "sha256": "778d233c487e0a0b6e072e0d67cb4345e06863335fbd12dccc143dff89bfa669"
+  },
+  "refusal_reason": null,
+  "claim_boundary": "The actual-lane auto-resume receipt records whether resume trusted the primary pointer or had to recover from the retained backup family. It does not claim that preflight admission or post-resume training succeeded.",
+  "detail": "Auto-resume accepted the primary retained checkpoint pointer without needing the backup copy.",
+  "receipt_digest": "5b0859a5945c2b78f83c4f37f637c05e05cf70a74971425cba4ce77f627477ef"
+}

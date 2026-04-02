@@ -1,0 +1,20 @@
+{
+  "schema_version": "psion.actual_pretraining_retained_summary.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t160000z",
+  "last_known_phase": "base_lane_rehearsal_complete",
+  "selected_git_ref": "7fead59c",
+  "git_commit_sha": "7fead59c86d6e80ce6e14b53f1e48c6b1e79252b",
+  "dirty_tree_admission": "refuse_by_default",
+  "current_status_path": "status/current_run_status.json",
+  "latest_checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+  "continuation_handoff_path": "continuation/accepted_checkpoint_handoff.json",
+  "launcher_surfaces": {
+    "start_surface_id": "psion_actual_pretraining.start",
+    "dry_run_surface_id": "psion_actual_pretraining.dry_run",
+    "resume_surface_id": "psion_actual_pretraining.resume",
+    "status_surface_id": "psion_actual_pretraining.status"
+  },
+  "claim_boundary": "The retained summary now proves one full base-lane rehearsal for the actual pretraining operator path, including launch, accepted checkpoint retention, backup recovery drill, continue-vs-restart decision, and resume. It does not claim external alert delivery, streaming dashboard publication, distributed cluster execution, or plugin-conditioned continuation execution.",
+  "detail": "Retained summary now points at the exact base-lane rehearsal closeout state for operator review."
+}

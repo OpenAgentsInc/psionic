@@ -318,6 +318,10 @@ proof packet. That closeout bundle now carries:
 
 The final retained phase becomes `base_lane_rehearsal_complete`.
 
+The repo also now commits one clean example run root for this proof gate under:
+
+- `fixtures/psion/pretrain/psion_actual_pretraining_base_lane_rehearsal_example/run-psion-actual-20260402t160000z/`
+
 ## Dashboard Command
 
 ```bash

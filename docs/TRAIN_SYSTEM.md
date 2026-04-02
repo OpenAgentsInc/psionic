@@ -263,6 +263,7 @@ lane dispatch in `psionic/TRAIN`, the focused runbook
 - `fixtures/psion/pretrain/psion_actual_pretraining_resume_manifest_v1.json`
 - `fixtures/psion/pretrain/psion_actual_pretraining_checkpoint_pointer_v1.json`
 - `fixtures/psion/pretrain/psion_actual_pretraining_closeout_bundle_v1.json`
+- `fixtures/psion/pretrain/psion_actual_pretraining_base_lane_rehearsal_example/run-psion-actual-20260402t160000z/`
 
 That surface gives the repo one real operator path for:
 

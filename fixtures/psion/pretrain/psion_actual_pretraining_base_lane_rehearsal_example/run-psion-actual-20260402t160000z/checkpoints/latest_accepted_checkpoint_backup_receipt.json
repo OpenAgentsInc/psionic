@@ -1,0 +1,40 @@
+{
+  "schema_version": "psion.actual_pretraining_checkpoint_backup_receipt.v1",
+  "lane_id": "psion_actual_pretraining_v1",
+  "run_id": "run-psion-actual-20260402t160000z",
+  "checkpoint_label": "broader-pretrain-final",
+  "optimizer_step": 16384,
+  "checkpoint_ref": "checkpoint://psion/actual-pretraining/broader-pretrain-final",
+  "selected_git_ref": "7fead59c",
+  "git_commit_sha": "7fead59c86d6e80ce6e14b53f1e48c6b1e79252b",
+  "dirty_tree_admission": "refuse_by_default",
+  "workspace_status_sha256": null,
+  "primary_pointer": {
+    "path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "sha256": "269af0b4b9907c99e5e305cbd9dbac9ba79a47b4daf6c68c62a8ad196c5fdaca"
+  },
+  "primary_checkpoint_manifest": {
+    "path": "checkpoints/step-16384/checkpoint_manifest.json",
+    "sha256": "778d233c487e0a0b6e072e0d67cb4345e06863335fbd12dccc143dff89bfa669"
+  },
+  "backup_pointer": {
+    "path": "checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json",
+    "sha256": "269af0b4b9907c99e5e305cbd9dbac9ba79a47b4daf6c68c62a8ad196c5fdaca"
+  },
+  "backup_checkpoint_manifest": {
+    "path": "checkpoints/backups/step-16384/checkpoint_manifest.backup.json",
+    "sha256": "778d233c487e0a0b6e072e0d67cb4345e06863335fbd12dccc143dff89bfa669"
+  },
+  "remote_backup_root": "${PSION_ACTUAL_PRETRAINING_BUCKET_URL}/psion_actual_pretraining_runs/run-psion-actual-20260402t160000z/checkpoints/backups",
+  "credential_source_names": [
+    "PSION_ACTUAL_PRETRAINING_GCP_PROJECT_ID",
+    "PSION_ACTUAL_PRETRAINING_BUCKET_URL",
+    "GOOGLE_APPLICATION_CREDENTIALS"
+  ],
+  "backup_state": "backed_up",
+  "upload_outcome": "succeeded",
+  "upload_failure_reason": null,
+  "claim_boundary": "This retained backup receipt binds the actual-lane latest accepted checkpoint to one durable backup contract and redacted credential-source posture. It does not claim that training continued or that automatic checkpoint eval already ran.",
+  "detail": "Checkpoint backup receipt preserves the accepted pointer plus checkpoint manifest under one local backup family and one redacted remote-backup root.",
+  "receipt_digest": "44c7a85509f8883f4c976dcd382210ceabb7f20f0a8e027a09a6f718022d5587"
+}
