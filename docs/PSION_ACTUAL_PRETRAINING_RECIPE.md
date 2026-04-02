@@ -21,6 +21,8 @@ bounded continuation path that later launcher and hardening work must consume.
   carries the canonical actual-lane recipe bundle.
 - `fixtures/psion/pretrain/psion_actual_pretraining_topology_storage_bundle_v1.json`
   carries the canonical actual-lane topology/storage bundle.
+- `docs/PSION_ACTUAL_PRETRAINING_SYSTEMS_BUNDLE.md` freezes the CS336
+  A2-shaped systems bundle that consumes this recipe and topology authority.
 - `docs/PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT.md` freezes the output,
   provenance, and redaction family later operator work must reuse.
 

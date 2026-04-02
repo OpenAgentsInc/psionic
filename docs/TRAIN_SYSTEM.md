@@ -93,6 +93,18 @@ That surface freezes one recipe id, one admitted four-node H100 topology and
 storage bundle, env-declared credential sources, and one bounded continuation
 path of `pretrain -> general_sft -> agentic_sft`.
 
+The repo now also owns the canonical actual-lane systems bundle in
+`crates/psionic-train/src/psion_actual_pretraining_systems_bundle.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_actual_pretraining_systems_bundle_fixtures.rs`,
+the focused doc `docs/PSION_ACTUAL_PRETRAINING_SYSTEMS_BUNDLE.md`, and the
+committed fixture
+`fixtures/psion/pretrain/psion_actual_pretraining_systems_bundle_v1.json`.
+That surface ports CS336 A2-style profiling, efficiency, distributed-runtime,
+hardware-preflight, and resume-support work into one actual-lane contract
+above the trusted-cluster anchor instead of leaving those concerns in a
+detached curriculum lane.
+
 The repo now also owns the canonical actual-lane output and evidence contract
 in `crates/psionic-train/src/psion_actual_pretraining_evidence_contract.rs`,
 the fixture generator
@@ -143,8 +155,8 @@ That surface gives the repo one real operator path for:
 - `./TRAIN --lane actual_pretraining resume --run-root <path>`
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 
-It consumes the frozen lane, recipe, topology/storage, evidence, and status
-contracts directly; refuses dirty working trees by default; retains the
+It consumes the frozen lane, recipe, systems, topology/storage, evidence, and
+status contracts directly; refuses dirty working trees by default; retains the
 selected ref plus exact commit SHA; and repeats that provenance in the
 provisional closeout bundle without claiming that later hardening issues are
 already finished.
