@@ -68,9 +68,28 @@ Use:
 ```
 
 for plan inspection and bounded CPU-reference fallback.
-- Tassadar executor lane
-  - executor-class research and runtime work for exact computation
-  - start with [docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md)
+
+## Tassadar Training Shortcut
+
+If you want the current default Tassadar training lane instead of guessing
+among older bounded benchmark lanes, run:
+
+```bash
+./TRAIN_TASSADAR
+```
+
+That command now means the bounded trace-bound article-transformer
+weight-production lane that produces the retained
+`tassadar-article-transformer-trace-bound-trained-v0` family under
+`fixtures/tassadar/runs/tassadar_article_transformer_weight_production_v1`.
+
+The lane contract lives in
+[docs/TASSADAR_DEFAULT_TRAIN_LANE.md](docs/TASSADAR_DEFAULT_TRAIN_LANE.md).
+
+## Tassadar Executor Lane
+
+Executor-class research and runtime work for exact computation starts with
+[docs/ROADMAP_TASSADAR.md](docs/ROADMAP_TASSADAR.md).
 
 ## Local GPT-OSS Inference
 

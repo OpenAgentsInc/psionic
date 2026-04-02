@@ -291,6 +291,25 @@ upgrading `closeout/closeout_bundle.json` into a retained proof packet with
 explicit evidence refs, closeout gates, failure-drill recovery evidence, and
 claim-boundary sections.
 
+The repo now also owns one explicit default Tassadar train contract in
+`crates/psionic-train/src/tassadar_default_train_lane.rs`, the fixture
+generator
+`crates/psionic-train/examples/tassadar_default_train_lane_fixtures.rs`, the
+launcher surface `./TRAIN_TASSADAR`, the checker
+`scripts/check-tassadar-default-train-lane.sh`, the focused doc
+`docs/TASSADAR_DEFAULT_TRAIN_LANE.md`, and the committed fixture
+`fixtures/tassadar/operator/tassadar_default_train_lane_contract_v1.json`.
+That contract freezes `train Tassadar` to one operator meaning:
+the bounded trace-bound article-transformer weight-production lane that emits
+the retained `tassadar-article-transformer-trace-bound-trained-v0` family under
+`fixtures/tassadar/runs/tassadar_article_transformer_weight_production_v1`.
+It keeps the hardware profile at `cpu_reference`, reuses the retained
+checkpoint family `train.tassadar.article_transformer.weight_production` as
+the evidence family, points the checker bundle at the default-lane checker plus
+the broad acceptance checker, and states directly that the older 4x4/9x9
+learned bundles, the separate Hungarian-10x10 exact learned benchmark lane,
+and the later 4080 executor candidate are not the default launcher meaning.
+
 The repo now also owns the canonical actual-lane hardware observation and
 hardware qualification receipt in
 `crates/psionic-train/src/psion_actual_pretraining_hardware_qualification.rs`,
