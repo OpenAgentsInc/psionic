@@ -2,7 +2,24 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-lane="reference_pilot"
+lane="actual_pretraining"
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || "${1:-}" == "help" ]]; then
+  cat <<'EOF'
+Usage:
+  ./TRAIN [start|record-checkpoint|backup|resume|decide-continue-restart|rehearse-base-lane|status|dashboard] [options]
+  ./TRAIN --lane actual_pretraining [same as the default actual-lane commands]
+  ./TRAIN --lane reference_pilot [reference-lane options]
+
+Default lane:
+  actual_pretraining
+
+Reference lane:
+  reference_pilot remains available as the bounded smoke/reference path and no
+  longer counts as the primary operator proof path.
+EOF
+  exit 0
+fi
 
 if [[ $# -ge 2 && "$1" == "--lane" ]]; then
   lane="$2"
@@ -10,11 +27,11 @@ if [[ $# -ge 2 && "$1" == "--lane" ]]; then
 fi
 
 case "${lane}" in
-  reference_pilot)
-    exec "${script_dir}/scripts/train-psion-reference-pilot.sh" "$@"
-    ;;
   actual_pretraining)
     exec "${script_dir}/scripts/train-psion-actual-pretraining.sh" "$@"
+    ;;
+  reference_pilot)
+    exec "${script_dir}/scripts/train-psion-reference-pilot.sh" "$@"
     ;;
   *)
     echo "error: unsupported lane ${lane}" >&2

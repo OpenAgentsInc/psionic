@@ -7,23 +7,26 @@ start, dry-run, resume, and status command for `psion_actual_pretraining_v1`.
 ## What This Runbook Is For
 
 This runbook exists so the repo has one explicit operator path for the actual
-broader-pretraining lane without changing the default meaning of `./TRAIN`.
+broader-pretraining lane, and it now defines the default meaning of `./TRAIN`.
 
 The commands are:
 
 ```bash
-./TRAIN --lane actual_pretraining start [options]
-./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
-./TRAIN --lane actual_pretraining backup --run-root <path> [options]
-./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path> [options]
-./TRAIN --lane actual_pretraining rehearse-base-lane [options]
-./TRAIN --lane actual_pretraining resume --run-root <path> [options]
-./TRAIN --lane actual_pretraining status --run-root <path>
-./TRAIN --lane actual_pretraining dashboard --run-root <path>
+./TRAIN [start] [options]
+./TRAIN record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
+./TRAIN backup --run-root <path> [options]
+./TRAIN decide-continue-restart --run-root <path> [options]
+./TRAIN rehearse-base-lane [options]
+./TRAIN resume --run-root <path> [options]
+./TRAIN status --run-root <path>
+./TRAIN dashboard --run-root <path>
 ```
 
-`./TRAIN` without `--lane actual_pretraining` still means the bounded
-reference-pilot lane.
+The older reference pilot is still available explicitly:
+
+```bash
+./TRAIN --lane reference_pilot [reference-lane options]
+```
 
 ## Current Claim Boundary
 
@@ -74,13 +77,13 @@ the full hardening pass.
 Dry-run materialization:
 
 ```bash
-./TRAIN --lane actual_pretraining start --dry-run
+./TRAIN --dry-run
 ```
 
 Dry-run with an admitted retained observation snapshot:
 
 ```bash
-./TRAIN --lane actual_pretraining start \
+./TRAIN start \
   --dry-run \
   --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
   --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json
@@ -89,7 +92,7 @@ Dry-run with an admitted retained observation snapshot:
 Start with an explicit run id and output root:
 
 ```bash
-./TRAIN --lane actual_pretraining start \
+./TRAIN start \
   --run-id run-psion-actual-20260402t120000z \
   --output-root ~/scratch/psion_actual_pretraining_runs/run-psion-actual-20260402t120000z
 ```
@@ -125,7 +128,7 @@ Before the first accepted checkpoint exists, the retained state is explicit:
 Canonical accepted-checkpoint materialization:
 
 ```bash
-./TRAIN --lane actual_pretraining record-checkpoint \
+./TRAIN record-checkpoint \
   --run-root <path> \
   --checkpoint-label broader-pretrain-final \
   --optimizer-step 16384 \
@@ -152,7 +155,7 @@ checkpoint identity unless the operator provides an explicit digest.
 Unavailable-worker rehearsal:
 
 ```bash
-./TRAIN --lane actual_pretraining record-checkpoint \
+./TRAIN record-checkpoint \
   --run-root <path> \
   --checkpoint-label broader-pretrain-final \
   --optimizer-step 16384 \
@@ -174,7 +177,7 @@ retry-required evidence instead of silently skipping automatic eval.
 Canonical durable-backup replay:
 
 ```bash
-./TRAIN --lane actual_pretraining backup --run-root <path>
+./TRAIN backup --run-root <path>
 ```
 
 This command rereads the current accepted pointer and checkpoint manifest and
@@ -187,7 +190,7 @@ raw receipts directly first.
 Failure-injection rehearsal:
 
 ```bash
-./TRAIN --lane actual_pretraining backup \
+./TRAIN backup \
   --run-root <path> \
   --inject-failed-upload
 ```
@@ -205,7 +208,7 @@ service-account payloads are not copied into retained artifacts or logs.
 Canonical long-run decision:
 
 ```bash
-./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path>
+./TRAIN decide-continue-restart --run-root <path>
 ```
 
 This command consumes the latest accepted checkpoint pointer, backup receipt,
@@ -244,7 +247,7 @@ instead of guessing.
 Canonical resume:
 
 ```bash
-./TRAIN --lane actual_pretraining resume --run-root <path>
+./TRAIN resume --run-root <path>
 ```
 
 Resume first reads:
@@ -292,7 +295,7 @@ explicit `auto_resume_receipt.json` with `resolution_state = refused` and logs
 Canonical base-lane proof gate:
 
 ```bash
-./TRAIN --lane actual_pretraining rehearse-base-lane \
+./TRAIN rehearse-base-lane \
   --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
   --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json
 ```
@@ -346,7 +349,7 @@ execution or plugin-conditioned RL execution.
 ## Dashboard Command
 
 ```bash
-./TRAIN --lane actual_pretraining dashboard --run-root <path>
+./TRAIN dashboard --run-root <path>
 ```
 
 This is a thin wrapper over
@@ -370,7 +373,7 @@ and prints:
 ## Status Command
 
 ```bash
-./TRAIN --lane actual_pretraining status --run-root <path>
+./TRAIN status --run-root <path>
 ```
 
 This is a thin wrapper over `scripts/psion-actual-pretraining-status.sh`. It
@@ -394,7 +397,7 @@ Dirty working trees are refused by default.
 If an operator deliberately overrides that rule:
 
 ```bash
-./TRAIN --lane actual_pretraining start --allow-dirty-tree --dry-run
+./TRAIN start --allow-dirty-tree --dry-run
 ```
 
 the launcher records:

@@ -1,20 +1,19 @@
-# Psion Local-First Train Runbook
+# Psion Local-First Reference Runbook
 
-Status: canonical local-first operator runbook for the bounded Psion
-reference-pilot lane, written 2026-03-30 and updated 2026-04-02 after
-separating bounded reference-pilot truth from the actual broader-pretraining
-lane.
+Status: canonical bounded smoke/reference runbook for the local-first Psion
+reference-pilot lane, written 2026-03-30 and updated 2026-04-02 after the
+actual broader-pretraining lane became the default meaning of `./TRAIN`.
 
 ## What This Runbook Is For
 
-This runbook exists so one operator command can launch the **current bounded
-reference-pilot Psion lane** without guessing between unrelated training
-systems.
+This runbook exists so the older bounded reference-pilot lane remains usable as
+an explicit smoke/reference path without pretending to be the main operator
+path.
 
 The command is:
 
 ```bash
-./TRAIN
+./TRAIN --lane reference_pilot
 ```
 
 From the Psionic repo root, that now means:
@@ -25,8 +24,9 @@ From the Psionic repo root, that now means:
 - copy the retained artifacts back locally
 - write one local operator manifest and one local operator summary
 
-It does not launch `psion_actual_pretraining_v1`. The actual broader-
-pretraining lane, recipe, and evidence family are frozen separately in:
+`./TRAIN` without `--lane reference_pilot` now means the actual broader-
+pretraining lane. The actual lane, recipe, and evidence family are frozen
+separately in:
 
 - `docs/PSION_ACTUAL_PRETRAINING_LANE.md`
 - `docs/PSION_ACTUAL_PRETRAINING_RECIPE.md`
@@ -60,7 +60,7 @@ The bounded CPU reference lane still exists:
   `crates/psionic-train/examples/psion_reference_pilot.rs`
 
 But that is now the explicit fallback or smoke path, not the default meaning of
-`TRAIN`.
+`./TRAIN`.
 
 ## Default Operator Posture
 
@@ -76,10 +76,10 @@ The default run is:
 From the Psionic repo root:
 
 ```bash
-./TRAIN
+./TRAIN --lane reference_pilot
 ```
 
-Default result:
+Reference-lane result:
 
 - mode: `accelerated_reference`
 - remote host: `archlinux`
@@ -88,7 +88,7 @@ Default result:
 
 The accelerated claim is still narrow:
 
-- control plane: the local host that launched `./TRAIN`
+- control plane: the local host that launched `./TRAIN --lane reference_pilot`
 - worker count: `1`
 - worker host: the admitted remote CUDA host
 - execution classification:
@@ -102,7 +102,7 @@ pilot, not mixed-device Mac + CUDA training and not a broader cluster proof.
 ### Dry run
 
 ```bash
-./TRAIN --dry-run
+./TRAIN --lane reference_pilot --dry-run
 ```
 
 This writes the operator manifest and prints the selected plan without launching
@@ -111,19 +111,19 @@ training.
 ### Explicit accelerated run
 
 ```bash
-./TRAIN --mode accelerated_reference
+./TRAIN --lane reference_pilot --mode accelerated_reference
 ```
 
 ### Explicit bounded local fallback
 
 ```bash
-./TRAIN --mode local_reference
+./TRAIN --lane reference_pilot --mode local_reference
 ```
 
 ### Auto mode with explicit fallback
 
 ```bash
-./TRAIN --allow-local-reference-fallback
+./TRAIN --lane reference_pilot --allow-local-reference-fallback
 ```
 
 This still prefers the accelerated lane. It only falls back to the CPU
@@ -171,7 +171,7 @@ For local reference runs, `reference_pilot_artifacts/` should contain:
 
 ## Refusal Behavior
 
-`./TRAIN` now refuses explicitly when:
+`./TRAIN --lane reference_pilot` now refuses explicitly when:
 
 - the remote Tailnet host is unreachable
 - `cargo` or `nvidia-smi` is missing on the remote host
@@ -188,7 +188,8 @@ wrapper failure can be retained honestly instead of reconstructed from memory.
 
 ## Staging Behavior
 
-In accelerated mode, `./TRAIN` now prefers the fastest honest staging path:
+In accelerated mode, `./TRAIN --lane reference_pilot` now prefers the fastest
+honest staging path:
 
 - use a remote detached git worktree when the admitted remote seed clone
   already contains the requested committed ref
@@ -200,7 +201,7 @@ the escape hatch for a committed local ref that has not been published yet.
 
 ## Claim Boundary
 
-`./TRAIN` proves one of two things:
+`./TRAIN --lane reference_pilot` proves one of two things:
 
 ### Accelerated mode
 
@@ -223,29 +224,31 @@ It does not prove:
 ## Why This Exists
 
 Before this runbook and entrypoint landed, the repo had multiple real training
-surfaces but no single Psion-first operator command. That made `TRAIN`
-ambiguous.
+surfaces but no single Psion-first operator command. The actual-lane closure
+changed that. This runbook now preserves the older pilot as a clearly labeled
+bounded reference surface.
 
-This runbook closes that ambiguity by binding `TRAIN` to the public Psion lane
-that matters most for user-facing Psion progress.
+This runbook keeps the older public-safe reference lane available without
+letting it stay cognitively equal to the actual lane.
 
-## Actual-Lane Escape Hatch
+## Actual-Lane Default
 
-The actual broader-pretraining lane now has its own explicit operator path:
+The actual broader-pretraining lane is now the default operator path:
 
 ```bash
-./TRAIN --lane actual_pretraining start --dry-run
+./TRAIN --dry-run
 ```
 
 Resume and status use the same lane selector:
 
 ```bash
-./TRAIN --lane actual_pretraining resume --run-root <path>
-./TRAIN --lane actual_pretraining rehearse-base-lane --run-id <id>
-./TRAIN --lane actual_pretraining status --run-root <path>
+./TRAIN resume --run-root <path>
+./TRAIN rehearse-base-lane --run-id <id>
+./TRAIN status --run-root <path>
 ```
 
-Those commands do not replace the bounded local-first reference runbook. They
-materialize the actual-lane retained evidence family and enforce the
+Those commands are the primary operator path. The bounded local-first
+reference runbook remains the smoke/reference escape hatch. The default path
+materializes the actual-lane retained evidence family and enforces the
 dirty-tree/ref provenance contract described in
 `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`.

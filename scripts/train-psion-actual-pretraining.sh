@@ -6,14 +6,17 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat <<'EOF' >&2
 Usage:
-  ./TRAIN --lane actual_pretraining start [options]
-  ./TRAIN --lane actual_pretraining record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
-  ./TRAIN --lane actual_pretraining backup --run-root <path> [options]
-  ./TRAIN --lane actual_pretraining resume --run-root <path> [options]
-  ./TRAIN --lane actual_pretraining decide-continue-restart --run-root <path> [options]
-  ./TRAIN --lane actual_pretraining rehearse-base-lane [options]
-  ./TRAIN --lane actual_pretraining status --run-root <path>
-  ./TRAIN --lane actual_pretraining dashboard --run-root <path>
+  ./TRAIN [start] [options]
+  ./TRAIN record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [options]
+  ./TRAIN backup --run-root <path> [options]
+  ./TRAIN resume --run-root <path> [options]
+  ./TRAIN decide-continue-restart --run-root <path> [options]
+  ./TRAIN rehearse-base-lane [options]
+  ./TRAIN status --run-root <path>
+  ./TRAIN dashboard --run-root <path>
+
+Reference lane escape hatch:
+  ./TRAIN --lane reference_pilot [reference-lane options]
 
 Options for `start`:
   --run-id <id>            Stable run identifier.
@@ -77,13 +80,21 @@ Options for `status` and `dashboard`:
 EOF
 }
 
-if [[ $# -lt 1 ]]; then
-  usage
-  exit 1
+command="start"
+if [[ $# -ge 1 ]]; then
+  case "$1" in
+    start|record-checkpoint|backup|resume|decide-continue-restart|rehearse-base-lane|status|dashboard)
+      command="$1"
+      shift
+      ;;
+    --help|-h|help)
+      usage
+      exit 0
+      ;;
+    *)
+      ;;
+  esac
 fi
-
-command="$1"
-shift
 
 case "${command}" in
   start|record-checkpoint|backup|resume|decide-continue-restart|rehearse-base-lane)
@@ -94,10 +105,6 @@ case "${command}" in
     ;;
   dashboard)
     exec "${script_dir}/psion-actual-pretraining-dashboard.sh" "$@"
-    ;;
-  --help|-h|help)
-    usage
-    exit 0
     ;;
   *)
     echo "error: unsupported actual-pretraining command ${command}" >&2

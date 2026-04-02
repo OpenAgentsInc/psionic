@@ -20,7 +20,8 @@ evidence.
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)
 - Repo-local library roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 - Psion learned-model program: [docs/PSION_PROGRAM_MAP.md](docs/PSION_PROGRAM_MAP.md)
-- Psion local-first operator runbook: [docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md](docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md)
+- Psion actual-pretraining operator runbook: [docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md](docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md)
+- Psion bounded reference-lane smoke runbook: [docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md](docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md)
 
 ## Main Tracks
 
@@ -45,7 +46,7 @@ evidence.
 - Psion learned-model program
   - corpus, tokenizer, pretrain, trusted-cluster, and decentralized contribution work
   - start with [docs/PSION_PROGRAM_MAP.md](docs/PSION_PROGRAM_MAP.md)
-  - supporting docs: [docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md](docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md), [docs/PSION_PRETRAIN_STAGE.md](docs/PSION_PRETRAIN_STAGE.md), [docs/PSION_TRUSTED_CLUSTER_RUN.md](docs/PSION_TRUSTED_CLUSTER_RUN.md), [docs/PSION_DECENTRALIZED_CONTRIBUTION.md](docs/PSION_DECENTRALIZED_CONTRIBUTION.md)
+  - supporting docs: [docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md](docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md), [docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md](docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md), [docs/PSION_PRETRAIN_STAGE.md](docs/PSION_PRETRAIN_STAGE.md), [docs/PSION_TRUSTED_CLUSTER_RUN.md](docs/PSION_TRUSTED_CLUSTER_RUN.md), [docs/PSION_DECENTRALIZED_CONTRIBUTION.md](docs/PSION_DECENTRALIZED_CONTRIBUTION.md)
 
 ## Psion Training Shortcut
 
@@ -56,18 +57,26 @@ benchmark-adjacent lanes, run:
 ./TRAIN
 ```
 
-That command now targets the canonical accelerator-backed Psion reference lane
-on the admitted Tailnet CUDA host and writes the copied-back artifacts plus one
-local operator manifest and summary under `~/scratch/psion_train_runs/<run_id>`.
+That command now targets the actual Psion pretraining lane and materializes the
+retained launch, status, preflight, checkpoint, dashboard, alert, and closeout
+surfaces under `~/scratch/psion_actual_pretraining_runs/<run_id>`.
 
 Use:
 
 ```bash
 ./TRAIN --dry-run
-./TRAIN --mode local_reference
+./TRAIN resume --run-root <path>
+./TRAIN status --run-root <path>
 ```
 
-for plan inspection and bounded CPU-reference fallback.
+for plan inspection and operator follow-up on the actual lane.
+
+The older bounded reference pilot still exists as the smoke/reference lane:
+
+```bash
+./TRAIN --lane reference_pilot --dry-run
+./TRAIN --lane reference_pilot --mode local_reference
+```
 
 ## Tassadar Training Shortcut
 

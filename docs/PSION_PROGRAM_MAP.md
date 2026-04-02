@@ -46,13 +46,19 @@ valid GPU training proof target. Future Google GPU audits must name the exact
 trainer command and execution backend explicitly instead of treating
 GPU-hosted reference runs as accelerator-backed training proof.
 
-The canonical bounded accelerator-backed trainer is now the dedicated
-`psion_accelerated_reference_pilot` lane, not the CPU reference pilot or the
-plugin reference bundle paths.
+The canonical bounded accelerator-backed reference trainer is still the
+dedicated `psion_accelerated_reference_pilot` lane, not the CPU reference
+pilot or the plugin reference bundle paths.
 
-The canonical local-first operator entrypoint for that lane is now:
+The canonical default operator entrypoint for the real broader-pretraining
+lane is now:
 
 - `TRAIN`
+- `docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md`
+
+The older bounded reference lane remains available explicitly through:
+
+- `./TRAIN --lane reference_pilot`
 - `docs/PSION_LOCAL_FIRST_TRAIN_RUNBOOK.md`
 
 The generic learned family also has one canonical serve packet on the current
