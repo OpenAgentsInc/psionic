@@ -4,7 +4,8 @@
 > state, case and batch evaluation contracts, unified case-eval cache, frontier
 > snapshots, persisted search state, cheap-first iteration receipts, reflection
 > datasets and prompt builders, proposer receipts, lineage-aware merge receipts,
-> top-level run receipts, and one committed compiled-agent module proof lane.
+> top-level run receipts, retained eval publication artifacts, and one
+> committed compiled-agent module proof lane.
 
 ## Purpose
 
@@ -85,7 +86,14 @@ The current explicit artifact contracts are:
     JSON state, and stable digest
 - `OptimizationRunReceipt`
   - run id, run spec digest, lineage state digest, retained candidates, frontier
-    refs, stop reason, and claim boundary
+  refs, stop reason, and claim boundary
+- `OptimizationRetainedEvalRunBundle`
+  - one published retained-validation bundle with stable run identity, typed
+    source refs, selected validation-case summaries, candidate eval summaries,
+    and retained candidate ids
+- `OptimizationCandidateComparisonManifest`
+  - one published baseline-versus-challenger summary with bundle ref, batch
+    refs, aggregate deltas, and explicit improved or regressed case ids
 
 ## Boundaries
 
@@ -94,7 +102,7 @@ Psionic owns:
 - optimizer artifact identity
 - lineage state
 - resumable run state
-- later evaluation and search receipts
+- evaluation, search, and retained-publication receipts
 
 Probe owns:
 

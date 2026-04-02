@@ -27,6 +27,9 @@ const REFLECTION_PROMPT_PREFIX: &[u8] = b"psionic_optimize_reflection_prompt|";
 const PROPOSER_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_proposer_receipt|";
 const MERGE_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_merge_receipt|";
 const RUN_RECEIPT_PREFIX: &[u8] = b"psionic_optimize_run_receipt|";
+const RETAINED_EVAL_RUN_BUNDLE_PREFIX: &[u8] = b"psionic_optimize_retained_eval_run_bundle|";
+const CANDIDATE_COMPARISON_MANIFEST_PREFIX: &[u8] =
+    b"psionic_optimize_candidate_comparison_manifest|";
 
 /// Stable frontier mode identifier declared by one optimization run spec.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2618,6 +2621,551 @@ impl OptimizationRunReceipt {
     }
 }
 
+/// Artifact kind published by the optimizer substrate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OptimizationArtifactKind {
+    /// Published run-spec artifact.
+    RunSpec,
+    /// Published lineage-state artifact.
+    LineageState,
+    /// Published persisted search-state artifact.
+    SearchState,
+    /// Published top-level run receipt.
+    RunReceipt,
+    /// Published frontier snapshot.
+    FrontierSnapshot,
+    /// Published case manifest.
+    CaseManifest,
+    /// Published batch evaluation receipt.
+    BatchEvaluationReceipt,
+    /// Published retained eval bundle.
+    RetainedEvalRunBundle,
+    /// Published candidate comparison manifest.
+    CandidateComparisonManifest,
+}
+
+/// Typed reference to one published optimizer artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationArtifactRef {
+    /// Artifact kind.
+    pub artifact_kind: OptimizationArtifactKind,
+    /// Stable artifact identifier.
+    pub artifact_id: String,
+    /// Stable artifact digest.
+    pub artifact_digest: String,
+}
+
+impl OptimizationArtifactRef {
+    /// Creates one typed artifact reference.
+    #[must_use]
+    pub fn new(
+        artifact_kind: OptimizationArtifactKind,
+        artifact_id: impl Into<String>,
+        artifact_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            artifact_kind,
+            artifact_id: artifact_id.into(),
+            artifact_digest: artifact_digest.into(),
+        }
+    }
+}
+
+/// Published summary for one retained validation case inside an eval bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationRetainedEvalCaseSummary {
+    /// Stable case identifier.
+    pub case_id: String,
+    /// Stable case digest.
+    pub case_digest: String,
+    /// Split membership for the retained case.
+    pub split: OptimizationCaseSplit,
+    /// Optional retained label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Ordered evidence refs carried by the case.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_refs: Vec<String>,
+}
+
+/// Published summary for one candidate validation batch inside an eval bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationPublishedCandidateEvaluation {
+    /// Stable candidate identifier.
+    pub candidate_id: String,
+    /// Stable candidate manifest digest.
+    pub candidate_manifest_digest: String,
+    /// Typed validation-batch reference.
+    pub validation_batch_ref: OptimizationArtifactRef,
+    /// Aggregated scalar score across retained validation cases.
+    pub aggregated_scalar_score: i64,
+    /// Aggregated objective totals across retained validation cases.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub aggregated_objective_scores: BTreeMap<String, i64>,
+}
+
+/// Published retained eval bundle for one bounded optimizer run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationRetainedEvalRunBundle {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable bundle identifier.
+    pub bundle_id: String,
+    /// Stable run id.
+    pub run_id: String,
+    /// Candidate family under optimization.
+    pub family_id: String,
+    /// Optional issue or queue ref bound to the run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issue_ref: Option<String>,
+    /// Frontier mode used by the bound run.
+    pub frontier_mode: OptimizationFrontierMode,
+    /// Ordered supporting artifact refs for the run.
+    pub source_artifacts: Vec<OptimizationArtifactRef>,
+    /// Ordered retained validation-case summaries.
+    pub validation_cases: Vec<OptimizationRetainedEvalCaseSummary>,
+    /// Ordered published candidate validation summaries.
+    pub candidate_evaluations: Vec<OptimizationPublishedCandidateEvaluation>,
+    /// Retained candidate ids for the run receipt.
+    pub retained_candidate_ids: Vec<String>,
+    /// Honest claim boundary.
+    pub claim_boundary: String,
+    /// Stable digest over the bundle payload.
+    pub bundle_digest: String,
+}
+
+impl OptimizationRetainedEvalRunBundle {
+    /// Publishes one retained eval bundle from a completed optimizer outcome.
+    #[must_use]
+    pub fn from_run_outcome(outcome: &OptimizationEngineRunOutcome) -> Self {
+        let run_id = outcome.state.run_spec.run_id.clone();
+        let bundle_id = format!("{run_id}:retained_eval_bundle");
+        let mut source_artifacts = vec![
+            OptimizationArtifactRef::new(
+                OptimizationArtifactKind::RunSpec,
+                format!("{run_id}:run_spec"),
+                outcome.state.run_spec.spec_digest.clone(),
+            ),
+            OptimizationArtifactRef::new(
+                OptimizationArtifactKind::LineageState,
+                format!("{run_id}:lineage_state"),
+                outcome.state.lineage_state.state_digest.clone(),
+            ),
+            OptimizationArtifactRef::new(
+                OptimizationArtifactKind::SearchState,
+                format!("{run_id}:search_state"),
+                outcome.state.state_digest.clone(),
+            ),
+            OptimizationArtifactRef::new(
+                OptimizationArtifactKind::RunReceipt,
+                format!("{run_id}:run_receipt"),
+                outcome.run_receipt.receipt_digest.clone(),
+            ),
+        ];
+        if let Some(frontier_snapshot) = outcome.state.latest_frontier_snapshot.as_ref() {
+            source_artifacts.push(OptimizationArtifactRef::new(
+                OptimizationArtifactKind::FrontierSnapshot,
+                format!("{run_id}:frontier_snapshot"),
+                frontier_snapshot.snapshot_digest.clone(),
+            ));
+        }
+
+        let validation_cases = outcome
+            .state
+            .validation_cases
+            .iter()
+            .map(|case| {
+                source_artifacts.push(OptimizationArtifactRef::new(
+                    OptimizationArtifactKind::CaseManifest,
+                    format!("{run_id}:case:{}", case.case_id),
+                    case.case_digest.clone(),
+                ));
+                OptimizationRetainedEvalCaseSummary {
+                    case_id: case.case_id.clone(),
+                    case_digest: case.case_digest.clone(),
+                    split: case.split,
+                    label: case.label.clone(),
+                    evidence_refs: case.evidence_refs.clone(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let candidate_evaluations = outcome
+            .state
+            .accepted_validation_batches
+            .values()
+            .map(|batch| {
+                let validation_batch_ref = OptimizationArtifactRef::new(
+                    OptimizationArtifactKind::BatchEvaluationReceipt,
+                    format!("{run_id}:validation_batch:{}", batch.candidate_id),
+                    batch.receipt_digest.clone(),
+                );
+                source_artifacts.push(validation_batch_ref.clone());
+                OptimizationPublishedCandidateEvaluation {
+                    candidate_id: batch.candidate_id.clone(),
+                    candidate_manifest_digest: batch.candidate_manifest_digest.clone(),
+                    validation_batch_ref,
+                    aggregated_scalar_score: batch.aggregated_scalar_score,
+                    aggregated_objective_scores: batch.aggregated_objective_scores.clone(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            schema_version: 1,
+            report_id: String::from("psionic.optimize.retained_eval_run_bundle.v1"),
+            bundle_id,
+            run_id,
+            family_id: outcome.state.run_spec.family_id.clone(),
+            issue_ref: outcome.state.run_spec.issue_ref.clone(),
+            frontier_mode: outcome.state.run_spec.frontier_mode,
+            source_artifacts,
+            validation_cases,
+            candidate_evaluations,
+            retained_candidate_ids: outcome.run_receipt.retained_candidate_ids.clone(),
+            claim_boundary: String::from(
+                "This bundle publishes the retained validation cases and accepted validation receipts Psionic already materialized for one bounded optimizer run. It does not claim campaign admission, product promotion, or payout readiness by itself.",
+            ),
+            bundle_digest: String::new(),
+        }
+        .with_stable_digest()
+    }
+
+    /// Returns the stable digest over the retained eval bundle payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.bundle_digest.clear();
+        stable_digest(RETAINED_EVAL_RUN_BUNDLE_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.bundle_digest = self.stable_digest();
+        self
+    }
+
+    /// Writes the retained eval bundle as pretty JSON.
+    pub fn write_json(&self, output_path: impl AsRef<Path>) -> Result<(), OptimizationIoError> {
+        let output_path = output_path.as_ref();
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| OptimizationIoError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            })?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        fs::write(output_path, format!("{json}\n")).map_err(|error| OptimizationIoError::Write {
+            path: output_path.display().to_string(),
+            error,
+        })
+    }
+
+    /// Loads the retained eval bundle from one JSON artifact.
+    pub fn read_json(input_path: impl AsRef<Path>) -> Result<Self, OptimizationIoError> {
+        let input_path = input_path.as_ref();
+        let body = fs::read_to_string(input_path).map_err(|error| OptimizationIoError::Read {
+            path: input_path.display().to_string(),
+            error,
+        })?;
+        let bundle: Self =
+            serde_json::from_str(&body).map_err(|error| OptimizationIoError::Deserialize {
+                path: input_path.display().to_string(),
+                error,
+            })?;
+        Ok(bundle)
+    }
+}
+
+/// Top-level comparison outcome between two retained candidate evaluations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OptimizationCandidateComparisonOutcome {
+    /// The challenger scored higher than the baseline.
+    ChallengerAhead,
+    /// The baseline scored higher than the challenger.
+    BaselineAhead,
+    /// Both candidates tied on aggregate scalar score.
+    Tied,
+}
+
+/// Published candidate comparison summary suitable for campaign gating.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OptimizationCandidateComparisonManifest {
+    /// Stable schema version.
+    pub schema_version: u16,
+    /// Stable report identifier.
+    pub report_id: String,
+    /// Stable comparison identifier.
+    pub comparison_id: String,
+    /// Stable run id.
+    pub run_id: String,
+    /// Candidate family under comparison.
+    pub family_id: String,
+    /// Retained eval bundle that owns the published evidence.
+    pub retained_eval_bundle_ref: OptimizationArtifactRef,
+    /// Baseline candidate identifier.
+    pub baseline_candidate_id: String,
+    /// Baseline candidate manifest digest.
+    pub baseline_candidate_manifest_digest: String,
+    /// Baseline validation-batch reference.
+    pub baseline_validation_batch_ref: OptimizationArtifactRef,
+    /// Challenger candidate identifier.
+    pub challenger_candidate_id: String,
+    /// Challenger candidate manifest digest.
+    pub challenger_candidate_manifest_digest: String,
+    /// Challenger validation-batch reference.
+    pub challenger_validation_batch_ref: OptimizationArtifactRef,
+    /// Aggregate comparison outcome.
+    pub outcome: OptimizationCandidateComparisonOutcome,
+    /// Baseline aggregate scalar score.
+    pub baseline_scalar_score: i64,
+    /// Challenger aggregate scalar score.
+    pub challenger_scalar_score: i64,
+    /// Challenger minus baseline aggregate scalar delta.
+    pub scalar_score_delta: i64,
+    /// Challenger minus baseline objective deltas.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub objective_score_deltas: BTreeMap<String, i64>,
+    /// Validation cases where the challenger improved over the baseline.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub improved_case_ids: Vec<String>,
+    /// Validation cases where the challenger regressed versus the baseline.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regressed_case_ids: Vec<String>,
+    /// Validation cases where both candidates tied.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tied_case_ids: Vec<String>,
+    /// Honest claim boundary.
+    pub claim_boundary: String,
+    /// Stable digest over the comparison payload.
+    pub comparison_digest: String,
+}
+
+impl OptimizationCandidateComparisonManifest {
+    /// Publishes one candidate comparison from a completed optimizer outcome.
+    pub fn from_run_outcome(
+        outcome: &OptimizationEngineRunOutcome,
+        baseline_candidate_id: impl AsRef<str>,
+        challenger_candidate_id: impl AsRef<str>,
+    ) -> Result<Self, OptimizationPublicationError> {
+        let baseline_candidate_id = baseline_candidate_id.as_ref();
+        let challenger_candidate_id = challenger_candidate_id.as_ref();
+        let run_id = outcome.state.run_spec.run_id.clone();
+        let baseline_batch = outcome
+            .state
+            .accepted_validation_batches
+            .get(baseline_candidate_id)
+            .ok_or_else(|| OptimizationPublicationError::MissingValidationBatch {
+                run_id: run_id.clone(),
+                candidate_id: baseline_candidate_id.to_string(),
+            })?;
+        let challenger_batch = outcome
+            .state
+            .accepted_validation_batches
+            .get(challenger_candidate_id)
+            .ok_or_else(|| OptimizationPublicationError::MissingValidationBatch {
+                run_id: run_id.clone(),
+                candidate_id: challenger_candidate_id.to_string(),
+            })?;
+
+        let baseline_cases = baseline_batch
+            .case_receipts
+            .iter()
+            .map(|receipt| (receipt.case_id.clone(), receipt))
+            .collect::<BTreeMap<_, _>>();
+        let challenger_cases = challenger_batch
+            .case_receipts
+            .iter()
+            .map(|receipt| (receipt.case_id.clone(), receipt))
+            .collect::<BTreeMap<_, _>>();
+        if baseline_cases.keys().collect::<Vec<_>>() != challenger_cases.keys().collect::<Vec<_>>()
+        {
+            return Err(OptimizationPublicationError::ValidationCaseSetMismatch {
+                baseline_candidate_id: baseline_candidate_id.to_string(),
+                challenger_candidate_id: challenger_candidate_id.to_string(),
+            });
+        }
+
+        let mut improved_case_ids = Vec::new();
+        let mut regressed_case_ids = Vec::new();
+        let mut tied_case_ids = Vec::new();
+        for case in &outcome.state.validation_cases {
+            let baseline_case = baseline_cases.get(&case.case_id).ok_or_else(|| {
+                OptimizationPublicationError::ValidationCaseSetMismatch {
+                    baseline_candidate_id: baseline_candidate_id.to_string(),
+                    challenger_candidate_id: challenger_candidate_id.to_string(),
+                }
+            })?;
+            let challenger_case = challenger_cases.get(&case.case_id).ok_or_else(|| {
+                OptimizationPublicationError::ValidationCaseSetMismatch {
+                    baseline_candidate_id: baseline_candidate_id.to_string(),
+                    challenger_candidate_id: challenger_candidate_id.to_string(),
+                }
+            })?;
+            if challenger_case.scalar_score > baseline_case.scalar_score {
+                improved_case_ids.push(case.case_id.clone());
+            } else if challenger_case.scalar_score < baseline_case.scalar_score {
+                regressed_case_ids.push(case.case_id.clone());
+            } else {
+                tied_case_ids.push(case.case_id.clone());
+            }
+        }
+
+        let objective_names = baseline_batch
+            .aggregated_objective_scores
+            .keys()
+            .chain(challenger_batch.aggregated_objective_scores.keys())
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let objective_score_deltas = objective_names
+            .into_iter()
+            .map(|objective_name| {
+                let baseline = baseline_batch
+                    .aggregated_objective_scores
+                    .get(&objective_name)
+                    .copied()
+                    .unwrap_or_default();
+                let challenger = challenger_batch
+                    .aggregated_objective_scores
+                    .get(&objective_name)
+                    .copied()
+                    .unwrap_or_default();
+                (objective_name, challenger - baseline)
+            })
+            .collect::<BTreeMap<_, _>>();
+        let scalar_score_delta =
+            challenger_batch.aggregated_scalar_score - baseline_batch.aggregated_scalar_score;
+        let outcome_kind = if scalar_score_delta > 0 {
+            OptimizationCandidateComparisonOutcome::ChallengerAhead
+        } else if scalar_score_delta < 0 {
+            OptimizationCandidateComparisonOutcome::BaselineAhead
+        } else {
+            OptimizationCandidateComparisonOutcome::Tied
+        };
+        let bundle = OptimizationRetainedEvalRunBundle::from_run_outcome(outcome);
+
+        Ok(Self {
+            schema_version: 1,
+            report_id: String::from("psionic.optimize.candidate_comparison_manifest.v1"),
+            comparison_id: format!(
+                "{run_id}:candidate_comparison:{baseline_candidate_id}:{challenger_candidate_id}"
+            ),
+            run_id: run_id.clone(),
+            family_id: outcome.state.run_spec.family_id.clone(),
+            retained_eval_bundle_ref: OptimizationArtifactRef::new(
+                OptimizationArtifactKind::RetainedEvalRunBundle,
+                bundle.bundle_id.clone(),
+                bundle.bundle_digest.clone(),
+            ),
+            baseline_candidate_id: baseline_candidate_id.to_string(),
+            baseline_candidate_manifest_digest: baseline_batch.candidate_manifest_digest.clone(),
+            baseline_validation_batch_ref: OptimizationArtifactRef::new(
+                OptimizationArtifactKind::BatchEvaluationReceipt,
+                format!("{run_id}:validation_batch:{baseline_candidate_id}"),
+                baseline_batch.receipt_digest.clone(),
+            ),
+            challenger_candidate_id: challenger_candidate_id.to_string(),
+            challenger_candidate_manifest_digest: challenger_batch
+                .candidate_manifest_digest
+                .clone(),
+            challenger_validation_batch_ref: OptimizationArtifactRef::new(
+                OptimizationArtifactKind::BatchEvaluationReceipt,
+                format!("{run_id}:validation_batch:{challenger_candidate_id}"),
+                challenger_batch.receipt_digest.clone(),
+            ),
+            outcome: outcome_kind,
+            baseline_scalar_score: baseline_batch.aggregated_scalar_score,
+            challenger_scalar_score: challenger_batch.aggregated_scalar_score,
+            scalar_score_delta,
+            objective_score_deltas,
+            improved_case_ids,
+            regressed_case_ids,
+            tied_case_ids,
+            claim_boundary: String::from(
+                "This comparison reports aggregate and per-case deltas between two accepted validation batches already materialized by Psionic. It does not claim product admission, live traffic promotion, or rollback authority by itself.",
+            ),
+            comparison_digest: String::new(),
+        }
+        .with_stable_digest())
+    }
+
+    /// Returns the stable digest over the comparison payload.
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut digestible = self.clone();
+        digestible.comparison_digest.clear();
+        stable_digest(CANDIDATE_COMPARISON_MANIFEST_PREFIX, &digestible)
+    }
+
+    /// Populates the stable digest field.
+    #[must_use]
+    pub fn with_stable_digest(mut self) -> Self {
+        self.comparison_digest = self.stable_digest();
+        self
+    }
+
+    /// Writes the comparison manifest as pretty JSON.
+    pub fn write_json(&self, output_path: impl AsRef<Path>) -> Result<(), OptimizationIoError> {
+        let output_path = output_path.as_ref();
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| OptimizationIoError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            })?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        fs::write(output_path, format!("{json}\n")).map_err(|error| OptimizationIoError::Write {
+            path: output_path.display().to_string(),
+            error,
+        })
+    }
+
+    /// Loads the comparison manifest from one JSON artifact.
+    pub fn read_json(input_path: impl AsRef<Path>) -> Result<Self, OptimizationIoError> {
+        let input_path = input_path.as_ref();
+        let body = fs::read_to_string(input_path).map_err(|error| OptimizationIoError::Read {
+            path: input_path.display().to_string(),
+            error,
+        })?;
+        let manifest: Self =
+            serde_json::from_str(&body).map_err(|error| OptimizationIoError::Deserialize {
+                path: input_path.display().to_string(),
+                error,
+            })?;
+        Ok(manifest)
+    }
+}
+
+/// Failure while publishing optimizer-facing eval artifacts.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum OptimizationPublicationError {
+    /// Accepted validation batch missing for one candidate.
+    #[error(
+        "run `{run_id}` is missing an accepted validation batch for candidate `{candidate_id}`"
+    )]
+    MissingValidationBatch {
+        /// Bound run id.
+        run_id: String,
+        /// Missing candidate id.
+        candidate_id: String,
+    },
+    /// The compared candidates did not cover the same retained validation cases.
+    #[error(
+        "comparison candidates `{baseline_candidate_id}` and `{challenger_candidate_id}` do not cover the same retained validation cases"
+    )]
+    ValidationCaseSetMismatch {
+        /// Baseline candidate identifier.
+        baseline_candidate_id: String,
+        /// Challenger candidate identifier.
+        challenger_candidate_id: String,
+    },
+}
+
 /// Failure while mutating lineage state.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum OptimizationLineageStateError {
@@ -2728,16 +3276,18 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        OptimizationBatchEvaluationReceipt, OptimizationCandidateManifest,
-        OptimizationCandidateProposal, OptimizationCandidateProposer,
-        OptimizationCaseEvaluationReceipt, OptimizationCaseLabelMutationStrategy,
-        OptimizationCaseManifest, OptimizationCaseSplit, OptimizationComponentFeedback,
-        OptimizationDefaultReflectionPromptBuilder, OptimizationEngine,
-        OptimizationEngineRunOutcome, OptimizationEvaluationCache, OptimizationEvaluator,
-        OptimizationFeedbackComponentSelector, OptimizationFrontierMode,
+        OptimizationArtifactKind, OptimizationBatchEvaluationReceipt,
+        OptimizationCandidateComparisonManifest, OptimizationCandidateComparisonOutcome,
+        OptimizationCandidateManifest, OptimizationCandidateProposal,
+        OptimizationCandidateProposer, OptimizationCaseEvaluationReceipt,
+        OptimizationCaseLabelMutationStrategy, OptimizationCaseManifest, OptimizationCaseSplit,
+        OptimizationComponentFeedback, OptimizationDefaultReflectionPromptBuilder,
+        OptimizationEngine, OptimizationEngineRunOutcome, OptimizationEvaluationCache,
+        OptimizationEvaluator, OptimizationFeedbackComponentSelector, OptimizationFrontierMode,
         OptimizationFrontierSnapshot, OptimizationLineageAwareMergeProposer,
         OptimizationLineageState, OptimizationLineageStateError, OptimizationProposerReceipt,
-        OptimizationReflectiveMutationProposer, OptimizationRunReceipt, OptimizationRunSpec,
+        OptimizationPublicationError, OptimizationReflectiveMutationProposer,
+        OptimizationRetainedEvalRunBundle, OptimizationRunReceipt, OptimizationRunSpec,
         OptimizationSearchState, OptimizationSequentialMinibatchSampler,
         OptimizationSharedFeedback, OptimizationStopReason,
         OptimizationTypedFeedbackDatasetBuilder,
@@ -2799,6 +3349,83 @@ mod tests {
             candidate_components(selected_tool, reason),
         )
         .with_parent_candidate_ids(parent_candidate_ids)
+    }
+
+    fn publication_outcome() -> OptimizationEngineRunOutcome {
+        let run_spec = OptimizationRunSpec::new("run_publication", "probe.tool_route")
+            .with_issue_ref("OpenAgentsInc/psionic#820")
+            .with_frontier_mode(OptimizationFrontierMode::Scalar)
+            .with_iteration_budget(4)
+            .with_candidate_budget(4);
+        let baseline = OptimizationCandidateManifest::new(
+            "baseline",
+            "probe.tool_route",
+            "run_publication",
+            route_components("read_file"),
+        );
+        let train_cases = vec![train_route_case("train_apply_patch", "apply_patch")];
+        let validation_cases = vec![
+            route_case("case_improved", "apply_patch"),
+            route_case("case_regressed", "read_file"),
+            route_case("case_tied", "shell"),
+        ];
+        let mut evaluator = DeterministicRouteEvaluator;
+        let mut state = OptimizationEngine::initialize(
+            run_spec,
+            baseline.clone(),
+            train_cases,
+            validation_cases.clone(),
+            &mut evaluator,
+        )
+        .expect("initialize publication state");
+        let challenger = OptimizationCandidateManifest::new(
+            "challenger",
+            "probe.tool_route",
+            "run_publication",
+            route_components("apply_patch"),
+        )
+        .with_parent_candidate_ids(vec![String::from("baseline")]);
+        state
+            .lineage_state
+            .register_candidate(challenger.clone())
+            .expect("register challenger");
+        let challenger_batch = evaluator.evaluate_candidate(
+            "run_publication",
+            &challenger,
+            validation_cases.as_slice(),
+            &mut state.evaluation_cache,
+        );
+        state
+            .accepted_validation_batches
+            .insert(challenger.candidate_id.clone(), challenger_batch);
+        let frontier_batches = state
+            .accepted_validation_batches
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let frontier = OptimizationFrontierSnapshot::from_batches(
+            "run_publication",
+            OptimizationFrontierMode::Scalar,
+            frontier_batches.as_slice(),
+        );
+        state
+            .lineage_state
+            .set_retained_candidates(frontier.hybrid_candidate_ids.clone())
+            .expect("set retained frontier");
+        state.latest_frontier_snapshot = Some(frontier.clone());
+        state.state_digest = state.stable_digest();
+
+        OptimizationEngineRunOutcome {
+            run_receipt: OptimizationRunReceipt::from_state(
+                &state.lineage_state,
+                vec![format!(
+                    "frontier_snapshot_digest:{}",
+                    frontier.snapshot_digest
+                )],
+                OptimizationStopReason::Manual,
+            ),
+            state,
+        }
     }
 
     #[derive(Debug, Default)]
@@ -3185,6 +3812,116 @@ mod tests {
             vec![String::from("baseline")]
         );
         assert!(!receipt.receipt_digest.is_empty());
+    }
+
+    #[test]
+    fn retained_eval_run_bundle_publishes_stable_refs_and_round_trips() {
+        let outcome = publication_outcome();
+        let bundle = OptimizationRetainedEvalRunBundle::from_run_outcome(&outcome);
+        assert_eq!(bundle.run_id, String::from("run_publication"));
+        assert_eq!(bundle.family_id, String::from("probe.tool_route"));
+        assert_eq!(
+            bundle.issue_ref,
+            Some(String::from("OpenAgentsInc/psionic#820"))
+        );
+        assert_eq!(
+            bundle
+                .validation_cases
+                .iter()
+                .map(|case| case.case_id.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                String::from("case_improved"),
+                String::from("case_regressed"),
+                String::from("case_tied"),
+            ]
+        );
+        assert_eq!(
+            bundle
+                .candidate_evaluations
+                .iter()
+                .map(|candidate| candidate.candidate_id.clone())
+                .collect::<Vec<_>>(),
+            vec![String::from("baseline"), String::from("challenger")]
+        );
+        assert!(
+            bundle
+                .source_artifacts
+                .iter()
+                .any(|artifact| artifact.artifact_kind == OptimizationArtifactKind::SearchState)
+        );
+        assert_eq!(
+            bundle.retained_candidate_ids,
+            outcome.run_receipt.retained_candidate_ids
+        );
+        assert!(!bundle.bundle_digest.is_empty());
+
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("retained_eval_bundle.json");
+        bundle.write_json(&path).expect("write bundle");
+        let loaded =
+            OptimizationRetainedEvalRunBundle::read_json(&path).expect("read retained bundle");
+        assert_eq!(loaded, bundle);
+    }
+
+    #[test]
+    fn candidate_comparison_manifest_tracks_case_deltas_and_round_trips() {
+        let outcome = publication_outcome();
+        let comparison = OptimizationCandidateComparisonManifest::from_run_outcome(
+            &outcome,
+            "baseline",
+            "challenger",
+        )
+        .expect("publish comparison");
+        assert_eq!(comparison.run_id, String::from("run_publication"));
+        assert_eq!(
+            comparison.outcome,
+            OptimizationCandidateComparisonOutcome::Tied
+        );
+        assert_eq!(comparison.scalar_score_delta, 0);
+        assert_eq!(
+            comparison.objective_score_deltas.get("correctness_bps"),
+            Some(&0)
+        );
+        assert_eq!(
+            comparison.improved_case_ids,
+            vec![String::from("case_improved")]
+        );
+        assert_eq!(
+            comparison.regressed_case_ids,
+            vec![String::from("case_regressed")]
+        );
+        assert_eq!(comparison.tied_case_ids, vec![String::from("case_tied")]);
+        assert_eq!(
+            comparison.retained_eval_bundle_ref.artifact_kind,
+            OptimizationArtifactKind::RetainedEvalRunBundle
+        );
+        assert!(!comparison.comparison_digest.is_empty());
+
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("candidate_comparison.json");
+        comparison.write_json(&path).expect("write comparison");
+        let loaded =
+            OptimizationCandidateComparisonManifest::read_json(&path).expect("read comparison");
+        assert_eq!(loaded, comparison);
+    }
+
+    #[test]
+    fn candidate_comparison_manifest_requires_existing_validation_batches() {
+        let outcome = publication_outcome();
+        let error = OptimizationCandidateComparisonManifest::from_run_outcome(
+            &outcome,
+            "missing",
+            "challenger",
+        )
+        .expect_err("missing baseline should fail");
+        assert_eq!(
+            error,
+            OptimizationPublicationError::MissingValidationBatch {
+                run_id: String::from("run_publication"),
+                candidate_id: String::from("missing"),
+            }
+        );
     }
 
     #[test]
