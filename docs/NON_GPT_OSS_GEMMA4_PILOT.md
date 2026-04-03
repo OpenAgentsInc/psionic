@@ -231,12 +231,15 @@ conformance work:
   full-attention layers, instead of assuming one uniform KV shape across the
   whole stack.
 
-The training side now also has one bounded first-step contract above that
-serving lane in `crates/psionic-train/src/gemma_e4b_finetuning_mvp.rs`.
-That contract freezes the first admitted `gemma4:e4b` finetuning family as
-CUDA-only adapter SFT with stable tokenizer, base-revision, checkpoint-family,
-adapter-target, and refusal truth. It does not mean the Gemma trainer,
-checkpoint refresh into serving, or promotion gate has landed yet.
+The training side now also has one bounded real trainer above that serving lane
+across `crates/psionic-train/src/gemma_e4b_finetuning_mvp.rs` and
+`crates/psionic-train/src/gemma_e4b_cuda_adapter_sft.rs`.
+That surface freezes the first admitted `gemma4:e4b` finetuning family as one
+CUDA-only LM-head adapter-SFT lane with rank `8` / alpha `16`, stable
+tokenizer plus base-revision truth, served-base compatibility checks, typed
+`safetensors` export, exact checkpoint resume, and explicit refusal truth. It
+still does not mean checkpoint refresh into serving or the promotion gate has
+landed yet.
 
 What still does not exist:
 

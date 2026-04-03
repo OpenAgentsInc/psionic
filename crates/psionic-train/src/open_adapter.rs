@@ -11,18 +11,20 @@ use psionic_array::{ArrayContext, ArrayError};
 use psionic_core::{DType, Device, DeviceKind, QuantizationMode, Shape, TensorSpec};
 use psionic_data::TokenizerDigest;
 use rayon::prelude::*;
-use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType};
+use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
     AdapterContributorCapabilityPolicy, AdapterTargetIdentity, AdapterWindowContractError,
-    FixedBudgetTrainingRun, ModelAdapterDelta, ModelIoArtifactReceipt, PortableModelBundle,
-    PortableTokenizerAssetFormat, PortableTokenizerBinding, TrainingCoreError,
-    TrainingGradientBatch, TrainingLoopBudget, TrainingOptimizerConfig,
-    TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
-    TrainingRunSummary, TrainingStepInput, TrainingStepReceipt, TrainingTensorBuffer,
+    FixedBudgetTrainingRun, GEMMA_E4B_FINETUNING_MVP_ADAPTER_FAMILY,
+    GEMMA_E4B_FINETUNING_MVP_ADAPTER_FORMAT, GEMMA_E4B_FINETUNING_MVP_BACKEND_LABEL,
+    ModelAdapterDelta, ModelIoArtifactReceipt, PortableModelBundle, PortableTokenizerAssetFormat,
+    PortableTokenizerBinding, TrainingCoreError, TrainingGradientBatch, TrainingLoopBudget,
+    TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy, TrainingParameterClass,
+    TrainingParameterGroupState, TrainingRunSummary, TrainingStepInput, TrainingStepReceipt,
+    TrainingTensorBuffer,
 };
 
 /// Canonical backend label for the first open adapter contributor target and the
@@ -45,6 +47,8 @@ const OPEN_ADAPTER_SAFETENSORS_MANIFEST_KEY: &str = "openagents.open_adapter.man
 pub enum OpenAdapterAdmissibleModelFamily {
     /// GPT-OSS-style decoder LM-head LoRA adapters exported as `safetensors`.
     GptOssDecoderLmHeadLora,
+    /// Gemma 4 e4b decoder LM-head LoRA adapters exported as `safetensors`.
+    Gemma4E4bDecoderLmHeadLora,
 }
 
 impl OpenAdapterAdmissibleModelFamily {
@@ -53,6 +57,7 @@ impl OpenAdapterAdmissibleModelFamily {
     pub const fn adapter_family(self) -> &'static str {
         match self {
             Self::GptOssDecoderLmHeadLora => OPEN_ADAPTER_REFERENCE_ADAPTER_FAMILY,
+            Self::Gemma4E4bDecoderLmHeadLora => GEMMA_E4B_FINETUNING_MVP_ADAPTER_FAMILY,
         }
     }
 
@@ -61,6 +66,7 @@ impl OpenAdapterAdmissibleModelFamily {
     pub const fn adapter_format(self) -> &'static str {
         match self {
             Self::GptOssDecoderLmHeadLora => OPEN_ADAPTER_REFERENCE_ADAPTER_FORMAT,
+            Self::Gemma4E4bDecoderLmHeadLora => GEMMA_E4B_FINETUNING_MVP_ADAPTER_FORMAT,
         }
     }
 }
@@ -1714,6 +1720,11 @@ fn open_adapter_logical_device(
             0,
             Some(String::from("cuda:0")),
         )),
+        GEMMA_E4B_FINETUNING_MVP_BACKEND_LABEL => Ok(Device::new(
+            DeviceKind::Cuda,
+            0,
+            Some(String::from("cuda:0")),
+        )),
         OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL => Ok(Device::new(
             DeviceKind::Metal,
             0,
@@ -1987,6 +1998,9 @@ fn open_adapter_family_label(family: OpenAdapterAdmissibleModelFamily) -> &'stat
     match family {
         OpenAdapterAdmissibleModelFamily::GptOssDecoderLmHeadLora => {
             b"gpt_oss_decoder_lm_head_lora"
+        }
+        OpenAdapterAdmissibleModelFamily::Gemma4E4bDecoderLmHeadLora => {
+            b"gemma4_e4b_decoder_lm_head_lora"
         }
     }
 }
@@ -2308,8 +2322,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_backend_produces_repo_owned_gradients_and_steps(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_backend_produces_repo_owned_gradients_and_steps()
+    -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         assert_eq!(backend.batches().len(), 2);
         assert_eq!(
@@ -2322,10 +2336,12 @@ mod tests {
         let (step_input, gradient_record) = backend.produce_step_input(&run, 0, 1_000, 1_020)?;
         assert_eq!(gradient_record.training_batch.sample_count, 2);
         assert!(gradient_record.mean_loss > 0.0);
-        assert!(gradient_record
-            .gradient_norms_l2
-            .values()
-            .all(|norm| *norm > 0.0));
+        assert!(
+            gradient_record
+                .gradient_norms_l2
+                .values()
+                .all(|norm| *norm > 0.0)
+        );
 
         let receipt = run.apply_step(step_input)?;
         assert_eq!(
@@ -2337,8 +2353,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_sft_lane_exports_loadable_lm_head_lora_artifact(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_sft_lane_exports_loadable_lm_head_lora_artifact()
+    -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         let outcome = run_open_adapter_sft_export(
             &backend,
@@ -2381,8 +2397,8 @@ mod tests {
     }
 
     #[test]
-    fn open_adapter_backend_reuses_generic_cluster_window_planning(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_adapter_backend_reuses_generic_cluster_window_planning()
+    -> Result<(), Box<dyn std::error::Error>> {
         let backend = OpenAdapterTrainingExecutionBackend::new(config(), samples())?;
         let state = cluster_state(
             &[
@@ -2482,8 +2498,8 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn mlx_metal_open_adapter_backend_uses_metal_logical_device_when_available(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn mlx_metal_open_adapter_backend_uses_metal_logical_device_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut config = config();
         config.execution_backend_label = OPEN_ADAPTER_MLX_METAL_BACKEND_LABEL.to_string();
         let backend = OpenAdapterTrainingExecutionBackend::new(config, samples())?;
