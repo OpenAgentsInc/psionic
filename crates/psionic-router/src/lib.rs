@@ -44,6 +44,7 @@ mod tool_loop;
 pub use response_state::{
     ResponseConversationRef, ResponseStateBackend, ResponseStateCapability, ResponseStateContext,
     ResponseStateError, ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
+    SparseRouteBinding,
 };
 pub use tassadar_async_lifecycle_route_policy::*;
 pub use tassadar_broad_general_compute_validator_route_policy::*;
@@ -641,6 +642,10 @@ pub struct RoutedModelInventory {
     /// lanes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    /// Explicit sparse shard artifact and placement truth for family-specific
+    /// distributed lanes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sparse_shard_state: Option<RoutedSparseShardState>,
     /// Live runtime facts that cache-aware and warm-aware policy can consume.
     pub runtime_state: RoutedModelRuntimeState,
 }
@@ -726,6 +731,85 @@ impl RoutedSparseExpertTopology {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedSparseShardArtifactStatus {
+    Materialized,
+    Reused,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedSparseShardHealth {
+    Healthy,
+    RebuildRequired,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutedSparseShardReplica {
+    pub node_id: String,
+    pub first_expert_index: usize,
+    pub last_expert_index_exclusive: usize,
+    pub build_cache_key: String,
+    pub shard_artifact_digest: String,
+    pub artifact_status: RoutedSparseShardArtifactStatus,
+}
+
+impl RoutedSparseShardReplica {
+    #[must_use]
+    pub fn new(
+        node_id: impl Into<String>,
+        first_expert_index: usize,
+        last_expert_index_exclusive: usize,
+        build_cache_key: impl Into<String>,
+        shard_artifact_digest: impl Into<String>,
+        artifact_status: RoutedSparseShardArtifactStatus,
+    ) -> Self {
+        Self {
+            node_id: node_id.into(),
+            first_expert_index,
+            last_expert_index_exclusive,
+            build_cache_key: build_cache_key.into(),
+            shard_artifact_digest: shard_artifact_digest.into(),
+            artifact_status,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutedSparseShardState {
+    pub placement_digest: String,
+    pub inventory_digest: String,
+    pub shard_version_digest: String,
+    pub health: RoutedSparseShardHealth,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub replicas: Vec<RoutedSparseShardReplica>,
+}
+
+impl RoutedSparseShardState {
+    #[must_use]
+    pub fn new(
+        placement_digest: impl Into<String>,
+        inventory_digest: impl Into<String>,
+        shard_version_digest: impl Into<String>,
+        health: RoutedSparseShardHealth,
+    ) -> Self {
+        Self {
+            placement_digest: placement_digest.into(),
+            inventory_digest: inventory_digest.into(),
+            shard_version_digest: shard_version_digest.into(),
+            health,
+            replicas: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_replica(mut self, replica: RoutedSparseShardReplica) -> Self {
+        self.replicas.push(replica);
+        self
+    }
+}
+
 impl RoutedModelInventory {
     /// Creates a model inventory entry and seeds stable aliases.
     #[must_use]
@@ -756,6 +840,7 @@ impl RoutedModelInventory {
             response_state: false,
             execution_refusal_reason: None,
             sparse_expert_topology: None,
+            sparse_shard_state: None,
             runtime_state: RoutedModelRuntimeState::default(),
         }
     }
@@ -852,6 +937,14 @@ impl RoutedModelInventory {
         sparse_expert_topology: RoutedSparseExpertTopology,
     ) -> Self {
         self.sparse_expert_topology = Some(sparse_expert_topology);
+        self
+    }
+
+    /// Publishes explicit sparse shard materialization and placement truth for
+    /// the lane.
+    #[must_use]
+    pub fn with_sparse_shard_state(mut self, sparse_shard_state: RoutedSparseShardState) -> Self {
+        self.sparse_shard_state = Some(sparse_shard_state);
         self
     }
 
@@ -2057,9 +2150,10 @@ mod tests {
         FleetRouter, ReliabilityAction, ReliabilityReason, RouteReliabilityController,
         RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry, RoutedExecutionLocality,
         RoutedExecutionProvenance, RoutedModelInventory, RoutedSparseExpertRuntimeContract,
-        RoutedSparseExpertTopology, RoutedWarmState, RoutedWorkerInventory, RoutingDemandKey,
-        RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError, RoutingRequest,
-        WorkerCircuitState,
+        RoutedSparseExpertTopology, RoutedSparseShardArtifactStatus, RoutedSparseShardHealth,
+        RoutedSparseShardReplica, RoutedSparseShardState, RoutedWarmState, RoutedWorkerInventory,
+        RoutingDemandKey, RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError,
+        RoutingRequest, WorkerCircuitState,
     };
     use psionic_runtime::{
         ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily, KvCacheEncodingObjective,
@@ -2291,7 +2385,59 @@ mod tests {
             routed_model.execution_refusal_reason.as_deref(),
             Some("model `gemma4:26b` requires distributed sparse placement")
         );
-        assert_eq!(routed_model.sparse_expert_topology.as_ref(), Some(&topology));
+        assert_eq!(
+            routed_model.sparse_expert_topology.as_ref(),
+            Some(&topology)
+        );
+    }
+
+    #[test]
+    fn router_keeps_sparse_shard_truth_in_inventory() {
+        let shard_state = RoutedSparseShardState::new(
+            "placement-a",
+            "inventory-a",
+            "version-a",
+            RoutedSparseShardHealth::Healthy,
+        )
+        .with_replica(RoutedSparseShardReplica::new(
+            "worker-a",
+            0,
+            32,
+            "cache-a",
+            "artifact-a",
+            RoutedSparseShardArtifactStatus::Materialized,
+        ))
+        .with_replica(RoutedSparseShardReplica::new(
+            "worker-b",
+            32,
+            64,
+            "cache-b",
+            "artifact-b",
+            RoutedSparseShardArtifactStatus::Materialized,
+        ));
+        let router = FleetRouter::new(
+            "gemma4:26b",
+            vec![
+                RoutedWorkerInventory::new("worker-gemma4-26b", "cuda", "native", "psionic")
+                    .with_model(
+                        RoutedModelInventory::new(
+                            "gemma4:26b",
+                            "gemma4:26b",
+                            "gemma4",
+                            sample_profile(),
+                        )
+                        .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                        .with_supported_endpoint(RoutingEndpoint::Responses)
+                        .with_sparse_shard_state(shard_state.clone()),
+                    ),
+            ],
+        )
+        .expect("router should build");
+
+        let routed_model = router
+            .routed_model("worker-gemma4-26b", "gemma4:26b")
+            .expect("router inventory should keep gemma4 26b shard truth");
+        assert_eq!(routed_model.sparse_shard_state.as_ref(), Some(&shard_state));
     }
 
     #[test]

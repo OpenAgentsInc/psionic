@@ -14,6 +14,28 @@ const FILE_RETENTION_SCOPE: &str = "best_effort_local_durable";
 const PROMPT_REPLAY_CACHE_BEHAVIOR: &str = "prompt_replay_only";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SparseRouteBinding {
+    pub worker_id: String,
+    pub placement_digest: String,
+    pub shard_version_digest: String,
+}
+
+impl SparseRouteBinding {
+    #[must_use]
+    pub fn new(
+        worker_id: impl Into<String>,
+        placement_digest: impl Into<String>,
+        shard_version_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            worker_id: worker_id.into(),
+            placement_digest: placement_digest.into(),
+            shard_version_digest: shard_version_digest.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResponseStateCapability {
     pub storage: String,
     pub retention_scope: String,
@@ -53,6 +75,7 @@ pub struct ResponseStateContext {
     pub model_key: Option<String>,
     pub worker_id: Option<String>,
     pub conversation_id: Option<String>,
+    pub sparse_route_binding: Option<SparseRouteBinding>,
     pub prompt_history: Vec<PromptMessage>,
     pub previous_response_id: Option<String>,
     pub replayed_prompt_messages: usize,
@@ -65,6 +88,7 @@ pub struct ResponseStateRecord {
     pub model_key: String,
     pub worker_id: String,
     pub conversation_id: Option<String>,
+    pub sparse_route_binding: Option<SparseRouteBinding>,
     pub prompt_history: Vec<PromptMessage>,
 }
 
@@ -190,6 +214,7 @@ struct StoredResponseState {
     model_key: String,
     worker_id: String,
     conversation_id: Option<String>,
+    sparse_route_binding: Option<SparseRouteBinding>,
     prompt_history: Vec<PromptMessage>,
 }
 
@@ -198,6 +223,7 @@ struct StoredConversationState {
     conversation_id: String,
     model_key: String,
     worker_id: String,
+    sparse_route_binding: Option<SparseRouteBinding>,
     prompt_history: Vec<PromptMessage>,
     revision: u64,
     last_response_id: String,
@@ -378,6 +404,7 @@ fn load_context_from_snapshot(
             model_key: Some(stored.model_key.clone()),
             worker_id: Some(stored.worker_id.clone()),
             conversation_id: stored.conversation_id.clone(),
+            sparse_route_binding: stored.sparse_route_binding.clone(),
             prompt_history: stored.prompt_history.clone(),
             previous_response_id: Some(stored.response_id.clone()),
             replayed_prompt_messages: stored.prompt_history.len(),
@@ -394,6 +421,7 @@ fn load_context_from_snapshot(
             model_key: Some(stored.model_key.clone()),
             worker_id: Some(stored.worker_id.clone()),
             conversation_id: Some(stored.conversation_id.clone()),
+            sparse_route_binding: stored.sparse_route_binding.clone(),
             prompt_history: stored.prompt_history.clone(),
             previous_response_id: Some(stored.last_response_id.clone()),
             replayed_prompt_messages: stored.prompt_history.len(),
@@ -418,6 +446,7 @@ fn record_response_in_snapshot(
         model_key: record.model_key.clone(),
         worker_id: record.worker_id.clone(),
         conversation_id: record.conversation_id.clone(),
+        sparse_route_binding: record.sparse_route_binding.clone(),
         prompt_history: record.prompt_history.clone(),
     };
     snapshot
@@ -439,6 +468,7 @@ fn record_response_in_snapshot(
             conversation_id: conversation_id.clone(),
             model_key: record.model_key,
             worker_id: record.worker_id,
+            sparse_route_binding: record.sparse_route_binding,
             prompt_history: record.prompt_history,
             revision,
             last_response_id: record.response_id,
@@ -582,7 +612,7 @@ fn temp_snapshot_path(path: &Path) -> PathBuf {
 mod tests {
     use super::{
         ResponseStateContext, ResponseStateError, ResponseStateRecord,
-        ResponseStateRetentionPolicy, ResponseStateStore,
+        ResponseStateRetentionPolicy, ResponseStateStore, SparseRouteBinding,
     };
     use psionic_models::{PromptMessage, PromptMessageRole};
 
@@ -603,6 +633,11 @@ mod tests {
             model_key: String::from("tiny-llama"),
             worker_id: String::from("worker-a"),
             conversation_id: Some(String::from("conv-1")),
+            sparse_route_binding: Some(SparseRouteBinding::new(
+                "worker-a",
+                "placement-a",
+                "version-a",
+            )),
             prompt_history: vec![
                 PromptMessage::new(PromptMessageRole::User, "hello"),
                 PromptMessage::new(PromptMessageRole::Assistant, "world"),
@@ -617,6 +652,11 @@ mod tests {
                 model_key: Some(String::from("tiny-llama")),
                 worker_id: Some(String::from("worker-a")),
                 conversation_id: Some(String::from("conv-1")),
+                sparse_route_binding: Some(SparseRouteBinding::new(
+                    "worker-a",
+                    "placement-a",
+                    "version-a",
+                )),
                 prompt_history: vec![
                     PromptMessage::new(PromptMessageRole::User, "hello"),
                     PromptMessage::new(PromptMessageRole::Assistant, "world"),
@@ -662,6 +702,11 @@ mod tests {
                 model_key: String::from("tiny-llama"),
                 worker_id: String::from("worker-a"),
                 conversation_id: Some(String::from("conv-1")),
+                sparse_route_binding: Some(SparseRouteBinding::new(
+                    "worker-a",
+                    "placement-a",
+                    "version-a",
+                )),
                 prompt_history: vec![
                     PromptMessage::new(PromptMessageRole::User, "hello"),
                     PromptMessage::new(PromptMessageRole::Assistant, "world"),
@@ -673,6 +718,14 @@ mod tests {
         let context = store.load_context(None, Some("conv-1"))?;
         assert_eq!(context.previous_response_id.as_deref(), Some("resp-1"));
         assert_eq!(context.worker_id.as_deref(), Some("worker-a"));
+        assert_eq!(
+            context.sparse_route_binding,
+            Some(SparseRouteBinding::new(
+                "worker-a",
+                "placement-a",
+                "version-a"
+            ))
+        );
         assert_eq!(context.prompt_history.len(), 2);
         Ok(())
     }
@@ -693,6 +746,7 @@ mod tests {
                 model_key: String::from("tiny-llama"),
                 worker_id: String::from("worker-a"),
                 conversation_id: Some(format!("conv-{index}")),
+                sparse_route_binding: None,
                 prompt_history: vec![
                     PromptMessage::new(PromptMessageRole::User, format!("hello-{index}")),
                     PromptMessage::new(PromptMessageRole::Assistant, "world"),

@@ -242,7 +242,9 @@ conformance work:
   the default path still fails closed, but an operator can now admit one real
   multi-node sparse schedule and get successful `/v1/chat/completions` and
   `/v1/responses` execution together with `tensor_sharded` cluster receipts,
-  selected-node truth, and request-specific expert-routing diagnostics.
+  selected-node truth, request-specific expert-routing diagnostics, published
+  shard artifact cache truth, and conversation-local sticky placement on
+  `/v1/responses`.
 - the managed dense-GGUF lane now allocates whole-model KV-cache width instead
   of silently falling back to one-layer fixture geometry, and the repo now
   carries a multi-layer regression that keeps that boundary explicit.
@@ -321,11 +323,17 @@ cargo test -p psionic-provider \
 cargo test -p psionic-cluster \
   realized_sparse_cluster_execution_attaches_live_route_proof \
   --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-cluster \
+  sparse_shard_materialization_reuses_cached_artifacts \
+  --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve \
   generic_execution_headers_surface_gemma4_pipeline_cluster_truth \
   --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve \
   generic_server_gemma4_26b_sparse_lane_executes_when_schedule_is_admitted \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_server_gemma4_26b_sparse_responses_keep_conversation_bound_to_same_placement \
   --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve conformance --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve gemma4 --manifest-path Cargo.toml --no-default-features

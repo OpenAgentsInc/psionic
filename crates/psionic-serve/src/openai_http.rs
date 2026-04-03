@@ -29,7 +29,8 @@ use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_cluster::{
     ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandRebalanceReason,
     ClusterReplicaDemandSnapshot, ClusterReplicaLifecyclePolicy, ClusterState,
-    Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule,
+    Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule, SparseShardArtifactCache,
+    SparseShardArtifactStatus, SparseShardHealth, SparseShardLifecycleState,
     realize_sparse_expert_cluster_execution, schedule_gemma4_26b_distributed_lane,
 };
 use psionic_models::{
@@ -51,8 +52,10 @@ use psionic_router::{
     ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore, RouteSelection,
     RouteSelectionStrategy, RoutedExecutionLocality, RoutedExecutionProvenance,
     RoutedModelInventory, RoutedSparseExpertRuntimeContract, RoutedSparseExpertTopology,
-    RoutedWarmState, RoutedWorkerInventory, RoutingDemandLedger, RoutingDemandSnapshot,
-    RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
+    RoutedSparseShardArtifactStatus, RoutedSparseShardHealth, RoutedSparseShardReplica,
+    RoutedSparseShardState, RoutedWarmState, RoutedWorkerInventory, RoutingDemandLedger,
+    RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
+    SparseRouteBinding,
 };
 use psionic_runtime::{
     ClusterExecutionContext, ExecutionCapabilityProfile, ExecutionTopologyKind,
@@ -1141,6 +1144,8 @@ struct BootstrapRemoteModelStatus {
     execution_refusal_reason: Option<String>,
     #[serde(default)]
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    #[serde(default)]
+    sparse_shard_state: Option<RoutedSparseShardState>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -1204,6 +1209,8 @@ struct MeshManagementModelStatus {
     execution_refusal_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sparse_shard_state: Option<RoutedSparseShardState>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -1897,6 +1904,7 @@ struct OpenAiCompatLoadedDecoderModel {
     audio_lane: Option<OpenAiCompatAudioLane>,
     execution_refusal_reason: Option<String>,
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    sparse_shard_state: Option<RoutedSparseShardState>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
@@ -2172,6 +2180,11 @@ impl OpenAiCompatLoadedModel {
         self.decoder()
             .and_then(|model| model.sparse_expert_topology.as_ref())
     }
+
+    fn sparse_shard_state(&self) -> Option<&RoutedSparseShardState> {
+        self.decoder()
+            .and_then(|model| model.sparse_shard_state.as_ref())
+    }
 }
 
 fn sparse_request_seed(request: &GenerationRequest) -> Vec<u8> {
@@ -2226,6 +2239,85 @@ fn attach_sparse_cluster_execution_truth(
     };
     response.provenance = Some(provenance.with_cluster_execution(cluster_execution));
     Ok(response)
+}
+
+fn routed_sparse_shard_artifact_status(
+    status: SparseShardArtifactStatus,
+) -> RoutedSparseShardArtifactStatus {
+    match status {
+        SparseShardArtifactStatus::Materialized => RoutedSparseShardArtifactStatus::Materialized,
+        SparseShardArtifactStatus::Reused => RoutedSparseShardArtifactStatus::Reused,
+    }
+}
+
+fn routed_sparse_shard_health(health: SparseShardHealth) -> RoutedSparseShardHealth {
+    match health {
+        SparseShardHealth::Healthy => RoutedSparseShardHealth::Healthy,
+        SparseShardHealth::RebuildRequired => RoutedSparseShardHealth::RebuildRequired,
+    }
+}
+
+fn routed_sparse_shard_state_from_materialization(
+    materialization: &SparseShardLifecycleState,
+) -> RoutedSparseShardState {
+    materialization.shard_artifacts.iter().fold(
+        RoutedSparseShardState::new(
+            materialization.placement_digest.clone(),
+            materialization.expert_host_inventory_digest.clone(),
+            materialization.shard_version_digest.clone(),
+            routed_sparse_shard_health(materialization.health),
+        ),
+        |state, artifact| {
+            state.with_replica(RoutedSparseShardReplica::new(
+                artifact.node_id.as_str(),
+                artifact.first_expert_index,
+                artifact.last_expert_index_exclusive,
+                artifact.build_cache_key.clone(),
+                artifact.shard_artifact_digest.clone(),
+                routed_sparse_shard_artifact_status(artifact.artifact_status),
+            ))
+        },
+    )
+}
+
+fn maybe_materialize_admitted_sparse_shards(
+    loaded_model: &mut OpenAiCompatLoadedModel,
+    load_plan: &OpenAiCompatModelLoadPlan,
+    shard_artifact_cache: &mut SparseShardArtifactCache,
+) {
+    let Some(schedule) = load_plan.sparse_cluster_schedule.as_ref() else {
+        return;
+    };
+    let Some(decoder) = loaded_model.decoder_mut() else {
+        return;
+    };
+    let materialization = shard_artifact_cache.materialize_schedule(schedule);
+    decoder.sparse_shard_state = Some(routed_sparse_shard_state_from_materialization(
+        &materialization,
+    ));
+}
+
+fn sparse_route_binding_for_route(route: &ResolvedGenericRoute<'_>) -> Option<SparseRouteBinding> {
+    let shard_state = route
+        .loaded_model
+        .and_then(OpenAiCompatLoadedModel::sparse_shard_state)
+        .or_else(|| route.routed_model.sparse_shard_state.as_ref())?;
+    Some(SparseRouteBinding::new(
+        route.selection.worker_id.clone(),
+        shard_state.placement_digest.clone(),
+        shard_state.shard_version_digest.clone(),
+    ))
+}
+
+fn apply_sparse_route_binding(
+    mut route_request: RoutingRequest,
+    binding: Option<&SparseRouteBinding>,
+) -> RoutingRequest {
+    let Some(binding) = binding else {
+        return route_request;
+    };
+    route_request = route_request.prefer_worker(binding.worker_id.clone());
+    route_request.with_topology_scope(binding.placement_digest.clone())
 }
 
 fn maybe_apply_admitted_sparse_schedule(
@@ -2579,6 +2671,7 @@ fn mesh_management_model_status(model: &RoutedModelInventory) -> MeshManagementM
         scheduler_policy: model.scheduler_policy.clone(),
         execution_refusal_reason: model.execution_refusal_reason.clone(),
         sparse_expert_topology: model.sparse_expert_topology.clone(),
+        sparse_shard_state: model.sparse_shard_state.clone(),
     }
 }
 
@@ -3016,6 +3109,9 @@ fn bootstrap_remote_model_inventory(
     if let Some(topology) = model.sparse_expert_topology.clone() {
         inventory = inventory.with_sparse_expert_topology(topology);
     }
+    if let Some(shard_state) = model.sparse_shard_state.clone() {
+        inventory = inventory.with_sparse_shard_state(shard_state);
+    }
     Some(inventory)
 }
 
@@ -3039,6 +3135,7 @@ fn bootstrap_management_node(
             scheduler_policy: model.scheduler_policy().cloned(),
             execution_refusal_reason: model.execution_refusal_reason().map(String::from),
             sparse_expert_topology: model.sparse_expert_topology().cloned(),
+            sparse_shard_state: model.sparse_shard_state().cloned(),
         })
         .collect::<Vec<_>>();
     models.sort_by(|left, right| left.model_key.cmp(&right.model_key));
@@ -3105,6 +3202,7 @@ impl OpenAiCompatServer {
         let mut routed_models = Vec::new();
         let mut default_model_key = None;
         let mut load_plans = Vec::new();
+        let mut sparse_shard_artifact_cache = SparseShardArtifactCache::default();
         let bootstrap_mode = BootstrapProxyMode::from_env()?;
 
         for model_path in &config.model_paths {
@@ -3140,6 +3238,11 @@ impl OpenAiCompatServer {
                 config.admitted_sparse_schedules.get(&model_key),
                 config.backend,
             )?;
+            maybe_materialize_admitted_sparse_shards(
+                &mut loaded_model,
+                &load_plan,
+                &mut sparse_shard_artifact_cache,
+            );
             if models_by_key
                 .insert(loaded_model.model_key.clone(), loaded_model.clone())
                 .is_some()
@@ -4067,6 +4170,8 @@ struct ModelCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_sparse_shard_state: Option<RoutedSparseShardState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_projection_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_supported_media: Option<Vec<&'static str>>,
@@ -4096,6 +4201,7 @@ struct PublishedGenericModelAccumulator {
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     execution_refusal_reason: Option<String>,
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    sparse_shard_state: Option<RoutedSparseShardState>,
     route_workers: BTreeSet<String>,
     route_backends: BTreeSet<String>,
     route_execution_modes: BTreeSet<String>,
@@ -4118,6 +4224,7 @@ struct PublishedGenericModel {
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     execution_refusal_reason: Option<String>,
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    sparse_shard_state: Option<RoutedSparseShardState>,
     route_workers: Vec<String>,
     route_backends: Vec<String>,
     route_execution_modes: Vec<String>,
@@ -4216,6 +4323,7 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
                     scheduler_policy: model.scheduler_policy.clone(),
                     execution_refusal_reason: model.execution_refusal_reason.clone(),
                     sparse_expert_topology: model.sparse_expert_topology.clone(),
+                    sparse_shard_state: model.sparse_shard_state.clone(),
                     route_workers: BTreeSet::new(),
                     route_backends: BTreeSet::new(),
                     route_execution_modes: BTreeSet::new(),
@@ -4236,6 +4344,9 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
             }
             if entry.sparse_expert_topology.is_none() {
                 entry.sparse_expert_topology = model.sparse_expert_topology.clone();
+            }
+            if entry.sparse_shard_state.is_none() {
+                entry.sparse_shard_state = model.sparse_shard_state.clone();
             }
             entry.route_workers.insert(
                 worker
@@ -4290,6 +4401,10 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
                     .and_then(OpenAiCompatLoadedModel::sparse_expert_topology)
                     .cloned()
                     .or(entry.sparse_expert_topology),
+                sparse_shard_state: local_loaded_model
+                    .and_then(OpenAiCompatLoadedModel::sparse_shard_state)
+                    .cloned()
+                    .or(entry.sparse_shard_state),
                 route_workers: entry.route_workers.into_iter().collect(),
                 route_backends: entry.route_backends.into_iter().collect(),
                 route_execution_modes: entry.route_execution_modes.into_iter().collect(),
@@ -4493,6 +4608,16 @@ fn published_model_sparse_expert_topology(
         .or_else(|| model.sparse_expert_topology.clone())
 }
 
+fn published_model_sparse_shard_state(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<RoutedSparseShardState> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::sparse_shard_state)
+        .cloned()
+        .or_else(|| model.sparse_shard_state.clone())
+}
+
 fn published_model_embedding_dimensions(
     state: &OpenAiCompatState,
     model: &PublishedGenericModel,
@@ -4602,6 +4727,7 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_scheduler_policy: None,
             psionic_execution_refusal_reason: None,
             psionic_sparse_expert_topology: None,
+            psionic_sparse_shard_state: None,
             psionic_multimodal_projection_mode: None,
             psionic_multimodal_supported_media: None,
             psionic_multimodal_projection_config: None,
@@ -4648,6 +4774,8 @@ struct GenericHealthResponse {
     execution_refusal_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sparse_shard_state: Option<RoutedSparseShardState>,
     #[serde(skip_serializing_if = "Option::is_none")]
     multimodal_projection_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4704,6 +4832,7 @@ async fn generic_health(
             state.as_ref(),
             &default_model,
         ),
+        sparse_shard_state: published_model_sparse_shard_state(state.as_ref(), &default_model),
         multimodal_projection_mode: published_model_multimodal_projection_mode(
             state.as_ref(),
             &default_model,
@@ -5460,6 +5589,10 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                         &model,
                     ),
                     psionic_sparse_expert_topology: published_model_sparse_expert_topology(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_sparse_shard_state: published_model_sparse_shard_state(
                         state.as_ref(),
                         &model,
                     ),
@@ -7551,9 +7684,12 @@ async fn handle_generic_responses(
         if let Some(worker_id) = response_state_context.worker_id.as_deref() {
             route_request = route_request.prefer_worker(worker_id.to_string());
         }
-        route_request
+        apply_sparse_route_binding(
+            route_request,
+            response_state_context.sparse_route_binding.as_ref(),
+        )
     };
-    let route = match (
+    let mut route = match (
         request.model.as_deref(),
         response_state_context.model_key.as_deref(),
     ) {
@@ -7576,6 +7712,34 @@ async fn handle_generic_responses(
             route_request,
         )?,
     };
+    let current_sparse_route_binding = sparse_route_binding_for_route(&route);
+    match (
+        response_state_context.sparse_route_binding.as_ref(),
+        current_sparse_route_binding.as_ref(),
+    ) {
+        (Some(expected), Some(current)) if expected == current => {
+            route.selection.routing_notes.push(format!(
+                "stateful sparse follow-up kept worker `{}` on placement digest `{}`",
+                current.worker_id, current.placement_digest
+            ));
+        }
+        (Some(expected), Some(current)) => {
+            route.selection.routing_notes.push(format!(
+                "stateful sparse follow-up reassigned from worker `{}` placement `{}` to worker `{}` placement `{}` after shard health or topology changed",
+                expected.worker_id,
+                expected.placement_digest,
+                current.worker_id,
+                current.placement_digest,
+            ));
+        }
+        (Some(expected), None) => {
+            route.selection.routing_notes.push(format!(
+                "stateful sparse follow-up could not keep prior placement `{}` on worker `{}` and fell back to general routing",
+                expected.placement_digest, expected.worker_id
+            ));
+        }
+        _ => {}
+    }
     if let Some(proxy) = bootstrap_proxy_for_route(state.as_ref(), &route.selection) {
         let route_execution =
             route_execution_status_for_bootstrap_proxy(&route.selection, proxy.mode);
@@ -7775,6 +7939,7 @@ async fn handle_generic_responses(
                     model_key: loaded_model.model_key.clone(),
                     worker_id: route.selection.worker_id.clone(),
                     conversation_id: assigned_conversation_id.clone(),
+                    sparse_route_binding: current_sparse_route_binding.clone(),
                     prompt_history: stored_prompt_history.clone(),
                 })
                 .map_err(response_state_error_into_http)?
@@ -9186,6 +9351,9 @@ fn routed_inventory_for_loaded_model(
     if let Some(topology) = model.sparse_expert_topology().cloned() {
         inventory = inventory.with_sparse_expert_topology(topology);
     }
+    if let Some(shard_state) = model.sparse_shard_state().cloned() {
+        inventory = inventory.with_sparse_shard_state(shard_state);
+    }
     inventory
 }
 
@@ -9355,6 +9523,7 @@ fn load_generic_decoder_model(
                 OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => pending_topology_refusal,
             },
             sparse_expert_topology,
+            sparse_shard_state: None,
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss)).then(|| {
                 GgufPromptTemplateRenderer::new(
                     inspection.tokenizer().clone(),
@@ -10397,10 +10566,10 @@ mod tests {
     };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
-        RoutedSparseExpertRuntimeContract, ToolExecutionRequest, ToolGateway,
-        ToolHistoryVisibility, ToolLoopController, ToolLoopError, ToolLoopModelRunner,
-        ToolLoopModelTurn, ToolLoopRequest, ToolLoopToolExecutor, ToolLoopToolResult,
-        ToolProviderDescriptor, ToolResultVisibility,
+        RoutedSparseExpertRuntimeContract, RoutedSparseShardHealth, SparseRouteBinding,
+        ToolExecutionRequest, ToolGateway, ToolHistoryVisibility, ToolLoopController,
+        ToolLoopError, ToolLoopModelRunner, ToolLoopModelTurn, ToolLoopRequest,
+        ToolLoopToolExecutor, ToolLoopToolResult, ToolProviderDescriptor, ToolResultVisibility,
     };
     use psionic_router::{RoutedExecutionLocality, RoutedExecutionProvenance};
     use psionic_runtime::{
@@ -11766,6 +11935,7 @@ mod tests {
                     scheduler_policy: None,
                     execution_refusal_reason: None,
                     sparse_expert_topology: None,
+                    sparse_shard_state: None,
                 }],
                 route_inventory: Vec::new(),
             },
@@ -11792,6 +11962,7 @@ mod tests {
                     scheduler_policy: None,
                     execution_refusal_reason: None,
                     sparse_expert_topology: None,
+                    sparse_shard_state: None,
                 }],
                 route_inventory: Vec::new(),
             },
@@ -11820,6 +11991,7 @@ mod tests {
                     scheduler_policy: None,
                     execution_refusal_reason: None,
                     sparse_expert_topology: None,
+                    sparse_shard_state: None,
                 }],
                 route_inventory: Vec::new(),
             },
@@ -13161,6 +13333,7 @@ mod tests {
                 model_key: final_server.state.default_model_key.clone(),
                 worker_id: String::from(super::OPENAI_COMPAT_WORKER_ID),
                 conversation_id: Some(seeded_conversation_id.clone()),
+                sparse_route_binding: None,
                 prompt_history: seeded_prompt_history,
             })?;
 
@@ -13532,6 +13705,7 @@ mod tests {
         assert_eq!(health_topology.family, "gemma4");
         assert_eq!(health_topology.expert_count, 64);
         assert_eq!(health_topology.active_expert_count, Some(4));
+        assert!(health.0.sparse_shard_state.is_none());
 
         let model_id = health.0.default_model.clone();
         let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
@@ -13549,6 +13723,7 @@ mod tests {
             .expect("model card should publish sparse topology truth");
         assert_eq!(model_topology.expert_count, 64);
         assert_eq!(model_topology.active_expert_count, Some(4));
+        assert!(model.psionic_sparse_shard_state.is_none());
         assert_eq!(
             model.psionic_execution_refusal_reason,
             Some(refusal_reason.clone())
@@ -13645,6 +13820,38 @@ mod tests {
             .decoder()
             .expect("sparse gemma route should resolve a decoder");
         assert!(model.execution_refusal_reason.is_none());
+        let shard_state = model
+            .sparse_shard_state
+            .as_ref()
+            .expect("admitted sparse gemma route should materialize shard state");
+        assert_eq!(shard_state.health, RoutedSparseShardHealth::Healthy);
+        assert_eq!(shard_state.replicas.len(), 2);
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(
+            health
+                .0
+                .sparse_shard_state
+                .as_ref()
+                .map(|state| state.replicas.len()),
+            Some(2)
+        );
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model_card = models
+            .0
+            .data
+            .iter()
+            .find(|candidate| candidate.id == "tiny-gemma4-26b-distributed")
+            .expect("admitted sparse gemma model should be listed");
+        assert_eq!(
+            model_card
+                .psionic_sparse_shard_state
+                .as_ref()
+                .map(|state| state.replicas.len()),
+            Some(2)
+        );
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&server.state),
@@ -13701,6 +13908,108 @@ mod tests {
             payload["psionic_cluster_execution"]["shard_handoffs"]
                 .as_array()
                 .is_some_and(|handoffs| !handoffs.is_empty())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_gemma4_26b_sparse_responses_keep_conversation_bound_to_same_placement()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp
+            .path()
+            .join("tiny-gemma4-26b-stateful-distributed.gguf");
+        write_test_gguf(
+            &gemma_path,
+            sparse_gemma4_26b_metadata_with_chat_template(
+                "tiny gemma4 26b sparse stateful execution",
+            )
+            .as_slice(),
+            dense_decoder_tensors_with_vocab(false, 7, 5, 6).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        config.admit_gemma4_26b_sparse_distributed_lane(
+            &sample_sparse_cluster_state(),
+            &Gemma4MoeDistributedLaneRequest::new(
+                NodeId::new("scheduler"),
+                sample_gemma4_26b_sparse_inventory(),
+            )
+            .with_minimum_free_memory_bytes_per_host(16 * 1024 * 1024 * 1024),
+        )?;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let first_response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&server.state),
+            ResponsesRequest {
+                model: Some(String::from("tiny-gemma4-26b-stateful-distributed")),
+                input: ResponsesInput::Text(String::from("hello")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let first_payload = runtime.block_on(response_json(first_response))?;
+        let first_response_id = first_payload["id"]
+            .as_str()
+            .expect("first sparse response id")
+            .to_string();
+        let conversation_id = first_payload["conversation"]["id"]
+            .as_str()
+            .expect("first sparse conversation id")
+            .to_string();
+        let first_context = server
+            .state
+            .response_state
+            .lock()
+            .expect("response-state store should be readable")
+            .load_context(Some(first_response_id.as_str()), None)?;
+        let first_binding = first_context
+            .sparse_route_binding
+            .clone()
+            .expect("first sparse response should store one route binding");
+        assert_eq!(first_binding.worker_id, OPENAI_COMPAT_WORKER_ID);
+
+        let second_response = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&server.state),
+            ResponsesRequest {
+                model: None,
+                conversation: Some(conversation_id.clone()),
+                input: ResponsesInput::Text(String::from("again")),
+                temperature: Some(0.0),
+                max_output_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let second_payload = runtime.block_on(response_json(second_response))?;
+        assert_eq!(
+            second_payload["conversation"]["id"],
+            serde_json::json!(conversation_id)
+        );
+        let second_response_id = second_payload["id"]
+            .as_str()
+            .expect("second sparse response id")
+            .to_string();
+        let second_context = server
+            .state
+            .response_state
+            .lock()
+            .expect("response-state store should be readable")
+            .load_context(Some(second_response_id.as_str()), None)?;
+        assert_eq!(
+            second_context.sparse_route_binding,
+            Some(SparseRouteBinding::new(
+                first_binding.worker_id,
+                first_binding.placement_digest,
+                first_binding.shard_version_digest,
+            ))
         );
         Ok(())
     }
@@ -16291,6 +16600,7 @@ mod tests {
                 model_key: final_server.state.default_model_key.clone(),
                 worker_id: String::from(super::OPENAI_COMPAT_WORKER_ID),
                 conversation_id: Some(seeded_conversation_id.clone()),
+                sparse_route_binding: None,
                 prompt_history: seeded_prompt_history,
             })?;
 

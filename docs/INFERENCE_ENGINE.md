@@ -84,6 +84,16 @@ than just run tensor math.
     `gemma4:26b` and publish `disposition = sharded`,
     `execution_topology = tensor_sharded`, and request-specific expert-routing
     proof in response headers and `psionic_cluster_execution`
+  - shard lifecycle = admitting that sparse schedule now also materializes and
+    caches one explicit shard artifact per expert-host assignment, publishes
+    shard build cache keys and artifact digests into routed inventory, `/health`,
+    `/v1/models`, and mesh management status, and reuses the same shard
+    artifacts on repeated admission instead of silently pretending every sparse
+    turn is cold
+  - stateful locality = `/v1/responses` now persists one sparse placement
+    binding per conversation so follow-up turns stay on the same worker and
+    placement digest while that shard state remains healthy, then rebind
+    cleanly if the placement changes
   - claim boundary = admitted distributed sparse execution only; this still
     does not promote single-node native `gemma4:26b` execution
 - The first real distributed `Gemma 4` proof is now one split

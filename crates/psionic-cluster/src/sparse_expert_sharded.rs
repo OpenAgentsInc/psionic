@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use psionic_runtime::{
     CacheAction, ClusterCacheCapability, ClusterCacheScope, ClusterCacheUsage,
@@ -495,6 +495,95 @@ pub struct SparseExpertClusterSchedule {
     pub cluster_execution: ClusterExecutionContext,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SparseShardArtifactStatus {
+    Materialized,
+    Reused,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SparseShardHealth {
+    Healthy,
+    RebuildRequired,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SparseShardArtifactRecord {
+    pub node_id: NodeId,
+    pub first_expert_index: usize,
+    pub last_expert_index_exclusive: usize,
+    pub build_cache_key: String,
+    pub shard_artifact_digest: String,
+    pub artifact_status: SparseShardArtifactStatus,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SparseShardLifecycleState {
+    pub model_id: String,
+    pub runtime_backend: String,
+    pub placement_digest: String,
+    pub expert_host_inventory_digest: String,
+    pub shard_version_digest: String,
+    pub health: SparseShardHealth,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shard_artifacts: Vec<SparseShardArtifactRecord>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct SparseShardArtifactCache {
+    cached_artifacts: BTreeMap<String, String>,
+}
+
+impl SparseShardArtifactCache {
+    #[must_use]
+    pub fn materialize_schedule(
+        &mut self,
+        schedule: &SparseExpertClusterSchedule,
+    ) -> SparseShardLifecycleState {
+        let placement_digest = schedule.placement_plan.stable_digest();
+        let shard_version_digest =
+            stable_sparse_shard_version_digest(schedule, placement_digest.as_str());
+        let mut shard_artifacts = Vec::with_capacity(schedule.placement_plan.assignments.len());
+        for assignment in &schedule.placement_plan.assignments {
+            let build_cache_key =
+                stable_sparse_shard_cache_key(schedule, assignment, shard_version_digest.as_str());
+            let artifact_status = if self.cached_artifacts.contains_key(&build_cache_key) {
+                SparseShardArtifactStatus::Reused
+            } else {
+                let shard_artifact_digest =
+                    stable_sparse_shard_artifact_digest(build_cache_key.as_str());
+                self.cached_artifacts
+                    .insert(build_cache_key.clone(), shard_artifact_digest);
+                SparseShardArtifactStatus::Materialized
+            };
+            let shard_artifact_digest = self
+                .cached_artifacts
+                .get(&build_cache_key)
+                .cloned()
+                .expect("materialized sparse shard artifact should exist");
+            shard_artifacts.push(SparseShardArtifactRecord {
+                node_id: assignment.node_id.clone(),
+                first_expert_index: assignment.first_expert_index,
+                last_expert_index_exclusive: assignment.last_expert_index_exclusive,
+                build_cache_key,
+                shard_artifact_digest,
+                artifact_status,
+            });
+        }
+        SparseShardLifecycleState {
+            model_id: schedule.lane.model_id.clone(),
+            runtime_backend: schedule.runtime_backend.clone(),
+            placement_digest,
+            expert_host_inventory_digest: schedule.expert_host_inventory_digest.clone(),
+            shard_version_digest,
+            health: SparseShardHealth::Healthy,
+            shard_artifacts,
+        }
+    }
+}
+
 /// Specialized request for the first Gemma 4 sparse distributed lane.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gemma4MoeDistributedLaneRequest {
@@ -508,6 +597,59 @@ pub struct Gemma4MoeDistributedLaneRequest {
     /// Stable policy digests constraining the lane.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub policy_digests: Vec<ClusterPolicyDigest>,
+}
+
+fn stable_sparse_shard_version_digest(
+    schedule: &SparseExpertClusterSchedule,
+    placement_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sparse_shard_version|");
+    hasher.update(schedule.cluster_id.as_str().as_bytes());
+    hasher.update(b"|");
+    hasher.update(schedule.lane.product_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(schedule.lane.model_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(schedule.lane.served_artifact_digest.as_bytes());
+    hasher.update(b"|");
+    hasher.update(placement_digest.as_bytes());
+    hasher.update(b"|");
+    hasher.update(
+        schedule
+            .cluster_execution
+            .sharded_model_manifest_digest
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    hex::encode(hasher.finalize())
+}
+
+fn stable_sparse_shard_cache_key(
+    schedule: &SparseExpertClusterSchedule,
+    assignment: &SparseExpertPlacementAssignment,
+    shard_version_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sparse_shard_cache_key|");
+    hasher.update(schedule.lane.model_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(assignment.node_id.as_str().as_bytes());
+    hasher.update(b"|");
+    hasher.update(assignment.first_expert_index.to_string());
+    hasher.update(b"|");
+    hasher.update(assignment.last_expert_index_exclusive.to_string());
+    hasher.update(b"|");
+    hasher.update(shard_version_digest.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn stable_sparse_shard_artifact_digest(build_cache_key: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sparse_shard_artifact|");
+    hasher.update(build_cache_key.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 impl Gemma4MoeDistributedLaneRequest {
@@ -1287,9 +1429,9 @@ mod tests {
     use super::{
         Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule, SparseExpertExecutionRequest,
         SparseExpertHostInventoryRecord, SparseExpertHostInventorySnapshot,
-        SparseExpertPlacementPolicy, SparseExpertSchedulingFailureCode,
-        realize_sparse_expert_cluster_execution, schedule_gemma4_26b_distributed_lane,
-        schedule_sparse_expert_execution,
+        SparseExpertPlacementPolicy, SparseExpertSchedulingFailureCode, SparseShardArtifactCache,
+        SparseShardArtifactStatus, realize_sparse_expert_cluster_execution,
+        schedule_gemma4_26b_distributed_lane, schedule_sparse_expert_execution,
     };
 
     fn fixture_error(detail: &str) -> Error {
@@ -1450,6 +1592,57 @@ mod tests {
                 .policy_digests
                 .iter()
                 .any(|digest| digest.kind == ClusterPolicyDigestKind::Sharding)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sparse_shard_materialization_reuses_cached_artifacts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = sample_state();
+        let request = SparseExpertExecutionRequest::new(
+            crate::NodeId::new("scheduler"),
+            sample_topology_requirement(),
+            sample_inventory(),
+        )
+        .with_minimum_free_memory_bytes_per_host(16 * 1024 * 1024 * 1024);
+        let schedule = schedule_sparse_expert_execution(
+            &state,
+            &request,
+            &SparseExpertPlacementPolicy::family_specific_default(),
+        )
+        .map_err(|error| {
+            fixture_error(&format!("expected sparse expert placement plan: {error:?}"))
+        })?;
+        let mut cache = SparseShardArtifactCache::default();
+
+        let first = cache.materialize_schedule(&schedule);
+        let second = cache.materialize_schedule(&schedule);
+
+        assert_eq!(first.placement_digest, second.placement_digest);
+        assert_eq!(first.shard_version_digest, second.shard_version_digest);
+        assert_eq!(first.shard_artifacts.len(), 2);
+        assert!(first
+            .shard_artifacts
+            .iter()
+            .all(|artifact| artifact.artifact_status == SparseShardArtifactStatus::Materialized));
+        assert_eq!(
+            first
+                .shard_artifacts
+                .iter()
+                .map(|artifact| artifact.shard_artifact_digest.as_str())
+                .collect::<Vec<_>>(),
+            second
+                .shard_artifacts
+                .iter()
+                .map(|artifact| artifact.shard_artifact_digest.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            second
+                .shard_artifacts
+                .iter()
+                .all(|artifact| artifact.artifact_status == SparseShardArtifactStatus::Reused)
         );
         Ok(())
     }
