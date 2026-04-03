@@ -255,11 +255,32 @@ surface in `crates/psionic-serve/src/gguf.rs`:
 - one rollback path to the last known-good promoted revision without requiring
   a restart of the bounded lane
 
+The same bounded lane is now also quality-gated instead of trainer-first across
+`crates/psionic-eval/src/gemma_e4b_finetune_eval_pack.rs` and
+`crates/psionic-train/src/gemma_e4b_finetune_eval.rs`:
+
+- one canonical held-out eval pack for the bounded finetune claim
+- one dataset contract that requires exact `train`, `held_out_validation`,
+  `final_report`, and `baseline_short` split refs, the checked-in prompt
+  template digest, full assistant-response masking, and explicit overlap plus
+  decontam review truth
+- one short baseline-sweep mode that compares small candidate configurations on
+  held-out validation loss before full-budget promotion
+- one typed eval-receipt surface for the untuned base and checkpoint
+  candidates, including automatic clearance over prompt-template, mask, tool-
+  use, formatting, and steerability checks
+- one canned promoted-checkpoint vibe-review packet plus operator review state
+- one promotion decision that refuses held-out regression against the untuned
+  base and does not silently promote without positive operator review
+
 What still does not exist:
 
 - no admitted image or video execution on the Gemma processor-owned lane
 - no admitted audio execution on the Gemma processor-owned audio lane
 - no generic structured-output Gemma surface
+- no broader Gemma finetuning platform claim beyond the bounded `e4b` CUDA
+  adapter-SFT lane
+- no RL-first, DPO-first, or full-model Gemma finetuning claim
 - no broader published support claim beyond the bounded dense `e4b` CUDA lane,
   server admission, the refusal-only Metal contract, routed mesh validation,
   repo-owned conformance coverage, and the optional `31B` validation repeat

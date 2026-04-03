@@ -2519,6 +2519,10 @@ trainer in `crates/psionic-train/src/gemma_e4b_cuda_adapter_sft.rs`.
 GitHub issue `#880` then closed the first trainer-to-serving seam in
 `crates/psionic-serve/src/gguf.rs` for that same lane.
 
+GitHub issue `#881` then made that same lane eval-first across
+`crates/psionic-eval/src/gemma_e4b_finetune_eval_pack.rs` and
+`crates/psionic-train/src/gemma_e4b_finetune_eval.rs`.
+
 That trainer sits above the shared open-adapter fixed-budget core, but it no
 longer pretends the Gemma work is just a paper contract. The lane now has one
 real trainer-owned API surface with:
@@ -2535,11 +2539,29 @@ real trainer-owned API surface with:
   revalidates typed checkpoint-plus-export inputs, refreshes the active served
   revision without restart where possible, surfaces served revision identity in
   response provenance, and preserves rollback to the last known-good revision
+- one canonical finetune eval pack with a fixed held-out validation benchmark,
+  stable package digest, fixed claim boundary, and a required operator-review
+  template id
+- one dataset contract with exact `train`, `held_out_validation`,
+  `final_report`, and `baseline_short` split refs, exact bounded prompt
+  template digest, `assistant_responses_only` masking, full assistant-mask
+  coverage, overlap and decontam review truth, and stable dataset digest
+- one bounded short-baseline sweep over a small candidate set that compares
+  held-out validation loss before full-budget promotion is allowed
+- one typed finetune eval receipt for the untuned base and each checkpoint
+  candidate, including held-out pass-rate, held-out score, template/mask/tool-
+  call/formatting/steerability gates, and receipt digests
+- one canned promoted-checkpoint vibe packet with explicit template-integrity,
+  steerability, tool-use, and formatting review cases
+- one promotion gate that compares the candidate against the untuned base,
+  refuses held-out regressions, requires automatic surface clearance, and holds
+  or rejects when operator vibe review is missing or negative
 
 The trainer is still intentionally narrow. It trains from bounded final-hidden-
 state LM-head supervision under frozen-base semantics. It does not yet claim a
 broader Gemma-wide LoRA surface, raw end-to-end token-level backprop through a
-native Gemma decoder, or broader eval-gated family promotion.
+native Gemma decoder, RL or preference optimization, or wider family-wide
+promotion semantics beyond the bounded `e4b` CUDA lane.
 
 The contract freezes one exact first claim:
 
@@ -2570,9 +2592,11 @@ That means the honest current repo claim is now:
 
 > Psionic now has one real bounded Gemma `e4b` CUDA adapter trainer with an
 > explicit LM-head target set, served-base/tokenizer compatibility checks,
-> typed `safetensors` export, exact checkpoint resume, and a live promoted-
-> revision refresh seam into the bounded serving lane, but broader eval-gated
-> family promotion still lands in later issues.
+> typed `safetensors` export, exact checkpoint resume, a canonical eval pack,
+> split-validation dataset and masking truth, short-baseline comparison, typed
+> candidate and untuned-base eval receipts, operator vibe review packets, and
+> a live promoted-revision refresh seam into the bounded serving lane that
+> refuses held-out regression or failed review before promotion.
 
 ### Canonical Workload Vocabulary
 

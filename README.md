@@ -17,7 +17,11 @@ closes the first trainer-to-serving refresh seam: typed Gemma checkpoints plus
 exported adapter artifacts can be revalidated into the live CUDA mesh lane
 without a process restart, the active served revision is surfaced in response
 provenance, stale or mismatched revisions fail closed, and operators can roll
-back to the last known-good promoted revision.
+back to the last known-good promoted revision. The same lane is now also
+eval-first: it binds one canonical held-out eval pack, one four-split dataset
+contract, one short baseline sweep against the untuned base, one overlap and
+decontam gate, one canned promoted-checkpoint vibe-review packet, and one
+promotion decision that refuses held-out regressions or failed operator review.
 
 ## Start Here
 

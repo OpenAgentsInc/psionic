@@ -24,6 +24,8 @@ mod compiled_agent_module_eval;
 mod compiled_agent_module_optimization_proof;
 #[path = "compiled_agent_route_model.rs"]
 mod compiled_agent_route_model;
+#[path = "gemma_e4b_finetune_eval_pack.rs"]
+mod gemma_e4b_finetune_eval_pack;
 #[path = "parameter_golf_benchmark.rs"]
 mod parameter_golf_benchmark;
 #[path = "parameter_golf_distributed.rs"]
@@ -439,6 +441,7 @@ pub use compiled_agent_grounded_model::*;
 pub use compiled_agent_module_eval::*;
 pub use compiled_agent_module_optimization_proof::*;
 pub use compiled_agent_route_model::*;
+pub use gemma_e4b_finetune_eval_pack::*;
 pub use parameter_golf_benchmark::*;
 pub use parameter_golf_distributed::*;
 pub use parameter_golf_promotion::*;

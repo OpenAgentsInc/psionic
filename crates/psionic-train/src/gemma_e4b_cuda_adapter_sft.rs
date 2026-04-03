@@ -8,7 +8,8 @@ use thiserror::Error;
 use crate::{
     FixedBudgetTrainingRun, GEMMA_E4B_FINETUNING_MVP_ADAPTER_TARGET_ID,
     GEMMA_E4B_FINETUNING_MVP_BASE_MODEL_REVISION, GEMMA_E4B_FINETUNING_MVP_CHECKPOINT_FAMILY,
-    GEMMA_E4B_FINETUNING_MVP_MODEL_ID, GemmaE4bFinetuningMvpContract, GemmaE4bFinetuningMvpError,
+    GEMMA_E4B_FINETUNING_MVP_MODEL_ID, GemmaE4bFinetuneDatasetContract,
+    GemmaE4bFinetuneEvalPackBinding, GemmaE4bFinetuningMvpContract, GemmaE4bFinetuningMvpError,
     GemmaE4bFinetuningMvpRequest, GemmaFinetuningInputModality, GemmaFinetuningUpdateMode,
     ModelAdapterDelta, ModelIoArtifactReceipt, ModelIoError, OpenAdapterAdmissibleModelFamily,
     OpenAdapterArtifactExportRequest, OpenAdapterGradientBatchRecord, OpenAdapterHiddenStateSample,
@@ -234,7 +235,7 @@ pub struct GemmaE4bCudaAdapterSftConfig {
 }
 
 impl GemmaE4bCudaAdapterSftConfig {
-    fn validate(&self) -> Result<(), GemmaE4bCudaAdapterSftError> {
+    pub(crate) fn validate(&self) -> Result<(), GemmaE4bCudaAdapterSftError> {
         if self.run_id.trim().is_empty() {
             return Err(GemmaE4bCudaAdapterSftError::MissingRunId);
         }
@@ -287,6 +288,10 @@ pub struct GemmaE4bCudaAdapterSftRunRequest {
     pub adapter_id: String,
     /// Stable adapter revision.
     pub adapter_revision: String,
+    /// Eval pack bound before the run starts.
+    pub eval_pack_binding: GemmaE4bFinetuneEvalPackBinding,
+    /// Dataset contract bound before the run starts.
+    pub dataset_contract: GemmaE4bFinetuneDatasetContract,
     /// Logical training start timestamp.
     pub started_at_ms: u64,
     /// Logical duration assigned to each trainer step.
@@ -306,6 +311,23 @@ impl GemmaE4bCudaAdapterSftRunRequest {
         }
         if self.adapter_revision.trim().is_empty() {
             return Err(GemmaE4bCudaAdapterSftError::MissingAdapterRevision);
+        }
+        self.eval_pack_binding.validate().map_err(|error| {
+            GemmaE4bCudaAdapterSftError::FinetuneEval {
+                detail: error.to_string(),
+            }
+        })?;
+        self.dataset_contract.validate().map_err(|error| {
+            GemmaE4bCudaAdapterSftError::FinetuneEval {
+                detail: error.to_string(),
+            }
+        })?;
+        if self.dataset_ref != self.dataset_contract.dataset_ref {
+            return Err(GemmaE4bCudaAdapterSftError::FinetuneEval {
+                detail: String::from(
+                    "run request dataset_ref drifted from the bound dataset contract",
+                ),
+            });
         }
         if self.step_duration_ms == 0 {
             return Err(GemmaE4bCudaAdapterSftError::InvalidStepDuration);
@@ -393,7 +415,7 @@ impl GemmaE4bCudaAdapterCheckpoint {
         stable_digest(b"psionic_gemma_e4b_cuda_adapter_checkpoint|", &clone)
     }
 
-    fn validate(&self) -> Result<(), GemmaE4bCudaAdapterSftError> {
+    pub(crate) fn validate(&self) -> Result<(), GemmaE4bCudaAdapterSftError> {
         if self.schema_version != GEMMA_E4B_CUDA_ADAPTER_CHECKPOINT_SCHEMA_VERSION {
             return Err(GemmaE4bCudaAdapterSftError::InvalidCheckpoint {
                 detail: String::from("checkpoint schema version drifted"),
@@ -448,6 +470,14 @@ pub struct GemmaE4bCudaAdapterSftSummary {
     pub dataset_ref: String,
     /// Stable validator policy reference.
     pub validator_policy_ref: String,
+    /// Stable eval-pack storage key.
+    pub eval_pack_storage_key: String,
+    /// Stable held-out validation split reference.
+    pub held_out_validation_split_ref: String,
+    /// Stable final report split reference.
+    pub final_report_split_ref: String,
+    /// Stable short baseline split reference.
+    pub baseline_short_split_ref: String,
     /// Stable adapter-artifact digest.
     pub adapter_artifact_digest: String,
     /// Stable adapter-identity digest.
@@ -818,6 +848,16 @@ impl GemmaE4bCudaAdapterSftTrainer {
             target_set_id: self.target_set.target_set_id.clone(),
             dataset_ref: request.dataset_ref.clone(),
             validator_policy_ref: request.validator_policy_ref.clone(),
+            eval_pack_storage_key: request
+                .eval_pack_binding
+                .benchmark_package_storage_key
+                .clone(),
+            held_out_validation_split_ref: request
+                .dataset_contract
+                .held_out_validation_split_ref
+                .clone(),
+            final_report_split_ref: request.dataset_contract.final_report_split_ref.clone(),
+            baseline_short_split_ref: request.dataset_contract.baseline_short_split_ref.clone(),
             adapter_artifact_digest: exported_artifact.adapter_artifact_digest.clone(),
             adapter_identity_digest: exported_artifact.adapter_identity_digest.clone(),
             initial_state_dict_digest: initial_bundle_receipt.state_dict_digest.clone(),
@@ -904,6 +944,8 @@ pub enum GemmaE4bCudaAdapterSftError {
     InvalidTargetSet { detail: String },
     #[error("Gemma e4b checkpoint is invalid: {detail}")]
     InvalidCheckpoint { detail: String },
+    #[error("Gemma e4b finetune eval contract is invalid: {detail}")]
+    FinetuneEval { detail: String },
     #[error(transparent)]
     Mvp(#[from] GemmaE4bFinetuningMvpError),
     #[error(transparent)]
@@ -1013,6 +1055,48 @@ mod tests {
             validator_policy_ref: String::from("policy://validator/gemma4/e4b-text-sft"),
             adapter_id: String::from("gemma4-e4b-helpdesk"),
             adapter_revision: String::from("r1"),
+            eval_pack_binding: crate::canonical_gemma_e4b_finetune_eval_pack_binding()
+                .expect("eval-pack binding"),
+            dataset_contract: {
+                let template_digest = canonical_gemma_e4b_finetuning_mvp_contract()
+                    .expect("contract")
+                    .tokenizer
+                    .template_digest
+                    .expect("template digest");
+                let mut contract = GemmaE4bFinetuneDatasetContract {
+                    schema_version: String::from(
+                        crate::GEMMA_E4B_FINETUNE_DATASET_CONTRACT_SCHEMA_VERSION,
+                    ),
+                    dataset_ref: String::from("dataset://openagents/gemma4-e4b-helpdesk@2026.04"),
+                    train_split_ref: String::from("split://gemma4-e4b-helpdesk/train"),
+                    held_out_validation_split_ref: String::from(
+                        "split://gemma4-e4b-helpdesk/held_out_validation",
+                    ),
+                    final_report_split_ref: String::from(
+                        "split://gemma4-e4b-helpdesk/final_report",
+                    ),
+                    baseline_short_split_ref: String::from(
+                        "split://gemma4-e4b-helpdesk/baseline_short",
+                    ),
+                    chat_template_digest: template_digest,
+                    assistant_mask_kind: crate::GemmaE4bAssistantMaskKind::AssistantResponsesOnly,
+                    assistant_mask_coverage_bps: 10_000,
+                    benchmark_overlap_check: crate::GemmaE4bBenchmarkOverlapCheck {
+                        check_id: String::from("gemma4-e4b-helpdesk-overlap-check"),
+                        compared_benchmark_refs: vec![
+                            String::from("benchmark://psionic/gemma4/e4b/finetune_eval"),
+                            String::from("benchmark://psion/actual_pretraining/checkpoint_eval"),
+                        ],
+                        exact_overlap_refs: Vec::new(),
+                        near_duplicate_overlap_refs: Vec::new(),
+                        passed: true,
+                        detail: String::from("curated dataset cleared overlap review"),
+                    },
+                    dataset_digest: String::new(),
+                };
+                contract.dataset_digest = contract.stable_digest();
+                contract
+            },
             started_at_ms: 1_000,
             step_duration_ms: 25,
         }
@@ -1051,6 +1135,14 @@ mod tests {
         assert_eq!(
             outcome.final_checkpoint.run.summary().completed_steps,
             outcome.summary.run_summary.completed_steps
+        );
+        assert_eq!(
+            outcome.summary.eval_pack_storage_key,
+            "benchmark://psionic/gemma4/e4b/finetune_eval@2026.04.03"
+        );
+        assert_eq!(
+            outcome.summary.held_out_validation_split_ref,
+            "split://gemma4-e4b-helpdesk/held_out_validation"
         );
         Ok(())
     }
@@ -1109,5 +1201,23 @@ mod tests {
             Some("gemma-e4b-adapter-run-step-4")
         );
         Ok(())
+    }
+
+    #[test]
+    fn gemma_e4b_cuda_adapter_run_refuses_dataset_contract_drift() {
+        let trainer = GemmaE4bCudaAdapterSftTrainer::new(
+            sample_config(),
+            sample_target_set(),
+            sample_binding(),
+            sample_supervision(),
+        )
+        .expect("trainer");
+        let mut request = sample_request();
+        request.dataset_contract.dataset_ref = String::from("dataset://drifted");
+        request.dataset_contract.dataset_digest = request.dataset_contract.stable_digest();
+        let error = trainer
+            .run_sft(&request)
+            .expect_err("dataset contract drift must refuse");
+        assert!(error.to_string().contains("dataset_ref drifted"));
     }
 }
