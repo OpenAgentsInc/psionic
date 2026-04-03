@@ -1,8 +1,9 @@
 # Psion CS336 A2 Reference Lane
 
-> Status: bounded full-port tranche in progress, updated 2026-04-02 after
-> landing the profiling baseline receipts and the owned FlashAttention2
-> reference path, plus the bounded fused CUDA receipt family.
+> Status: bounded full-port tranche in progress, updated 2026-04-03 after
+> landing the profiling baseline receipts, the owned FlashAttention2
+> reference path, the bounded fused CUDA receipt family, and the bounded
+> sharded-optimizer proof lane.
 
 This document records the owned `psionic` surfaces for the bounded Stanford
 CS336 Assignment 2 port program.
@@ -155,6 +156,32 @@ That bucketed DDP tranche now provides:
 - one honest boundary note that the current path records bucket coordination
   truth but does not claim asynchronous transport overlap or backend collectives
 
+The sixth bounded A2 tranche now owns:
+
+- one bounded sharded-optimizer proof lane above the owned A1 tiny trainer
+- one explicit ownership layout showing replicated parameters with rank-local
+  AdamW optimizer-state ownership by parameter path
+- one retained proof that owner-only optimizer updates plus parameter
+  rebroadcast stay aligned with the non-sharded baseline
+
+Primary landing surfaces:
+
+- `crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_sharded_optimizer_receipt.rs`
+- `fixtures/training/cs336_a2_sharded_optimizer_receipt_v1.json`
+
+That sharded-optimizer tranche now provides:
+
+- one owned bounded ZeRO-stage-1-style reference lane with replicated model
+  parameters and sharded AdamW moments
+- one explicit per-parameter ownership layout bound to existing `psionic`
+  sharding vocabulary instead of prose about future partitioning
+- one retained step-by-step proof that the reconstructed combined optimizer
+  state matches the non-sharded baseline after each bounded update
+- one honest boundary note that the current path is owner-only host reference
+  execution and does not claim transport-backed partition exchange or actual
+  cluster-scale checkpoint sharding
+
 ## Current Claim Boundary
 
 This lane now honestly claims:
@@ -169,12 +196,14 @@ This lane now honestly claims:
   two-rank synchronization evidence against the non-parallel baseline
 - `psionic` owns a bounded bucketed DDP proof lane with retained bucket
   planning, start-of-step, and after-backward coordination evidence
+- `psionic` owns a bounded sharded-optimizer proof lane with retained
+  optimizer-state ownership, owner-step, rebroadcast, and checkpoint-state
+  reconstruction evidence against the non-sharded baseline
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 - later A2 tranches now have one retained receipt family to plug into
 
 It does not yet claim:
 
-- sharded-optimizer execution
 - full Stanford CS336 A2 parity
 - admitted actual-lane throughput or distributed-cluster qualification

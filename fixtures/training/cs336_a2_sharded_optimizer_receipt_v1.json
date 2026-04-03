@@ -1,0 +1,958 @@
+{
+  "schema_version": "psion.cs336_a2.sharded_optimizer_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "baseline_profile_bundle_path": "fixtures/training/cs336_a2_baseline_profile_bundle_v1.json",
+  "bucketed_ddp_receipt_path": "fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json",
+  "corpus_fixture_path": "fixtures/training/cs336_a1_reference_tiny_corpus.txt",
+  "config": {
+    "world_size": 2,
+    "training_steps": 3,
+    "a1_training": {
+      "requested_vocab_size": 256,
+      "batch_size": 2,
+      "context_length": 2,
+      "d_model": 2,
+      "num_layers": 1,
+      "num_heads": 1,
+      "d_ff": 4,
+      "rope_theta": 10000.0,
+      "rms_norm_eps": 0.00001,
+      "max_learning_rate": 0.1,
+      "min_learning_rate": 0.1,
+      "warmup_iters": 0,
+      "cosine_cycle_iters": 8,
+      "gradient_clip_norm": 1.0,
+      "finite_difference_epsilon": 0.005,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.999,
+      "adam_epsilon": 1e-8,
+      "weight_decay": 0.1
+    }
+  },
+  "layout": {
+    "world_size": 2,
+    "rank_device_labels": {
+      "0": "cpu:0",
+      "1": "cpu:1"
+    },
+    "parameter_shard_kind": "replicated",
+    "optimizer_state_shard_kind": "zero_stage1",
+    "synchronization_posture": "same_batch_on_all_ranks_then_owner_step_then_parameter_rebroadcast",
+    "same_batch_on_all_ranks": true,
+    "per_rank_owned_parameter_paths": {
+      "0": [
+        "layers.0.attn.k_proj.weight",
+        "layers.0.attn.q_proj.weight",
+        "layers.0.ffn.w1.weight",
+        "layers.0.ffn.w3.weight",
+        "layers.0.ln2.weight",
+        "ln_final.weight"
+      ],
+      "1": [
+        "layers.0.attn.output_proj.weight",
+        "layers.0.attn.v_proj.weight",
+        "layers.0.ffn.w2.weight",
+        "layers.0.ln1.weight",
+        "lm_head.weight",
+        "token_embeddings.weight"
+      ]
+    },
+    "per_rank_logical_optimizer_state_bytes": {
+      "0": 224,
+      "1": 8336
+    },
+    "parameter_ownership": [
+      {
+        "parameter_path": "layers.0.attn.k_proj.weight",
+        "parameter_element_count": 4,
+        "logical_optimizer_state_bytes": 32,
+        "owner_rank": 0,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.attn.output_proj.weight",
+        "parameter_element_count": 4,
+        "logical_optimizer_state_bytes": 32,
+        "owner_rank": 1,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.attn.q_proj.weight",
+        "parameter_element_count": 4,
+        "logical_optimizer_state_bytes": 32,
+        "owner_rank": 0,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.attn.v_proj.weight",
+        "parameter_element_count": 4,
+        "logical_optimizer_state_bytes": 32,
+        "owner_rank": 1,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.ffn.w1.weight",
+        "parameter_element_count": 8,
+        "logical_optimizer_state_bytes": 64,
+        "owner_rank": 0,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 16
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.ffn.w2.weight",
+        "parameter_element_count": 8,
+        "logical_optimizer_state_bytes": 64,
+        "owner_rank": 1,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 16
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.ffn.w3.weight",
+        "parameter_element_count": 8,
+        "logical_optimizer_state_bytes": 64,
+        "owner_rank": 0,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 8
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 16
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.ln1.weight",
+        "parameter_element_count": 2,
+        "logical_optimizer_state_bytes": 16,
+        "owner_rank": 1,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 2
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 2
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "layers.0.ln2.weight",
+        "parameter_element_count": 2,
+        "logical_optimizer_state_bytes": 16,
+        "owner_rank": 0,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 2
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 2
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "lm_head.weight",
+        "parameter_element_count": 512,
+        "logical_optimizer_state_bytes": 4096,
+        "owner_rank": 1,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 512
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 512
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 1024
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "ln_final.weight",
+        "parameter_element_count": 2,
+        "logical_optimizer_state_bytes": 16,
+        "owner_rank": 0,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 2
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 2
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "parameter_path": "token_embeddings.weight",
+        "parameter_element_count": 512,
+        "logical_optimizer_state_bytes": 4096,
+        "owner_rank": 1,
+        "parameter_layout": {
+          "kind": "replicated",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 0,
+              "axis_id": "dp",
+              "node_id": "rank-0",
+              "device_label": "cpu:0",
+              "replica_ordinal": 0,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 512
+              }
+            },
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 512
+              }
+            }
+          ]
+        },
+        "optimizer_state_layout": {
+          "kind": "zero_stage1",
+          "residency": "host_offloaded",
+          "axis_id": "dp",
+          "placements": [
+            {
+              "shard_id": 1,
+              "axis_id": "dp",
+              "node_id": "rank-1",
+              "device_label": "cpu:1",
+              "replica_ordinal": 1,
+              "range": {
+                "offset_elements": 0,
+                "element_count": 1024
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "ownership_is_disjoint_and_complete": true
+  },
+  "initial_model_state_digest": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+  "steps": [
+    {
+      "step_number": 1,
+      "batch_start_positions": [
+        0,
+        1
+      ],
+      "baseline_loss_before": 5.5636673,
+      "sharded_loss_before_by_rank": {
+        "0": 5.5636673,
+        "1": 5.5636673
+      },
+      "baseline_step": {
+        "step_number": 1,
+        "learning_rate": 0.1,
+        "loss_before": 5.5636673,
+        "loss_after": 5.482321,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 1.0316794,
+          "gradient_norm_l2_after": 1.0000001,
+          "clipping_ratio": 0.96929336
+        },
+        "model_state_digest_before": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+        "model_state_digest_after": "de514d862e1c09e5b12a0029d067fd14e9125cf299f8e3571b806e63ea49727b",
+        "optimizer_state_digest_after": "da79c01193ad4d978798e99483fe8fe95f46ad200adb1eb4a6dcca8b05fa5f66"
+      },
+      "rank_steps": [
+        {
+          "rank": 0,
+          "owned_parameter_paths": [
+            "layers.0.attn.k_proj.weight",
+            "layers.0.attn.q_proj.weight",
+            "layers.0.ffn.w1.weight",
+            "layers.0.ffn.w3.weight",
+            "layers.0.ln2.weight",
+            "ln_final.weight"
+          ],
+          "optimizer_state_entry_count_before": 0,
+          "optimizer_state_entry_count_after": 6,
+          "logical_optimizer_state_bytes_after": 224,
+          "optimizer_state_digest_before": "9e74544d2f09f4307457691d920f4e1be29839a86bbcb3d01d7ab15fe3942404",
+          "optimizer_state_digest_after": "66baebe80ab2c3e707449ccbac792d5691fe5b83d0f8c94683f8ca6b5e3fe41a",
+          "updated_parameter_digests": {
+            "layers.0.attn.k_proj.weight": "5e44ff7c0bb07075753c696b2fb09665524d4e29b49925dad981852b9abb8e63",
+            "layers.0.attn.q_proj.weight": "66baf8a886c86420d43b893b468fb009226bbed518dc9780ff43be7782199d07",
+            "layers.0.ffn.w1.weight": "49b987326d29bfeafab49e3c87f1320c0478533a1d4d6b34e3b7c5ab3219b9db",
+            "layers.0.ffn.w3.weight": "599d582d1b26d56d53d26655445fe9bac997948adb7c6cc4aa8c768512e06752",
+            "layers.0.ln2.weight": "753b8e6077bbb8947d281f136eda93dd7904c7392946af0b6b91171399cde1ca",
+            "ln_final.weight": "69411668d73dde25143e8167d90b0d2267fd559c8129ac014b6e6c4472e8f7b4"
+          }
+        },
+        {
+          "rank": 1,
+          "owned_parameter_paths": [
+            "layers.0.attn.output_proj.weight",
+            "layers.0.attn.v_proj.weight",
+            "layers.0.ffn.w2.weight",
+            "layers.0.ln1.weight",
+            "lm_head.weight",
+            "token_embeddings.weight"
+          ],
+          "optimizer_state_entry_count_before": 0,
+          "optimizer_state_entry_count_after": 6,
+          "logical_optimizer_state_bytes_after": 8336,
+          "optimizer_state_digest_before": "9e74544d2f09f4307457691d920f4e1be29839a86bbcb3d01d7ab15fe3942404",
+          "optimizer_state_digest_after": "297abdde2ad8c2574f959dbd3443f3f1cd1fd79fc50112932f18e80a08bb704d",
+          "updated_parameter_digests": {
+            "layers.0.attn.output_proj.weight": "fd26ef0d749f5376a49f994723e7b2b39e69d10337a3f70c2f41e0dbea7254e5",
+            "layers.0.attn.v_proj.weight": "70d40f813094f656cf5565c6f50c459e4d8ea790f7f644159a09326c9941cc7d",
+            "layers.0.ffn.w2.weight": "554b114ed7affa2135d2b9d2b3d48c2b9e9ac0fc0a6c0749ab12f89dc01afc48",
+            "layers.0.ln1.weight": "726a2d418114a84fb5857dcd4f011f8a9d5a3cb7ac5e246cfcdb77b9d1716a64",
+            "lm_head.weight": "c8871f221c41d5e1bd530f68c309a21c36b8ac41fff6d4d4d1d68dcd599c5dc0",
+            "token_embeddings.weight": "3e5a4addf62f7724937f616a238ce04caec72b112444a318e2e5facffc91f8f6"
+          }
+        }
+      ],
+      "combined_optimizer_state_digest_after": "da79c01193ad4d978798e99483fe8fe95f46ad200adb1eb4a6dcca8b05fa5f66",
+      "baseline_optimizer_state_digest_after": "da79c01193ad4d978798e99483fe8fe95f46ad200adb1eb4a6dcca8b05fa5f66",
+      "reconstructed_checkpoint_optimizer_state_matches_baseline": true,
+      "rank0_baseline_max_model_delta": 0.0,
+      "rank1_rank0_max_model_delta": 0.0,
+      "combined_optimizer_baseline_max_delta": 0.0,
+      "rank0_matches_baseline": true,
+      "rank1_matches_rank0": true
+    },
+    {
+      "step_number": 2,
+      "batch_start_positions": [
+        2,
+        3
+      ],
+      "baseline_loss_before": 5.482132,
+      "sharded_loss_before_by_rank": {
+        "0": 5.482132,
+        "1": 5.482132
+      },
+      "baseline_step": {
+        "step_number": 2,
+        "learning_rate": 0.1,
+        "loss_before": 5.482132,
+        "loss_after": 5.3738356,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 1.4111012,
+          "gradient_norm_l2_after": 1.000002,
+          "clipping_ratio": 0.7086664
+        },
+        "model_state_digest_before": "de514d862e1c09e5b12a0029d067fd14e9125cf299f8e3571b806e63ea49727b",
+        "model_state_digest_after": "befa77c365416c6a19371bc4fc2286669db444c020a91c842048a132d48175a4",
+        "optimizer_state_digest_after": "6aa7f6b6437fb5b4cddefeb6fb8c30de3df9fb517a066cd651c21f9218f34d1d"
+      },
+      "rank_steps": [
+        {
+          "rank": 0,
+          "owned_parameter_paths": [
+            "layers.0.attn.k_proj.weight",
+            "layers.0.attn.q_proj.weight",
+            "layers.0.ffn.w1.weight",
+            "layers.0.ffn.w3.weight",
+            "layers.0.ln2.weight",
+            "ln_final.weight"
+          ],
+          "optimizer_state_entry_count_before": 6,
+          "optimizer_state_entry_count_after": 6,
+          "logical_optimizer_state_bytes_after": 224,
+          "optimizer_state_digest_before": "66baebe80ab2c3e707449ccbac792d5691fe5b83d0f8c94683f8ca6b5e3fe41a",
+          "optimizer_state_digest_after": "c33df32fa6096303f1368f871dd95ca3af8d89f1360d43e7418d0ecc76727949",
+          "updated_parameter_digests": {
+            "layers.0.attn.k_proj.weight": "c6af720a261d6e8f559bffb5b797bb5c423d190fd79da3cddceb55bd05189abf",
+            "layers.0.attn.q_proj.weight": "f3c586d8c578bb727f33355e2a0abab3d5185456a40c6d9937b90541d22b8316",
+            "layers.0.ffn.w1.weight": "6d4515b143ec5d19e415869c326e5a1ae0b9f3b1990ca8d2e9e5d30f21297ed7",
+            "layers.0.ffn.w3.weight": "c49f09af50ee0b400edc51700793c06b614c9684531f373dfdd0662c969e72bf",
+            "layers.0.ln2.weight": "85c9d16bbe627f373e53f731f6b15909ef857a295dcddafa2c6d2e738d235788",
+            "ln_final.weight": "1b31c26e61ab19e0f43abb1984c6ff5f314cf465a715e26cf817d9c857da4b4d"
+          }
+        },
+        {
+          "rank": 1,
+          "owned_parameter_paths": [
+            "layers.0.attn.output_proj.weight",
+            "layers.0.attn.v_proj.weight",
+            "layers.0.ffn.w2.weight",
+            "layers.0.ln1.weight",
+            "lm_head.weight",
+            "token_embeddings.weight"
+          ],
+          "optimizer_state_entry_count_before": 6,
+          "optimizer_state_entry_count_after": 6,
+          "logical_optimizer_state_bytes_after": 8336,
+          "optimizer_state_digest_before": "297abdde2ad8c2574f959dbd3443f3f1cd1fd79fc50112932f18e80a08bb704d",
+          "optimizer_state_digest_after": "c9cfa7f3351b7a998d6a2ae45cc10e8b967c6d822b6637114ee1a1de78270424",
+          "updated_parameter_digests": {
+            "layers.0.attn.output_proj.weight": "0a47fd2c1854ac917c21299232a53604a2355cda960ca8c26f26bbc4d761019a",
+            "layers.0.attn.v_proj.weight": "e6bb096c80b285fa706a0d4ac985ea7e6d0b175254d88f25361265cf8e3e2db2",
+            "layers.0.ffn.w2.weight": "3ce080da0124f1f12e48a91e4b2a7e435dfe8c428cba4acb4db0aada3638254e",
+            "layers.0.ln1.weight": "b9ec4aacad62ee5b8fb12aa6f30947caa5a4ddf4b2c9f1e9fa76d748cca753d5",
+            "lm_head.weight": "0b114bc151e1e06af48754e19a443047278839294e5a9e959948dce12cafd6c5",
+            "token_embeddings.weight": "8903390ff9d7eefb4a142485f62c62e896785eaf054110dd9bac324c075524d5"
+          }
+        }
+      ],
+      "combined_optimizer_state_digest_after": "6aa7f6b6437fb5b4cddefeb6fb8c30de3df9fb517a066cd651c21f9218f34d1d",
+      "baseline_optimizer_state_digest_after": "6aa7f6b6437fb5b4cddefeb6fb8c30de3df9fb517a066cd651c21f9218f34d1d",
+      "reconstructed_checkpoint_optimizer_state_matches_baseline": true,
+      "rank0_baseline_max_model_delta": 0.0,
+      "rank1_rank0_max_model_delta": 0.0,
+      "combined_optimizer_baseline_max_delta": 0.0,
+      "rank0_matches_baseline": true,
+      "rank1_matches_rank0": true
+    },
+    {
+      "step_number": 3,
+      "batch_start_positions": [
+        4,
+        5
+      ],
+      "baseline_loss_before": 5.6077976,
+      "sharded_loss_before_by_rank": {
+        "0": 5.6077976,
+        "1": 5.6077976
+      },
+      "baseline_step": {
+        "step_number": 3,
+        "learning_rate": 0.1,
+        "loss_before": 5.6077976,
+        "loss_after": 5.3925314,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 1.180956,
+          "gradient_norm_l2_after": 1.0000007,
+          "clipping_ratio": 0.8467716
+        },
+        "model_state_digest_before": "befa77c365416c6a19371bc4fc2286669db444c020a91c842048a132d48175a4",
+        "model_state_digest_after": "24884050746b44cbff53fe0427023d5a46df6034781588c79c95430f1a6a1039",
+        "optimizer_state_digest_after": "c28761bbf4acf87259c26bb649debe4593406fa77e449a9b98ae8c7d2e4df41e"
+      },
+      "rank_steps": [
+        {
+          "rank": 0,
+          "owned_parameter_paths": [
+            "layers.0.attn.k_proj.weight",
+            "layers.0.attn.q_proj.weight",
+            "layers.0.ffn.w1.weight",
+            "layers.0.ffn.w3.weight",
+            "layers.0.ln2.weight",
+            "ln_final.weight"
+          ],
+          "optimizer_state_entry_count_before": 6,
+          "optimizer_state_entry_count_after": 6,
+          "logical_optimizer_state_bytes_after": 224,
+          "optimizer_state_digest_before": "c33df32fa6096303f1368f871dd95ca3af8d89f1360d43e7418d0ecc76727949",
+          "optimizer_state_digest_after": "2f78dd5b9070c8effa51e111e08216e28453b53eb97903bffb9aab40065c132a",
+          "updated_parameter_digests": {
+            "layers.0.attn.k_proj.weight": "29eb4bd4ae8bb9a9539195d469c2802fb393b4ca1afd98c2cebb78a87b14ec4c",
+            "layers.0.attn.q_proj.weight": "8e7c37200d459023327616194e087734c4c4a52c331828f55acd2690b7bd1754",
+            "layers.0.ffn.w1.weight": "6994ddacfff37df82d338ff3d9a5bc881cdd48c4ba0ddbae2a53f3bd47cb3ea3",
+            "layers.0.ffn.w3.weight": "bd97ca9ed34742a0634cf84e2ace5842e789fe07593eb8ce9a2736b8de87644d",
+            "layers.0.ln2.weight": "adc44dc1bfb93a31405a8f8a77823e8694a15d32abd1c11e69782d4414ab3791",
+            "ln_final.weight": "5904741231d8df3204e01b50b4d67db349beb0bede7341e0606fe3b8a3103598"
+          }
+        },
+        {
+          "rank": 1,
+          "owned_parameter_paths": [
+            "layers.0.attn.output_proj.weight",
+            "layers.0.attn.v_proj.weight",
+            "layers.0.ffn.w2.weight",
+            "layers.0.ln1.weight",
+            "lm_head.weight",
+            "token_embeddings.weight"
+          ],
+          "optimizer_state_entry_count_before": 6,
+          "optimizer_state_entry_count_after": 6,
+          "logical_optimizer_state_bytes_after": 8336,
+          "optimizer_state_digest_before": "c9cfa7f3351b7a998d6a2ae45cc10e8b967c6d822b6637114ee1a1de78270424",
+          "optimizer_state_digest_after": "736bc94a42ca7ce18bdea6ea26887a7911f241d6fa4ad669f04a84b42e0c6ec8",
+          "updated_parameter_digests": {
+            "layers.0.attn.output_proj.weight": "87b866a847eb728bab0781f0b1d673b7b8dee77677e8b5be1d63ce16dca3ca4b",
+            "layers.0.attn.v_proj.weight": "56afac27f361320b5aaf2d39f0d18e410689401ef4c29cdce67590df08b2cee2",
+            "layers.0.ffn.w2.weight": "09b0b219c5952429722cb226f205d47534983013c0b30173a68a894956df2a71",
+            "layers.0.ln1.weight": "de10cb2e1d19de174fb5806ec0f171070aa329d0bebdba193e11d4a21c9c3291",
+            "lm_head.weight": "ffb6a5241423750b3c1ce638903164b81782cb6387143166943613f27744f7fb",
+            "token_embeddings.weight": "e3d620363fb2c4186b29201072436a3d0d5a98cdfaf2172957ecbc36d55e71c7"
+          }
+        }
+      ],
+      "combined_optimizer_state_digest_after": "c28761bbf4acf87259c26bb649debe4593406fa77e449a9b98ae8c7d2e4df41e",
+      "baseline_optimizer_state_digest_after": "c28761bbf4acf87259c26bb649debe4593406fa77e449a9b98ae8c7d2e4df41e",
+      "reconstructed_checkpoint_optimizer_state_matches_baseline": true,
+      "rank0_baseline_max_model_delta": 0.0,
+      "rank1_rank0_max_model_delta": 0.0,
+      "combined_optimizer_baseline_max_delta": 0.0,
+      "rank0_matches_baseline": true,
+      "rank1_matches_rank0": true
+    }
+  ],
+  "final_rank0_model_state_digest": "24884050746b44cbff53fe0427023d5a46df6034781588c79c95430f1a6a1039",
+  "final_rank1_model_state_digest": "24884050746b44cbff53fe0427023d5a46df6034781588c79c95430f1a6a1039",
+  "final_baseline_model_state_digest": "24884050746b44cbff53fe0427023d5a46df6034781588c79c95430f1a6a1039",
+  "final_optimizer_shard_digests_by_rank": {
+    "0": "2f78dd5b9070c8effa51e111e08216e28453b53eb97903bffb9aab40065c132a",
+    "1": "736bc94a42ca7ce18bdea6ea26887a7911f241d6fa4ad669f04a84b42e0c6ec8"
+  },
+  "final_combined_optimizer_state_digest": "c28761bbf4acf87259c26bb649debe4593406fa77e449a9b98ae8c7d2e4df41e",
+  "final_baseline_optimizer_state_digest": "c28761bbf4acf87259c26bb649debe4593406fa77e449a9b98ae8c7d2e4df41e",
+  "all_steps_match_baseline": true,
+  "claim_boundary": "This receipt proves a bounded CS336 A2 sharded-optimizer lane inside psionic. It keeps model parameters replicated across two local reference ranks, assigns AdamW optimizer state ownership by parameter path, applies owner-only updates against the clipped global finite-difference gradient surface from the owned A1 trainer, and then rebroadcasts the updated parameters so both ranks converge back to the same model state. The retained combined optimizer-state digest matches the non-sharded baseline after each bounded step. It does not claim actual transport-backed ZeRO execution, real checkpoint partition exchange, or actual-lane distributed qualification."
+}

@@ -209,6 +209,21 @@ gradient surface as the non-parallel baseline so the retained proof stays
 deterministic. It still does not claim asynchronous transport overlap or
 backend collective execution.
 
+The repo now also owns the sixth bounded full-port A2 reference-lane tranche in
+`crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs`, the fixture
+generator
+`crates/psionic-train/examples/psion_cs336_a2_sharded_optimizer_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_sharded_optimizer_receipt_v1.json`. That surface
+keeps model parameters replicated across the bounded two-rank lane, assigns
+AdamW optimizer-state ownership by parameter path, applies owner-only updates
+against the clipped global finite-difference gradient surface from the owned A1
+trainer, and then rebroadcasts the updated parameters so both ranks converge
+back to the same model state. The retained combined optimizer-state digest
+matches the non-sharded baseline after each bounded step. It still does not
+claim transport-backed ZeRO execution, partition-exchange collectives, or
+actual-lane checkpoint sharding.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator
