@@ -66,6 +66,9 @@ Psionic now publishes exactly one bounded dense `Gemma 4` lane:
   state on `/v1/responses`
 - published multimodal posture = one `processor_owned` image/video lane that
   refuses direct media URL parts on the current generic OpenAI surface
+- published audio posture = one `processor_owned` audio lane on `e2b` and
+  `e4b` only, with `input_audio` publication and explicit refusal on the
+  current generic OpenAI surface until a real audio processor lands
 - distributed proof surface = one bootstrap-routed remote `gemma4:e4b` lane
   with honest proxy publication
 
@@ -116,13 +119,34 @@ What that means:
 - direct media parts now fail with a processor-lane refusal instead of a vague
   generic prompt-render refusal.
 
+## Processor-Owned Audio Lane
+
+After `#869`, only dense `Gemma 4 e2b` and `Gemma 4 e4b` artifacts that publish
+audio facts now carry one separate audio lane on the generic server:
+
+- `audio_input_mode = processor_owned`
+- accepted request parts = `input_audio`
+- current surface posture = explicit refusal for direct `input_audio` parts
+
+What that means:
+
+- Psionic now publishes that `e2b` and `e4b` have a distinct processor-owned
+  audio path instead of pretending audio is either generally supported or
+  generally absent across the dense family.
+- Psionic still does not claim native audio execution on the current generic
+  OpenAI surface.
+- `31B` and `26B A4B` do not inherit this audio publication by implication.
+- direct `input_audio` parts now fail with an explicit processor-lane refusal
+  on the admitted `e2b` and `e4b` rows, while non-admitted dense variants fail
+  closed without publishing audio capability at all.
+
 ## Explicit Non-Goals
 
 The first `Gemma 4` claim does not include:
 
 - admitted image execution on the processor-owned lane
 - admitted video execution on the processor-owned lane
-- audio
+- admitted audio execution on the processor-owned audio lane
 - `31B Dense`
 - `26B A4B`
 - Metal

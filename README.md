@@ -35,6 +35,9 @@ evidence.
     repeat that keeps the same family contract without widening the first claim
   - the Gemma image or video path now publishes as a processor-owned refusal
     lane instead of pretending the dense text surface can consume media URLs
+  - the dense `Gemma 4` `e2b` and `e4b` rows now also publish a separate
+    processor-owned audio lane with explicit `input_audio` refusal until the
+    real audio processor lands, while `31B` and `26B` still fail closed
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
   - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
 - Hermes agent backend

@@ -1299,6 +1299,7 @@ struct OpenAiCompatLoadedDecoderModel {
     descriptor: DecoderModelDescriptor,
     family: GgufDecoderFamily,
     multimodal_lane: Option<OpenAiCompatMultimodalLane>,
+    audio_lane: Option<OpenAiCompatAudioLane>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
@@ -1327,6 +1328,30 @@ impl ProcessorOwnedMultimodalLane {
 
     fn supported_media(&self) -> Vec<&'static str> {
         self.supported_media.to_vec()
+    }
+}
+
+#[derive(Clone)]
+enum OpenAiCompatAudioLane {
+    ProcessorOwned(ProcessorOwnedAudioLane),
+}
+
+#[derive(Clone)]
+struct ProcessorOwnedAudioLane {
+    owner_label: &'static str,
+    supported_parts: &'static [&'static str],
+}
+
+impl ProcessorOwnedAudioLane {
+    const fn gemma4() -> Self {
+        Self {
+            owner_label: "gemma4_audio_processor",
+            supported_parts: &["input_audio"],
+        }
+    }
+
+    fn supported_parts(&self) -> Vec<&'static str> {
+        self.supported_parts.to_vec()
     }
 }
 
@@ -1515,6 +1540,22 @@ impl OpenAiCompatLoadedModel {
             .and_then(|lane| match lane {
                 OpenAiCompatMultimodalLane::PromptProjection(config) => Some(config.clone()),
                 OpenAiCompatMultimodalLane::ProcessorOwned(_) => None,
+            })
+    }
+
+    fn audio_input_mode(&self) -> Option<&'static str> {
+        self.decoder()
+            .and_then(|model| model.audio_lane.as_ref())
+            .map(|lane| match lane {
+                OpenAiCompatAudioLane::ProcessorOwned(_) => "processor_owned",
+            })
+    }
+
+    fn audio_input_parts(&self) -> Option<Vec<&'static str>> {
+        self.decoder()
+            .and_then(|model| model.audio_lane.as_ref())
+            .map(|lane| match lane {
+                OpenAiCompatAudioLane::ProcessorOwned(lane) => lane.supported_parts(),
             })
     }
 }
@@ -3164,6 +3205,10 @@ struct ModelCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_projection_config: Option<Qwen35MultimodalProjectionConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_audio_input_mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_audio_input_parts: Option<Vec<&'static str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_embedding_dimensions: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_embedding_normalization: Option<EmbeddingNormalization>,
@@ -3526,6 +3571,20 @@ fn published_model_multimodal_projection_config(
         .and_then(OpenAiCompatLoadedModel::multimodal_projection_config)
 }
 
+fn published_model_audio_input_mode(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<&'static str> {
+    published_model_loaded_model(state, model).and_then(OpenAiCompatLoadedModel::audio_input_mode)
+}
+
+fn published_model_audio_input_parts(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<Vec<&'static str>> {
+    published_model_loaded_model(state, model).and_then(OpenAiCompatLoadedModel::audio_input_parts)
+}
+
 fn published_model_embedding_dimensions(
     state: &OpenAiCompatState,
     model: &PublishedGenericModel,
@@ -3636,6 +3695,8 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_multimodal_projection_mode: None,
             psionic_multimodal_supported_media: None,
             psionic_multimodal_projection_config: None,
+            psionic_audio_input_mode: None,
+            psionic_audio_input_parts: None,
             psionic_embedding_dimensions: None,
             psionic_embedding_normalization: None,
         }],
@@ -3679,6 +3740,10 @@ struct GenericHealthResponse {
     multimodal_supported_media: Option<Vec<&'static str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     multimodal_projection_config: Option<Qwen35MultimodalProjectionConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    audio_input_mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    audio_input_parts: Option<Vec<&'static str>>,
 }
 
 async fn generic_health(
@@ -3729,6 +3794,8 @@ async fn generic_health(
             state.as_ref(),
             &default_model,
         ),
+        audio_input_mode: published_model_audio_input_mode(state.as_ref(), &default_model),
+        audio_input_parts: published_model_audio_input_parts(state.as_ref(), &default_model),
     })
 }
 
@@ -4299,6 +4366,14 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                     ),
                     psionic_multimodal_projection_config:
                         published_model_multimodal_projection_config(state.as_ref(), &model),
+                    psionic_audio_input_mode: published_model_audio_input_mode(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_audio_input_parts: published_model_audio_input_parts(
+                        state.as_ref(),
+                        &model,
+                    ),
                     psionic_embedding_dimensions: published_model_embedding_dimensions(
                         state.as_ref(),
                         &model,
@@ -4515,6 +4590,7 @@ enum ChatCompletionMessageContent {
 enum ChatCompletionContentPart {
     Text { text: String },
     ImageUrl { image_url: ChatCompletionMediaUrl },
+    InputAudio { input_audio: ChatCompletionMediaUrl },
     VideoUrl { video_url: ChatCompletionMediaUrl },
 }
 
@@ -4528,6 +4604,13 @@ impl ChatCompletionContentPart {
     fn image_url(url: impl Into<String>) -> Self {
         Self::ImageUrl {
             image_url: ChatCompletionMediaUrl { url: url.into() },
+        }
+    }
+
+    #[cfg(test)]
+    fn input_audio(url: impl Into<String>) -> Self {
+        Self::InputAudio {
+            input_audio: ChatCompletionMediaUrl { url: url.into() },
         }
     }
 
@@ -5079,6 +5162,7 @@ fn required_tool_call_floor_from_chat_messages(
     contract: &ToolCallingContract,
     family: GgufDecoderFamily,
     multimodal_lane: Option<&OpenAiCompatMultimodalLane>,
+    audio_lane: Option<&OpenAiCompatAudioLane>,
 ) -> Result<usize, OpenAiCompatHttpError> {
     if !matches!(contract.mode, ToolChoiceMode::Required) || !contract.allows_parallel_tool_calls()
     {
@@ -5098,6 +5182,7 @@ fn required_tool_call_floor_from_chat_messages(
             family,
             role,
             multimodal_lane,
+            audio_lane,
         )?;
         for tool_name in contract.tools.keys() {
             let quoted = format!("`{tool_name}`");
@@ -6050,6 +6135,7 @@ async fn handle_generic_chat_completions(
             contract,
             model.family,
             model.multimodal_lane.as_ref(),
+            model.audio_lane.as_ref(),
         )?;
     }
     let prompt_messages = apply_tool_contract_to_prompt_messages(
@@ -7943,6 +8029,42 @@ fn gemma4_processor_owned_multimodal_lane(
         .then(ProcessorOwnedMultimodalLane::gemma4)
 }
 
+fn audio_lane_from_family_metadata(
+    family_metadata: &psionic_models::GgufDecoderFamilyMetadata,
+    model_key: &str,
+    canonical_name: &str,
+) -> Option<OpenAiCompatAudioLane> {
+    gemma4_processor_owned_audio_lane(family_metadata, model_key, canonical_name)
+        .map(OpenAiCompatAudioLane::ProcessorOwned)
+}
+
+fn gemma4_processor_owned_audio_lane(
+    family_metadata: &psionic_models::GgufDecoderFamilyMetadata,
+    model_key: &str,
+    canonical_name: &str,
+) -> Option<ProcessorOwnedAudioLane> {
+    if !matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
+        return None;
+    }
+    if !family_metadata
+        .family_facts
+        .contains_key("gemma4.audio.block_count")
+    {
+        return None;
+    }
+    gemma4_audio_lane_variant_is_admitted(model_key, canonical_name)
+        .then(ProcessorOwnedAudioLane::gemma4)
+}
+
+fn gemma4_audio_lane_variant_is_admitted(model_key: &str, canonical_name: &str) -> bool {
+    let lowered = format!(
+        "{}\n{}",
+        model_key.to_ascii_lowercase(),
+        canonical_name.to_ascii_lowercase()
+    );
+    lowered.contains("e2b") || lowered.contains("e4b")
+}
+
 fn load_generic_decoder_model(
     model_path: &Path,
     reasoning_budget: u8,
@@ -7978,16 +8100,22 @@ fn load_generic_decoder_model(
             ));
         }
     };
+    let canonical_name = default_model_name(model_path, descriptor.model.model_id.as_str());
     let supported_endpoints = vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses];
     let loaded_model = OpenAiCompatLoadedModel {
         model_key: descriptor.model.model_id.clone(),
-        canonical_name: default_model_name(model_path, descriptor.model.model_id.as_str()),
+        canonical_name: canonical_name.clone(),
         supported_endpoints,
         serving_truth: generic_decoder_serving_truth(family, backend),
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
             family,
             multimodal_lane: multimodal_lane_from_family_metadata(adapter.family_metadata()),
+            audio_lane: audio_lane_from_family_metadata(
+                adapter.family_metadata(),
+                descriptor.model.model_id.as_str(),
+                canonical_name.as_str(),
+            ),
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
                 .then(|| adapter.prompt_renderer()),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
@@ -8477,6 +8605,7 @@ fn chat_messages_to_prompt_messages_for_decoder(
         messages,
         model.family,
         model.multimodal_lane.as_ref(),
+        model.audio_lane.as_ref(),
     )
 }
 
@@ -8487,7 +8616,7 @@ fn chat_messages_to_prompt_messages_for_family(
     if matches!(family, GgufDecoderFamily::GptOss) {
         return chat_messages_to_prompt_messages_gpt_oss(messages);
     }
-    chat_messages_to_prompt_messages_generic(messages, family, None)
+    chat_messages_to_prompt_messages_generic(messages, family, None, None)
 }
 
 fn chat_messages_to_prompt_messages_gpt_oss(
@@ -8528,6 +8657,7 @@ fn chat_messages_to_prompt_messages_gpt_oss(
                 GgufDecoderFamily::GptOss,
                 normalized_role,
                 None,
+                None,
             )?,
         );
         if normalized_role == PromptMessageRole::Tool {
@@ -8547,6 +8677,7 @@ fn chat_messages_to_prompt_messages_generic(
     messages: &[ChatCompletionMessage],
     family: GgufDecoderFamily,
     multimodal_lane: Option<&OpenAiCompatMultimodalLane>,
+    audio_lane: Option<&OpenAiCompatAudioLane>,
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
     if messages.is_empty() {
         return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -8588,6 +8719,7 @@ fn chat_messages_to_prompt_messages_generic(
                 family,
                 role,
                 multimodal_lane,
+                audio_lane,
             )?,
         );
         if role == PromptMessageRole::Tool {
@@ -8656,6 +8788,7 @@ fn chat_message_content_to_text(
     family: GgufDecoderFamily,
     role: PromptMessageRole,
     multimodal_lane: Option<&OpenAiCompatMultimodalLane>,
+    audio_lane: Option<&OpenAiCompatAudioLane>,
 ) -> Result<String, OpenAiCompatHttpError> {
     match content {
         ChatCompletionMessageContent::Text(text) => Ok(text.clone()),
@@ -8676,6 +8809,14 @@ fn chat_message_content_to_text(
                                 processor_owned_multimodal_content_error(family, lane)
                             }
                             _ => unsupported_multimodal_content_error(family),
+                        });
+                    }
+                    ChatCompletionContentPart::InputAudio { .. } => {
+                        return Err(match audio_lane {
+                            Some(OpenAiCompatAudioLane::ProcessorOwned(lane)) => {
+                                processor_owned_audio_content_error(family, lane)
+                            }
+                            None => unsupported_audio_content_error(family),
                         });
                     }
                 }
@@ -8702,6 +8843,11 @@ fn project_qwen35_multimodal_content(
             {
                 return Err(OpenAiCompatHttpError::BadRequest(String::from(
                     "qwen35 system messages cannot contain image or video parts",
+                )));
+            }
+            ChatCompletionContentPart::InputAudio { .. } => {
+                return Err(OpenAiCompatHttpError::BadRequest(String::from(
+                    "qwen35 multimodal projection supports image and video parts only",
                 )));
             }
             ChatCompletionContentPart::ImageUrl { .. } => {
@@ -8736,6 +8882,30 @@ fn processor_owned_multimodal_content_error(
         "{} {} inputs require the `{}` processor-owned multimodal lane; the current generic OpenAI surface refuses direct media URL parts instead of projecting them through the text lane",
         decoder_family_label(family),
         processor_owned_supported_media_phrase(lane),
+        lane.owner_label,
+    ))
+}
+
+fn unsupported_audio_content_error(family: GgufDecoderFamily) -> OpenAiCompatHttpError {
+    if matches!(family, GgufDecoderFamily::Gemma4) {
+        OpenAiCompatHttpError::BadRequest(String::from(
+            "audio inputs are unavailable on the current `gemma4` lane; only `e2b` and `e4b` publish the processor-owned audio path",
+        ))
+    } else {
+        OpenAiCompatHttpError::BadRequest(format!(
+            "audio inputs are unavailable on the current `{}` generic OpenAI surface",
+            decoder_family_label(family)
+        ))
+    }
+}
+
+fn processor_owned_audio_content_error(
+    family: GgufDecoderFamily,
+    lane: &ProcessorOwnedAudioLane,
+) -> OpenAiCompatHttpError {
+    OpenAiCompatHttpError::BadRequest(format!(
+        "{} audio inputs require the `{}` processor-owned audio lane; the current generic OpenAI surface refuses direct `input_audio` parts until a real audio processor lands",
+        decoder_family_label(family),
         lane.owner_label,
     ))
 }
@@ -8961,6 +9131,7 @@ mod tests {
                 },
             ],
             GgufDecoderFamily::Qwen35,
+            None,
             None,
         )
         .expect("prompt messages");
@@ -11626,6 +11797,189 @@ mod tests {
     }
 
     #[test]
+    fn generic_server_gemma4_e4b_audio_lane_publishes_and_refuses_input_audio()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-e4b-audio.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template("tiny gemma4 e4b audio").as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab(7, 5).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+
+        assert_eq!(health.0.audio_input_mode, Some("processor_owned"));
+        assert_eq!(health.0.audio_input_parts, Some(vec!["input_audio"]));
+
+        let model_id = health.0.default_model.clone();
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|candidate| candidate.id == model_id)
+            .expect("gemma4 e4b audio model should be listed");
+        assert_eq!(model.psionic_audio_input_mode, Some("processor_owned"));
+        assert_eq!(model.psionic_audio_input_parts, Some(vec!["input_audio"]));
+
+        let chat_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(model.id.clone()),
+                    messages: vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("transcribe "),
+                            ChatCompletionContentPart::input_audio(
+                                "https://example.invalid/gemma4-e4b.wav",
+                            ),
+                        ],
+                    )],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 e4b audio input should fail through the processor-owned lane");
+        let chat_payload = runtime.block_on(response_json(chat_error.into_response()))?;
+        assert_eq!(
+            chat_payload["error"]["message"],
+            serde_json::json!(
+                "gemma4 audio inputs require the `gemma4_audio_processor` processor-owned audio lane; the current generic OpenAI surface refuses direct `input_audio` parts until a real audio processor lands"
+            )
+        );
+
+        let responses_error = runtime
+            .block_on(handle_generic_responses(
+                std::sync::Arc::clone(&server.state),
+                ResponsesRequest {
+                    model: Some(model.id.clone()),
+                    instructions: None,
+                    conversation: None,
+                    input: ResponsesInput::Messages(vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("transcribe "),
+                            ChatCompletionContentPart::input_audio(
+                                "https://example.invalid/gemma4-e4b.wav",
+                            ),
+                        ],
+                    )]),
+                    temperature: Some(0.0),
+                    max_output_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    previous_response_id: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_response_state: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 e4b responses audio input should fail through the processor-owned lane");
+        let responses_payload = runtime.block_on(response_json(responses_error.into_response()))?;
+        assert_eq!(
+            responses_payload["error"]["message"],
+            serde_json::json!(
+                "gemma4 audio inputs require the `gemma4_audio_processor` processor-owned audio lane; the current generic OpenAI surface refuses direct `input_audio` parts until a real audio processor lands"
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_gemma4_non_e2b_variants_do_not_publish_audio_lane()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        for variant in ["31b", "26b"] {
+            let gemma_path = temp.path().join(format!("tiny-gemma4-{variant}-audio.gguf"));
+            write_test_gguf(
+                &gemma_path,
+                dense_gemma4_metadata_with_chat_template(&format!("tiny gemma4 {variant} audio"))
+                    .as_slice(),
+                dense_gemma4_cuda_decoder_tensors_with_vocab(7, 5).as_slice(),
+            )?;
+
+            let mut config = OpenAiCompatConfig::new(&gemma_path);
+            config.backend = OpenAiCompatBackend::Cuda;
+            let server = OpenAiCompatServer::from_config(&config)?;
+            let health =
+                runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+            assert_eq!(health.0.audio_input_mode, None);
+            assert_eq!(health.0.audio_input_parts, None);
+
+            let error = runtime
+                .block_on(handle_generic_chat_completions(
+                    std::sync::Arc::clone(&server.state),
+                    ChatCompletionRequest {
+                        model: Some(health.0.default_model.clone()),
+                        messages: vec![ChatCompletionMessage::multimodal(
+                            "user",
+                            vec![
+                                ChatCompletionContentPart::text("transcribe "),
+                                ChatCompletionContentPart::input_audio(
+                                    "https://example.invalid/gemma4-variant.wav",
+                                ),
+                            ],
+                        )],
+                        temperature: Some(0.0),
+                        max_tokens: Some(1),
+                        stop: None,
+                        stream: false,
+                        tools: Vec::new(),
+                        tool_choice: None,
+                        response_format: None,
+                        psionic_grammar: None,
+                        psionic_structured_output: None,
+                        psionic_reasoning: None,
+                        psionic_prefix_cache: None,
+                        ..Default::default()
+                    },
+                ))
+                .expect_err("non-e2b gemma4 variants must fail audio closed");
+            let payload = runtime.block_on(response_json(error.into_response()))?;
+            assert_eq!(
+                payload["error"]["message"],
+                serde_json::json!(
+                    "audio inputs are unavailable on the current `gemma4` lane; only `e2b` and `e4b` publish the processor-owned audio path"
+                )
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn gemma4_e4b_cuda_conformance_repeat_is_machine_checkable_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("gemma4_e4b").expect("gemma4 prompt fixture");
@@ -13450,6 +13804,41 @@ mod tests {
         assert_eq!(
             system_payload["error"]["message"],
             serde_json::json!("qwen35 system messages cannot contain image or video parts")
+        );
+
+        let audio_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(String::from("tiny-qwen35")),
+                    messages: vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("listen "),
+                            ChatCompletionContentPart::input_audio(
+                                "https://example.invalid/qwen35-audio.wav",
+                            ),
+                        ],
+                    )],
+                    temperature: Some(0.0),
+                    max_tokens: Some(2),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("qwen35 multimodal input must refuse direct audio parts");
+        let audio_payload = runtime.block_on(response_json(audio_error.into_response()))?;
+        assert_eq!(
+            audio_payload["error"]["message"],
+            serde_json::json!("qwen35 multimodal projection supports image and video parts only")
         );
 
         let _ = shutdown_tx.send(());
@@ -16778,6 +17167,7 @@ mod tests {
             ],
             &contract,
             GgufDecoderFamily::Qwen35,
+            None,
             None,
         )
         .expect("backticked tool floor should parse");

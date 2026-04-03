@@ -47,6 +47,10 @@ than just run tensor math.
   - published `multimodal_projection_mode = processor_owned` for `image` and
     `video`, with explicit refusal on the current generic OpenAI surface until
     a real Gemma processor lands
+  - published `audio_input_mode = processor_owned` with
+    `audio_input_parts = ["input_audio"]` on dense `e2b` and `e4b` rows only,
+    with explicit refusal on the current generic OpenAI surface until a real
+    Gemma audio processor lands
   - bounded prompt-render, server-smoke, refusal, and repeatable CUDA
     conformance coverage for `gemma4:e4b`
 - `Gemma 4` also now has one second dense validation lane outside the first
@@ -73,7 +77,7 @@ than just run tensor math.
   regions:
   - admitted image execution on the processor-owned lane
   - admitted video execution on the processor-owned lane
-  - audio
+  - admitted audio execution on the processor-owned audio lane
   - `31B`
   - `26B A4B`
   - Metal
@@ -84,6 +88,12 @@ than just run tensor math.
   `gemma4:e4b` claim. The optional dense `31B` validation lane keeps the same
   refusal posture and publication shape, but it still does not promote `31B`
   into the published first claim automatically.
+- The dense `Gemma 4` audio lane is narrower than the family-wide multimodal
+  publication:
+  - `e2b` and `e4b` publish `audio_input_mode = processor_owned` and
+    `audio_input_parts = ["input_audio"]`
+  - `31B` and `26B A4B` do not publish audio capability and fail closed for
+    direct `input_audio` parts on the current generic surface
 - CPU-only debug bring-up may still be useful while the lane is under active
   development. The repo now admits `Gemma 4` on CPU for bounded debug
   execution, but CPU still does not satisfy the first published `Gemma 4`
