@@ -126,6 +126,35 @@ That individual-parameter DDP tranche now provides:
 - one honest boundary note that the current path uses host-owned reference
   collective emulation and does not claim backend transport execution
 
+The fifth bounded A2 tranche now owns:
+
+- one bounded bucketed DDP synchronization receipt above the owned A1 tiny
+  trainer
+- one explicit start-of-step reset surface and one after-backward bucket
+  completion surface
+- one retained proof that the bucketed coordination lane stays aligned with the
+  non-parallel baseline while still recording bucket-plan variation
+
+Primary landing surfaces:
+
+- `crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_ddp_bucketed_receipt.rs`
+- `fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json`
+
+That bucketed DDP tranche now provides:
+
+- one owned bounded bucket-planning surface with single-bucket, profile-bucket,
+  and small-bucket retained cases
+- one explicit train-batch-start receipt that resets the pending bucket set for
+  each step
+- one explicit after-backward receipt that records deterministic reverse-order
+  bucket completion and bucket gradient digests
+- one bounded update path pinned to the same global finite-difference gradient
+  surface as the non-parallel reference trainer so retained parity stays
+  deterministic
+- one honest boundary note that the current path records bucket coordination
+  truth but does not claim asynchronous transport overlap or backend collectives
+
 ## Current Claim Boundary
 
 This lane now honestly claims:
@@ -138,12 +167,14 @@ This lane now honestly claims:
   refusal posture on non-CUDA hosts
 - `psionic` owns a bounded individual-parameter DDP proof lane with retained
   two-rank synchronization evidence against the non-parallel baseline
+- `psionic` owns a bounded bucketed DDP proof lane with retained bucket
+  planning, start-of-step, and after-backward coordination evidence
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 - later A2 tranches now have one retained receipt family to plug into
 
 It does not yet claim:
 
-- bucketed DDP or sharded-optimizer execution
+- sharded-optimizer execution
 - full Stanford CS336 A2 parity
 - admitted actual-lane throughput or distributed-cluster qualification

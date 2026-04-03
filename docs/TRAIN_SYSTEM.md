@@ -195,6 +195,20 @@ proof stays deterministic, while still stating clearly that the collective path
 is host-owned reference emulation rather than transport-backed distributed
 execution.
 
+The repo now also owns the fifth bounded full-port A2 reference-lane tranche in
+`crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs`, the fixture
+generator `crates/psionic-train/examples/psion_cs336_a2_ddp_bucketed_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json`. That surface adds
+explicit bucket planning, train-batch-start reset receipts, and after-backward
+bucket completion receipts above the same tiny owned A1 trainer. It retains
+single-bucket, profile-bucket, and small-bucket plan cases, records
+deterministic reverse-order bucket completion for the active bounded case, and
+pins the bounded update application to the same global finite-difference
+gradient surface as the non-parallel baseline so the retained proof stays
+deterministic. It still does not claim asynchronous transport overlap or
+backend collective execution.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator

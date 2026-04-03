@@ -1,0 +1,771 @@
+{
+  "schema_version": "psion.cs336_a2.ddp_bucketed_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "baseline_profile_bundle_path": "fixtures/training/cs336_a2_baseline_profile_bundle_v1.json",
+  "individual_parameter_receipt_path": "fixtures/training/cs336_a2_ddp_individual_parameters_receipt_v1.json",
+  "corpus_fixture_path": "fixtures/training/cs336_a1_reference_tiny_corpus.txt",
+  "config": {
+    "world_size": 2,
+    "training_steps": 2,
+    "profile_bucket_size_bytes": 128,
+    "a1_training": {
+      "requested_vocab_size": 256,
+      "batch_size": 2,
+      "context_length": 2,
+      "d_model": 2,
+      "num_layers": 1,
+      "num_heads": 1,
+      "d_ff": 4,
+      "rope_theta": 10000.0,
+      "rms_norm_eps": 0.00001,
+      "max_learning_rate": 0.15,
+      "min_learning_rate": 0.02,
+      "warmup_iters": 1,
+      "cosine_cycle_iters": 4,
+      "gradient_clip_norm": 1.0,
+      "finite_difference_epsilon": 0.005,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.95,
+      "adam_epsilon": 1e-8,
+      "weight_decay": 0.0
+    }
+  },
+  "distributed_group": {
+    "world_size": 2,
+    "rank_count": 2,
+    "rank_device_labels": {
+      "0": "cpu:0",
+      "1": "cpu:1"
+    },
+    "backend_family": "bounded_reference_ddp_bucketed",
+    "communication_class": "host_owned_bucket_sync",
+    "topology_profile": "two_rank_local_reference",
+    "collective_support": {
+      "broadcast": "owned_model_state_copy_from_rank0",
+      "bucketed_all_reduce": "host_owned_arithmetic_mean_by_bucket"
+    }
+  },
+  "broadcast": {
+    "rank0_model_state_digest_before": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+    "rank1_model_state_digest_before_broadcast": "8bf4c06399a746dc19930991574f340a9b1d4fd9aa330556b3f18a812c3acbbf",
+    "rank1_model_state_digest_after_broadcast": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+    "broadcast_matches_rank0": true
+  },
+  "bucket_cases": [
+    {
+      "case_id": "single_bucket",
+      "bucket_size_bytes": 4280,
+      "bucket_count": 1,
+      "total_parameter_bytes": 4280,
+      "buckets": [
+        {
+          "bucket_id": "single_bucket.bucket_0",
+          "bucket_size_bytes": 4280,
+          "total_parameter_bytes": 4280,
+          "parameter_count": 12,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.attn.k_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.attn.output_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.attn.q_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.attn.v_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.ffn.w1.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            },
+            {
+              "parameter_path": "layers.0.ffn.w2.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            },
+            {
+              "parameter_path": "layers.0.ffn.w3.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            },
+            {
+              "parameter_path": "layers.0.ln1.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            },
+            {
+              "parameter_path": "layers.0.ln2.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_bytes": 2048,
+              "gradient_element_count": 512
+            },
+            {
+              "parameter_path": "ln_final.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            },
+            {
+              "parameter_path": "token_embeddings.weight",
+              "parameter_bytes": 2048,
+              "gradient_element_count": 512
+            }
+          ]
+        }
+      ],
+      "completed_bucket_ids_in_ready_order": [
+        "single_bucket.bucket_0"
+      ]
+    },
+    {
+      "case_id": "profile_bucket",
+      "bucket_size_bytes": 128,
+      "bucket_count": 5,
+      "total_parameter_bytes": 4280,
+      "buckets": [
+        {
+          "bucket_id": "profile_bucket.bucket_0",
+          "bucket_size_bytes": 128,
+          "total_parameter_bytes": 128,
+          "parameter_count": 6,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.attn.k_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.attn.output_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.attn.q_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.attn.v_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            },
+            {
+              "parameter_path": "layers.0.ffn.w1.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            },
+            {
+              "parameter_path": "layers.0.ffn.w2.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            }
+          ]
+        },
+        {
+          "bucket_id": "profile_bucket.bucket_1",
+          "bucket_size_bytes": 128,
+          "total_parameter_bytes": 48,
+          "parameter_count": 3,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.ffn.w3.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            },
+            {
+              "parameter_path": "layers.0.ln1.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            },
+            {
+              "parameter_path": "layers.0.ln2.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            }
+          ]
+        },
+        {
+          "bucket_id": "profile_bucket.bucket_2",
+          "bucket_size_bytes": 128,
+          "total_parameter_bytes": 2048,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_bytes": 2048,
+              "gradient_element_count": 512
+            }
+          ]
+        },
+        {
+          "bucket_id": "profile_bucket.bucket_3",
+          "bucket_size_bytes": 128,
+          "total_parameter_bytes": 8,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "ln_final.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            }
+          ]
+        },
+        {
+          "bucket_id": "profile_bucket.bucket_4",
+          "bucket_size_bytes": 128,
+          "total_parameter_bytes": 2048,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "token_embeddings.weight",
+              "parameter_bytes": 2048,
+              "gradient_element_count": 512
+            }
+          ]
+        }
+      ],
+      "completed_bucket_ids_in_ready_order": [
+        "profile_bucket.bucket_4",
+        "profile_bucket.bucket_3",
+        "profile_bucket.bucket_2",
+        "profile_bucket.bucket_1",
+        "profile_bucket.bucket_0"
+      ]
+    },
+    {
+      "case_id": "small_bucket",
+      "bucket_size_bytes": 8,
+      "bucket_count": 12,
+      "total_parameter_bytes": 4280,
+      "buckets": [
+        {
+          "bucket_id": "small_bucket.bucket_0",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 16,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.attn.k_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_1",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 16,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.attn.output_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_2",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 16,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.attn.q_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_3",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 16,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.attn.v_proj.weight",
+              "parameter_bytes": 16,
+              "gradient_element_count": 4
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_4",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 32,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.ffn.w1.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_5",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 32,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.ffn.w2.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_6",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 32,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.ffn.w3.weight",
+              "parameter_bytes": 32,
+              "gradient_element_count": 8
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_7",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 8,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.ln1.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_8",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 8,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "layers.0.ln2.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_9",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 2048,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_bytes": 2048,
+              "gradient_element_count": 512
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_10",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 8,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "ln_final.weight",
+              "parameter_bytes": 8,
+              "gradient_element_count": 2
+            }
+          ]
+        },
+        {
+          "bucket_id": "small_bucket.bucket_11",
+          "bucket_size_bytes": 8,
+          "total_parameter_bytes": 2048,
+          "parameter_count": 1,
+          "parameters": [
+            {
+              "parameter_path": "token_embeddings.weight",
+              "parameter_bytes": 2048,
+              "gradient_element_count": 512
+            }
+          ]
+        }
+      ],
+      "completed_bucket_ids_in_ready_order": [
+        "small_bucket.bucket_11",
+        "small_bucket.bucket_10",
+        "small_bucket.bucket_9",
+        "small_bucket.bucket_8",
+        "small_bucket.bucket_7",
+        "small_bucket.bucket_6",
+        "small_bucket.bucket_5",
+        "small_bucket.bucket_4",
+        "small_bucket.bucket_3",
+        "small_bucket.bucket_2",
+        "small_bucket.bucket_1",
+        "small_bucket.bucket_0"
+      ]
+    }
+  ],
+  "active_bucket_case_id": "profile_bucket",
+  "steps": [
+    {
+      "step_number": 1,
+      "global_batch_start_positions": [
+        0,
+        1
+      ],
+      "local_batch_start_positions_by_rank": {
+        "0": [
+          0
+        ],
+        "1": [
+          1
+        ]
+      },
+      "baseline_loss_before": 5.5636673,
+      "local_loss_before_by_rank": {
+        "0": 5.5616503,
+        "1": 5.565684
+      },
+      "train_batch_start": {
+        "case_id": "profile_bucket",
+        "step_number": 1,
+        "reset_applied": true,
+        "pending_bucket_ids_after_reset": [
+          "profile_bucket.bucket_0",
+          "profile_bucket.bucket_1",
+          "profile_bucket.bucket_2",
+          "profile_bucket.bucket_3",
+          "profile_bucket.bucket_4"
+        ]
+      },
+      "after_backward": {
+        "case_id": "profile_bucket",
+        "step_number": 1,
+        "synchronized_bucket_count": 5,
+        "completed_bucket_ids_in_order": [
+          "profile_bucket.bucket_4",
+          "profile_bucket.bucket_3",
+          "profile_bucket.bucket_2",
+          "profile_bucket.bucket_1",
+          "profile_bucket.bucket_0"
+        ],
+        "bucket_syncs": [
+          {
+            "bucket_id": "profile_bucket.bucket_4",
+            "ready_order_index": 0,
+            "parameter_paths": [
+              "token_embeddings.weight"
+            ],
+            "parameter_sync_count": 1,
+            "rank_bucket_gradient_digests": {
+              "0": "2cc8cdd58ee9797a19e1375c6b15c9c7f71a4a936916ca4e033e18d676539e06",
+              "1": "8f305b1457795bcbf36faa8fa2a3a9b78193966634b5560520ac93b13e3593e0"
+            },
+            "synchronized_bucket_gradient_digest": "64b3ffbbcaa75469b72e461b32672ea3016b47899db055d6a8d5fe7caaafac4e"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_3",
+            "ready_order_index": 1,
+            "parameter_paths": [
+              "ln_final.weight"
+            ],
+            "parameter_sync_count": 1,
+            "rank_bucket_gradient_digests": {
+              "0": "d999693356fec9353c837ee93851f2574b1b98b59fc325a0f381485d7d7c1b42",
+              "1": "dbdda5fa2a511423d431479a37223e57afe6e5066002c016c3b7da98b33e73d0"
+            },
+            "synchronized_bucket_gradient_digest": "f0e48ec6c4b82d1b820e32fc7974692c8389f32575cf0a638c14c01961d601b7"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_2",
+            "ready_order_index": 2,
+            "parameter_paths": [
+              "lm_head.weight"
+            ],
+            "parameter_sync_count": 1,
+            "rank_bucket_gradient_digests": {
+              "0": "c53c96ea042cfa6a0b5a7b47f9da208c3e4e8439b31aa0fe044814ea3076690e",
+              "1": "12ab3c92c0a0f48253ef0f52de39c0675c8b6ff4822a40d585a3528637d8d7b1"
+            },
+            "synchronized_bucket_gradient_digest": "41e7433b306f670cbcc62deabfa5c08085a4c7b09f76d386fcb429a504998687"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_1",
+            "ready_order_index": 3,
+            "parameter_paths": [
+              "layers.0.ffn.w3.weight",
+              "layers.0.ln1.weight",
+              "layers.0.ln2.weight"
+            ],
+            "parameter_sync_count": 3,
+            "rank_bucket_gradient_digests": {
+              "0": "aec75291049a4c0ff63a647403e21785a151f5e8d7c5f55ac5c5a5050614e5b8",
+              "1": "ed3b869be0ba7b592252ab7467720cbe77bd209d35902643c70f2fb77b485196"
+            },
+            "synchronized_bucket_gradient_digest": "85b5a95603d095d3712dcac16b277b06ca1063832e0ab79f1c96119a2dd404ad"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_0",
+            "ready_order_index": 4,
+            "parameter_paths": [
+              "layers.0.attn.k_proj.weight",
+              "layers.0.attn.output_proj.weight",
+              "layers.0.attn.q_proj.weight",
+              "layers.0.attn.v_proj.weight",
+              "layers.0.ffn.w1.weight",
+              "layers.0.ffn.w2.weight"
+            ],
+            "parameter_sync_count": 6,
+            "rank_bucket_gradient_digests": {
+              "0": "5c47f5ba5e01a6e51aeb3f2a40b2824d5800d386cc47d0096d6a8a1c9d34b5bb",
+              "1": "900a628bed5f22cacea9a382bc38c988711777749df69773754c314e4dffbb2e"
+            },
+            "synchronized_bucket_gradient_digest": "199940350bdc3818a2df2ee251bac898245ec387179aff43016210ca3dbcf0e2"
+          }
+        ]
+      },
+      "baseline_step": {
+        "step_number": 1,
+        "learning_rate": 0.15,
+        "loss_before": 5.5636673,
+        "loss_after": 5.486285,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 1.0316794,
+          "gradient_norm_l2_after": 1.0000001,
+          "clipping_ratio": 0.96929336
+        },
+        "model_state_digest_before": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+        "model_state_digest_after": "a6c199f41cdaba9b78fdcfc70721a7c9405b5f90c1560e07a39929986ab4c6e6",
+        "optimizer_state_digest_after": "1c575ff617c2c717e4d338f8a4940d11f143246a935baef8e3cb754a3ed78b7b"
+      },
+      "rank0_step": {
+        "step_number": 1,
+        "learning_rate": 0.15,
+        "loss_before": 5.5636673,
+        "loss_after": 5.486285,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 1.0316794,
+          "gradient_norm_l2_after": 1.0000001,
+          "clipping_ratio": 0.96929336
+        },
+        "model_state_digest_before": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+        "model_state_digest_after": "a6c199f41cdaba9b78fdcfc70721a7c9405b5f90c1560e07a39929986ab4c6e6",
+        "optimizer_state_digest_after": "1c575ff617c2c717e4d338f8a4940d11f143246a935baef8e3cb754a3ed78b7b"
+      },
+      "rank1_step": {
+        "step_number": 1,
+        "learning_rate": 0.15,
+        "loss_before": 5.5636673,
+        "loss_after": 5.486285,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 1.0316794,
+          "gradient_norm_l2_after": 1.0000001,
+          "clipping_ratio": 0.96929336
+        },
+        "model_state_digest_before": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+        "model_state_digest_after": "a6c199f41cdaba9b78fdcfc70721a7c9405b5f90c1560e07a39929986ab4c6e6",
+        "optimizer_state_digest_after": "1c575ff617c2c717e4d338f8a4940d11f143246a935baef8e3cb754a3ed78b7b"
+      },
+      "rank0_baseline_max_model_delta": 0.0,
+      "rank1_rank0_max_model_delta": 0.0,
+      "rank0_baseline_max_optimizer_delta": 0.0,
+      "rank1_rank0_max_optimizer_delta": 0.0,
+      "rank0_matches_baseline": true,
+      "rank1_matches_rank0": true
+    },
+    {
+      "step_number": 2,
+      "global_batch_start_positions": [
+        2,
+        3
+      ],
+      "local_batch_start_positions_by_rank": {
+        "0": [
+          2
+        ],
+        "1": [
+          3
+        ]
+      },
+      "baseline_loss_before": 5.460012,
+      "local_loss_before_by_rank": {
+        "0": 5.372422,
+        "1": 5.5476017
+      },
+      "train_batch_start": {
+        "case_id": "profile_bucket",
+        "step_number": 2,
+        "reset_applied": true,
+        "pending_bucket_ids_after_reset": [
+          "profile_bucket.bucket_0",
+          "profile_bucket.bucket_1",
+          "profile_bucket.bucket_2",
+          "profile_bucket.bucket_3",
+          "profile_bucket.bucket_4"
+        ]
+      },
+      "after_backward": {
+        "case_id": "profile_bucket",
+        "step_number": 2,
+        "synchronized_bucket_count": 5,
+        "completed_bucket_ids_in_order": [
+          "profile_bucket.bucket_4",
+          "profile_bucket.bucket_3",
+          "profile_bucket.bucket_2",
+          "profile_bucket.bucket_1",
+          "profile_bucket.bucket_0"
+        ],
+        "bucket_syncs": [
+          {
+            "bucket_id": "profile_bucket.bucket_4",
+            "ready_order_index": 0,
+            "parameter_paths": [
+              "token_embeddings.weight"
+            ],
+            "parameter_sync_count": 1,
+            "rank_bucket_gradient_digests": {
+              "0": "5ac1777d36fcb5fc84a1923345bf31c04a6d2ce56f5f365e46dd556907786fb0",
+              "1": "feaf5447f9ae083d2fb7610b6a7a98ed82a015fec95e09b799f0f5553ad058ec"
+            },
+            "synchronized_bucket_gradient_digest": "683ab994538a77b7177dc8272322eb7db2ba2f36cd9b7449f434c00cf30c9c4d"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_3",
+            "ready_order_index": 1,
+            "parameter_paths": [
+              "ln_final.weight"
+            ],
+            "parameter_sync_count": 1,
+            "rank_bucket_gradient_digests": {
+              "0": "c3c6cad63f480664527fa046752715f3a06e0703f62cc05fcbf96eaba28cdd8d",
+              "1": "50c1b032bca898478f820b97b2ee63c5c563cbd39159ce2cda394043b0a9f451"
+            },
+            "synchronized_bucket_gradient_digest": "8e22e615966b9132b9f7f19cf3bca660cc54c79de6b40e071fe3a068d1df544d"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_2",
+            "ready_order_index": 2,
+            "parameter_paths": [
+              "lm_head.weight"
+            ],
+            "parameter_sync_count": 1,
+            "rank_bucket_gradient_digests": {
+              "0": "ff6240312c838e7d1c00d7dbc992d9462af1dcfba8b3c831019918d1164ef860",
+              "1": "f2a11684db535d716d03ef66f220965282eee32f209a30796decdb470524c8f4"
+            },
+            "synchronized_bucket_gradient_digest": "6af65d6a1231194323af6e40d2c83a2b3d6f36b9284f7729a754197ee86c1f16"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_1",
+            "ready_order_index": 3,
+            "parameter_paths": [
+              "layers.0.ffn.w3.weight",
+              "layers.0.ln1.weight",
+              "layers.0.ln2.weight"
+            ],
+            "parameter_sync_count": 3,
+            "rank_bucket_gradient_digests": {
+              "0": "ce6a4914ca57b8f9b987659481ff3ad41af5b5b826bdeddfb7d1af64d11c2b9d",
+              "1": "786abb36b65af6de1a380fe3c997f8ed1afeb5855b07ba0e9ad6888399704274"
+            },
+            "synchronized_bucket_gradient_digest": "bc82796f98a4e7c5fa9d9a6147df73992467641b6d6563b35e8aa0143924e75f"
+          },
+          {
+            "bucket_id": "profile_bucket.bucket_0",
+            "ready_order_index": 4,
+            "parameter_paths": [
+              "layers.0.attn.k_proj.weight",
+              "layers.0.attn.output_proj.weight",
+              "layers.0.attn.q_proj.weight",
+              "layers.0.attn.v_proj.weight",
+              "layers.0.ffn.w1.weight",
+              "layers.0.ffn.w2.weight"
+            ],
+            "parameter_sync_count": 6,
+            "rank_bucket_gradient_digests": {
+              "0": "6ef415b11d3b25f69e4c6e97e3730d766a42f8f7f2e21106d11c1b49261f6bf3",
+              "1": "40fa92830527801ee1347140e0f47e5a378c4664b2bff29477884e8f22ae3903"
+            },
+            "synchronized_bucket_gradient_digest": "bdf22cbdca705905fa423c064c03131b3c5046132a71354c2290e3b273e4c3c9"
+          }
+        ]
+      },
+      "baseline_step": {
+        "step_number": 2,
+        "learning_rate": 0.15,
+        "loss_before": 5.460012,
+        "loss_after": 5.157278,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 0.95762885,
+          "gradient_norm_l2_after": 0.95762885,
+          "clipping_ratio": 1.0
+        },
+        "model_state_digest_before": "a6c199f41cdaba9b78fdcfc70721a7c9405b5f90c1560e07a39929986ab4c6e6",
+        "model_state_digest_after": "d8027ad1d03ffd4b6714418fd058261774fad9d6c7bfea1d1c8d4606bbe5a471",
+        "optimizer_state_digest_after": "ee3fa23768c7a40ad7656d3fa95dfb9683ae419e5855defef56c203c42e29581"
+      },
+      "rank0_step": {
+        "step_number": 2,
+        "learning_rate": 0.15,
+        "loss_before": 5.460012,
+        "loss_after": 5.157278,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 0.95762885,
+          "gradient_norm_l2_after": 0.95762885,
+          "clipping_ratio": 1.0
+        },
+        "model_state_digest_before": "a6c199f41cdaba9b78fdcfc70721a7c9405b5f90c1560e07a39929986ab4c6e6",
+        "model_state_digest_after": "d8027ad1d03ffd4b6714418fd058261774fad9d6c7bfea1d1c8d4606bbe5a471",
+        "optimizer_state_digest_after": "ee3fa23768c7a40ad7656d3fa95dfb9683ae419e5855defef56c203c42e29581"
+      },
+      "rank1_step": {
+        "step_number": 2,
+        "learning_rate": 0.15,
+        "loss_before": 5.460012,
+        "loss_after": 5.157278,
+        "gradient_clip": {
+          "gradient_norm_l2_before": 0.95762885,
+          "gradient_norm_l2_after": 0.95762885,
+          "clipping_ratio": 1.0
+        },
+        "model_state_digest_before": "a6c199f41cdaba9b78fdcfc70721a7c9405b5f90c1560e07a39929986ab4c6e6",
+        "model_state_digest_after": "d8027ad1d03ffd4b6714418fd058261774fad9d6c7bfea1d1c8d4606bbe5a471",
+        "optimizer_state_digest_after": "ee3fa23768c7a40ad7656d3fa95dfb9683ae419e5855defef56c203c42e29581"
+      },
+      "rank0_baseline_max_model_delta": 0.0,
+      "rank1_rank0_max_model_delta": 0.0,
+      "rank0_baseline_max_optimizer_delta": 0.0,
+      "rank1_rank0_max_optimizer_delta": 0.0,
+      "rank0_matches_baseline": true,
+      "rank1_matches_rank0": true
+    }
+  ],
+  "final_rank0_model_state_digest": "d8027ad1d03ffd4b6714418fd058261774fad9d6c7bfea1d1c8d4606bbe5a471",
+  "final_rank1_model_state_digest": "d8027ad1d03ffd4b6714418fd058261774fad9d6c7bfea1d1c8d4606bbe5a471",
+  "final_baseline_model_state_digest": "d8027ad1d03ffd4b6714418fd058261774fad9d6c7bfea1d1c8d4606bbe5a471",
+  "final_rank0_optimizer_state_digest": "ee3fa23768c7a40ad7656d3fa95dfb9683ae419e5855defef56c203c42e29581",
+  "final_rank1_optimizer_state_digest": "ee3fa23768c7a40ad7656d3fa95dfb9683ae419e5855defef56c203c42e29581",
+  "final_baseline_optimizer_state_digest": "ee3fa23768c7a40ad7656d3fa95dfb9683ae419e5855defef56c203c42e29581",
+  "all_steps_match_baseline": true,
+  "claim_boundary": "This receipt proves a bounded CS336 A2 bucketed DDP lane inside psionic. It records explicit bucket planning, start-of-step reset behavior, after-backward bucket completion order, per-rank local bucket gradient receipts, and host-owned bucket averaging receipts above the tiny owned A1 trainer. The bounded update application is pinned to the same global finite-difference gradient surface as the non-parallel reference trainer so retained parity stays deterministic. It does not claim asynchronous transport overlap, transport-backed collectives, or actual-lane distributed qualification."
+}
