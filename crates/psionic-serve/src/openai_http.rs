@@ -53,8 +53,9 @@ use psionic_router::{
     RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
 };
 use psionic_runtime::{
-    ExecutionCapabilityProfile, GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt,
-    PrefixCacheControl, PrefixCacheRefusalReason, PrefixCacheState, StructuredGrammarSyntax,
+    ClusterExecutionContext, ExecutionCapabilityProfile, ExecutionTopologyKind,
+    GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt, PrefixCacheControl,
+    PrefixCacheRefusalReason, PrefixCacheState, StructuredGrammarSyntax,
     StructuredOutputCapability, StructuredOutputExecutionReport, StructuredOutputMatcher,
     StructuredOutputParser, StructuredOutputRequest, StructuredOutputValue,
     StructuredTaggedVariant, local_structured_output_capabilities, local_structured_output_parsers,
@@ -4451,7 +4452,10 @@ async fn generic_health(
             state.as_ref(),
             &default_model,
         ),
-        sparse_expert_topology: published_model_sparse_expert_topology(state.as_ref(), &default_model),
+        sparse_expert_topology: published_model_sparse_expert_topology(
+            state.as_ref(),
+            &default_model,
+        ),
         multimodal_projection_mode: published_model_multimodal_projection_mode(
             state.as_ref(),
             &default_model,
@@ -6927,6 +6931,7 @@ async fn handle_chat_completions(
         psionic_structured_output: None,
         psionic_structured_value: None,
         psionic_tool_calls: None,
+        psionic_cluster_execution: None,
         psionic_claim_posture: None,
         psionic_scheduler: None,
     })
@@ -7087,6 +7092,10 @@ async fn handle_generic_chat_completions(
         .provenance
         .as_ref()
         .and_then(|value| value.structured_output.clone());
+    let cluster_execution = response
+        .provenance
+        .as_ref()
+        .and_then(|value| value.cluster_execution.clone());
     let structured_output_value = response.output.structured.clone();
     let scheduler_receipt = response
         .provenance
@@ -7144,6 +7153,7 @@ async fn handle_generic_chat_completions(
             local_serving_truth_for_route(state.as_ref(), &route),
             &route.selection,
             &route_execution,
+            cluster_execution.as_ref(),
             structured_output_report.as_ref(),
             scheduler_receipt.as_ref(),
             prefill_decode_mode,
@@ -7203,6 +7213,7 @@ async fn handle_generic_chat_completions(
             .and_then(|value| value.structured_output.clone()),
         psionic_structured_value: structured_output_value,
         psionic_tool_calls,
+        psionic_cluster_execution: cluster_execution.clone(),
         psionic_claim_posture: state
             .include_psionic_fields
             .then(|| {
@@ -7223,6 +7234,7 @@ async fn handle_generic_chat_completions(
         local_serving_truth_for_route(state.as_ref(), &route),
         &route.selection,
         &route_execution,
+        cluster_execution.as_ref(),
         structured_output_report.as_ref(),
         scheduler_receipt.as_ref(),
         prefill_decode_mode,
@@ -7451,6 +7463,10 @@ async fn handle_generic_responses(
         .provenance
         .as_ref()
         .and_then(|value| value.structured_output.clone());
+    let cluster_execution = response
+        .provenance
+        .as_ref()
+        .and_then(|value| value.cluster_execution.clone());
     let structured_output_value = response.output.structured.clone();
     let scheduler_receipt = response
         .provenance
@@ -7601,6 +7617,7 @@ async fn handle_generic_responses(
             .and_then(|value| value.structured_output.clone()),
         psionic_structured_value: structured_output_value,
         psionic_tool_calls,
+        psionic_cluster_execution: cluster_execution.clone(),
         psionic_claim_posture: state
             .include_psionic_fields
             .then(|| {
@@ -7621,6 +7638,7 @@ async fn handle_generic_responses(
         local_serving_truth_for_route(state.as_ref(), &route),
         &route.selection,
         &route_execution,
+        cluster_execution.as_ref(),
         structured_output_report.as_ref(),
         scheduler_receipt.as_ref(),
         prefill_decode_mode,
@@ -7733,6 +7751,7 @@ async fn handle_generic_embeddings(
         local_serving_truth_for_route(state.as_ref(), &route),
         &route.selection,
         &route_execution,
+        None,
         None,
         None,
         None,
@@ -7943,6 +7962,8 @@ struct ChatCompletionResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_tool_calls: Option<Vec<PsionicToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_cluster_execution: Option<ClusterExecutionContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_claim_posture: Option<crate::PsionServedOutputClaimPosture>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler: Option<GenerationSchedulerRequestReceipt>,
@@ -7980,6 +8001,8 @@ struct ResponsesResponse {
     psionic_structured_value: Option<StructuredOutputValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_tool_calls: Option<Vec<PsionicToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_cluster_execution: Option<ClusterExecutionContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_claim_posture: Option<crate::PsionServedOutputClaimPosture>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -8409,6 +8432,7 @@ fn insert_generic_execution_headers(
     local_serving_truth: LocalServingTruth,
     route_selection: &RouteSelection,
     route_execution: &MeshManagementRouteExecutionStatus,
+    cluster_execution: Option<&ClusterExecutionContext>,
     structured_output: Option<&StructuredOutputExecutionReport>,
     scheduler: Option<&GenerationSchedulerRequestReceipt>,
     prefill_decode_mode: Option<psionic_runtime::PrefillDecodeExecutionMode>,
@@ -8553,6 +8577,7 @@ fn insert_generic_execution_headers(
             );
         }
     }
+    insert_cluster_execution_headers(headers, cluster_execution);
     insert_structured_output_headers(headers, structured_output);
 }
 
@@ -8586,6 +8611,57 @@ fn insert_structured_output_headers(
         HeaderName::from_static("x-psionic-structured-output-parser"),
         HeaderValue::from_static(structured_output.parser.label()),
     );
+}
+
+fn insert_cluster_execution_headers(
+    headers: &mut HeaderMap,
+    cluster_execution: Option<&ClusterExecutionContext>,
+) {
+    let Some(cluster_execution) = cluster_execution else {
+        return;
+    };
+    headers.insert(
+        HeaderName::from_static("x-psionic-cluster-disposition"),
+        HeaderValue::from_static(match cluster_execution.disposition {
+            psionic_runtime::ClusterExecutionDisposition::LocalOnly => "local_only",
+            psionic_runtime::ClusterExecutionDisposition::RemoteWholeRequest => {
+                "remote_whole_request"
+            }
+            psionic_runtime::ClusterExecutionDisposition::ReplicaRouted => "replica_routed",
+            psionic_runtime::ClusterExecutionDisposition::Sharded => "sharded",
+        }),
+    );
+    if let Some(execution_topology) = cluster_execution.execution_topology.as_ref() {
+        headers.insert(
+            HeaderName::from_static("x-psionic-cluster-topology"),
+            HeaderValue::from_static(match execution_topology.kind {
+                ExecutionTopologyKind::SingleDevice => "single_device",
+                ExecutionTopologyKind::Replicated => "replicated",
+                ExecutionTopologyKind::PipelineSharded => "pipeline_sharded",
+                ExecutionTopologyKind::LayerSharded => "layer_sharded",
+                ExecutionTopologyKind::TensorSharded => "tensor_sharded",
+            }),
+        );
+    }
+    insert_usize_header(
+        headers,
+        "x-psionic-cluster-selected-nodes",
+        cluster_execution.selected_nodes.len(),
+    );
+    if !cluster_execution.pipeline_stages.is_empty() {
+        insert_usize_header(
+            headers,
+            "x-psionic-cluster-pipeline-stages",
+            cluster_execution.pipeline_stages.len(),
+        );
+    }
+    if !cluster_execution.shard_handoffs.is_empty() {
+        insert_usize_header(
+            headers,
+            "x-psionic-cluster-shard-handoffs",
+            cluster_execution.shard_handoffs.len(),
+        );
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -8975,7 +9051,9 @@ fn load_generic_decoder_model(
         inspection.admission().kind,
         GgufDecoderServingAdmissionKind::PendingExpertTopology
     )
-    .then(|| pending_topology_execution_refusal_reason(&descriptor, sparse_expert_topology.as_ref()));
+    .then(|| {
+        pending_topology_execution_refusal_reason(&descriptor, sparse_expert_topology.as_ref())
+    });
     let runtime_kind = match (backend, family, pending_topology_refusal.is_some()) {
         (OpenAiCompatBackend::Cpu, _, true) => {
             OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
@@ -9029,13 +9107,12 @@ fn load_generic_decoder_model(
                 OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => pending_topology_refusal,
             },
             sparse_expert_topology,
-            prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
-                .then(|| {
-                    GgufPromptTemplateRenderer::new(
-                        inspection.tokenizer().clone(),
-                        inspection.chat_templates().clone(),
-                    )
-                }),
+            prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss)).then(|| {
+                GgufPromptTemplateRenderer::new(
+                    inspection.tokenizer().clone(),
+                    inspection.chat_templates().clone(),
+                )
+            }),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
             execution_profile: generic_decoder_execution_profile(family, backend),
             scheduler_policy: generic_decoder_scheduler_policy(family, backend),
@@ -9154,7 +9231,9 @@ fn routed_sparse_expert_runtime_contract(
 fn routed_sparse_expert_topology_from_inspection(
     inspection: &GgufDecoderArtifactInspection,
 ) -> Option<RoutedSparseExpertTopology> {
-    let requirements = inspection.family_metadata().expert_topology_requirements()?;
+    let requirements = inspection
+        .family_metadata()
+        .expert_topology_requirements()?;
     let served_artifact_digest = inspection
         .descriptor()
         .weights
@@ -9199,10 +9278,10 @@ fn pending_topology_execution_refusal_reason(
             };
             format!(
                 "model `{}` requires distributed sparse placement before Psionic can claim native execution on this node: contract=`{runtime_contract}` experts={} active_experts={:?} artifact_digest={}",
-            descriptor.model.model_id,
-            topology.expert_count,
-            topology.active_expert_count,
-            topology.served_artifact_digest,
+                descriptor.model.model_id,
+                topology.expert_count,
+                topology.active_expert_count,
+                topology.served_artifact_digest,
             )
         }
         None => format!(
@@ -10005,9 +10084,10 @@ mod tests {
         OpenAiCompatConfig, OpenAiCompatRuntimeKind, OpenAiCompatServer, PromptTokenCache,
         PsionicGrammarRequest, PsionicReasoningMode, PsionicReasoningRequest,
         PsionicResponseStateRequest, ResolvedReasoningRequest, ResolvedToolCall,
-        ResponseContinuationMode, ResponsesInput, ResponsesRequest, RoutingEndpoint,
-        RoutingRequest, StopSequences, THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract,
-        ToolChoiceMode, ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
+        ResponseContinuationMode, ResponsesInput, ResponsesRequest, RouteSelection,
+        RouteSelectionStrategy, RoutingEndpoint, RoutingRequest, StopSequences,
+        THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract, ToolChoiceMode,
+        ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
         WARMING_FALLBACK_POSTURE, apply_tool_contract_to_prompt_messages,
         assistant_prompt_message_for_tool_loop, chat_messages_to_prompt_messages,
         chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
@@ -10070,9 +10150,9 @@ mod tests {
     };
     use psionic_router::{RoutedExecutionLocality, RoutedExecutionProvenance};
     use psionic_runtime::{
-        BatchExecutionPosture, ExecutionCapabilityProfile, PrefixCacheControl, PrefixCacheMode,
-        QueueDiscipline, StructuredGrammarSyntax, StructuredOutputRequest, StructuredOutputValue,
-        StructuredTaggedVariant,
+        BatchExecutionPosture, ClusterExecutionContext, ExecutionCapabilityProfile,
+        PrefixCacheControl, PrefixCacheMode, QueueDiscipline, StructuredGrammarSyntax,
+        StructuredOutputRequest, StructuredOutputValue, StructuredTaggedVariant,
     };
     use std::{
         collections::BTreeMap,
@@ -18226,6 +18306,7 @@ mod tests {
             psionic_structured_output: None,
             psionic_structured_value: None,
             psionic_tool_calls: None,
+            psionic_cluster_execution: None,
             psionic_claim_posture: Some(psion_claim_posture),
             psionic_scheduler: None,
         })?;
@@ -18239,6 +18320,274 @@ mod tests {
             serde_json::json!(true)
         );
         Ok(())
+    }
+
+    #[test]
+    fn chat_completion_response_serializes_cluster_execution_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = serde_json::to_value(super::ChatCompletionResponse {
+            id: String::from("chatcmpl-gemma4-cluster"),
+            object: "chat.completion",
+            created: 0,
+            model: String::from("gemma4:e4b"),
+            choices: vec![super::ChatCompletionChoice {
+                index: 0,
+                message: super::ChatCompletionResponseMessage {
+                    role: "assistant",
+                    content: Some(String::from("ok")),
+                    reasoning_content: None,
+                    tool_calls: None,
+                },
+                finish_reason: "stop",
+            }],
+            usage: super::ChatCompletionUsage {
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                total_tokens: 2,
+            },
+            psionic_metrics: None,
+            psionic_harmony: None,
+            psionic_reasoning: None,
+            psionic_perf: None,
+            psionic_output_text: Some(String::from("ok")),
+            psionic_output_tokens: Some(vec![1]),
+            psionic_structured_output: None,
+            psionic_structured_value: None,
+            psionic_tool_calls: None,
+            psionic_cluster_execution: Some(sample_gemma4_pipeline_sharded_cluster_execution()),
+            psionic_claim_posture: None,
+            psionic_scheduler: None,
+        })?;
+
+        assert_eq!(
+            payload["psionic_cluster_execution"]["disposition"],
+            serde_json::json!("sharded")
+        );
+        assert_eq!(
+            payload["psionic_cluster_execution"]["execution_topology"]["kind"],
+            serde_json::json!("pipeline_sharded")
+        );
+        assert_eq!(
+            payload["psionic_cluster_execution"]["selected_nodes"][0]["node_id"],
+            serde_json::json!("worker-a")
+        );
+        assert_eq!(
+            payload["psionic_cluster_execution"]["pipeline_stages"][1]["role"],
+            serde_json::json!("exit")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_execution_headers_surface_gemma4_pipeline_cluster_truth() {
+        let mut headers = HeaderMap::new();
+        let route_selection = sample_gemma4_route_selection();
+        let route_execution = super::route_execution_status_for_local_route(&route_selection);
+        let cluster_execution = sample_gemma4_pipeline_sharded_cluster_execution();
+
+        super::insert_generic_execution_headers(
+            &mut headers,
+            super::LocalServingTruth::cuda_native(),
+            &route_selection,
+            &route_execution,
+            Some(&cluster_execution),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            header_value(&headers, "x-psionic-cluster-disposition"),
+            Some(String::from("sharded"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-cluster-topology"),
+            Some(String::from("pipeline_sharded"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-cluster-selected-nodes"),
+            Some(String::from("2"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-cluster-pipeline-stages"),
+            Some(String::from("2"))
+        );
+        assert_eq!(
+            header_value(&headers, "x-psionic-cluster-shard-handoffs"),
+            Some(String::from("2"))
+        );
+    }
+
+    fn sample_gemma4_route_selection() -> RouteSelection {
+        RouteSelection {
+            worker_id: String::from("worker-a"),
+            peer_worker_id: None,
+            model_key: String::from("gemma4:e4b"),
+            canonical_name: String::from("gemma4:e4b"),
+            endpoint: RoutingEndpoint::ChatCompletions,
+            family: String::from("gemma4"),
+            backend_label: String::from("cuda"),
+            execution_mode_label: String::from("native"),
+            execution_engine_label: String::from("psionic"),
+            execution_locality: RoutedExecutionLocality::Local,
+            execution_provenance: RoutedExecutionProvenance::LocalExecution,
+            execution_profile: ExecutionCapabilityProfile::single_request_latency_optimized(),
+            scheduler_policy: None,
+            kv_cache_encoding_policy: None,
+            supported_kv_cache_encoding_policies: Vec::new(),
+            metrics: psionic_router::RouteSelectionMetrics {
+                eligible_workers: 2,
+                warm_workers: 2,
+                cache_matches: 0,
+                sampled_workers: 1,
+                selected_active_requests: 0,
+                strategy: RouteSelectionStrategy::WarmAware,
+                fallback_reason: None,
+            },
+            routing_notes: vec![String::from(
+                "gemma4:e4b stayed on the warm pipeline-sharded cluster route",
+            )],
+        }
+    }
+
+    fn sample_cuda_inventory(
+        stable_device_id: &str,
+        topology_key: &str,
+    ) -> psionic_runtime::DeviceInventoryQualifiers {
+        psionic_runtime::DeviceInventoryQualifiers {
+            stable_device_id: String::from(stable_device_id),
+            topology_key: Some(String::from(topology_key)),
+            performance_class: psionic_runtime::DevicePerformanceClass::DiscreteAccelerator,
+            memory_class: psionic_runtime::DeviceMemoryClass::DedicatedDevice,
+            total_memory_bytes: Some(24 * 1024 * 1024 * 1024),
+            free_memory_bytes: Some(20 * 1024 * 1024 * 1024),
+        }
+    }
+
+    fn sample_gemma4_pipeline_sharded_cluster_execution() -> ClusterExecutionContext {
+        let first = sample_cuda_inventory("cuda:0", "00000000:01:00.0");
+        let second = sample_cuda_inventory("cuda:1", "00000000:02:00.0");
+        let capability_profile = psionic_runtime::ClusterExecutionCapabilityProfile::new("cuda")
+            .with_supported_lanes(vec![
+                psionic_runtime::ClusterExecutionLane::RemoteWholeRequest,
+                psionic_runtime::ClusterExecutionLane::PipelineSharded,
+            ])
+            .with_serving_semantics_capability(psionic_runtime::ClusterServingSemantics::new(
+                psionic_runtime::ClusterExecutionLane::PipelineSharded,
+                ExecutionCapabilityProfile::single_request_latency_optimized(),
+                psionic_runtime::ClusterWarmRoutePosture::TopologyPinned,
+            ))
+            .with_detail(
+                "gemma4:e4b can run across two warm CUDA machines in one fixed stage order",
+            );
+        ClusterExecutionContext::new(
+            "cluster-alpha",
+            "cluster-state-digest",
+            "cluster-topology-digest",
+            "scheduler-node",
+            psionic_runtime::ClusterTransportClass::WiderNetworkStream,
+            psionic_runtime::ClusterExecutionDisposition::Sharded,
+        )
+        .with_communication_eligibility(
+            capability_profile.lane_communication_eligibility(
+                psionic_runtime::ClusterExecutionLane::PipelineSharded,
+            ),
+        )
+        .with_artifact_residency_digest("artifact-residency-digest")
+        .with_sharded_model_manifest_digest("gemma4-pipeline-manifest-digest")
+        .with_execution_topology(psionic_runtime::ExecutionTopologyPlan::pipeline_sharded(
+            "cuda",
+            vec![(first.clone(), 0, 21), (second.clone(), 21, 42)],
+        ))
+        .with_policy_digest(psionic_runtime::ClusterPolicyDigest::new(
+            psionic_runtime::ClusterPolicyDigestKind::Sharding,
+            "pipeline-policy-digest",
+        ))
+        .with_selected_nodes(vec![
+            psionic_runtime::ClusterSelectedNode::new("worker-a", "cuda")
+                .with_role("worker")
+                .with_device_inventory(first.clone())
+                .with_served_artifact_digest("gemma4-e4b-served-artifact-digest")
+                .with_artifact_residency(
+                    psionic_runtime::ClusterArtifactResidencyDisposition::Resident,
+                ),
+            psionic_runtime::ClusterSelectedNode::new("worker-b", "cuda")
+                .with_role("worker")
+                .with_device_inventory(second.clone())
+                .with_served_artifact_digest("gemma4-e4b-served-artifact-digest")
+                .with_artifact_residency(
+                    psionic_runtime::ClusterArtifactResidencyDisposition::Resident,
+                ),
+        ])
+        .with_pipeline_stages(vec![
+            psionic_runtime::ClusterPipelineStage::new(
+                0,
+                "worker-a",
+                psionic_runtime::ClusterPipelineStageRole::Entry,
+                0,
+                21,
+                30,
+                60,
+                20,
+            )
+            .with_handoff(
+                psionic_runtime::ClusterTransportClass::WiderNetworkStream,
+                Some(32),
+                Some(3_000),
+            )
+            .with_detail("entry machine owns layers [0..21) for gemma4:e4b"),
+            psionic_runtime::ClusterPipelineStage::new(
+                1,
+                "worker-b",
+                psionic_runtime::ClusterPipelineStageRole::Exit,
+                21,
+                42,
+                34,
+                68,
+                24,
+            )
+            .with_detail("exit machine owns layers [21..42) for gemma4:e4b"),
+        ])
+        .with_shard_handoffs(vec![
+            psionic_runtime::ClusterShardHandoff::new(
+                0,
+                1,
+                "worker-a",
+                "worker-b",
+                psionic_runtime::ClusterShardHandoffKind::Activation,
+                psionic_runtime::ClusterTransportClass::WiderNetworkStream,
+                21,
+                8192,
+            )
+            .with_detail("forward activations from the entry Gemma stage to the exit stage"),
+            psionic_runtime::ClusterShardHandoff::new(
+                0,
+                1,
+                "worker-a",
+                "worker-b",
+                psionic_runtime::ClusterShardHandoffKind::KvCache,
+                psionic_runtime::ClusterTransportClass::WiderNetworkStream,
+                21,
+                4096,
+            )
+            .with_detail("forward Gemma KV state across the stage boundary"),
+        ])
+        .with_serving_semantics(
+            capability_profile
+                .serving_semantics_capability(
+                    psionic_runtime::ClusterExecutionLane::PipelineSharded,
+                )
+                .cloned()
+                .expect("pipeline capability should expose serving semantics"),
+        )
+        .with_degraded_reason(
+            "public-network stage handoff adds fixed latency but keeps real split execution",
+        )
     }
 
     fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
@@ -18478,7 +18827,9 @@ mod tests {
         metadata
     }
 
-    fn sparse_gemma4_26b_metadata_with_chat_template(name: &str) -> Vec<(String, GgufMetadataValue)> {
+    fn sparse_gemma4_26b_metadata_with_chat_template(
+        name: &str,
+    ) -> Vec<(String, GgufMetadataValue)> {
         let mut metadata = dense_gemma4_metadata_with_chat_template(name);
         metadata.push((
             String::from("gemma4.expert_count"),

@@ -5369,10 +5369,12 @@ mod tests {
                 .map(|value| value.family),
             Some(KvCacheEncodingFamily::DenseF16Mirror)
         );
-        assert!(envelope
-            .supported_kv_cache_encoding_policies
-            .iter()
-            .any(|value| value.family == KvCacheEncodingFamily::DenseF16Mirror));
+        assert!(
+            envelope
+                .supported_kv_cache_encoding_policies
+                .iter()
+                .any(|value| value.family == KvCacheEncodingFamily::DenseF16Mirror)
+        );
         Ok(())
     }
 
@@ -6795,6 +6797,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -6803,6 +6807,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("cluster-plan"),
                 cluster_execution: Some(cluster_execution.clone()),
                 load_state: GenerationLoadState::Cold,
@@ -6941,6 +6946,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -6949,6 +6956,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("psion-evidence-plan"),
                 cluster_execution: None,
                 load_state: GenerationLoadState::Cold,
@@ -7049,6 +7057,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7057,6 +7067,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("psion-claim-plan"),
                 cluster_execution: None,
                 load_state: GenerationLoadState::Cold,
@@ -7151,6 +7162,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7159,6 +7172,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("cluster-plan-export"),
                 cluster_execution: Some(cluster_execution.clone()),
                 load_state: GenerationLoadState::Cold,
@@ -7264,11 +7278,14 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
                 served_artifact,
                 adapter_serving: Some(adapter_serving.clone()),
+                served_revision: None,
                 execution_plan_digest: String::from("adapter-plan"),
                 cluster_execution: None,
                 load_state: GenerationLoadState::Cold,
@@ -7371,6 +7388,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7379,6 +7398,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("cluster-plan-replicated"),
                 cluster_execution: Some(cluster_execution.clone()),
                 load_state: GenerationLoadState::Warm,
@@ -7493,6 +7513,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7501,6 +7523,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("cluster-plan-layer-sharded"),
                 cluster_execution: Some(cluster_execution.clone()),
                 load_state: GenerationLoadState::Warm,
@@ -7622,6 +7645,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7630,6 +7655,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("cluster-plan-pipeline-sharded"),
                 cluster_execution: Some(cluster_execution.clone()),
                 load_state: GenerationLoadState::Warm,
@@ -7712,6 +7738,122 @@ mod tests {
     }
 
     #[test]
+    fn text_generation_receipt_surfaces_gemma4_pipeline_sharded_cluster_execution_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let request = GenerationRequest::new_text(
+            "gen-gemma4-cluster-pipeline-sharded-1",
+            sample_gemma4_decoder_descriptor(),
+            Some(SessionId::new("sess-gemma4-cluster-pipeline-sharded-1")),
+            "hello",
+            GenerationOptions::greedy(2),
+        );
+        let cluster_execution = sample_pipeline_sharded_cluster_execution_context();
+        let first = sample_cuda_device().inventory_qualifiers();
+        let second = sample_cuda_device_1().inventory_qualifiers();
+        let response = GenerationResponse::new(
+            &request,
+            request.session_id.clone(),
+            TokenSequence::new(vec![psionic_serve::FixtureWordTokenizer::OPEN_ID]),
+            "open",
+            1,
+            2,
+            psionic_serve::TerminationReason::EndOfSequence,
+        )
+        .with_metrics_and_provenance(
+            GenerationMetrics {
+                total_duration_ns: Some(120),
+                load_duration_ns: Some(35),
+                prompt_eval_count: Some(1),
+                prompt_eval_duration_ns: Some(24),
+                context_window: None,
+                eval_count: Some(1),
+                eval_duration_ns: Some(86),
+                time_to_first_token_ns: None,
+                inter_token_latency_ns: None,
+                kv_cache: None,
+                kv_residency: None,
+                kv_cache_encoding: None,
+                prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
+                gpt_oss_perf: None,
+            },
+            GenerationProvenance {
+                served_artifact: served_artifact_identity_for_decoder_model(
+                    &request.model,
+                    &cpu_backend_selection(),
+                ),
+                adapter_serving: None,
+                served_revision: None,
+                execution_plan_digest: String::from("gemma4-cluster-plan-pipeline-sharded"),
+                cluster_execution: Some(cluster_execution.clone()),
+                load_state: GenerationLoadState::Warm,
+                isolation_policy: LocalServingIsolationPolicy::in_process_runtime(),
+                streaming_policy: None,
+                memory_plan: Some(default_decoder_memory_plan(&request.model, None, None)),
+                residency_policy: Some(ModelResidencyPolicy::default()),
+                residency_snapshot: None,
+                kv_cache_policy: Some(default_decoder_kv_cache_policy(&request.model)),
+                kv_cache_encoding_policy: None,
+                prefix_cache_state: Some(PrefixCacheState::None),
+                prefix_cache_policy: Some(default_prefix_cache_policy()),
+                prefix_cache_identity: None,
+                compile_path: None,
+                delivery_proof: None,
+                cache_observations: Vec::new(),
+                scheduler: None,
+                kv_ownership: None,
+                prefix_cache_control: None,
+                prefix_cache_refusal_reason: None,
+                structured_output: None,
+                psion_served_evidence: None,
+                psion_served_output_claim_posture: None,
+            },
+        );
+        let receipt = TextGenerationReceipt::succeeded_for_response(
+            cpu_backend_selection(),
+            &request,
+            &response,
+            "gemma4-cluster-plan-pipeline-sharded",
+            10,
+            120,
+        );
+
+        assert_eq!(receipt.model_id, "gemma4:e4b");
+        assert_eq!(receipt.model_family, "gemma4");
+        assert_eq!(
+            receipt.execution_topology.as_ref().map(|plan| plan.kind),
+            Some(psionic_runtime::ExecutionTopologyKind::PipelineSharded)
+        );
+        assert_eq!(receipt.cluster_execution, Some(cluster_execution.clone()));
+
+        let encoded = serde_json::to_value(&receipt)?;
+        assert_eq!(encoded["model_id"], json!("gemma4:e4b"));
+        assert_eq!(encoded["model_family"], json!("gemma4"));
+        assert_eq!(
+            encoded["execution_topology"]["kind"],
+            json!("pipeline_sharded")
+        );
+        assert_eq!(
+            encoded["cluster_execution"]["disposition"],
+            json!("sharded")
+        );
+        assert_eq!(
+            encoded["cluster_execution"]["pipeline_stages"][0]["role"],
+            json!("entry")
+        );
+        assert_eq!(
+            encoded["cluster_execution"]["selected_nodes"][0]["device_inventory"]["stable_device_id"],
+            json!(first.stable_device_id)
+        );
+        assert_eq!(
+            encoded["cluster_execution"]["selected_nodes"][1]["device_inventory"]["stable_device_id"],
+            json!(second.stable_device_id)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn text_generation_receipt_surfaces_tensor_sharded_cluster_execution_truth()
     -> Result<(), Box<dyn std::error::Error>> {
         let request = GenerationRequest::new_text(
@@ -7748,6 +7890,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7756,6 +7900,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("cluster-plan-tensor-sharded"),
                 cluster_execution: Some(cluster_execution.clone()),
                 load_state: GenerationLoadState::Warm,
@@ -7906,6 +8051,8 @@ mod tests {
                     default_decoder_kv_cache_encoding_policy(&request.model, "cpu"),
                 )),
                 prefix_tokens_reused: Some(1),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -7914,6 +8061,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("plan-digest-from-response"),
                 cluster_execution: None,
                 load_state: GenerationLoadState::Cold,
@@ -8200,6 +8348,8 @@ mod tests {
                     )),
                 }),
                 prefix_tokens_reused: None,
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -8208,6 +8358,7 @@ mod tests {
                     &cuda_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("turboquant-downgrade-plan"),
                 cluster_execution: None,
                 load_state: GenerationLoadState::Warm,
@@ -8261,16 +8412,20 @@ mod tests {
                 .map(|value| value.active.family),
             Some(KvCacheEncodingFamily::DenseF16Mirror)
         );
-        assert!(receipt
-            .kv_cache_encoding
-            .as_ref()
-            .is_some_and(|value| value.downgraded));
-        assert!(receipt
-            .kv_cache_encoding
-            .as_ref()
-            .and_then(|value| value.refusal_reason.as_deref())
-            .unwrap_or_default()
-            .contains("only runs on CUDA"));
+        assert!(
+            receipt
+                .kv_cache_encoding
+                .as_ref()
+                .is_some_and(|value| value.downgraded)
+        );
+        assert!(
+            receipt
+                .kv_cache_encoding
+                .as_ref()
+                .and_then(|value| value.refusal_reason.as_deref())
+                .unwrap_or_default()
+                .contains("only runs on CUDA")
+        );
         Ok(())
     }
 
@@ -8394,6 +8549,8 @@ mod tests {
                 kv_residency: None,
                 kv_cache_encoding: None,
                 prefix_tokens_reused: Some(0),
+                termination_detail: None,
+                qwen35_cuda_decode: None,
                 gpt_oss_perf: None,
             },
             GenerationProvenance {
@@ -8402,6 +8559,7 @@ mod tests {
                     &cpu_backend_selection(),
                 ),
                 adapter_serving: None,
+                served_revision: None,
                 execution_plan_digest: String::from("stream-plan"),
                 cluster_execution: None,
                 load_state: GenerationLoadState::Cold,
@@ -8756,6 +8914,15 @@ mod tests {
     fn sample_gpt_oss_decoder_descriptor() -> psionic_serve::DecoderModelDescriptor {
         let mut descriptor = sample_decoder_descriptor();
         descriptor.model.family = String::from("gpt-oss");
+        descriptor
+    }
+
+    fn sample_gemma4_decoder_descriptor() -> psionic_serve::DecoderModelDescriptor {
+        let mut descriptor = sample_decoder_descriptor();
+        descriptor.model.model_id = String::from("gemma4:e4b");
+        descriptor.model.family = String::from("gemma4");
+        descriptor.tokenizer_family = String::from("gemma4");
+        descriptor.weights.digest = String::from("gemma4-e4b-fixture-digest");
         descriptor
     }
 

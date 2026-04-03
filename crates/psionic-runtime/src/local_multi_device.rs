@@ -2353,6 +2353,83 @@ mod tests {
     }
 
     #[test]
+    fn local_multi_device_plan_runner_executes_gemma4_pipeline_sharded_workload_with_direct_handoff()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let device0 = sample_cuda_device(0, 24 * 1024 * 1024 * 1024);
+        let device1 = sample_cuda_device(1, 24 * 1024 * 1024 * 1024);
+        let execution_topology = crate::ExecutionTopologyPlan::pipeline_sharded(
+            "cuda",
+            vec![
+                (device0.inventory_qualifiers(), 0, 21),
+                (device1.inventory_qualifiers(), 21, 42),
+            ],
+        );
+        let selection = BackendSelection::direct_with_policy(
+            "cuda",
+            Some(device0.clone()),
+            vec![String::from("matmul"), String::from("add")],
+            ServedProductBackendPolicy::same_backend_only(),
+        )
+        .with_selected_devices(vec![device0.clone(), device1.clone()])
+        .with_execution_topology(Some(execution_topology));
+        let contract = sample_gemma4_layer_contract()?;
+        let manifest = sample_gemma4_layer_manifest()?;
+        let plan = sample_plan();
+        let inputs = sample_inputs(&plan);
+        let mut runtimes = vec![
+            MockLocalShardRuntime::with_direct_stage_handoff(device0.clone(), true),
+            MockLocalShardRuntime::with_direct_stage_handoff(device1.clone(), true),
+        ];
+
+        let outcome = execute_local_multi_device_plan(
+            runtimes.as_mut_slice(),
+            LocalMultiDeviceExecutionRequest::new(&plan, &selection, &contract, &manifest, &inputs),
+        )?;
+        let report = outcome.report;
+
+        assert_eq!(report.runtime_backend, "cuda");
+        assert_eq!(report.model_family, "gguf_decoder:gemma4");
+        assert_eq!(
+            report.execution_topology.kind,
+            crate::ExecutionTopologyKind::PipelineSharded
+        );
+        assert_eq!(
+            report.collective_posture,
+            LocalCollectivePosture::HostMediatedSequentialHandoff
+        );
+        assert_eq!(
+            report.outcome_posture,
+            LocalExecutionOutcomePosture::FinalOutputsAndMetrics
+        );
+        assert_eq!(report.stage_handoff_count, 1);
+        assert_eq!(report.stage_handoffs.len(), 1);
+        assert_eq!(
+            report.stage_handoffs[0].transport,
+            LocalStageHandoffTransport::DirectWorker
+        );
+        assert_eq!(
+            report.stage_handoffs[0].handoff_id.as_deref(),
+            Some("shard0-to-shard1")
+        );
+        assert_eq!(report.final_output_tensor_ids, vec![TensorId(3)]);
+        assert!(outcome.outputs.contains_key(&TensorId(3)));
+        assert_eq!(report.shard_reports[0].artifact_id, "gemma4.e4b.layers0_21");
+        assert_eq!(
+            report.shard_reports[1].artifact_id,
+            "gemma4.e4b.layers21_42"
+        );
+        assert_eq!(
+            runtimes[0].observed_artifact_ids,
+            vec!["gemma4.e4b.layers0_21"]
+        );
+        assert_eq!(
+            runtimes[1].observed_artifact_ids,
+            vec!["gemma4.e4b.layers21_42"]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn local_sharding_contract_refuses_backend_memory_and_device_count_mismatches()
     -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 4 * 1024 * 1024 * 1024);
@@ -2847,6 +2924,56 @@ mod tests {
         )?)
     }
 
+    fn sample_gemma4_layer_contract() -> Result<LocalShardingContract, Box<dyn std::error::Error>> {
+        Ok(LocalShardingContract::new(
+            "gguf-decoder-gemma4-pp-v1",
+            "gguf_decoder:gemma4",
+            "cuda",
+            ShardedModelLayoutKind::LayerSharded,
+            2,
+            Some(2),
+            Some(20 * 1024 * 1024 * 1024),
+            vec![
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::TokenEmbedding,
+                    LocalWeightShardingStrategy::Replicated,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::AttentionQuery,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::AttentionKey,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::AttentionValue,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::AttentionOutput,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::FeedForwardGate,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::FeedForwardUp,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::FeedForwardDown,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::KvCache,
+                    LocalWeightShardingStrategy::Replicated,
+                ),
+            ],
+        )?)
+    }
+
     fn sample_layer_manifest() -> Result<ShardedModelManifest, Box<dyn std::error::Error>> {
         let served_artifact = ServedArtifactIdentity::new(
             "fixture-word-decoder-v0",
@@ -2881,6 +3008,44 @@ mod tests {
             ExecutionPartition::LayerRange {
                 start_layer: 16,
                 end_layer: 32,
+            },
+        )))
+    }
+
+    fn sample_gemma4_layer_manifest() -> Result<ShardedModelManifest, Box<dyn std::error::Error>> {
+        let served_artifact = ServedArtifactIdentity::new(
+            "gemma4:e4b",
+            "pilot",
+            "gemma4-e4b-bundle-digest",
+            Some(String::from("gemma4-e4b-model-blob-digest")),
+            Some(String::from("gemma4-tokenizer-digest")),
+            Some(String::from("gemma4-template-digest")),
+            "gemma4-defaults-digest",
+            "gguf",
+            QuantizationMode::GgmlQ4_0,
+            BackendToolchainIdentity::new("cuda", "cuda@0.1.0", vec![]),
+        );
+        Ok(ShardedModelManifest::new(
+            "gemma4-e4b-pipeline-manifest",
+            served_artifact,
+            ShardedModelLayoutKind::LayerSharded,
+        )
+        .with_shard(ShardedModelArtifactRef::new(
+            0,
+            "gemma4.e4b.layers0_21",
+            "gemma4-layer-digest-0",
+            ExecutionPartition::LayerRange {
+                start_layer: 0,
+                end_layer: 21,
+            },
+        ))
+        .with_shard(ShardedModelArtifactRef::new(
+            1,
+            "gemma4.e4b.layers21_42",
+            "gemma4-layer-digest-1",
+            ExecutionPartition::LayerRange {
+                start_layer: 21,
+                end_layer: 42,
             },
         )))
     }

@@ -81,8 +81,16 @@ than just run tensor math.
     placement is admitted
   - claim boundary = truthful topology publication only; this does not promote
     single-node native `gemma4:26b` execution
-- The first distributed `Gemma 4` mesh validation now rides the bootstrap path
-  too:
+- The first real distributed `Gemma 4` proof is now one split
+  `pipeline_sharded` `gemma4:e4b` request across two CUDA machines:
+  - execution target = dense `gemma4:e4b`
+  - realized topology = `pipeline_sharded`
+  - realized disposition = `sharded`
+  - request publication now exposes the clustered path directly in response
+    headers and response or receipt provenance instead of inferring it from a
+    remote route
+- The older bootstrap path still exists, but it remains explicitly classified
+  as remote whole-request proxying:
   - remote execution target = CUDA-backed `gemma4:e4b`
   - routed publication keeps remote route truth explicit on `/v1/models` with
     `route_backend = cuda`, `route_execution_mode = native`, and
@@ -98,8 +106,12 @@ than just run tensor math.
   - execution posture = adjacent shard runtimes prefer direct worker-to-worker
     stage handoff when both sides support it and otherwise fall back to the
     host-mediated path, with final output assembly on the last stage
-  - claim boundary = runtime-core execution truth only; this does not by
-    itself promote a broader wallet-settled served product claim
+  - `gemma4:e4b` now has one bounded proof on top of that runtime-core path
+    through runtime reports, provider receipts, and generic-server response
+    headers
+  - claim boundary = one bounded split dense path only; this does not by
+    itself promote broader wallet-settled or sparse-family served product
+    claims
 - `Gemma 4` now also has one first-class Metal lane contract on the generic
   OpenAI-compatible server:
   - `backend = metal`

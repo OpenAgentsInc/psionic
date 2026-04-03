@@ -4,7 +4,9 @@
 > `#865`, and `#866`; `#867` then added one optional dense `31B` validation
 > lane that reuses the same family contract without widening the original
 > published claim; `#880` then closed the first trainer-to-serving promoted-
-> revision seam for the bounded `gemma4:e4b` lane.
+> revision seam for the bounded `gemma4:e4b` lane; `#895` then replaced the
+> old proxy-only distributed proof with one real split-execution proof for
+> `gemma4:e4b`.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -70,14 +72,16 @@ Psionic now publishes exactly one bounded dense `Gemma 4` lane:
 - published audio posture = one `processor_owned` audio lane on `e2b` and
   `e4b` only, with `input_audio` publication and explicit refusal on the
   current generic OpenAI surface until a real audio processor lands
-- distributed proof surface = one bootstrap-routed remote `gemma4:e4b` lane
-  with honest proxy publication
+- distributed proof surface = one real `pipeline_sharded` `gemma4:e4b`
+  execution path across two CUDA machines, with request headers and receipts
+  that publish the realized clustered topology
 
 This published lane is not the claim "Psionic supports Gemma 4" in the broad
 sense. It is the smaller claim that Psionic can admit one dense `Gemma 4`
-artifact, execute it natively on CUDA, route to the same family through the
-mesh bootstrap path, and keep unsupported regions refused instead of widening
-the claim by implication.
+artifact, execute it natively on CUDA, execute one real split request across
+multiple CUDA machines, keep the old remote-proxy path explicit as just
+proxying, and keep unsupported regions refused instead of widening the claim by
+implication.
 
 ## Second Dense Validation Lane
 
@@ -221,9 +225,14 @@ conformance work:
 - the same bounded family contract now also has one optional dense `31B`
   validation repeat and one optional real-artifact tokenizer and prompt-render
   check, both keyed off `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH`.
-- the same `gemma4:e4b` lane now also has one first distributed bootstrap-mesh
-  validation path, keeping routed remote publication explicit instead of
-  silently widening the thin-client lane.
+- the same `gemma4:e4b` lane now also has one first real split-execution
+  proof: the repo carries a machine-checkable `pipeline_sharded` Gemma request
+  across two CUDA workers, plus matching response headers and receipt surfaces
+  that publish `cluster_disposition = sharded` and
+  `cluster_topology = pipeline_sharded`.
+- the older bootstrap-mesh path is still useful, but it now stays explicitly
+  classified as remote whole-request proxying instead of being treated as the
+  distributed proof.
 - the managed dense-GGUF lane now allocates whole-model KV-cache width instead
   of silently falling back to one-layer fixture geometry, and the repo now
   carries a multi-layer regression that keeps that boundary explicit.
@@ -282,8 +291,9 @@ What still does not exist:
   adapter-SFT lane
 - no RL-first, DPO-first, or full-model Gemma finetuning claim
 - no broader published support claim beyond the bounded dense `e4b` CUDA lane,
-  server admission, the refusal-only Metal contract, routed mesh validation,
-  repo-owned conformance coverage, and the optional `31B` validation repeat
+  one real split-execution proof, the refusal-only Metal contract, routed mesh
+  publication, repo-owned conformance coverage, and the optional `31B`
+  validation repeat
 
 ## Canonical Repeat
 
@@ -292,6 +302,15 @@ The published lane is repeatable through repo-owned tests.
 Documented local validation:
 
 ```bash
+cargo test -p psionic-runtime \
+  local_multi_device_plan_runner_executes_gemma4_pipeline_sharded_workload_with_direct_handoff \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-provider \
+  text_generation_receipt_surfaces_gemma4_pipeline_sharded_cluster_execution_truth \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_execution_headers_surface_gemma4_pipeline_cluster_truth \
+  --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve conformance --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve gemma4 --manifest-path Cargo.toml --no-default-features
 ```
@@ -343,8 +362,10 @@ Those runs are the current publication bar. They prove:
   both the artifact and a usable CUDA host are present
 - optional repeatable validation against a local dense `31B` GGUF when that
   artifact is supplied explicitly
+- one real split-execution Gemma proof across two CUDA workers, with
+  machine-checkable receipt and header publication for the clustered topology
 - bootstrap-routed mesh publication that keeps remote `Gemma 4` route truth
-  explicit instead of widening the thin-client claim
+  explicit instead of widening the thin-client claim into split execution
 
 ## Pass Criteria
 
@@ -362,6 +383,9 @@ The pilot stays green only if all of the following remain true:
 - structured outputs still fail closed on the published lane
 - the generic server still publishes `processor_owned` for Gemma image/video
   media and still refuses direct media URL parts explicitly
+- split-execution publication keeps `cluster_disposition = sharded` and
+  `cluster_topology = pipeline_sharded` machine-checkable on the bounded proof
+  path
 - mesh bootstrap publication keeps routed remote truth explicit and does not
   borrow a local host's wider endpoint claim
 - when `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH` is supplied, the dense `31B`
