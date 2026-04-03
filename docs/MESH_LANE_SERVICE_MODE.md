@@ -6,6 +6,11 @@
 `psionic-mesh-lane` is the supported operator entrypoint for installing one
 durable pooled-inference lane on one machine.
 
+It is also the owned integration seam for the rest of the stack. `openagents`
+may shell out to this binary for install, export, or import workflows, and
+`probe` may attach to the resulting management surface, but neither repo
+depends on a separate external mesh sidecar product.
+
 It does four things that the lower-level server binaries do not:
 
 1. materializes one stable on-disk root for config, model paths, logs, node

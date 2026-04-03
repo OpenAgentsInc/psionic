@@ -208,7 +208,10 @@ supported service-mode entrypoint for durable inference-mesh nodes.
 
 It materializes one lane root with config, file-backed node identity, durable
 network state, logs, model paths, and generated `launchd` / `systemd` service
-artifacts. The full operator runbook lives in
+artifacts. `openagents` and `probe` integrate against that Psionic-owned
+service binary and its management surfaces directly; the supported pooled
+inference path does not depend on any separate mesh sidecar runtime. The full
+operator runbook lives in
 [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md).
 
 ## GPT-OSS Benchmark Proof
