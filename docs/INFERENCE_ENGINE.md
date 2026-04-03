@@ -104,6 +104,21 @@ than just run tensor math.
   - request publication now exposes the clustered path directly in response
     headers and response or receipt provenance instead of inferring it from a
     remote route
+- The generic OpenAI-compatible server, routed inventory, and mesh management
+  status now also publish one family-agnostic clustered-execution summary for
+  every admitted model row:
+  - generic execution modes = `remote_whole_request`, `replicated`,
+    `dense_split`, `sparse_expert`
+  - generic topology kinds = `replicated`, `pipeline_sharded`,
+    `layer_sharded`, `tensor_sharded`
+  - publication surfaces = `/health`, `/v1/models`, routed inventory, and
+    mesh management status
+  - local routed detail = routed inventory and mesh management status can also
+    carry one runtime-owned cluster capability profile that explains which
+    multi-machine path is actually admitted on that row
+  - intent = downstream product surfaces no longer need `gpt_oss`-specific
+    inference to tell whether a model is proxied to one remote host, replicated
+    across hosts, split across hosts, or running as a sparse expert topology
 - The older bootstrap path still exists, but it remains explicitly classified
   as remote whole-request proxying:
   - remote execution target = CUDA-backed `gemma4:e4b`

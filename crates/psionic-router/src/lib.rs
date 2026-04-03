@@ -82,8 +82,8 @@ pub use tool_loop::{
 };
 
 use psionic_runtime::{
-    ExecutionCapabilityProfile, GenerationSchedulerPolicy, HealthStatus, KvCacheEncodingFamily,
-    KvCacheEncodingPolicy,
+    ClusterExecutionCapabilityProfile, ExecutionCapabilityProfile, ExecutionTopologyKind,
+    GenerationSchedulerPolicy, HealthStatus, KvCacheEncodingFamily, KvCacheEncodingPolicy,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -638,6 +638,15 @@ pub struct RoutedModelInventory {
     /// execute locally yet.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_refusal_reason: Option<String>,
+    /// Generic clustered execution modes admitted or published for this route.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    /// Cluster topology kinds admitted or published for this route.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cluster_execution_topologies: Vec<ExecutionTopologyKind>,
+    /// Runtime-owned cluster capability profile when this route publishes one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster_execution_capability_profile: Option<ClusterExecutionCapabilityProfile>,
     /// Explicit sparse expert-topology truth for family-specific distributed
     /// lanes.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -648,6 +657,20 @@ pub struct RoutedModelInventory {
     pub sparse_shard_state: Option<RoutedSparseShardState>,
     /// Live runtime facts that cache-aware and warm-aware policy can consume.
     pub runtime_state: RoutedModelRuntimeState,
+}
+
+/// Generic clustered execution mode surfaced to downstream consumers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedClusterExecutionMode {
+    /// Forward the whole request to one remote executor.
+    RemoteWholeRequest,
+    /// Route requests across multiple warm full-model replicas.
+    Replicated,
+    /// Split one dense model across multiple machines.
+    DenseSplit,
+    /// Execute one sparse or MoE family across distributed expert hosts.
+    SparseExpert,
 }
 
 /// Runtime contract required for one sparse expert lane.
@@ -839,6 +862,9 @@ impl RoutedModelInventory {
             tool_calling: false,
             response_state: false,
             execution_refusal_reason: None,
+            cluster_execution_modes: Vec::new(),
+            cluster_execution_topologies: Vec::new(),
+            cluster_execution_capability_profile: None,
             sparse_expert_topology: None,
             sparse_shard_state: None,
             runtime_state: RoutedModelRuntimeState::default(),
@@ -927,6 +953,51 @@ impl RoutedModelInventory {
         execution_refusal_reason: impl Into<String>,
     ) -> Self {
         self.execution_refusal_reason = Some(execution_refusal_reason.into());
+        self
+    }
+
+    /// Publishes one generic clustered execution mode for the lane.
+    #[must_use]
+    pub fn with_cluster_execution_mode(
+        mut self,
+        cluster_execution_mode: RoutedClusterExecutionMode,
+    ) -> Self {
+        if !self
+            .cluster_execution_modes
+            .iter()
+            .any(|existing| existing == &cluster_execution_mode)
+        {
+            self.cluster_execution_modes.push(cluster_execution_mode);
+            self.cluster_execution_modes.sort_unstable();
+        }
+        self
+    }
+
+    /// Publishes one cluster topology kind for the lane.
+    #[must_use]
+    pub fn with_cluster_execution_topology(
+        mut self,
+        cluster_execution_topology: ExecutionTopologyKind,
+    ) -> Self {
+        if !self
+            .cluster_execution_topologies
+            .iter()
+            .any(|existing| existing == &cluster_execution_topology)
+        {
+            self.cluster_execution_topologies
+                .push(cluster_execution_topology);
+            self.cluster_execution_topologies.sort_unstable();
+        }
+        self
+    }
+
+    /// Publishes one runtime-owned cluster capability profile for the lane.
+    #[must_use]
+    pub fn with_cluster_execution_capability_profile(
+        mut self,
+        cluster_execution_capability_profile: ClusterExecutionCapabilityProfile,
+    ) -> Self {
+        self.cluster_execution_capability_profile = Some(cluster_execution_capability_profile);
         self
     }
 
@@ -2148,16 +2219,19 @@ fn cache_entry_matches_kv_cache_encoding(
 mod tests {
     use super::{
         FleetRouter, ReliabilityAction, ReliabilityReason, RouteReliabilityController,
-        RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry, RoutedExecutionLocality,
-        RoutedExecutionProvenance, RoutedModelInventory, RoutedSparseExpertRuntimeContract,
-        RoutedSparseExpertTopology, RoutedSparseShardArtifactStatus, RoutedSparseShardHealth,
-        RoutedSparseShardReplica, RoutedSparseShardState, RoutedWarmState, RoutedWorkerInventory,
-        RoutingDemandKey, RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError,
-        RoutingRequest, WorkerCircuitState,
+        RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry,
+        RoutedClusterExecutionMode, RoutedExecutionLocality, RoutedExecutionProvenance,
+        RoutedModelInventory, RoutedSparseExpertRuntimeContract, RoutedSparseExpertTopology,
+        RoutedSparseShardArtifactStatus, RoutedSparseShardHealth, RoutedSparseShardReplica,
+        RoutedSparseShardState, RoutedWarmState, RoutedWorkerInventory, RoutingDemandKey,
+        RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError, RoutingRequest,
+        WorkerCircuitState,
     };
     use psionic_runtime::{
-        ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily, KvCacheEncodingObjective,
-        KvCacheEncodingPolicy, PrefillDecodeCapability,
+        ClusterExecutionCapabilityProfile, ClusterExecutionLane, ClusterServingSemantics,
+        ClusterWarmRoutePosture, ExecutionCapabilityProfile, ExecutionTopologyKind, HealthStatus,
+        KvCacheEncodingFamily, KvCacheEncodingObjective, KvCacheEncodingPolicy,
+        PrefillDecodeCapability,
     };
 
     fn sample_profile() -> ExecutionCapabilityProfile {
@@ -2438,6 +2512,53 @@ mod tests {
             .routed_model("worker-gemma4-26b", "gemma4:26b")
             .expect("router inventory should keep gemma4 26b shard truth");
         assert_eq!(routed_model.sparse_shard_state.as_ref(), Some(&shard_state));
+    }
+
+    #[test]
+    fn router_keeps_generic_cluster_execution_truth_in_inventory() {
+        let capability_profile = ClusterExecutionCapabilityProfile::new("cuda")
+            .with_supported_lanes(vec![ClusterExecutionLane::PipelineSharded])
+            .with_serving_semantics_capability(ClusterServingSemantics::new(
+                ClusterExecutionLane::PipelineSharded,
+                sample_profile(),
+                ClusterWarmRoutePosture::TopologyPinned,
+            ));
+        let router = FleetRouter::new(
+            "gemma4:e4b",
+            vec![
+                RoutedWorkerInventory::new("worker-gemma4-e4b", "cuda", "native", "psionic")
+                    .with_model(
+                        RoutedModelInventory::new(
+                            "gemma4:e4b",
+                            "gemma4:e4b",
+                            "gemma4",
+                            sample_profile(),
+                        )
+                        .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                        .with_supported_endpoint(RoutingEndpoint::Responses)
+                        .with_cluster_execution_mode(RoutedClusterExecutionMode::DenseSplit)
+                        .with_cluster_execution_topology(ExecutionTopologyKind::PipelineSharded)
+                        .with_cluster_execution_capability_profile(capability_profile.clone()),
+                    ),
+            ],
+        )
+        .expect("router should build");
+
+        let routed_model = router
+            .routed_model("worker-gemma4-e4b", "gemma4:e4b")
+            .expect("router inventory should keep cluster execution truth");
+        assert_eq!(
+            routed_model.cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::DenseSplit]
+        );
+        assert_eq!(
+            routed_model.cluster_execution_topologies,
+            vec![ExecutionTopologyKind::PipelineSharded]
+        );
+        assert_eq!(
+            routed_model.cluster_execution_capability_profile.as_ref(),
+            Some(&capability_profile)
+        );
     }
 
     #[test]

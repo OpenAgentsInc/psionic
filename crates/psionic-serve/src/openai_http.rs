@@ -50,17 +50,18 @@ use psionic_net::{
 use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
     ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore, RouteSelection,
-    RouteSelectionStrategy, RoutedExecutionLocality, RoutedExecutionProvenance,
-    RoutedModelInventory, RoutedSparseExpertRuntimeContract, RoutedSparseExpertTopology,
-    RoutedSparseShardArtifactStatus, RoutedSparseShardHealth, RoutedSparseShardReplica,
-    RoutedSparseShardState, RoutedWarmState, RoutedWorkerInventory, RoutingDemandLedger,
-    RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
-    SparseRouteBinding,
+    RouteSelectionStrategy, RoutedClusterExecutionMode, RoutedExecutionLocality,
+    RoutedExecutionProvenance, RoutedModelInventory, RoutedSparseExpertRuntimeContract,
+    RoutedSparseExpertTopology, RoutedSparseShardArtifactStatus, RoutedSparseShardHealth,
+    RoutedSparseShardReplica, RoutedSparseShardState, RoutedWarmState, RoutedWorkerInventory,
+    RoutingDemandLedger, RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest,
+    RoutingTarget, SparseRouteBinding,
 };
 use psionic_runtime::{
-    ClusterExecutionContext, ExecutionCapabilityProfile, ExecutionTopologyKind,
-    GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt, PrefixCacheControl,
-    PrefixCacheRefusalReason, PrefixCacheState, StructuredGrammarSyntax,
+    ClusterExecutionCapabilityProfile, ClusterExecutionContext, ClusterExecutionLane,
+    ClusterServingSemantics, ClusterWarmRoutePosture, ExecutionCapabilityProfile,
+    ExecutionTopologyKind, GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt,
+    PrefixCacheControl, PrefixCacheRefusalReason, PrefixCacheState, StructuredGrammarSyntax,
     StructuredOutputCapability, StructuredOutputExecutionReport, StructuredOutputMatcher,
     StructuredOutputParser, StructuredOutputRequest, StructuredOutputValue,
     StructuredTaggedVariant, local_structured_output_capabilities, local_structured_output_parsers,
@@ -1143,6 +1144,12 @@ struct BootstrapRemoteModelStatus {
     #[serde(default)]
     execution_refusal_reason: Option<String>,
     #[serde(default)]
+    cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    #[serde(default)]
+    cluster_execution_topologies: Vec<ExecutionTopologyKind>,
+    #[serde(default)]
+    cluster_execution_capability_profile: Option<ClusterExecutionCapabilityProfile>,
+    #[serde(default)]
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     #[serde(default)]
     sparse_shard_state: Option<RoutedSparseShardState>,
@@ -1207,6 +1214,12 @@ struct MeshManagementModelStatus {
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     execution_refusal_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    cluster_execution_topologies: Vec<ExecutionTopologyKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cluster_execution_capability_profile: Option<ClusterExecutionCapabilityProfile>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1903,6 +1916,9 @@ struct OpenAiCompatLoadedDecoderModel {
     multimodal_lane: Option<OpenAiCompatMultimodalLane>,
     audio_lane: Option<OpenAiCompatAudioLane>,
     execution_refusal_reason: Option<String>,
+    cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    cluster_execution_topologies: Vec<ExecutionTopologyKind>,
+    cluster_execution_capability_profile: Option<ClusterExecutionCapabilityProfile>,
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     sparse_shard_state: Option<RoutedSparseShardState>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
@@ -2174,6 +2190,23 @@ impl OpenAiCompatLoadedModel {
     fn execution_refusal_reason(&self) -> Option<&str> {
         self.decoder()
             .and_then(|model| model.execution_refusal_reason.as_deref())
+    }
+
+    fn cluster_execution_modes(&self) -> Vec<RoutedClusterExecutionMode> {
+        self.decoder()
+            .map(|model| model.cluster_execution_modes.clone())
+            .unwrap_or_default()
+    }
+
+    fn cluster_execution_topologies(&self) -> Vec<ExecutionTopologyKind> {
+        self.decoder()
+            .map(|model| model.cluster_execution_topologies.clone())
+            .unwrap_or_default()
+    }
+
+    fn cluster_execution_capability_profile(&self) -> Option<&ClusterExecutionCapabilityProfile> {
+        self.decoder()
+            .and_then(|model| model.cluster_execution_capability_profile.as_ref())
     }
 
     fn sparse_expert_topology(&self) -> Option<&RoutedSparseExpertTopology> {
@@ -2670,6 +2703,9 @@ fn mesh_management_model_status(model: &RoutedModelInventory) -> MeshManagementM
         execution_profile: model.execution_profile.clone(),
         scheduler_policy: model.scheduler_policy.clone(),
         execution_refusal_reason: model.execution_refusal_reason.clone(),
+        cluster_execution_modes: model.cluster_execution_modes.clone(),
+        cluster_execution_topologies: model.cluster_execution_topologies.clone(),
+        cluster_execution_capability_profile: model.cluster_execution_capability_profile.clone(),
         sparse_expert_topology: model.sparse_expert_topology.clone(),
         sparse_shard_state: model.sparse_shard_state.clone(),
     }
@@ -3106,6 +3142,15 @@ fn bootstrap_remote_model_inventory(
     if let Some(reason) = model.execution_refusal_reason.clone() {
         inventory = inventory.with_execution_refusal_reason(reason);
     }
+    for mode in &model.cluster_execution_modes {
+        inventory = inventory.with_cluster_execution_mode(*mode);
+    }
+    for topology in &model.cluster_execution_topologies {
+        inventory = inventory.with_cluster_execution_topology(*topology);
+    }
+    if let Some(profile) = model.cluster_execution_capability_profile.clone() {
+        inventory = inventory.with_cluster_execution_capability_profile(profile);
+    }
     if let Some(topology) = model.sparse_expert_topology.clone() {
         inventory = inventory.with_sparse_expert_topology(topology);
     }
@@ -3134,6 +3179,11 @@ fn bootstrap_management_node(
             execution_profile: model.execution_profile().clone(),
             scheduler_policy: model.scheduler_policy().cloned(),
             execution_refusal_reason: model.execution_refusal_reason().map(String::from),
+            cluster_execution_modes: model.cluster_execution_modes(),
+            cluster_execution_topologies: model.cluster_execution_topologies(),
+            cluster_execution_capability_profile: model
+                .cluster_execution_capability_profile()
+                .cloned(),
             sparse_expert_topology: model.sparse_expert_topology().cloned(),
             sparse_shard_state: model.sparse_shard_state().cloned(),
         })
@@ -4167,6 +4217,10 @@ struct ModelCard {
     psionic_scheduler_policy: Option<GenerationSchedulerPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_execution_refusal_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    psionic_cluster_execution_topologies: Vec<ExecutionTopologyKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4200,6 +4254,8 @@ struct PublishedGenericModelAccumulator {
     execution_profile: ExecutionCapabilityProfile,
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     execution_refusal_reason: Option<String>,
+    cluster_execution_modes: BTreeSet<RoutedClusterExecutionMode>,
+    cluster_execution_topologies: BTreeSet<ExecutionTopologyKind>,
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     sparse_shard_state: Option<RoutedSparseShardState>,
     route_workers: BTreeSet<String>,
@@ -4223,6 +4279,8 @@ struct PublishedGenericModel {
     execution_profile: ExecutionCapabilityProfile,
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     execution_refusal_reason: Option<String>,
+    cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    cluster_execution_topologies: Vec<ExecutionTopologyKind>,
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     sparse_shard_state: Option<RoutedSparseShardState>,
     route_workers: Vec<String>,
@@ -4322,6 +4380,16 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
                     execution_profile: model.execution_profile.clone(),
                     scheduler_policy: model.scheduler_policy.clone(),
                     execution_refusal_reason: model.execution_refusal_reason.clone(),
+                    cluster_execution_modes: model
+                        .cluster_execution_modes
+                        .iter()
+                        .copied()
+                        .collect(),
+                    cluster_execution_topologies: model
+                        .cluster_execution_topologies
+                        .iter()
+                        .copied()
+                        .collect(),
                     sparse_expert_topology: model.sparse_expert_topology.clone(),
                     sparse_shard_state: model.sparse_shard_state.clone(),
                     route_workers: BTreeSet::new(),
@@ -4342,6 +4410,12 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
             if entry.execution_refusal_reason.is_none() {
                 entry.execution_refusal_reason = model.execution_refusal_reason.clone();
             }
+            entry
+                .cluster_execution_modes
+                .extend(model.cluster_execution_modes.iter().copied());
+            entry
+                .cluster_execution_topologies
+                .extend(model.cluster_execution_topologies.iter().copied());
             if entry.sparse_expert_topology.is_none() {
                 entry.sparse_expert_topology = model.sparse_expert_topology.clone();
             }
@@ -4371,8 +4445,24 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
 
     let mut models = published
         .into_values()
-        .map(|entry| {
+        .map(|mut entry| {
             let local_loaded_model = state.models_by_key.get(entry.model_key.as_str());
+            if entry
+                .route_localities
+                .contains(&RoutedExecutionLocality::RemoteProxy)
+            {
+                entry
+                    .cluster_execution_modes
+                    .insert(RoutedClusterExecutionMode::RemoteWholeRequest);
+            }
+            if entry.route_workers.len() > 1 {
+                entry
+                    .cluster_execution_modes
+                    .insert(RoutedClusterExecutionMode::Replicated);
+                entry
+                    .cluster_execution_topologies
+                    .insert(ExecutionTopologyKind::Replicated);
+            }
             PublishedGenericModel {
                 model_key: entry.model_key,
                 canonical_name: local_loaded_model
@@ -4397,6 +4487,11 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
                     .and_then(OpenAiCompatLoadedModel::execution_refusal_reason)
                     .map(String::from)
                     .or(entry.execution_refusal_reason),
+                cluster_execution_modes: entry.cluster_execution_modes.into_iter().collect(),
+                cluster_execution_topologies: entry
+                    .cluster_execution_topologies
+                    .into_iter()
+                    .collect(),
                 sparse_expert_topology: local_loaded_model
                     .and_then(OpenAiCompatLoadedModel::sparse_expert_topology)
                     .cloned()
@@ -4726,6 +4821,8 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_execution_profile: None,
             psionic_scheduler_policy: None,
             psionic_execution_refusal_reason: None,
+            psionic_cluster_execution_modes: Vec::new(),
+            psionic_cluster_execution_topologies: Vec::new(),
             psionic_sparse_expert_topology: None,
             psionic_sparse_shard_state: None,
             psionic_multimodal_projection_mode: None,
@@ -4772,6 +4869,10 @@ struct GenericHealthResponse {
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     execution_refusal_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    cluster_execution_modes: Vec<RoutedClusterExecutionMode>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    cluster_execution_topologies: Vec<ExecutionTopologyKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4828,6 +4929,8 @@ async fn generic_health(
             state.as_ref(),
             &default_model,
         ),
+        cluster_execution_modes: default_model.cluster_execution_modes.clone(),
+        cluster_execution_topologies: default_model.cluster_execution_topologies.clone(),
         sparse_expert_topology: published_model_sparse_expert_topology(
             state.as_ref(),
             &default_model,
@@ -5588,6 +5691,10 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                         state.as_ref(),
                         &model,
                     ),
+                    psionic_cluster_execution_modes: model.cluster_execution_modes.clone(),
+                    psionic_cluster_execution_topologies: model
+                        .cluster_execution_topologies
+                        .clone(),
                     psionic_sparse_expert_topology: published_model_sparse_expert_topology(
                         state.as_ref(),
                         &model,
@@ -9348,6 +9455,15 @@ fn routed_inventory_for_loaded_model(
     if let Some(reason) = model.execution_refusal_reason() {
         inventory = inventory.with_execution_refusal_reason(reason.to_string());
     }
+    for mode in model.cluster_execution_modes() {
+        inventory = inventory.with_cluster_execution_mode(mode);
+    }
+    for topology in model.cluster_execution_topologies() {
+        inventory = inventory.with_cluster_execution_topology(topology);
+    }
+    if let Some(profile) = model.cluster_execution_capability_profile().cloned() {
+        inventory = inventory.with_cluster_execution_capability_profile(profile);
+    }
     if let Some(topology) = model.sparse_expert_topology().cloned() {
         inventory = inventory.with_sparse_expert_topology(topology);
     }
@@ -9504,6 +9620,17 @@ fn load_generic_decoder_model(
     };
     let canonical_name = default_model_name(model_path, descriptor.model.model_id.as_str());
     let supported_endpoints = vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses];
+    let execution_profile = generic_decoder_execution_profile(family, backend);
+    let (
+        cluster_execution_modes,
+        cluster_execution_topologies,
+        cluster_execution_capability_profile,
+    ) = generic_decoder_cluster_execution_truth(
+        family,
+        backend,
+        &execution_profile,
+        sparse_expert_topology.as_ref(),
+    );
     let loaded_model = OpenAiCompatLoadedModel {
         model_key: descriptor.model.model_id.clone(),
         canonical_name: canonical_name.clone(),
@@ -9522,6 +9649,9 @@ fn load_generic_decoder_model(
                 OpenAiCompatBackend::Metal => generic_metal_execution_refusal_reason(family),
                 OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => pending_topology_refusal,
             },
+            cluster_execution_modes,
+            cluster_execution_topologies,
+            cluster_execution_capability_profile,
             sparse_expert_topology,
             sparse_shard_state: None,
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss)).then(|| {
@@ -9531,7 +9661,7 @@ fn load_generic_decoder_model(
                 )
             }),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
-            execution_profile: generic_decoder_execution_profile(family, backend),
+            execution_profile,
             scheduler_policy: generic_decoder_scheduler_policy(family, backend),
         }),
     };
@@ -9624,6 +9754,68 @@ fn generic_decoder_scheduler_policy(
 ) -> Option<GenerationSchedulerPolicy> {
     (matches!(backend, OpenAiCompatBackend::Cpu) && !matches!(family, GgufDecoderFamily::Qwen35))
         .then(default_generation_scheduler_policy)
+}
+
+fn generic_decoder_cluster_execution_truth(
+    family: GgufDecoderFamily,
+    backend: OpenAiCompatBackend,
+    execution_profile: &ExecutionCapabilityProfile,
+    sparse_expert_topology: Option<&RoutedSparseExpertTopology>,
+) -> (
+    Vec<RoutedClusterExecutionMode>,
+    Vec<ExecutionTopologyKind>,
+    Option<ClusterExecutionCapabilityProfile>,
+) {
+    if !matches!(
+        (backend, family),
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
+    ) {
+        return (Vec::new(), Vec::new(), None);
+    }
+
+    if sparse_expert_topology.is_some() {
+        let capability_profile = ClusterExecutionCapabilityProfile::new("cuda")
+            .with_supported_lanes(vec![ClusterExecutionLane::TensorSharded])
+            .with_serving_semantics_capability(
+                ClusterServingSemantics::new(
+                    ClusterExecutionLane::TensorSharded,
+                    execution_profile.clone(),
+                    ClusterWarmRoutePosture::TopologyPinned,
+                )
+                .with_detail(
+                    "sparse expert requests stay bound to one admitted shard placement while the topology remains healthy",
+                ),
+            )
+            .with_detail(
+                "gemma4 sparse distributed execution is published as one tensor-sharded sparse expert path",
+            );
+        return (
+            vec![RoutedClusterExecutionMode::SparseExpert],
+            vec![ExecutionTopologyKind::TensorSharded],
+            Some(capability_profile),
+        );
+    }
+
+    let capability_profile = ClusterExecutionCapabilityProfile::new("cuda")
+        .with_supported_lanes(vec![ClusterExecutionLane::PipelineSharded])
+        .with_serving_semantics_capability(
+            ClusterServingSemantics::new(
+                ClusterExecutionLane::PipelineSharded,
+                execution_profile.clone(),
+                ClusterWarmRoutePosture::TopologyPinned,
+            )
+            .with_detail(
+                "dense split requests stay on one ordered multi-machine stage plan for truthful warm reuse",
+            ),
+        )
+        .with_detail(
+            "gemma4 dense distributed execution is published as one pipeline-sharded dense split path",
+        );
+    (
+        vec![RoutedClusterExecutionMode::DenseSplit],
+        vec![ExecutionTopologyKind::PipelineSharded],
+        Some(capability_profile),
+    )
 }
 
 fn refused_local_backend_error(backend: &'static str, reason: &str) -> OpenAiCompatHttpError {
@@ -10566,16 +10758,19 @@ mod tests {
     };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
-        RoutedSparseExpertRuntimeContract, RoutedSparseShardHealth, SparseRouteBinding,
-        ToolExecutionRequest, ToolGateway, ToolHistoryVisibility, ToolLoopController,
-        ToolLoopError, ToolLoopModelRunner, ToolLoopModelTurn, ToolLoopRequest,
-        ToolLoopToolExecutor, ToolLoopToolResult, ToolProviderDescriptor, ToolResultVisibility,
+        RoutedClusterExecutionMode, RoutedSparseExpertRuntimeContract, RoutedSparseExpertTopology,
+        RoutedSparseShardHealth, SparseRouteBinding, ToolExecutionRequest, ToolGateway,
+        ToolHistoryVisibility, ToolLoopController, ToolLoopError, ToolLoopModelRunner,
+        ToolLoopModelTurn, ToolLoopRequest, ToolLoopToolExecutor, ToolLoopToolResult,
+        ToolProviderDescriptor, ToolResultVisibility,
     };
     use psionic_router::{RoutedExecutionLocality, RoutedExecutionProvenance};
     use psionic_runtime::{
-        BatchExecutionPosture, ClusterExecutionContext, ExecutionCapabilityProfile,
-        PrefixCacheControl, PrefixCacheMode, QueueDiscipline, StructuredGrammarSyntax,
-        StructuredOutputRequest, StructuredOutputValue, StructuredTaggedVariant,
+        BatchExecutionPosture, ClusterExecutionCapabilityProfile, ClusterExecutionContext,
+        ClusterExecutionLane, ClusterServingSemantics, ClusterWarmRoutePosture,
+        ExecutionCapabilityProfile, ExecutionTopologyKind, PrefixCacheControl, PrefixCacheMode,
+        QueueDiscipline, StructuredGrammarSyntax, StructuredOutputRequest, StructuredOutputValue,
+        StructuredTaggedVariant,
     };
     use std::{
         collections::BTreeMap,
@@ -10661,6 +10856,80 @@ mod tests {
         assert_eq!(prompt[2].role, PromptMessageRole::Tool);
         assert_eq!(prompt[2].author_name.as_deref(), Some("get_weather"));
         assert_eq!(prompt[2].content, "{\"condition\":\"sunny\"}");
+    }
+
+    #[test]
+    fn generic_decoder_cluster_execution_truth_distinguishes_dense_and_sparse_gemma() {
+        let dense_profile = ExecutionCapabilityProfile::single_request_latency_optimized();
+        let (dense_modes, dense_topologies, dense_capability_profile) =
+            super::generic_decoder_cluster_execution_truth(
+                GgufDecoderFamily::Gemma4,
+                OpenAiCompatBackend::Cuda,
+                &dense_profile,
+                None,
+            );
+        assert_eq!(dense_modes, vec![RoutedClusterExecutionMode::DenseSplit]);
+        assert_eq!(
+            dense_topologies,
+            vec![ExecutionTopologyKind::PipelineSharded]
+        );
+        assert_eq!(
+            dense_capability_profile,
+            Some(
+                ClusterExecutionCapabilityProfile::new("cuda")
+                    .with_supported_lanes(vec![ClusterExecutionLane::PipelineSharded])
+                    .with_serving_semantics_capability(ClusterServingSemantics::new(
+                        ClusterExecutionLane::PipelineSharded,
+                        dense_profile.clone(),
+                        ClusterWarmRoutePosture::TopologyPinned,
+                    )
+                    .with_detail(
+                        "dense split requests stay on one ordered multi-machine stage plan for truthful warm reuse",
+                    ))
+                    .with_detail(
+                        "gemma4 dense distributed execution is published as one pipeline-sharded dense split path",
+                    )
+            )
+        );
+
+        let sparse_profile = ExecutionCapabilityProfile::single_request_latency_optimized();
+        let sparse_topology = RoutedSparseExpertTopology::new(
+            "gemma4",
+            "gemma4",
+            "artifact",
+            RoutedSparseExpertRuntimeContract::FamilySpecificPlacement,
+            64,
+        );
+        let (sparse_modes, sparse_topologies, sparse_capability_profile) =
+            super::generic_decoder_cluster_execution_truth(
+                GgufDecoderFamily::Gemma4,
+                OpenAiCompatBackend::Cuda,
+                &sparse_profile,
+                Some(&sparse_topology),
+            );
+        assert_eq!(sparse_modes, vec![RoutedClusterExecutionMode::SparseExpert]);
+        assert_eq!(
+            sparse_topologies,
+            vec![ExecutionTopologyKind::TensorSharded]
+        );
+        assert_eq!(
+            sparse_capability_profile,
+            Some(
+                ClusterExecutionCapabilityProfile::new("cuda")
+                    .with_supported_lanes(vec![ClusterExecutionLane::TensorSharded])
+                    .with_serving_semantics_capability(ClusterServingSemantics::new(
+                        ClusterExecutionLane::TensorSharded,
+                        sparse_profile,
+                        ClusterWarmRoutePosture::TopologyPinned,
+                    )
+                    .with_detail(
+                        "sparse expert requests stay bound to one admitted shard placement while the topology remains healthy",
+                    ))
+                    .with_detail(
+                        "gemma4 sparse distributed execution is published as one tensor-sharded sparse expert path",
+                    )
+            )
+        );
     }
 
     #[test]
@@ -11934,6 +12203,9 @@ mod tests {
                     execution_profile: ExecutionCapabilityProfile::default(),
                     scheduler_policy: None,
                     execution_refusal_reason: None,
+                    cluster_execution_modes: Vec::new(),
+                    cluster_execution_topologies: Vec::new(),
+                    cluster_execution_capability_profile: None,
                     sparse_expert_topology: None,
                     sparse_shard_state: None,
                 }],
@@ -11961,6 +12233,9 @@ mod tests {
                     execution_profile: ExecutionCapabilityProfile::default(),
                     scheduler_policy: None,
                     execution_refusal_reason: None,
+                    cluster_execution_modes: Vec::new(),
+                    cluster_execution_topologies: Vec::new(),
+                    cluster_execution_capability_profile: None,
                     sparse_expert_topology: None,
                     sparse_shard_state: None,
                 }],
@@ -11990,6 +12265,9 @@ mod tests {
                     execution_profile: ExecutionCapabilityProfile::default(),
                     scheduler_policy: None,
                     execution_refusal_reason: None,
+                    cluster_execution_modes: Vec::new(),
+                    cluster_execution_topologies: Vec::new(),
+                    cluster_execution_capability_profile: None,
                     sparse_expert_topology: None,
                     sparse_shard_state: None,
                 }],
@@ -12286,6 +12564,11 @@ mod tests {
             gemma.psionic_route_provenances,
             vec![RoutedExecutionProvenance::BootstrapProxy]
         );
+        assert_eq!(
+            gemma.psionic_cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::RemoteWholeRequest]
+        );
+        assert!(gemma.psionic_cluster_execution_topologies.is_empty());
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&local_server.state),
@@ -12427,6 +12710,17 @@ mod tests {
         assert_eq!(
             gemma.psionic_route_provenances,
             vec![RoutedExecutionProvenance::BootstrapProxy]
+        );
+        assert_eq!(
+            gemma.psionic_cluster_execution_modes,
+            vec![
+                RoutedClusterExecutionMode::RemoteWholeRequest,
+                RoutedClusterExecutionMode::DenseSplit,
+            ]
+        );
+        assert_eq!(
+            gemma.psionic_cluster_execution_topologies,
+            vec![ExecutionTopologyKind::PipelineSharded]
         );
         assert!(gemma.psionic_response_state.is_some());
         assert_eq!(
@@ -13445,6 +13739,14 @@ mod tests {
             Some(vec!["image", "video"])
         );
         assert_eq!(health.0.multimodal_projection_config, None);
+        assert_eq!(
+            health.0.cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::DenseSplit]
+        );
+        assert_eq!(
+            health.0.cluster_execution_topologies,
+            vec![ExecutionTopologyKind::PipelineSharded]
+        );
 
         let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
             &server.state,
@@ -13490,6 +13792,14 @@ mod tests {
             Some(vec!["image", "video"])
         );
         assert_eq!(model.psionic_multimodal_projection_config, None);
+        assert_eq!(
+            model.psionic_cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::DenseSplit]
+        );
+        assert_eq!(
+            model.psionic_cluster_execution_topologies,
+            vec![ExecutionTopologyKind::PipelineSharded]
+        );
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&server.state),
@@ -13705,6 +14015,14 @@ mod tests {
         assert_eq!(health_topology.family, "gemma4");
         assert_eq!(health_topology.expert_count, 64);
         assert_eq!(health_topology.active_expert_count, Some(4));
+        assert_eq!(
+            health.0.cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::SparseExpert]
+        );
+        assert_eq!(
+            health.0.cluster_execution_topologies,
+            vec![ExecutionTopologyKind::TensorSharded]
+        );
         assert!(health.0.sparse_shard_state.is_none());
 
         let model_id = health.0.default_model.clone();
@@ -13723,6 +14041,14 @@ mod tests {
             .expect("model card should publish sparse topology truth");
         assert_eq!(model_topology.expert_count, 64);
         assert_eq!(model_topology.active_expert_count, Some(4));
+        assert_eq!(
+            model.psionic_cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::SparseExpert]
+        );
+        assert_eq!(
+            model.psionic_cluster_execution_topologies,
+            vec![ExecutionTopologyKind::TensorSharded]
+        );
         assert!(model.psionic_sparse_shard_state.is_none());
         assert_eq!(
             model.psionic_execution_refusal_reason,
@@ -13836,6 +14162,14 @@ mod tests {
                 .map(|state| state.replicas.len()),
             Some(2)
         );
+        assert_eq!(
+            health.0.cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::SparseExpert]
+        );
+        assert_eq!(
+            health.0.cluster_execution_topologies,
+            vec![ExecutionTopologyKind::TensorSharded]
+        );
         let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
             &server.state,
         ))));
@@ -13851,6 +14185,14 @@ mod tests {
                 .as_ref()
                 .map(|state| state.replicas.len()),
             Some(2)
+        );
+        assert_eq!(
+            model_card.psionic_cluster_execution_modes,
+            vec![RoutedClusterExecutionMode::SparseExpert]
+        );
+        assert_eq!(
+            model_card.psionic_cluster_execution_topologies,
+            vec![ExecutionTopologyKind::TensorSharded]
         );
 
         let response = runtime.block_on(handle_generic_chat_completions(

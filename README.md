@@ -58,6 +58,11 @@ promotion decision that refuses held-out regressions or failed operator review.
     contract with `backend = metal`, `execution_mode = native`, and
     `fallback_policy = refuse`, and it returns an explicit refusal instead of
     silently falling back to CPU or CUDA until a real Metal decoder lands
+  - the generic server, routed inventory, and mesh management status now also
+    publish family-agnostic clustered execution truth so downstream consumers
+    can tell whether a model is remote-proxied, replicated, split across
+    machines, or running as a sparse distributed expert row without `gpt_oss`
+    specific heuristics
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
   - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
 - Hermes agent backend

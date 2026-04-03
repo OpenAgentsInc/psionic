@@ -234,6 +234,16 @@ conformance work:
   across two CUDA workers, plus matching response headers and receipt surfaces
   that publish `cluster_disposition = sharded` and
   `cluster_topology = pipeline_sharded`.
+- the generic OpenAI-compatible surfaces now also publish family-agnostic
+  clustered execution truth for `Gemma 4` instead of forcing downstream
+  consumers to infer it from route details:
+  - `/health` and `/v1/models` now expose generic execution modes such as
+    `dense_split`, `sparse_expert`, `remote_whole_request`, and `replicated`
+  - the same rows also expose generic topology kinds such as
+    `pipeline_sharded` and `tensor_sharded`
+  - routed inventory and mesh management status additionally carry the
+    runtime-owned cluster capability profile for the admitted multi-machine
+    path on that row
 - the older bootstrap-mesh path is still useful, but it now stays explicitly
   classified as remote whole-request proxying instead of being treated as the
   distributed proof.
@@ -390,6 +400,11 @@ Those runs are the current publication bar. They prove:
   machine-checkable receipt and header publication for the clustered topology
 - bootstrap-routed mesh publication that keeps remote `Gemma 4` route truth
   explicit instead of widening the thin-client claim into split execution
+- family-agnostic publication of clustered execution mode and topology on
+  `/health`, `/v1/models`, routed inventory, and mesh management status, so
+  downstream consumers can tell the difference between proxying, replication,
+  dense split execution, and sparse expert execution without family-specific
+  heuristics
 
 ## Pass Criteria
 
@@ -410,6 +425,9 @@ The pilot stays green only if all of the following remain true:
 - split-execution publication keeps `cluster_disposition = sharded` and
   `cluster_topology = pipeline_sharded` machine-checkable on the bounded proof
   path
+- family-agnostic clustered execution publication still distinguishes remote
+  whole-request proxying from the true split dense proof and from the admitted
+  sparse expert path
 - mesh bootstrap publication keeps routed remote truth explicit and does not
   borrow a local host's wider endpoint claim
 - when `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH` is supplied, the dense `31B`
