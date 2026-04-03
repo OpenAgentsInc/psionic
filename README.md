@@ -8,6 +8,11 @@ project is broader than one app or one benchmark lane. It is the crate family
 that OpenAgents uses for inference, training, cluster bring-up, and execution
 evidence.
 
+The training side now also carries one bounded `gemma4:e4b` finetuning family
+contract above the shared adapter substrate: dense, text only, CUDA only,
+adapter SFT only, with explicit refusal truth for wider Gemma regions that
+remain out of scope.
+
 ## Start Here
 
 - System architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)

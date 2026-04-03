@@ -2508,6 +2508,45 @@ The first implementation has explicit non-goals:
   operator truth exist
 - no ad hoc JSON sidecars for contribution-state truth
 
+### First Gemma e4b Finetuning MVP Contract
+
+On 2026-04-03, GitHub issue `#878` added the first bounded Gemma finetuning
+contract in `crates/psionic-train/src/gemma_e4b_finetuning_mvp.rs`.
+
+This is not the landed Gemma trainer yet. It is the training-side family and
+artifact contract that stops treating Gemma as serving-only.
+
+The contract freezes one exact first claim:
+
+- model id = `gemma4:e4b`
+- model family = `gemma4`
+- execution backend label = `open_adapter_backend.cuda.gemma4_e4b_lm_head`
+- training family id = `gemma4.e4b.cuda.adapter_sft.v1`
+- adapter family = `gemma4.e4b.decoder_lm_head_lora`
+- adapter format = `safetensors`
+- adapter target id = `lm_head`
+- base-model revision = `v1`
+- checkpoint family = `train.gemma4.e4b.adapter_sft`
+- tokenizer binding = the bounded `gemma4_e4b` SentencePiece fixture plus the
+  checked-in `gemma4_e4b.default` template digest
+- serving posture = async-job-compatible training with optional later promoted
+  revision adoption on the Gemma mesh lane
+
+The same contract now also carries explicit refusal truth for:
+
+- dense `Gemma 4 31B` finetuning
+- sparse `Gemma 4 26B A4B` finetuning
+- multimodal finetuning
+- audio finetuning
+- Metal execution
+- full-model finetuning
+
+That means the honest current repo claim is now:
+
+> Psionic has one bounded Gemma finetuning family contract and artifact
+> identity, but the actual Gemma trainer, checkpoint export into serving, and
+> eval-gated promotion still land in later issues.
+
 ### Canonical Workload Vocabulary
 
 The decentralized adapter workload family should use the following additional
@@ -2713,7 +2752,7 @@ shape already includes at least:
 | Data contracts | `implemented_early` | `psionic-data` now owns versioned dataset manifests, tokenizer digests, split declarations, resumable iteration cursors, long-context packing policies, and Apple adapter JSONL import or validation with typed tool-schema augmentation plus tokenizer/prompt-shaping packing lineage |
 | Adapters | `implemented_early` | adapter identity, package manifests, hosted adapter binding lineage, and first Apple `.fmadapter` reader/writer plus file-inventory validation |
 | Sandbox for RL/train workloads | `implemented_early` | bounded execution, background jobs, warm reusable pools, staged loop inputs, pool acquisition receipts, and repeated agentic iteration receipts now exist in `psionic-sandbox` |
-| Training core | `implemented_early` | `psionic-train` now has a typed fixed-budget trainer-step loop, `psionic-ir` now provides reusable reverse-mode autodiff plus explicit detach/training-mode gradient semantics beneath it, the repo-owned Apple adapter execution backend now turns packed Apple dataset batches into adapter-only gradient batches for that loop, the first higher-level Apple SFT lane closes the path through typed training summary plus `.fmadapter` export, and an explicitly separate optional Apple draft-model distillation lane now emits paired draft payloads plus latency or acceptance metadata; the crate also now owns a first non-Apple open adapter backend for `gpt_oss.decoder_lm_head_lora`, producing loadable LM-head LoRA `safetensors` artifacts from bounded hidden-state supervision under the same fixed-budget core; parameter-group scaling semantics, scheduler bindings, optimizer state/residency, step telemetry, model-IO roundtrip, and checkpoint restore lineage remain explicit over gradient batches |
+| Training core | `implemented_early` | `psionic-train` now has a typed fixed-budget trainer-step loop, `psionic-ir` now provides reusable reverse-mode autodiff plus explicit detach/training-mode gradient semantics beneath it, the repo-owned Apple adapter execution backend now turns packed Apple dataset batches into adapter-only gradient batches for that loop, the first higher-level Apple SFT lane closes the path through typed training summary plus `.fmadapter` export, and an explicitly separate optional Apple draft-model distillation lane now emits paired draft payloads plus latency or acceptance metadata; the crate also now owns a first non-Apple open adapter backend for `gpt_oss.decoder_lm_head_lora`, producing loadable LM-head LoRA `safetensors` artifacts from bounded hidden-state supervision under the same fixed-budget core, plus one bounded `gemma4:e4b` finetuning family contract that freezes the first Gemma training identity, tokenizer binding, adapter target, checkpoint family, and refusal boundary before the actual Gemma trainer lands; parameter-group scaling semantics, scheduler bindings, optimizer state/residency, step telemetry, model-IO roundtrip, and checkpoint restore lineage remain explicit over gradient batches |
 | Training run graph | `implemented_early` | `psionic-train` now owns typed runs, contributor-set revisions, topology revisions, persistent participant ranking, heartbeats, departures, and window transitions |
 | Orchestrator | `implemented_early` | `psionic-train` now owns typed window-control, assignment posture, rollout-assignment refs, rollout-admission receipts, bounded off-policy freshness budgets, rollout-worker heartbeats, claims, upload receipts, and trainer-batch assembly requests over the run graph |
 | Live RL run service | `implemented_early` | `psionic-train` now also owns a bounded durable `LiveRlRunService` above the run graph, orchestrator, worker protocol, and validator state, with persistent run snapshots, current status or per-window artifacts, graceful draining or stop semantics, and restart recovery through a service-owned filesystem root |
