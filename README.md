@@ -8,6 +8,13 @@ project is broader than one app or one benchmark lane. It is the crate family
 that OpenAgents uses for inference, training, cluster bring-up, and execution
 evidence.
 
+Psionic should be read hardware-first. It owns the admitted hardware strategy
+for each lane: backend family, residency mode, topology, serving or training
+role, and the capability, refusal, and evidence surfaces that higher layers
+consume. Upstream systems such as `llama.cpp`, `vLLM`, `SGLang`, MLX, and
+other reference repos are inputs for specific layers or hardware classes, not
+the identity of the shipped Psionic stack.
+
 The training side now also carries one bounded `gemma4:e4b` CUDA adapter-SFT
 trainer above the shared adapter substrate: LM-head-only final-hidden-state
 supervision, frozen-base semantics, typed export, exact checkpoint resume,

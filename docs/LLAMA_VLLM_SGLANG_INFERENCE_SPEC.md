@@ -1,8 +1,9 @@
 # Psionic Inference Spec From `llama.cpp`, `vLLM`, and `SGLang`
 
 > Status: canonical `PSI-232` source split and completion-matrix spec, updated
-> 2026-03-14 after re-verifying the live `PSI-232` through `PSI-258` GitHub
-> issue state against this repo.
+> 2026-04-03 after retaining the existing `PSI-232` through `PSI-258` issue
+> framing and making the hardware-class reading explicit in the canonical
+> source split.
 >
 > Baseline assumption: the generic Psionic cutover through `PSI-178` and
 > `OA-203` is already landed on `main`, the GPT-OSS enablement path through
@@ -66,6 +67,25 @@ The target end state is:
 - Psionic gains a real `SGLang`-class structured serving and routing layer
 - OpenAgents gets one coherent inference stack instead of a mix of narrow local
   engine fragments and ad hoc agent-serving seams
+
+## Hardware Strategy Before Engine Choice
+
+The first operator question is not which upstream engine name Psionic copies.
+
+The first question is which hardware class and admitted serving role Psionic is
+closing, because that determines the useful reference layer, the meaningful
+performance constraints, and the honest publication surface.
+
+| Hardware class and admitted role | Dominant constraints | Primary reference emphasis | Psionic-owned outcome |
+| --- | --- | --- | --- |
+| portable CPU, edge, or odd-hardware local lane | portability, RAM pressure, hybrid offload, broad host support | `llama.cpp` | GGUF ingestion, portable local runtime truth, and explicit degraded or proxy posture when the native lane is not admitted |
+| Apple Silicon local-serving or contributor lane | unified-memory pressure, Metal backend closure, bounded same-host serving | `llama.cpp`-class backend lessons plus the companion Apple and MLX docs in this repo | Apple-native backend truth, explicit refusal when the native Metal lane is outside the admitted row, and no silent collapse into proxy-only folklore |
+| single-node CUDA local-serving lane | memory bandwidth, KV reuse, scheduler overhead, runtime publication | current Psionic CUDA runtime plus `vLLM` serving lessons where scheduler or KV design matters | native CUDA serving with explicit backend, residency, and capability publication rather than one generic "GPU" claim |
+| clustered or disaggregated serving lane | prefill/decode split, KV movement, interconnect, scheduling, failure recovery | `vLLM` | scheduler, paged or block KV ownership, disaggregated topology truth, and cluster-visible serving evidence |
+| structured, routed, or agent-serving lane | parser semantics, structured outputs, cache-aware routing, conversation state | `SGLang` | structured serving, `/v1/responses`, routing, hierarchical cache policy, and gateway truth above the same runtime substrate |
+
+This keeps the three-source split intact, but it makes the intended reading
+explicit: hardware class and serving role first, reference layer second.
 
 ## `PSI-232` Closure Checklist
 

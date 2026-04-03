@@ -1,7 +1,30 @@
 # Inference Engine
 
-Psionic is only inference-ready when it can honestly serve compute products rather
-than just run tensor math.
+Psionic is only inference-ready when it can honestly serve compute products on
+admitted hardware classes rather than just run tensor math.
+
+## Hardware-First Rule
+
+Psionic does not start by picking one upstream engine brand and then forcing
+every lane through that shape.
+
+It starts by fixing:
+
+- hardware class and backend family
+- residency and memory posture
+- single-node versus clustered topology
+- admitted serving role
+- capability, refusal, and latency publication
+
+The runtime lane follows from that decision.
+
+`docs/HARDWARE_VALIDATION_MATRIX.md` owns the minimum shipped hardware rows and
+their admitted roles. This document owns the serving-runtime contract above
+those rows.
+
+If two lanes share one API surface but differ in hardware class, topology, or
+admitted role, they must publish different runtime truth instead of collapsing
+into one generic engine claim.
 
 ## Text Generation Requirements
 
