@@ -62,6 +62,9 @@ evidence.
     expert artifacts, carry artifact identity plus expert-topology requirements, and refuse native
     execution with a machine-checkable topology-contract error instead of collapsing them into a
     generic unsupported-family bucket
+  - `psionic-cluster` now also owns one native sparse expert-placement contract over explicit
+    expert-host inventory, stable placement digests, typed refusal codes, and reusable sharded
+    execution receipts instead of a sidecar-only MoE control plane
   - start with [docs/ROADMAP_CLUSTER.md](docs/ROADMAP_CLUSTER.md)
   - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
 - Psion learned-model program

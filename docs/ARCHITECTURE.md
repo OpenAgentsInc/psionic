@@ -2726,7 +2726,7 @@ Phase 0 through Phase 9D are now tracked in
 | Area | Current Status | Current Repo Truth |
 | --- | --- | --- |
 | Local inference substrate | `implemented_early` | runtime, backend, model, and serve crates exist with CPU and partial Metal lanes |
-| Clustered serving substrate | `implemented_early` | `psionic-cluster` owns ordered state, placement, catch-up, and sharded serving topology truth |
+| Clustered serving substrate | `implemented_early` | `psionic-cluster` owns ordered state, placement, catch-up, sharded serving topology truth, and the first native sparse expert-placement contract over explicit expert-host inventory plus typed placement refusals |
 | Datastream and artifact staging | `implemented_early` | resumable manifests, policy-weight broadcast refs, freshness enforcement, chunk transport, and delivery receipts exist in `psionic-datastream` |
 | Data contracts | `implemented_early` | `psionic-data` now owns versioned dataset manifests, tokenizer digests, split declarations, streamed iteration, and long-context packing policies |
 | Sandbox execution | `implemented_early` | bounded execution, runtime detection, background jobs, file transfer, warm reusable pools, staged loop inputs, and repeated agentic iteration receipts exist in `psionic-sandbox` |

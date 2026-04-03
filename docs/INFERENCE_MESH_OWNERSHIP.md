@@ -203,6 +203,57 @@ later expert-placement issues land.
 expert-topology-requirement field so future sparse-family lanes can carry the
 same topology truth and digest stability as dense or replicated lanes do today.
 
+## Native Sparse Expert Placement
+
+`psionic-cluster` now owns the first native sparse expert-placement contract for
+family-specific expert lanes.
+
+The contract starts from one explicit expert-host inventory snapshot:
+
+- product id
+- model id
+- runtime backend
+- served-artifact digest
+- optional sharded-model-manifest digest
+- one published expert range per ready host
+
+That inventory has one stable digest. The planner then emits either one
+truthful sparse schedule or one typed refusal.
+
+The successful schedule carries:
+
+- the same expert-topology requirement already inspected by `psionic-models`
+- one stable placement plan digest over ordered expert assignments
+- one `tensor_sharded` execution topology with explicit expert-index ranges
+- one lane key that keeps artifact identity, optional sharded manifest identity,
+  and expert-topology truth together
+- one cluster execution receipt with selected nodes, topology digest, artifact
+  residency digest, placement digest, and sharding policy digest
+
+The refusal surface stays machine-checkable. Current sparse-placement failures
+include:
+
+- `unsupported_backend`
+- `communication_class_ineligible`
+- `model_ineligible`
+- `inventory_host_unavailable`
+- `artifact_identity_mismatch`
+- `invalid_expert_geometry`
+- `duplicate_host_entry`
+- `incomplete_expert_coverage`
+- `insufficient_expert_hosts`
+- `active_expert_placement_unsatisfied`
+
+This is still a planning and receipt contract, not a claim that every sparse
+family executes natively today. The current honest boundary is:
+
+- Psionic can now publish sparse expert-host inventory and placement truth for
+  family-specific lanes.
+- Psionic can now keep those lanes inside native cluster identity and sharded
+  execution receipts.
+- Family-specific runtime execution remains gated on later model-family
+  implementations above this placement truth.
+
 ## Demand And Rebalance
 
 Mesh demand is now a first-class Psionic control signal instead of an operator
