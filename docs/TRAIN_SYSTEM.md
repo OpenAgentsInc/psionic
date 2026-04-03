@@ -180,6 +180,21 @@ surface, one retained correctness comparison against the owned tiled reference
 path, and one bounded forward benchmark family covering naive CPU, tiled CPU,
 and fused CUDA routes when admitted hardware exists.
 
+The repo now also owns the fourth bounded full-port A2 reference-lane tranche
+in `crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs`,
+the fixture generator
+`crates/psionic-train/examples/psion_cs336_a2_ddp_individual_parameters_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_ddp_individual_parameters_receipt_v1.json`. That
+surface binds the tiny owned A1 trainer into one bounded two-rank individual-
+parameter DDP proof lane above the public distributed helper surface through
+rank-0 broadcast, immediate per-parameter gradient receipts, host-owned
+averaging receipts, and a bounded update path pinned to the same global
+finite-difference gradient surface as the non-parallel baseline so the parity
+proof stays deterministic, while still stating clearly that the collective path
+is host-owned reference emulation rather than transport-backed distributed
+execution.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator

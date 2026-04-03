@@ -99,6 +99,33 @@ retained artifact records the explicit refusal path rather than a successful
 backend execution. The same receipt family records correctness and fused timing
 data when regenerated on admitted CUDA hardware.
 
+The fourth bounded A2 tranche now owns:
+
+- one bounded two-rank individual-parameter DDP synchronization receipt above
+  the owned A1 tiny trainer
+- one retained proof that rank-0 broadcast, per-parameter gradient averaging,
+  and bounded update application stay aligned with a non-parallel baseline
+- one explicit statement that the collective path is host-owned reference
+  emulation, not transport-backed distributed execution
+
+Primary landing surfaces:
+
+- `crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_ddp_individual_parameters_receipt.rs`
+- `fixtures/training/cs336_a2_ddp_individual_parameters_receipt_v1.json`
+
+That individual-parameter DDP tranche now provides:
+
+- one owned bounded DDP path that synchronizes each trainable parameter tensor
+  through a host-owned reference averaging path inside `psionic-train`
+- one bounded update path pinned to the same global finite-difference gradient
+  surface as the non-parallel reference trainer so retained parity stays
+  deterministic
+- one retained two-rank proof bundle showing broadcast closure and synchronized
+  updates matching the non-parallel baseline
+- one honest boundary note that the current path uses host-owned reference
+  collective emulation and does not claim backend transport execution
+
 ## Current Claim Boundary
 
 This lane now honestly claims:
@@ -109,12 +136,14 @@ This lane now honestly claims:
   retained parity evidence against the naive baseline
 - `psionic` owns a bounded fused CUDA attention receipt family with explicit
   refusal posture on non-CUDA hosts
+- `psionic` owns a bounded individual-parameter DDP proof lane with retained
+  two-rank synchronization evidence against the non-parallel baseline
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 - later A2 tranches now have one retained receipt family to plug into
 
 It does not yet claim:
 
-- bounded DDP or sharded-optimizer execution
+- bucketed DDP or sharded-optimizer execution
 - full Stanford CS336 A2 parity
 - admitted actual-lane throughput or distributed-cluster qualification

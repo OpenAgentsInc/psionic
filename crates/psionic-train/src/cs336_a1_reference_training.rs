@@ -356,27 +356,123 @@ impl Cs336A1ReferenceTrainer {
         })
     }
 
-    pub fn current_loss(&self) -> Result<f32, Cs336A1ReferenceTrainingError> {
-        let batch = cs336_a1_get_batch(
-            self.tokenized_dataset.as_slice(),
-            self.config.batch_size,
-            self.config.context_length,
-            self.iteration,
-        )?;
-        self.loss_for_batch(&self.model, &batch)
+    #[must_use]
+    pub fn config(&self) -> &Cs336A1ReferenceTrainingConfig {
+        &self.config
     }
 
-    pub fn step(
+    #[must_use]
+    pub fn tokenized_dataset(&self) -> &[u32] {
+        self.tokenized_dataset.as_slice()
+    }
+
+    #[must_use]
+    pub fn model_state(&self) -> ModuleStateDict {
+        self.model.state_dict()
+    }
+
+    pub fn load_model_state(
         &mut self,
-    ) -> Result<Cs336A1ReferenceTrainingStepReport, Cs336A1ReferenceTrainingError> {
-        let batch = cs336_a1_get_batch(
+        state: &ModuleStateDict,
+    ) -> Result<(), Cs336A1ReferenceTrainingError> {
+        self.model
+            .load_state_dict(state, ModuleStateLoadMode::Strict)?;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn optimizer_states(&self) -> &BTreeMap<String, TrainingOptimizerState> {
+        &self.optimizer_states
+    }
+
+    pub fn batch_for_iteration(
+        &self,
+        iteration: u64,
+    ) -> Result<Cs336A1ReferenceBatch, Cs336A1ReferenceTrainingError> {
+        cs336_a1_get_batch(
             self.tokenized_dataset.as_slice(),
             self.config.batch_size,
             self.config.context_length,
-            self.iteration,
-        )?;
-        let loss_before = self.loss_for_batch(&self.model, &batch)?;
-        let mut gradients = self.estimate_gradients(&batch, loss_before)?;
+            iteration,
+        )
+    }
+
+    pub fn current_loss(&self) -> Result<f32, Cs336A1ReferenceTrainingError> {
+        let batch = self.batch_for_iteration(self.iteration)?;
+        self.loss_for_explicit_batch(&batch)
+    }
+
+    pub fn loss_for_explicit_batch(
+        &self,
+        batch: &Cs336A1ReferenceBatch,
+    ) -> Result<f32, Cs336A1ReferenceTrainingError> {
+        self.loss_for_batch(&self.model, batch)
+    }
+
+    #[must_use]
+    pub fn trainable_parameter_paths(&self) -> Vec<String> {
+        self.model
+            .state_dict()
+            .entries
+            .iter()
+            .filter(|(_, entry)| {
+                entry.kind == ModuleStateEntryKind::Parameter && entry.requires_grad
+            })
+            .map(|(path, _)| path.clone())
+            .collect()
+    }
+
+    pub fn estimate_parameter_gradient(
+        &self,
+        batch: &Cs336A1ReferenceBatch,
+        base_loss: f32,
+        path: &str,
+    ) -> Result<ModuleStateEntry, Cs336A1ReferenceTrainingError> {
+        let base_state = self.model.state_dict();
+        let parameter_entry = base_state.entries.get(path).ok_or_else(|| {
+            Cs336A1ReferenceTrainingError::InvalidConfig(format!(
+                "missing parameter entry `{path}` during finite-difference gradient estimation"
+            ))
+        })?;
+        if parameter_entry.kind != ModuleStateEntryKind::Parameter || !parameter_entry.requires_grad
+        {
+            return Err(Cs336A1ReferenceTrainingError::InvalidConfig(format!(
+                "parameter entry `{path}` is not a trainable parameter"
+            )));
+        }
+        let parameter_values = dense_tensor_values(&parameter_entry.data)?;
+        let mut gradient_values = Vec::with_capacity(parameter_values.len());
+        for index in 0..parameter_values.len() {
+            let mut perturbed_state = base_state.clone();
+            let perturbed_entry = perturbed_state.entries.get_mut(path).ok_or_else(|| {
+                Cs336A1ReferenceTrainingError::InvalidConfig(format!(
+                    "missing parameter entry `{path}` during finite-difference gradient estimation"
+                ))
+            })?;
+            let perturbed_values = dense_tensor_values_mut(perturbed_entry)?;
+            perturbed_values[index] += self.config.finite_difference_epsilon;
+            let mut perturbed_model = self.model.clone();
+            perturbed_model.load_state_dict(&perturbed_state, ModuleStateLoadMode::Strict)?;
+            let perturbed_loss = self.loss_for_batch(&perturbed_model, batch)?;
+            gradient_values
+                .push((perturbed_loss - base_loss) / self.config.finite_difference_epsilon);
+        }
+        Ok(ModuleStateEntry {
+            path: path.to_string(),
+            kind: ModuleStateEntryKind::Parameter,
+            spec: parameter_entry.spec.clone(),
+            data: TensorData::F32(gradient_values),
+            requires_grad: true,
+            persistent: true,
+        })
+    }
+
+    pub fn apply_precomputed_gradients(
+        &mut self,
+        batch: &Cs336A1ReferenceBatch,
+        loss_before: f32,
+        mut gradients: ModuleStateDict,
+    ) -> Result<Cs336A1ReferenceTrainingStepReport, Cs336A1ReferenceTrainingError> {
         let gradient_clip =
             cs336_a1_gradient_clipping(&mut gradients, self.config.gradient_clip_norm)?;
         let learning_rate = cs336_a1_get_lr_cosine_schedule(
@@ -411,7 +507,7 @@ impl Cs336A1ReferenceTrainer {
         }
         self.model
             .load_state_dict(&updated_state, ModuleStateLoadMode::Strict)?;
-        let loss_after = self.loss_for_batch(&self.model, &batch)?;
+        let loss_after = self.loss_for_batch(&self.model, batch)?;
         self.iteration += 1;
         self.loss_history.push(loss_after);
         Ok(Cs336A1ReferenceTrainingStepReport {
@@ -424,6 +520,22 @@ impl Cs336A1ReferenceTrainer {
             model_state_digest_after: self.model.state_dict().state_dict_digest,
             optimizer_state_digest_after: optimizer_state_digest(&self.optimizer_states)?,
         })
+    }
+
+    pub fn step_with_batch(
+        &mut self,
+        batch: &Cs336A1ReferenceBatch,
+    ) -> Result<Cs336A1ReferenceTrainingStepReport, Cs336A1ReferenceTrainingError> {
+        let loss_before = self.loss_for_explicit_batch(batch)?;
+        let gradients = self.estimate_gradients(batch, loss_before)?;
+        self.apply_precomputed_gradients(batch, loss_before, gradients)
+    }
+
+    pub fn step(
+        &mut self,
+    ) -> Result<Cs336A1ReferenceTrainingStepReport, Cs336A1ReferenceTrainingError> {
+        let batch = self.batch_for_iteration(self.iteration)?;
+        self.step_with_batch(&batch)
     }
 
     pub fn run_steps(
@@ -500,43 +612,14 @@ impl Cs336A1ReferenceTrainer {
         batch: &Cs336A1ReferenceBatch,
         base_loss: f32,
     ) -> Result<ModuleStateDict, Cs336A1ReferenceTrainingError> {
-        let base_state = self.model.state_dict();
         let mut gradient_entries = BTreeMap::new();
-        for (path, parameter_entry) in &base_state.entries {
-            if parameter_entry.kind != ModuleStateEntryKind::Parameter
-                || !parameter_entry.requires_grad
-            {
-                continue;
-            }
-            let parameter_values = dense_tensor_values(&parameter_entry.data)?;
-            let mut gradient_values = Vec::with_capacity(parameter_values.len());
-            for index in 0..parameter_values.len() {
-                let mut perturbed_state = base_state.clone();
-                let perturbed_entry = perturbed_state.entries.get_mut(path).ok_or_else(|| {
-                    Cs336A1ReferenceTrainingError::InvalidConfig(format!(
-                        "missing parameter entry `{path}` during finite-difference gradient estimation"
-                    ))
-                })?;
-                let perturbed_values = dense_tensor_values_mut(perturbed_entry)?;
-                perturbed_values[index] += self.config.finite_difference_epsilon;
-                let mut perturbed_model = self.model.clone();
-                perturbed_model.load_state_dict(&perturbed_state, ModuleStateLoadMode::Strict)?;
-                let perturbed_loss = self.loss_for_batch(&perturbed_model, batch)?;
-                gradient_values
-                    .push((perturbed_loss - base_loss) / self.config.finite_difference_epsilon);
-            }
+        for path in self.trainable_parameter_paths() {
             gradient_entries.insert(
                 path.clone(),
-                ModuleStateEntry {
-                    path: path.clone(),
-                    kind: ModuleStateEntryKind::Parameter,
-                    spec: parameter_entry.spec.clone(),
-                    data: TensorData::F32(gradient_values),
-                    requires_grad: true,
-                    persistent: true,
-                },
+                self.estimate_parameter_gradient(batch, base_loss, path.as_str())?,
             );
         }
+        let base_state = self.model.state_dict();
         Ok(ModuleStateDict::new(
             base_state.root_module_id.clone(),
             base_state.root_module_kind.clone(),
