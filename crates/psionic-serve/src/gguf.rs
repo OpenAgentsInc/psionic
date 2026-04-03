@@ -24,6 +24,10 @@ use psionic_models::{
     TokenizerBoundary,
 };
 use psionic_runtime::DeviceDiscovery;
+use psionic_train::{
+    GemmaE4bCudaAdapterCheckpoint, GemmaE4bCudaAdapterExportedArtifact,
+    GemmaE4bServedBaseModelBinding,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -34,9 +38,9 @@ use crate::{
     GenerationStreamTerminal, GenerationStreamingPolicy, InMemoryGenerationModelRegistry,
     InMemoryGenerationSessionStore, LoadedModelView, LoadedModelsObservation,
     LocalRuntimeObservability, ManagedTextGenerationRuntime, ReferenceTextGenerationError,
-    SessionId, SharedPrefixStore, StreamingTextGenerationExecutor, TextGenerationExecutor,
-    continuous_batch_text_generation_execution_profile, default_generation_scheduler_policy,
-    default_generation_streaming_policy,
+    ServedModelRevisionIdentity, SessionId, SharedPrefixStore, StreamingTextGenerationExecutor,
+    TextGenerationExecutor, continuous_batch_text_generation_execution_profile,
+    default_generation_scheduler_policy, default_generation_streaming_policy,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,6 +147,85 @@ impl DenseAdapterRuntimeStore {
                     binding.served_adapter_digest
                 ),
             })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PromotedGemmaRevisionEntry {
+    binding: AdapterServingBinding,
+    identity: ServedModelRevisionIdentity,
+}
+
+#[derive(Clone, Debug, Default)]
+struct PromotedGemmaRevisionState {
+    entries: BTreeMap<String, PromotedGemmaRevisionEntry>,
+    active_served_adapter_digest: Option<String>,
+    last_known_good_served_adapter_digest: Option<String>,
+}
+
+impl PromotedGemmaRevisionState {
+    fn promote(&mut self, entry: PromotedGemmaRevisionEntry) -> ServedModelRevisionIdentity {
+        let digest = entry.binding.served_adapter_digest.clone();
+        if let Some(active_digest) = self.active_served_adapter_digest.clone() {
+            self.last_known_good_served_adapter_digest = Some(active_digest);
+        } else {
+            self.last_known_good_served_adapter_digest = Some(digest.clone());
+        }
+        self.entries.insert(digest.clone(), entry.clone());
+        self.active_served_adapter_digest = Some(digest);
+        entry.identity
+    }
+
+    fn rollback(&mut self) -> Option<ServedModelRevisionIdentity> {
+        let rollback_digest = self.last_known_good_served_adapter_digest.clone()?;
+        self.active_served_adapter_digest = Some(rollback_digest.clone());
+        self.last_known_good_served_adapter_digest = Some(rollback_digest.clone());
+        self.entries
+            .get(rollback_digest.as_str())
+            .map(|entry| entry.identity.clone())
+    }
+
+    fn active_binding(&self) -> Option<AdapterServingBinding> {
+        self.active_entry().map(|entry| entry.binding.clone())
+    }
+
+    fn active_identity(&self) -> Option<ServedModelRevisionIdentity> {
+        self.active_entry().map(|entry| entry.identity.clone())
+    }
+
+    fn last_known_good_identity(&self) -> Option<ServedModelRevisionIdentity> {
+        self.last_known_good_served_adapter_digest
+            .as_deref()
+            .and_then(|digest| self.entries.get(digest))
+            .map(|entry| entry.identity.clone())
+    }
+
+    fn entry_for_binding(
+        &self,
+        binding: &AdapterServingBinding,
+    ) -> Option<&PromotedGemmaRevisionEntry> {
+        self.entries.get(binding.served_adapter_digest.as_str())
+    }
+
+    fn attach_to_response(&self, mut response: GenerationResponse) -> GenerationResponse {
+        let served_revision = response
+            .provenance
+            .as_ref()
+            .and_then(|provenance| provenance.adapter_serving.as_ref())
+            .and_then(|binding| self.entry_for_binding(binding))
+            .map(|entry| entry.identity.clone());
+        if let (Some(provenance), Some(served_revision)) =
+            (response.provenance.as_mut(), served_revision)
+        {
+            provenance.served_revision = Some(served_revision);
+        }
+        response
+    }
+
+    fn active_entry(&self) -> Option<&PromotedGemmaRevisionEntry> {
+        self.active_served_adapter_digest
+            .as_deref()
+            .and_then(|digest| self.entries.get(digest))
     }
 }
 
@@ -2042,12 +2125,16 @@ pub struct CudaGemma4TextGenerationService {
     backend_health: super::BackendHealthTracker,
     model_descriptor: DecoderModelDescriptor,
     runtime_support: GgufDecoderRuntimeSupport,
+    adapters: Arc<Mutex<DenseAdapterRuntimeStore>>,
+    promoted_revisions: PromotedGemmaRevisionState,
 }
 
 impl CudaGemma4TextGenerationService {
     pub fn from_gguf_path(path: impl AsRef<Path>) -> Result<Self, ReferenceTextGenerationError> {
         let mut backend = CudaBackend::new();
-        let model = CudaGemma4GenerationModel::from_gguf_path(path, &mut backend)?;
+        let adapters = Arc::new(Mutex::new(DenseAdapterRuntimeStore::default()));
+        let model =
+            CudaGemma4GenerationModel::from_gguf_path(path, &mut backend, Arc::clone(&adapters))?;
         let model_descriptor = model.descriptor().clone();
         let runtime_support = model.runtime_support();
         let mut models = InMemoryGenerationModelRegistry::new();
@@ -2070,6 +2157,8 @@ impl CudaGemma4TextGenerationService {
             backend_health,
             model_descriptor,
             runtime_support,
+            adapters,
+            promoted_revisions: PromotedGemmaRevisionState::default(),
         })
     }
 
@@ -2125,11 +2214,16 @@ impl CudaGemma4TextGenerationService {
             .models
             .active(model_id)
             .ok_or_else(|| ReferenceTextGenerationError::UnsupportedModel(model_id.to_string()))?;
-        Ok(self.sessions.create(
-            model,
-            super::served_artifact_identity_for_decoder_backend(model.descriptor(), "cuda", &[])
-                .served_artifact_digest,
-        ))
+        let served_artifact =
+            super::served_artifact_identity_for_decoder_backend(model.descriptor(), "cuda", &[]);
+        let effective_served_artifact_digest = self
+            .promoted_revisions
+            .active_binding()
+            .map(|binding| binding.served_adapter_digest)
+            .unwrap_or(served_artifact.served_artifact_digest);
+        Ok(self
+            .sessions
+            .create(model, effective_served_artifact_digest))
     }
 
     pub fn reset_session(
@@ -2150,14 +2244,26 @@ impl CudaGemma4TextGenerationService {
         &mut self,
         requests: Vec<GenerationRequest>,
     ) -> ContinuousBatchGenerationResult {
-        super::run_continuous_batch_generation_requests(
+        let requests = requests
+            .into_iter()
+            .map(|request| self.request_with_active_revision(request))
+            .collect();
+        let mut result = super::run_continuous_batch_generation_requests(
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
             &mut self.shared_prefixes,
             requests,
             default_generation_scheduler_policy(),
-        )
+        );
+        result.responses = result
+            .responses
+            .into_iter()
+            .map(|response| {
+                response.map(|response| self.promoted_revisions.attach_to_response(response))
+            })
+            .collect();
+        result
     }
 
     #[must_use]
@@ -2184,19 +2290,107 @@ impl CudaGemma4TextGenerationService {
         self.models.expire_idle(now_millis);
         self.models.loaded_model_views()
     }
+
+    pub fn active_revision_identity(&self) -> Option<ServedModelRevisionIdentity> {
+        self.promoted_revisions.active_identity()
+    }
+
+    pub fn last_known_good_revision_identity(&self) -> Option<ServedModelRevisionIdentity> {
+        self.promoted_revisions.last_known_good_identity()
+    }
+
+    pub fn promote_exported_revision(
+        &mut self,
+        base_binding: &GemmaE4bServedBaseModelBinding,
+        exported_artifact: &GemmaE4bCudaAdapterExportedArtifact,
+        checkpoint: &GemmaE4bCudaAdapterCheckpoint,
+    ) -> Result<ServedModelRevisionIdentity, ReferenceTextGenerationError> {
+        let served_artifact = crate::served_artifact_identity_for_decoder_backend(
+            &self.model_descriptor,
+            "cuda",
+            &[],
+        );
+        let binding = self.register_exported_revision(
+            base_binding,
+            &served_artifact,
+            exported_artifact,
+            checkpoint,
+        )?;
+        let identity = gemma_served_revision_identity(
+            &binding,
+            exported_artifact,
+            checkpoint,
+            crate::current_time_millis(),
+        );
+        Ok(self
+            .promoted_revisions
+            .promote(PromotedGemmaRevisionEntry { binding, identity }))
+    }
+
+    pub fn rollback_to_last_known_good_revision(
+        &mut self,
+    ) -> Result<Option<ServedModelRevisionIdentity>, ReferenceTextGenerationError> {
+        Ok(self.promoted_revisions.rollback())
+    }
+
+    fn request_with_active_revision(&self, mut request: GenerationRequest) -> GenerationRequest {
+        if request.adapter_serving.is_none() {
+            request.adapter_serving = self.promoted_revisions.active_binding();
+        }
+        request
+    }
+
+    fn register_exported_revision(
+        &mut self,
+        base_binding: &GemmaE4bServedBaseModelBinding,
+        served_artifact: &psionic_runtime::ServedArtifactIdentity,
+        exported_artifact: &GemmaE4bCudaAdapterExportedArtifact,
+        checkpoint: &GemmaE4bCudaAdapterCheckpoint,
+    ) -> Result<AdapterServingBinding, ReferenceTextGenerationError> {
+        let adapter = validate_gemma_exported_revision(
+            &self.model_descriptor,
+            base_binding,
+            served_artifact,
+            exported_artifact,
+            checkpoint,
+        )?;
+        let binding = AdapterServingBinding::new(
+            format!(
+                "gemma4-promoted:{}:{}",
+                checkpoint.checkpoint_id, exported_artifact.adapter_identity.adapter_revision
+            ),
+            base_binding.model_id.clone(),
+            base_binding.base_model_revision.clone(),
+            base_binding.base_served_artifact_digest.clone(),
+            AdapterResidencyMode::HotSwapOverlay,
+            vec![exported_artifact.adapter_identity.clone()],
+        );
+        self.adapters
+            .lock()
+            .map_err(
+                |_| ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                    binding_id: binding.binding_id.clone(),
+                    reason: String::from("adapter registry is poisoned"),
+                },
+            )?
+            .insert(DenseAdapterRuntime::new(binding.clone(), adapter)?);
+        Ok(binding)
+    }
 }
 
 impl TextGenerationExecutor for CudaGemma4TextGenerationService {
     type Error = ReferenceTextGenerationError;
 
     fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
-        super::run_generation_request(
+        let request = self.request_with_active_revision(request.clone());
+        let response = super::run_generation_request(
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
             &mut self.shared_prefixes,
-            request,
-        )
+            &request,
+        )?;
+        Ok(self.promoted_revisions.attach_to_response(response))
     }
 }
 
@@ -2240,20 +2434,23 @@ impl ManagedTextGenerationRuntime for CudaGemma4TextGenerationService {
 #[derive(Clone, Debug)]
 struct CudaGemma4GenerationModel {
     inner: Arc<CudaGemma4ModelInner>,
+    adapters: Arc<Mutex<DenseAdapterRuntimeStore>>,
 }
 
 impl CudaGemma4GenerationModel {
     fn from_gguf_path(
         path: impl AsRef<Path>,
         backend: &mut CudaBackend,
+        adapters: Arc<Mutex<DenseAdapterRuntimeStore>>,
     ) -> Result<Self, ReferenceTextGenerationError> {
         let artifact = GgufBlobArtifact::open_path(path, gguf_local_blob_open_options())?;
-        Self::from_blob_artifact(artifact, backend)
+        Self::from_blob_artifact(artifact, backend, adapters)
     }
 
     fn from_blob_artifact(
         artifact: GgufBlobArtifact,
         backend: &mut CudaBackend,
+        adapters: Arc<Mutex<DenseAdapterRuntimeStore>>,
     ) -> Result<Self, ReferenceTextGenerationError> {
         let load_start = Instant::now();
         let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
@@ -2313,6 +2510,7 @@ impl CudaGemma4GenerationModel {
         };
         Ok(Self {
             inner: Arc::new(inner),
+            adapters,
         })
     }
 
@@ -2328,9 +2526,7 @@ impl CudaGemma4GenerationModel {
             GgufDecoderFamily::Gemma4,
             vec![String::from("cuda")],
             vec![String::from("cpu"), String::from("metal")],
-            unsupported_adapter_runtime_support(
-                "LM-head LoRA serving is not implemented on the native gemma4 cuda runtime",
-            ),
+            gemma_cuda_adapter_runtime_support(),
         );
         support.unsupported_features = vec![
             String::from("image_inputs"),
@@ -2338,7 +2534,6 @@ impl CudaGemma4GenerationModel {
             String::from("audio_inputs"),
             String::from("tool_calling"),
             String::from("response_state"),
-            String::from("adapter_serving"),
         ];
         support
     }
@@ -2427,6 +2622,32 @@ impl super::CompiledWordGenerationModel for CudaGemma4GenerationModel {
 
     fn backend_compatibility(&self) -> &'static str {
         "cuda"
+    }
+
+    fn adjust_step_output(
+        &self,
+        step: &mut GenerationStepOutput,
+        request: &GenerationRequest,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let Some(binding) = request.adapter_serving.as_ref() else {
+            return Ok(());
+        };
+        let hidden = step.hidden.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: binding.binding_id.clone(),
+                reason: String::from(
+                    "the active gemma4 cuda step does not expose the final hidden state needed for LM-head LoRA serving",
+                ),
+            }
+        })?;
+        let adapters = self.adapters.lock().map_err(|_| {
+            ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: binding.binding_id.clone(),
+                reason: String::from("adapter registry is poisoned"),
+            }
+        })?;
+        let runtime = adapters.get(binding)?;
+        runtime.apply_to_logits(hidden.as_slice(), step.logits.as_mut_slice())
     }
 }
 
@@ -2876,6 +3097,205 @@ fn dense_adapter_runtime_support() -> DecoderAdapterRuntimeSupport {
     }
 }
 
+fn gemma_cuda_adapter_runtime_support() -> DecoderAdapterRuntimeSupport {
+    DecoderAdapterRuntimeSupport {
+        support_level: String::from("lm_head_lora_cuda"),
+        import_formats: vec![String::from("safetensors")],
+        residency_modes: vec![
+            String::from("hot_swap_overlay"),
+            String::from("merged_resident"),
+        ],
+        batching_mode: String::from("one_promoted_or_explicit_binding_per_request"),
+        unsupported_reasons: Vec::new(),
+    }
+}
+
+fn validate_gemma_exported_revision(
+    descriptor: &DecoderModelDescriptor,
+    base_binding: &GemmaE4bServedBaseModelBinding,
+    served_artifact: &psionic_runtime::ServedArtifactIdentity,
+    exported_artifact: &GemmaE4bCudaAdapterExportedArtifact,
+    checkpoint: &GemmaE4bCudaAdapterCheckpoint,
+) -> Result<LmHeadLoraAdapterArtifact, ReferenceTextGenerationError> {
+    if descriptor.model.family != "gemma4" {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: format!(
+                "promoted revision loading requires a gemma4 base model, but the runtime loaded `{}`",
+                descriptor.model.family
+            ),
+        });
+    }
+    if base_binding.model_id != descriptor.model.model_id {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: format!(
+                "promotion targets model `{}`, but the runtime loaded `{}`",
+                base_binding.model_id, descriptor.model.model_id
+            ),
+        });
+    }
+    if base_binding.base_served_artifact_digest != served_artifact.served_artifact_digest {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: format!(
+                "promotion targets served artifact `{}`, but the runtime loaded `{}`",
+                base_binding.base_served_artifact_digest, served_artifact.served_artifact_digest
+            ),
+        });
+    }
+    if base_binding.hidden_size != descriptor.config.hidden_size {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: format!(
+                "promotion targets hidden width {}, but the runtime loaded {}",
+                base_binding.hidden_size, descriptor.config.hidden_size
+            ),
+        });
+    }
+    if base_binding.vocab_size() != descriptor.config.vocab_size {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: format!(
+                "promotion targets vocabulary width {}, but the runtime loaded {}",
+                base_binding.vocab_size(),
+                descriptor.config.vocab_size
+            ),
+        });
+    }
+
+    let tokenizer_contract_digest = base_binding.tokenizer.stable_digest();
+    if exported_artifact.tokenizer_contract_digest != tokenizer_contract_digest {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "exported adapter tokenizer contract does not match the served base binding",
+            ),
+        });
+    }
+    if checkpoint.tokenizer_contract_digest != tokenizer_contract_digest {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "checkpoint tokenizer contract does not match the served base binding",
+            ),
+        });
+    }
+    if exported_artifact.contract_digest != checkpoint.contract_digest {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "exported adapter contract digest does not match the checkpoint contract digest",
+            ),
+        });
+    }
+    if exported_artifact.compatibility_digest != checkpoint.compatibility_digest {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "exported adapter compatibility digest does not match the checkpoint compatibility digest",
+            ),
+        });
+    }
+    if checkpoint.base_served_artifact_digest != base_binding.base_served_artifact_digest {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "checkpoint base served artifact digest does not match the served base binding",
+            ),
+        });
+    }
+    if checkpoint.checkpoint_digest != checkpoint.stable_digest() {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "checkpoint digest does not match the serialized checkpoint payload",
+            ),
+        });
+    }
+    if exported_artifact.adapter_identity.base_model_id != base_binding.model_id
+        || exported_artifact.adapter_identity.base_model_revision
+            != base_binding.base_model_revision
+        || exported_artifact
+            .adapter_identity
+            .base_served_artifact_digest
+            != base_binding.base_served_artifact_digest
+    {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "exported adapter base-model identity does not match the served base binding",
+            ),
+        });
+    }
+    if exported_artifact.adapter_artifact_digest
+        != exported_artifact.adapter_identity.artifact_digest
+    {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "exported adapter artifact digest does not match the embedded adapter identity",
+            ),
+        });
+    }
+    if exported_artifact.adapter_identity_digest
+        != exported_artifact.adapter_identity.stable_digest()
+    {
+        return Err(ReferenceTextGenerationError::UnsupportedAdapterBinding {
+            binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+            reason: String::from(
+                "exported adapter identity digest does not match the adapter identity payload",
+            ),
+        });
+    }
+
+    let adapter = exported_artifact
+        .load_lm_head_lora_artifact()
+        .map_err(
+            |error| ReferenceTextGenerationError::UnsupportedAdapterBinding {
+                binding_id: exported_artifact.adapter_identity.adapter_id.clone(),
+                reason: error.to_string(),
+            },
+        )?;
+    validate_lm_head_lora_adapter(descriptor, &adapter)?;
+    Ok(adapter)
+}
+
+fn gemma_served_revision_identity(
+    binding: &AdapterServingBinding,
+    exported_artifact: &GemmaE4bCudaAdapterExportedArtifact,
+    checkpoint: &GemmaE4bCudaAdapterCheckpoint,
+    activated_at_ms: u64,
+) -> ServedModelRevisionIdentity {
+    let revision_id = stable_digest(
+        b"psionic_gemma_served_revision|",
+        &(
+            binding.served_adapter_digest.as_str(),
+            checkpoint.checkpoint_id.as_str(),
+            checkpoint.checkpoint_digest.as_str(),
+            exported_artifact.adapter_identity_digest.as_str(),
+            exported_artifact.adapter_artifact_digest.as_str(),
+        ),
+    );
+    ServedModelRevisionIdentity {
+        revision_id,
+        binding_id: binding.binding_id.clone(),
+        served_adapter_digest: binding.served_adapter_digest.clone(),
+        base_model_id: binding.base_model_id.clone(),
+        base_model_revision: binding.base_model_revision.clone(),
+        base_served_artifact_digest: binding.base_served_artifact_digest.clone(),
+        checkpoint_id: checkpoint.checkpoint_id.clone(),
+        checkpoint_digest: checkpoint.checkpoint_digest.clone(),
+        contract_digest: exported_artifact.contract_digest.clone(),
+        compatibility_digest: exported_artifact.compatibility_digest.clone(),
+        adapter_id: exported_artifact.adapter_identity.adapter_id.clone(),
+        adapter_revision: exported_artifact.adapter_identity.adapter_revision.clone(),
+        adapter_identity_digest: exported_artifact.adapter_identity_digest.clone(),
+        adapter_artifact_digest: exported_artifact.adapter_artifact_digest.clone(),
+        activated_at_ms,
+    }
+}
+
 fn validate_adapter_identity(
     descriptor: &DecoderModelDescriptor,
     family: GgufDecoderFamily,
@@ -3009,6 +3429,19 @@ fn digest_qwen35_proxy_plan(
     hex::encode(hasher.finalize())
 }
 
+fn stable_digest<T>(prefix: &[u8], value: &T) -> String
+where
+    T: Serialize,
+{
+    let mut hasher = Sha256::new();
+    hasher.update(prefix);
+    hasher.update(
+        serde_json::to_vec(value)
+            .expect("served revision digest serialization should not fail for stable structs"),
+    );
+    hex::encode(hasher.finalize())
+}
+
 fn qwen35_proxy_prompt_json(
     prompt: &GenerationInput,
     vocab_size: usize,
@@ -3087,6 +3520,7 @@ fn build_qwen35_proxy_generation_response(
             &[],
         ),
         adapter_serving: None,
+        served_revision: None,
         execution_plan_digest: plan_digest.to_string(),
         cluster_execution: None,
         load_state: crate::GenerationLoadState::Warm,
@@ -3498,19 +3932,38 @@ impl GenerationEventStream for CompletedGenerationStream {
 
 #[cfg(test)]
 mod tests {
-    use super::{CpuGgufServiceKind, CpuGgufTextGenerationService};
+    use super::{
+        CpuGgufServiceKind, CpuGgufTextGenerationService, PromotedGemmaRevisionEntry,
+        PromotedGemmaRevisionState, gemma_served_revision_identity,
+        validate_gemma_exported_revision,
+    };
     use crate::{
-        CompiledWordGenerationModel, GenerationModelHandle, GenerationOptions, GenerationRequest,
-        GenerationStreamEvent, InMemoryKvCache, ReferenceTextGenerationError,
-        StreamingTextGenerationExecutor, TextGenerationExecutor,
+        AdapterServingBinding, CompiledWordGenerationModel, GenerationLoadState,
+        GenerationModelHandle, GenerationOptions, GenerationProvenance, GenerationRequest,
+        GenerationResponse, GenerationStreamEvent, InMemoryKvCache, ReferenceTextGenerationError,
+        StreamingTextGenerationExecutor, TerminationReason, TextGenerationExecutor,
     };
     use psionic_adapters::{
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
         AdapterTargetFamily,
     };
-    use psionic_core::QuantizationMode;
-    use psionic_models::{GgufDecoderFamily, GgufMetadataValue, GgufTensorType};
-    use safetensors::{Dtype as SafeTensorsDType, serialize_to_file, tensor::TensorView};
+    use psionic_core::{DType, Device, QuantizationMode, Shape, TensorSpec};
+    use psionic_data::{TokenizerDigest, TokenizerFamily};
+    use psionic_models::{
+        DecoderModelDescriptor, GgufDecoderFamily, GgufMetadataValue, GgufTensorType, TokenId,
+        TokenSequence,
+    };
+    use psionic_runtime::LocalServingIsolationPolicy;
+    use psionic_train::{
+        FixedBudgetTrainingRun, GEMMA_E4B_CUDA_ADAPTER_CHECKPOINT_SCHEMA_VERSION,
+        GEMMA_E4B_CUDA_ADAPTER_TARGET_SET_ID, GEMMA_E4B_FINETUNING_MVP_TRAINING_FAMILY_ID,
+        GemmaE4bCudaAdapterCheckpoint, GemmaE4bCudaAdapterExportedArtifact,
+        GemmaE4bServedBaseModelBinding, TrainingLoopBudget, TrainingOptimizerConfig,
+        TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
+        TrainingTensorBuffer,
+    };
+    use safetensors::{Dtype as SafeTensorsDType, serialize, tensor::TensorView};
+    use sha2::{Digest, Sha256};
     use std::{
         fs,
         path::Path,
@@ -3879,6 +4332,171 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn gemma_promoted_revision_validation_accepts_matching_export_and_checkpoint()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let descriptor = tiny_gemma4_descriptor()?;
+        let (served_artifact, base_binding) = sample_gemma_served_base_binding(&descriptor);
+        let (exported_artifact, checkpoint) = sample_gemma_exported_revision(
+            &descriptor,
+            &base_binding,
+            "gemma4-e4b-helpdesk",
+            "r1",
+            5,
+        )?;
+
+        let adapter = validate_gemma_exported_revision(
+            &descriptor,
+            &base_binding,
+            &served_artifact,
+            &exported_artifact,
+            &checkpoint,
+        )?;
+        let mut logits = vec![0.0; descriptor.config.vocab_size];
+        adapter.apply_to_logits(&[1.0, 0.0, 0.0, 0.0], logits.as_mut_slice())?;
+
+        assert_eq!(adapter.hidden_size, descriptor.config.hidden_size);
+        assert_eq!(adapter.vocab_size, descriptor.config.vocab_size);
+        assert!(
+            logits[5] > 0.0,
+            "validated adapter should steer the target token"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gemma_promoted_revision_validation_refuses_tokenizer_and_artifact_drift()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let descriptor = tiny_gemma4_descriptor()?;
+        let (served_artifact, base_binding) = sample_gemma_served_base_binding(&descriptor);
+        let (exported_artifact, checkpoint) = sample_gemma_exported_revision(
+            &descriptor,
+            &base_binding,
+            "gemma4-e4b-helpdesk",
+            "r1",
+            5,
+        )?;
+
+        let mut stale_checkpoint = checkpoint.clone();
+        stale_checkpoint.saved_at_ms += 1;
+        let checkpoint_error = validate_gemma_exported_revision(
+            &descriptor,
+            &base_binding,
+            &served_artifact,
+            &exported_artifact,
+            &stale_checkpoint,
+        )
+        .expect_err("stale checkpoint digests must be refused");
+        assert!(
+            checkpoint_error
+                .to_string()
+                .contains("checkpoint digest does not match"),
+            "checkpoint refusal should describe digest drift"
+        );
+
+        let mut wrong_tokenizer = exported_artifact.clone();
+        wrong_tokenizer.tokenizer_contract_digest = String::from("drifted-tokenizer-contract");
+        let tokenizer_error = validate_gemma_exported_revision(
+            &descriptor,
+            &base_binding,
+            &served_artifact,
+            &wrong_tokenizer,
+            &checkpoint,
+        )
+        .expect_err("tokenizer drift must be refused");
+        assert!(
+            tokenizer_error
+                .to_string()
+                .contains("tokenizer contract does not match"),
+            "tokenizer refusal should describe the contract mismatch"
+        );
+
+        let mut wrong_identity = exported_artifact.clone();
+        wrong_identity.adapter_identity.base_served_artifact_digest =
+            String::from("sha256:stale-base-artifact");
+        wrong_identity.adapter_identity_digest = wrong_identity.adapter_identity.stable_digest();
+        let artifact_error = validate_gemma_exported_revision(
+            &descriptor,
+            &base_binding,
+            &served_artifact,
+            &wrong_identity,
+            &checkpoint,
+        )
+        .expect_err("artifact identity drift must be refused");
+        assert!(
+            artifact_error
+                .to_string()
+                .contains("base-model identity does not match"),
+            "artifact refusal should describe the base-lane mismatch"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn gemma_promoted_revision_state_surfaces_revision_identity_and_rolls_back()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let descriptor = tiny_gemma4_descriptor()?;
+        let (_, base_binding) = sample_gemma_served_base_binding(&descriptor);
+        let entry_one = sample_promoted_gemma_revision_entry(
+            &descriptor,
+            &base_binding,
+            "gemma4-e4b-helpdesk",
+            "r1",
+            5,
+            1_000,
+        )?;
+        let entry_two = sample_promoted_gemma_revision_entry(
+            &descriptor,
+            &base_binding,
+            "gemma4-e4b-helpdesk",
+            "r2",
+            4,
+            2_000,
+        )?;
+        let mut state = PromotedGemmaRevisionState::default();
+
+        let first_identity = state.promote(entry_one.clone());
+        assert_eq!(first_identity, entry_one.identity);
+        assert_eq!(state.active_identity(), Some(entry_one.identity.clone()));
+        assert_eq!(
+            state.last_known_good_identity(),
+            Some(entry_one.identity.clone())
+        );
+
+        let first_response = state.attach_to_response(response_with_adapter_binding(
+            &descriptor,
+            &entry_one.binding,
+        ));
+        assert_eq!(
+            first_response
+                .provenance
+                .as_ref()
+                .and_then(|provenance| provenance.served_revision.clone()),
+            Some(entry_one.identity.clone())
+        );
+
+        let second_identity = state.promote(entry_two.clone());
+        assert_eq!(second_identity, entry_two.identity);
+        assert_eq!(state.active_identity(), Some(entry_two.identity.clone()));
+        assert_eq!(
+            state.last_known_good_identity(),
+            Some(entry_one.identity.clone())
+        );
+
+        let rolled_back = state
+            .rollback()
+            .expect("rollback should restore the last known-good revision");
+        assert_eq!(rolled_back, entry_one.identity);
+        assert_eq!(state.active_identity(), Some(entry_one.identity.clone()));
+        assert_eq!(
+            state.last_known_good_identity(),
+            Some(entry_one.identity.clone())
+        );
+
+        Ok(())
+    }
+
     fn run_dense_family_case(
         family_label: &str,
         expected_family: GgufDecoderFamily,
@@ -3999,9 +4617,22 @@ mod tests {
         target_token_index: usize,
         strength: f32,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        fs::write(
+            path,
+            prompt_specific_lora_adapter_bytes(hidden, 6, target_token_index, strength)?,
+        )?;
+        Ok(())
+    }
+
+    fn prompt_specific_lora_adapter_bytes(
+        hidden: &[f32],
+        vocab_size: usize,
+        target_token_index: usize,
+        strength: f32,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let norm = hidden.iter().map(|value| value * value).sum::<f32>();
         let lora_a: Vec<f32> = hidden.iter().map(|value| value / norm.max(1e-6)).collect();
-        let mut lora_b = vec![0.0_f32; 6];
+        let mut lora_b = vec![0.0_f32; vocab_size];
         lora_b[target_token_index] = strength;
         let lora_a_bytes = encode_f32_bytes(lora_a.as_slice());
         let lora_b_bytes = encode_f32_bytes(lora_b.as_slice());
@@ -4012,10 +4643,14 @@ mod tests {
         );
         tensors.insert(
             "lm_head.lora_B.weight".to_string(),
-            TensorView::new(SafeTensorsDType::F32, vec![6, 1], &lora_b_bytes)?,
+            TensorView::new(SafeTensorsDType::F32, vec![vocab_size, 1], &lora_b_bytes)?,
         );
-        serialize_to_file(tensors, None, path)?;
-        Ok(())
+        Ok(serialize(
+            tensors
+                .iter()
+                .map(|(name, view)| (name.as_str(), view.clone())),
+            None,
+        )?)
     }
 
     fn encode_f32_bytes(values: &[f32]) -> Vec<u8> {
@@ -4023,6 +4658,238 @@ mod tests {
             .iter()
             .flat_map(|value| value.to_le_bytes())
             .collect()
+    }
+
+    fn tiny_gemma4_descriptor() -> Result<DecoderModelDescriptor, Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_gemma4_promoted_revision.gguf");
+        write_test_gguf(
+            &path,
+            dense_gemma4_metadata("tiny psionic gemma4 promoted revision").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        Ok(CpuGgufTextGenerationService::from_gguf_path(&path)?
+            .model_descriptor()
+            .clone())
+    }
+
+    fn sample_gemma_served_base_binding(
+        descriptor: &DecoderModelDescriptor,
+    ) -> (
+        psionic_runtime::ServedArtifactIdentity,
+        GemmaE4bServedBaseModelBinding,
+    ) {
+        let served_artifact =
+            crate::served_artifact_identity_for_decoder_backend(descriptor, "cuda", &[]);
+        let tokenizer = TokenizerDigest::new(
+            TokenizerFamily::SentencePiece,
+            "tiny-gemma4-tokenizer",
+            descriptor.config.vocab_size as u32,
+        )
+        .with_special_tokens_digest("tiny-gemma4-specials")
+        .with_template_digest("tiny-gemma4-template");
+        let binding = GemmaE4bServedBaseModelBinding {
+            model_id: descriptor.model.model_id.clone(),
+            base_model_revision: descriptor.model.revision.clone(),
+            base_served_artifact_digest: served_artifact.served_artifact_digest.clone(),
+            tokenizer,
+            hidden_size: descriptor.config.hidden_size,
+        };
+        (served_artifact, binding)
+    }
+
+    fn sample_training_run(
+        hidden_size: usize,
+    ) -> Result<FixedBudgetTrainingRun, Box<dyn std::error::Error>> {
+        let parameter = TrainingTensorBuffer::from_f32(
+            "lm_head",
+            TensorSpec::new(Shape::new(vec![hidden_size]), DType::F32, Device::cpu()),
+            vec![0.0; hidden_size],
+        )?;
+        let group = TrainingParameterGroupState::new(
+            "lm_head",
+            TrainingParameterClass::Head,
+            parameter,
+            TrainingOptimizerConfig::adamw(0.05, 0.9, 0.99, 1e-8),
+            TrainingOptimizerResidencyPolicy::host_only(),
+        )?;
+        Ok(FixedBudgetTrainingRun::new(
+            "gemma4-promoted-run",
+            "gemma4-e4b-mesh-checkpoint-family",
+            TrainingLoopBudget::new(1, 1, 1)?,
+            vec![group],
+        )?)
+    }
+
+    fn sample_gemma_exported_revision(
+        descriptor: &DecoderModelDescriptor,
+        base_binding: &GemmaE4bServedBaseModelBinding,
+        adapter_id: &str,
+        adapter_revision: &str,
+        target_token_index: usize,
+    ) -> Result<
+        (
+            GemmaE4bCudaAdapterExportedArtifact,
+            GemmaE4bCudaAdapterCheckpoint,
+        ),
+        Box<dyn std::error::Error>,
+    > {
+        let adapter_bytes = prompt_specific_lora_adapter_bytes(
+            &vec![1.0, 0.0, 0.0, 0.0],
+            descriptor.config.vocab_size,
+            target_token_index,
+            24.0,
+        )?;
+        let adapter_artifact_digest = format!("sha256:{}", sha256_hex(&adapter_bytes));
+        let adapter_identity = AdapterArtifactIdentity::new(
+            adapter_id,
+            adapter_revision,
+            AdapterArtifactKind::Lora,
+            AdapterArtifactFormat::Safetensors,
+            base_binding.model_id.clone(),
+            base_binding.base_model_revision.clone(),
+            base_binding.base_served_artifact_digest.clone(),
+            adapter_artifact_digest.clone(),
+            QuantizationMode::None,
+            AdapterTargetFamily::DecoderComposite,
+            10,
+        );
+        let contract_digest = String::from("gemma4-e4b-contract-r1");
+        let compatibility_digest = String::from("gemma4-e4b-compatibility-r1");
+        let tokenizer_contract_digest = base_binding.tokenizer.stable_digest();
+        let exported_artifact = GemmaE4bCudaAdapterExportedArtifact {
+            contract_digest: contract_digest.clone(),
+            compatibility_digest: compatibility_digest.clone(),
+            tokenizer_contract_digest: tokenizer_contract_digest.clone(),
+            adapter_identity: adapter_identity.clone(),
+            adapter_identity_digest: adapter_identity.stable_digest(),
+            adapter_artifact_digest,
+            adapter_alpha: 1.0,
+            adapter_bytes,
+        };
+        let mut checkpoint = GemmaE4bCudaAdapterCheckpoint {
+            schema_version: String::from(GEMMA_E4B_CUDA_ADAPTER_CHECKPOINT_SCHEMA_VERSION),
+            checkpoint_id: format!("{adapter_id}-{adapter_revision}-checkpoint"),
+            training_family_id: String::from(GEMMA_E4B_FINETUNING_MVP_TRAINING_FAMILY_ID),
+            contract_digest,
+            compatibility_digest,
+            target_set_id: String::from(GEMMA_E4B_CUDA_ADAPTER_TARGET_SET_ID),
+            base_served_artifact_digest: base_binding.base_served_artifact_digest.clone(),
+            tokenizer_contract_digest,
+            saved_at_ms: 1_250,
+            run: sample_training_run(descriptor.config.hidden_size)?,
+            checkpoint_digest: String::new(),
+        };
+        checkpoint.checkpoint_digest = checkpoint.stable_digest();
+        Ok((exported_artifact, checkpoint))
+    }
+
+    fn sample_promoted_gemma_revision_entry(
+        descriptor: &DecoderModelDescriptor,
+        base_binding: &GemmaE4bServedBaseModelBinding,
+        adapter_id: &str,
+        adapter_revision: &str,
+        target_token_index: usize,
+        activated_at_ms: u64,
+    ) -> Result<PromotedGemmaRevisionEntry, Box<dyn std::error::Error>> {
+        let (served_artifact, exported_artifact, checkpoint) = {
+            let (served_artifact, _) = sample_gemma_served_base_binding(descriptor);
+            let (exported_artifact, checkpoint) = sample_gemma_exported_revision(
+                descriptor,
+                base_binding,
+                adapter_id,
+                adapter_revision,
+                target_token_index,
+            )?;
+            (served_artifact, exported_artifact, checkpoint)
+        };
+        validate_gemma_exported_revision(
+            descriptor,
+            base_binding,
+            &served_artifact,
+            &exported_artifact,
+            &checkpoint,
+        )?;
+        let binding = AdapterServingBinding::new(
+            format!(
+                "gemma4-promoted:{}:{}",
+                checkpoint.checkpoint_id, exported_artifact.adapter_identity.adapter_revision
+            ),
+            base_binding.model_id.clone(),
+            base_binding.base_model_revision.clone(),
+            base_binding.base_served_artifact_digest.clone(),
+            AdapterResidencyMode::HotSwapOverlay,
+            vec![exported_artifact.adapter_identity.clone()],
+        );
+        let identity = gemma_served_revision_identity(
+            &binding,
+            &exported_artifact,
+            &checkpoint,
+            activated_at_ms,
+        );
+        Ok(PromotedGemmaRevisionEntry { binding, identity })
+    }
+
+    fn response_with_adapter_binding(
+        descriptor: &DecoderModelDescriptor,
+        binding: &psionic_adapters::AdapterServingBinding,
+    ) -> GenerationResponse {
+        let request = GenerationRequest::new_text(
+            format!("{}-response", binding.binding_id),
+            descriptor.clone(),
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        )
+        .with_adapter_serving(binding.clone());
+        let mut response = GenerationResponse::new(
+            &request,
+            None,
+            TokenSequence::new(vec![TokenId(4)]),
+            "world",
+            1,
+            0,
+            TerminationReason::EndOfSequence,
+        );
+        response.provenance = Some(GenerationProvenance {
+            served_artifact: crate::served_artifact_identity_for_decoder_backend(
+                descriptor,
+                "cuda",
+                &[],
+            ),
+            adapter_serving: Some(binding.clone()),
+            served_revision: None,
+            execution_plan_digest: String::from("tiny-gemma4-cuda-plan"),
+            cluster_execution: None,
+            load_state: GenerationLoadState::Warm,
+            isolation_policy: LocalServingIsolationPolicy::in_process_runtime(),
+            streaming_policy: None,
+            memory_plan: None,
+            residency_policy: None,
+            residency_snapshot: None,
+            kv_cache_policy: None,
+            kv_cache_encoding_policy: None,
+            kv_ownership: None,
+            prefix_cache_control: None,
+            prefix_cache_state: None,
+            prefix_cache_refusal_reason: None,
+            prefix_cache_policy: None,
+            prefix_cache_identity: None,
+            compile_path: None,
+            delivery_proof: None,
+            cache_observations: Vec::new(),
+            scheduler: None,
+            structured_output: None,
+            psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
+        });
+        response
+    }
+
+    fn sha256_hex(bytes: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(bytes);
+        hex::encode(hasher.finalize())
     }
 
     fn dense_llama_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {

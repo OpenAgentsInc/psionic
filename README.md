@@ -12,7 +12,12 @@ The training side now also carries one bounded `gemma4:e4b` CUDA adapter-SFT
 trainer above the shared adapter substrate: LM-head-only final-hidden-state
 supervision, frozen-base semantics, typed export, exact checkpoint resume,
 served-base plus tokenizer compatibility checks, and explicit refusal truth for
-wider Gemma regions that remain out of scope.
+wider Gemma regions that remain out of scope. The same bounded lane now also
+closes the first trainer-to-serving refresh seam: typed Gemma checkpoints plus
+exported adapter artifacts can be revalidated into the live CUDA mesh lane
+without a process restart, the active served revision is surfaced in response
+provenance, stale or mismatched revisions fail closed, and operators can roll
+back to the last known-good promoted revision.
 
 ## Start Here
 

@@ -3,7 +3,8 @@
 > Status: `published_bounded_lane` on 2026-04-02 after issues `#864`,
 > `#865`, and `#866`; `#867` then added one optional dense `31B` validation
 > lane that reuses the same family contract without widening the original
-> published claim.
+> published claim; `#880` then closed the first trainer-to-serving promoted-
+> revision seam for the bounded `gemma4:e4b` lane.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -230,6 +231,10 @@ conformance work:
   attention geometry, including narrower sliding-window layers and wider
   full-attention layers, instead of assuming one uniform KV shape across the
   whole stack.
+- the same bounded `gemma4:e4b` lane now also accepts typed promoted adapter
+  revisions from the Gemma trainer without restart, revalidates checkpoint and
+  adapter truth before activation, surfaces the active served revision in
+  response provenance, and preserves rollback to the last known-good revision.
 
 The training side now also has one bounded real trainer above that serving lane
 across `crates/psionic-train/src/gemma_e4b_finetuning_mvp.rs` and
@@ -237,9 +242,18 @@ across `crates/psionic-train/src/gemma_e4b_finetuning_mvp.rs` and
 That surface freezes the first admitted `gemma4:e4b` finetuning family as one
 CUDA-only LM-head adapter-SFT lane with rank `8` / alpha `16`, stable
 tokenizer plus base-revision truth, served-base compatibility checks, typed
-`safetensors` export, exact checkpoint resume, and explicit refusal truth. It
-still does not mean checkpoint refresh into serving or the promotion gate has
-landed yet.
+`safetensors` export, exact checkpoint resume, and explicit refusal truth.
+
+That same bounded lane now also has the first real trainer-to-serving refresh
+surface in `crates/psionic-serve/src/gguf.rs`:
+
+- one typed promoted-revision import path for Gemma exported adapter artifacts
+  plus exact trainer checkpoints
+- one fail-closed revalidation gate for base-model identity, served-artifact
+  digest, tokenizer contract, compatibility digest, and checkpoint integrity
+- one active served-revision identity packet on generation provenance
+- one rollback path to the last known-good promoted revision without requiring
+  a restart of the bounded lane
 
 What still does not exist:
 

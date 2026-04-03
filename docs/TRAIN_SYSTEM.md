@@ -2516,6 +2516,9 @@ contract in `crates/psionic-train/src/gemma_e4b_finetuning_mvp.rs`.
 On the same date, GitHub issue `#879` then landed the first real bounded Gemma
 trainer in `crates/psionic-train/src/gemma_e4b_cuda_adapter_sft.rs`.
 
+GitHub issue `#880` then closed the first trainer-to-serving seam in
+`crates/psionic-serve/src/gguf.rs` for that same lane.
+
 That trainer sits above the shared open-adapter fixed-budget core, but it no
 longer pretends the Gemma work is just a paper contract. The lane now has one
 real trainer-owned API surface with:
@@ -2528,11 +2531,15 @@ real trainer-owned API surface with:
   `FixedBudgetTrainingRun`
 - one typed `safetensors` export surface rebound to the Gemma contract digest,
   served-compatibility digest, and tokenizer contract digest
+- one live promoted-revision adoption seam on the bounded Gemma CUDA lane that
+  revalidates typed checkpoint-plus-export inputs, refreshes the active served
+  revision without restart where possible, surfaces served revision identity in
+  response provenance, and preserves rollback to the last known-good revision
 
 The trainer is still intentionally narrow. It trains from bounded final-hidden-
 state LM-head supervision under frozen-base semantics. It does not yet claim a
 broader Gemma-wide LoRA surface, raw end-to-end token-level backprop through a
-native Gemma decoder, serving refresh, or promotion gating.
+native Gemma decoder, or broader eval-gated family promotion.
 
 The contract freezes one exact first claim:
 
@@ -2563,8 +2570,9 @@ That means the honest current repo claim is now:
 
 > Psionic now has one real bounded Gemma `e4b` CUDA adapter trainer with an
 > explicit LM-head target set, served-base/tokenizer compatibility checks,
-> typed `safetensors` export, and exact checkpoint resume, but serving refresh
-> and eval-gated promotion still land in later issues.
+> typed `safetensors` export, exact checkpoint resume, and a live promoted-
+> revision refresh seam into the bounded serving lane, but broader eval-gated
+> family promotion still lands in later issues.
 
 ### Canonical Workload Vocabulary
 

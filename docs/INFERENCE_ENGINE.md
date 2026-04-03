@@ -39,6 +39,10 @@ than just run tensor math.
   - `execution_engine = psionic`
   - `/v1/chat/completions` and `/v1/responses` on the generic
     OpenAI-compatible server
+  - typed promoted-revision adoption for `gemma4:e4b` from the bounded Gemma
+    trainer, with checkpoint-plus-export revalidation, active served-revision
+    provenance, fail-closed mismatch refusal, and rollback to the last
+    known-good revision
   - Gemma-native tool calling through explicit
     `<|tool_call>call:<tool>{...}<tool_call|>` blocks with JSON-schema-subset
     argument validation

@@ -2163,6 +2163,42 @@ pub enum GenerationLoadState {
     Warm,
 }
 
+/// Active served-revision identity when a runtime bound one promoted revision
+/// above the loaded base model.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServedModelRevisionIdentity {
+    /// Stable revision identifier for the active promoted lane.
+    pub revision_id: String,
+    /// Stable binding identifier used to attach the revision at serve time.
+    pub binding_id: String,
+    /// Stable served-adapter digest for the promoted revision.
+    pub served_adapter_digest: String,
+    /// Base model identifier the promoted revision targets.
+    pub base_model_id: String,
+    /// Base model revision declared by the promoted revision.
+    pub base_model_revision: String,
+    /// Stable served-artifact digest for the base lane the revision targets.
+    pub base_served_artifact_digest: String,
+    /// Stable checkpoint identifier that produced the promoted revision.
+    pub checkpoint_id: String,
+    /// Stable checkpoint digest that produced the promoted revision.
+    pub checkpoint_digest: String,
+    /// Stable training-contract digest bound to the revision.
+    pub contract_digest: String,
+    /// Stable compatibility digest shared by the checkpoint and exported adapter.
+    pub compatibility_digest: String,
+    /// Stable adapter identifier.
+    pub adapter_id: String,
+    /// Stable adapter revision.
+    pub adapter_revision: String,
+    /// Stable adapter-identity digest.
+    pub adapter_identity_digest: String,
+    /// Stable adapter-artifact digest.
+    pub adapter_artifact_digest: String,
+    /// Logical activation timestamp for the active served revision.
+    pub activated_at_ms: u64,
+}
+
 /// Provenance fields attached to one generation response.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GenerationProvenance {
@@ -2171,6 +2207,9 @@ pub struct GenerationProvenance {
     /// Explicit adapter-serving binding when the request targeted a hosted adapter product.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adapter_serving: Option<AdapterServingBinding>,
+    /// Active promoted revision identity when the runtime served one above the base lane.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub served_revision: Option<ServedModelRevisionIdentity>,
     /// Stable execution-plan digest for the active model graph.
     pub execution_plan_digest: String,
     /// Explicit clustered execution or scheduling context for the realized request path.
@@ -2251,6 +2290,13 @@ impl GenerationProvenance {
     #[must_use]
     pub fn with_adapter_serving(mut self, adapter_serving: AdapterServingBinding) -> Self {
         self.adapter_serving = Some(adapter_serving);
+        self
+    }
+
+    /// Attaches explicit served-revision identity.
+    #[must_use]
+    pub fn with_served_revision(mut self, served_revision: ServedModelRevisionIdentity) -> Self {
+        self.served_revision = Some(served_revision);
         self
     }
 
@@ -6512,6 +6558,7 @@ impl<'a> PromotedParameterGolfGenerationStream<'a> {
         let provenance = GenerationProvenance {
             served_artifact: self.served_artifact.clone(),
             adapter_serving: None,
+            served_revision: None,
             execution_plan_digest: self.loaded_model.execution_plan_digest().to_string(),
             cluster_execution: None,
             load_state: self.load_state,
@@ -8180,6 +8227,7 @@ where
         let provenance = GenerationProvenance {
             served_artifact: self.served_artifact,
             adapter_serving: self.request.adapter_serving.clone(),
+            served_revision: None,
             execution_plan_digest: delivery_plan_digest.clone(),
             cluster_execution: None,
             load_state: self.load_state,
@@ -9101,6 +9149,7 @@ where
         let provenance = GenerationProvenance {
             served_artifact: self.served_artifact.clone(),
             adapter_serving: self.request.adapter_serving.clone(),
+            served_revision: None,
             execution_plan_digest: self.execution_plan_digest.clone(),
             cluster_execution: None,
             load_state: self.load_state,
@@ -9780,6 +9829,7 @@ where
         let provenance = GenerationProvenance {
             served_artifact,
             adapter_serving: request.adapter_serving.clone(),
+            served_revision: None,
             execution_plan_digest: delivery_plan_digest.clone(),
             cluster_execution: None,
             load_state,

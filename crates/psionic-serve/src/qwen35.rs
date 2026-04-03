@@ -1068,6 +1068,7 @@ impl CudaGgufQwen35TextGenerationService {
                 &[],
             ),
             adapter_serving: None,
+            served_revision: None,
             execution_plan_digest: self.model.plan_digest.clone(),
             cluster_execution: None,
             load_state: crate::GenerationLoadState::Warm,

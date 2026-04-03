@@ -2298,6 +2298,7 @@ fn run_cuda_generation_request(
         let provenance = super::GenerationProvenance {
             served_artifact,
             adapter_serving: None,
+            served_revision: None,
             execution_plan_digest: delivery_plan_digest.clone(),
             cluster_execution: None,
             load_state,
@@ -2788,6 +2789,7 @@ fn run_cuda_hybrid_generation_request(
         let provenance = super::GenerationProvenance {
             served_artifact,
             adapter_serving: None,
+            served_revision: None,
             execution_plan_digest: delivery_plan_digest.clone(),
             cluster_execution: None,
             load_state,
@@ -3504,6 +3506,7 @@ fn run_metal_generation_request(
         let provenance = super::GenerationProvenance {
             served_artifact,
             adapter_serving: None,
+            served_revision: None,
             execution_plan_digest: delivery_plan_digest.clone(),
             cluster_execution: None,
             load_state,
