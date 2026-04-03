@@ -1064,6 +1064,89 @@ impl LocalShardExecutionReport {
     }
 }
 
+/// Realized transport used for one local dense stage handoff.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalStageHandoffTransport {
+    /// The host received outputs and then presented them to the next stage.
+    HostMediated,
+    /// Adjacent shard runtimes exchanged the stage payload directly.
+    DirectWorker,
+}
+
+/// One realized stage handoff inside a dense multi-device run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalStageHandoffReport {
+    /// Source shard identifier.
+    pub from_shard_id: usize,
+    /// Destination shard identifier.
+    pub to_shard_id: usize,
+    /// Source stable device identifier.
+    pub from_stable_device_id: String,
+    /// Destination stable device identifier.
+    pub to_stable_device_id: String,
+    /// Transport used for the handoff.
+    pub transport: LocalStageHandoffTransport,
+    /// Number of tensors moved by the handoff.
+    pub tensor_count: usize,
+    /// Stable handoff identifier when one direct handoff was materialized.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handoff_id: Option<String>,
+    /// Plain-language handoff detail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+impl LocalStageHandoffReport {
+    fn host_mediated(
+        assignment: &ExecutionShardAssignment,
+        next_assignment: &ExecutionShardAssignment,
+        tensor_count: usize,
+    ) -> Self {
+        Self {
+            from_shard_id: assignment.shard_id,
+            to_shard_id: next_assignment.shard_id,
+            from_stable_device_id: assignment.device.stable_device_id.clone(),
+            to_stable_device_id: next_assignment.device.stable_device_id.clone(),
+            transport: LocalStageHandoffTransport::HostMediated,
+            tensor_count,
+            handoff_id: None,
+            detail: Some(format!(
+                "host-mediated handoff from shard {} on `{}` to shard {} on `{}`",
+                assignment.shard_id,
+                assignment.device.stable_device_id,
+                next_assignment.shard_id,
+                next_assignment.device.stable_device_id
+            )),
+        }
+    }
+
+    fn direct(
+        assignment: &ExecutionShardAssignment,
+        next_assignment: &ExecutionShardAssignment,
+        receipt: &LocalDirectStageHandoffReceipt,
+    ) -> Self {
+        Self {
+            from_shard_id: assignment.shard_id,
+            to_shard_id: next_assignment.shard_id,
+            from_stable_device_id: assignment.device.stable_device_id.clone(),
+            to_stable_device_id: next_assignment.device.stable_device_id.clone(),
+            transport: receipt.transport,
+            tensor_count: receipt.tensor_count,
+            handoff_id: Some(receipt.handoff_id.clone()),
+            detail: Some(format!(
+                "direct worker handoff `{}` moved {} tensor(s) from shard {} on `{}` to shard {} on `{}`",
+                receipt.handoff_id,
+                receipt.tensor_count,
+                assignment.shard_id,
+                assignment.device.stable_device_id,
+                next_assignment.shard_id,
+                next_assignment.device.stable_device_id
+            )),
+        }
+    }
+}
+
 /// Local-only execution report for one same-type multi-device run.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LocalMultiDeviceExecutionReport {
@@ -1095,6 +1178,9 @@ pub struct LocalMultiDeviceExecutionReport {
     pub aggregate_metrics: ExecutionMetrics,
     /// Per-shard execution reports in shard order.
     pub shard_reports: Vec<LocalShardExecutionReport>,
+    /// Realized dense stage handoffs for this run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stage_handoffs: Vec<LocalStageHandoffReport>,
     /// Final output tensor IDs returned by the runner when the current posture assembles them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub final_output_tensor_ids: Vec<TensorId>,
@@ -1111,6 +1197,57 @@ pub struct LocalMultiDeviceExecutionOutcome<B> {
     pub report: LocalMultiDeviceExecutionReport,
     /// Final assembled outputs when the realized posture returns them.
     pub outputs: BTreeMap<TensorId, B>,
+}
+
+/// Direct handoff payload produced by one shard and delivered to the next shard runtime.
+pub struct LocalDirectStageHandoff<B> {
+    /// Stable handoff identifier.
+    pub handoff_id: String,
+    /// Source shard identifier.
+    pub from_shard_id: usize,
+    /// Destination shard identifier.
+    pub to_shard_id: usize,
+    /// Tensors moved across the handoff.
+    pub outputs: BTreeMap<TensorId, B>,
+}
+
+impl<B> LocalDirectStageHandoff<B> {
+    /// Creates a direct handoff payload.
+    #[must_use]
+    pub fn new(
+        handoff_id: impl Into<String>,
+        from_shard_id: usize,
+        to_shard_id: usize,
+        outputs: BTreeMap<TensorId, B>,
+    ) -> Self {
+        Self {
+            handoff_id: handoff_id.into(),
+            from_shard_id,
+            to_shard_id,
+            outputs,
+        }
+    }
+}
+
+/// Receipt for one direct stage handoff between adjacent shard runtimes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocalDirectStageHandoffReceipt {
+    /// Stable handoff identifier.
+    pub handoff_id: String,
+    /// Transport used for the handoff.
+    pub transport: LocalStageHandoffTransport,
+    /// Number of tensors moved by the handoff.
+    pub tensor_count: usize,
+}
+
+impl LocalDirectStageHandoffReceipt {
+    fn direct(handoff_id: impl Into<String>, tensor_count: usize) -> Self {
+        Self {
+            handoff_id: handoff_id.into(),
+            transport: LocalStageHandoffTransport::DirectWorker,
+            tensor_count,
+        }
+    }
 }
 
 /// Explicit refusal or execution failure for one same-type local multi-device run.
@@ -1152,6 +1289,30 @@ pub enum LocalMultiDeviceExecutionError {
         /// Stable device identifier.
         stable_device_id: String,
     },
+    /// One direct handoff failed before the destination shard could execute.
+    #[error(
+        "local multi-device direct handoff from shard {from_shard_id} to shard {to_shard_id} failed: {message}"
+    )]
+    DirectStageHandoffFailed {
+        /// Source shard identifier.
+        from_shard_id: usize,
+        /// Destination shard identifier.
+        to_shard_id: usize,
+        /// Runtime error detail.
+        message: String,
+    },
+    /// The destination runtime did not surface the direct handoff inputs it was expected to receive.
+    #[error(
+        "local multi-device execution could not recover direct handoff `{handoff_id}` for shard {shard_id} on device `{stable_device_id}`"
+    )]
+    MissingDirectStageHandoffPayload {
+        /// Handoff identifier.
+        handoff_id: String,
+        /// Destination shard identifier.
+        shard_id: usize,
+        /// Stable device identifier.
+        stable_device_id: String,
+    },
     /// One shard execution failed after the local path was bound.
     #[error(
         "local multi-device execution failed for shard {shard_id} on device `{stable_device_id}`: {message}"
@@ -1186,6 +1347,8 @@ impl LocalMultiDeviceExecutionError {
             }
             Self::MissingRuntimeInstances
             | Self::RuntimeDiscoveryFailed { .. }
+            | Self::DirectStageHandoffFailed { .. }
+            | Self::MissingDirectStageHandoffPayload { .. }
             | Self::ShardExecutionFailed { .. } => None,
         }
     }
@@ -1242,6 +1405,34 @@ pub trait LocalShardExecutionBackend: DeviceDiscovery + ExecutionBackend {
         &mut self,
         request: LocalShardExecutionRequest<'_, Self::Buffer>,
     ) -> Result<ExecutionResult<Self::Buffer>, RuntimeError>;
+
+    /// Returns the direct stage-handoff transport this runtime can honor, when one exists.
+    fn direct_stage_handoff_transport(&self) -> Option<LocalStageHandoffTransport> {
+        None
+    }
+
+    /// Pushes one direct handoff payload from this runtime into an adjacent runtime.
+    fn handoff_partition_outputs(
+        &mut self,
+        destination: &mut Self,
+        handoff: LocalDirectStageHandoff<Self::Buffer>,
+    ) -> Result<LocalDirectStageHandoffReceipt, RuntimeError> {
+        let _ = destination;
+        let _ = handoff;
+        Err(RuntimeError::Backend(format!(
+            "backend `{}` does not implement direct stage handoff",
+            self.backend_name()
+        )))
+    }
+
+    /// Consumes one previously delivered direct handoff payload on this runtime.
+    fn consume_direct_stage_handoff(
+        &mut self,
+        handoff_id: &str,
+    ) -> Option<BTreeMap<TensorId, Self::Buffer>> {
+        let _ = handoff_id;
+        None
+    }
 }
 
 /// Default whole-model or replica execution helper for backends adopting the local runner.
@@ -1300,6 +1491,21 @@ where
         .validate_against_topology(&execution_topology)?;
 
     let selected_devices = request.backend_selection.selected_devices_inventory();
+    let mut runtime_index_by_device = BTreeMap::new();
+    for (runtime_index, runtime) in runtimes.iter_mut().enumerate() {
+        let discovered_devices = runtime.discover_devices().map_err(|error| {
+            LocalMultiDeviceExecutionError::RuntimeDiscoveryFailed {
+                backend: runtime.backend_name().to_string(),
+                message: error.to_string(),
+            }
+        })?;
+        for device in discovered_devices {
+            runtime_index_by_device.insert(
+                device.inventory_qualifiers().stable_device_id,
+                runtime_index,
+            );
+        }
+    }
     let shard_artifacts = request
         .sharded_model_manifest
         .shards
@@ -1313,12 +1519,14 @@ where
     };
     let mut final_outputs = BTreeMap::new();
     let mut previous_stage_outputs = None;
+    let mut pending_direct_handoffs = BTreeMap::<usize, String>::new();
+    let mut stage_handoffs = Vec::new();
     let host_mediated_dense_handoff = matches!(
         execution_topology.kind,
         ExecutionTopologyKind::PipelineSharded | ExecutionTopologyKind::LayerSharded
     );
 
-    for assignment in &execution_topology.assignments {
+    for (assignment_index, assignment) in execution_topology.assignments.iter().enumerate() {
         let Some(shard_artifact) = shard_artifacts.get(&assignment.shard_id) else {
             return Err(LocalMultiDeviceExecutionError::Manifest(
                 ShardedModelManifestError::TopologyShardMissing {
@@ -1327,51 +1535,8 @@ where
             ));
         };
 
-        let mut shard_result = None;
-        for runtime in runtimes.iter_mut() {
-            if runtime.backend_name() != execution_topology.effective_backend {
-                continue;
-            }
-            let discovered_devices = runtime.discover_devices().map_err(|error| {
-                LocalMultiDeviceExecutionError::RuntimeDiscoveryFailed {
-                    backend: runtime.backend_name().to_string(),
-                    message: error.to_string(),
-                }
-            })?;
-            let serves_device = discovered_devices.iter().any(|device| {
-                device.inventory_qualifiers().stable_device_id == assignment.device.stable_device_id
-            });
-            if !serves_device {
-                continue;
-            }
-            let shard_inputs = if host_mediated_dense_handoff && assignment.shard_id > 0 {
-                previous_stage_outputs.as_ref().unwrap_or(request.inputs)
-            } else {
-                request.inputs
-            };
-            let result = runtime
-                .execute_partition(LocalShardExecutionRequest::new(
-                    request.plan,
-                    assignment,
-                    shard_artifact,
-                    shard_inputs,
-                ))
-                .map_err(
-                    |error| LocalMultiDeviceExecutionError::ShardExecutionFailed {
-                        shard_id: assignment.shard_id,
-                        stable_device_id: assignment.device.stable_device_id.clone(),
-                        message: error.to_string(),
-                    },
-                )?;
-            let ExecutionResult { outputs, metrics } = result;
-            if host_mediated_dense_handoff {
-                previous_stage_outputs = Some(outputs);
-            }
-            shard_result = Some(metrics);
-            break;
-        }
-
-        let Some(metrics) = shard_result else {
+        let Some(&runtime_index) = runtime_index_by_device.get(&assignment.device.stable_device_id)
+        else {
             return Err(
                 LocalMultiDeviceExecutionError::MissingRuntimeForShardDevice {
                     shard_id: assignment.shard_id,
@@ -1379,6 +1544,117 @@ where
                 },
             );
         };
+        if runtimes[runtime_index].backend_name() != execution_topology.effective_backend {
+            return Err(
+                LocalMultiDeviceExecutionError::MissingRuntimeForShardDevice {
+                    shard_id: assignment.shard_id,
+                    stable_device_id: assignment.device.stable_device_id.clone(),
+                },
+            );
+        }
+
+        let direct_inputs =
+            if let Some(handoff_id) = pending_direct_handoffs.remove(&assignment.shard_id) {
+                Some(
+                    runtimes[runtime_index]
+                        .consume_direct_stage_handoff(handoff_id.as_str())
+                        .ok_or_else(|| {
+                            LocalMultiDeviceExecutionError::MissingDirectStageHandoffPayload {
+                                handoff_id,
+                                shard_id: assignment.shard_id,
+                                stable_device_id: assignment.device.stable_device_id.clone(),
+                            }
+                        })?,
+                )
+            } else {
+                None
+            };
+        let shard_inputs = if let Some(ref direct_inputs) = direct_inputs {
+            direct_inputs
+        } else if host_mediated_dense_handoff && assignment.shard_id > 0 {
+            previous_stage_outputs.as_ref().unwrap_or(request.inputs)
+        } else {
+            request.inputs
+        };
+        let result = runtimes[runtime_index]
+            .execute_partition(LocalShardExecutionRequest::new(
+                request.plan,
+                assignment,
+                shard_artifact,
+                shard_inputs,
+            ))
+            .map_err(
+                |error| LocalMultiDeviceExecutionError::ShardExecutionFailed {
+                    shard_id: assignment.shard_id,
+                    stable_device_id: assignment.device.stable_device_id.clone(),
+                    message: error.to_string(),
+                },
+            )?;
+        let ExecutionResult { outputs, metrics } = result;
+        if host_mediated_dense_handoff {
+            if let Some(next_assignment) = execution_topology.assignments.get(assignment_index + 1)
+            {
+                let Some(&next_runtime_index) =
+                    runtime_index_by_device.get(&next_assignment.device.stable_device_id)
+                else {
+                    return Err(
+                        LocalMultiDeviceExecutionError::MissingRuntimeForShardDevice {
+                            shard_id: next_assignment.shard_id,
+                            stable_device_id: next_assignment.device.stable_device_id.clone(),
+                        },
+                    );
+                };
+                let tensor_count = outputs.len();
+                let can_direct_handoff = runtime_index != next_runtime_index
+                    && runtimes[runtime_index].direct_stage_handoff_transport()
+                        == Some(LocalStageHandoffTransport::DirectWorker)
+                    && runtimes[next_runtime_index].direct_stage_handoff_transport()
+                        == Some(LocalStageHandoffTransport::DirectWorker);
+                if can_direct_handoff {
+                    let handoff = LocalDirectStageHandoff::new(
+                        format!(
+                            "shard{}-to-shard{}",
+                            assignment.shard_id, next_assignment.shard_id
+                        ),
+                        assignment.shard_id,
+                        next_assignment.shard_id,
+                        outputs,
+                    );
+                    let receipt = with_two_runtimes(
+                        runtimes,
+                        runtime_index,
+                        next_runtime_index,
+                        |source_runtime, destination_runtime| {
+                            source_runtime.handoff_partition_outputs(destination_runtime, handoff)
+                        },
+                    )
+                    .map_err(|error| {
+                        LocalMultiDeviceExecutionError::DirectStageHandoffFailed {
+                            from_shard_id: assignment.shard_id,
+                            to_shard_id: next_assignment.shard_id,
+                            message: error.to_string(),
+                        }
+                    })?;
+                    pending_direct_handoffs
+                        .insert(next_assignment.shard_id, receipt.handoff_id.clone());
+                    stage_handoffs.push(LocalStageHandoffReport::direct(
+                        assignment,
+                        next_assignment,
+                        &receipt,
+                    ));
+                } else {
+                    previous_stage_outputs = Some(outputs);
+                    stage_handoffs.push(LocalStageHandoffReport::host_mediated(
+                        assignment,
+                        next_assignment,
+                        tensor_count,
+                    ));
+                }
+            } else {
+                final_outputs = outputs;
+            }
+        }
+
         accumulate_metrics(&mut aggregate_metrics, &metrics);
         shard_reports.push(LocalShardExecutionReport::new(
             assignment,
@@ -1387,15 +1663,11 @@ where
         ));
     }
 
-    if host_mediated_dense_handoff {
+    if host_mediated_dense_handoff && final_outputs.is_empty() {
         final_outputs = previous_stage_outputs.unwrap_or_default();
     }
     let final_output_tensor_ids = final_outputs.keys().cloned().collect::<Vec<_>>();
-    let stage_handoff_count = if host_mediated_dense_handoff {
-        execution_topology.assignments.len().saturating_sub(1)
-    } else {
-        0
-    };
+    let stage_handoff_count = stage_handoffs.len();
 
     Ok(LocalMultiDeviceExecutionOutcome {
         report: LocalMultiDeviceExecutionReport {
@@ -1413,6 +1685,7 @@ where
             selected_devices: selected_devices.clone(),
             aggregate_metrics,
             shard_reports,
+            stage_handoffs,
             final_output_tensor_ids,
             stage_handoff_count,
             delivered_execution: DeliveredExecutionContext::new(
@@ -1423,6 +1696,22 @@ where
         },
         outputs: final_outputs,
     })
+}
+
+fn with_two_runtimes<R, T>(
+    runtimes: &mut [R],
+    left_index: usize,
+    right_index: usize,
+    f: impl FnOnce(&mut R, &mut R) -> T,
+) -> T {
+    assert_ne!(left_index, right_index);
+    if left_index < right_index {
+        let (left, right) = runtimes.split_at_mut(right_index);
+        f(&mut left[left_index], &mut right[0])
+    } else {
+        let (left, right) = runtimes.split_at_mut(left_index);
+        f(&mut right[0], &mut left[right_index])
+    }
 }
 
 fn accumulate_metrics(total: &mut ExecutionMetrics, metrics: &ExecutionMetrics) {
@@ -1554,11 +1843,12 @@ mod tests {
     };
 
     use super::{
-        LocalCollectivePosture, LocalExecutionOutcomePosture, LocalModelWeightClass,
-        LocalMultiDeviceExecutionError, LocalMultiDeviceExecutionRequest,
-        LocalMultiDeviceRefusalReason, LocalShardExecutionRequest, LocalShardingContract,
-        LocalShardingContractError, LocalShardingExecutionMode, LocalShardingPolicy,
-        LocalShardingPolicyError, LocalWeightShardingRule, LocalWeightShardingStrategy,
+        LocalCollectivePosture, LocalDirectStageHandoff, LocalDirectStageHandoffReceipt,
+        LocalExecutionOutcomePosture, LocalModelWeightClass, LocalMultiDeviceExecutionError,
+        LocalMultiDeviceExecutionRequest, LocalMultiDeviceRefusalReason,
+        LocalShardExecutionRequest, LocalShardingContract, LocalShardingContractError,
+        LocalShardingExecutionMode, LocalShardingPolicy, LocalShardingPolicyError,
+        LocalStageHandoffTransport, LocalWeightShardingRule, LocalWeightShardingStrategy,
         ShardedModelArtifactRef, ShardedModelLayoutKind, ShardedModelManifest,
         execute_local_multi_device_plan,
     };
@@ -1580,15 +1870,23 @@ mod tests {
         executed_shards: Vec<usize>,
         observed_input_ids: Vec<Vec<TensorId>>,
         observed_artifact_ids: Vec<String>,
+        direct_stage_handoff: bool,
+        pending_direct_handoffs: BTreeMap<String, BTreeMap<TensorId, MockBuffer>>,
     }
 
     impl MockLocalShardRuntime {
         fn new(device: DeviceDescriptor) -> Self {
+            Self::with_direct_stage_handoff(device, false)
+        }
+
+        fn with_direct_stage_handoff(device: DeviceDescriptor, direct_stage_handoff: bool) -> Self {
             Self {
                 device,
                 executed_shards: Vec::new(),
                 observed_input_ids: Vec::new(),
                 observed_artifact_ids: Vec::new(),
+                direct_stage_handoff,
+                pending_direct_handoffs: BTreeMap::new(),
             }
         }
     }
@@ -1690,6 +1988,33 @@ mod tests {
                     compile_path: None,
                 },
             })
+        }
+
+        fn direct_stage_handoff_transport(&self) -> Option<LocalStageHandoffTransport> {
+            self.direct_stage_handoff
+                .then_some(LocalStageHandoffTransport::DirectWorker)
+        }
+
+        fn handoff_partition_outputs(
+            &mut self,
+            destination: &mut Self,
+            handoff: LocalDirectStageHandoff<Self::Buffer>,
+        ) -> Result<LocalDirectStageHandoffReceipt, RuntimeError> {
+            let tensor_count = handoff.outputs.len();
+            destination
+                .pending_direct_handoffs
+                .insert(handoff.handoff_id.clone(), handoff.outputs);
+            Ok(LocalDirectStageHandoffReceipt::direct(
+                handoff.handoff_id,
+                tensor_count,
+            ))
+        }
+
+        fn consume_direct_stage_handoff(
+            &mut self,
+            handoff_id: &str,
+        ) -> Option<BTreeMap<TensorId, Self::Buffer>> {
+            self.pending_direct_handoffs.remove(handoff_id)
         }
     }
 
@@ -1878,6 +2203,7 @@ mod tests {
             report.outcome_posture,
             LocalExecutionOutcomePosture::MetricsOnlyEvidence
         );
+        assert!(report.stage_handoffs.is_empty());
         assert!(report.final_output_tensor_ids.is_empty());
         assert_eq!(report.stage_handoff_count, 0);
         assert!(outcome.outputs.is_empty());
@@ -1950,6 +2276,11 @@ mod tests {
             LocalExecutionOutcomePosture::FinalOutputsAndMetrics
         );
         assert_eq!(report.stage_handoff_count, 1);
+        assert_eq!(report.stage_handoffs.len(), 1);
+        assert_eq!(
+            report.stage_handoffs[0].transport,
+            LocalStageHandoffTransport::HostMediated
+        );
         assert_eq!(report.final_output_tensor_ids, vec![TensorId(3)]);
         assert!(outcome.outputs.contains_key(&TensorId(3)));
         assert_eq!(runtimes[0].executed_shards, vec![0]);
@@ -1966,6 +2297,58 @@ mod tests {
         );
         assert_eq!(report.shard_reports[0].artifact_id, "decoder.layers0_16");
         assert_eq!(report.shard_reports[1].artifact_id, "decoder.layers16_32");
+        Ok(())
+    }
+
+    #[test]
+    fn local_multi_device_plan_runner_prefers_direct_stage_handoff_when_adjacent_runtimes_support_it()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
+        let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
+        let execution_topology = crate::ExecutionTopologyPlan::pipeline_sharded(
+            "cuda",
+            vec![
+                (device0.inventory_qualifiers(), 0, 16),
+                (device1.inventory_qualifiers(), 16, 32),
+            ],
+        );
+        let selection = BackendSelection::direct_with_policy(
+            "cuda",
+            Some(device0.clone()),
+            vec![String::from("matmul"), String::from("add")],
+            ServedProductBackendPolicy::same_backend_only(),
+        )
+        .with_selected_devices(vec![device0.clone(), device1.clone()])
+        .with_execution_topology(Some(execution_topology));
+        let contract = sample_layer_contract()?;
+        let manifest = sample_layer_manifest()?;
+        let plan = sample_plan();
+        let inputs = sample_inputs(&plan);
+        let mut runtimes = vec![
+            MockLocalShardRuntime::with_direct_stage_handoff(device0.clone(), true),
+            MockLocalShardRuntime::with_direct_stage_handoff(device1.clone(), true),
+        ];
+
+        let outcome = execute_local_multi_device_plan(
+            runtimes.as_mut_slice(),
+            LocalMultiDeviceExecutionRequest::new(&plan, &selection, &contract, &manifest, &inputs),
+        )?;
+        let report = outcome.report;
+
+        assert_eq!(report.stage_handoff_count, 1);
+        assert_eq!(report.stage_handoffs.len(), 1);
+        assert_eq!(
+            report.stage_handoffs[0].transport,
+            LocalStageHandoffTransport::DirectWorker
+        );
+        assert_eq!(
+            report.stage_handoffs[0].handoff_id.as_deref(),
+            Some("shard0-to-shard1")
+        );
+        assert_eq!(report.final_output_tensor_ids, vec![TensorId(3)]);
+        assert!(outcome.outputs.contains_key(&TensorId(3)));
+        assert_eq!(runtimes[0].observed_input_ids, vec![vec![TensorId(1)]]);
+        assert_eq!(runtimes[1].observed_input_ids, vec![vec![TensorId(2)]]);
         Ok(())
     }
 

@@ -2824,9 +2824,10 @@ Applications / Operators / Authority
    - runtime-owned RNG, generator-state, checkpoint-restore, and
      deterministic-algorithm contracts
    - same-type local multi-device plan-runner contracts, explicit local
-     sharding policy and refusal taxonomy, one bounded host-mediated dense
-     split execution core for ordered layer shards, and local multi-device
-     execution evidence kept distinct from clustered execution truth
+     sharding policy and refusal taxonomy, one bounded dense split execution
+     core for ordered layer shards with direct worker-to-worker handoff plus
+     host fallback, and local multi-device execution evidence kept distinct
+     from clustered execution truth
 5. `psionic-sandbox`
    - bounded execution profiles, runtime detection, execution receipts, and
      background-job lifecycle

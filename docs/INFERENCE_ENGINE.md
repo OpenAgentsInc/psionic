@@ -95,11 +95,11 @@ than just run tensor math.
   below the served product surface:
   - admitted topology = ordered `pipeline_sharded` or `layer_sharded`
     execution over explicit layer-range shard artifacts
-  - execution posture = host-mediated sequential stage handoff with final
-    output assembly
-  - claim boundary = runtime-core execution truth only; this does not yet
-    promote direct worker-to-worker transport or a broader wallet-settled
-    served product claim on its own
+  - execution posture = adjacent shard runtimes prefer direct worker-to-worker
+    stage handoff when both sides support it and otherwise fall back to the
+    host-mediated path, with final output assembly on the last stage
+  - claim boundary = runtime-core execution truth only; this does not by
+    itself promote a broader wallet-settled served product claim
 - `Gemma 4` now also has one first-class Metal lane contract on the generic
   OpenAI-compatible server:
   - `backend = metal`
