@@ -9308,6 +9308,19 @@ impl ShardedModelLayoutKind {
         }
     }
 
+    /// Returns whether the layout accepts the supplied execution-topology kind.
+    #[must_use]
+    pub fn accepts_topology_kind(self, kind: ExecutionTopologyKind) -> bool {
+        match self {
+            Self::Replicated => kind == ExecutionTopologyKind::Replicated,
+            Self::LayerSharded => matches!(
+                kind,
+                ExecutionTopologyKind::LayerSharded | ExecutionTopologyKind::PipelineSharded
+            ),
+            Self::TensorSharded => kind == ExecutionTopologyKind::TensorSharded,
+        }
+    }
+
     /// Returns the matching clustered lane.
     #[must_use]
     pub const fn cluster_lane(self) -> ClusterExecutionLane {
@@ -9491,7 +9504,7 @@ impl ShardedModelManifest {
         topology: &ExecutionTopologyPlan,
     ) -> Result<(), ShardedModelManifestError> {
         self.validate()?;
-        if topology.kind != self.layout.topology_kind() {
+        if !self.layout.accepts_topology_kind(topology.kind) {
             return Err(ShardedModelManifestError::TopologyKindMismatch {
                 manifest: self.layout,
                 topology: topology.kind,
@@ -12042,6 +12055,37 @@ mod tests {
             ],
         };
         layer_sharded.validate_against_topology(&layer_topology)?;
+        let pipeline_topology = ExecutionTopologyPlan {
+            effective_backend: String::from("cuda"),
+            kind: ExecutionTopologyKind::PipelineSharded,
+            assignments: vec![
+                super::ExecutionShardAssignment {
+                    shard_id: 0,
+                    device: super::ExecutionDevicePlacement {
+                        stable_device_id: String::from("cuda:0"),
+                        topology_key: None,
+                        placement_index: 0,
+                    },
+                    partition: ExecutionPartition::LayerRange {
+                        start_layer: 0,
+                        end_layer: 20,
+                    },
+                },
+                super::ExecutionShardAssignment {
+                    shard_id: 1,
+                    device: super::ExecutionDevicePlacement {
+                        stable_device_id: String::from("cuda:1"),
+                        topology_key: None,
+                        placement_index: 1,
+                    },
+                    partition: ExecutionPartition::LayerRange {
+                        start_layer: 20,
+                        end_layer: 40,
+                    },
+                },
+            ],
+        };
+        layer_sharded.validate_against_topology(&pipeline_topology)?;
 
         let tensor_sharded = ShardedModelManifest::new(
             "tensor-manifest",

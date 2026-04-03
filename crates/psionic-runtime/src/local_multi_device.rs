@@ -124,6 +124,8 @@ pub enum LocalShardingExecutionMode {
 pub enum LocalCollectivePosture {
     /// No cross-device collective is part of the current runtime contract.
     None,
+    /// The host orchestrates sequential stage handoff between ordered layer shards.
+    HostMediatedSequentialHandoff,
     /// Later collectives or activation handoff remain caller-managed future work.
     CallerManagedFuture,
 }
@@ -134,6 +136,8 @@ pub enum LocalCollectivePosture {
 pub enum LocalExecutionOutcomePosture {
     /// The current local runner only guarantees per-shard metrics and evidence.
     MetricsOnlyEvidence,
+    /// The runner returns one final output set after staged handoff and output assembly.
+    FinalOutputsAndMetrics,
 }
 
 /// Validation failure for one local sharding policy declaration.
@@ -230,8 +234,34 @@ impl LocalShardingPolicy {
                         collective_posture,
                     });
                 }
+                if outcome_posture != LocalExecutionOutcomePosture::MetricsOnlyEvidence {
+                    return Err(LocalShardingPolicyError::LayoutOutcomePostureMismatch {
+                        layout,
+                        outcome_posture,
+                    });
+                }
             }
-            ShardedModelLayoutKind::LayerSharded | ShardedModelLayoutKind::TensorSharded => {
+            ShardedModelLayoutKind::LayerSharded => {
+                if execution_mode != LocalShardingExecutionMode::Partitioned {
+                    return Err(LocalShardingPolicyError::LayoutExecutionModeMismatch {
+                        layout,
+                        execution_mode,
+                    });
+                }
+                if collective_posture != LocalCollectivePosture::HostMediatedSequentialHandoff {
+                    return Err(LocalShardingPolicyError::LayoutCollectivePostureMismatch {
+                        layout,
+                        collective_posture,
+                    });
+                }
+                if outcome_posture != LocalExecutionOutcomePosture::FinalOutputsAndMetrics {
+                    return Err(LocalShardingPolicyError::LayoutOutcomePostureMismatch {
+                        layout,
+                        outcome_posture,
+                    });
+                }
+            }
+            ShardedModelLayoutKind::TensorSharded => {
                 if execution_mode != LocalShardingExecutionMode::Partitioned {
                     return Err(LocalShardingPolicyError::LayoutExecutionModeMismatch {
                         layout,
@@ -244,13 +274,13 @@ impl LocalShardingPolicy {
                         collective_posture,
                     });
                 }
+                if outcome_posture != LocalExecutionOutcomePosture::MetricsOnlyEvidence {
+                    return Err(LocalShardingPolicyError::LayoutOutcomePostureMismatch {
+                        layout,
+                        outcome_posture,
+                    });
+                }
             }
-        }
-        if outcome_posture != LocalExecutionOutcomePosture::MetricsOnlyEvidence {
-            return Err(LocalShardingPolicyError::LayoutOutcomePostureMismatch {
-                layout,
-                outcome_posture,
-            });
         }
         Ok(Self::build(
             policy_id,
@@ -279,14 +309,14 @@ impl LocalShardingPolicy {
                 )),
             ),
             ShardedModelLayoutKind::LayerSharded => Self::build(
-                String::from("local_layer_sharded_metrics_only_v1"),
+                String::from("local_layer_sharded_host_handoff_v1"),
                 1,
                 layout,
                 LocalShardingExecutionMode::Partitioned,
-                LocalCollectivePosture::CallerManagedFuture,
-                LocalExecutionOutcomePosture::MetricsOnlyEvidence,
+                LocalCollectivePosture::HostMediatedSequentialHandoff,
+                LocalExecutionOutcomePosture::FinalOutputsAndMetrics,
                 Some(String::from(
-                    "the first-cut local multi-device runtime can execute layer partitions but keeps activation handoff and output assembly outside the current evidence-only contract",
+                    "the first-cut local multi-device runtime can execute ordered layer partitions with host-mediated stage handoff and final output assembly",
                 )),
             ),
             ShardedModelLayoutKind::TensorSharded => Self::build(
@@ -876,7 +906,7 @@ impl LocalShardingContract {
                 topology_backend: topology.effective_backend.clone(),
             });
         }
-        if topology.kind != self.layout.topology_kind() {
+        if !self.layout.accepts_topology_kind(topology.kind) {
             return Err(LocalShardingContractError::TopologyLayoutMismatch {
                 contract_layout: self.layout,
                 topology_kind: topology.kind,
@@ -1053,6 +1083,10 @@ pub struct LocalMultiDeviceExecutionReport {
     pub sharded_model_manifest_id: String,
     /// Stable sharded-model manifest digest.
     pub sharded_model_manifest_digest: String,
+    /// Realized cross-device handoff posture for the run.
+    pub collective_posture: LocalCollectivePosture,
+    /// Realized outcome posture for the run.
+    pub outcome_posture: LocalExecutionOutcomePosture,
     /// Realized local execution topology.
     pub execution_topology: ExecutionTopologyPlan,
     /// Selected-device inventory qualifiers for the run.
@@ -1061,8 +1095,22 @@ pub struct LocalMultiDeviceExecutionReport {
     pub aggregate_metrics: ExecutionMetrics,
     /// Per-shard execution reports in shard order.
     pub shard_reports: Vec<LocalShardExecutionReport>,
+    /// Final output tensor IDs returned by the runner when the current posture assembles them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub final_output_tensor_ids: Vec<TensorId>,
+    /// Number of ordered host-mediated stage handoffs completed during the run.
+    pub stage_handoff_count: usize,
     /// Local delivered-execution context, intentionally separate from clustered execution.
     pub delivered_execution: DeliveredExecutionContext,
+}
+
+/// Output-bearing result of one same-type local multi-device run.
+#[derive(Debug)]
+pub struct LocalMultiDeviceExecutionOutcome<B> {
+    /// Stable report describing the run.
+    pub report: LocalMultiDeviceExecutionReport,
+    /// Final assembled outputs when the realized posture returns them.
+    pub outputs: BTreeMap<TensorId, B>,
 }
 
 /// Explicit refusal or execution failure for one same-type local multi-device run.
@@ -1157,30 +1205,56 @@ impl LocalMultiDeviceExecutionError {
     }
 }
 
+/// Execution request for one concrete shard assignment and bound shard artifact.
+pub struct LocalShardExecutionRequest<'a, B> {
+    /// Compiled or logical plan to execute.
+    pub plan: &'a ExecutionPlan,
+    /// Assignment being executed.
+    pub assignment: &'a ExecutionShardAssignment,
+    /// Bound shard artifact selected for the assignment.
+    pub shard_artifact: &'a ShardedModelArtifactRef,
+    /// Inputs presented to the shard.
+    pub inputs: &'a BTreeMap<TensorId, B>,
+}
+
+impl<'a, B> LocalShardExecutionRequest<'a, B> {
+    /// Creates a shard execution request.
+    #[must_use]
+    pub fn new(
+        plan: &'a ExecutionPlan,
+        assignment: &'a ExecutionShardAssignment,
+        shard_artifact: &'a ShardedModelArtifactRef,
+        inputs: &'a BTreeMap<TensorId, B>,
+    ) -> Self {
+        Self {
+            plan,
+            assignment,
+            shard_artifact,
+            inputs,
+        }
+    }
+}
+
 /// Backend contract for same-type local multi-device partition execution.
 pub trait LocalShardExecutionBackend: DeviceDiscovery + ExecutionBackend {
     /// Executes one topology assignment on the backend-selected local device.
     fn execute_partition(
         &mut self,
-        plan: &ExecutionPlan,
-        assignment: &ExecutionShardAssignment,
-        inputs: &BTreeMap<TensorId, Self::Buffer>,
+        request: LocalShardExecutionRequest<'_, Self::Buffer>,
     ) -> Result<ExecutionResult<Self::Buffer>, RuntimeError>;
 }
 
 /// Default whole-model or replica execution helper for backends adopting the local runner.
 pub fn execute_local_partition_or_refuse<B>(
     backend: &mut B,
-    plan: &ExecutionPlan,
-    assignment: &ExecutionShardAssignment,
-    inputs: &BTreeMap<TensorId, B::Buffer>,
+    request: LocalShardExecutionRequest<'_, B::Buffer>,
 ) -> Result<ExecutionResult<B::Buffer>, RuntimeError>
 where
     B: DeviceDiscovery + ExecutionBackend,
 {
-    match assignment.partition {
+    match request.assignment.partition {
         ExecutionPartition::WholeModel | ExecutionPartition::Replica { .. } => {
-            backend.execute(plan, inputs)
+            backend.execute(request.plan, request.inputs)
         }
         ExecutionPartition::LayerRange { .. } => Err(RuntimeError::Backend(format!(
             "backend `{}` does not implement local layer-sharded partition execution yet",
@@ -1197,7 +1271,7 @@ where
 pub fn execute_local_multi_device_plan<R>(
     runtimes: &mut [R],
     request: LocalMultiDeviceExecutionRequest<'_, R::Buffer>,
-) -> Result<LocalMultiDeviceExecutionReport, LocalMultiDeviceExecutionError>
+) -> Result<LocalMultiDeviceExecutionOutcome<R::Buffer>, LocalMultiDeviceExecutionError>
 where
     R: LocalShardExecutionBackend,
 {
@@ -1210,6 +1284,7 @@ where
     };
     match execution_topology.kind {
         ExecutionTopologyKind::Replicated
+        | ExecutionTopologyKind::PipelineSharded
         | ExecutionTopologyKind::LayerSharded
         | ExecutionTopologyKind::TensorSharded => {}
         kind => {
@@ -1236,6 +1311,12 @@ where
         execution_plan_digest: Some(request.plan.stable_digest()),
         ..ExecutionMetrics::default()
     };
+    let mut final_outputs = BTreeMap::new();
+    let mut previous_stage_outputs = None;
+    let host_mediated_dense_handoff = matches!(
+        execution_topology.kind,
+        ExecutionTopologyKind::PipelineSharded | ExecutionTopologyKind::LayerSharded
+    );
 
     for assignment in &execution_topology.assignments {
         let Some(shard_artifact) = shard_artifacts.get(&assignment.shard_id) else {
@@ -1263,8 +1344,18 @@ where
             if !serves_device {
                 continue;
             }
+            let shard_inputs = if host_mediated_dense_handoff && assignment.shard_id > 0 {
+                previous_stage_outputs.as_ref().unwrap_or(request.inputs)
+            } else {
+                request.inputs
+            };
             let result = runtime
-                .execute_partition(request.plan, assignment, request.inputs)
+                .execute_partition(LocalShardExecutionRequest::new(
+                    request.plan,
+                    assignment,
+                    shard_artifact,
+                    shard_inputs,
+                ))
                 .map_err(
                     |error| LocalMultiDeviceExecutionError::ShardExecutionFailed {
                         shard_id: assignment.shard_id,
@@ -1272,7 +1363,11 @@ where
                         message: error.to_string(),
                     },
                 )?;
-            shard_result = Some(result.metrics);
+            let ExecutionResult { outputs, metrics } = result;
+            if host_mediated_dense_handoff {
+                previous_stage_outputs = Some(outputs);
+            }
+            shard_result = Some(metrics);
             break;
         }
 
@@ -1292,24 +1387,41 @@ where
         ));
     }
 
-    Ok(LocalMultiDeviceExecutionReport {
-        runtime_backend: execution_topology.effective_backend.clone(),
-        model_family: request.sharding_contract.model_family.clone(),
-        sharding_contract_id: request.sharding_contract.contract_id.clone(),
-        sharding_contract_digest: request.sharding_contract.contract_digest.clone(),
-        sharding_policy_id: request.sharding_contract.policy.policy_id.clone(),
-        sharding_policy_digest: request.sharding_contract.policy.policy_digest.clone(),
-        sharded_model_manifest_id: request.sharded_model_manifest.manifest_id.clone(),
-        sharded_model_manifest_digest: request.sharded_model_manifest.stable_digest(),
-        execution_topology: execution_topology.clone(),
-        selected_devices: selected_devices.clone(),
-        aggregate_metrics,
-        shard_reports,
-        delivered_execution: DeliveredExecutionContext::new(
-            request.backend_selection.effective_backend.clone(),
-            Some(execution_topology),
-            selected_devices,
-        ),
+    if host_mediated_dense_handoff {
+        final_outputs = previous_stage_outputs.unwrap_or_default();
+    }
+    let final_output_tensor_ids = final_outputs.keys().cloned().collect::<Vec<_>>();
+    let stage_handoff_count = if host_mediated_dense_handoff {
+        execution_topology.assignments.len().saturating_sub(1)
+    } else {
+        0
+    };
+
+    Ok(LocalMultiDeviceExecutionOutcome {
+        report: LocalMultiDeviceExecutionReport {
+            runtime_backend: execution_topology.effective_backend.clone(),
+            model_family: request.sharding_contract.model_family.clone(),
+            sharding_contract_id: request.sharding_contract.contract_id.clone(),
+            sharding_contract_digest: request.sharding_contract.contract_digest.clone(),
+            sharding_policy_id: request.sharding_contract.policy.policy_id.clone(),
+            sharding_policy_digest: request.sharding_contract.policy.policy_digest.clone(),
+            sharded_model_manifest_id: request.sharded_model_manifest.manifest_id.clone(),
+            sharded_model_manifest_digest: request.sharded_model_manifest.stable_digest(),
+            collective_posture: request.sharding_contract.policy.collective_posture,
+            outcome_posture: request.sharding_contract.policy.outcome_posture,
+            execution_topology: execution_topology.clone(),
+            selected_devices: selected_devices.clone(),
+            aggregate_metrics,
+            shard_reports,
+            final_output_tensor_ids,
+            stage_handoff_count,
+            delivered_execution: DeliveredExecutionContext::new(
+                request.backend_selection.effective_backend.clone(),
+                Some(execution_topology),
+                selected_devices,
+            ),
+        },
+        outputs: final_outputs,
     })
 }
 
@@ -1403,11 +1515,17 @@ fn stable_local_sharding_policy_digest(
     hasher.update(b"|collective|");
     hasher.update(match collective_posture {
         LocalCollectivePosture::None => b"none".as_slice(),
+        LocalCollectivePosture::HostMediatedSequentialHandoff => {
+            b"host_mediated_sequential_handoff".as_slice()
+        }
         LocalCollectivePosture::CallerManagedFuture => b"caller_managed_future".as_slice(),
     });
     hasher.update(b"|outcome|");
     hasher.update(match outcome_posture {
         LocalExecutionOutcomePosture::MetricsOnlyEvidence => b"metrics_only_evidence".as_slice(),
+        LocalExecutionOutcomePosture::FinalOutputsAndMetrics => {
+            b"final_outputs_and_metrics".as_slice()
+        }
     });
     if let Some(detail) = detail {
         hasher.update(b"|detail|");
@@ -1436,12 +1554,13 @@ mod tests {
     };
 
     use super::{
-        execute_local_multi_device_plan, LocalCollectivePosture, LocalExecutionOutcomePosture,
-        LocalModelWeightClass, LocalMultiDeviceExecutionError, LocalMultiDeviceExecutionRequest,
-        LocalMultiDeviceRefusalReason, LocalShardingContract, LocalShardingContractError,
-        LocalShardingExecutionMode, LocalShardingPolicy, LocalShardingPolicyError,
-        LocalWeightShardingRule, LocalWeightShardingStrategy, ShardedModelArtifactRef,
-        ShardedModelLayoutKind, ShardedModelManifest,
+        LocalCollectivePosture, LocalExecutionOutcomePosture, LocalModelWeightClass,
+        LocalMultiDeviceExecutionError, LocalMultiDeviceExecutionRequest,
+        LocalMultiDeviceRefusalReason, LocalShardExecutionRequest, LocalShardingContract,
+        LocalShardingContractError, LocalShardingExecutionMode, LocalShardingPolicy,
+        LocalShardingPolicyError, LocalWeightShardingRule, LocalWeightShardingStrategy,
+        ShardedModelArtifactRef, ShardedModelLayoutKind, ShardedModelManifest,
+        execute_local_multi_device_plan,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1459,6 +1578,8 @@ mod tests {
     struct MockLocalShardRuntime {
         device: DeviceDescriptor,
         executed_shards: Vec<usize>,
+        observed_input_ids: Vec<Vec<TensorId>>,
+        observed_artifact_ids: Vec<String>,
     }
 
     impl MockLocalShardRuntime {
@@ -1466,6 +1587,8 @@ mod tests {
             Self {
                 device,
                 executed_shards: Vec::new(),
+                observed_input_ids: Vec::new(),
+                observed_artifact_ids: Vec::new(),
             }
         }
     }
@@ -1513,13 +1636,46 @@ mod tests {
     impl LocalShardExecutionBackend for MockLocalShardRuntime {
         fn execute_partition(
             &mut self,
-            plan: &ExecutionPlan,
-            assignment: &crate::ExecutionShardAssignment,
-            _inputs: &BTreeMap<TensorId, Self::Buffer>,
+            request: LocalShardExecutionRequest<'_, Self::Buffer>,
         ) -> Result<ExecutionResult<Self::Buffer>, RuntimeError> {
+            let plan = request.plan;
+            let assignment = request.assignment;
             self.executed_shards.push(assignment.shard_id);
+            self.observed_input_ids
+                .push(request.inputs.keys().cloned().collect());
+            self.observed_artifact_ids
+                .push(request.shard_artifact.artifact_id.clone());
+            let mut outputs = BTreeMap::new();
+            if let ExecutionPartition::LayerRange { start_layer, .. } = assignment.partition {
+                let (output_id, spec) = if start_layer == 0 {
+                    (
+                        plan.steps
+                            .first()
+                            .expect("sample plan should include one hidden step")
+                            .output,
+                        plan.steps
+                            .first()
+                            .expect("sample plan should include one hidden step")
+                            .spec
+                            .clone(),
+                    )
+                } else {
+                    (
+                        *plan
+                            .outputs
+                            .first()
+                            .expect("sample plan should include one final output"),
+                        plan.steps
+                            .last()
+                            .expect("sample plan should include one final step")
+                            .spec
+                            .clone(),
+                    )
+                };
+                outputs.insert(output_id, MockBuffer { spec });
+            }
             Ok(ExecutionResult {
-                outputs: BTreeMap::new(),
+                outputs,
                 metrics: crate::ExecutionMetrics {
                     steps_executed: plan.steps.len(),
                     kernel_count: 1,
@@ -1538,8 +1694,8 @@ mod tests {
     }
 
     #[test]
-    fn local_sharding_policy_defaults_are_serializable_and_metrics_only(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_sharding_policy_defaults_are_serializable_and_metrics_only()
+    -> Result<(), Box<dyn std::error::Error>> {
         let policy = LocalShardingPolicy::for_layout(ShardedModelLayoutKind::TensorSharded);
 
         assert_eq!(policy.policy_version, 1);
@@ -1568,10 +1724,43 @@ mod tests {
         let encoded = serde_json::to_string(&policy)?;
         let decoded: LocalShardingPolicy = serde_json::from_str(&encoded)?;
         assert_eq!(decoded, policy);
-        assert!(decoded
-            .stable_signature_lines()
-            .iter()
-            .any(|line| line.starts_with("policy_digest=")));
+        assert!(
+            decoded
+                .stable_signature_lines()
+                .iter()
+                .any(|line| line.starts_with("policy_digest="))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn layer_sharding_policy_defaults_surface_host_handoff_and_final_outputs()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let policy = LocalShardingPolicy::for_layout(ShardedModelLayoutKind::LayerSharded);
+
+        assert_eq!(policy.policy_version, 1);
+        assert_eq!(policy.layout, ShardedModelLayoutKind::LayerSharded);
+        assert_eq!(
+            policy.execution_mode,
+            LocalShardingExecutionMode::Partitioned
+        );
+        assert_eq!(
+            policy.collective_posture,
+            LocalCollectivePosture::HostMediatedSequentialHandoff
+        );
+        assert_eq!(
+            policy.outcome_posture,
+            LocalExecutionOutcomePosture::FinalOutputsAndMetrics
+        );
+        assert!(policy.requires_partition_capable_runtime());
+        assert!(policy.supports_partition(&ExecutionPartition::LayerRange {
+            start_layer: 0,
+            end_layer: 16,
+        }));
+
+        let encoded = serde_json::to_string(&policy)?;
+        let decoded: LocalShardingPolicy = serde_json::from_str(&encoded)?;
+        assert_eq!(decoded, policy);
         Ok(())
     }
 
@@ -1596,8 +1785,8 @@ mod tests {
     }
 
     #[test]
-    fn local_multi_device_plan_runner_executes_tensor_sharded_workload_without_cluster_truth(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_multi_device_plan_runner_executes_tensor_sharded_workload_without_cluster_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
         let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
         let execution_topology = crate::ExecutionTopologyPlan::tensor_sharded(
@@ -1652,10 +1841,11 @@ mod tests {
             MockLocalShardRuntime::new(device1.clone()),
         ];
 
-        let report = execute_local_multi_device_plan(
+        let outcome = execute_local_multi_device_plan(
             runtimes.as_mut_slice(),
             LocalMultiDeviceExecutionRequest::new(&plan, &selection, &contract, &manifest, &inputs),
         )?;
+        let report = outcome.report;
 
         assert_eq!(report.runtime_backend, "cuda");
         assert_eq!(report.model_family, "gguf_decoder:llama");
@@ -1680,16 +1870,108 @@ mod tests {
             report.delivered_execution.topology_kind(),
             Some(crate::ExecutionTopologyKind::TensorSharded)
         );
+        assert_eq!(
+            report.collective_posture,
+            LocalCollectivePosture::CallerManagedFuture
+        );
+        assert_eq!(
+            report.outcome_posture,
+            LocalExecutionOutcomePosture::MetricsOnlyEvidence
+        );
+        assert!(report.final_output_tensor_ids.is_empty());
+        assert_eq!(report.stage_handoff_count, 0);
+        assert!(outcome.outputs.is_empty());
         assert_eq!(runtimes[0].executed_shards, vec![0]);
         assert_eq!(runtimes[1].executed_shards, vec![1]);
+        assert_eq!(
+            runtimes[0].observed_artifact_ids,
+            vec!["decoder.tensor0_32"]
+        );
+        assert_eq!(
+            runtimes[1].observed_artifact_ids,
+            vec!["decoder.tensor32_64"]
+        );
         assert_eq!(report.shard_reports[0].artifact_id, "decoder.tensor0_32");
         assert_eq!(report.shard_reports[1].artifact_id, "decoder.tensor32_64");
         Ok(())
     }
 
     #[test]
-    fn local_sharding_contract_refuses_backend_memory_and_device_count_mismatches(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_multi_device_plan_runner_executes_pipeline_sharded_workload_with_host_handoff()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
+        let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
+        let execution_topology = crate::ExecutionTopologyPlan::pipeline_sharded(
+            "cuda",
+            vec![
+                (device0.inventory_qualifiers(), 0, 16),
+                (device1.inventory_qualifiers(), 16, 32),
+            ],
+        );
+        let selection = BackendSelection::direct_with_policy(
+            "cuda",
+            Some(device0.clone()),
+            vec![String::from("matmul"), String::from("add")],
+            ServedProductBackendPolicy::same_backend_only(),
+        )
+        .with_selected_devices(vec![device0.clone(), device1.clone()])
+        .with_execution_topology(Some(execution_topology.clone()));
+        let contract = sample_layer_contract()?;
+        let manifest = sample_layer_manifest()?;
+        let plan = sample_plan();
+        let inputs = sample_inputs(&plan);
+        let mut runtimes = vec![
+            MockLocalShardRuntime::new(device0.clone()),
+            MockLocalShardRuntime::new(device1.clone()),
+        ];
+
+        let outcome = execute_local_multi_device_plan(
+            runtimes.as_mut_slice(),
+            LocalMultiDeviceExecutionRequest::new(&plan, &selection, &contract, &manifest, &inputs),
+        )?;
+        let report = outcome.report;
+
+        assert_eq!(report.runtime_backend, "cuda");
+        assert_eq!(report.model_family, "gguf_decoder:llama");
+        assert_eq!(
+            report.sharding_policy_id,
+            "local_layer_sharded_host_handoff_v1"
+        );
+        assert_eq!(
+            report.execution_topology.kind,
+            crate::ExecutionTopologyKind::PipelineSharded
+        );
+        assert_eq!(
+            report.collective_posture,
+            LocalCollectivePosture::HostMediatedSequentialHandoff
+        );
+        assert_eq!(
+            report.outcome_posture,
+            LocalExecutionOutcomePosture::FinalOutputsAndMetrics
+        );
+        assert_eq!(report.stage_handoff_count, 1);
+        assert_eq!(report.final_output_tensor_ids, vec![TensorId(3)]);
+        assert!(outcome.outputs.contains_key(&TensorId(3)));
+        assert_eq!(runtimes[0].executed_shards, vec![0]);
+        assert_eq!(runtimes[1].executed_shards, vec![1]);
+        assert_eq!(runtimes[0].observed_input_ids, vec![vec![TensorId(1)]]);
+        assert_eq!(runtimes[1].observed_input_ids, vec![vec![TensorId(2)]]);
+        assert_eq!(
+            runtimes[0].observed_artifact_ids,
+            vec!["decoder.layers0_16"]
+        );
+        assert_eq!(
+            runtimes[1].observed_artifact_ids,
+            vec!["decoder.layers16_32"]
+        );
+        assert_eq!(report.shard_reports[0].artifact_id, "decoder.layers0_16");
+        assert_eq!(report.shard_reports[1].artifact_id, "decoder.layers16_32");
+        Ok(())
+    }
+
+    #[test]
+    fn local_sharding_contract_refuses_backend_memory_and_device_count_mismatches()
+    -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 4 * 1024 * 1024 * 1024);
         let device1 = sample_cuda_device(1, 4 * 1024 * 1024 * 1024);
         let execution_topology = crate::ExecutionTopologyPlan::tensor_sharded(
@@ -1794,8 +2076,8 @@ mod tests {
     }
 
     #[test]
-    fn local_sharding_contract_refusal_taxonomy_surfaces_topology_mismatch(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_sharding_contract_refusal_taxonomy_surfaces_topology_mismatch()
+    -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
         let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
         let execution_topology = crate::ExecutionTopologyPlan::tensor_sharded(
@@ -1851,8 +2133,8 @@ mod tests {
     }
 
     #[test]
-    fn local_sharding_contract_policy_refuses_partition_kind_mismatch(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_sharding_contract_policy_refuses_partition_kind_mismatch()
+    -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
         let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
         let contract = LocalShardingContract::new(
@@ -1923,8 +2205,8 @@ mod tests {
     }
 
     #[test]
-    fn local_multi_device_plan_runner_refuses_missing_runtime_for_selected_device(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_multi_device_plan_runner_refuses_missing_runtime_for_selected_device()
+    -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
         let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
         let execution_topology = crate::ExecutionTopologyPlan::tensor_sharded(
@@ -1995,8 +2277,8 @@ mod tests {
     }
 
     #[test]
-    fn local_multi_device_execution_refusal_taxonomy_surfaces_missing_topology_and_pipeline_gap(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_multi_device_execution_refusal_taxonomy_surfaces_missing_topology_and_layout_mismatch()
+    -> Result<(), Box<dyn std::error::Error>> {
         let device0 = sample_cuda_device(0, 16 * 1024 * 1024 * 1024);
         let device1 = sample_cuda_device(1, 16 * 1024 * 1024 * 1024);
         let contract = LocalShardingContract::new(
@@ -2076,20 +2358,14 @@ mod tests {
         .expect_err("pipeline topology should refuse");
         assert_eq!(
             pipeline_error.refusal_reason(),
-            Some(LocalMultiDeviceRefusalReason::UnsupportedTopologyKind)
+            Some(LocalMultiDeviceRefusalReason::TopologyLayoutMismatch)
         );
         let refusal = pipeline_error
             .refusal()
-            .expect("unsupported pipeline topology should map to refusal");
-        assert_eq!(
-            refusal.code,
-            PsionicRefusalCode::UnsupportedBackendCapability
-        );
+            .expect("layout mismatch should map to refusal");
+        assert_eq!(refusal.code, PsionicRefusalCode::TopologyMismatch);
         assert_eq!(refusal.scope, PsionicRefusalScope::Topology);
-        assert_eq!(
-            refusal.subject.as_deref(),
-            Some("unsupported_topology_kind")
-        );
+        assert_eq!(refusal.subject.as_deref(), Some("topology_layout_mismatch"));
         Ok(())
     }
 
@@ -2156,6 +2432,93 @@ mod tests {
                 end: 64,
             },
         )))
+    }
+
+    fn sample_layer_contract() -> Result<LocalShardingContract, Box<dyn std::error::Error>> {
+        Ok(LocalShardingContract::new(
+            "gguf-decoder-llama-pp-v1",
+            "gguf_decoder:llama",
+            "cuda",
+            ShardedModelLayoutKind::LayerSharded,
+            2,
+            Some(2),
+            Some(8 * 1024 * 1024 * 1024),
+            vec![
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::TokenEmbedding,
+                    LocalWeightShardingStrategy::Replicated,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::AttentionQuery,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::AttentionOutput,
+                    LocalWeightShardingStrategy::LayerRangeOwned,
+                ),
+                LocalWeightShardingRule::new(
+                    LocalModelWeightClass::KvCache,
+                    LocalWeightShardingStrategy::Replicated,
+                ),
+            ],
+        )?)
+    }
+
+    fn sample_layer_manifest() -> Result<ShardedModelManifest, Box<dyn std::error::Error>> {
+        let served_artifact = ServedArtifactIdentity::new(
+            "fixture-word-decoder-v0",
+            "v0",
+            "bundle-digest",
+            Some(String::from("model-blob-digest")),
+            Some(String::from("tokenizer-digest")),
+            Some(String::from("template-digest")),
+            "defaults-digest",
+            "gguf",
+            QuantizationMode::GgmlQ4_0,
+            BackendToolchainIdentity::new("cuda", "cuda@0.1.0", vec![]),
+        );
+        Ok(ShardedModelManifest::new(
+            "layer-manifest",
+            served_artifact,
+            ShardedModelLayoutKind::LayerSharded,
+        )
+        .with_shard(ShardedModelArtifactRef::new(
+            0,
+            "decoder.layers0_16",
+            "layer-digest-0",
+            ExecutionPartition::LayerRange {
+                start_layer: 0,
+                end_layer: 16,
+            },
+        ))
+        .with_shard(ShardedModelArtifactRef::new(
+            1,
+            "decoder.layers16_32",
+            "layer-digest-1",
+            ExecutionPartition::LayerRange {
+                start_layer: 16,
+                end_layer: 32,
+            },
+        )))
+    }
+
+    fn sample_inputs(plan: &ExecutionPlan) -> BTreeMap<TensorId, MockBuffer> {
+        let input_id = plan
+            .steps
+            .first()
+            .and_then(|step| step.inputs.first().copied())
+            .expect("sample plan should include one input tensor");
+        BTreeMap::from([(
+            input_id,
+            MockBuffer {
+                spec: plan
+                    .steps
+                    .first()
+                    .expect("sample plan should include one step")
+                    .spec
+                    .clone(),
+            },
+        )])
     }
 
     fn sample_cuda_device(index: usize, memory_capacity_bytes: u64) -> DeviceDescriptor {

@@ -91,6 +91,15 @@ than just run tensor math.
     `served_backend = remote` and `execution_mode = proxy`
   - routed remote publication now keeps the same admitted endpoint set as the
     local dense lane instead of silently narrowing back to chat-only
+- `psionic-runtime` now also owns one bounded dense multi-device execution core
+  below the served product surface:
+  - admitted topology = ordered `pipeline_sharded` or `layer_sharded`
+    execution over explicit layer-range shard artifacts
+  - execution posture = host-mediated sequential stage handoff with final
+    output assembly
+  - claim boundary = runtime-core execution truth only; this does not yet
+    promote direct worker-to-worker transport or a broader wallet-settled
+    served product claim on its own
 - `Gemma 4` now also has one first-class Metal lane contract on the generic
   OpenAI-compatible server:
   - `backend = metal`
