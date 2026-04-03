@@ -1298,11 +1298,36 @@ enum OpenAiCompatLoadedModelKind {
 struct OpenAiCompatLoadedDecoderModel {
     descriptor: DecoderModelDescriptor,
     family: GgufDecoderFamily,
-    qwen35_multimodal_projection: Option<Qwen35MultimodalProjectionConfig>,
+    multimodal_lane: Option<OpenAiCompatMultimodalLane>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+}
+
+#[derive(Clone)]
+enum OpenAiCompatMultimodalLane {
+    PromptProjection(Qwen35MultimodalProjectionConfig),
+    ProcessorOwned(ProcessorOwnedMultimodalLane),
+}
+
+#[derive(Clone)]
+struct ProcessorOwnedMultimodalLane {
+    owner_label: &'static str,
+    supported_media: &'static [&'static str],
+}
+
+impl ProcessorOwnedMultimodalLane {
+    const fn gemma4() -> Self {
+        Self {
+            owner_label: "gemma4_processor",
+            supported_media: &["image", "video"],
+        }
+    }
+
+    fn supported_media(&self) -> Vec<&'static str> {
+        self.supported_media.to_vec()
+    }
 }
 
 #[derive(Clone)]
@@ -1468,19 +1493,29 @@ impl OpenAiCompatLoadedModel {
 
     fn multimodal_projection_mode(&self) -> Option<&'static str> {
         self.decoder()
-            .and_then(|model| model.qwen35_multimodal_projection.as_ref())
-            .map(|_| "prompt_projection_only")
+            .and_then(|model| model.multimodal_lane.as_ref())
+            .map(|lane| match lane {
+                OpenAiCompatMultimodalLane::PromptProjection(_) => "prompt_projection_only",
+                OpenAiCompatMultimodalLane::ProcessorOwned(_) => "processor_owned",
+            })
     }
 
     fn multimodal_supported_media(&self) -> Option<Vec<&'static str>> {
         self.decoder()
-            .and_then(|model| model.qwen35_multimodal_projection.as_ref())
-            .map(|_| vec!["image", "video"])
+            .and_then(|model| model.multimodal_lane.as_ref())
+            .map(|lane| match lane {
+                OpenAiCompatMultimodalLane::PromptProjection(_) => vec!["image", "video"],
+                OpenAiCompatMultimodalLane::ProcessorOwned(lane) => lane.supported_media(),
+            })
     }
 
     fn multimodal_projection_config(&self) -> Option<Qwen35MultimodalProjectionConfig> {
         self.decoder()
-            .and_then(|model| model.qwen35_multimodal_projection.clone())
+            .and_then(|model| model.multimodal_lane.as_ref())
+            .and_then(|lane| match lane {
+                OpenAiCompatMultimodalLane::PromptProjection(config) => Some(config.clone()),
+                OpenAiCompatMultimodalLane::ProcessorOwned(_) => None,
+            })
     }
 }
 
@@ -5043,7 +5078,7 @@ fn required_tool_call_floor_from_chat_messages(
     messages: &[ChatCompletionMessage],
     contract: &ToolCallingContract,
     family: GgufDecoderFamily,
-    qwen35_multimodal_projection: Option<&Qwen35MultimodalProjectionConfig>,
+    multimodal_lane: Option<&OpenAiCompatMultimodalLane>,
 ) -> Result<usize, OpenAiCompatHttpError> {
     if !matches!(contract.mode, ToolChoiceMode::Required) || !contract.allows_parallel_tool_calls()
     {
@@ -5062,7 +5097,7 @@ fn required_tool_call_floor_from_chat_messages(
             &message.content,
             family,
             role,
-            qwen35_multimodal_projection,
+            multimodal_lane,
         )?;
         for tool_name in contract.tools.keys() {
             let quoted = format!("`{tool_name}`");
@@ -6014,7 +6049,7 @@ async fn handle_generic_chat_completions(
             &request.messages,
             contract,
             model.family,
-            model.qwen35_multimodal_projection.as_ref(),
+            model.multimodal_lane.as_ref(),
         )?;
     }
     let prompt_messages = apply_tool_contract_to_prompt_messages(
@@ -7884,6 +7919,30 @@ fn prompt_options_for_family(
     }
 }
 
+fn multimodal_lane_from_family_metadata(
+    family_metadata: &psionic_models::GgufDecoderFamilyMetadata,
+) -> Option<OpenAiCompatMultimodalLane> {
+    family_metadata
+        .qwen35_multimodal_projection_config()
+        .map(OpenAiCompatMultimodalLane::PromptProjection)
+        .or_else(|| {
+            gemma4_processor_owned_multimodal_lane(family_metadata)
+                .map(OpenAiCompatMultimodalLane::ProcessorOwned)
+        })
+}
+
+fn gemma4_processor_owned_multimodal_lane(
+    family_metadata: &psionic_models::GgufDecoderFamilyMetadata,
+) -> Option<ProcessorOwnedMultimodalLane> {
+    if !matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
+        return None;
+    }
+    family_metadata
+        .family_facts
+        .contains_key("gemma4.vision.block_count")
+        .then(ProcessorOwnedMultimodalLane::gemma4)
+}
+
 fn load_generic_decoder_model(
     model_path: &Path,
     reasoning_budget: u8,
@@ -7928,9 +7987,7 @@ fn load_generic_decoder_model(
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
             family,
-            qwen35_multimodal_projection: adapter
-                .family_metadata()
-                .qwen35_multimodal_projection_config(),
+            multimodal_lane: multimodal_lane_from_family_metadata(adapter.family_metadata()),
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
                 .then(|| adapter.prompt_renderer()),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
@@ -8419,7 +8476,7 @@ fn chat_messages_to_prompt_messages_for_decoder(
     chat_messages_to_prompt_messages_generic(
         messages,
         model.family,
-        model.qwen35_multimodal_projection.as_ref(),
+        model.multimodal_lane.as_ref(),
     )
 }
 
@@ -8489,7 +8546,7 @@ fn chat_messages_to_prompt_messages_gpt_oss(
 fn chat_messages_to_prompt_messages_generic(
     messages: &[ChatCompletionMessage],
     family: GgufDecoderFamily,
-    qwen35_multimodal_projection: Option<&Qwen35MultimodalProjectionConfig>,
+    multimodal_lane: Option<&OpenAiCompatMultimodalLane>,
 ) -> Result<Vec<PromptMessage>, OpenAiCompatHttpError> {
     if messages.is_empty() {
         return Err(OpenAiCompatHttpError::BadRequest(String::from(
@@ -8530,7 +8587,7 @@ fn chat_messages_to_prompt_messages_generic(
                 &message.content,
                 family,
                 role,
-                qwen35_multimodal_projection,
+                multimodal_lane,
             )?,
         );
         if role == PromptMessageRole::Tool {
@@ -8598,14 +8655,12 @@ fn chat_message_content_to_text(
     content: &ChatCompletionMessageContent,
     family: GgufDecoderFamily,
     role: PromptMessageRole,
-    qwen35_multimodal_projection: Option<&Qwen35MultimodalProjectionConfig>,
+    multimodal_lane: Option<&OpenAiCompatMultimodalLane>,
 ) -> Result<String, OpenAiCompatHttpError> {
     match content {
         ChatCompletionMessageContent::Text(text) => Ok(text.clone()),
         ChatCompletionMessageContent::Parts(parts) => {
-            if matches!(family, GgufDecoderFamily::Qwen35)
-                && let Some(config) = qwen35_multimodal_projection
-            {
+            if let Some(OpenAiCompatMultimodalLane::PromptProjection(config)) = multimodal_lane {
                 return project_qwen35_multimodal_content(parts.as_slice(), role, config);
             }
             let mut text = String::new();
@@ -8616,7 +8671,12 @@ fn chat_message_content_to_text(
                     }
                     ChatCompletionContentPart::ImageUrl { .. }
                     | ChatCompletionContentPart::VideoUrl { .. } => {
-                        return Err(unsupported_multimodal_content_error(family));
+                        return Err(match multimodal_lane {
+                            Some(OpenAiCompatMultimodalLane::ProcessorOwned(lane)) => {
+                                processor_owned_multimodal_content_error(family, lane)
+                            }
+                            _ => unsupported_multimodal_content_error(family),
+                        });
                     }
                 }
             }
@@ -8665,6 +8725,26 @@ fn unsupported_multimodal_content_error(family: GgufDecoderFamily) -> OpenAiComp
             "multimodal inputs are unavailable on the current `{}` generic prompt-render path",
             decoder_family_label(family)
         ))
+    }
+}
+
+fn processor_owned_multimodal_content_error(
+    family: GgufDecoderFamily,
+    lane: &ProcessorOwnedMultimodalLane,
+) -> OpenAiCompatHttpError {
+    OpenAiCompatHttpError::BadRequest(format!(
+        "{} {} inputs require the `{}` processor-owned multimodal lane; the current generic OpenAI surface refuses direct media URL parts instead of projecting them through the text lane",
+        decoder_family_label(family),
+        processor_owned_supported_media_phrase(lane),
+        lane.owner_label,
+    ))
+}
+
+fn processor_owned_supported_media_phrase(lane: &ProcessorOwnedMultimodalLane) -> &'static str {
+    match lane.supported_media {
+        [] => "multimodal",
+        ["image", "video"] => "image and video",
+        _ => "multimodal",
     }
 }
 
@@ -11286,6 +11366,12 @@ mod tests {
                         .all(|capability| capability.support_level.label() == "unsupported")
                 })
         );
+        assert_eq!(health.0.multimodal_projection_mode, Some("processor_owned"));
+        assert_eq!(
+            health.0.multimodal_supported_media,
+            Some(vec!["image", "video"])
+        );
+        assert_eq!(health.0.multimodal_projection_config, None);
 
         let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
             &server.state,
@@ -11322,6 +11408,12 @@ mod tests {
                         .all(|capability| capability.support_level.label() == "unsupported")
                 })
         );
+        assert_eq!(model.psionic_multimodal_projection_mode, Some("processor_owned"));
+        assert_eq!(
+            model.psionic_multimodal_supported_media,
+            Some(vec!["image", "video"])
+        );
+        assert_eq!(model.psionic_multimodal_projection_config, None);
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&server.state),
@@ -11460,7 +11552,74 @@ mod tests {
         assert_eq!(
             multimodal_payload["error"]["message"],
             serde_json::json!(
-                "multimodal inputs are unavailable on the current `gemma4` generic prompt-render path"
+                "gemma4 image and video inputs require the `gemma4_processor` processor-owned multimodal lane; the current generic OpenAI surface refuses direct media URL parts instead of projecting them through the text lane"
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_responses_gemma4_processor_owned_lane_refuses_direct_media_parts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-responses-media-refusal.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata_with_chat_template("tiny gemma4 responses media refusal")
+                .as_slice(),
+            dense_gemma4_cuda_decoder_tensors_with_vocab(7, 5).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        let model_id = runtime
+            .block_on(generic_health(State(std::sync::Arc::clone(&server.state))))
+            .0
+            .default_model;
+
+        let error = runtime
+            .block_on(handle_generic_responses(
+                std::sync::Arc::clone(&server.state),
+                ResponsesRequest {
+                    model: Some(model_id),
+                    instructions: None,
+                    conversation: None,
+                    input: ResponsesInput::Messages(vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("describe "),
+                            ChatCompletionContentPart::image_url(
+                                "https://example.invalid/gemma4-processor-lane.png",
+                            ),
+                        ],
+                    )]),
+                    temperature: Some(0.0),
+                    max_output_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    previous_response_id: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_response_state: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 responses multimodal input should fail through the processor-owned lane");
+        let payload = runtime.block_on(response_json(error.into_response()))?;
+        assert_eq!(
+            payload["error"]["message"],
+            serde_json::json!(
+                "gemma4 image and video inputs require the `gemma4_processor` processor-owned multimodal lane; the current generic OpenAI surface refuses direct media URL parts instead of projecting them through the text lane"
             )
         );
         Ok(())
@@ -16239,6 +16398,14 @@ mod tests {
             String::from("tokenizer.ggml.pre"),
             GgufMetadataValue::String(String::from("gemma4")),
         ));
+        metadata.push((
+            String::from("gemma4.audio.block_count"),
+            GgufMetadataValue::U32(12),
+        ));
+        metadata.push((
+            String::from("gemma4.vision.block_count"),
+            GgufMetadataValue::U32(16),
+        ));
         metadata.extend(sentencepiece_tokenizer_metadata_entries());
         metadata
     }
@@ -16264,6 +16431,14 @@ mod tests {
         metadata.push((
             String::from("tokenizer.chat_template"),
             GgufMetadataValue::String(gemma4_chat_template().to_string()),
+        ));
+        metadata.push((
+            String::from("gemma4.audio.block_count"),
+            GgufMetadataValue::U32(12),
+        ));
+        metadata.push((
+            String::from("gemma4.vision.block_count"),
+            GgufMetadataValue::U32(16),
         ));
         metadata.extend(sentencepiece_tokenizer_metadata_entries_with_tokens(tokens));
         metadata
@@ -17744,7 +17919,7 @@ mod tests {
         assert_eq!(
             multimodal_payload["error"]["message"],
             serde_json::json!(
-                "multimodal inputs are unavailable on the current `gemma4` generic prompt-render path"
+                "gemma4 image and video inputs require the `gemma4_processor` processor-owned multimodal lane; the current generic OpenAI surface refuses direct media URL parts instead of projecting them through the text lane"
             )
         );
 

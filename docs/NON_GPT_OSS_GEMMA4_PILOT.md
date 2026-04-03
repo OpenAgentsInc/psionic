@@ -64,6 +64,8 @@ Psionic now publishes exactly one bounded dense `Gemma 4` lane:
 - bounded tool contract = Gemma-native `<|tool_call>call:<tool>{...}<tool_call|>`
   blocks with JSON-schema-subset argument validation and replayable tool-result
   state on `/v1/responses`
+- published multimodal posture = one `processor_owned` image/video lane that
+  refuses direct media URL parts on the current generic OpenAI surface
 - distributed proof surface = one bootstrap-routed remote `gemma4:e4b` lane
   with honest proxy publication
 
@@ -87,7 +89,7 @@ That lane is deliberately narrower than a second publication claim:
 - backend publication contract = the same `backend = cuda`,
   `execution_mode = native`, and `execution_engine = psionic` truth
 - refusal contract = the same explicit refusal for structured outputs and
-  multimodal request admission
+  the processor-owned image/video lane as on `e4b`
 
 What this means:
 
@@ -97,12 +99,29 @@ What this means:
   `gemma4:e4b` to the whole dense family.
 - `31B` stays a validation lane until we decide to publish it separately.
 
+## Processor-Owned Multimodal Lane
+
+After `#868`, dense `Gemma 4` artifacts that publish vision facts now carry one
+explicit multimodal lane on the generic server:
+
+- `multimodal_projection_mode = processor_owned`
+- accepted media labels = `image`, `video`
+- current surface posture = explicit refusal for direct media URL parts
+
+What that means:
+
+- Psionic no longer pretends the dense text prompt lane can consume image or
+  video inputs.
+- Psionic still does not claim native image or video understanding on Gemma.
+- direct media parts now fail with a processor-lane refusal instead of a vague
+  generic prompt-render refusal.
+
 ## Explicit Non-Goals
 
 The first `Gemma 4` claim does not include:
 
-- image
-- video
+- admitted image execution on the processor-owned lane
+- admitted video execution on the processor-owned lane
 - audio
 - `31B Dense`
 - `26B A4B`
@@ -146,7 +165,8 @@ conformance work:
   `tool_responses` turn instead of failing the continuation surface closed.
 - the repo now has bounded prompt-render, health/model publication, and
   refusal coverage for the `Gemma 4` CUDA lane, including explicit fail-closed
-  checks for structured outputs and multimodal inputs.
+  checks for structured outputs and the processor-owned image/video refusal
+  lane.
 - the conformance harness now accepts the real `gemma4:e4b` fixture shape and
   the repo now carries one repeatable `gemma4:e4b` CUDA conformance repeat
   test that runs when both the pilot GGUF and a CUDA host are available.
@@ -166,9 +186,9 @@ conformance work:
 
 What still does not exist:
 
-- no image, video, or audio Gemma lane
+- no admitted image or video execution on the Gemma processor-owned lane
+- no audio Gemma lane
 - no generic structured-output Gemma surface
-- no multimodal Gemma request surface
 - no broader published support claim beyond the bounded dense `e4b` CUDA lane,
   server admission, routed mesh validation, repo-owned conformance coverage,
   and the optional `31B` validation repeat
@@ -226,7 +246,7 @@ Those runs are the current publication bar. They prove:
   validation and replayable response-state storage
 - explicit refusal for:
   - structured outputs
-  - multimodal inputs
+  - direct image or video media URL parts on the processor-owned lane
 - repeatable real-artifact CUDA conformance against the local `e4b` GGUF when
   both the artifact and a usable CUDA host are present
 - optional repeatable validation against a local dense `31B` GGUF when that
@@ -247,8 +267,9 @@ The pilot stays green only if all of the following remain true:
 - the generic server still admits `/v1/chat/completions` and `/v1/responses`
 - Gemma-native tool calling still produces machine-checkable tool calls on the
   admitted lane
-- structured outputs and multimodal inputs still fail closed on the published
-  lane
+- structured outputs still fail closed on the published lane
+- the generic server still publishes `processor_owned` for Gemma image/video
+  media and still refuses direct media URL parts explicitly
 - mesh bootstrap publication keeps routed remote truth explicit and does not
   borrow a local host's wider endpoint claim
 - when `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH` is supplied, the dense `31B`
@@ -265,7 +286,7 @@ unsupported.
 
 That bounded claim keeps later work cleanly separated:
 
-- image and video processing
+- admitted image and video execution on the processor-owned lane
 - audio support for `E2B` and `E4B`
 - generic structured outputs
 - `26B A4B` and wider non-`GptOss` MoE admission

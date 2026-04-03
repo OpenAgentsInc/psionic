@@ -33,6 +33,8 @@ evidence.
   - bounded non-`GptOss` lanes including `qwen35`, the published dense
     `gemma4:e4b` CUDA lane, and the optional dense `Gemma 4 31B` validation
     repeat that keeps the same family contract without widening the first claim
+  - the Gemma image or video path now publishes as a processor-owned refusal
+    lane instead of pretending the dense text surface can consume media URLs
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
   - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
 - Hermes agent backend

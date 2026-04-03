@@ -44,6 +44,9 @@ than just run tensor math.
     argument validation
   - replayable `/v1/responses` state across assistant tool turns and replayed
     tool results
+  - published `multimodal_projection_mode = processor_owned` for `image` and
+    `video`, with explicit refusal on the current generic OpenAI surface until
+    a real Gemma processor lands
   - bounded prompt-render, server-smoke, refusal, and repeatable CUDA
     conformance coverage for `gemma4:e4b`
 - `Gemma 4` also now has one second dense validation lane outside the first
@@ -51,8 +54,9 @@ than just run tensor math.
   - artifact class = dense `31B`
   - operator hook = `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH`
   - validation scope = the same checked-in prompt fixture, CUDA backend truth,
-    `/v1/chat/completions` and `/v1/responses` endpoint set, and structured or
-    multimodal refusal posture as the `e4b` lane
+    `/v1/chat/completions` and `/v1/responses` endpoint set, structured-output
+    refusal posture, and processor-owned image/video refusal posture as the
+    `e4b` lane
   - claim boundary = validation only; it does not widen the original
     `gemma4:e4b` publication
 - The first distributed `Gemma 4` mesh validation now rides the bootstrap path
@@ -67,14 +71,13 @@ than just run tensor math.
     local dense lane instead of silently narrowing back to chat-only
 - The first bounded `Gemma 4` claim must stay explicit about its unsupported
   regions:
-  - image
-  - video
+  - admitted image execution on the processor-owned lane
+  - admitted video execution on the processor-owned lane
   - audio
   - `31B`
   - `26B A4B`
   - Metal
   - generic structured outputs
-  - multimodal request admission
   - unquantized projection tensors on the native CUDA lane
   - full parity with `llama.cpp` or `ollama`
 - That unsupported-region list is the boundary of the first published
