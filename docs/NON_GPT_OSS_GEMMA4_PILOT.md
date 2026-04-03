@@ -140,6 +140,29 @@ What that means:
   on the admitted `e2b` and `e4b` rows, while non-admitted dense variants fail
   closed without publishing audio capability at all.
 
+## Metal Lane Contract
+
+After `#872`, the generic OpenAI-compatible server also publishes one explicit
+`Gemma 4` Metal lane contract:
+
+- backend = `metal`
+- execution mode = `native`
+- execution engine = `psionic`
+- residency mode = `metal_accelerated`
+- fallback policy = `refuse`
+- current execution posture = explicit request-time refusal
+
+What that means:
+
+- Psionic now treats Gemma on Metal as a first-class contract surface instead
+  of leaving Apple Silicon behavior implied or undefined.
+- `/health` and `/v1/models` publish the same backend, execution, and refusal
+  truth that the server will actually enforce at request time.
+- `/v1/chat/completions` and `/v1/responses` fail closed with one explicit
+  refusal reason instead of silently falling back to CPU or CUDA.
+- This does not widen the published Gemma claim from one admitted CUDA
+  execution lane into successful native Metal decode.
+
 ## Explicit Non-Goals
 
 The first `Gemma 4` claim does not include:
@@ -149,7 +172,7 @@ The first `Gemma 4` claim does not include:
 - admitted audio execution on the processor-owned audio lane
 - `31B Dense`
 - `26B A4B`
-- Metal
+- successful native Metal execution
 - full parity with `llama.cpp`
 - full parity with `ollama`
 
@@ -211,11 +234,11 @@ conformance work:
 What still does not exist:
 
 - no admitted image or video execution on the Gemma processor-owned lane
-- no audio Gemma lane
+- no admitted audio execution on the Gemma processor-owned audio lane
 - no generic structured-output Gemma surface
 - no broader published support claim beyond the bounded dense `e4b` CUDA lane,
-  server admission, routed mesh validation, repo-owned conformance coverage,
-  and the optional `31B` validation repeat
+  server admission, the refusal-only Metal contract, routed mesh validation,
+  repo-owned conformance coverage, and the optional `31B` validation repeat
 
 ## Canonical Repeat
 

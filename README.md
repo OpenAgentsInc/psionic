@@ -38,6 +38,10 @@ evidence.
   - the dense `Gemma 4` `e2b` and `e4b` rows now also publish a separate
     processor-owned audio lane with explicit `input_audio` refusal until the
     real audio processor lands, while `31B` and `26B` still fail closed
+  - the generic server now also publishes one first-class `Gemma 4` Metal lane
+    contract with `backend = metal`, `execution_mode = native`, and
+    `fallback_policy = refuse`, and it returns an explicit refusal instead of
+    silently falling back to CPU or CUDA until a real Metal decoder lands
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
   - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
 - Hermes agent backend

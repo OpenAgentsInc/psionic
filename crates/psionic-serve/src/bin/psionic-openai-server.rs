@@ -93,9 +93,10 @@ where
                 backend = match value.as_str() {
                     "cpu" => OpenAiCompatBackend::Cpu,
                     "cuda" => OpenAiCompatBackend::Cuda,
+                    "metal" => OpenAiCompatBackend::Metal,
                     _ => {
                         return Err(format!(
-                            "invalid --backend value `{value}` (expected cpu or cuda)\n\n{}",
+                            "invalid --backend value `{value}` (expected cpu, cuda, or metal)\n\n{}",
                             usage()
                         ));
                     }
@@ -136,7 +137,7 @@ fn next_value(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<Str
 
 fn usage() -> String {
     String::from(
-        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda] [--host <ip>] [--port <port>] [--reasoning-budget <n>]",
+        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda|metal] [--host <ip>] [--port <port>] [--reasoning-budget <n>]",
     )
 }
 
@@ -164,10 +165,18 @@ mod tests {
     }
 
     #[test]
+    fn parse_args_accepts_metal_backend() {
+        let config = parse_args_from(["-m", "/tmp/model.gguf", "--backend", "metal"])
+            .expect("metal backend should parse");
+
+        assert!(matches!(config.backend, OpenAiCompatBackend::Metal));
+    }
+
+    #[test]
     fn parse_args_rejects_unknown_backend() {
-        let error = parse_args_from(["-m", "/tmp/model.gguf", "--backend", "metal"])
+        let error = parse_args_from(["-m", "/tmp/model.gguf", "--backend", "bogus"])
             .expect_err("generic server should reject unknown backend");
 
-        assert!(error.contains("expected cpu or cuda"));
+        assert!(error.contains("expected cpu, cuda, or metal"));
     }
 }

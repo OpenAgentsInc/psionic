@@ -73,6 +73,17 @@ than just run tensor math.
     `served_backend = remote` and `execution_mode = proxy`
   - routed remote publication now keeps the same admitted endpoint set as the
     local dense lane instead of silently narrowing back to chat-only
+- `Gemma 4` now also has one first-class Metal lane contract on the generic
+  OpenAI-compatible server:
+  - `backend = metal`
+  - `execution_mode = native`
+  - `execution_engine = psionic`
+  - `residency_mode = metal_accelerated`
+  - `fallback_policy = refuse`
+  - the same `/v1/chat/completions` and `/v1/responses` publication surface as
+    the admitted CUDA lane
+  - no scheduler policy claim
+  - explicit request-time refusal until a real native Metal decoder lands
 - The first bounded `Gemma 4` claim must stay explicit about its unsupported
   regions:
   - admitted image execution on the processor-owned lane
@@ -80,7 +91,7 @@ than just run tensor math.
   - admitted audio execution on the processor-owned audio lane
   - `31B`
   - `26B A4B`
-  - Metal
+  - successful native Metal execution
   - generic structured outputs
   - unquantized projection tensors on the native CUDA lane
   - full parity with `llama.cpp` or `ollama`

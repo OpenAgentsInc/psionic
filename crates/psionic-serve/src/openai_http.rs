@@ -180,6 +180,20 @@ impl LocalServingTruth {
             memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
         }
     }
+
+    const fn metal_native() -> Self {
+        Self {
+            residency_mode: "metal_accelerated",
+            hybrid_offload: "unsupported",
+            hybrid_offload_layers: None,
+            fallback_policy: "refuse",
+            performance_class: "apple_silicon_native",
+            load_status: LOCAL_SERVER_LOAD_STATUS,
+            warm_control: LOCAL_SERVER_WARM_CONTROL,
+            unload_control: LOCAL_SERVER_UNLOAD_CONTROL,
+            memory_pressure_reporting: LOCAL_SERVER_MEMORY_PRESSURE_REPORTING,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -224,6 +238,15 @@ impl OpenAiCompatServingTruth {
             execution_mode_label: "native",
             execution_engine_label: "psionic",
             local_serving_truth: LocalServingTruth::cuda_native(),
+        }
+    }
+
+    const fn metal_native() -> Self {
+        Self {
+            backend_label: "metal",
+            execution_mode_label: "native",
+            execution_engine_label: "psionic",
+            local_serving_truth: LocalServingTruth::metal_native(),
         }
     }
 }
@@ -899,6 +922,17 @@ impl GptOssCudaOpenAiCompatServer {
 pub enum OpenAiCompatBackend {
     Cpu,
     Cuda,
+    Metal,
+}
+
+impl OpenAiCompatBackend {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Cuda => "cuda",
+            Self::Metal => "metal",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1270,6 +1304,7 @@ enum OpenAiCompatRuntimeKind {
     GgufDecoderCpu,
     GgufDecoderCudaGemma4,
     GgufDecoderCudaQwen35,
+    GgufDecoderMetalGemma4Refusal,
     SafetensorsEmbeddings,
 }
 
@@ -1300,6 +1335,7 @@ struct OpenAiCompatLoadedDecoderModel {
     family: GgufDecoderFamily,
     multimodal_lane: Option<OpenAiCompatMultimodalLane>,
     audio_lane: Option<OpenAiCompatAudioLane>,
+    execution_refusal_reason: Option<String>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
@@ -1557,6 +1593,11 @@ impl OpenAiCompatLoadedModel {
             .map(|lane| match lane {
                 OpenAiCompatAudioLane::ProcessorOwned(lane) => lane.supported_parts(),
             })
+    }
+
+    fn execution_refusal_reason(&self) -> Option<&str> {
+        self.decoder()
+            .and_then(|model| model.execution_refusal_reason.as_deref())
     }
 }
 
@@ -2314,8 +2355,9 @@ impl OpenAiCompatServer {
             let embeddings_attempt = if matches!(config.backend, OpenAiCompatBackend::Cpu) {
                 load_generic_embeddings_model(model_path)
             } else {
-                Err(String::from(
-                    "generic OpenAI cuda backend does not support embeddings artifacts",
+                Err(format!(
+                    "generic OpenAI {} backend does not support embeddings artifacts",
+                    config.backend.label()
                 ))
             };
             let (loaded_model, accepted_names, load_plan) = match (
@@ -2552,6 +2594,7 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
+                        OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal => {}
                         OpenAiCompatRuntimeKind::SafetensorsEmbeddings => {
                             match CpuModelEmbeddingsService::from_safetensors_artifact(
                                 &load_plan.path,
@@ -3199,6 +3242,8 @@ struct ModelCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_scheduler_policy: Option<GenerationSchedulerPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_execution_refusal_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_projection_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_supported_media: Option<Vec<&'static str>>,
@@ -3585,6 +3630,15 @@ fn published_model_audio_input_parts(
     published_model_loaded_model(state, model).and_then(OpenAiCompatLoadedModel::audio_input_parts)
 }
 
+fn published_model_execution_refusal_reason(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<String> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::execution_refusal_reason)
+        .map(String::from)
+}
+
 fn published_model_embedding_dimensions(
     state: &OpenAiCompatState,
     model: &PublishedGenericModel,
@@ -3692,6 +3746,7 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_response_state: None,
             psionic_execution_profile: None,
             psionic_scheduler_policy: None,
+            psionic_execution_refusal_reason: None,
             psionic_multimodal_projection_mode: None,
             psionic_multimodal_supported_media: None,
             psionic_multimodal_projection_config: None,
@@ -3734,6 +3789,8 @@ struct GenericHealthResponse {
     execution_profile: ExecutionCapabilityProfile,
     #[serde(skip_serializing_if = "Option::is_none")]
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    execution_refusal_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     multimodal_projection_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3782,6 +3839,10 @@ async fn generic_health(
         response_state: published_model_response_state_capability(state.as_ref(), &default_model),
         execution_profile: default_model.execution_profile.clone(),
         scheduler_policy: default_model.scheduler_policy.clone(),
+        execution_refusal_reason: published_model_execution_refusal_reason(
+            state.as_ref(),
+            &default_model,
+        ),
         multimodal_projection_mode: published_model_multimodal_projection_mode(
             state.as_ref(),
             &default_model,
@@ -4356,6 +4417,10 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                     ),
                     psionic_execution_profile: Some(model.execution_profile.clone()),
                     psionic_scheduler_policy: model.scheduler_policy.clone(),
+                    psionic_execution_refusal_reason: published_model_execution_refusal_reason(
+                        state.as_ref(),
+                        &model,
+                    ),
                     psionic_multimodal_projection_mode: published_model_multimodal_projection_mode(
                         state.as_ref(),
                         &model,
@@ -6126,6 +6191,14 @@ async fn handle_generic_chat_completions(
             loaded_model.model_key
         ))
     })?;
+    if let Some(reason) = loaded_model.execution_refusal_reason() {
+        let route_execution = route_execution_status_for_local_route(&route.selection);
+        state.record_route_execution(route_execution);
+        return Err(refused_local_backend_error(
+            loaded_model.backend_label(),
+            reason,
+        ));
+    }
     let reasoning_request =
         reasoning_request_for_family(request.psionic_reasoning.as_ref(), model.family)?;
     let mut tool_contract = tool_contract;
@@ -6475,6 +6548,14 @@ async fn handle_generic_responses(
             loaded_model.model_key
         ))
     })?;
+    if let Some(reason) = loaded_model.execution_refusal_reason() {
+        let route_execution = route_execution_status_for_local_route(&route.selection);
+        state.record_route_execution(route_execution);
+        return Err(refused_local_backend_error(
+            loaded_model.backend_label(),
+            reason,
+        ));
+    }
     if !response_state_context.prompt_history.is_empty()
         && let Some(instructions) = request.instructions.as_deref()
         && leading_response_instructions(response_state_context.prompt_history.as_slice())
@@ -8017,6 +8098,15 @@ fn multimodal_lane_from_family_metadata(
         })
 }
 
+fn generic_metal_execution_refusal_reason(family: GgufDecoderFamily) -> Option<String> {
+    matches!(family, GgufDecoderFamily::Gemma4).then(|| {
+        format!(
+            "native metal {} GGUF decode is not implemented on the current generic OpenAI runtime; this lane refuses instead of silently falling back to CPU or CUDA",
+            decoder_family_label(family)
+        )
+    })
+}
+
 fn gemma4_processor_owned_multimodal_lane(
     family_metadata: &psionic_models::GgufDecoderFamilyMetadata,
 ) -> Option<ProcessorOwnedMultimodalLane> {
@@ -8099,6 +8189,16 @@ fn load_generic_decoder_model(
                 decoder_family_label(family),
             ));
         }
+        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4) => {
+            OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal
+        }
+        (OpenAiCompatBackend::Metal, _) => {
+            return Err(format!(
+                "generic OpenAI metal backend currently supports only the gemma4 metal lane contract; `{}` resolved to `{}`",
+                model_path.display(),
+                decoder_family_label(family),
+            ));
+        }
     };
     let canonical_name = default_model_name(model_path, descriptor.model.model_id.as_str());
     let supported_endpoints = vec![RoutingEndpoint::ChatCompletions, RoutingEndpoint::Responses];
@@ -8116,6 +8216,10 @@ fn load_generic_decoder_model(
                 descriptor.model.model_id.as_str(),
                 canonical_name.as_str(),
             ),
+            execution_refusal_reason: match backend {
+                OpenAiCompatBackend::Metal => generic_metal_execution_refusal_reason(family),
+                OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => None,
+            },
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
                 .then(|| adapter.prompt_renderer()),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
@@ -8176,6 +8280,11 @@ fn generic_decoder_serving_truth(
             | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
     ) {
         OpenAiCompatServingTruth::cuda_native()
+    } else if matches!(
+        (backend, family),
+        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
+    ) {
+        OpenAiCompatServingTruth::metal_native()
     } else if matches!(family, GgufDecoderFamily::Qwen35) {
         OpenAiCompatServingTruth::cpu_llama_cpp_proxy()
     } else {
@@ -8191,6 +8300,7 @@ fn generic_decoder_execution_profile(
         (backend, family),
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
+            | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
     ) {
         default_text_generation_execution_profile()
     } else {
@@ -8204,6 +8314,14 @@ fn generic_decoder_scheduler_policy(
 ) -> Option<GenerationSchedulerPolicy> {
     (matches!(backend, OpenAiCompatBackend::Cpu) && !matches!(family, GgufDecoderFamily::Qwen35))
         .then(default_generation_scheduler_policy)
+}
+
+fn refused_local_backend_error(backend: &'static str, reason: &str) -> OpenAiCompatHttpError {
+    OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::BackendUnavailable {
+        backend,
+        status: psionic_runtime::HealthStatus::Degraded,
+        message: reason.to_string(),
+    })
 }
 
 fn render_prompt_for_model(
@@ -9008,11 +9126,13 @@ mod tests {
         completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
         generation_options_from_chat_request_for_family, generation_options_from_responses_request,
         generic_embeddings, generic_health, generic_list_models, generic_management_status,
-        gpt_oss_local_serving_truth, handle_generic_chat_completions, handle_generic_embeddings,
-        handle_generic_responses, insert_local_serving_truth_headers, load_generic_decoder_model,
+        generic_metal_execution_refusal_reason, gpt_oss_local_serving_truth,
+        handle_generic_chat_completions, handle_generic_embeddings, handle_generic_responses,
+        insert_local_serving_truth_headers, load_generic_decoder_model,
         local_loaded_model_for_route, model_endpoint_paths, prompt_request_cache_key,
-        render_prompt_for_model, required_tool_call_floor_from_chat_messages,
-        resolve_execution_summary, resolve_generic_model, resolve_generic_model_for_endpoint,
+        refused_local_backend_error, render_prompt_for_model,
+        required_tool_call_floor_from_chat_messages, resolve_execution_summary,
+        resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
         structured_output_from_tool_contract, surfaced_reasoning_response,
         tool_call_outcome_from_response, tool_contract_from_chat_request,
@@ -10973,6 +11093,41 @@ mod tests {
     }
 
     #[test]
+    fn generic_metal_gemma4_load_plan_publishes_refusal_contract()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-metal.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata("tiny pilot gemma4 metal").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let refusal_reason = generic_metal_execution_refusal_reason(GgufDecoderFamily::Gemma4)
+            .expect("gemma4 metal refusal reason should be published");
+        let (loaded_model, accepted_names, load_plan) =
+            load_generic_decoder_model(&gemma_path, 0, OpenAiCompatBackend::Metal)?;
+
+        assert_eq!(
+            load_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal
+        );
+        assert_eq!(loaded_model.backend_label(), "metal");
+        assert_eq!(loaded_model.execution_mode_label(), "native");
+        assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(
+            loaded_model.execution_refusal_reason(),
+            Some(refusal_reason.as_str())
+        );
+        assert_eq!(
+            model_endpoint_paths(&loaded_model),
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        assert!(accepted_names.contains("tiny-gemma4-metal.gguf"));
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_gemma4_prompt_render_keeps_system_on_the_instruction_surface()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
@@ -11579,7 +11734,10 @@ mod tests {
                         .all(|capability| capability.support_level.label() == "unsupported")
                 })
         );
-        assert_eq!(model.psionic_multimodal_projection_mode, Some("processor_owned"));
+        assert_eq!(
+            model.psionic_multimodal_projection_mode,
+            Some("processor_owned")
+        );
         assert_eq!(
             model.psionic_multimodal_supported_media,
             Some(vec!["image", "video"])
@@ -11629,6 +11787,130 @@ mod tests {
         assert_eq!(payload["model"], serde_json::json!(model_id));
         assert!(payload["choices"][0]["message"]["content"].is_string());
         assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_gemma4_metal_lane_publishes_refusal_contract_and_fails_closed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-metal-server.gguf");
+        write_test_gguf(
+            &gemma_path,
+            dense_gemma4_metadata("tiny gemma4 metal refusal").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let refusal_reason = generic_metal_execution_refusal_reason(GgufDecoderFamily::Gemma4)
+            .expect("gemma4 metal refusal reason should be published");
+        let expected_error_message =
+            refused_local_backend_error("metal", refusal_reason.as_str()).to_string();
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Metal;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.backend, "metal");
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+        assert_eq!(health.0.residency_mode, "metal_accelerated");
+        assert_eq!(health.0.fallback_policy, "refuse");
+        assert_eq!(
+            health.0.default_model_supported_endpoints,
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        assert_eq!(
+            health.0.execution_profile.batch_posture,
+            BatchExecutionPosture::SingleRequestOnly
+        );
+        assert!(health.0.scheduler_policy.is_none());
+        assert_eq!(
+            health.0.execution_refusal_reason,
+            Some(refusal_reason.clone())
+        );
+
+        let model_id = health.0.default_model.clone();
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|candidate| candidate.id == model_id)
+            .expect("gemma4 metal model should be listed");
+        assert_eq!(model.psionic_served_backend, Some("metal"));
+        assert_eq!(model.psionic_execution_mode, Some("native"));
+        assert_eq!(model.psionic_execution_engine, Some("psionic"));
+        assert_eq!(model.psionic_residency_mode, Some("metal_accelerated"));
+        assert_eq!(model.psionic_fallback_policy, Some("refuse"));
+        assert!(model.psionic_scheduler_policy.is_none());
+        assert_eq!(
+            model.psionic_execution_refusal_reason,
+            Some(refusal_reason.clone())
+        );
+
+        let chat_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(model.id.clone()),
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 metal lane should fail closed for chat completions");
+        let chat_response = chat_error.into_response();
+        assert_eq!(chat_response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let chat_payload = runtime.block_on(response_json(chat_response))?;
+        assert_eq!(
+            chat_payload["error"]["message"],
+            serde_json::json!(expected_error_message)
+        );
+
+        let responses_error = runtime
+            .block_on(handle_generic_responses(
+                std::sync::Arc::clone(&server.state),
+                ResponsesRequest {
+                    model: Some(model.id.clone()),
+                    instructions: None,
+                    conversation: None,
+                    input: ResponsesInput::Text(String::from("hello")),
+                    temperature: Some(0.0),
+                    max_output_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    previous_response_id: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_response_state: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 metal lane should fail closed for responses");
+        let responses_response = responses_error.into_response();
+        assert_eq!(responses_response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let responses_payload = runtime.block_on(response_json(responses_response))?;
+        assert_eq!(
+            responses_payload["error"]["message"],
+            serde_json::json!(expected_error_message)
+        );
         Ok(())
     }
 
@@ -11785,7 +12067,9 @@ mod tests {
                     ..Default::default()
                 },
             ))
-            .expect_err("gemma4 responses multimodal input should fail through the processor-owned lane");
+            .expect_err(
+                "gemma4 responses multimodal input should fail through the processor-owned lane",
+            );
         let payload = runtime.block_on(response_json(error.into_response()))?;
         assert_eq!(
             payload["error"]["message"],
@@ -11901,7 +12185,9 @@ mod tests {
                     ..Default::default()
                 },
             ))
-            .expect_err("gemma4 e4b responses audio input should fail through the processor-owned lane");
+            .expect_err(
+                "gemma4 e4b responses audio input should fail through the processor-owned lane",
+            );
         let responses_payload = runtime.block_on(response_json(responses_error.into_response()))?;
         assert_eq!(
             responses_payload["error"]["message"],
@@ -11923,7 +12209,9 @@ mod tests {
         let temp = tempfile::tempdir()?;
         let runtime = tokio::runtime::Runtime::new()?;
         for variant in ["31b", "26b"] {
-            let gemma_path = temp.path().join(format!("tiny-gemma4-{variant}-audio.gguf"));
+            let gemma_path = temp
+                .path()
+                .join(format!("tiny-gemma4-{variant}-audio.gguf"));
             write_test_gguf(
                 &gemma_path,
                 dense_gemma4_metadata_with_chat_template(&format!("tiny gemma4 {variant} audio"))
