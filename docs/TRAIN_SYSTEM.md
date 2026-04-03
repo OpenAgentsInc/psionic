@@ -145,6 +145,16 @@ and the retained report
 combination is the repo-owned completion bar for saying “full Stanford A1 port”
 inside the bounded reference lane.
 
+The repo now also owns the first bounded full-port A2 reference-lane tranche in
+`crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator
+`crates/psionic-train/examples/psion_cs336_a2_baseline_profile_bundle.rs`, the
+focused doc `docs/PSION_CS336_A2_REFERENCE_LANE.md`, and the retained fixture
+`fixtures/training/cs336_a2_baseline_profile_bundle_v1.json`. That first A2
+surface fixes one deterministic baseline receipt family for naive attention, the
+tiny A1-backed training step, and the pre-DDP distributed communication posture
+so later FlashAttention, DDP, and sharded-optimizer work plugs into one shared
+bounded proof bundle instead of standalone notes.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator
