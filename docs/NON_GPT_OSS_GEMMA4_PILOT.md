@@ -6,7 +6,9 @@
 > published claim; `#880` then closed the first trainer-to-serving promoted-
 > revision seam for the bounded `gemma4:e4b` lane; `#895` then replaced the
 > old proxy-only distributed proof with one real split-execution proof for
-> `gemma4:e4b`.
+> `gemma4:e4b`; `#892` then promoted `gemma4:26b` from topology-only sparse
+> publication into admitted sparse distributed execution when the generic
+> server is given a real multi-node sparse schedule.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -176,7 +178,8 @@ The first `Gemma 4` claim does not include:
 - admitted video execution on the processor-owned lane
 - admitted audio execution on the processor-owned audio lane
 - `31B Dense`
-- successful native `gemma4:26b` sparse execution
+- default or single-node `gemma4:26b` sparse execution without an admitted
+  distributed schedule
 - successful native Metal execution
 - full parity with `llama.cpp`
 - full parity with `ollama`
@@ -197,7 +200,8 @@ conformance work:
   including the Gemma-specific turn, tool-call, tool-response, and channel
   tags.
 - dense `Gemma 4` artifacts classify cleanly, while expert-bearing `Gemma 4`
-  artifacts still fail closed at the current non-`GptOss` MoE gate.
+  artifacts still fail closed by default at the current non-`GptOss` MoE gate
+  unless the server is given an admitted distributed sparse schedule.
 - the local `e4b` GGUF does not currently embed `tokenizer.chat_template`, so
   the repo now carries one checked-in bounded text template fixture at
   `crates/psionic-models/src/testdata/gemma4_chat_template.jinja`.
@@ -233,6 +237,12 @@ conformance work:
 - the older bootstrap-mesh path is still useful, but it now stays explicitly
   classified as remote whole-request proxying instead of being treated as the
   distributed proof.
+- the same generic server now also has one admitted sparse distributed
+  `gemma4:26b` execution path above the existing topology-publication surface:
+  the default path still fails closed, but an operator can now admit one real
+  multi-node sparse schedule and get successful `/v1/chat/completions` and
+  `/v1/responses` execution together with `tensor_sharded` cluster receipts,
+  selected-node truth, and request-specific expert-routing diagnostics.
 - the managed dense-GGUF lane now allocates whole-model KV-cache width instead
   of silently falling back to one-layer fixture geometry, and the repo now
   carries a multi-layer regression that keeps that boundary explicit.
@@ -291,9 +301,9 @@ What still does not exist:
   adapter-SFT lane
 - no RL-first, DPO-first, or full-model Gemma finetuning claim
 - no broader published support claim beyond the bounded dense `e4b` CUDA lane,
-  one real split-execution proof, the refusal-only Metal contract, routed mesh
-  publication, repo-owned conformance coverage, and the optional `31B`
-  validation repeat
+  one real dense split-execution proof, one admitted sparse distributed
+  `gemma4:26b` path, the refusal-only Metal contract, routed mesh publication,
+  repo-owned conformance coverage, and the optional `31B` validation repeat
 
 ## Canonical Repeat
 
@@ -308,8 +318,14 @@ cargo test -p psionic-runtime \
 cargo test -p psionic-provider \
   text_generation_receipt_surfaces_gemma4_pipeline_sharded_cluster_execution_truth \
   --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-cluster \
+  realized_sparse_cluster_execution_attaches_live_route_proof \
+  --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve \
   generic_execution_headers_surface_gemma4_pipeline_cluster_truth \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_server_gemma4_26b_sparse_lane_executes_when_schedule_is_admitted \
   --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve conformance --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve gemma4 --manifest-path Cargo.toml --no-default-features
@@ -392,7 +408,9 @@ The pilot stays green only if all of the following remain true:
   validation lane still matches the same tokenizer, prompt, backend-truth,
   and refusal contract instead of forking the family semantics
 - `gemma4:26b` now publishes sparse-topology truth with one explicit refusal
-  reason instead of falling back to a generic unsupported-family error
+  reason by default, and the same row can now cross into admitted distributed
+  execution with machine-checkable clustered receipts instead of falling back
+  to a generic unsupported-family error
 
 ## Why The Claim Is Narrow
 
@@ -407,8 +425,6 @@ That bounded claim keeps later work cleanly separated:
 - admitted image and video execution on the processor-owned lane
 - audio support for `E2B` and `E4B`
 - generic structured outputs
-- admitted distributed `gemma4:26b` execution above the new sparse-topology
-  contract
 - wider non-`GptOss` MoE family admission
 - Metal and other accelerator parity
 - any future decision to promote `31B` from validation-only into its own

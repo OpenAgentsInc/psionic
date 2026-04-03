@@ -76,11 +76,16 @@ than just run tensor math.
   - publication surfaces = `/health`, `/v1/models`, routed inventory, and mesh
     management status all carry the same sparse-topology truth plus one
     explicit execution refusal reason
-  - request posture = the local generic OpenAI-compatible server fails closed
-    on `/v1/chat/completions` and `/v1/responses` until a distributed sparse
-    placement is admitted
-  - claim boundary = truthful topology publication only; this does not promote
-    single-node native `gemma4:26b` execution
+  - default request posture = the local generic OpenAI-compatible server fails
+    closed on `/v1/chat/completions` and `/v1/responses` until an explicit
+    distributed sparse schedule is admitted
+  - admitted request posture = once the operator admits a real
+    two-or-more-node sparse schedule, the same server can execute
+    `gemma4:26b` and publish `disposition = sharded`,
+    `execution_topology = tensor_sharded`, and request-specific expert-routing
+    proof in response headers and `psionic_cluster_execution`
+  - claim boundary = admitted distributed sparse execution only; this still
+    does not promote single-node native `gemma4:26b` execution
 - The first real distributed `Gemma 4` proof is now one split
   `pipeline_sharded` `gemma4:e4b` request across two CUDA machines:
   - execution target = dense `gemma4:e4b`

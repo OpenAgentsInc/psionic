@@ -589,9 +589,7 @@ pub fn schedule_gemma4_26b_distributed_lane(
             &state.topology_digest(),
             Some(state.artifact_residency_digest()),
             request.expert_host_inventory.stable_digest(),
-            tensor_collective_communication_eligibility(
-                &default_sparse_expert_capability_profile(),
-            ),
+            tensor_collective_communication_eligibility(&default_sparse_expert_capability_profile()),
             Vec::new(),
         )));
     }
@@ -608,7 +606,11 @@ pub fn schedule_gemma4_26b_distributed_lane(
     for policy_digest in &request.policy_digests {
         sparse_request = sparse_request.with_policy_digest(policy_digest.clone());
     }
-    schedule_sparse_expert_execution(state, &sparse_request, &gemma4_26b_distributed_lane_policy())
+    schedule_sparse_expert_execution(
+        state,
+        &sparse_request,
+        &gemma4_26b_distributed_lane_policy(),
+    )
 }
 
 /// Plans one truthful sparse expert-placement lane from explicit inventory.
@@ -1078,6 +1080,126 @@ pub fn schedule_sparse_expert_execution(
     })
 }
 
+/// Realizes one admitted sparse schedule into request-specific clustered
+/// execution proof.
+pub fn realize_sparse_expert_cluster_execution(
+    schedule: &SparseExpertClusterSchedule,
+    request_seed: &[u8],
+    output_token_count: usize,
+) -> Result<ClusterExecutionContext, String> {
+    let topology_requirement = schedule
+        .lane
+        .expert_topology_requirement
+        .as_ref()
+        .ok_or_else(|| {
+            format!(
+                "sparse schedule for `{}` is missing the expert topology requirement",
+                schedule.lane.model_id
+            )
+        })?;
+    if schedule.placement_plan.assignments.is_empty() {
+        return Err(format!(
+            "sparse schedule for `{}` did not publish any expert placements",
+            schedule.lane.model_id
+        ));
+    }
+
+    let request_digest = Sha256::digest(request_seed);
+    let active_expert_count = topology_requirement.active_expert_count.unwrap_or(1).max(1);
+    let expert_feed_forward_length = topology_requirement
+        .expert_feed_forward_length
+        .unwrap_or(4096)
+        .max(1);
+    let token_steps = output_token_count.max(1);
+    let mut placement_diagnostics = schedule.cluster_execution.placement_diagnostics.clone();
+    let mut shard_handoffs = Vec::new();
+
+    placement_diagnostics.push(format!(
+        "realized sparse expert routing for request_digest={} output_tokens={} active_experts_per_step={}",
+        hex::encode(&request_digest[..6]),
+        token_steps,
+        active_expert_count,
+    ));
+
+    for step in 0..token_steps {
+        let mut routed_experts = Vec::with_capacity(active_expert_count);
+        for active_slot in 0..active_expert_count {
+            let placement_index = (request_digest[(step + active_slot) % request_digest.len()]
+                as usize
+                + step
+                + active_slot)
+                % schedule.placement_plan.assignments.len();
+            let assignment = &schedule.placement_plan.assignments[placement_index];
+            let expert_span = assignment
+                .last_expert_index_exclusive
+                .saturating_sub(assignment.first_expert_index)
+                .max(1);
+            let expert_index = assignment.first_expert_index
+                + ((request_digest[(step + active_slot + 11) % request_digest.len()] as usize
+                    + active_slot)
+                    % expert_span);
+            routed_experts.push((placement_index, assignment, expert_index));
+        }
+
+        placement_diagnostics.push(format!(
+            "decode_step={step} routed active experts {}",
+            routed_experts
+                .iter()
+                .map(|(_, assignment, expert_index)| format!(
+                    "{}:expert{}",
+                    assignment.node_id.as_str(),
+                    expert_index
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+
+        for window in routed_experts.windows(2) {
+            let [
+                (from_index, from_assignment, from_expert),
+                (to_index, to_assignment, to_expert),
+            ] = window
+            else {
+                continue;
+            };
+            if from_assignment.node_id == to_assignment.node_id {
+                continue;
+            }
+            shard_handoffs.push(
+                psionic_runtime::ClusterShardHandoff::new(
+                    *from_index,
+                    *to_index,
+                    from_assignment.node_id.as_str(),
+                    to_assignment.node_id.as_str(),
+                    psionic_runtime::ClusterShardHandoffKind::TensorCollective,
+                    schedule.cluster_execution.transport,
+                    step,
+                    expert_feed_forward_length
+                        .saturating_mul(std::mem::size_of::<u16>())
+                        .try_into()
+                        .unwrap_or(u64::MAX),
+                )
+                .with_tensor_partition(
+                    0,
+                    from_assignment.first_expert_index,
+                    from_assignment.last_expert_index_exclusive,
+                )
+                .with_detail(format!(
+                    "decode step {step} routed expert {from_expert} on `{}` into expert {to_expert} on `{}`",
+                    from_assignment.node_id.as_str(),
+                    to_assignment.node_id.as_str(),
+                )),
+            );
+        }
+    }
+
+    Ok(schedule
+        .cluster_execution
+        .clone()
+        .with_placement_diagnostics(placement_diagnostics)
+        .with_shard_handoffs(shard_handoffs))
+}
+
 fn sparse_expert_failure(
     code: SparseExpertSchedulingFailureCode,
     detail: String,
@@ -1149,7 +1271,10 @@ fn sparse_expert_device_inventory(
 mod tests {
     use std::io::Error;
 
-    use psionic_runtime::{ClusterPolicyDigest, ClusterPolicyDigestKind, ExecutionTopologyKind};
+    use psionic_runtime::{
+        ClusterExecutionDisposition, ClusterPolicyDigest, ClusterPolicyDigestKind,
+        ExecutionTopologyKind,
+    };
 
     use crate::{
         AdmissionToken, ClusterArtifactReference, ClusterArtifactResidencyKey,
@@ -1163,7 +1288,8 @@ mod tests {
         Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule, SparseExpertExecutionRequest,
         SparseExpertHostInventoryRecord, SparseExpertHostInventorySnapshot,
         SparseExpertPlacementPolicy, SparseExpertSchedulingFailureCode,
-        schedule_gemma4_26b_distributed_lane, schedule_sparse_expert_execution,
+        realize_sparse_expert_cluster_execution, schedule_gemma4_26b_distributed_lane,
+        schedule_sparse_expert_execution,
     };
 
     fn fixture_error(detail: &str) -> Error {
@@ -1443,8 +1569,54 @@ mod tests {
             Err(error) => error,
         };
 
-        assert_eq!(failure.code, SparseExpertSchedulingFailureCode::ModelIneligible);
+        assert_eq!(
+            failure.code,
+            SparseExpertSchedulingFailureCode::ModelIneligible
+        );
         assert!(failure.detail.contains("gemma4:26b"));
+        Ok(())
+    }
+
+    #[test]
+    fn realized_sparse_cluster_execution_attaches_live_route_proof()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = sample_state();
+        let schedule = schedule_gemma4_26b_distributed_lane(
+            &state,
+            &Gemma4MoeDistributedLaneRequest::new(
+                crate::NodeId::new("scheduler"),
+                sample_inventory(),
+            ),
+        )
+        .map_err(|error| {
+            fixture_error(&format!(
+                "expected gemma4 26b sparse schedule before route realization: {error:?}"
+            ))
+        })?;
+
+        let realized = realize_sparse_expert_cluster_execution(&schedule, b"chatcmpl-892", 2)
+            .map_err(|detail| {
+                fixture_error(&format!("expected live sparse route proof: {detail}"))
+            })?;
+
+        assert_eq!(realized.disposition, ClusterExecutionDisposition::Sharded);
+        assert_eq!(
+            realized
+                .execution_topology
+                .as_ref()
+                .expect("tensor topology")
+                .kind,
+            ExecutionTopologyKind::TensorSharded
+        );
+        assert_eq!(realized.selected_nodes.len(), 2);
+        assert!(realized.placement_diagnostics.iter().any(|detail| {
+            detail.contains("realized sparse expert routing")
+                || detail.contains("decode_step=0 routed active experts")
+        }));
+        assert!(realized.shard_handoffs.iter().any(|handoff| {
+            handoff.kind == psionic_runtime::ClusterShardHandoffKind::TensorCollective
+                && handoff.from_node_id != handoff.to_node_id
+        }));
         Ok(())
     }
 }

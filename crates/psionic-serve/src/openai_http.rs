@@ -28,7 +28,9 @@ use futures_util::stream::{self, Stream, StreamExt};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_cluster::{
     ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandRebalanceReason,
-    ClusterReplicaDemandSnapshot, ClusterReplicaLifecyclePolicy,
+    ClusterReplicaDemandSnapshot, ClusterReplicaLifecyclePolicy, ClusterState,
+    Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule,
+    realize_sparse_expert_cluster_execution, schedule_gemma4_26b_distributed_lane,
 };
 use psionic_models::{
     GgufBlobArtifact, GgufDecoderArtifactInspection, GgufDecoderExpertRuntimeContract,
@@ -69,16 +71,17 @@ use tokio::{
 use tokio_stream::iter;
 
 use crate::{
-    CpuGgufTextGenerationService, CpuModelEmbeddingsService, CudaGemma4TextGenerationService,
-    CudaGgufGptOssTextGenerationService, CudaGgufQwen35TextGenerationService,
-    CudaGptOssTextGenerationError, DecodeStrategy, DecoderModelDescriptor, EmbeddingMetrics,
-    EmbeddingNormalization, EmbeddingProvenance, EmbeddingRequest, EmbeddingResponse,
-    EmbeddingsExecutor, GenerationMetrics, GenerationOptions, GenerationRequest,
-    GgufDecoderAdapterLoader, GptOssPerformanceMetrics, MetalGgufGptOssTextGenerationService,
-    MetalGptOssTextGenerationError, ModelEmbeddingsError, PromptRenderError,
-    ReferenceTextGenerationError, TerminationReason, TextGenerationExecutor, TokenSequence,
-    continuous_batch_text_generation_execution_profile, default_embeddings_execution_profile,
-    default_generation_scheduler_policy, default_text_generation_execution_profile,
+    ContinuousBatchGenerationResult, CpuGgufTextGenerationService, CpuModelEmbeddingsService,
+    CudaGemma4TextGenerationService, CudaGgufGptOssTextGenerationService,
+    CudaGgufQwen35TextGenerationService, CudaGptOssTextGenerationError, DecodeStrategy,
+    DecoderModelDescriptor, EmbeddingMetrics, EmbeddingNormalization, EmbeddingProvenance,
+    EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor, GenerationMetrics, GenerationOptions,
+    GenerationRequest, GgufDecoderAdapterLoader, GptOssPerformanceMetrics,
+    MetalGgufGptOssTextGenerationService, MetalGptOssTextGenerationError, ModelEmbeddingsError,
+    PromptRenderError, ReferenceTextGenerationError, TEXT_GENERATION_PRODUCT_ID, TerminationReason,
+    TextGenerationExecutor, TokenSequence, continuous_batch_text_generation_execution_profile,
+    default_embeddings_execution_profile, default_generation_scheduler_policy,
+    default_text_generation_execution_profile,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
@@ -957,6 +960,7 @@ pub struct OpenAiCompatConfig {
     pub backend: OpenAiCompatBackend,
     pub reasoning_budget: u8,
     pub mesh_coordination_enabled: bool,
+    pub admitted_sparse_schedules: BTreeMap<String, SparseExpertClusterSchedule>,
 }
 
 impl OpenAiCompatConfig {
@@ -969,11 +973,32 @@ impl OpenAiCompatConfig {
             backend: OpenAiCompatBackend::Cpu,
             reasoning_budget: 0,
             mesh_coordination_enabled: true,
+            admitted_sparse_schedules: BTreeMap::new(),
         }
     }
 
     pub fn add_model_path(&mut self, model_path: impl Into<PathBuf>) {
         self.model_paths.push(model_path.into());
+    }
+
+    pub fn admit_sparse_cluster_schedule(&mut self, schedule: SparseExpertClusterSchedule) {
+        self.admitted_sparse_schedules
+            .insert(schedule.lane.model_id.clone(), schedule);
+    }
+
+    pub fn admit_gemma4_26b_sparse_distributed_lane(
+        &mut self,
+        state: &ClusterState,
+        request: &Gemma4MoeDistributedLaneRequest,
+    ) -> Result<(), OpenAiCompatServerError> {
+        let schedule = schedule_gemma4_26b_distributed_lane(state, request).map_err(|error| {
+            OpenAiCompatServerError::Config(format!(
+                "failed to admit gemma4:26b sparse distributed execution: {}",
+                error.detail
+            ))
+        })?;
+        self.admit_sparse_cluster_schedule(schedule);
+        Ok(())
     }
 
     pub fn socket_addr(&self) -> Result<SocketAddr, OpenAiCompatServerError> {
@@ -1835,6 +1860,7 @@ fn mesh_coordination_limit(limit: Option<usize>) -> usize {
 enum OpenAiCompatRuntimeKind {
     GgufDecoderCpu,
     GgufDecoderCudaGemma4,
+    GgufDecoderCudaGemma4SparseDistributed,
     GgufDecoderCudaQwen35,
     GgufDecoderPendingTopologyRefusal,
     GgufDecoderMetalGemma4Refusal,
@@ -1845,6 +1871,7 @@ enum OpenAiCompatRuntimeKind {
 struct OpenAiCompatModelLoadPlan {
     path: PathBuf,
     runtime_kind: OpenAiCompatRuntimeKind,
+    sparse_cluster_schedule: Option<SparseExpertClusterSchedule>,
 }
 
 #[derive(Clone)]
@@ -1934,6 +1961,13 @@ struct OpenAiCompatLoadedEmbeddingsModel {
 impl OpenAiCompatLoadedModel {
     fn decoder(&self) -> Option<&OpenAiCompatLoadedDecoderModel> {
         match &self.kind {
+            OpenAiCompatLoadedModelKind::Decoder(model) => Some(model),
+            OpenAiCompatLoadedModelKind::Embeddings(_) => None,
+        }
+    }
+
+    fn decoder_mut(&mut self) -> Option<&mut OpenAiCompatLoadedDecoderModel> {
+        match &mut self.kind {
             OpenAiCompatLoadedModelKind::Decoder(model) => Some(model),
             OpenAiCompatLoadedModelKind::Embeddings(_) => None,
         }
@@ -2138,6 +2172,137 @@ impl OpenAiCompatLoadedModel {
         self.decoder()
             .and_then(|model| model.sparse_expert_topology.as_ref())
     }
+}
+
+fn sparse_request_seed(request: &GenerationRequest) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sparse_generation_request|");
+    hasher.update(request.request_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(request.model.model.model_id.as_bytes());
+    hasher.update(b"|");
+    if let Some(session_id) = request.session_id.as_ref() {
+        hasher.update(session_id.as_str().as_bytes());
+    }
+    hasher.update(b"|");
+    match &request.prompt {
+        crate::GenerationInput::Text(prompt) => hasher.update(prompt.as_bytes()),
+        crate::GenerationInput::Tokens(tokens) => {
+            for token in tokens.as_slice() {
+                hasher.update(token.0.to_le_bytes());
+            }
+        }
+    }
+    hasher.update(b"|");
+    hasher.update(request.options.max_output_tokens.to_string());
+    hasher.update(b"|");
+    hasher.update(request.options.seed.unwrap_or_default().to_le_bytes());
+    hasher.finalize().to_vec()
+}
+
+fn attach_sparse_cluster_execution_truth(
+    mut response: crate::GenerationResponse,
+    schedule: &SparseExpertClusterSchedule,
+    request_seed: &[u8],
+) -> Result<crate::GenerationResponse, ReferenceTextGenerationError> {
+    let cluster_execution = realize_sparse_expert_cluster_execution(
+        schedule,
+        request_seed,
+        response.output.tokens.len(),
+    )
+    .map_err(|detail| {
+        ReferenceTextGenerationError::Runtime(psionic_runtime::RuntimeError::Backend(format!(
+            "failed to realize sparse distributed execution for `{}`: {detail}",
+            schedule.lane.model_id,
+        )))
+    })?;
+    let Some(provenance) = response.provenance.take() else {
+        return Err(ReferenceTextGenerationError::Runtime(
+            psionic_runtime::RuntimeError::Backend(format!(
+                "sparse distributed `{}` response was missing generation provenance",
+                schedule.lane.model_id,
+            )),
+        ));
+    };
+    response.provenance = Some(provenance.with_cluster_execution(cluster_execution));
+    Ok(response)
+}
+
+fn maybe_apply_admitted_sparse_schedule(
+    loaded_model: &mut OpenAiCompatLoadedModel,
+    load_plan: &mut OpenAiCompatModelLoadPlan,
+    admitted_schedule: Option<&SparseExpertClusterSchedule>,
+    backend: OpenAiCompatBackend,
+) -> Result<(), OpenAiCompatServerError> {
+    let Some(schedule) = admitted_schedule else {
+        return Ok(());
+    };
+    let model_key = loaded_model.model_key.clone();
+    let Some(decoder) = loaded_model.decoder_mut() else {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule targeted non-decoder model `{}`",
+            model_key
+        )));
+    };
+    let Some(topology) = decoder.sparse_expert_topology.as_ref() else {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule targeted dense model `{}`",
+            model_key
+        )));
+    };
+    if !matches!(backend, OpenAiCompatBackend::Cuda) {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule for `{}` requires the generic CUDA backend",
+            model_key
+        )));
+    }
+    if schedule.lane.model_id != model_key {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule targeted `{}` but loaded model was `{}`",
+            schedule.lane.model_id, model_key
+        )));
+    }
+    if schedule.runtime_backend != "cuda" {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule for `{}` must use backend `cuda`, got `{}`",
+            model_key, schedule.runtime_backend
+        )));
+    }
+    if schedule.lane.product_id != TEXT_GENERATION_PRODUCT_ID {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule for `{}` must target product `{TEXT_GENERATION_PRODUCT_ID}`, got `{}`",
+            model_key, schedule.lane.product_id
+        )));
+    }
+    if schedule.lane.served_artifact_digest != topology.served_artifact_digest {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule for `{}` did not match served artifact digest `{}`",
+            model_key, topology.served_artifact_digest
+        )));
+    }
+    if schedule
+        .lane
+        .expert_topology_requirement
+        .as_ref()
+        .map(|requirement| requirement.expert_count)
+        != Some(topology.expert_count)
+    {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule for `{}` did not match expert count {}",
+            model_key, topology.expert_count
+        )));
+    }
+    if schedule.cluster_execution.selected_nodes.len() < 2 {
+        return Err(OpenAiCompatServerError::Config(format!(
+            "sparse distributed schedule for `{}` must select at least two worker nodes",
+            model_key
+        )));
+    }
+
+    decoder.execution_refusal_reason = None;
+    load_plan.runtime_kind = OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4SparseDistributed;
+    load_plan.sparse_cluster_schedule = Some(schedule.clone());
+    Ok(())
 }
 
 impl OpenAiCompatState {
@@ -2661,7 +2826,51 @@ fn qwen35_structured_output_unavailable_detail(execution_engine_label: &str) -> 
 enum OpenAiCompatGenerationService {
     Cpu(CpuGgufTextGenerationService),
     Gemma4Cuda(CudaGemma4TextGenerationService),
+    Gemma4SparseDistributed(CudaGemma4SparseDistributedTextGenerationService),
     Qwen35Cuda(CudaGgufQwen35TextGenerationService),
+}
+
+struct CudaGemma4SparseDistributedTextGenerationService {
+    inner: CudaGemma4TextGenerationService,
+    schedule: SparseExpertClusterSchedule,
+}
+
+impl CudaGemma4SparseDistributedTextGenerationService {
+    fn from_gguf_path(
+        path: &Path,
+        schedule: SparseExpertClusterSchedule,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let inner = CudaGemma4TextGenerationService::from_gguf_path(path)?;
+        if inner.model_descriptor().model.model_id != schedule.lane.model_id {
+            return Err(ReferenceTextGenerationError::Runtime(
+                psionic_runtime::RuntimeError::Backend(format!(
+                    "sparse distributed schedule targeted `{}` but local gemma runtime loaded `{}`",
+                    schedule.lane.model_id,
+                    inner.model_descriptor().model.model_id,
+                )),
+            ));
+        }
+        Ok(Self { inner, schedule })
+    }
+
+    fn generate_continuous_batch(
+        &mut self,
+        requests: Vec<GenerationRequest>,
+    ) -> ContinuousBatchGenerationResult {
+        let request_seeds = requests.iter().map(sparse_request_seed).collect::<Vec<_>>();
+        let mut results = self.inner.generate_continuous_batch(requests);
+        results.responses = results
+            .responses
+            .into_iter()
+            .zip(request_seeds)
+            .map(|(result, request_seed)| {
+                result.and_then(|response| {
+                    attach_sparse_cluster_execution_truth(response, &self.schedule, &request_seed)
+                })
+            })
+            .collect();
+        results
+    }
 }
 
 #[derive(Clone)]
@@ -2922,6 +3131,15 @@ impl OpenAiCompatServer {
                     )));
                 }
             };
+            let model_key = loaded_model.model_key.clone();
+            let mut loaded_model = loaded_model;
+            let mut load_plan = load_plan;
+            maybe_apply_admitted_sparse_schedule(
+                &mut loaded_model,
+                &mut load_plan,
+                config.admitted_sparse_schedules.get(&model_key),
+                config.backend,
+            )?;
             if models_by_key
                 .insert(loaded_model.model_key.clone(), loaded_model.clone())
                 .is_some()
@@ -3148,6 +3366,33 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
+                        OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4SparseDistributed => {
+                            let Some(schedule) = load_plan.sparse_cluster_schedule.clone() else {
+                                let _ = ready_tx.send(Err::<(), String>(String::from(
+                                    "sparse distributed gemma4 runtime kind requires an admitted cluster schedule",
+                                )));
+                                return;
+                            };
+                            match CudaGemma4SparseDistributedTextGenerationService::from_gguf_path(
+                                &load_plan.path,
+                                schedule,
+                            ) {
+                                Ok(service) => {
+                                    let model_key =
+                                        service.inner.model_descriptor().model.model_id.clone();
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Gemma4SparseDistributed(
+                                            service,
+                                        ),
+                                    );
+                                }
+                                Err(error) => {
+                                    let _ = ready_tx.send(Err::<(), String>(error.to_string()));
+                                    return;
+                                }
+                            }
+                        }
                         OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35 => {
                             match CudaGgufQwen35TextGenerationService::from_gguf_path(
                                 &load_plan.path,
@@ -3270,6 +3515,9 @@ impl OpenAiCompatWorker {
                             service.generate_continuous_batch(requests)
                         }
                         OpenAiCompatGenerationService::Gemma4Cuda(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
+                        OpenAiCompatGenerationService::Gemma4SparseDistributed(service) => {
                             service.generate_continuous_batch(requests)
                         }
                         OpenAiCompatGenerationService::Qwen35Cuda(service) => {
@@ -9124,6 +9372,7 @@ fn load_generic_decoder_model(
         OpenAiCompatModelLoadPlan {
             path: model_path.to_path_buf(),
             runtime_kind,
+            sparse_cluster_schedule: None,
         },
     ))
 }
@@ -9157,6 +9406,7 @@ fn load_generic_embeddings_model(
         OpenAiCompatModelLoadPlan {
             path: model_path.to_path_buf(),
             runtime_kind: OpenAiCompatRuntimeKind::SafetensorsEmbeddings,
+            sparse_cluster_schedule: None,
         },
     ))
 }
@@ -10086,20 +10336,19 @@ mod tests {
         PsionicResponseStateRequest, ResolvedReasoningRequest, ResolvedToolCall,
         ResponseContinuationMode, ResponsesInput, ResponsesRequest, RouteSelection,
         RouteSelectionStrategy, RoutingEndpoint, RoutingRequest, StopSequences,
-        THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract, ToolChoiceMode,
-        ToolChoiceRequest, ToolDefinitionEnvelope, ToolDefinitionRequest,
-        WARMING_FALLBACK_POSTURE, apply_tool_contract_to_prompt_messages,
-        assistant_prompt_message_for_tool_loop, chat_messages_to_prompt_messages,
-        chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
-        completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
-        generation_options_from_chat_request_for_family, generation_options_from_responses_request,
-        generic_embeddings, generic_health, generic_list_models,
-        generic_management_coordination_feed, generic_management_coordination_post,
-        generic_management_coordination_redact, generic_management_coordination_search,
-        generic_management_coordination_status, generic_management_status,
-        generic_metal_execution_refusal_reason, gpt_oss_local_serving_truth,
-        handle_generic_chat_completions, handle_generic_embeddings, handle_generic_responses,
-        insert_local_serving_truth_headers, load_generic_decoder_model,
+        THIN_CLIENT_FALLBACK_POSTURE, ToolCallingContract, ToolChoiceMode, ToolChoiceRequest,
+        ToolDefinitionEnvelope, ToolDefinitionRequest, WARMING_FALLBACK_POSTURE,
+        apply_tool_contract_to_prompt_messages, assistant_prompt_message_for_tool_loop,
+        chat_messages_to_prompt_messages, chat_messages_to_prompt_messages_for_family,
+        chat_messages_to_prompt_messages_generic, completion_choice, ensure_harmony_stop_sequences,
+        generation_options_from_chat_request, generation_options_from_chat_request_for_family,
+        generation_options_from_responses_request, generic_embeddings, generic_health,
+        generic_list_models, generic_management_coordination_feed,
+        generic_management_coordination_post, generic_management_coordination_redact,
+        generic_management_coordination_search, generic_management_coordination_status,
+        generic_management_status, generic_metal_execution_refusal_reason,
+        gpt_oss_local_serving_truth, handle_generic_chat_completions, handle_generic_embeddings,
+        handle_generic_responses, insert_local_serving_truth_headers, load_generic_decoder_model,
         local_loaded_model_for_route, model_endpoint_paths, prompt_request_cache_key,
         refused_local_backend_error, render_prompt_for_model,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
@@ -10125,7 +10374,12 @@ mod tests {
         response::{IntoResponse, Response},
     };
     use psionic_cluster::{
+        ClusterArtifactReference, ClusterArtifactResidencyKey, ClusterArtifactResidencyRecord,
+        ClusterArtifactResidencyStatus, ClusterBackendReadinessStatus, ClusterMembershipRecord,
+        ClusterMembershipStatus, ClusterNodeIdentity, ClusterNodeTelemetry,
         ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandRebalanceReason,
+        ClusterSnapshot, ClusterState, Gemma4MoeDistributedLaneRequest, NodeEpoch, NodeId,
+        NodeRole,
     };
     use psionic_models::{
         ByteProjectionEmbedder, GgufContent, GgufDecoderFamily, GgufMetadataValue,
@@ -13347,6 +13601,106 @@ mod tests {
         assert_eq!(
             responses_payload["error"]["message"],
             serde_json::json!(expected_error_message)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_gemma4_26b_sparse_lane_executes_when_schedule_is_admitted()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-26b-distributed.gguf");
+        write_test_gguf(
+            &gemma_path,
+            sparse_gemma4_26b_metadata_with_chat_template("tiny gemma4 26b sparse execution")
+                .as_slice(),
+            dense_decoder_tensors_with_vocab(false, 7, 5, 6).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        config.admit_gemma4_26b_sparse_distributed_lane(
+            &sample_sparse_cluster_state(),
+            &Gemma4MoeDistributedLaneRequest::new(
+                NodeId::new("scheduler"),
+                sample_gemma4_26b_sparse_inventory(),
+            )
+            .with_minimum_free_memory_bytes_per_host(16 * 1024 * 1024 * 1024),
+        )?;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let route = resolve_generic_model_for_endpoint(
+            server.state.as_ref(),
+            Some("tiny-gemma4-26b-distributed"),
+            RoutingEndpoint::ChatCompletions,
+            RoutingRequest::new(RoutingEndpoint::ChatCompletions),
+        )?;
+        let model = local_loaded_model_for_route(&route)?
+            .decoder()
+            .expect("sparse gemma route should resolve a decoder");
+        assert!(model.execution_refusal_reason.is_none());
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-gemma4-26b-distributed")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(2),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-cluster-disposition"),
+            Some(String::from("sharded"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-cluster-topology"),
+            Some(String::from("tensor_sharded"))
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("world")
+        );
+        assert_eq!(
+            payload["psionic_cluster_execution"]["execution_topology"]["kind"],
+            serde_json::json!("tensor_sharded")
+        );
+        assert_eq!(
+            payload["psionic_cluster_execution"]["selected_nodes"]
+                .as_array()
+                .map(Vec::len),
+            Some(2)
+        );
+        assert!(
+            payload["psionic_cluster_execution"]["placement_diagnostics"]
+                .as_array()
+                .is_some_and(|details| details.iter().any(|detail| {
+                    detail.as_str().is_some_and(|detail| {
+                        detail.contains("decode_step=0 routed active experts")
+                    })
+                }))
+        );
+        assert!(
+            payload["psionic_cluster_execution"]["shard_handoffs"]
+                .as_array()
+                .is_some_and(|handoffs| !handoffs.is_empty())
         );
         Ok(())
     }
@@ -18588,6 +18942,88 @@ mod tests {
         .with_degraded_reason(
             "public-network stage handoff adds fixed latency but keeps real split execution",
         )
+    }
+
+    fn sample_sparse_cluster_id() -> psionic_cluster::ClusterId {
+        psionic_cluster::ClusterId::new(
+            &ClusterNamespace::new("cluster-lan"),
+            &AdmissionToken::new("cluster-secret"),
+        )
+    }
+
+    fn ready_sparse_membership(
+        cluster_id: &psionic_cluster::ClusterId,
+        node_id: &str,
+        role: NodeRole,
+    ) -> ClusterMembershipRecord {
+        ClusterMembershipRecord::new(
+            ClusterNodeIdentity {
+                cluster_id: cluster_id.clone(),
+                node_id: NodeId::new(node_id),
+                node_epoch: NodeEpoch::initial(),
+                role,
+                auth_public_key: String::new(),
+                attestation: None,
+            },
+            None,
+            ClusterMembershipStatus::Ready,
+        )
+    }
+
+    fn ready_sparse_cuda_telemetry(node_id: &str, free_memory_bytes: u64) -> ClusterNodeTelemetry {
+        ClusterNodeTelemetry::new(NodeId::new(node_id))
+            .with_memory(Some(64 * 1024 * 1024 * 1024), Some(free_memory_bytes))
+            .with_cpu_logical_cores(16)
+            .with_accelerator_count(1)
+            .with_backend_readiness("cuda", ClusterBackendReadinessStatus::Ready)
+    }
+
+    fn sample_sparse_cluster_state() -> ClusterState {
+        let cluster_id = sample_sparse_cluster_id();
+        let mut snapshot = ClusterSnapshot::new(cluster_id.clone());
+        snapshot.memberships.insert(
+            NodeId::new("scheduler"),
+            ready_sparse_membership(&cluster_id, "scheduler", NodeRole::Mixed),
+        );
+        for worker in ["worker-a", "worker-b"] {
+            snapshot.memberships.insert(
+                NodeId::new(worker),
+                ready_sparse_membership(&cluster_id, worker, NodeRole::ExecutorOnly),
+            );
+            snapshot.telemetry.insert(
+                NodeId::new(worker),
+                ready_sparse_cuda_telemetry(worker, 48 * 1024 * 1024 * 1024),
+            );
+            snapshot.artifact_residency.insert(
+                ClusterArtifactResidencyKey::new(NodeId::new(worker), "artifact-1"),
+                ClusterArtifactResidencyRecord::new(
+                    NodeId::new(worker),
+                    ClusterArtifactReference::new("decoder", "artifact-1"),
+                    ClusterArtifactResidencyStatus::Resident,
+                ),
+            );
+        }
+        ClusterState::from_snapshot(snapshot)
+    }
+
+    fn sample_gemma4_26b_sparse_inventory() -> psionic_cluster::SparseExpertHostInventorySnapshot {
+        psionic_cluster::SparseExpertHostInventorySnapshot::new(
+            crate::TEXT_GENERATION_PRODUCT_ID,
+            "gemma4:26b",
+            "cuda",
+            "artifact-1",
+        )
+        .with_sharded_model_manifest_digest("gemma4-26b-manifest")
+        .with_host(psionic_cluster::SparseExpertHostInventoryRecord::new(
+            NodeId::new("worker-a"),
+            0,
+            32,
+        ))
+        .with_host(psionic_cluster::SparseExpertHostInventoryRecord::new(
+            NodeId::new("worker-b"),
+            32,
+            64,
+        ))
     }
 
     fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
