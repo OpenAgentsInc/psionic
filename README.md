@@ -55,6 +55,9 @@ evidence.
   - supporting docs: [docs/PARAMETER_GOLF_SINGLE_H100_TRAINER.md](docs/PARAMETER_GOLF_SINGLE_H100_TRAINER.md), [docs/PARAMETER_GOLF_DISTRIBUTED_8XH100.md](docs/PARAMETER_GOLF_DISTRIBUTED_8XH100.md), [docs/PARAMETER_GOLF_RUNPOD_8XH100_RUNBOOK.md](docs/PARAMETER_GOLF_RUNPOD_8XH100_RUNBOOK.md)
 - Cluster, swarm, and cross-provider compute
   - local mixed-hardware swarm, Google dual-node swarm, cross-provider training contracts
+  - optional mesh coordination adjunct under `/psionic/management/coordination/*` for typed
+    status, finding, question, tip, and done packets with TTL, visibility, provenance, search,
+    and redaction semantics outside the inference critical path
   - start with [docs/ROADMAP_CLUSTER.md](docs/ROADMAP_CLUSTER.md)
   - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
 - Psion learned-model program

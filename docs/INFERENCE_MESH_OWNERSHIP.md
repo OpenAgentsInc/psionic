@@ -234,6 +234,20 @@ The first published paths are:
 - `/psionic/management/events`
   - one SSE stream that emits an initial topology snapshot and live
     route-selection events
+- `/psionic/management/coordination/status`
+  - one typed summary for the optional coordination adjunct, including TTL,
+    supported kinds, supported visibilities, supported provenance labels, and
+    redaction posture
+- `/psionic/management/coordination/feed`
+  - one typed recent-feed surface for short-lived coordination packets
+- `/psionic/management/coordination/search`
+  - one typed search surface over the same short-lived coordination packets
+- `/psionic/management/coordination/post`
+  - one typed post surface for status, finding, question, tip, done, or note
+    packets
+- `/psionic/management/coordination/redact`
+  - one typed redaction surface that removes entry bodies while retaining the
+    receipt, actor, reason, and timestamp
 - `/psionic/management/console`
   - one read-only first-party operator surface backed only by the typed status
     snapshot and SSE event stream; join, leave, load, unload, standby, and
@@ -241,6 +255,15 @@ The first published paths are:
 
 Those responses must stay backed by typed router and network truth. They are
 not allowed to depend on scraping logs or inferring topology from user traffic.
+
+The coordination adjunct is explicitly outside the inference critical path:
+
+- it is optional and disableable
+- disabling it does not change route selection or inference correctness
+- bootstrap thin clients may proxy the coordination surface to the admitted
+  remote mesh node instead of inventing a second side channel
+- coordination entries carry explicit visibility, provenance, expiry, and
+  redaction facts so shared notes do not become hidden runtime state
 
 ## Published Service Mode
 

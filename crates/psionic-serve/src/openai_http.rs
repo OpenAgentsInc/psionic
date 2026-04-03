@@ -16,7 +16,7 @@ use std::{
 
 use axum::{
     Json, Router,
-    extract::State,
+    extract::{Query, State},
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
     response::{
         Html, IntoResponse, Response,
@@ -56,7 +56,7 @@ use psionic_runtime::{
     StructuredOutputParser, StructuredOutputRequest, StructuredOutputValue,
     StructuredTaggedVariant, local_structured_output_capabilities, local_structured_output_parsers,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use tokio::{
     net::TcpListener,
@@ -110,6 +110,16 @@ const OPENAI_COMPAT_PRODUCT_ID: &str = "psionic.openai_compat";
 const GEMMA4_TOOL_CALL_START: &str = "<|tool_call>";
 const GEMMA4_TOOL_CALL_END: &str = "<tool_call|>";
 const GEMMA4_CUSTOM_STRING_QUOTE: &str = "<|\"|>";
+const MESH_COORDINATION_FEED_PATH: &str = "/psionic/management/coordination/feed";
+const MESH_COORDINATION_SEARCH_PATH: &str = "/psionic/management/coordination/search";
+const MESH_COORDINATION_POST_PATH: &str = "/psionic/management/coordination/post";
+const MESH_COORDINATION_REDACT_PATH: &str = "/psionic/management/coordination/redact";
+const MESH_COORDINATION_STATUS_PATH: &str = "/psionic/management/coordination/status";
+const MESH_COORDINATION_DEFAULT_LIMIT: usize = 20;
+const MESH_COORDINATION_MAX_QUERY_LIMIT: usize = MESH_COORDINATION_MAX_ITEMS;
+const MESH_COORDINATION_TTL_SECS: u64 = 48 * 3600;
+const MESH_COORDINATION_MAX_ITEMS: usize = 500;
+const MESH_COORDINATION_MAX_BODY_BYTES: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct LocalServingTruth {
@@ -942,6 +952,7 @@ pub struct OpenAiCompatConfig {
     pub port: u16,
     pub backend: OpenAiCompatBackend,
     pub reasoning_budget: u8,
+    pub mesh_coordination_enabled: bool,
 }
 
 impl OpenAiCompatConfig {
@@ -953,6 +964,7 @@ impl OpenAiCompatConfig {
             port: 8080,
             backend: OpenAiCompatBackend::Cpu,
             reasoning_budget: 0,
+            mesh_coordination_enabled: true,
         }
     }
 
@@ -988,6 +1000,7 @@ struct OpenAiCompatState {
     response_state_capability: ResponseStateCapability,
     response_state: Mutex<ResponseStateStore>,
     management_join_state: Mutex<MeshManagementJoinState>,
+    management_coordination: MeshManagementCoordinationStore,
     management_event_counter: AtomicU64,
     management_events: broadcast::Sender<MeshManagementEventEnvelope>,
     local_management_node: Option<MeshManagementNodeStatus>,
@@ -1297,6 +1310,513 @@ impl MeshManagementEventEnvelope {
             MeshManagementEventPayload::RouteSelection { .. } => "route_selection",
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshManagementCoordinationMode {
+    Disabled,
+    Local,
+    BootstrapProxy,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshManagementCoordinationKind {
+    Status,
+    Finding,
+    Question,
+    Tip,
+    Done,
+    Note,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshManagementCoordinationVisibility {
+    Mesh,
+    OperatorInternal,
+    NodeLocal,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshManagementCoordinationProvenance {
+    LocalPost,
+    BootstrapProxyForwarded,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct MeshManagementCoordinationRedactionReceipt {
+    reason: String,
+    redacted_by: String,
+    redacted_at_ms: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct MeshManagementCoordinationEntry {
+    id: u64,
+    kind: MeshManagementCoordinationKind,
+    author: String,
+    worker_id: String,
+    visibility: MeshManagementCoordinationVisibility,
+    provenance: MeshManagementCoordinationProvenance,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    body: Option<String>,
+    created_at_ms: u64,
+    expires_at_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    redaction: Option<MeshManagementCoordinationRedactionReceipt>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct MeshManagementCoordinationStatusResponse {
+    status: String,
+    mode: MeshManagementCoordinationMode,
+    feed_path: String,
+    search_path: String,
+    post_path: String,
+    redact_path: String,
+    ttl_secs: u64,
+    max_items: usize,
+    max_body_bytes: usize,
+    supported_kinds: Vec<MeshManagementCoordinationKind>,
+    supported_visibilities: Vec<MeshManagementCoordinationVisibility>,
+    supported_provenances: Vec<MeshManagementCoordinationProvenance>,
+    redaction_mode: String,
+    item_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_post_at_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct MeshManagementCoordinationPostRequest {
+    kind: MeshManagementCoordinationKind,
+    body: String,
+    #[serde(default = "mesh_coordination_default_author")]
+    author: String,
+    #[serde(default = "mesh_coordination_default_visibility")]
+    visibility: MeshManagementCoordinationVisibility,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    origin_worker_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    provenance: Option<MeshManagementCoordinationProvenance>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct MeshManagementCoordinationFeedQuery {
+    #[serde(default)]
+    since_ms: Option<u64>,
+    #[serde(default)]
+    author: Option<String>,
+    #[serde(default)]
+    kind: Option<MeshManagementCoordinationKind>,
+    #[serde(default)]
+    visibility: Option<MeshManagementCoordinationVisibility>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct MeshManagementCoordinationSearchQuery {
+    query: String,
+    #[serde(default)]
+    since_ms: Option<u64>,
+    #[serde(default)]
+    author: Option<String>,
+    #[serde(default)]
+    kind: Option<MeshManagementCoordinationKind>,
+    #[serde(default)]
+    visibility: Option<MeshManagementCoordinationVisibility>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct MeshManagementCoordinationRedactRequest {
+    id: u64,
+    reason: String,
+    #[serde(default = "mesh_coordination_default_author")]
+    actor: String,
+}
+
+#[derive(Clone)]
+struct MeshManagementCoordinationStore {
+    enabled: bool,
+    next_id: Arc<AtomicU64>,
+    entries: Arc<Mutex<Vec<MeshManagementCoordinationEntry>>>,
+}
+
+impl MeshManagementCoordinationStore {
+    fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            next_id: Arc::new(AtomicU64::new(1)),
+            entries: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    const fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn local_status(&self) -> MeshManagementCoordinationStatusResponse {
+        let observed_at_ms = unix_timestamp_ms();
+        let (item_count, last_post_at_ms) = if self.enabled {
+            let mut entries = self
+                .entries
+                .lock()
+                .expect("coordination entries should not be poisoned");
+            self.prune_locked(&mut entries, observed_at_ms);
+            let last_post = entries.iter().map(|entry| entry.created_at_ms).max();
+            (entries.len(), last_post)
+        } else {
+            (0, None)
+        };
+        MeshManagementCoordinationStatusResponse {
+            status: String::from("ok"),
+            mode: if self.enabled {
+                MeshManagementCoordinationMode::Local
+            } else {
+                MeshManagementCoordinationMode::Disabled
+            },
+            feed_path: String::from(MESH_COORDINATION_FEED_PATH),
+            search_path: String::from(MESH_COORDINATION_SEARCH_PATH),
+            post_path: String::from(MESH_COORDINATION_POST_PATH),
+            redact_path: String::from(MESH_COORDINATION_REDACT_PATH),
+            ttl_secs: MESH_COORDINATION_TTL_SECS,
+            max_items: MESH_COORDINATION_MAX_ITEMS,
+            max_body_bytes: MESH_COORDINATION_MAX_BODY_BYTES,
+            supported_kinds: mesh_coordination_supported_kinds(),
+            supported_visibilities: mesh_coordination_supported_visibilities(),
+            supported_provenances: mesh_coordination_supported_provenances(),
+            redaction_mode: String::from("body_removed_receipt_retained"),
+            item_count,
+            last_post_at_ms,
+        }
+    }
+
+    fn post_at(
+        &self,
+        request: MeshManagementCoordinationPostRequest,
+        observed_at_ms: u64,
+    ) -> Result<MeshManagementCoordinationEntry, ManagementApiError> {
+        if !self.enabled {
+            return Err(ManagementApiError::disabled(
+                "mesh coordination is disabled on this node",
+            ));
+        }
+        let body = request.body.trim();
+        if body.is_empty() {
+            return Err(ManagementApiError::bad_request(
+                "mesh coordination posts require a non-empty `body`",
+            ));
+        }
+        if body.len() > MESH_COORDINATION_MAX_BODY_BYTES {
+            return Err(ManagementApiError::bad_request(format!(
+                "mesh coordination posts are capped at {} bytes",
+                MESH_COORDINATION_MAX_BODY_BYTES
+            )));
+        }
+        let author = request.author.trim();
+        if author.is_empty() {
+            return Err(ManagementApiError::bad_request(
+                "mesh coordination posts require a non-empty `author`",
+            ));
+        }
+        let entry = MeshManagementCoordinationEntry {
+            id: self.next_id.fetch_add(1, Ordering::Relaxed),
+            kind: request.kind,
+            author: author.to_string(),
+            worker_id: request
+                .origin_worker_id
+                .unwrap_or_else(|| String::from(OPENAI_COMPAT_WORKER_ID)),
+            visibility: request.visibility,
+            provenance: request
+                .provenance
+                .unwrap_or(MeshManagementCoordinationProvenance::LocalPost),
+            body: Some(body.to_string()),
+            created_at_ms: observed_at_ms,
+            expires_at_ms: observed_at_ms + (MESH_COORDINATION_TTL_SECS * 1000),
+            redaction: None,
+        };
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("coordination entries should not be poisoned");
+        entries.push(entry.clone());
+        self.prune_locked(&mut entries, observed_at_ms);
+        Ok(entry)
+    }
+
+    fn feed_at(
+        &self,
+        query: &MeshManagementCoordinationFeedQuery,
+        observed_at_ms: u64,
+    ) -> Vec<MeshManagementCoordinationEntry> {
+        if !self.enabled {
+            return Vec::new();
+        }
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("coordination entries should not be poisoned");
+        self.prune_locked(&mut entries, observed_at_ms);
+        let author_filter = query.author.as_deref().map(str::to_ascii_lowercase);
+        let limit = mesh_coordination_limit(query.limit);
+        let mut filtered = entries
+            .iter()
+            .filter(|entry| {
+                query
+                    .since_ms
+                    .is_none_or(|since_ms| entry.created_at_ms >= since_ms)
+                    && query.kind.is_none_or(|kind| entry.kind == kind)
+                    && query
+                        .visibility
+                        .is_none_or(|visibility| entry.visibility == visibility)
+                    && author_filter.as_ref().is_none_or(|author| {
+                        entry.author.to_ascii_lowercase().contains(author.as_str())
+                    })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        filtered.sort_by(|left, right| {
+            right
+                .created_at_ms
+                .cmp(&left.created_at_ms)
+                .then_with(|| right.id.cmp(&left.id))
+        });
+        filtered.truncate(limit);
+        filtered
+    }
+
+    fn search_at(
+        &self,
+        query: &MeshManagementCoordinationSearchQuery,
+        observed_at_ms: u64,
+    ) -> Result<Vec<MeshManagementCoordinationEntry>, ManagementApiError> {
+        if !self.enabled {
+            return Err(ManagementApiError::disabled(
+                "mesh coordination is disabled on this node",
+            ));
+        }
+        let query_text = query.query.trim().to_ascii_lowercase();
+        if query_text.is_empty() {
+            return Err(ManagementApiError::bad_request(
+                "mesh coordination search requires a non-empty `query`",
+            ));
+        }
+        let terms = query_text
+            .split_whitespace()
+            .filter(|term| !term.is_empty())
+            .collect::<Vec<_>>();
+        let author_filter = query.author.as_deref().map(str::to_ascii_lowercase);
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("coordination entries should not be poisoned");
+        self.prune_locked(&mut entries, observed_at_ms);
+        let mut scored = entries
+            .iter()
+            .filter(|entry| {
+                query
+                    .since_ms
+                    .is_none_or(|since_ms| entry.created_at_ms >= since_ms)
+                    && query.kind.is_none_or(|kind| entry.kind == kind)
+                    && query
+                        .visibility
+                        .is_none_or(|visibility| entry.visibility == visibility)
+                    && author_filter.as_ref().is_none_or(|author| {
+                        entry.author.to_ascii_lowercase().contains(author.as_str())
+                    })
+            })
+            .filter_map(|entry| {
+                let body = entry
+                    .body
+                    .as_deref()
+                    .unwrap_or_default()
+                    .to_ascii_lowercase();
+                let author = entry.author.to_ascii_lowercase();
+                let hits = terms
+                    .iter()
+                    .filter(|term| body.contains(**term) || author.contains(**term))
+                    .count();
+                (hits > 0).then(|| (hits, entry.created_at_ms, entry.clone()))
+            })
+            .collect::<Vec<_>>();
+        scored.sort_by(|left, right| {
+            right
+                .0
+                .cmp(&left.0)
+                .then_with(|| right.1.cmp(&left.1))
+                .then_with(|| right.2.id.cmp(&left.2.id))
+        });
+        let mut entries = scored
+            .into_iter()
+            .map(|(_, _, entry)| entry)
+            .collect::<Vec<_>>();
+        entries.truncate(mesh_coordination_limit(query.limit));
+        Ok(entries)
+    }
+
+    fn redact_at(
+        &self,
+        request: &MeshManagementCoordinationRedactRequest,
+        observed_at_ms: u64,
+    ) -> Result<MeshManagementCoordinationEntry, ManagementApiError> {
+        if !self.enabled {
+            return Err(ManagementApiError::disabled(
+                "mesh coordination is disabled on this node",
+            ));
+        }
+        let reason = request.reason.trim();
+        if reason.is_empty() {
+            return Err(ManagementApiError::bad_request(
+                "mesh coordination redaction requires a non-empty `reason`",
+            ));
+        }
+        let actor = request.actor.trim();
+        if actor.is_empty() {
+            return Err(ManagementApiError::bad_request(
+                "mesh coordination redaction requires a non-empty `actor`",
+            ));
+        }
+        let mut entries = self
+            .entries
+            .lock()
+            .expect("coordination entries should not be poisoned");
+        self.prune_locked(&mut entries, observed_at_ms);
+        let entry = entries
+            .iter_mut()
+            .find(|entry| entry.id == request.id)
+            .ok_or_else(|| {
+                ManagementApiError::not_found(format!(
+                    "mesh coordination entry `{}` does not exist",
+                    request.id
+                ))
+            })?;
+        entry.body = None;
+        entry.redaction = Some(MeshManagementCoordinationRedactionReceipt {
+            reason: reason.to_string(),
+            redacted_by: actor.to_string(),
+            redacted_at_ms: observed_at_ms,
+        });
+        Ok(entry.clone())
+    }
+
+    fn prune_locked(
+        &self,
+        entries: &mut Vec<MeshManagementCoordinationEntry>,
+        observed_at_ms: u64,
+    ) {
+        entries.retain(|entry| entry.expires_at_ms > observed_at_ms);
+        if entries.len() <= MESH_COORDINATION_MAX_ITEMS {
+            return;
+        }
+        entries.sort_by(|left, right| {
+            left.created_at_ms
+                .cmp(&right.created_at_ms)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        let to_drop = entries.len() - MESH_COORDINATION_MAX_ITEMS;
+        entries.drain(0..to_drop);
+    }
+}
+
+#[derive(Debug)]
+struct ManagementApiError {
+    status: StatusCode,
+    message: String,
+}
+
+impl ManagementApiError {
+    fn bad_request(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message: message.into(),
+        }
+    }
+
+    fn disabled(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            message: message.into(),
+        }
+    }
+
+    fn not_found(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            message: message.into(),
+        }
+    }
+
+    fn upstream(status: StatusCode, message: impl Into<String>) -> Self {
+        Self {
+            status,
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for ManagementApiError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ManagementApiError {}
+
+impl IntoResponse for ManagementApiError {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(serde_json::json!({
+                "error": self.message,
+            })),
+        )
+            .into_response()
+    }
+}
+
+fn mesh_coordination_default_author() -> String {
+    String::from("operator")
+}
+
+const fn mesh_coordination_default_visibility() -> MeshManagementCoordinationVisibility {
+    MeshManagementCoordinationVisibility::Mesh
+}
+
+fn mesh_coordination_supported_kinds() -> Vec<MeshManagementCoordinationKind> {
+    vec![
+        MeshManagementCoordinationKind::Status,
+        MeshManagementCoordinationKind::Finding,
+        MeshManagementCoordinationKind::Question,
+        MeshManagementCoordinationKind::Tip,
+        MeshManagementCoordinationKind::Done,
+        MeshManagementCoordinationKind::Note,
+    ]
+}
+
+fn mesh_coordination_supported_visibilities() -> Vec<MeshManagementCoordinationVisibility> {
+    vec![
+        MeshManagementCoordinationVisibility::Mesh,
+        MeshManagementCoordinationVisibility::OperatorInternal,
+        MeshManagementCoordinationVisibility::NodeLocal,
+    ]
+}
+
+fn mesh_coordination_supported_provenances() -> Vec<MeshManagementCoordinationProvenance> {
+    vec![
+        MeshManagementCoordinationProvenance::LocalPost,
+        MeshManagementCoordinationProvenance::BootstrapProxyForwarded,
+    ]
+}
+
+fn mesh_coordination_limit(limit: Option<usize>) -> usize {
+    limit
+        .unwrap_or(MESH_COORDINATION_DEFAULT_LIMIT)
+        .min(MESH_COORDINATION_MAX_QUERY_LIMIT)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2468,6 +2988,9 @@ impl OpenAiCompatServer {
                 response_state_capability,
                 response_state: Mutex::new(response_state),
                 management_join_state: Mutex::new(MeshManagementJoinState::default()),
+                management_coordination: MeshManagementCoordinationStore::new(
+                    config.mesh_coordination_enabled,
+                ),
                 management_event_counter: AtomicU64::new(1),
                 management_events,
                 local_management_node,
@@ -2515,6 +3038,26 @@ impl OpenAiCompatServer {
             .route("/health", get(generic_health))
             .route("/psionic/management/status", get(generic_management_status))
             .route("/psionic/management/events", get(generic_management_events))
+            .route(
+                MESH_COORDINATION_STATUS_PATH,
+                get(generic_management_coordination_status),
+            )
+            .route(
+                MESH_COORDINATION_FEED_PATH,
+                get(generic_management_coordination_feed),
+            )
+            .route(
+                MESH_COORDINATION_SEARCH_PATH,
+                get(generic_management_coordination_search),
+            )
+            .route(
+                MESH_COORDINATION_POST_PATH,
+                post(generic_management_coordination_post),
+            )
+            .route(
+                MESH_COORDINATION_REDACT_PATH,
+                post(generic_management_coordination_redact),
+            )
             .route(
                 "/psionic/management/console",
                 get(generic_management_console),
@@ -4338,6 +4881,183 @@ async fn generic_management_status(
     State(state): State<Arc<OpenAiCompatState>>,
 ) -> Json<MeshManagementStatusResponse> {
     Json(state.management_status())
+}
+
+async fn bootstrap_proxy_management_get<T, Q>(
+    proxy: &BootstrapProxyState,
+    path: &str,
+    query: Option<&Q>,
+) -> Result<T, ManagementApiError>
+where
+    T: DeserializeOwned,
+    Q: Serialize + ?Sized,
+{
+    let mut request = proxy.client.get(format!("{}{}", proxy.base_url, path));
+    if let Some(query) = query {
+        request = request.query(query);
+    }
+    let response = request.send().await.map_err(|error| {
+        ManagementApiError::upstream(
+            StatusCode::BAD_GATEWAY,
+            format!("failed to fetch bootstrap mesh coordination path `{path}`: {error}"),
+        )
+    })?;
+    let status =
+        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(ManagementApiError::upstream(
+            status,
+            format!("bootstrap mesh coordination GET `{path}` failed: {body}"),
+        ));
+    }
+    response.json::<T>().await.map_err(|error| {
+        ManagementApiError::upstream(
+            StatusCode::BAD_GATEWAY,
+            format!("failed to decode bootstrap mesh coordination response for `{path}`: {error}"),
+        )
+    })
+}
+
+async fn bootstrap_proxy_management_post<T, B>(
+    proxy: &BootstrapProxyState,
+    path: &str,
+    body: &B,
+) -> Result<T, ManagementApiError>
+where
+    T: DeserializeOwned,
+    B: Serialize + ?Sized,
+{
+    let response = proxy
+        .client
+        .post(format!("{}{}", proxy.base_url, path))
+        .json(body)
+        .send()
+        .await
+        .map_err(|error| {
+            ManagementApiError::upstream(
+                StatusCode::BAD_GATEWAY,
+                format!("failed to post bootstrap mesh coordination path `{path}`: {error}"),
+            )
+        })?;
+    let status =
+        StatusCode::from_u16(response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(ManagementApiError::upstream(
+            status,
+            format!("bootstrap mesh coordination POST `{path}` failed: {body}"),
+        ));
+    }
+    response.json::<T>().await.map_err(|error| {
+        ManagementApiError::upstream(
+            StatusCode::BAD_GATEWAY,
+            format!("failed to decode bootstrap mesh coordination response for `{path}`: {error}"),
+        )
+    })
+}
+
+async fn generic_management_coordination_status(
+    State(state): State<Arc<OpenAiCompatState>>,
+) -> Result<Json<MeshManagementCoordinationStatusResponse>, ManagementApiError> {
+    if !state.management_coordination.enabled() {
+        return Ok(Json(state.management_coordination.local_status()));
+    }
+    if let Some(proxy) = state.bootstrap_proxy.as_ref() {
+        let mut status = bootstrap_proxy_management_get::<
+            MeshManagementCoordinationStatusResponse,
+            (),
+        >(proxy, MESH_COORDINATION_STATUS_PATH, None)
+        .await?;
+        if !matches!(status.mode, MeshManagementCoordinationMode::Disabled) {
+            status.mode = MeshManagementCoordinationMode::BootstrapProxy;
+        }
+        return Ok(Json(status));
+    }
+    Ok(Json(state.management_coordination.local_status()))
+}
+
+async fn generic_management_coordination_feed(
+    State(state): State<Arc<OpenAiCompatState>>,
+    Query(query): Query<MeshManagementCoordinationFeedQuery>,
+) -> Result<Json<Vec<MeshManagementCoordinationEntry>>, ManagementApiError> {
+    if !state.management_coordination.enabled() {
+        return Err(ManagementApiError::disabled(
+            "mesh coordination is disabled on this node",
+        ));
+    }
+    if let Some(proxy) = state.bootstrap_proxy.as_ref() {
+        return bootstrap_proxy_management_get(proxy, MESH_COORDINATION_FEED_PATH, Some(&query))
+            .await
+            .map(Json);
+    }
+    Ok(Json(
+        state
+            .management_coordination
+            .feed_at(&query, unix_timestamp_ms()),
+    ))
+}
+
+async fn generic_management_coordination_search(
+    State(state): State<Arc<OpenAiCompatState>>,
+    Query(query): Query<MeshManagementCoordinationSearchQuery>,
+) -> Result<Json<Vec<MeshManagementCoordinationEntry>>, ManagementApiError> {
+    if !state.management_coordination.enabled() {
+        return Err(ManagementApiError::disabled(
+            "mesh coordination is disabled on this node",
+        ));
+    }
+    if let Some(proxy) = state.bootstrap_proxy.as_ref() {
+        return bootstrap_proxy_management_get(proxy, MESH_COORDINATION_SEARCH_PATH, Some(&query))
+            .await
+            .map(Json);
+    }
+    state
+        .management_coordination
+        .search_at(&query, unix_timestamp_ms())
+        .map(Json)
+}
+
+async fn generic_management_coordination_post(
+    State(state): State<Arc<OpenAiCompatState>>,
+    Json(mut request): Json<MeshManagementCoordinationPostRequest>,
+) -> Result<Json<MeshManagementCoordinationEntry>, ManagementApiError> {
+    if !state.management_coordination.enabled() {
+        return Err(ManagementApiError::disabled(
+            "mesh coordination is disabled on this node",
+        ));
+    }
+    if let Some(proxy) = state.bootstrap_proxy.as_ref() {
+        request.origin_worker_id = Some(String::from(OPENAI_COMPAT_WORKER_ID));
+        request.provenance = Some(MeshManagementCoordinationProvenance::BootstrapProxyForwarded);
+        return bootstrap_proxy_management_post(proxy, MESH_COORDINATION_POST_PATH, &request)
+            .await
+            .map(Json);
+    }
+    state
+        .management_coordination
+        .post_at(request, unix_timestamp_ms())
+        .map(Json)
+}
+
+async fn generic_management_coordination_redact(
+    State(state): State<Arc<OpenAiCompatState>>,
+    Json(request): Json<MeshManagementCoordinationRedactRequest>,
+) -> Result<Json<MeshManagementCoordinationEntry>, ManagementApiError> {
+    if !state.management_coordination.enabled() {
+        return Err(ManagementApiError::disabled(
+            "mesh coordination is disabled on this node",
+        ));
+    }
+    if let Some(proxy) = state.bootstrap_proxy.as_ref() {
+        return bootstrap_proxy_management_post(proxy, MESH_COORDINATION_REDACT_PATH, &request)
+            .await
+            .map(Json);
+    }
+    state
+        .management_coordination
+        .redact_at(&request, unix_timestamp_ms())
+        .map(Json)
 }
 
 async fn generic_management_console(State(state): State<Arc<OpenAiCompatState>>) -> Html<String> {
@@ -9125,7 +9845,10 @@ mod tests {
         chat_messages_to_prompt_messages_for_family, chat_messages_to_prompt_messages_generic,
         completion_choice, ensure_harmony_stop_sequences, generation_options_from_chat_request,
         generation_options_from_chat_request_for_family, generation_options_from_responses_request,
-        generic_embeddings, generic_health, generic_list_models, generic_management_status,
+        generic_embeddings, generic_health, generic_list_models,
+        generic_management_coordination_feed, generic_management_coordination_post,
+        generic_management_coordination_redact, generic_management_coordination_search,
+        generic_management_coordination_status, generic_management_status,
         generic_metal_execution_refusal_reason, gpt_oss_local_serving_truth,
         handle_generic_chat_completions, handle_generic_embeddings, handle_generic_responses,
         insert_local_serving_truth_headers, load_generic_decoder_model,
@@ -9149,7 +9872,7 @@ mod tests {
     use axum::{
         Json,
         body::{Body, to_bytes},
-        extract::State,
+        extract::{Query, State},
         http::{HeaderMap, Request, StatusCode},
         response::{IntoResponse, Response},
     };
@@ -10206,6 +10929,306 @@ mod tests {
                 .as_ref()
                 .map(|record| record.imported_at_ms),
             Some(40_000)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn mesh_coordination_store_prunes_expired_items_and_caps_retention()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let store = super::MeshManagementCoordinationStore::new(true);
+        let first = store.post_at(
+            super::MeshManagementCoordinationPostRequest {
+                kind: super::MeshManagementCoordinationKind::Status,
+                body: String::from("old entry"),
+                author: String::from("operator"),
+                visibility: super::mesh_coordination_default_visibility(),
+                origin_worker_id: None,
+                provenance: None,
+            },
+            1_000,
+        )?;
+        let feed_after_expiry = store.feed_at(
+            &super::MeshManagementCoordinationFeedQuery::default(),
+            first.expires_at_ms + 1,
+        );
+        assert!(feed_after_expiry.is_empty());
+
+        for index in 0..(super::MESH_COORDINATION_MAX_ITEMS + 2) {
+            store.post_at(
+                super::MeshManagementCoordinationPostRequest {
+                    kind: super::MeshManagementCoordinationKind::Finding,
+                    body: format!("entry {index}"),
+                    author: String::from("operator"),
+                    visibility: super::mesh_coordination_default_visibility(),
+                    origin_worker_id: None,
+                    provenance: None,
+                },
+                10_000 + index as u64,
+            )?;
+        }
+        let retained = store.feed_at(
+            &super::MeshManagementCoordinationFeedQuery {
+                limit: Some(super::MESH_COORDINATION_MAX_ITEMS + 10),
+                ..Default::default()
+            },
+            20_000,
+        );
+        assert_eq!(retained.len(), super::MESH_COORDINATION_MAX_ITEMS);
+        assert!(
+            retained
+                .iter()
+                .all(|entry| entry.body.as_deref() != Some("entry 0"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_coordination_local_surface_is_typed_and_redactable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-coordination-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny coordination llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let status = runtime.block_on(generic_management_coordination_status(State(
+            std::sync::Arc::clone(&server.state),
+        )))?;
+        assert_eq!(status.0.mode, super::MeshManagementCoordinationMode::Local);
+        assert_eq!(status.0.feed_path, super::MESH_COORDINATION_FEED_PATH);
+        assert_eq!(status.0.ttl_secs, super::MESH_COORDINATION_TTL_SECS);
+        assert!(
+            status
+                .0
+                .supported_visibilities
+                .contains(&super::MeshManagementCoordinationVisibility::OperatorInternal)
+        );
+
+        let finding = runtime.block_on(generic_management_coordination_post(
+            State(std::sync::Arc::clone(&server.state)),
+            Json(super::MeshManagementCoordinationPostRequest {
+                kind: super::MeshManagementCoordinationKind::Finding,
+                body: String::from("GPU host is warming gemma lane"),
+                author: String::from("operator"),
+                visibility: super::MeshManagementCoordinationVisibility::Mesh,
+                origin_worker_id: None,
+                provenance: None,
+            }),
+        ))?;
+        assert_eq!(
+            finding.0.provenance,
+            super::MeshManagementCoordinationProvenance::LocalPost
+        );
+        assert_eq!(
+            finding.0.visibility,
+            super::MeshManagementCoordinationVisibility::Mesh
+        );
+
+        let question = runtime.block_on(generic_management_coordination_post(
+            State(std::sync::Arc::clone(&server.state)),
+            Json(super::MeshManagementCoordinationPostRequest {
+                kind: super::MeshManagementCoordinationKind::Question,
+                body: String::from("Need another standby host for gemma lane"),
+                author: String::from("ops"),
+                visibility: super::MeshManagementCoordinationVisibility::OperatorInternal,
+                origin_worker_id: None,
+                provenance: None,
+            }),
+        ))?;
+
+        let feed = runtime.block_on(generic_management_coordination_feed(
+            State(std::sync::Arc::clone(&server.state)),
+            Query(super::MeshManagementCoordinationFeedQuery {
+                limit: Some(10),
+                ..Default::default()
+            }),
+        ))?;
+        assert_eq!(feed.0.len(), 2);
+        assert_eq!(feed.0[0].id, question.0.id);
+        assert_eq!(feed.0[1].id, finding.0.id);
+
+        let search = runtime.block_on(generic_management_coordination_search(
+            State(std::sync::Arc::clone(&server.state)),
+            Query(super::MeshManagementCoordinationSearchQuery {
+                query: String::from("warming GPU"),
+                since_ms: None,
+                author: None,
+                kind: None,
+                visibility: Some(super::MeshManagementCoordinationVisibility::Mesh),
+                limit: Some(5),
+            }),
+        ))?;
+        assert_eq!(search.0.len(), 1);
+        assert_eq!(search.0[0].id, finding.0.id);
+
+        let redacted = runtime.block_on(generic_management_coordination_redact(
+            State(std::sync::Arc::clone(&server.state)),
+            Json(super::MeshManagementCoordinationRedactRequest {
+                id: finding.0.id,
+                reason: String::from("contains stale host details"),
+                actor: String::from("operator"),
+            }),
+        ))?;
+        assert!(redacted.0.body.is_none());
+        assert_eq!(
+            redacted
+                .0
+                .redaction
+                .as_ref()
+                .map(|receipt| receipt.reason.as_str()),
+            Some("contains stale host details")
+        );
+
+        let feed_after_redaction = runtime.block_on(generic_management_coordination_feed(
+            State(std::sync::Arc::clone(&server.state)),
+            Query(super::MeshManagementCoordinationFeedQuery {
+                limit: Some(10),
+                ..Default::default()
+            }),
+        ))?;
+        let redacted_entry = feed_after_redaction
+            .0
+            .iter()
+            .find(|entry| entry.id == finding.0.id)
+            .expect("redacted coordination entry should remain visible");
+        assert!(redacted_entry.body.is_none());
+        assert!(redacted_entry.redaction.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_management_coordination_bootstrap_thin_client_proxies_shared_posts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _proxy_lock = bootstrap_proxy_test_lock()
+            .lock()
+            .expect("bootstrap proxy test lock should not be poisoned");
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-coordination-bootstrap.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny coordination bootstrap").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let remote_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        let (base_url, shutdown_tx) =
+            runtime.block_on(start_openai_compat_test_server(remote_server.clone()))?;
+
+        let bootstrap_env =
+            ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_BASE_URL", base_url.as_str());
+        let mode_env = ScopedEnvVar::set("PSIONIC_BOOTSTRAP_PROXY_MODE", "thin_client");
+        let local_server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&llama_path))?;
+        drop(mode_env);
+        drop(bootstrap_env);
+
+        let post = runtime.block_on(generic_management_coordination_post(
+            State(std::sync::Arc::clone(&local_server.state)),
+            Json(super::MeshManagementCoordinationPostRequest {
+                kind: super::MeshManagementCoordinationKind::Status,
+                body: String::from("thin client sees remote gemma lane"),
+                author: String::from("operator"),
+                visibility: super::MeshManagementCoordinationVisibility::Mesh,
+                origin_worker_id: None,
+                provenance: None,
+            }),
+        ))?;
+        assert_eq!(
+            post.0.provenance,
+            super::MeshManagementCoordinationProvenance::BootstrapProxyForwarded
+        );
+
+        let local_feed = runtime.block_on(generic_management_coordination_feed(
+            State(std::sync::Arc::clone(&local_server.state)),
+            Query(super::MeshManagementCoordinationFeedQuery {
+                limit: Some(10),
+                ..Default::default()
+            }),
+        ))?;
+        assert_eq!(local_feed.0.len(), 1);
+        assert_eq!(
+            local_feed.0[0].body.as_deref(),
+            Some("thin client sees remote gemma lane")
+        );
+
+        let remote_feed = runtime.block_on(generic_management_coordination_feed(
+            State(std::sync::Arc::clone(&remote_server.state)),
+            Query(super::MeshManagementCoordinationFeedQuery {
+                limit: Some(10),
+                ..Default::default()
+            }),
+        ))?;
+        assert_eq!(remote_feed.0.len(), 1);
+        assert_eq!(remote_feed.0[0].id, post.0.id);
+
+        let proxied_status = runtime.block_on(generic_management_coordination_status(State(
+            std::sync::Arc::clone(&local_server.state),
+        )))?;
+        assert_eq!(
+            proxied_status.0.mode,
+            super::MeshManagementCoordinationMode::BootstrapProxy
+        );
+        assert_eq!(proxied_status.0.item_count, 1);
+
+        let _ = shutdown_tx.send(());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_coordination_can_be_disabled_without_affecting_inference()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let llama_path = temp.path().join("tiny-disabled-coordination-llama.gguf");
+        write_test_gguf(
+            &llama_path,
+            dense_llama_metadata("tiny disabled coordination llama").as_slice(),
+            dense_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&llama_path);
+        config.mesh_coordination_enabled = false;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let status = runtime.block_on(generic_management_coordination_status(State(
+            std::sync::Arc::clone(&server.state),
+        )))?;
+        assert_eq!(
+            status.0.mode,
+            super::MeshManagementCoordinationMode::Disabled
+        );
+        assert_eq!(status.0.item_count, 0);
+
+        let disabled_error = runtime
+            .block_on(generic_management_coordination_feed(
+                State(std::sync::Arc::clone(&server.state)),
+                Query(super::MeshManagementCoordinationFeedQuery::default()),
+            ))
+            .expect_err("disabled coordination feed should fail closed");
+        assert_eq!(
+            disabled_error.into_response().status(),
+            StatusCode::NOT_FOUND
+        );
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-disabled-coordination-llama")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(
+            payload["choices"][0]["message"]["content"],
+            serde_json::json!("world")
         );
         Ok(())
     }

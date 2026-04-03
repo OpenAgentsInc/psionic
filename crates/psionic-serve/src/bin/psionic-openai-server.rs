@@ -73,6 +73,7 @@ where
     let mut port = 8080_u16;
     let mut backend = OpenAiCompatBackend::Cpu;
     let mut reasoning_budget = 0_u8;
+    let mut mesh_coordination_enabled = true;
 
     let mut args = args.into_iter().map(Into::into);
     while let Some(argument) = args.next() {
@@ -107,6 +108,19 @@ where
                     .parse()
                     .map_err(|error| format!("invalid --reasoning-budget value: {error}"))?;
             }
+            "--mesh-coordination" => {
+                let value = next_value(&mut args, argument.as_str())?;
+                mesh_coordination_enabled = match value.as_str() {
+                    "enabled" => true,
+                    "disabled" => false,
+                    _ => {
+                        return Err(format!(
+                            "invalid --mesh-coordination value `{value}` (expected enabled or disabled)\n\n{}",
+                            usage()
+                        ));
+                    }
+                };
+            }
             "-h" | "--help" => {
                 return Err(usage());
             }
@@ -127,6 +141,7 @@ where
     config.port = port;
     config.backend = backend;
     config.reasoning_budget = reasoning_budget;
+    config.mesh_coordination_enabled = mesh_coordination_enabled;
     Ok(config)
 }
 
@@ -137,7 +152,7 @@ fn next_value(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<Str
 
 fn usage() -> String {
     String::from(
-        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda|metal] [--host <ip>] [--port <port>] [--reasoning-budget <n>]",
+        "usage: psionic-openai-server -m <model-artifact> [-m <model-artifact> ...] [--backend cpu|cuda|metal] [--host <ip>] [--port <port>] [--reasoning-budget <n>] [--mesh-coordination enabled|disabled]",
     )
 }
 
@@ -178,5 +193,13 @@ mod tests {
             .expect_err("generic server should reject unknown backend");
 
         assert!(error.contains("expected cpu, cuda, or metal"));
+    }
+
+    #[test]
+    fn parse_args_can_disable_mesh_coordination() {
+        let config = parse_args_from(["-m", "/tmp/model.gguf", "--mesh-coordination", "disabled"])
+            .expect("mesh coordination flag should parse");
+
+        assert!(!config.mesh_coordination_enabled);
     }
 }
