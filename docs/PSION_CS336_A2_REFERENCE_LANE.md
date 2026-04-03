@@ -2,7 +2,7 @@
 
 > Status: bounded full-port tranche in progress, updated 2026-04-02 after
 > landing the profiling baseline receipts and the owned FlashAttention2
-> reference path.
+> reference path, plus the bounded fused CUDA receipt family.
 
 This document records the owned `psionic` surfaces for the bounded Stanford
 CS336 Assignment 2 port program.
@@ -66,6 +66,39 @@ That FlashAttention tranche now provides:
 - one retained proof bundle that stays attached to the shared bounded A2
   receipt family
 
+The third bounded A2 tranche now owns:
+
+- one explicit CUDA capability and refusal surface for the bounded fused path
+- one retained fused CUDA receipt family that compares the backend path against
+  the owned tiled reference path
+- one bounded benchmark family that records naive CPU, tiled CPU, and fused
+  CUDA forward timings in the same A2 lane when the admitted CUDA path exists
+
+Primary landing surfaces:
+
+- `crates/psionic-backend-cuda/src/lib.rs`
+- `crates/psionic-train/src/cs336_a2_flashattention_fused_cuda_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_flashattention_fused_cuda_receipt.rs`
+- `fixtures/training/cs336_a2_flashattention_fused_cuda_receipt_v1.json`
+
+That fused tranche now provides:
+
+- one honest bounded backend-accelerated attention path tied to owned CUDA code
+  instead of prose about future acceleration
+- one explicit refusal receipt on hosts where the admitted CUDA path does not
+  exist
+- one retained correctness bundle that checks fused output and backward
+  gradients against the owned tiled reference path within the declared
+  tolerance on admitted hardware
+- one shared benchmark surface that records naive, tiled, and fused forward
+  timings without pretending that this tiny lane is a production throughput
+  claim
+
+The current checked-in fused receipt was generated on a non-CUDA host, so the
+retained artifact records the explicit refusal path rather than a successful
+backend execution. The same receipt family records correctness and fused timing
+data when regenerated on admitted CUDA hardware.
+
 ## Current Claim Boundary
 
 This lane now honestly claims:
@@ -74,13 +107,14 @@ This lane now honestly claims:
   future systems work
 - `psionic` owns a bounded FlashAttention2-style reference implementation with
   retained parity evidence against the naive baseline
+- `psionic` owns a bounded fused CUDA attention receipt family with explicit
+  refusal posture on non-CUDA hosts
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 - later A2 tranches now have one retained receipt family to plug into
 
 It does not yet claim:
 
-- a fused backend FlashAttention2 path
 - bounded DDP or sharded-optimizer execution
 - full Stanford CS336 A2 parity
 - admitted actual-lane throughput or distributed-cluster qualification

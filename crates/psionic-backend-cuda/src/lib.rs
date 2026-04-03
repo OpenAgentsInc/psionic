@@ -4024,6 +4024,20 @@ impl CudaBackend {
         }
     }
 
+    /// Returns whether the bounded public causal scaled-dot-product-attention
+    /// lane is available on the selected CUDA device.
+    #[must_use]
+    pub fn supports_bounded_scaled_dot_product_attention(&self) -> bool {
+        self.selected_device().is_some()
+    }
+
+    /// Returns an explicit refusal reason for the bounded public causal
+    /// scaled-dot-product-attention lane when CUDA is unavailable.
+    #[must_use]
+    pub fn bounded_scaled_dot_product_attention_refusal_reason(&self) -> Option<String> {
+        (!self.supports_bounded_scaled_dot_product_attention()).then(|| self.health().message)
+    }
+
     /// Registers one transposed-f16 weight buffer with an explicit serving scope
     /// so the runtime can use scope-keyed cuBLASLt plans instead of a generic
     /// shape-only fallback.
@@ -18459,6 +18473,27 @@ mod tests {
         DeviceDiscovery, ExecutionResult, NvidiaRecoveryAction, NvidiaRiskLevel, RuntimeError,
         ServedProductBackendPolicy,
     };
+
+    #[test]
+    fn bounded_scaled_dot_product_attention_support_tracks_selected_device() {
+        let backend = CudaBackend::new();
+        assert_eq!(
+            backend.supports_bounded_scaled_dot_product_attention(),
+            backend.selected_device().is_some()
+        );
+        if backend.supports_bounded_scaled_dot_product_attention() {
+            assert_eq!(
+                backend.bounded_scaled_dot_product_attention_refusal_reason(),
+                None
+            );
+        } else {
+            assert!(
+                backend
+                    .bounded_scaled_dot_product_attention_refusal_reason()
+                    .is_some()
+            );
+        }
+    }
 
     #[test]
     fn allocator_pool_reuses_exact_tensor_spec() {

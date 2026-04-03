@@ -1,0 +1,42 @@
+{
+  "schema_version": "psion.cs336_a2.flashattention_fused_cuda_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "baseline_profile_bundle_path": "fixtures/training/cs336_a2_baseline_profile_bundle_v1.json",
+  "reference_receipt_path": "fixtures/training/cs336_a2_flashattention_reference_receipt_v1.json",
+  "config": {
+    "batch_size": 1,
+    "head_count": 2,
+    "sequence_length": 4,
+    "head_dim": 8,
+    "causal": true,
+    "query_block_rows": 4,
+    "key_block_rows": 4,
+    "benchmark_iterations": 32,
+    "max_abs_tolerance": 0.03
+  },
+  "capability": {
+    "backend": "cuda",
+    "supports_bounded_fused_attention": false,
+    "health": {
+      "status": "Offline",
+      "message": "cuda backend unavailable: nvidia-smi is not installed or the NVIDIA driver is not reachable"
+    },
+    "selected_device": null,
+    "refusal_reason": "cuda backend unavailable: nvidia-smi is not installed or the NVIDIA driver is not reachable"
+  },
+  "benchmark": {
+    "naive_forward": {
+      "route_id": "naive_attention_forward_cpu",
+      "benchmark_iterations": 32,
+      "average_elapsed_ms": 0.1368451875
+    },
+    "reference_forward": {
+      "route_id": "flashattention_reference_forward_cpu",
+      "benchmark_iterations": 32,
+      "average_elapsed_ms": 0.0015859687500000008
+    },
+    "fused_forward": null
+  },
+  "correctness": null,
+  "claim_boundary": "This receipt covers the bounded CS336 A2 fused CUDA attention tranche inside psionic. On admitted CUDA hardware it records correctness and bounded benchmark comparisons against the owned tiled reference path. On hosts without that CUDA path it records an explicit refusal instead of pretending the fused path ran. It does not claim actual-lane broader pretraining closure."
+}

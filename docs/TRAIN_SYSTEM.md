@@ -167,6 +167,19 @@ path, proves parity against the bounded naive baseline, and records the smaller
 tiled score/probability memory posture without overstating it as a fused backend
 kernel or actual-lane production attention closure.
 
+The repo now also owns the third bounded full-port A2 reference-lane tranche in
+`crates/psionic-backend-cuda/src/lib.rs`,
+`crates/psionic-train/src/cs336_a2_flashattention_fused_cuda_receipt.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_cs336_a2_flashattention_fused_cuda_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_flashattention_fused_cuda_receipt_v1.json`. That
+surface binds the existing bounded CUDA scaled-dot-product-attention execution
+lane into the CS336 A2 reference program through one explicit capability/refusal
+surface, one retained correctness comparison against the owned tiled reference
+path, and one bounded forward benchmark family covering naive CPU, tiled CPU,
+and fused CUDA routes when admitted hardware exists.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator
