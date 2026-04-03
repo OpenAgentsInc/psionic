@@ -1,12 +1,15 @@
 # Psion CS336 A2 Reference Lane
 
-> Status: bounded full-port tranche in progress, updated 2026-04-03 after
-> landing the profiling baseline receipts, the owned FlashAttention2
-> reference path, the bounded fused CUDA receipt family, and the bounded
-> sharded-optimizer proof lane.
+> Status: full Stanford CS336 Assignment 2 adapter coverage is complete in the
+> bounded `psionic` reference lane as of 2026-04-03.
 
 This document records the owned `psionic` surfaces for the bounded Stanford
 CS336 Assignment 2 port program.
+
+Canonical completion bar:
+
+- `docs/PSION_CS336_A2_FULL_PORT_MATRIX.md`
+- `fixtures/training/cs336_a2_full_port_conformance_report_v1.json`
 
 It exists so the repo can distinguish between:
 
@@ -199,11 +202,13 @@ This lane now honestly claims:
 - `psionic` owns a bounded sharded-optimizer proof lane with retained
   optimizer-state ownership, owner-step, rebroadcast, and checkpoint-state
   reconstruction evidence against the non-sharded baseline
+- `psionic` now has one checked-in full A2 completion matrix and one retained
+  conformance report, so “full Stanford A2 port” means a concrete in-repo bar
+  instead of a moving doc note
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 - later A2 tranches now have one retained receipt family to plug into
 
 It does not yet claim:
 
-- full Stanford CS336 A2 parity
 - admitted actual-lane throughput or distributed-cluster qualification

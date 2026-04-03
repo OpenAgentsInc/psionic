@@ -224,6 +224,18 @@ matches the non-sharded baseline after each bounded step. It still does not
 claim transport-backed ZeRO execution, partition-exchange collectives, or
 actual-lane checkpoint sharding.
 
+The hard completion bar for saying “full Stanford CS336 A2 port” now lives in
+`crates/psionic-train/src/cs336_a2_full_port_conformance.rs`, the fixture
+generator
+`crates/psionic-train/examples/psion_cs336_a2_full_port_conformance_report.rs`,
+the checked-in matrix `docs/PSION_CS336_A2_FULL_PORT_MATRIX.md`, and the
+retained report
+`fixtures/training/cs336_a2_full_port_conformance_report_v1.json`. That
+surface makes the bounded status explicit: every Stanford A2 adapter family is
+mapped to an owned Rust surface plus a checked-in proof row, while the claim
+boundary still stops short of actual-lane distributed throughput or operator
+closure.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator
