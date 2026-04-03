@@ -8815,7 +8815,6 @@ mod tests {
     use std::{
         collections::BTreeMap,
         net::SocketAddr,
-        path::Path,
         sync::{Mutex, OnceLock},
     };
     use tower::util::ServiceExt;
@@ -11470,160 +11469,33 @@ mod tests {
     #[test]
     fn gemma4_e4b_cuda_conformance_repeat_is_machine_checkable_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
-        let backend = psionic_backend_cuda::CudaBackend::new();
-        if !backend.quantized_kernels_available() {
-            return Ok(());
-        }
-
         let fixture = golden_prompt_fixture("gemma4_e4b").expect("gemma4 prompt fixture");
-        let path = gemma4_pilot_fixture_path(fixture.source_path);
-        if !Path::new(path.as_str()).exists() {
+        let Some(path) = optional_gemma4_validation_path(
+            "PSIONIC_GEMMA4_PILOT_GGUF_PATH",
+            Some(fixture.source_path),
+        ) else {
             return Ok(());
-        }
-
-        let mut config = OpenAiCompatConfig::new(path.as_str());
-        config.backend = OpenAiCompatBackend::Cuda;
-        let server = OpenAiCompatServer::from_config(&config)?;
-        let runtime = tokio::runtime::Runtime::new()?;
-        let model_id = runtime
-            .block_on(generic_health(State(std::sync::Arc::clone(&server.state))))
-            .0
-            .default_model;
-        let case = GenerateConformanceCase::from_generate_compatible_prompt_fixture(
-            "gemma4-e4b-repeat",
-            model_id.as_str(),
-            "gemma4_e4b",
-            "gemma4_e4b.default",
-            "gemma4_e4b.default_developer",
-        )?;
-
-        let first = runtime.block_on(handle_generic_chat_completions(
-            std::sync::Arc::clone(&server.state),
-            ChatCompletionRequest {
-                model: Some(model_id.clone()),
-                messages: vec![
-                    ChatCompletionMessage::text("developer", "Be terse."),
-                    ChatCompletionMessage::text("user", "Summarize the lane."),
-                ],
-                temperature: Some(0.0),
-                max_tokens: Some(8),
-                stop: None,
-                stream: false,
-                tools: Vec::new(),
-                tool_choice: None,
-                response_format: None,
-                psionic_grammar: None,
-                psionic_structured_output: None,
-                psionic_reasoning: None,
-                psionic_prefix_cache: None,
-                ..Default::default()
-            },
-        ))?;
-        assert_eq!(
-            header_value(first.headers(), "x-psionic-served-backend"),
-            Some(String::from("cuda"))
-        );
-        let first_payload = runtime.block_on(response_json(first))?;
-
-        let second = runtime.block_on(handle_generic_chat_completions(
-            std::sync::Arc::clone(&server.state),
-            ChatCompletionRequest {
-                model: Some(model_id.clone()),
-                messages: vec![
-                    ChatCompletionMessage::text("developer", "Be terse."),
-                    ChatCompletionMessage::text("user", "Summarize the lane."),
-                ],
-                temperature: Some(0.0),
-                max_tokens: Some(8),
-                stop: None,
-                stream: false,
-                tools: Vec::new(),
-                tool_choice: None,
-                response_format: None,
-                psionic_grammar: None,
-                psionic_structured_output: None,
-                psionic_reasoning: None,
-                psionic_prefix_cache: None,
-                ..Default::default()
-            },
-        ))?;
-        let second_payload = runtime.block_on(response_json(second))?;
-
-        let third = runtime.block_on(handle_generic_chat_completions(
-            std::sync::Arc::clone(&server.state),
-            ChatCompletionRequest {
-                model: Some(model_id.clone()),
-                messages: vec![
-                    ChatCompletionMessage::text("developer", "Be terse."),
-                    ChatCompletionMessage::text("user", "Summarize the lane."),
-                ],
-                temperature: Some(0.0),
-                max_tokens: Some(8),
-                stop: None,
-                stream: false,
-                tools: Vec::new(),
-                tool_choice: None,
-                response_format: None,
-                psionic_grammar: None,
-                psionic_structured_output: None,
-                psionic_reasoning: None,
-                psionic_prefix_cache: None,
-                ..Default::default()
-            },
-        ))?;
-        let third_payload = runtime.block_on(response_json(third))?;
-
-        let expected_rendered_prompt = case.expected_rendered_prompt.clone();
-        let first_observation = generate_observation_from_chat_payload(
-            &first_payload,
-            expected_rendered_prompt.as_deref(),
-        );
-        let second_observation = generate_observation_from_chat_payload(
-            &second_payload,
-            expected_rendered_prompt.as_deref(),
-        );
-        let third_observation = generate_observation_from_chat_payload(
-            &third_payload,
-            expected_rendered_prompt.as_deref(),
-        );
-
-        let suite = ConformanceSuite {
-            id: String::from("gemma4-e4b-cuda-repeat"),
-            compare_tags: false,
-            compare_ps: false,
-            show_cases: Vec::new(),
-            generate_cases: vec![case],
-            embed_cases: Vec::new(),
         };
-        let baseline = RecordedConformanceSubject::new("gemma4-e4b-cuda-run-1").with_generate_case(
+        run_gemma4_dense_cuda_conformance_repeat(
             "gemma4-e4b-repeat",
-            SubjectObservation::Supported(first_observation),
-        );
-        let candidate = RecordedConformanceSubject::new("gemma4-e4b-cuda-run-2")
-            .with_generate_case(
-                "gemma4-e4b-repeat",
-                SubjectObservation::Supported(second_observation.clone()),
-            );
+            "gemma4-e4b-cuda-repeat",
+            path.as_str(),
+        )
+    }
 
-        let mut baseline = baseline;
-        let mut candidate = candidate;
-        let report = run_conformance_suite(&suite, &mut baseline, &mut candidate)?;
-
-        assert_eq!(report.summary.passed, 1);
-        assert_eq!(report.summary.failed, 0);
-        assert_eq!(report.summary.unsupported, 0);
-        assert_eq!(report.summary.intentional_differences, 0);
-        assert!(report.cutover_ready());
-        assert_eq!(
-            second_observation.output_text,
-            third_observation.output_text
-        );
-        assert_eq!(
-            second_observation.done_reason,
-            third_observation.done_reason
-        );
-        assert_eq!(second_observation.eval_count, third_observation.eval_count);
-        Ok(())
+    #[test]
+    fn gemma4_31b_cuda_conformance_repeat_is_machine_checkable_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) =
+            optional_gemma4_validation_path("PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH", None)
+        else {
+            return Ok(());
+        };
+        run_gemma4_dense_cuda_conformance_repeat(
+            "gemma4-31b-repeat",
+            "gemma4-31b-cuda-repeat",
+            path.as_str(),
+        )
     }
 
     #[test]
@@ -16753,11 +16625,6 @@ mod tests {
         include_str!("../../psionic-models/src/testdata/gemma4_chat_template.jinja")
     }
 
-    fn gemma4_pilot_fixture_path(default_path: &str) -> String {
-        std::env::var("PSIONIC_GEMMA4_PILOT_GGUF_PATH")
-            .unwrap_or_else(|_| String::from(default_path))
-    }
-
     fn qwen35_decoder_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
         let mut metadata = vec![
             (
@@ -17714,6 +17581,252 @@ mod tests {
             performance: None,
             error: None,
         }
+    }
+
+    fn optional_gemma4_validation_path(
+        env_var: &str,
+        default_path: Option<&str>,
+    ) -> Option<String> {
+        std::env::var(env_var)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| default_path.map(String::from))
+    }
+
+    fn dense_gemma4_repeat_request(model_id: &str) -> ChatCompletionRequest {
+        ChatCompletionRequest {
+            model: Some(model_id.to_string()),
+            messages: vec![
+                ChatCompletionMessage::text("developer", "Be terse."),
+                ChatCompletionMessage::text("user", "Summarize the lane."),
+            ],
+            temperature: Some(0.0),
+            max_tokens: Some(8),
+            stop: None,
+            stream: false,
+            tools: Vec::new(),
+            tool_choice: None,
+            response_format: None,
+            psionic_grammar: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_prefix_cache: None,
+            ..Default::default()
+        }
+    }
+
+    fn run_gemma4_dense_cuda_conformance_repeat(
+        case_id: &str,
+        suite_id: &str,
+        path: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+        if !std::path::Path::new(path).exists() {
+            return Ok(());
+        }
+
+        let mut config = OpenAiCompatConfig::new(path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.backend, "cuda");
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+        assert!(
+            health
+                .0
+                .structured_output_capabilities
+                .as_ref()
+                .is_some_and(|capabilities| {
+                    capabilities
+                        .iter()
+                        .all(|capability| capability.support_level.label() == "unsupported")
+                })
+        );
+        let model_id = health.0.default_model;
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|candidate| candidate.id == model_id)
+            .expect("gemma4 cuda model should be listed");
+        assert_eq!(model.psionic_model_family, "gemma4");
+        assert_eq!(
+            model.psionic_supported_endpoints,
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        assert_eq!(model.psionic_served_backend, Some("cuda"));
+        assert_eq!(model.psionic_execution_mode, Some("native"));
+        assert_eq!(model.psionic_execution_engine, Some("psionic"));
+        assert!(
+            model
+                .psionic_structured_output_capabilities
+                .as_ref()
+                .is_some_and(|capabilities| {
+                    capabilities
+                        .iter()
+                        .all(|capability| capability.support_level.label() == "unsupported")
+                })
+        );
+
+        let structured_output_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(model_id.clone()),
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: Some(ChatCompletionResponseFormatRequest {
+                        kind: String::from("json_object"),
+                        json_schema: None,
+                        schema: None,
+                    }),
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 structured output should fail closed");
+        let structured_output_payload =
+            runtime.block_on(response_json(structured_output_error.into_response()))?;
+        assert!(
+            structured_output_payload["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("lacks structured-output support")
+        );
+
+        let multimodal_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(model_id.clone()),
+                    messages: vec![ChatCompletionMessage::multimodal(
+                        "user",
+                        vec![
+                            ChatCompletionContentPart::text("hello "),
+                            ChatCompletionContentPart::image_url("https://example.invalid/cat.png"),
+                        ],
+                    )],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 multimodal input should fail closed");
+        let multimodal_payload =
+            runtime.block_on(response_json(multimodal_error.into_response()))?;
+        assert_eq!(
+            multimodal_payload["error"]["message"],
+            serde_json::json!(
+                "multimodal inputs are unavailable on the current `gemma4` generic prompt-render path"
+            )
+        );
+
+        let case = GenerateConformanceCase::from_generate_compatible_prompt_fixture(
+            case_id,
+            model_id.as_str(),
+            "gemma4_e4b",
+            "gemma4_e4b.default",
+            "gemma4_e4b.default_developer",
+        )?;
+
+        let first = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            dense_gemma4_repeat_request(model_id.as_str()),
+        ))?;
+        assert_eq!(
+            header_value(first.headers(), "x-psionic-served-backend"),
+            Some(String::from("cuda"))
+        );
+        let first_payload = runtime.block_on(response_json(first))?;
+
+        let second = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            dense_gemma4_repeat_request(model_id.as_str()),
+        ))?;
+        let second_payload = runtime.block_on(response_json(second))?;
+
+        let third = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            dense_gemma4_repeat_request(model_id.as_str()),
+        ))?;
+        let third_payload = runtime.block_on(response_json(third))?;
+
+        let expected_rendered_prompt = case.expected_rendered_prompt.clone();
+        let first_observation = generate_observation_from_chat_payload(
+            &first_payload,
+            expected_rendered_prompt.as_deref(),
+        );
+        let second_observation = generate_observation_from_chat_payload(
+            &second_payload,
+            expected_rendered_prompt.as_deref(),
+        );
+        let third_observation = generate_observation_from_chat_payload(
+            &third_payload,
+            expected_rendered_prompt.as_deref(),
+        );
+
+        let suite = ConformanceSuite {
+            id: suite_id.to_string(),
+            compare_tags: false,
+            compare_ps: false,
+            show_cases: Vec::new(),
+            generate_cases: vec![case],
+            embed_cases: Vec::new(),
+        };
+        let baseline = RecordedConformanceSubject::new(format!("{suite_id}-run-1"))
+            .with_generate_case(case_id, SubjectObservation::Supported(first_observation));
+        let candidate = RecordedConformanceSubject::new(format!("{suite_id}-run-2"))
+            .with_generate_case(
+                case_id,
+                SubjectObservation::Supported(second_observation.clone()),
+            );
+
+        let mut baseline = baseline;
+        let mut candidate = candidate;
+        let report = run_conformance_suite(&suite, &mut baseline, &mut candidate)?;
+
+        assert_eq!(report.summary.passed, 1);
+        assert_eq!(report.summary.failed, 0);
+        assert_eq!(report.summary.unsupported, 0);
+        assert_eq!(report.summary.intentional_differences, 0);
+        assert!(report.cutover_ready());
+        assert_eq!(
+            second_observation.output_text,
+            third_observation.output_text
+        );
+        assert_eq!(
+            second_observation.done_reason,
+            third_observation.done_reason
+        );
+        assert_eq!(second_observation.eval_count, third_observation.eval_count);
+        Ok(())
     }
 
     fn align_usize(value: usize, alignment: usize) -> usize {

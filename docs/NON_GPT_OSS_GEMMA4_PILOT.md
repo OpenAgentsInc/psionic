@@ -1,8 +1,9 @@
 # Non-GPT-OSS Gemma 4 Pilot
 
 > Status: `published_bounded_lane` on 2026-04-02 after issues `#864`,
-> `#865`, and `#866`; Psionic now publishes one narrow dense `Gemma 4` CUDA
-> lane and keeps the rest of the family explicitly out of scope.
+> `#865`, and `#866`; `#867` then added one optional dense `31B` validation
+> lane that reuses the same family contract without widening the original
+> published claim.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -72,6 +73,30 @@ artifact, execute it natively on CUDA, route to the same family through the
 mesh bootstrap path, and keep unsupported regions refused instead of widening
 the claim by implication.
 
+## Second Dense Validation Lane
+
+After `#867`, the repo also carries one second dense validation lane for
+`Gemma 4 31B`.
+
+That lane is deliberately narrower than a second publication claim:
+
+- artifact class = dense `31B`
+- operator hook = `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH`
+- prompt contract = the same checked-in `gemma4_e4b` family fixture and
+  bounded text template
+- backend publication contract = the same `backend = cuda`,
+  `execution_mode = native`, and `execution_engine = psionic` truth
+- refusal contract = the same explicit refusal for structured outputs and
+  multimodal request admission
+
+What this means:
+
+- Psionic can validate a larger dense `Gemma 4` workstation artifact against
+  the same family contract it already publishes for `e4b`.
+- Psionic does not, by doing this, widen the first public claim from
+  `gemma4:e4b` to the whole dense family.
+- `31B` stays a validation lane until we decide to publish it separately.
+
 ## Explicit Non-Goals
 
 The first `Gemma 4` claim does not include:
@@ -125,6 +150,9 @@ conformance work:
 - the conformance harness now accepts the real `gemma4:e4b` fixture shape and
   the repo now carries one repeatable `gemma4:e4b` CUDA conformance repeat
   test that runs when both the pilot GGUF and a CUDA host are available.
+- the same bounded family contract now also has one optional dense `31B`
+  validation repeat and one optional real-artifact tokenizer and prompt-render
+  check, both keyed off `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH`.
 - the same `gemma4:e4b` lane now also has one first distributed bootstrap-mesh
   validation path, keeping routed remote publication explicit instead of
   silently widening the thin-client lane.
@@ -141,9 +169,9 @@ What still does not exist:
 - no image, video, or audio Gemma lane
 - no generic structured-output Gemma surface
 - no multimodal Gemma request surface
-- no broader published support claim beyond the bounded dense CUDA lane,
-  server admission, routed mesh validation, and repo-owned conformance
-  coverage
+- no broader published support claim beyond the bounded dense `e4b` CUDA lane,
+  server admission, routed mesh validation, repo-owned conformance coverage,
+  and the optional `31B` validation repeat
 
 ## Canonical Repeat
 
@@ -163,6 +191,22 @@ PSIONIC_GEMMA4_PILOT_GGUF_PATH=/abs/path/to/gemma4-e4b-ollama.gguf \
   cargo test -p psionic-serve \
   gemma4_e4b_cuda_conformance_repeat_is_machine_checkable_when_available \
   --manifest-path Cargo.toml --no-default-features
+```
+
+Optional second dense validation repeat:
+
+```bash
+PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH=/abs/path/to/gemma4-31b.gguf \
+  cargo test -p psionic-serve \
+  gemma4_31b_cuda_conformance_repeat_is_machine_checkable_when_available \
+  --manifest-path Cargo.toml --no-default-features
+```
+
+Optional real-artifact tokenizer and prompt-render checks for that same lane:
+
+```bash
+PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH=/abs/path/to/gemma4-31b.gguf \
+  cargo test -p psionic-models gemma4_31b --manifest-path Cargo.toml --no-default-features
 ```
 
 Those runs are the current publication bar. They prove:
@@ -185,6 +229,8 @@ Those runs are the current publication bar. They prove:
   - multimodal inputs
 - repeatable real-artifact CUDA conformance against the local `e4b` GGUF when
   both the artifact and a usable CUDA host are present
+- optional repeatable validation against a local dense `31B` GGUF when that
+  artifact is supplied explicitly
 - bootstrap-routed mesh publication that keeps remote `Gemma 4` route truth
   explicit instead of widening the thin-client claim
 
@@ -205,6 +251,9 @@ The pilot stays green only if all of the following remain true:
   lane
 - mesh bootstrap publication keeps routed remote truth explicit and does not
   borrow a local host's wider endpoint claim
+- when `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH` is supplied, the dense `31B`
+  validation lane still matches the same tokenizer, prompt, backend-truth,
+  and refusal contract instead of forking the family semantics
 
 ## Why The Claim Is Narrow
 
@@ -219,9 +268,10 @@ That bounded claim keeps later work cleanly separated:
 - image and video processing
 - audio support for `E2B` and `E4B`
 - generic structured outputs
-- `31B Dense`
 - `26B A4B` and wider non-`GptOss` MoE admission
 - Metal and other accelerator parity
+- any future decision to promote `31B` from validation-only into its own
+  published support claim
 
 ## Follow-On Issues
 

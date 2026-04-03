@@ -8373,6 +8373,13 @@ mod tests {
             .unwrap_or_else(|_| String::from(default_path))
     }
 
+    fn gemma4_31b_validation_fixture_path() -> Option<String> {
+        std::env::var("PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    }
+
     fn qwen35_pilot_fixture_path(default_path: &str) -> String {
         std::env::var("PSIONIC_QWEN35_PILOT_GGUF_PATH")
             .unwrap_or_else(|_| String::from(default_path))
@@ -9448,6 +9455,77 @@ mod tests {
                 .get("gemma4.vision.block_count")
                 .and_then(GgufMetadataValue::as_u64),
             Some(16)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_real_gemma4_31b_tokenizer_matches_bounded_dense_fixture_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = gemma4_31b_validation_fixture_path() else {
+            return Ok(());
+        };
+        if !Path::new(path.as_str()).exists() {
+            return Ok(());
+        }
+
+        let fixture = golden_tokenizer_fixture("gemma4_e4b").expect("gemma4 fixture");
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let tokenizer = content.load_tokenizer()?;
+
+        assert_tokenizer_fixture_matches(fixture, &tokenizer)?;
+        assert_eq!(
+            tokenizer.pretokenizer,
+            Some(GgufTokenizerPretokenizer::Gemma4)
+        );
+
+        let family = super::classify_gguf_decoder_family(content.metadata(), "gemma4")?;
+        assert_eq!(family, GgufDecoderFamily::Gemma4);
+        super::validate_supported_decoder_family_features(content.metadata(), family, "gemma4")?;
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_real_gemma4_31b_prompt_render_matches_bounded_dense_fixture_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = gemma4_31b_validation_fixture_path() else {
+            return Ok(());
+        };
+        if !Path::new(path.as_str()).exists() {
+            return Ok(());
+        }
+
+        let fixture = golden_prompt_fixture("gemma4_e4b").expect("gemma4 fixture");
+        let variant = fixture
+            .template_variant("gemma4_e4b.default")
+            .expect("variant");
+        let render_case = variant
+            .render_case("gemma4_e4b.default_developer")
+            .expect("render case");
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let renderer = GgufPromptTemplateRenderer::new(
+            content.load_tokenizer()?,
+            super::GgufChatTemplateMetadata::new(
+                Some(String::from(gemma4_chat_template())),
+                BTreeMap::new(),
+            ),
+        );
+
+        let rendered = renderer.render(
+            None,
+            prompt_messages_from_fixture(render_case.messages).as_slice(),
+            render_case.add_generation_prompt,
+        )?;
+
+        assert_eq!(rendered.family, GgufPromptTemplateFamily::Gemma4);
+        assert_eq!(rendered.text, render_case.expected_rendered);
+        assert_eq!(
+            rendered.stop_sequences,
+            variant
+                .stop_sequences
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect::<Vec<_>>()
         );
         Ok(())
     }

@@ -46,6 +46,15 @@ than just run tensor math.
     tool results
   - bounded prompt-render, server-smoke, refusal, and repeatable CUDA
     conformance coverage for `gemma4:e4b`
+- `Gemma 4` also now has one second dense validation lane outside the first
+  published claim:
+  - artifact class = dense `31B`
+  - operator hook = `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH`
+  - validation scope = the same checked-in prompt fixture, CUDA backend truth,
+    `/v1/chat/completions` and `/v1/responses` endpoint set, and structured or
+    multimodal refusal posture as the `e4b` lane
+  - claim boundary = validation only; it does not widen the original
+    `gemma4:e4b` publication
 - The first distributed `Gemma 4` mesh validation now rides the bootstrap path
   too:
   - remote execution target = CUDA-backed `gemma4:e4b`
@@ -68,6 +77,10 @@ than just run tensor math.
   - multimodal request admission
   - unquantized projection tensors on the native CUDA lane
   - full parity with `llama.cpp` or `ollama`
+- That unsupported-region list is the boundary of the first published
+  `gemma4:e4b` claim. The optional dense `31B` validation lane keeps the same
+  refusal posture and publication shape, but it still does not promote `31B`
+  into the published first claim automatically.
 - CPU-only debug bring-up may still be useful while the lane is under active
   development. The repo now admits `Gemma 4` on CPU for bounded debug
   execution, but CPU still does not satisfy the first published `Gemma 4`

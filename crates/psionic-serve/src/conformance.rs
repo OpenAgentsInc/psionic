@@ -3127,17 +3127,43 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn generate_case_builder_uses_real_gemma4_fixture() -> Result<(), Box<dyn std::error::Error>> {
-        let case = GenerateConformanceCase::from_generate_compatible_prompt_fixture(
-            "gemma4-render",
-            "gemma4:e4b",
+    fn gemma4_dense_generate_case(
+        case_id: &str,
+        model: &str,
+    ) -> Result<GenerateConformanceCase, Box<dyn std::error::Error>> {
+        Ok(GenerateConformanceCase::from_generate_compatible_prompt_fixture(
+            case_id,
+            model,
             "gemma4_e4b",
             "gemma4_e4b.default",
             "gemma4_e4b.default_developer",
-        )?;
+        )?)
+    }
+
+    #[test]
+    fn generate_case_builder_uses_real_gemma4_fixture() -> Result<(), Box<dyn std::error::Error>> {
+        let case = gemma4_dense_generate_case("gemma4-render", "gemma4:e4b")?;
 
         assert_eq!(case.model, "gemma4:e4b");
+        assert_eq!(case.prompt, "Summarize the lane.");
+        assert_eq!(case.system.as_deref(), Some("Be terse."));
+        assert!(case.debug_render_only);
+        assert_eq!(case.stop_sequences, vec![String::from("<turn|>")]);
+        assert_eq!(
+            case.expected_rendered_prompt.as_deref(),
+            Some(
+                "<bos><|turn>developer\nBe terse.<turn|>\n<|turn>user\nSummarize the lane.<turn|>\n<|turn>model\n"
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generate_case_builder_reuses_gemma4_fixture_for_31b_lane()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let case = gemma4_dense_generate_case("gemma4-31b-render", "gemma4:31b")?;
+
+        assert_eq!(case.model, "gemma4:31b");
         assert_eq!(case.prompt, "Summarize the lane.");
         assert_eq!(case.system.as_deref(), Some("Be terse."));
         assert!(case.debug_render_only);
@@ -3215,13 +3241,7 @@ mod tests {
     #[test]
     fn conformance_suite_accepts_matching_gemma4_prompt_render_candidate()
     -> Result<(), Box<dyn std::error::Error>> {
-        let case = GenerateConformanceCase::from_generate_compatible_prompt_fixture(
-            "gemma4-render",
-            "gemma4:e4b",
-            "gemma4_e4b",
-            "gemma4_e4b.default",
-            "gemma4_e4b.default_developer",
-        )?;
+        let case = gemma4_dense_generate_case("gemma4-render", "gemma4:e4b")?;
         let expected_rendered_prompt = match &case.expected_rendered_prompt {
             Some(value) => value.clone(),
             None => return Err("expected gemma4 fixture render".into()),
@@ -3250,6 +3270,61 @@ mod tests {
         );
         let candidate = RecordedConformanceSubject::new("gemma4-candidate").with_generate_case(
             "gemma4-render",
+            SubjectObservation::Supported(GenerateObservation {
+                rendered_prompt: Some(expected_rendered_prompt),
+                output_text: String::new(),
+                done_reason: None,
+                prompt_eval_count: None,
+                eval_count: None,
+                performance: None,
+                error: None,
+            }),
+        );
+
+        let mut baseline = baseline;
+        let mut candidate = candidate;
+        let report = run_conformance_suite(&suite, &mut baseline, &mut candidate)?;
+
+        assert_eq!(report.summary.passed, 1);
+        assert_eq!(report.summary.failed, 0);
+        assert_eq!(report.summary.unsupported, 0);
+        assert_eq!(report.summary.intentional_differences, 0);
+        assert!(report.cutover_ready());
+        Ok(())
+    }
+
+    #[test]
+    fn conformance_suite_accepts_matching_gemma4_31b_prompt_render_candidate()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let case = gemma4_dense_generate_case("gemma4-31b-render", "gemma4:31b")?;
+        let expected_rendered_prompt = match &case.expected_rendered_prompt {
+            Some(value) => value.clone(),
+            None => return Err("expected gemma4 31b fixture render".into()),
+        };
+
+        let suite = ConformanceSuite {
+            id: String::from("fixture-gemma4-31b-suite"),
+            compare_tags: false,
+            compare_ps: false,
+            show_cases: Vec::new(),
+            generate_cases: vec![case],
+            embed_cases: Vec::new(),
+        };
+
+        let baseline = RecordedConformanceSubject::new("gemma4-31b-baseline").with_generate_case(
+            "gemma4-31b-render",
+            SubjectObservation::Supported(GenerateObservation {
+                rendered_prompt: Some(expected_rendered_prompt.clone()),
+                output_text: String::new(),
+                done_reason: None,
+                prompt_eval_count: None,
+                eval_count: None,
+                performance: None,
+                error: None,
+            }),
+        );
+        let candidate = RecordedConformanceSubject::new("gemma4-31b-candidate").with_generate_case(
+            "gemma4-31b-render",
             SubjectObservation::Supported(GenerateObservation {
                 rendered_prompt: Some(expected_rendered_prompt),
                 output_text: String::new(),

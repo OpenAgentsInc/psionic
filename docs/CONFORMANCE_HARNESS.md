@@ -157,6 +157,20 @@ requires. The repeat lane also machine-checks backend publication via the
 response headers, with `x-psionic-backend` as the canonical header and
 `x-psionic-served-backend` kept as a matching compatibility alias.
 
+The second dense validation repeat for `Gemma 4 31B` is:
+
+```bash
+PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH=/abs/path/to/gemma4-31b.gguf \
+  cargo test -p psionic-serve \
+  gemma4_31b_cuda_conformance_repeat_is_machine_checkable_when_available \
+  --manifest-path Cargo.toml --no-default-features
+```
+
+That lane intentionally reuses the same checked-in `gemma4_e4b` prompt fixture
+and the same structured or multimodal refusal contract. It is a second dense
+validation lane, not a silent widening of the first published `gemma4:e4b`
+claim.
+
 ## Controlled Local Validation
 
 For a local cutover check against a real Ollama daemon:
