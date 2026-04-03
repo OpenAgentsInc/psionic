@@ -2,8 +2,8 @@
 
 mod attnres;
 mod cs336_a1_reference_stack;
-mod cs336_a2_flashattention_reference;
 mod cs336_a1_tokenizer;
+mod cs336_a2_flashattention_reference;
 mod fixtures;
 mod harmony;
 mod parameter_golf;
@@ -85,8 +85,8 @@ use thiserror::Error;
 
 pub use attnres::*;
 pub use cs336_a1_reference_stack::*;
-pub use cs336_a2_flashattention_reference::*;
 pub use cs336_a1_tokenizer::*;
+pub use cs336_a2_flashattention_reference::*;
 pub use fixtures::*;
 pub use harmony::*;
 pub use parameter_golf::*;
@@ -3339,6 +3339,85 @@ impl GgufDecoderFamily {
     }
 }
 
+/// Runtime contract required to execute one GGUF expert-family decoder honestly.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GgufDecoderExpertRuntimeContract {
+    /// Psionic has a native MoE tensor/runtime contract for this family today.
+    GptOssNativeMoe,
+    /// The family requires explicit expert-placement and cluster-topology truth
+    /// before Psionic can claim native execution.
+    FamilySpecificPlacement,
+}
+
+impl GgufDecoderExpertRuntimeContract {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::GptOssNativeMoe => "gpt_oss_native_moe",
+            Self::FamilySpecificPlacement => "family_specific_placement",
+        }
+    }
+}
+
+/// Explicit expert-family topology requirements derived from GGUF metadata.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GgufDecoderExpertTopologyRequirements {
+    /// Stable Psionic family label for the artifact.
+    pub family: String,
+    /// Raw GGUF architecture label that declared the expert facts.
+    pub architecture: String,
+    /// Total declared expert count.
+    pub expert_count: usize,
+    /// Routed active-expert count per token when the artifact declares it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_expert_count: Option<usize>,
+    /// Expert feed-forward width when the artifact declares it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expert_feed_forward_length: Option<usize>,
+    /// Runtime contract required to execute the lane honestly.
+    pub runtime_contract: GgufDecoderExpertRuntimeContract,
+    /// Whether honest serving requires cluster-topology truth above a single
+    /// local tensor layout.
+    pub requires_cluster_topology_truth: bool,
+}
+
+/// Machine-checkable serving admission posture for one inspected GGUF decoder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GgufDecoderServingAdmissionKind {
+    /// Psionic can continue toward a native tensor-layout build today.
+    PsionicNative,
+    /// Psionic can describe the lane, but native execution requires a later
+    /// expert-topology contract.
+    PendingExpertTopology,
+}
+
+/// Honest serving-admission result for one inspected GGUF decoder.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GgufDecoderServingAdmission {
+    /// Machine-checkable admission posture.
+    pub kind: GgufDecoderServingAdmissionKind,
+    /// Plain-language detail for pending or narrowed posture.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+impl GgufDecoderServingAdmission {
+    fn native() -> Self {
+        Self {
+            kind: GgufDecoderServingAdmissionKind::PsionicNative,
+            detail: None,
+        }
+    }
+
+    fn pending_topology(detail: impl Into<String>) -> Self {
+        Self {
+            kind: GgufDecoderServingAdmissionKind::PendingExpertTopology,
+            detail: Some(detail.into()),
+        }
+    }
+}
+
 /// Family-specific GGUF decoder metadata kept outside the generic decoder descriptor.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GgufDecoderFamilyMetadata {
@@ -3416,6 +3495,53 @@ impl Qwen35MultimodalProjectionConfig {
 }
 
 impl GgufDecoderFamilyMetadata {
+    /// Returns explicit expert-family topology requirements when the artifact
+    /// declares routed experts.
+    #[must_use]
+    pub fn expert_topology_requirements(&self) -> Option<GgufDecoderExpertTopologyRequirements> {
+        let expert_count = self.expert_count?;
+        if expert_count == 0 {
+            return None;
+        }
+        let runtime_contract = if matches!(self.family, GgufDecoderFamily::GptOss) {
+            GgufDecoderExpertRuntimeContract::GptOssNativeMoe
+        } else {
+            GgufDecoderExpertRuntimeContract::FamilySpecificPlacement
+        };
+        Some(GgufDecoderExpertTopologyRequirements {
+            family: self.family.as_str().to_string(),
+            architecture: self.architecture.clone(),
+            expert_count,
+            active_expert_count: self.expert_used_count,
+            expert_feed_forward_length: self.expert_feed_forward_length,
+            runtime_contract,
+            requires_cluster_topology_truth: matches!(
+                runtime_contract,
+                GgufDecoderExpertRuntimeContract::FamilySpecificPlacement
+            ),
+        })
+    }
+
+    /// Returns the truthful serving-admission posture for this family metadata.
+    #[must_use]
+    pub fn serving_admission(&self) -> GgufDecoderServingAdmission {
+        let Some(requirements) = self.expert_topology_requirements() else {
+            return GgufDecoderServingAdmission::native();
+        };
+        if matches!(
+            requirements.runtime_contract,
+            GgufDecoderExpertRuntimeContract::GptOssNativeMoe
+        ) {
+            return GgufDecoderServingAdmission::native();
+        }
+        GgufDecoderServingAdmission::pending_topology(format!(
+            "family `{}` declares {} experts and requires `{}` topology truth before Psionic can claim native execution",
+            requirements.family,
+            requirements.expert_count,
+            requirements.runtime_contract.as_str()
+        ))
+    }
+
     /// Returns the bounded qwen35 multimodal projection config when the
     /// artifact declares the required vision facts.
     #[must_use]
@@ -4099,10 +4225,7 @@ impl GgufWeightBundleLoader {
             format: WeightFormat::Gguf,
             source: WeightSource::ExternalArtifact,
             quantization: dominant_quantization_mode(&quantized_bytes),
-            quantization_modes: quantized_bytes
-                .iter()
-                .filter_map(|(mode, _)| (*mode != QuantizationMode::None).then_some(*mode))
-                .collect(),
+            quantization_modes: quantization_modes_from_counts(&quantized_bytes),
             digest: hex::encode(hasher.finalize()),
             tensors: metadata,
             artifacts: vec![artifact.artifact_metadata().clone()],
@@ -4409,6 +4532,50 @@ pub struct GgufDecoderAdapter {
     tensor_layout: GgufDecoderTensorLayout,
 }
 
+/// Inspectable decoder artifact truth that remains available even when native
+/// tensor-layout support is still pending.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GgufDecoderArtifactInspection {
+    descriptor: DecoderModelDescriptor,
+    family_metadata: GgufDecoderFamilyMetadata,
+    tokenizer: GgufTokenizerMetadata,
+    chat_templates: GgufChatTemplateMetadata,
+    admission: GgufDecoderServingAdmission,
+}
+
+impl GgufDecoderArtifactInspection {
+    /// Returns the generic decoder descriptor for higher-layer request
+    /// contracts, including artifact identity.
+    #[must_use]
+    pub fn descriptor(&self) -> &DecoderModelDescriptor {
+        &self.descriptor
+    }
+
+    /// Returns the family-specific GGUF metadata.
+    #[must_use]
+    pub fn family_metadata(&self) -> &GgufDecoderFamilyMetadata {
+        &self.family_metadata
+    }
+
+    /// Returns the tokenizer metadata loaded from GGUF.
+    #[must_use]
+    pub fn tokenizer(&self) -> &GgufTokenizerMetadata {
+        &self.tokenizer
+    }
+
+    /// Returns the chat-template metadata loaded from GGUF.
+    #[must_use]
+    pub fn chat_templates(&self) -> &GgufChatTemplateMetadata {
+        &self.chat_templates
+    }
+
+    /// Returns the machine-checkable serving-admission posture.
+    #[must_use]
+    pub fn admission(&self) -> &GgufDecoderServingAdmission {
+        &self.admission
+    }
+}
+
 impl GgufDecoderAdapter {
     /// Returns the generic decoder descriptor for higher-layer request contracts.
     #[must_use]
@@ -4483,11 +4650,11 @@ impl GgufDecoderAdapter {
 pub struct GgufDecoderAdapterLoader;
 
 impl GgufDecoderAdapterLoader {
-    fn load_blob_artifact_with_governance(
+    fn inspect_blob_artifact_with_governance(
         &self,
         artifact: &GgufBlobArtifact,
         artifact_governance: ModelArtifactGovernance,
-    ) -> Result<GgufDecoderAdapter, ModelLoadError> {
+    ) -> Result<GgufDecoderArtifactInspection, ModelLoadError> {
         let content = artifact.content();
         let metadata = content.metadata();
         let architecture = read_required_gguf_string(metadata, "general.architecture")?;
@@ -4508,16 +4675,125 @@ impl GgufDecoderAdapterLoader {
             content,
         )?
         .with_artifact_governance(artifact_governance);
-        let tensor_layout =
-            build_gguf_decoder_tensor_layout(content, &family_metadata, &descriptor.config)?;
+        let admission = family_metadata.serving_admission();
 
-        Ok(GgufDecoderAdapter {
+        Ok(GgufDecoderArtifactInspection {
             descriptor,
             family_metadata,
             tokenizer,
             chat_templates,
+            admission,
+        })
+    }
+
+    fn load_blob_artifact_with_governance(
+        &self,
+        artifact: &GgufBlobArtifact,
+        artifact_governance: ModelArtifactGovernance,
+    ) -> Result<GgufDecoderAdapter, ModelLoadError> {
+        let content = artifact.content();
+        let inspection =
+            self.inspect_blob_artifact_with_governance(artifact, artifact_governance)?;
+        if matches!(
+            inspection.admission.kind,
+            GgufDecoderServingAdmissionKind::PendingExpertTopology
+        ) {
+            if let Some(requirements) = inspection.family_metadata.expert_topology_requirements() {
+                return Err(ModelLoadError::UnsupportedGgufDecoderExpertTopology {
+                    family: requirements.family,
+                    runtime_contract: requirements.runtime_contract,
+                    expert_count: requirements.expert_count,
+                    active_expert_count: requirements.active_expert_count,
+                    expert_feed_forward_length: requirements.expert_feed_forward_length,
+                    detail: inspection
+                        .admission
+                        .detail
+                        .clone()
+                        .unwrap_or_else(|| String::from("expert topology contract pending")),
+                });
+            }
+        }
+        let tensor_layout = build_gguf_decoder_tensor_layout(
+            content,
+            &inspection.family_metadata,
+            &inspection.descriptor.config,
+        )?;
+
+        Ok(GgufDecoderAdapter {
+            descriptor: inspection.descriptor,
+            family_metadata: inspection.family_metadata,
+            tokenizer: inspection.tokenizer,
+            chat_templates: inspection.chat_templates,
             tensor_layout,
         })
+    }
+
+    /// Inspects a decoder-family artifact without requiring native tensor-layout
+    /// support to exist yet.
+    pub fn inspect_blob_artifact(
+        &self,
+        artifact: &GgufBlobArtifact,
+    ) -> Result<GgufDecoderArtifactInspection, ModelLoadError> {
+        let artifact_governance = match artifact.blob_metadata().kind {
+            LocalBlobKind::GgufFile => {
+                ModelArtifactGovernance::local_path(&artifact.blob_metadata().path)
+            }
+            LocalBlobKind::OllamaBlob => {
+                ModelArtifactGovernance::ollama_blob(artifact.blob_metadata())
+            }
+        };
+        self.inspect_blob_artifact_with_governance(artifact, artifact_governance)
+    }
+
+    /// Inspects a decoder-family artifact from a local GGUF path.
+    pub fn inspect_path(
+        &self,
+        path: &Path,
+    ) -> Result<GgufDecoderArtifactInspection, ModelLoadError> {
+        let artifact = GgufBlobArtifact::open_path(path, LocalBlobOpenOptions::default())?;
+        self.inspect_blob_artifact(&artifact)
+    }
+
+    /// Inspects a decoder-family artifact from an Ollama-managed GGUF blob.
+    pub fn inspect_ollama_blob(
+        &self,
+        models_root: impl AsRef<Path>,
+        digest: &str,
+        options: LocalBlobOpenOptions,
+    ) -> Result<GgufDecoderArtifactInspection, ModelLoadError> {
+        let artifact = GgufBlobArtifact::open_ollama_blob(models_root, digest, options)?;
+        self.inspect_blob_artifact(&artifact)
+    }
+
+    /// Inspects a decoder-family artifact from a resolved Ollama manifest.
+    pub fn inspect_ollama_manifest(
+        &self,
+        manifest: &OllamaManifest,
+        options: LocalBlobOpenOptions,
+    ) -> Result<GgufDecoderArtifactInspection, ModelLoadError> {
+        let config = manifest
+            .load_config(
+                LocalBlobOpenOptions::default()
+                    .with_read_preference(psionic_catalog::BlobReadPreference::PreferBuffered),
+            )
+            .map_err(|error| ModelLoadError::ArtifactRead {
+                path: manifest.manifest_path.display().to_string(),
+                message: error.to_string(),
+            })?;
+        let licenses = manifest
+            .load_license_facts(
+                LocalBlobOpenOptions::default()
+                    .with_read_preference(psionic_catalog::BlobReadPreference::PreferBuffered),
+            )
+            .map_err(|error| ModelLoadError::ArtifactRead {
+                path: manifest.manifest_path.display().to_string(),
+                message: error.to_string(),
+            })?;
+        let artifact = GgufBlobArtifact::open_ollama_manifest(manifest, options)?;
+        self.inspect_blob_artifact_with_governance(
+            &artifact,
+            ModelArtifactGovernance::from_ollama_manifest(manifest, config.as_ref(), licenses),
+        )
     }
 
     /// Loads a decoder-family adapter from an already-open GGUF blob artifact.
@@ -5111,16 +5387,54 @@ fn classify_gguf_decoder_family(
 
 fn validate_supported_decoder_family_features(
     metadata: &BTreeMap<String, GgufMetadataValue>,
-    family: GgufDecoderFamily,
+    _family: GgufDecoderFamily,
     architecture: &str,
 ) -> Result<(), ModelLoadError> {
     let expert_count_key = format!("{architecture}.expert_count");
     let expert_count = read_optional_gguf_usize(metadata, expert_count_key.as_str())?.unwrap_or(0);
-    if expert_count > 0 && !matches!(family, GgufDecoderFamily::GptOss) {
-        return Err(ModelLoadError::UnsupportedGgufDecoderFamilyFeature {
-            family: family.as_str().to_string(),
-            feature: String::from("mixture_of_experts"),
-        });
+    let expert_used_count_key = format!("{architecture}.expert_used_count");
+    let expert_used_count = read_optional_gguf_usize(metadata, expert_used_count_key.as_str())?;
+    let expert_feed_forward_length_key = format!("{architecture}.expert_feed_forward_length");
+    let expert_feed_forward_length =
+        read_optional_gguf_usize(metadata, expert_feed_forward_length_key.as_str())?;
+    if expert_count == 0 {
+        if expert_used_count.is_some() {
+            return Err(ModelLoadError::InvalidGgufMetadata {
+                key: expert_used_count_key,
+                message: String::from("expert_used_count requires expert_count > 0"),
+            });
+        }
+        if expert_feed_forward_length.is_some() {
+            return Err(ModelLoadError::InvalidGgufMetadata {
+                key: expert_feed_forward_length_key,
+                message: String::from("expert_feed_forward_length requires expert_count > 0"),
+            });
+        }
+        return Ok(());
+    }
+    if let Some(active_expert_count) = expert_used_count {
+        if active_expert_count == 0 {
+            return Err(ModelLoadError::InvalidGgufMetadata {
+                key: expert_used_count_key,
+                message: String::from("expert_used_count must be greater than zero"),
+            });
+        }
+        if active_expert_count > expert_count {
+            return Err(ModelLoadError::InvalidGgufMetadata {
+                key: expert_used_count_key,
+                message: format!(
+                    "expert_used_count {active_expert_count} exceeds expert_count {expert_count}"
+                ),
+            });
+        }
+    }
+    if let Some(expert_feed_forward_length) = expert_feed_forward_length {
+        if expert_feed_forward_length == 0 {
+            return Err(ModelLoadError::InvalidGgufMetadata {
+                key: expert_feed_forward_length_key,
+                message: String::from("expert_feed_forward_length must be greater than zero"),
+            });
+        }
     }
     Ok(())
 }
@@ -5301,6 +5615,25 @@ fn build_gguf_decoder_tensor_layout(
     family_metadata: &GgufDecoderFamilyMetadata,
     config: &DecoderConfig,
 ) -> Result<GgufDecoderTensorLayout, ModelLoadError> {
+    if let Some(requirements) = family_metadata.expert_topology_requirements() {
+        if matches!(
+            requirements.runtime_contract,
+            GgufDecoderExpertRuntimeContract::FamilySpecificPlacement
+        ) {
+            return Err(ModelLoadError::UnsupportedGgufDecoderExpertTopology {
+                family: requirements.family,
+                runtime_contract: requirements.runtime_contract,
+                expert_count: requirements.expert_count,
+                active_expert_count: requirements.active_expert_count,
+                expert_feed_forward_length: requirements.expert_feed_forward_length,
+                detail: format!(
+                    "family `{}` requires `{}` topology truth before Psionic can build a native decoder tensor layout",
+                    family_metadata.family.as_str(),
+                    requirements.runtime_contract.as_str()
+                ),
+            });
+        }
+    }
     required_tensor_info(content, "token_embd.weight")?;
     required_tensor_info(content, "output_norm.weight")?;
     let metadata = content.metadata();
@@ -6249,6 +6582,25 @@ pub enum ModelLoadError {
         family: String,
         /// Unsupported feature summary.
         feature: String,
+    },
+    /// The GGUF decoder artifact declared an expert-family topology contract
+    /// that Psionic can inspect honestly but cannot execute natively yet.
+    #[error(
+        "unsupported gguf decoder expert topology for `{family}`: contract=`{runtime_contract:?}` experts={expert_count} active_experts={active_expert_count:?} detail={detail}"
+    )]
+    UnsupportedGgufDecoderExpertTopology {
+        /// Launch-family label.
+        family: String,
+        /// Runtime contract required to execute the family honestly.
+        runtime_contract: GgufDecoderExpertRuntimeContract,
+        /// Total declared expert count.
+        expert_count: usize,
+        /// Routed active-expert count per token when the artifact declares it.
+        active_expert_count: Option<usize>,
+        /// Expert feed-forward width when the artifact declares it.
+        expert_feed_forward_length: Option<usize>,
+        /// Plain-language refusal detail.
+        detail: String,
     },
     /// The GGUF embedding artifact uses a family feature that the first-launch adapters do not support yet.
     #[error("unsupported gguf embedding family feature for `{family}`: {feature}")]
@@ -9384,7 +9736,7 @@ mod tests {
     }
 
     #[test]
-    fn gemma4_dense_family_classifies_and_sparse_is_refused()
+    fn gemma4_sparse_family_is_admitted_for_inspection_but_marked_pending_topology()
     -> Result<(), Box<dyn std::error::Error>> {
         let dense = BTreeMap::from([(
             String::from("general.architecture"),
@@ -9399,17 +9751,60 @@ mod tests {
             String::from("gemma4.expert_count"),
             GgufMetadataValue::U32(64),
         );
-        let error = super::validate_supported_decoder_family_features(
+        sparse.insert(
+            String::from("gemma4.expert_used_count"),
+            GgufMetadataValue::U32(4),
+        );
+        sparse.insert(
+            String::from("gemma4.expert_feed_forward_length"),
+            GgufMetadataValue::U32(256),
+        );
+        super::validate_supported_decoder_family_features(
             &sparse,
             GgufDecoderFamily::Gemma4,
             "gemma4",
-        )
-        .expect_err("gemma4 moe lane should remain refused");
-        assert!(matches!(
-            error,
-            super::ModelLoadError::UnsupportedGgufDecoderFamilyFeature { family, feature }
-                if family == "gemma4" && feature == "mixture_of_experts"
-        ));
+        )?;
+
+        let family_metadata = GgufDecoderFamilyMetadata {
+            family: GgufDecoderFamily::Gemma4,
+            architecture: String::from("gemma4"),
+            display_name: None,
+            rope_theta: 10_000.0,
+            rope_scaling_factor: None,
+            rope_original_context_length: None,
+            rms_norm_epsilon: 1e-6,
+            sliding_window: None,
+            attention_key_length: None,
+            attention_value_length: None,
+            tie_word_embeddings: false,
+            attention_qkv_biases: false,
+            expert_count: Some(64),
+            expert_used_count: Some(4),
+            expert_feed_forward_length: Some(256),
+            family_facts: BTreeMap::new(),
+        };
+        let requirements = family_metadata
+            .expert_topology_requirements()
+            .expect("gemma4 sparse topology requirements");
+        assert_eq!(requirements.family, "gemma4");
+        assert_eq!(requirements.expert_count, 64);
+        assert_eq!(requirements.active_expert_count, Some(4));
+        assert_eq!(
+            requirements.runtime_contract,
+            super::GgufDecoderExpertRuntimeContract::FamilySpecificPlacement
+        );
+        assert!(requirements.requires_cluster_topology_truth);
+        let admission = family_metadata.serving_admission();
+        assert_eq!(
+            admission.kind,
+            super::GgufDecoderServingAdmissionKind::PendingExpertTopology
+        );
+        assert!(
+            admission
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("family_specific_placement"))
+        );
         Ok(())
     }
 
@@ -10640,29 +11035,64 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("moe_llama.gguf");
+        let mut metadata = llama_decoder_metadata("Tiny MoE Llama", None);
+        metadata.push((
+            String::from("llama.expert_count"),
+            GgufMetadataValue::U32(8),
+        ));
+        metadata.push((
+            String::from("llama.expert_used_count"),
+            GgufMetadataValue::U32(2),
+        ));
+        metadata.push((
+            String::from("llama.expert_feed_forward_length"),
+            GgufMetadataValue::U32(16),
+        ));
         write_test_gguf(
             &path,
             GgufVersion::V3,
-            &[
-                (
-                    String::from("general.architecture"),
-                    GgufMetadataValue::String(String::from("llama")),
-                ),
-                (
-                    String::from("llama.expert_count"),
-                    GgufMetadataValue::U32(8),
-                ),
-            ],
-            &[],
+            &metadata,
+            &decoder_family_tensors(2, false, true),
         )?;
+
+        let inspection = GgufDecoderAdapterLoader.inspect_path(&path)?;
+        let requirements = inspection
+            .family_metadata()
+            .expert_topology_requirements()
+            .expect("llama expert topology requirements");
+        assert_eq!(requirements.family, "llama");
+        assert_eq!(requirements.expert_count, 8);
+        assert_eq!(requirements.active_expert_count, Some(2));
+        assert_eq!(
+            requirements.runtime_contract,
+            super::GgufDecoderExpertRuntimeContract::FamilySpecificPlacement
+        );
+        assert!(
+            inspection
+                .descriptor()
+                .artifact_identity
+                .as_ref()
+                .and_then(|identity| identity.model_blob_digest.as_ref())
+                .is_some()
+        );
+        assert_eq!(
+            inspection.admission().kind,
+            super::GgufDecoderServingAdmissionKind::PendingExpertTopology
+        );
 
         let error = GgufDecoderAdapterLoader
             .load_path(&path)
             .expect_err("moe llama should remain unsupported");
         assert!(matches!(
             error,
-            super::ModelLoadError::UnsupportedGgufDecoderFamilyFeature { family, feature }
-                if family == "llama" && feature == "mixture_of_experts"
+            super::ModelLoadError::UnsupportedGgufDecoderExpertTopology {
+                family,
+                runtime_contract: super::GgufDecoderExpertRuntimeContract::FamilySpecificPlacement,
+                expert_count: 8,
+                active_expert_count: Some(2),
+                expert_feed_forward_length: Some(16),
+                ..
+            } if family == "llama"
         ));
         Ok(())
     }

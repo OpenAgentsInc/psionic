@@ -58,6 +58,10 @@ evidence.
   - optional mesh coordination adjunct under `/psionic/management/coordination/*` for typed
     status, finding, question, tip, and done packets with TTL, visibility, provenance, search,
     and redaction semantics outside the inference critical path
+  - expert-family GGUF admission now stays explicit: `psionic-models` can inspect non-`gpt-oss`
+    expert artifacts, carry artifact identity plus expert-topology requirements, and refuse native
+    execution with a machine-checkable topology-contract error instead of collapsing them into a
+    generic unsupported-family bucket
   - start with [docs/ROADMAP_CLUSTER.md](docs/ROADMAP_CLUSTER.md)
   - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
 - Psion learned-model program

@@ -19,6 +19,69 @@ use crate::{
     plan_cluster_serving_admission, replica_routing_communication_eligibility,
 };
 
+/// Runtime contract required to execute one expert-family replica lane honestly.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClusterReplicaLaneExpertRuntimeContract {
+    /// Psionic already has a native family contract for the expert lane.
+    GptOssNativeMoe,
+    /// The lane requires later family-specific placement and topology truth.
+    FamilySpecificPlacement,
+}
+
+/// Explicit expert-family topology truth attached to one replica lane.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ClusterReplicaLaneExpertTopologyRequirement {
+    /// Stable model-family label for the lane.
+    pub family: String,
+    /// Raw model-architecture label when one differs from family.
+    pub architecture: String,
+    /// Total declared expert count.
+    pub expert_count: usize,
+    /// Routed active-expert count per token when the lane declares it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_expert_count: Option<usize>,
+    /// Expert feed-forward width when the lane declares it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expert_feed_forward_length: Option<usize>,
+    /// Runtime contract required to execute the lane honestly.
+    pub runtime_contract: ClusterReplicaLaneExpertRuntimeContract,
+}
+
+impl ClusterReplicaLaneExpertTopologyRequirement {
+    /// Creates one explicit expert-family topology requirement.
+    #[must_use]
+    pub fn new(
+        family: impl Into<String>,
+        architecture: impl Into<String>,
+        expert_count: usize,
+        runtime_contract: ClusterReplicaLaneExpertRuntimeContract,
+    ) -> Self {
+        Self {
+            family: family.into(),
+            architecture: architecture.into(),
+            expert_count,
+            active_expert_count: None,
+            expert_feed_forward_length: None,
+            runtime_contract,
+        }
+    }
+
+    /// Attaches routed active-expert count per token.
+    #[must_use]
+    pub fn with_active_expert_count(mut self, active_expert_count: usize) -> Self {
+        self.active_expert_count = Some(active_expert_count);
+        self
+    }
+
+    /// Attaches expert feed-forward width.
+    #[must_use]
+    pub fn with_expert_feed_forward_length(mut self, expert_feed_forward_length: usize) -> Self {
+        self.expert_feed_forward_length = Some(expert_feed_forward_length);
+        self
+    }
+}
+
 /// Stable identity for one replicated serving lane.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ClusterReplicaLaneKey {
@@ -33,6 +96,10 @@ pub struct ClusterReplicaLaneKey {
     /// Stable sharded-manifest digest for the lane, when replicas were provisioned from one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sharded_model_manifest_digest: Option<String>,
+    /// Honest expert-family topology truth when the lane cannot be described as
+    /// a simple dense replica.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expert_topology_requirement: Option<ClusterReplicaLaneExpertTopologyRequirement>,
 }
 
 impl ClusterReplicaLaneKey {
@@ -50,6 +117,7 @@ impl ClusterReplicaLaneKey {
             runtime_backend: runtime_backend.into(),
             served_artifact_digest: served_artifact_digest.into(),
             sharded_model_manifest_digest: None,
+            expert_topology_requirement: None,
         }
     }
 
@@ -57,6 +125,16 @@ impl ClusterReplicaLaneKey {
     #[must_use]
     pub fn with_sharded_model_manifest_digest(mut self, digest: impl Into<String>) -> Self {
         self.sharded_model_manifest_digest = Some(digest.into());
+        self
+    }
+
+    /// Attaches explicit expert-family topology truth for the lane.
+    #[must_use]
+    pub fn with_expert_topology_requirement(
+        mut self,
+        requirement: ClusterReplicaLaneExpertTopologyRequirement,
+    ) -> Self {
+        self.expert_topology_requirement = Some(requirement);
         self
     }
 }
@@ -150,6 +228,30 @@ impl ClusterReplicaSnapshot {
                 .unwrap_or_default()
                 .as_bytes(),
         );
+        hasher.update(b"|");
+        if let Some(requirement) = &self.lane.expert_topology_requirement {
+            hasher.update(requirement.family.as_bytes());
+            hasher.update(b"|");
+            hasher.update(requirement.architecture.as_bytes());
+            hasher.update(b"|");
+            hasher.update(requirement.expert_count.to_string());
+            hasher.update(b"|");
+            hasher.update(
+                requirement
+                    .active_expert_count
+                    .map(|count| count.to_string())
+                    .unwrap_or_default(),
+            );
+            hasher.update(b"|");
+            hasher.update(
+                requirement
+                    .expert_feed_forward_length
+                    .map(|count| count.to_string())
+                    .unwrap_or_default(),
+            );
+            hasher.update(b"|");
+            hasher.update(format!("{:?}", requirement.runtime_contract));
+        }
         for replica in self.replicas.values() {
             hasher.update(b"|replica|");
             hasher.update(replica.node_id.as_str().as_bytes());
@@ -1090,6 +1192,26 @@ mod tests {
         replica_lane().with_sharded_model_manifest_digest("replica-manifest-digest")
     }
 
+    fn expert_replica_lane() -> ClusterReplicaLaneKey {
+        ClusterReplicaLaneKey::new(
+            "psionic.text_generation",
+            "gemma4:26b",
+            "cuda",
+            "gemma4-26b-artifact",
+        )
+        .with_sharded_model_manifest_digest("gemma4-26b-manifest")
+        .with_expert_topology_requirement(
+            ClusterReplicaLaneExpertTopologyRequirement::new(
+                "gemma4",
+                "gemma4",
+                64,
+                ClusterReplicaLaneExpertRuntimeContract::FamilySpecificPlacement,
+            )
+            .with_active_expert_count(4)
+            .with_expert_feed_forward_length(4096),
+        )
+    }
+
     fn ready_membership(cluster_id: &ClusterId, node_id: &str) -> ClusterMembershipRecord {
         ClusterMembershipRecord::new(
             ClusterNodeIdentity {
@@ -1570,6 +1692,44 @@ mod tests {
                 .cluster_execution
                 .disposition,
             ClusterExecutionDisposition::ReplicaRouted
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replicated_serving_snapshot_digest_tracks_expert_topology_truth()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cluster_id = sample_cluster_id();
+        let dense_snapshot =
+            ClusterReplicaSnapshot::new(cluster_id.clone(), replica_lane_with_manifest())
+                .with_replica(ClusterReplicaRecord::new(
+                    replica_lane_with_manifest(),
+                    NodeId::new("worker-a"),
+                    ClusterReplicaWarmState::Warm,
+                ));
+        let expert_lane = expert_replica_lane();
+        let expert_snapshot = ClusterReplicaSnapshot::new(cluster_id, expert_lane.clone())
+            .with_replica(ClusterReplicaRecord::new(
+                expert_lane.clone(),
+                NodeId::new("worker-a"),
+                ClusterReplicaWarmState::Warm,
+            ));
+
+        assert_ne!(
+            dense_snapshot.stable_digest(),
+            expert_snapshot.stable_digest()
+        );
+        let requirement = expert_snapshot
+            .lane
+            .expert_topology_requirement
+            .as_ref()
+            .expect("expert topology requirement");
+        assert_eq!(requirement.family, "gemma4");
+        assert_eq!(requirement.expert_count, 64);
+        assert_eq!(requirement.active_expert_count, Some(4));
+        assert_eq!(
+            requirement.runtime_contract,
+            ClusterReplicaLaneExpertRuntimeContract::FamilySpecificPlacement
         );
         Ok(())
     }

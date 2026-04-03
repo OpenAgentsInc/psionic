@@ -179,6 +179,30 @@ The execution contract above that ordered record is:
 - management state can explain the current term, promotion reason, and standby
   set without inferring them from traffic
 
+## Expert-Family Admission Truth
+
+Non-`gpt-oss` expert families now stay explicit instead of failing as a generic
+"unsupported family feature" bucket.
+
+`psionic-models` now owns an inspectable expert-topology contract that keeps
+these facts machine-checkable before any native serve claim:
+
+- artifact identity
+- model family and raw architecture
+- expert count and active-expert count when declared
+- expert feed-forward width when declared
+- required runtime contract
+
+For `gpt-oss`, that runtime contract can stay `gpt_oss_native_moe`. For other
+expert families, the honest posture is currently `family_specific_placement`.
+That means Psionic can describe the lane and carry its artifact and topology
+truth into cluster state, but it must still refuse native execution until the
+later expert-placement issues land.
+
+`psionic-cluster` replicated lane identity now has an optional
+expert-topology-requirement field so future sparse-family lanes can carry the
+same topology truth and digest stability as dense or replicated lanes do today.
+
 ## Demand And Rebalance
 
 Mesh demand is now a first-class Psionic control signal instead of an operator
