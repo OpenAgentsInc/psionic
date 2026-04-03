@@ -1,0 +1,36 @@
+{
+  "schema_version": "psion.cs336_a2.flashattention_reference_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "baseline_profile_bundle_path": "fixtures/training/cs336_a2_baseline_profile_bundle_v1.json",
+  "config": {
+    "batch_size": 2,
+    "head_count": 2,
+    "sequence_length": 4,
+    "head_dim": 4,
+    "causal": true,
+    "query_block_rows": 3,
+    "key_block_rows": 2,
+    "max_abs_tolerance": 0.0001
+  },
+  "forward_output_max_abs_diff": 1.1920929e-7,
+  "forward_logsumexp_max_abs_diff": 1.1920929e-7,
+  "backward_d_query_max_abs_diff": 1.8626451e-8,
+  "backward_d_key_max_abs_diff": 3.7252903e-9,
+  "backward_d_value_max_abs_diff": 5.9604645e-8,
+  "memory": {
+    "naive_score_elements": 64,
+    "naive_probability_elements": 64,
+    "reference_score_tile_elements": 6,
+    "reference_probability_tile_elements": 6,
+    "reference_saved_lse_elements": 16,
+    "reference_saved_output_elements": 64,
+    "score_tile_reduction_ratio": 10.666667,
+    "probability_tile_reduction_ratio": 10.666667
+  },
+  "reference_output_digest": "64f9e8205a31cb0063cfacd1ec940eeef9af83008c44eb9885e6ad0451892e95",
+  "reference_logsumexp_digest": "cdfac7700c6137af5ced6627d551e06916f328f0fd48b15ac29103ab63d6f59e",
+  "reference_d_query_digest": "b754aff38bf297f04b509a19466197e004f8fe037c0613861adf0ea856d7b382",
+  "reference_d_key_digest": "ba27b78edea85d9052aad830c987a5ce7ef0083e02264cfd104beef931499f43",
+  "reference_d_value_digest": "8388fb7c592adbb226cc3ec094b92471821091a67449dbb20ca2316e0a944e28",
+  "claim_boundary": "This receipt proves a bounded owned FlashAttention2-style reference path inside psionic. It covers forward parity, backward parity, and tiled-memory posture for the CS336 A2 reference lane only. It does not claim a fused backend kernel or production actual-lane attention closure."
+}

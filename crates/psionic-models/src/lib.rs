@@ -2,6 +2,7 @@
 
 mod attnres;
 mod cs336_a1_reference_stack;
+mod cs336_a2_flashattention_reference;
 mod cs336_a1_tokenizer;
 mod fixtures;
 mod harmony;
@@ -84,6 +85,7 @@ use thiserror::Error;
 
 pub use attnres::*;
 pub use cs336_a1_reference_stack::*;
+pub use cs336_a2_flashattention_reference::*;
 pub use cs336_a1_tokenizer::*;
 pub use fixtures::*;
 pub use harmony::*;

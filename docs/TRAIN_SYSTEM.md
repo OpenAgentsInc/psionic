@@ -155,6 +155,18 @@ tiny A1-backed training step, and the pre-DDP distributed communication posture
 so later FlashAttention, DDP, and sharded-optimizer work plugs into one shared
 bounded proof bundle instead of standalone notes.
 
+The repo now also owns the second bounded full-port A2 reference-lane tranche
+in `crates/psionic-models/src/cs336_a2_flashattention_reference.rs`,
+`crates/psionic-train/src/cs336_a2_flashattention_reference_receipt.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_cs336_a2_flashattention_reference_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_flashattention_reference_receipt_v1.json`. That
+surface lands one owned tiled FlashAttention2-style forward/backward reference
+path, proves parity against the bounded naive baseline, and records the smaller
+tiled score/probability memory posture without overstating it as a fused backend
+kernel or actual-lane production attention closure.
+
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the
 fixture generator
