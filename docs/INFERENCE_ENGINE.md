@@ -63,6 +63,20 @@ than just run tensor math.
     `e4b` lane
   - claim boundary = validation only; it does not widen the original
     `gemma4:e4b` publication
+- `Gemma 4` now also has one first sparse-family publication contract outside
+  the dense first claim:
+  - artifact class = sparse `gemma4:26b`
+  - runtime contract = `family_specific_placement`
+  - published topology = `expert_count = 64`, `active_expert_count = 4`,
+    `expert_feed_forward_length = 4096`
+  - publication surfaces = `/health`, `/v1/models`, routed inventory, and mesh
+    management status all carry the same sparse-topology truth plus one
+    explicit execution refusal reason
+  - request posture = the local generic OpenAI-compatible server fails closed
+    on `/v1/chat/completions` and `/v1/responses` until a distributed sparse
+    placement is admitted
+  - claim boundary = truthful topology publication only; this does not promote
+    single-node native `gemma4:26b` execution
 - The first distributed `Gemma 4` mesh validation now rides the bootstrap path
   too:
   - remote execution target = CUDA-backed `gemma4:e4b`
@@ -90,7 +104,8 @@ than just run tensor math.
   - admitted video execution on the processor-owned lane
   - admitted audio execution on the processor-owned audio lane
   - `31B`
-  - `26B A4B`
+  - successful native `gemma4:26b` execution without admitted distributed
+    sparse placement
   - successful native Metal execution
   - generic structured outputs
   - unquantized projection tensors on the native CUDA lane
@@ -103,8 +118,8 @@ than just run tensor math.
   publication:
   - `e2b` and `e4b` publish `audio_input_mode = processor_owned` and
     `audio_input_parts = ["input_audio"]`
-  - `31B` and `26B A4B` do not publish audio capability and fail closed for
-    direct `input_audio` parts on the current generic surface
+  - `31B` and sparse `gemma4:26b` do not publish audio capability and fail
+    closed for direct `input_audio` parts on the current generic surface
 - CPU-only debug bring-up may still be useful while the lane is under active
   development. The repo now admits `Gemma 4` on CPU for bounded debug
   execution, but CPU still does not satisfy the first published `Gemma 4`

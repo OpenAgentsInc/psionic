@@ -31,8 +31,9 @@ evidence.
   - generic OpenAI-compatible server surfaces
   - hardware validation and backend truth
   - bounded non-`GptOss` lanes including `qwen35`, the published dense
-    `gemma4:e4b` CUDA lane, and the optional dense `Gemma 4 31B` validation
-    repeat that keeps the same family contract without widening the first claim
+    `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` topology-publication and
+    refusal lane, and the optional dense `Gemma 4 31B` validation repeat that
+    keeps the same family contract without widening the first claim
   - the Gemma image or video path now publishes as a processor-owned refusal
     lane instead of pretending the dense text surface can consume media URLs
   - the dense `Gemma 4` `e2b` and `e4b` rows now also publish a separate
@@ -64,7 +65,9 @@ evidence.
     generic unsupported-family bucket
   - `psionic-cluster` now also owns one native sparse expert-placement contract over explicit
     expert-host inventory, stable placement digests, typed refusal codes, and reusable sharded
-    execution receipts instead of a sidecar-only MoE control plane
+    execution receipts instead of a sidecar-only MoE control plane; the first specialized lane is
+    `gemma4:26b` with `64` experts, `4` active experts, `family_specific_placement`, and a
+    truthful two-host partitioned planning policy
   - start with [docs/ROADMAP_CLUSTER.md](docs/ROADMAP_CLUSTER.md)
   - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
 - Psion learned-model program

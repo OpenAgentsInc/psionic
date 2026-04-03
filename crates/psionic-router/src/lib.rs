@@ -633,8 +633,97 @@ pub struct RoutedModelInventory {
     pub tool_calling: bool,
     /// Whether response-state flows are supported.
     pub response_state: bool,
+    /// Explicit execution refusal reason when the route is published but cannot
+    /// execute locally yet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_refusal_reason: Option<String>,
+    /// Explicit sparse expert-topology truth for family-specific distributed
+    /// lanes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     /// Live runtime facts that cache-aware and warm-aware policy can consume.
     pub runtime_state: RoutedModelRuntimeState,
+}
+
+/// Runtime contract required for one sparse expert lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedSparseExpertRuntimeContract {
+    /// The runtime has native expert-family execution.
+    NativeMoe,
+    /// The runtime needs explicit family-specific placement truth.
+    FamilySpecificPlacement,
+}
+
+/// Explicit sparse expert-topology truth carried by one routed model lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutedSparseExpertTopology {
+    /// Model family label.
+    pub family: String,
+    /// Raw architecture label.
+    pub architecture: String,
+    /// Primary artifact digest that the sparse lane expects on expert hosts.
+    pub served_artifact_digest: String,
+    /// Stable sharded-model manifest digest when one manifest seeded the lane.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sharded_model_manifest_digest: Option<String>,
+    /// Runtime contract required for honest execution.
+    pub runtime_contract: RoutedSparseExpertRuntimeContract,
+    /// Total expert count declared by the model.
+    pub expert_count: usize,
+    /// Routed active-expert count when the model declares one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_expert_count: Option<usize>,
+    /// Expert feed-forward width when the model declares one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expert_feed_forward_length: Option<usize>,
+}
+
+impl RoutedSparseExpertTopology {
+    /// Creates one routed sparse expert-topology record.
+    #[must_use]
+    pub fn new(
+        family: impl Into<String>,
+        architecture: impl Into<String>,
+        served_artifact_digest: impl Into<String>,
+        runtime_contract: RoutedSparseExpertRuntimeContract,
+        expert_count: usize,
+    ) -> Self {
+        Self {
+            family: family.into(),
+            architecture: architecture.into(),
+            served_artifact_digest: served_artifact_digest.into(),
+            sharded_model_manifest_digest: None,
+            runtime_contract,
+            expert_count,
+            active_expert_count: None,
+            expert_feed_forward_length: None,
+        }
+    }
+
+    /// Attaches a sharded-model manifest digest.
+    #[must_use]
+    pub fn with_sharded_model_manifest_digest(mut self, digest: impl Into<String>) -> Self {
+        self.sharded_model_manifest_digest = Some(digest.into());
+        self
+    }
+
+    /// Attaches the active expert count.
+    #[must_use]
+    pub const fn with_active_expert_count(mut self, active_expert_count: usize) -> Self {
+        self.active_expert_count = Some(active_expert_count);
+        self
+    }
+
+    /// Attaches the expert feed-forward width.
+    #[must_use]
+    pub const fn with_expert_feed_forward_length(
+        mut self,
+        expert_feed_forward_length: usize,
+    ) -> Self {
+        self.expert_feed_forward_length = Some(expert_feed_forward_length);
+        self
+    }
 }
 
 impl RoutedModelInventory {
@@ -665,6 +754,8 @@ impl RoutedModelInventory {
             structured_outputs: false,
             tool_calling: false,
             response_state: false,
+            execution_refusal_reason: None,
+            sparse_expert_topology: None,
             runtime_state: RoutedModelRuntimeState::default(),
         }
     }
@@ -741,6 +832,26 @@ impl RoutedModelInventory {
     #[must_use]
     pub const fn with_response_state(mut self) -> Self {
         self.response_state = true;
+        self
+    }
+
+    /// Publishes one explicit execution refusal reason for the lane.
+    #[must_use]
+    pub fn with_execution_refusal_reason(
+        mut self,
+        execution_refusal_reason: impl Into<String>,
+    ) -> Self {
+        self.execution_refusal_reason = Some(execution_refusal_reason.into());
+        self
+    }
+
+    /// Publishes explicit sparse expert-topology truth for the lane.
+    #[must_use]
+    pub fn with_sparse_expert_topology(
+        mut self,
+        sparse_expert_topology: RoutedSparseExpertTopology,
+    ) -> Self {
+        self.sparse_expert_topology = Some(sparse_expert_topology);
         self
     }
 
@@ -1945,9 +2056,10 @@ mod tests {
     use super::{
         FleetRouter, ReliabilityAction, ReliabilityReason, RouteReliabilityController,
         RouteReliabilityPolicy, RouteSelectionStrategy, RoutedCacheEntry, RoutedExecutionLocality,
-        RoutedExecutionProvenance, RoutedModelInventory, RoutedWarmState, RoutedWorkerInventory,
-        RoutingDemandKey, RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError,
-        RoutingRequest, WorkerCircuitState,
+        RoutedExecutionProvenance, RoutedModelInventory, RoutedSparseExpertRuntimeContract,
+        RoutedSparseExpertTopology, RoutedWarmState, RoutedWorkerInventory, RoutingDemandKey,
+        RoutingDemandLedger, RoutingDemandPolicy, RoutingEndpoint, RoutingError, RoutingRequest,
+        WorkerCircuitState,
     };
     use psionic_runtime::{
         ExecutionCapabilityProfile, HealthStatus, KvCacheEncodingFamily, KvCacheEncodingObjective,
@@ -2136,6 +2248,50 @@ mod tests {
             error.to_string().contains("/v1/responses"),
             "refusal should keep the unsupported endpoint explicit"
         );
+    }
+
+    #[test]
+    fn router_keeps_sparse_gemma26b_topology_truth_in_inventory() {
+        let topology = RoutedSparseExpertTopology::new(
+            "gemma4",
+            "gemma4",
+            "gemma4-26b-artifact",
+            RoutedSparseExpertRuntimeContract::FamilySpecificPlacement,
+            64,
+        )
+        .with_active_expert_count(4)
+        .with_expert_feed_forward_length(4096)
+        .with_sharded_model_manifest_digest("gemma4-26b-manifest");
+        let router = FleetRouter::new(
+            "gemma4:26b",
+            vec![
+                RoutedWorkerInventory::new("worker-gemma4-26b", "cuda", "native", "psionic")
+                    .with_model(
+                        RoutedModelInventory::new(
+                            "gemma4:26b",
+                            "gemma4:26b",
+                            "gemma4",
+                            sample_profile(),
+                        )
+                        .with_supported_endpoint(RoutingEndpoint::ChatCompletions)
+                        .with_supported_endpoint(RoutingEndpoint::Responses)
+                        .with_execution_refusal_reason(
+                            "model `gemma4:26b` requires distributed sparse placement",
+                        )
+                        .with_sparse_expert_topology(topology.clone()),
+                    ),
+            ],
+        )
+        .expect("router should build");
+
+        let routed_model = router
+            .routed_model("worker-gemma4-26b", "gemma4:26b")
+            .expect("router inventory should keep gemma4 26b truth");
+        assert_eq!(
+            routed_model.execution_refusal_reason.as_deref(),
+            Some("model `gemma4:26b` requires distributed sparse placement")
+        );
+        assert_eq!(routed_model.sparse_expert_topology.as_ref(), Some(&topology));
     }
 
     #[test]

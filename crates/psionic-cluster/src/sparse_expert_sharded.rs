@@ -495,6 +495,122 @@ pub struct SparseExpertClusterSchedule {
     pub cluster_execution: ClusterExecutionContext,
 }
 
+/// Specialized request for the first Gemma 4 sparse distributed lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Gemma4MoeDistributedLaneRequest {
+    /// Node performing the placement decision.
+    pub scheduler_node_id: NodeId,
+    /// Explicit expert-host inventory for the lane.
+    pub expert_host_inventory: SparseExpertHostInventorySnapshot,
+    /// Minimum free memory each host must expose, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum_free_memory_bytes_per_host: Option<u64>,
+    /// Stable policy digests constraining the lane.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_digests: Vec<ClusterPolicyDigest>,
+}
+
+impl Gemma4MoeDistributedLaneRequest {
+    /// Creates one Gemma 4 sparse distributed-lane request.
+    #[must_use]
+    pub fn new(
+        scheduler_node_id: NodeId,
+        expert_host_inventory: SparseExpertHostInventorySnapshot,
+    ) -> Self {
+        Self {
+            scheduler_node_id,
+            expert_host_inventory,
+            minimum_free_memory_bytes_per_host: None,
+            policy_digests: Vec::new(),
+        }
+    }
+
+    /// Attaches a per-host minimum free-memory requirement.
+    #[must_use]
+    pub const fn with_minimum_free_memory_bytes_per_host(
+        mut self,
+        minimum_free_memory_bytes_per_host: u64,
+    ) -> Self {
+        self.minimum_free_memory_bytes_per_host = Some(minimum_free_memory_bytes_per_host);
+        self
+    }
+
+    /// Appends one policy digest reference.
+    #[must_use]
+    pub fn with_policy_digest(mut self, policy_digest: ClusterPolicyDigest) -> Self {
+        self.policy_digests.push(policy_digest);
+        self
+    }
+}
+
+/// Returns the canonical topology requirement for the first Gemma 4 sparse
+/// distributed lane.
+#[must_use]
+pub fn gemma4_26b_topology_requirement() -> ClusterReplicaLaneExpertTopologyRequirement {
+    ClusterReplicaLaneExpertTopologyRequirement::new(
+        "gemma4",
+        "gemma4",
+        64,
+        crate::ClusterReplicaLaneExpertRuntimeContract::FamilySpecificPlacement,
+    )
+    .with_active_expert_count(4)
+    .with_expert_feed_forward_length(4096)
+}
+
+/// Returns the first truthful placement policy for the Gemma 4 26B sparse
+/// distributed lane.
+#[must_use]
+pub const fn gemma4_26b_distributed_lane_policy() -> SparseExpertPlacementPolicy {
+    SparseExpertPlacementPolicy::family_specific_default()
+        .with_minimum_distinct_hosts(2)
+        .with_active_experts_must_span_distinct_hosts(false)
+}
+
+/// Schedules the first Gemma 4 26B sparse distributed lane from explicit host
+/// inventory.
+pub fn schedule_gemma4_26b_distributed_lane(
+    state: &ClusterState,
+    request: &Gemma4MoeDistributedLaneRequest,
+) -> Result<SparseExpertClusterSchedule, Box<SparseExpertSchedulingFailure>> {
+    if request.expert_host_inventory.model_id != "gemma4:26b" {
+        return Err(Box::new(sparse_expert_failure(
+            SparseExpertSchedulingFailureCode::ModelIneligible,
+            format!(
+                "Gemma 4 sparse distributed lane expects model_id `gemma4:26b`, got `{}`",
+                request.expert_host_inventory.model_id
+            ),
+            state,
+            &SparseExpertExecutionRequest::new(
+                request.scheduler_node_id.clone(),
+                gemma4_26b_topology_requirement(),
+                request.expert_host_inventory.clone(),
+            ),
+            &state.stable_digest(),
+            &state.topology_digest(),
+            Some(state.artifact_residency_digest()),
+            request.expert_host_inventory.stable_digest(),
+            tensor_collective_communication_eligibility(
+                &default_sparse_expert_capability_profile(),
+            ),
+            Vec::new(),
+        )));
+    }
+
+    let mut sparse_request = SparseExpertExecutionRequest::new(
+        request.scheduler_node_id.clone(),
+        gemma4_26b_topology_requirement(),
+        request.expert_host_inventory.clone(),
+    );
+    if let Some(minimum_free_memory_bytes_per_host) = request.minimum_free_memory_bytes_per_host {
+        sparse_request = sparse_request
+            .with_minimum_free_memory_bytes_per_host(minimum_free_memory_bytes_per_host);
+    }
+    for policy_digest in &request.policy_digests {
+        sparse_request = sparse_request.with_policy_digest(policy_digest.clone());
+    }
+    schedule_sparse_expert_execution(state, &sparse_request, &gemma4_26b_distributed_lane_policy())
+}
+
 /// Plans one truthful sparse expert-placement lane from explicit inventory.
 pub fn schedule_sparse_expert_execution(
     state: &ClusterState,
@@ -1044,9 +1160,10 @@ mod tests {
     };
 
     use super::{
-        SparseExpertClusterSchedule, SparseExpertExecutionRequest, SparseExpertHostInventoryRecord,
-        SparseExpertHostInventorySnapshot, SparseExpertPlacementPolicy,
-        SparseExpertSchedulingFailureCode, schedule_sparse_expert_execution,
+        Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule, SparseExpertExecutionRequest,
+        SparseExpertHostInventoryRecord, SparseExpertHostInventorySnapshot,
+        SparseExpertPlacementPolicy, SparseExpertSchedulingFailureCode,
+        schedule_gemma4_26b_distributed_lane, schedule_sparse_expert_execution,
     };
 
     fn fixture_error(detail: &str) -> Error {
@@ -1256,6 +1373,78 @@ mod tests {
             SparseExpertSchedulingFailureCode::ActiveExpertPlacementUnsatisfied
         );
         assert!(failure.detail.contains("active expert count 4"));
+        Ok(())
+    }
+
+    #[test]
+    fn gemma4_26b_distributed_lane_accepts_two_host_partitioned_inventory()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = sample_state();
+        let request = Gemma4MoeDistributedLaneRequest::new(
+            crate::NodeId::new("scheduler"),
+            sample_inventory(),
+        )
+        .with_minimum_free_memory_bytes_per_host(16 * 1024 * 1024 * 1024)
+        .with_policy_digest(ClusterPolicyDigest::new(
+            ClusterPolicyDigestKind::Placement,
+            "gemma4-26b-operator-placement",
+        ));
+
+        let schedule = schedule_gemma4_26b_distributed_lane(&state, &request).map_err(|error| {
+            fixture_error(&format!(
+                "expected gemma4 26b distributed lane schedule: {error:?}"
+            ))
+        })?;
+
+        assert_eq!(schedule.runtime_backend, "cuda");
+        assert_eq!(schedule.lane.model_id, "gemma4:26b");
+        assert_eq!(schedule.placement_plan.assignments.len(), 2);
+        assert_eq!(
+            schedule
+                .lane
+                .expert_topology_requirement
+                .as_ref()
+                .and_then(|requirement| requirement.active_expert_count),
+            Some(4)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gemma4_26b_distributed_lane_refuses_wrong_model_identity()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let state = sample_state();
+        let request = Gemma4MoeDistributedLaneRequest::new(
+            crate::NodeId::new("scheduler"),
+            SparseExpertHostInventorySnapshot::new(
+                "psionic.text_generation",
+                "gemma4:e4b",
+                "cuda",
+                "artifact-1",
+            )
+            .with_host(SparseExpertHostInventoryRecord::new(
+                crate::NodeId::new("worker-a"),
+                0,
+                32,
+            ))
+            .with_host(SparseExpertHostInventoryRecord::new(
+                crate::NodeId::new("worker-b"),
+                32,
+                64,
+            )),
+        );
+
+        let failure = match schedule_gemma4_26b_distributed_lane(&state, &request) {
+            Ok(SparseExpertClusterSchedule { .. }) => {
+                return Err(
+                    fixture_error("wrong gemma lane identity should have been refused").into(),
+                );
+            }
+            Err(error) => error,
+        };
+
+        assert_eq!(failure.code, SparseExpertSchedulingFailureCode::ModelIneligible);
+        assert!(failure.detail.contains("gemma4:26b"));
         Ok(())
     }
 }

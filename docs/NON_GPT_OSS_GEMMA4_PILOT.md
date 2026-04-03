@@ -171,7 +171,7 @@ The first `Gemma 4` claim does not include:
 - admitted video execution on the processor-owned lane
 - admitted audio execution on the processor-owned audio lane
 - `31B Dense`
-- `26B A4B`
+- successful native `gemma4:26b` sparse execution
 - successful native Metal execution
 - full parity with `llama.cpp`
 - full parity with `ollama`
@@ -322,6 +322,8 @@ The pilot stays green only if all of the following remain true:
 - when `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH` is supplied, the dense `31B`
   validation lane still matches the same tokenizer, prompt, backend-truth,
   and refusal contract instead of forking the family semantics
+- `gemma4:26b` now publishes sparse-topology truth with one explicit refusal
+  reason instead of falling back to a generic unsupported-family error
 
 ## Why The Claim Is Narrow
 
@@ -336,7 +338,9 @@ That bounded claim keeps later work cleanly separated:
 - admitted image and video execution on the processor-owned lane
 - audio support for `E2B` and `E4B`
 - generic structured outputs
-- `26B A4B` and wider non-`GptOss` MoE admission
+- admitted distributed `gemma4:26b` execution above the new sparse-topology
+  contract
+- wider non-`GptOss` MoE family admission
 - Metal and other accelerator parity
 - any future decision to promote `31B` from validation-only into its own
   published support claim

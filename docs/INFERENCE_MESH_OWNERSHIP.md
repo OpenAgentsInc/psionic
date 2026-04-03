@@ -199,6 +199,11 @@ That means Psionic can describe the lane and carry its artifact and topology
 truth into cluster state, but it must still refuse native execution until the
 later expert-placement issues land.
 
+The first published sparse-family lane on that contract is `gemma4:26b`. The
+generic server now carries its `64`-expert, `4`-active-expert topology and one
+explicit refusal reason into `/health`, `/v1/models`, and routed inventory
+instead of collapsing it into a generic unsupported-decoder error.
+
 `psionic-cluster` replicated lane identity now has an optional
 expert-topology-requirement field so future sparse-family lanes can carry the
 same topology truth and digest stability as dense or replicated lanes do today.
@@ -207,6 +212,16 @@ same topology truth and digest stability as dense or replicated lanes do today.
 
 `psionic-cluster` now owns the first native sparse expert-placement contract for
 family-specific expert lanes.
+
+The first specialized lane on that contract is `gemma4:26b`:
+
+- model id = `gemma4:26b`
+- runtime contract = `family_specific_placement`
+- expert count = `64`
+- active expert count = `4`
+- expert feed-forward length = `4096`
+- first planning policy = two ready hosts may each carry one contiguous half of
+  the expert space while still producing one stable placement digest
 
 The contract starts from one explicit expert-host inventory snapshot:
 
@@ -249,6 +264,9 @@ family executes natively today. The current honest boundary is:
 
 - Psionic can now publish sparse expert-host inventory and placement truth for
   family-specific lanes.
+- Psionic can now specialize one native sparse planner for `gemma4:26b` and
+  emit either one stable sharded schedule or one typed refusal against that
+  family contract.
 - Psionic can now keep those lanes inside native cluster identity and sharded
   execution receipts.
 - Family-specific runtime execution remains gated on later model-family

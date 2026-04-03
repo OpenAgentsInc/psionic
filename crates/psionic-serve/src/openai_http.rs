@@ -31,12 +31,14 @@ use psionic_cluster::{
     ClusterReplicaDemandSnapshot, ClusterReplicaLifecyclePolicy,
 };
 use psionic_models::{
-    GgufBlobArtifact, GgufDecoderFamily, GgufPromptTemplateRenderer, GptOssHarmonyParseOptions,
-    GptOssHarmonyParsedOutput, GptOssHarmonyRenderContext, GptOssTokenizer,
-    ParsedReasoningResponse, PromptChannelConfig, PromptMessage, PromptMessageRole,
-    PromptReasoningEffort, PromptRenderOptions, Qwen35MultimodalProjectionConfig, ReasoningParser,
-    parse_gpt_oss_harmony_text, parse_reasoning_response_text_for_decoder_family,
-    reasoning_parser_for_decoder_family, render_gpt_oss_harmony_prompt,
+    GgufBlobArtifact, GgufDecoderArtifactInspection, GgufDecoderExpertRuntimeContract,
+    GgufDecoderFamily, GgufDecoderServingAdmissionKind, GgufPromptTemplateRenderer,
+    GptOssHarmonyParseOptions, GptOssHarmonyParsedOutput, GptOssHarmonyRenderContext,
+    GptOssTokenizer, ParsedReasoningResponse, PromptChannelConfig, PromptMessage,
+    PromptMessageRole, PromptReasoningEffort, PromptRenderOptions,
+    Qwen35MultimodalProjectionConfig, ReasoningParser, parse_gpt_oss_harmony_text,
+    parse_reasoning_response_text_for_decoder_family, reasoning_parser_for_decoder_family,
+    render_gpt_oss_harmony_prompt,
 };
 use psionic_net::{
     PersistedClusterNetworkState, PersistedImportedJoinBundle, PersistedJoinedMeshPreference,
@@ -46,8 +48,9 @@ use psionic_router::{
     FleetRouter, ResponseConversationRef, ResponseStateCapability, ResponseStateError,
     ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore, RouteSelection,
     RouteSelectionStrategy, RoutedExecutionLocality, RoutedExecutionProvenance,
-    RoutedModelInventory, RoutedWarmState, RoutedWorkerInventory, RoutingDemandLedger,
-    RoutingDemandSnapshot, RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
+    RoutedModelInventory, RoutedSparseExpertRuntimeContract, RoutedSparseExpertTopology,
+    RoutedWarmState, RoutedWorkerInventory, RoutingDemandLedger, RoutingDemandSnapshot,
+    RoutingEndpoint, RoutingError, RoutingRequest, RoutingTarget,
 };
 use psionic_runtime::{
     ExecutionCapabilityProfile, GenerationSchedulerPolicy, GenerationSchedulerRequestReceipt,
@@ -1108,6 +1111,10 @@ struct BootstrapRemoteModelStatus {
     execution_profile: ExecutionCapabilityProfile,
     #[serde(default)]
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+    #[serde(default)]
+    execution_refusal_reason: Option<String>,
+    #[serde(default)]
+    sparse_expert_topology: Option<RoutedSparseExpertTopology>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -1167,6 +1174,10 @@ struct MeshManagementModelStatus {
     execution_profile: ExecutionCapabilityProfile,
     #[serde(skip_serializing_if = "Option::is_none")]
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    execution_refusal_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sparse_expert_topology: Option<RoutedSparseExpertTopology>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -1824,6 +1835,7 @@ enum OpenAiCompatRuntimeKind {
     GgufDecoderCpu,
     GgufDecoderCudaGemma4,
     GgufDecoderCudaQwen35,
+    GgufDecoderPendingTopologyRefusal,
     GgufDecoderMetalGemma4Refusal,
     SafetensorsEmbeddings,
 }
@@ -1856,6 +1868,7 @@ struct OpenAiCompatLoadedDecoderModel {
     multimodal_lane: Option<OpenAiCompatMultimodalLane>,
     audio_lane: Option<OpenAiCompatAudioLane>,
     execution_refusal_reason: Option<String>,
+    sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     prompt_renderer: Option<GgufPromptTemplateRenderer>,
     prompt_options: PromptRenderOptions,
     execution_profile: ExecutionCapabilityProfile,
@@ -2118,6 +2131,11 @@ impl OpenAiCompatLoadedModel {
     fn execution_refusal_reason(&self) -> Option<&str> {
         self.decoder()
             .and_then(|model| model.execution_refusal_reason.as_deref())
+    }
+
+    fn sparse_expert_topology(&self) -> Option<&RoutedSparseExpertTopology> {
+        self.decoder()
+            .and_then(|model| model.sparse_expert_topology.as_ref())
     }
 }
 
@@ -2393,6 +2411,8 @@ fn mesh_management_model_status(model: &RoutedModelInventory) -> MeshManagementM
         response_state: model.response_state,
         execution_profile: model.execution_profile.clone(),
         scheduler_policy: model.scheduler_policy.clone(),
+        execution_refusal_reason: model.execution_refusal_reason.clone(),
+        sparse_expert_topology: model.sparse_expert_topology.clone(),
     }
 }
 
@@ -2780,6 +2800,12 @@ fn bootstrap_remote_model_inventory(
     if let Some(policy) = model.scheduler_policy.clone() {
         inventory = inventory.with_scheduler_policy(policy);
     }
+    if let Some(reason) = model.execution_refusal_reason.clone() {
+        inventory = inventory.with_execution_refusal_reason(reason);
+    }
+    if let Some(topology) = model.sparse_expert_topology.clone() {
+        inventory = inventory.with_sparse_expert_topology(topology);
+    }
     Some(inventory)
 }
 
@@ -2801,6 +2827,8 @@ fn bootstrap_management_node(
             response_state: model.supports_response_state(),
             execution_profile: model.execution_profile().clone(),
             scheduler_policy: model.scheduler_policy().cloned(),
+            execution_refusal_reason: model.execution_refusal_reason().map(String::from),
+            sparse_expert_topology: model.sparse_expert_topology().cloned(),
         })
         .collect::<Vec<_>>();
     models.sort_by(|left, right| left.model_key.cmp(&right.model_key));
@@ -3137,7 +3165,8 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
-                        OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal => {}
+                        OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
+                        | OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal => {}
                         OpenAiCompatRuntimeKind::SafetensorsEmbeddings => {
                             match CpuModelEmbeddingsService::from_safetensors_artifact(
                                 &load_plan.path,
@@ -3787,6 +3816,8 @@ struct ModelCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_execution_refusal_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    psionic_sparse_expert_topology: Option<RoutedSparseExpertTopology>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_projection_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     psionic_multimodal_supported_media: Option<Vec<&'static str>>,
@@ -3814,6 +3845,8 @@ struct PublishedGenericModelAccumulator {
     response_state: bool,
     execution_profile: ExecutionCapabilityProfile,
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+    execution_refusal_reason: Option<String>,
+    sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     route_workers: BTreeSet<String>,
     route_backends: BTreeSet<String>,
     route_execution_modes: BTreeSet<String>,
@@ -3834,6 +3867,8 @@ struct PublishedGenericModel {
     response_state: bool,
     execution_profile: ExecutionCapabilityProfile,
     scheduler_policy: Option<GenerationSchedulerPolicy>,
+    execution_refusal_reason: Option<String>,
+    sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     route_workers: Vec<String>,
     route_backends: Vec<String>,
     route_execution_modes: Vec<String>,
@@ -3930,6 +3965,8 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
                     response_state: false,
                     execution_profile: model.execution_profile.clone(),
                     scheduler_policy: model.scheduler_policy.clone(),
+                    execution_refusal_reason: model.execution_refusal_reason.clone(),
+                    sparse_expert_topology: model.sparse_expert_topology.clone(),
                     route_workers: BTreeSet::new(),
                     route_backends: BTreeSet::new(),
                     route_execution_modes: BTreeSet::new(),
@@ -3945,6 +3982,12 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
             entry.structured_outputs |= model.structured_outputs;
             entry.tool_calling |= model.tool_calling;
             entry.response_state |= model.response_state;
+            if entry.execution_refusal_reason.is_none() {
+                entry.execution_refusal_reason = model.execution_refusal_reason.clone();
+            }
+            if entry.sparse_expert_topology.is_none() {
+                entry.sparse_expert_topology = model.sparse_expert_topology.clone();
+            }
             entry.route_workers.insert(
                 worker
                     .peer_worker_id
@@ -3990,6 +4033,14 @@ fn published_mesh_models(state: &OpenAiCompatState) -> Vec<PublishedGenericModel
                     .and_then(OpenAiCompatLoadedModel::scheduler_policy)
                     .cloned()
                     .or(entry.scheduler_policy),
+                execution_refusal_reason: local_loaded_model
+                    .and_then(OpenAiCompatLoadedModel::execution_refusal_reason)
+                    .map(String::from)
+                    .or(entry.execution_refusal_reason),
+                sparse_expert_topology: local_loaded_model
+                    .and_then(OpenAiCompatLoadedModel::sparse_expert_topology)
+                    .cloned()
+                    .or(entry.sparse_expert_topology),
                 route_workers: entry.route_workers.into_iter().collect(),
                 route_backends: entry.route_backends.into_iter().collect(),
                 route_execution_modes: entry.route_execution_modes.into_iter().collect(),
@@ -4180,6 +4231,17 @@ fn published_model_execution_refusal_reason(
     published_model_loaded_model(state, model)
         .and_then(OpenAiCompatLoadedModel::execution_refusal_reason)
         .map(String::from)
+        .or_else(|| model.execution_refusal_reason.clone())
+}
+
+fn published_model_sparse_expert_topology(
+    state: &OpenAiCompatState,
+    model: &PublishedGenericModel,
+) -> Option<RoutedSparseExpertTopology> {
+    published_model_loaded_model(state, model)
+        .and_then(OpenAiCompatLoadedModel::sparse_expert_topology)
+        .cloned()
+        .or_else(|| model.sparse_expert_topology.clone())
 }
 
 fn published_model_embedding_dimensions(
@@ -4290,6 +4352,7 @@ async fn list_models(State(state): State<Arc<GptOssOpenAiCompatState>>) -> Json<
             psionic_execution_profile: None,
             psionic_scheduler_policy: None,
             psionic_execution_refusal_reason: None,
+            psionic_sparse_expert_topology: None,
             psionic_multimodal_projection_mode: None,
             psionic_multimodal_supported_media: None,
             psionic_multimodal_projection_config: None,
@@ -4334,6 +4397,8 @@ struct GenericHealthResponse {
     scheduler_policy: Option<GenerationSchedulerPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     execution_refusal_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sparse_expert_topology: Option<RoutedSparseExpertTopology>,
     #[serde(skip_serializing_if = "Option::is_none")]
     multimodal_projection_mode: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4386,6 +4451,7 @@ async fn generic_health(
             state.as_ref(),
             &default_model,
         ),
+        sparse_expert_topology: published_model_sparse_expert_topology(state.as_ref(), &default_model),
         multimodal_projection_mode: published_model_multimodal_projection_mode(
             state.as_ref(),
             &default_model,
@@ -5138,6 +5204,10 @@ async fn generic_list_models(State(state): State<Arc<OpenAiCompatState>>) -> Jso
                     psionic_execution_profile: Some(model.execution_profile.clone()),
                     psionic_scheduler_policy: model.scheduler_policy.clone(),
                     psionic_execution_refusal_reason: published_model_execution_refusal_reason(
+                        state.as_ref(),
+                        &model,
+                    ),
+                    psionic_sparse_expert_topology: published_model_sparse_expert_topology(
                         state.as_ref(),
                         &model,
                     ),
@@ -8786,6 +8856,12 @@ fn routed_inventory_for_loaded_model(
     if model.supports_response_state() {
         inventory = inventory.with_response_state();
     }
+    if let Some(reason) = model.execution_refusal_reason() {
+        inventory = inventory.with_execution_refusal_reason(reason.to_string());
+    }
+    if let Some(topology) = model.sparse_expert_topology().cloned() {
+        inventory = inventory.with_sparse_expert_topology(topology);
+    }
     inventory
 }
 
@@ -8889,30 +8965,42 @@ fn load_generic_decoder_model(
 > {
     let artifact = GgufBlobArtifact::open_path(model_path, gpt_oss_local_blob_open_options())
         .map_err(|error| error.to_string())?;
-    let adapter = GgufDecoderAdapterLoader
-        .load_blob_artifact(&artifact)
+    let inspection = GgufDecoderAdapterLoader
+        .inspect_blob_artifact(&artifact)
         .map_err(|error| error.to_string())?;
-    let descriptor = adapter.descriptor().clone();
-    let family = adapter.family_metadata().family;
-    let runtime_kind = match (backend, family) {
-        (OpenAiCompatBackend::Cpu, _) => OpenAiCompatRuntimeKind::GgufDecoderCpu,
-        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4) => {
+    let descriptor = inspection.descriptor().clone();
+    let family = inspection.family_metadata().family;
+    let sparse_expert_topology = routed_sparse_expert_topology_from_inspection(&inspection);
+    let pending_topology_refusal = matches!(
+        inspection.admission().kind,
+        GgufDecoderServingAdmissionKind::PendingExpertTopology
+    )
+    .then(|| pending_topology_execution_refusal_reason(&descriptor, sparse_expert_topology.as_ref()));
+    let runtime_kind = match (backend, family, pending_topology_refusal.is_some()) {
+        (OpenAiCompatBackend::Cpu, _, true) => {
+            OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
+        }
+        (OpenAiCompatBackend::Cpu, _, false) => OpenAiCompatRuntimeKind::GgufDecoderCpu,
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4, true) => {
+            OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
+        }
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4, false) => {
             OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4
         }
-        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35) => {
+        (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35, false) => {
             OpenAiCompatRuntimeKind::GgufDecoderCudaQwen35
         }
-        (OpenAiCompatBackend::Cuda, _) => {
+        (OpenAiCompatBackend::Cuda, _, _) => {
             return Err(format!(
                 "generic OpenAI cuda backend currently supports only gemma4 and qwen35 GGUF decoders; `{}` resolved to `{}`",
                 model_path.display(),
                 decoder_family_label(family),
             ));
         }
-        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4) => {
+        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4, _) => {
             OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal
         }
-        (OpenAiCompatBackend::Metal, _) => {
+        (OpenAiCompatBackend::Metal, _, _) => {
             return Err(format!(
                 "generic OpenAI metal backend currently supports only the gemma4 metal lane contract; `{}` resolved to `{}`",
                 model_path.display(),
@@ -8930,18 +9018,24 @@ fn load_generic_decoder_model(
         kind: OpenAiCompatLoadedModelKind::Decoder(OpenAiCompatLoadedDecoderModel {
             descriptor: descriptor.clone(),
             family,
-            multimodal_lane: multimodal_lane_from_family_metadata(adapter.family_metadata()),
+            multimodal_lane: multimodal_lane_from_family_metadata(inspection.family_metadata()),
             audio_lane: audio_lane_from_family_metadata(
-                adapter.family_metadata(),
+                inspection.family_metadata(),
                 descriptor.model.model_id.as_str(),
                 canonical_name.as_str(),
             ),
             execution_refusal_reason: match backend {
                 OpenAiCompatBackend::Metal => generic_metal_execution_refusal_reason(family),
-                OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => None,
+                OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => pending_topology_refusal,
             },
+            sparse_expert_topology,
             prompt_renderer: (!matches!(family, GgufDecoderFamily::GptOss))
-                .then(|| adapter.prompt_renderer()),
+                .then(|| {
+                    GgufPromptTemplateRenderer::new(
+                        inspection.tokenizer().clone(),
+                        inspection.chat_templates().clone(),
+                    )
+                }),
             prompt_options: prompt_options_for_family(family, reasoning_budget),
             execution_profile: generic_decoder_execution_profile(family, backend),
             scheduler_policy: generic_decoder_scheduler_policy(family, backend),
@@ -9042,6 +9136,80 @@ fn refused_local_backend_error(backend: &'static str, reason: &str) -> OpenAiCom
         status: psionic_runtime::HealthStatus::Degraded,
         message: reason.to_string(),
     })
+}
+
+fn routed_sparse_expert_runtime_contract(
+    runtime_contract: GgufDecoderExpertRuntimeContract,
+) -> RoutedSparseExpertRuntimeContract {
+    match runtime_contract {
+        GgufDecoderExpertRuntimeContract::GptOssNativeMoe => {
+            RoutedSparseExpertRuntimeContract::NativeMoe
+        }
+        GgufDecoderExpertRuntimeContract::FamilySpecificPlacement => {
+            RoutedSparseExpertRuntimeContract::FamilySpecificPlacement
+        }
+    }
+}
+
+fn routed_sparse_expert_topology_from_inspection(
+    inspection: &GgufDecoderArtifactInspection,
+) -> Option<RoutedSparseExpertTopology> {
+    let requirements = inspection.family_metadata().expert_topology_requirements()?;
+    let served_artifact_digest = inspection
+        .descriptor()
+        .weights
+        .primary_artifact_digest()
+        .unwrap_or_else(|| inspection.descriptor().weights.digest.as_str())
+        .to_string();
+    let mut topology = RoutedSparseExpertTopology::new(
+        requirements.family,
+        requirements.architecture,
+        served_artifact_digest,
+        routed_sparse_expert_runtime_contract(requirements.runtime_contract),
+        requirements.expert_count,
+    );
+    if let Some(active_expert_count) = requirements.active_expert_count {
+        topology = topology.with_active_expert_count(active_expert_count);
+    }
+    if let Some(expert_feed_forward_length) = requirements.expert_feed_forward_length {
+        topology = topology.with_expert_feed_forward_length(expert_feed_forward_length);
+    }
+    if let Some(manifest_digest) = inspection
+        .descriptor()
+        .artifact_governance
+        .as_ref()
+        .and_then(|governance| governance.provenance.manifest_sha256.clone())
+    {
+        topology = topology.with_sharded_model_manifest_digest(manifest_digest);
+    }
+    Some(topology)
+}
+
+fn pending_topology_execution_refusal_reason(
+    descriptor: &DecoderModelDescriptor,
+    sparse_expert_topology: Option<&RoutedSparseExpertTopology>,
+) -> String {
+    match sparse_expert_topology {
+        Some(topology) => {
+            let runtime_contract = match topology.runtime_contract {
+                RoutedSparseExpertRuntimeContract::NativeMoe => "native_moe",
+                RoutedSparseExpertRuntimeContract::FamilySpecificPlacement => {
+                    "family_specific_placement"
+                }
+            };
+            format!(
+                "model `{}` requires distributed sparse placement before Psionic can claim native execution on this node: contract=`{runtime_contract}` experts={} active_experts={:?} artifact_digest={}",
+            descriptor.model.model_id,
+            topology.expert_count,
+            topology.active_expert_count,
+            topology.served_artifact_digest,
+            )
+        }
+        None => format!(
+            "model `{}` requires distributed topology truth before Psionic can claim native execution on this node",
+            descriptor.model.model_id
+        ),
+    }
 }
 
 fn render_prompt_for_model(
@@ -9895,9 +10063,10 @@ mod tests {
     };
     use psionic_router::{
         ResponseStateRecord, ResponseStateRetentionPolicy, ResponseStateStore,
-        ToolExecutionRequest, ToolGateway, ToolHistoryVisibility, ToolLoopController,
-        ToolLoopError, ToolLoopModelRunner, ToolLoopModelTurn, ToolLoopRequest,
-        ToolLoopToolExecutor, ToolLoopToolResult, ToolProviderDescriptor, ToolResultVisibility,
+        RoutedSparseExpertRuntimeContract, ToolExecutionRequest, ToolGateway,
+        ToolHistoryVisibility, ToolLoopController, ToolLoopError, ToolLoopModelRunner,
+        ToolLoopModelTurn, ToolLoopRequest, ToolLoopToolExecutor, ToolLoopToolResult,
+        ToolProviderDescriptor, ToolResultVisibility,
     };
     use psionic_router::{RoutedExecutionLocality, RoutedExecutionProvenance};
     use psionic_runtime::{
@@ -11261,6 +11430,8 @@ mod tests {
                     response_state: false,
                     execution_profile: ExecutionCapabilityProfile::default(),
                     scheduler_policy: None,
+                    execution_refusal_reason: None,
+                    sparse_expert_topology: None,
                 }],
                 route_inventory: Vec::new(),
             },
@@ -11285,6 +11456,8 @@ mod tests {
                     response_state: false,
                     execution_profile: ExecutionCapabilityProfile::default(),
                     scheduler_policy: None,
+                    execution_refusal_reason: None,
+                    sparse_expert_topology: None,
                 }],
                 route_inventory: Vec::new(),
             },
@@ -11311,6 +11484,8 @@ mod tests {
                     response_state: false,
                     execution_profile: ExecutionCapabilityProfile::default(),
                     scheduler_policy: None,
+                    execution_refusal_reason: None,
+                    sparse_expert_topology: None,
                 }],
                 route_inventory: Vec::new(),
             },
@@ -12151,6 +12326,48 @@ mod tests {
     }
 
     #[test]
+    fn generic_cuda_gemma4_26b_load_plan_publishes_sparse_topology_refusal_contract()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-26b.gguf");
+        write_test_gguf(
+            &gemma_path,
+            sparse_gemma4_26b_metadata_with_chat_template("tiny pilot gemma4 26b").as_slice(),
+            dense_decoder_tensors_with_vocab(false, 7, 5, 6).as_slice(),
+        )?;
+
+        let (loaded_model, accepted_names, load_plan) =
+            load_generic_decoder_model(&gemma_path, 0, OpenAiCompatBackend::Cuda)?;
+        let decoder = loaded_model.decoder().expect("decoder model");
+        let topology = decoder
+            .sparse_expert_topology
+            .as_ref()
+            .expect("sparse gemma topology should be published");
+
+        assert_eq!(
+            load_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
+        );
+        assert_eq!(loaded_model.backend_label(), "cuda");
+        assert_eq!(loaded_model.execution_mode_label(), "native");
+        assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(topology.family, "gemma4");
+        assert_eq!(topology.expert_count, 64);
+        assert_eq!(topology.active_expert_count, Some(4));
+        assert_eq!(
+            topology.runtime_contract,
+            RoutedSparseExpertRuntimeContract::FamilySpecificPlacement
+        );
+        assert!(
+            loaded_model
+                .execution_refusal_reason()
+                .is_some_and(|reason| reason.contains("family_specific_placement"))
+        );
+        assert!(accepted_names.contains("tiny-gemma4-26b.gguf"));
+        Ok(())
+    }
+
+    #[test]
     fn generic_server_gemma4_prompt_render_keeps_system_on_the_instruction_surface()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
@@ -12927,6 +13144,123 @@ mod tests {
                 },
             ))
             .expect_err("gemma4 metal lane should fail closed for responses");
+        let responses_response = responses_error.into_response();
+        assert_eq!(responses_response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let responses_payload = runtime.block_on(response_json(responses_response))?;
+        assert_eq!(
+            responses_payload["error"]["message"],
+            serde_json::json!(expected_error_message)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_gemma4_26b_sparse_lane_publishes_topology_truth_and_fails_closed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-26b-server.gguf");
+        write_test_gguf(
+            &gemma_path,
+            sparse_gemma4_26b_metadata_with_chat_template("tiny gemma4 26b sparse lane").as_slice(),
+            dense_decoder_tensors_with_vocab(false, 7, 5, 6).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Cuda;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+        let default_model_key = server.state.default_model_key.clone();
+        let routed_model = server
+            .state
+            .router
+            .routed_model(OPENAI_COMPAT_WORKER_ID, default_model_key.as_str())
+            .expect("local router inventory should include the sparse gemma lane");
+        let routed_topology = routed_model
+            .sparse_expert_topology
+            .as_ref()
+            .expect("router should keep sparse gemma topology truth");
+        assert_eq!(routed_topology.expert_count, 64);
+        assert_eq!(routed_topology.active_expert_count, Some(4));
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        let refusal_reason = health
+            .0
+            .execution_refusal_reason
+            .clone()
+            .expect("sparse gemma lane should publish one refusal reason");
+        let expected_error_message =
+            refused_local_backend_error("cuda", refusal_reason.as_str()).to_string();
+        let health_topology = health
+            .0
+            .sparse_expert_topology
+            .clone()
+            .expect("health should publish sparse topology truth");
+        assert_eq!(health_topology.family, "gemma4");
+        assert_eq!(health_topology.expert_count, 64);
+        assert_eq!(health_topology.active_expert_count, Some(4));
+
+        let model_id = health.0.default_model.clone();
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|candidate| candidate.id == model_id)
+            .expect("gemma4 26b sparse model should be listed");
+        let model_topology = model
+            .psionic_sparse_expert_topology
+            .clone()
+            .expect("model card should publish sparse topology truth");
+        assert_eq!(model_topology.expert_count, 64);
+        assert_eq!(model_topology.active_expert_count, Some(4));
+        assert_eq!(
+            model.psionic_execution_refusal_reason,
+            Some(refusal_reason.clone())
+        );
+
+        let chat_error = runtime
+            .block_on(handle_generic_chat_completions(
+                std::sync::Arc::clone(&server.state),
+                ChatCompletionRequest {
+                    model: Some(model.id.clone()),
+                    messages: vec![ChatCompletionMessage::text("user", "hello")],
+                    temperature: Some(0.0),
+                    max_tokens: Some(1),
+                    stop: None,
+                    stream: false,
+                    tools: Vec::new(),
+                    tool_choice: None,
+                    response_format: None,
+                    psionic_grammar: None,
+                    psionic_structured_output: None,
+                    psionic_reasoning: None,
+                    psionic_prefix_cache: None,
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 26b sparse lane should fail closed for chat completions");
+        let chat_response = chat_error.into_response();
+        assert_eq!(chat_response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let chat_payload = runtime.block_on(response_json(chat_response))?;
+        assert_eq!(
+            chat_payload["error"]["message"],
+            serde_json::json!(expected_error_message)
+        );
+
+        let responses_error = runtime
+            .block_on(handle_generic_responses(
+                std::sync::Arc::clone(&server.state),
+                ResponsesRequest {
+                    model: Some(model.id.clone()),
+                    input: ResponsesInput::Messages(vec![ChatCompletionMessage::text(
+                        "user", "hello",
+                    )]),
+                    ..Default::default()
+                },
+            ))
+            .expect_err("gemma4 26b sparse lane should fail closed for responses");
         let responses_response = responses_error.into_response();
         assert_eq!(responses_response.status(), StatusCode::SERVICE_UNAVAILABLE);
         let responses_payload = runtime.block_on(response_json(responses_response))?;
@@ -18141,6 +18475,23 @@ mod tests {
             GgufMetadataValue::U32(16),
         ));
         metadata.extend(sentencepiece_tokenizer_metadata_entries_with_tokens(tokens));
+        metadata
+    }
+
+    fn sparse_gemma4_26b_metadata_with_chat_template(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = dense_gemma4_metadata_with_chat_template(name);
+        metadata.push((
+            String::from("gemma4.expert_count"),
+            GgufMetadataValue::U32(64),
+        ));
+        metadata.push((
+            String::from("gemma4.expert_used_count"),
+            GgufMetadataValue::U32(4),
+        ));
+        metadata.push((
+            String::from("gemma4.expert_feed_forward_length"),
+            GgufMetadataValue::U32(4096),
+        ));
         metadata
     }
 

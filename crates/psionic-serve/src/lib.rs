@@ -4548,6 +4548,7 @@ fn model_load_error_diagnostic(error: &ModelLoadError) -> LocalRuntimeDiagnostic
             )
         }
         ModelLoadError::UnsupportedGgufDecoderFamilyFeature { .. }
+        | ModelLoadError::UnsupportedGgufDecoderExpertTopology { .. }
         | ModelLoadError::UnsupportedGgufEmbeddingFamilyFeature { .. }
         | ModelLoadError::UnsupportedOllamaAdapterPolicy { .. }
         | ModelLoadError::UnsupportedTokenizerModel { .. }
