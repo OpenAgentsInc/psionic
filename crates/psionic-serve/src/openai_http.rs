@@ -764,6 +764,7 @@ struct GptOssOpenAiCompatState {
     default_model_name: String,
     accepted_model_names: BTreeSet<String>,
     include_psionic_fields: bool,
+    request_id_prefix: String,
     request_counter: AtomicU64,
 }
 
@@ -771,6 +772,14 @@ struct LlamaCppProxyState {
     base_url: String,
     client: reqwest::Client,
     child: Mutex<Option<Child>>,
+}
+
+fn process_unique_request_prefix() -> String {
+    let now_millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    format!("{:x}-{:x}", now_millis, std::process::id())
 }
 
 impl Drop for LlamaCppProxyState {
@@ -889,6 +898,7 @@ impl GptOssOpenAiCompatServer {
                 default_model_name,
                 accepted_model_names,
                 include_psionic_fields,
+                request_id_prefix: process_unique_request_prefix(),
                 request_counter: AtomicU64::new(1),
             }),
         })
@@ -1031,6 +1041,7 @@ struct OpenAiCompatState {
     default_model_name: String,
     models_by_key: BTreeMap<String, OpenAiCompatLoadedModel>,
     include_psionic_fields: bool,
+    request_id_prefix: String,
     request_counter: AtomicU64,
     conversation_counter: AtomicU64,
     response_state_capability: ResponseStateCapability,
@@ -3465,6 +3476,7 @@ impl OpenAiCompatServer {
                 default_model_name: published_default_model_name,
                 models_by_key,
                 include_psionic_fields,
+                request_id_prefix: process_unique_request_prefix(),
                 request_counter: AtomicU64::new(1),
                 conversation_counter: AtomicU64::new(1),
                 response_state_capability,
@@ -9301,12 +9313,12 @@ fn finish_reason(termination: TerminationReason) -> &'static str {
 
 fn next_request_id(state: &GptOssOpenAiCompatState) -> String {
     let next = state.request_counter.fetch_add(1, Ordering::Relaxed);
-    format!("psionic-chatcmpl-{next}")
+    format!("psionic-chatcmpl-{}-{next}", state.request_id_prefix)
 }
 
 fn next_generic_request_id(state: &OpenAiCompatState, prefix: &str) -> String {
     let next = state.request_counter.fetch_add(1, Ordering::Relaxed);
-    format!("{prefix}-{next}")
+    format!("{prefix}-{}-{next}", state.request_id_prefix)
 }
 
 fn insert_generic_execution_headers(

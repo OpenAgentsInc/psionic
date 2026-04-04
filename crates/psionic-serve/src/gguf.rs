@@ -1748,13 +1748,13 @@ impl DenseGgufModelInner {
             let mut q = Vec::new();
             layer
                 .attention_query_weight
-                .matvec(hidden_norm.as_slice(), &mut q)?;
+                .matvec(&hidden_norm, &mut q)?;
             if let Some(bias) = layer.attention_query_bias.as_ref() {
                 add_bias_in_place(&mut q, bias.as_slice());
             }
             if let Some(norm) = layer.attention_query_norm.as_ref() {
-                q = per_head_rms_norm(
-                    q.as_slice(),
+                per_head_rms_norm_in_place(
+                    q.as_mut_slice(),
                     layer.attention_geometry.head_count,
                     layer.attention_geometry.head_dim,
                     norm.as_slice(),
@@ -1776,13 +1776,13 @@ impl DenseGgufModelInner {
                 let mut k = Vec::new();
                 layer
                     .attention_key_weight
-                    .matvec(hidden_norm.as_slice(), &mut k)?;
+                    .matvec(&hidden_norm, &mut k)?;
                 if let Some(bias) = layer.attention_key_bias.as_ref() {
                     add_bias_in_place(&mut k, bias.as_slice());
                 }
                 if let Some(norm) = layer.attention_key_norm.as_ref() {
-                    k = per_head_rms_norm(
-                        k.as_slice(),
+                    per_head_rms_norm_in_place(
+                        k.as_mut_slice(),
                         layer.attention_geometry.kv_head_count,
                         layer.attention_geometry.head_dim,
                         norm.as_slice(),
@@ -1793,13 +1793,13 @@ impl DenseGgufModelInner {
                 let mut v = Vec::new();
                 layer
                     .attention_value_weight
-                    .matvec(hidden_norm.as_slice(), &mut v)?;
+                    .matvec(&hidden_norm, &mut v)?;
                 if let Some(bias) = layer.attention_value_bias.as_ref() {
                     add_bias_in_place(&mut v, bias.as_slice());
                 }
                 if self.family_metadata.family == GgufDecoderFamily::Gemma4 {
-                    v = per_head_rms_norm_unit(
-                        v.as_slice(),
+                    per_head_rms_norm_unit_in_place(
+                        v.as_mut_slice(),
                         layer.attention_geometry.kv_head_count,
                         layer.attention_geometry.head_dim,
                         self.family_metadata.rms_norm_epsilon,
@@ -1880,13 +1880,14 @@ impl DenseGgufModelInner {
                 add_bias_in_place(&mut attention_out, bias.as_slice());
             }
             if let Some(norm) = layer.attention_post_norm.as_ref() {
-                attention_out = rms_norm(
-                    attention_out.as_slice(),
+                rms_norm_in_place(
+                    attention_out.as_mut_slice(),
                     norm.as_slice(),
                     self.family_metadata.rms_norm_epsilon,
                 );
             }
-            hidden = add_vectors(attention_out.as_slice(), residual.as_slice())?;
+            add_vectors_in_place(attention_out.as_mut_slice(), residual.as_slice())?;
+            hidden = attention_out;
 
             let ffn_residual = hidden.clone();
             let ffn_input = rms_norm(
@@ -1897,11 +1898,11 @@ impl DenseGgufModelInner {
             let mut gate = Vec::new();
             layer
                 .feed_forward_gate_weight
-                .matvec(ffn_input.as_slice(), &mut gate)?;
+                .matvec(&ffn_input, &mut gate)?;
             let mut up = Vec::new();
             layer
                 .feed_forward_up_weight
-                .matvec(ffn_input.as_slice(), &mut up)?;
+                .matvec(&ffn_input, &mut up)?;
             let activated =
                 feed_forward_activation(&self.family_metadata, gate.as_slice(), up.as_slice());
             let mut ffn_out = Vec::new();
@@ -1909,13 +1910,14 @@ impl DenseGgufModelInner {
                 .feed_forward_down_weight
                 .matvec(activated.as_slice(), &mut ffn_out)?;
             if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
-                ffn_out = rms_norm(
-                    ffn_out.as_slice(),
+                rms_norm_in_place(
+                    ffn_out.as_mut_slice(),
                     norm.as_slice(),
                     self.family_metadata.rms_norm_epsilon,
                 );
             }
-            hidden = add_vectors(ffn_out.as_slice(), ffn_residual.as_slice())?;
+            add_vectors_in_place(ffn_out.as_mut_slice(), ffn_residual.as_slice())?;
+            hidden = ffn_out;
 
             if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
                 if let (Some(input_gate), Some(proj), Some(post_norm)) = (
@@ -1937,8 +1939,8 @@ impl DenseGgufModelInner {
                     )?;
                     let mut projected = Vec::new();
                     proj.matvec(gated.as_slice(), &mut projected)?;
-                    let projected = rms_norm(
-                        projected.as_slice(),
+                    rms_norm_in_place(
+                        projected.as_mut_slice(),
                         post_norm.as_slice(),
                         self.family_metadata.rms_norm_epsilon,
                     );
@@ -3071,7 +3073,6 @@ impl MetalGemma4ModelInner {
                 }
             }
         }
-
         for (layer_index, layer) in self
             .layers
             .iter()
@@ -3088,13 +3089,13 @@ impl MetalGemma4ModelInner {
 
             let mut q = layer
                 .attention_query_weight
-                .matvec(backend, hidden_norm.as_slice())?;
+                .matvec(backend, &hidden_norm)?;
             if let Some(bias) = layer.attention_query_bias.as_ref() {
                 add_bias_in_place(&mut q.values, bias.as_slice());
             }
             if let Some(norm) = layer.attention_query_norm.as_ref() {
-                q.values = per_head_rms_norm(
-                    q.values.as_slice(),
+                per_head_rms_norm_in_place(
+                    q.values.as_mut_slice(),
                     layer.attention_geometry.head_count,
                     layer.attention_geometry.head_dim,
                     norm.as_slice(),
@@ -3115,13 +3116,13 @@ impl MetalGemma4ModelInner {
             let (k, v) = if layer.attention_geometry.has_kv() {
                 let mut k = layer
                     .attention_key_weight
-                    .matvec(backend, hidden_norm.as_slice())?;
+                    .matvec(backend, &hidden_norm)?;
                 if let Some(bias) = layer.attention_key_bias.as_ref() {
                     add_bias_in_place(&mut k.values, bias.as_slice());
                 }
                 if let Some(norm) = layer.attention_key_norm.as_ref() {
-                    k.values = per_head_rms_norm(
-                        k.values.as_slice(),
+                    per_head_rms_norm_in_place(
+                        k.values.as_mut_slice(),
                         layer.attention_geometry.kv_head_count,
                         layer.attention_geometry.head_dim,
                         norm.as_slice(),
@@ -3131,12 +3132,12 @@ impl MetalGemma4ModelInner {
 
                 let mut v = layer
                     .attention_value_weight
-                    .matvec(backend, hidden_norm.as_slice())?;
+                    .matvec(backend, &hidden_norm)?;
                 if let Some(bias) = layer.attention_value_bias.as_ref() {
                     add_bias_in_place(&mut v.values, bias.as_slice());
                 }
-                v.values = per_head_rms_norm_unit(
-                    v.values.as_slice(),
+                per_head_rms_norm_unit_in_place(
+                    v.values.as_mut_slice(),
                     layer.attention_geometry.kv_head_count,
                     layer.attention_geometry.head_dim,
                     self.family_metadata.rms_norm_epsilon,
@@ -3227,14 +3228,15 @@ impl MetalGemma4ModelInner {
                 add_bias_in_place(&mut attention_out.values, bias.as_slice());
             }
             if let Some(norm) = layer.attention_post_norm.as_ref() {
-                attention_out.values = rms_norm(
-                    attention_out.values.as_slice(),
+                rms_norm_in_place(
+                    attention_out.values.as_mut_slice(),
                     norm.as_slice(),
                     self.family_metadata.rms_norm_epsilon,
                 );
             }
-            hidden = add_vectors(attention_out.values.as_slice(), residual.as_slice())
+            add_vectors_in_place(attention_out.values.as_mut_slice(), residual.as_slice())
                 .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = attention_out.values;
 
             let ffn_residual = hidden.clone();
             let ffn_input = rms_norm(
@@ -3242,29 +3244,31 @@ impl MetalGemma4ModelInner {
                 layer.feed_forward_norm.as_slice(),
                 self.family_metadata.rms_norm_epsilon,
             );
-            let gate = layer
+            let mut gate = layer
                 .feed_forward_gate_weight
-                .matvec(backend, ffn_input.as_slice())?;
+                .matvec(backend, &ffn_input)?;
             let up = layer
                 .feed_forward_up_weight
-                .matvec(backend, ffn_input.as_slice())?;
-            let activated = feed_forward_activation(
+                .matvec(backend, &ffn_input)?;
+            feed_forward_activation_in_place(
                 &self.family_metadata,
-                gate.values.as_slice(),
+                gate.values.as_mut_slice(),
                 up.values.as_slice(),
-            );
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
             let mut ffn_out = layer
                 .feed_forward_down_weight
-                .matvec(backend, activated.as_slice())?;
+                .matvec(backend, gate.values.as_slice())?;
             if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
-                ffn_out.values = rms_norm(
-                    ffn_out.values.as_slice(),
+                rms_norm_in_place(
+                    ffn_out.values.as_mut_slice(),
                     norm.as_slice(),
                     self.family_metadata.rms_norm_epsilon,
                 );
             }
-            hidden = add_vectors(ffn_out.values.as_slice(), ffn_residual.as_slice())
+            add_vectors_in_place(ffn_out.values.as_mut_slice(), ffn_residual.as_slice())
                 .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = ffn_out.values;
 
             if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
                 if let (Some(input_gate), Some(proj), Some(post_norm)) = (
@@ -3276,21 +3280,21 @@ impl MetalGemma4ModelInner {
                     for value in &mut gated.values {
                         *value = approximate_gelu(*value);
                     }
-                    let gated_values = multiply_vectors(
-                        gated.values.as_slice(),
+                    multiply_vectors_in_place(
+                        gated.values.as_mut_slice(),
                         self.gemma4_per_layer_inputs
                             .as_ref()
                             .expect("per-layer config")
                             .layer_slice(per_layer_inputs.values.as_slice(), layer_index),
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
-                    let mut projected = proj.matvec(backend, gated_values.as_slice())?;
-                    projected.values = rms_norm(
-                        projected.values.as_slice(),
+                    let mut projected = proj.matvec(backend, gated.values.as_slice())?;
+                    rms_norm_in_place(
+                        projected.values.as_mut_slice(),
                         post_norm.as_slice(),
                         self.family_metadata.rms_norm_epsilon,
                     );
-                    hidden = add_vectors(hidden.as_slice(), projected.values.as_slice())
+                    add_vectors_in_place(hidden.as_mut_slice(), projected.values.as_slice())
                         .map_err(ReferenceTextGenerationError::Runtime)?;
                     bytes_moved = bytes_moved
                         .saturating_add(gated.bytes_moved)
@@ -3974,19 +3978,24 @@ impl DistributedGemma4FrontBackend {
         let Some(request_id) = self.active_request_id.take() else {
             return;
         };
-        let mut request = self.client.post(format!(
-            "{}/psionic/internal/gemma4/pipeline/reset",
-            self.peer.peer_base_url
-        ));
-        if let Some(shared_key) = self.peer.shared_key.as_deref() {
-            request = request.header("x-psionic-distributed-key", shared_key);
-        }
-        let _ = request
-            .json(&DistributedGemma4RemoteResetRequest {
-                request_id,
-                model_id: self.peer_model_key.clone(),
-            })
-            .send();
+        let client = self.client.clone();
+        let peer = self.peer.clone();
+        let model_id = self.peer_model_key.clone();
+        let _ = std::thread::Builder::new()
+            .name(String::from("psionic-gemma4-distributed-reset"))
+            .spawn(move || {
+                let mut request =
+                    client.post(format!("{}/psionic/internal/gemma4/pipeline/reset", peer.peer_base_url));
+                if let Some(shared_key) = peer.shared_key.as_deref() {
+                    request = request.header("x-psionic-distributed-key", shared_key);
+                }
+                let _ = request
+                    .json(&DistributedGemma4RemoteResetRequest {
+                        request_id,
+                        model_id,
+                    })
+                    .send();
+            });
     }
 
     fn remote_suffix_step(
@@ -4028,11 +4037,20 @@ impl DistributedGemma4FrontBackend {
                     "distributed gemma4 remote suffix request failed: {error}"
                 )))
             })?;
-        let response = response.error_for_status().map_err(|error| {
-            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
-                "distributed gemma4 remote suffix request failed with status: {error}"
-            )))
-        })?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().unwrap_or_default();
+            let detail = if body.trim().is_empty() {
+                String::new()
+            } else {
+                format!(" body={body}")
+            };
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "distributed gemma4 remote suffix request failed with status: {status}{detail}"
+                )),
+            ));
+        }
         let body = response.bytes().map_err(|error| {
             ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
                 "failed to read distributed gemma4 remote suffix response body: {error}"
@@ -4046,7 +4064,6 @@ pub struct DistributedGemma4TextGenerationService {
     backend: DistributedGemma4FrontBackend,
     models: InMemoryGenerationModelRegistry<DistributedGemma4GenerationModel>,
     sessions: InMemoryGenerationSessionStore,
-    shared_prefixes: SharedPrefixStore,
     backend_health: super::BackendHealthTracker,
     model_descriptor: DecoderModelDescriptor,
     runtime_support: GgufDecoderRuntimeSupport,
@@ -4088,7 +4105,6 @@ impl DistributedGemma4TextGenerationService {
             backend,
             models,
             sessions: InMemoryGenerationSessionStore::new(),
-            shared_prefixes: SharedPrefixStore::default(),
             backend_health,
             model_descriptor,
             runtime_support,
@@ -4239,11 +4255,14 @@ impl TextGenerationExecutor for DistributedGemma4TextGenerationService {
 
     fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
         self.backend.begin_request(request.request_id.as_str());
+        // Local prompt-prefix reuse is unsafe on the distributed front because the
+        // remote suffix does not receive mirrored prefix KV state from that cache.
+        let mut shared_prefixes = SharedPrefixStore::default();
         let result = super::run_generation_request(
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
-            &mut self.shared_prefixes,
+            &mut shared_prefixes,
             request,
         );
         self.backend
@@ -5264,7 +5283,6 @@ impl CudaGemma4ModelInner {
                 }
             }
         }
-
         for (layer_index, layer) in self
             .layers
             .iter()
@@ -5281,13 +5299,13 @@ impl CudaGemma4ModelInner {
 
             let mut q = layer
                 .attention_query_weight
-                .matvec(backend, hidden_norm.as_slice())?;
+                .matvec(backend, &hidden_norm)?;
             if let Some(bias) = layer.attention_query_bias.as_ref() {
                 add_bias_in_place(&mut q.values, bias.as_slice());
             }
             if let Some(norm) = layer.attention_query_norm.as_ref() {
-                q.values = per_head_rms_norm(
-                    q.values.as_slice(),
+                per_head_rms_norm_in_place(
+                    q.values.as_mut_slice(),
                     layer.attention_geometry.head_count,
                     layer.attention_geometry.head_dim,
                     norm.as_slice(),
@@ -5308,13 +5326,13 @@ impl CudaGemma4ModelInner {
             let (k, v) = if layer.attention_geometry.has_kv() {
                 let mut k = layer
                     .attention_key_weight
-                    .matvec(backend, hidden_norm.as_slice())?;
+                    .matvec(backend, &hidden_norm)?;
                 if let Some(bias) = layer.attention_key_bias.as_ref() {
                     add_bias_in_place(&mut k.values, bias.as_slice());
                 }
                 if let Some(norm) = layer.attention_key_norm.as_ref() {
-                    k.values = per_head_rms_norm(
-                        k.values.as_slice(),
+                    per_head_rms_norm_in_place(
+                        k.values.as_mut_slice(),
                         layer.attention_geometry.kv_head_count,
                         layer.attention_geometry.head_dim,
                         norm.as_slice(),
@@ -5324,13 +5342,13 @@ impl CudaGemma4ModelInner {
 
                 let mut v = layer
                     .attention_value_weight
-                    .matvec(backend, hidden_norm.as_slice())?;
+                    .matvec(backend, &hidden_norm)?;
                 if let Some(bias) = layer.attention_value_bias.as_ref() {
                     add_bias_in_place(&mut v.values, bias.as_slice());
                 }
                 if self.family_metadata.family == GgufDecoderFamily::Gemma4 {
-                    v.values = per_head_rms_norm_unit(
-                        v.values.as_slice(),
+                    per_head_rms_norm_unit_in_place(
+                        v.values.as_mut_slice(),
                         layer.attention_geometry.kv_head_count,
                         layer.attention_geometry.head_dim,
                         self.family_metadata.rms_norm_epsilon,
@@ -5422,14 +5440,15 @@ impl CudaGemma4ModelInner {
                 add_bias_in_place(&mut attention_out.values, bias.as_slice());
             }
             if let Some(norm) = layer.attention_post_norm.as_ref() {
-                attention_out.values = rms_norm(
-                    attention_out.values.as_slice(),
+                rms_norm_in_place(
+                    attention_out.values.as_mut_slice(),
                     norm.as_slice(),
                     self.family_metadata.rms_norm_epsilon,
                 );
             }
-            hidden = add_vectors(attention_out.values.as_slice(), residual.as_slice())
+            add_vectors_in_place(attention_out.values.as_mut_slice(), residual.as_slice())
                 .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = attention_out.values;
 
             let ffn_residual = hidden.clone();
             let ffn_input = rms_norm(
@@ -5439,10 +5458,10 @@ impl CudaGemma4ModelInner {
             );
             let gate = layer
                 .feed_forward_gate_weight
-                .matvec(backend, ffn_input.as_slice())?;
+                .matvec(backend, &ffn_input)?;
             let up = layer
                 .feed_forward_up_weight
-                .matvec(backend, ffn_input.as_slice())?;
+                .matvec(backend, &ffn_input)?;
             let activated = feed_forward_activation(
                 &self.family_metadata,
                 gate.values.as_slice(),
@@ -5452,14 +5471,15 @@ impl CudaGemma4ModelInner {
                 .feed_forward_down_weight
                 .matvec(backend, activated.as_slice())?;
             if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
-                ffn_out.values = rms_norm(
-                    ffn_out.values.as_slice(),
+                rms_norm_in_place(
+                    ffn_out.values.as_mut_slice(),
                     norm.as_slice(),
                     self.family_metadata.rms_norm_epsilon,
                 );
             }
-            hidden = add_vectors(ffn_out.values.as_slice(), ffn_residual.as_slice())
+            add_vectors_in_place(ffn_out.values.as_mut_slice(), ffn_residual.as_slice())
                 .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = ffn_out.values;
 
             if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
                 if let (Some(input_gate), Some(proj), Some(post_norm)) = (
@@ -5480,8 +5500,8 @@ impl CudaGemma4ModelInner {
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                     let mut projected = proj.matvec(backend, gated_values.as_slice())?;
-                    projected.values = rms_norm(
-                        projected.values.as_slice(),
+                    rms_norm_in_place(
+                        projected.values.as_mut_slice(),
                         post_norm.as_slice(),
                         self.family_metadata.rms_norm_epsilon,
                     );
@@ -6596,6 +6616,14 @@ fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {
         .collect()
 }
 
+fn rms_norm_in_place(values: &mut [f32], weight: &[f32], epsilon: f32) {
+    let mean_square = values.iter().map(|value| value * value).sum::<f32>() / values.len() as f32;
+    let scale = (mean_square + epsilon).sqrt().recip();
+    for (value, weight) in values.iter_mut().zip(weight.iter().copied()) {
+        *value *= scale * weight;
+    }
+}
+
 fn per_head_rms_norm(
     input: &[f32],
     head_count: usize,
@@ -6626,6 +6654,28 @@ fn per_head_rms_norm(
     normalized
 }
 
+fn per_head_rms_norm_in_place(
+    values: &mut [f32],
+    head_count: usize,
+    head_dim: usize,
+    weight: &[f32],
+    epsilon: f32,
+) {
+    for head_index in 0..head_count {
+        let start = head_index.saturating_mul(head_dim);
+        let end = start.saturating_add(head_dim);
+        if end > values.len() {
+            break;
+        }
+        let head = &mut values[start..end];
+        let mean_square = head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
+        let scale = (mean_square + epsilon).sqrt().recip();
+        for (value, norm) in head.iter_mut().zip(weight.iter().copied()) {
+            *value *= scale * norm;
+        }
+    }
+}
+
 fn per_head_rms_norm_unit(
     input: &[f32],
     head_count: usize,
@@ -6651,6 +6701,27 @@ fn per_head_rms_norm_unit(
     normalized
 }
 
+fn per_head_rms_norm_unit_in_place(
+    values: &mut [f32],
+    head_count: usize,
+    head_dim: usize,
+    epsilon: f32,
+) {
+    for head_index in 0..head_count {
+        let start = head_index.saturating_mul(head_dim);
+        let end = start.saturating_add(head_dim);
+        if end > values.len() {
+            break;
+        }
+        let head = &mut values[start..end];
+        let mean_square = head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
+        let scale = (mean_square + epsilon).sqrt().recip();
+        for value in head {
+            *value *= scale;
+        }
+    }
+}
+
 fn add_vectors(left: &[f32], right: &[f32]) -> Result<Vec<f32>, crate::RuntimeError> {
     if left.len() != right.len() {
         return Err(crate::RuntimeError::Backend(format!(
@@ -6664,6 +6735,20 @@ fn add_vectors(left: &[f32], right: &[f32]) -> Result<Vec<f32>, crate::RuntimeEr
         .zip(right.iter())
         .map(|(left, right)| left + right)
         .collect())
+}
+
+fn add_vectors_in_place(left: &mut [f32], right: &[f32]) -> Result<(), crate::RuntimeError> {
+    if left.len() != right.len() {
+        return Err(crate::RuntimeError::Backend(format!(
+            "vector width mismatch: left={} right={}",
+            left.len(),
+            right.len()
+        )));
+    }
+    for (left, right) in left.iter_mut().zip(right.iter().copied()) {
+        *left += right;
+    }
+    Ok(())
 }
 
 fn add_bias_in_place(values: &mut [f32], bias: &[f32]) {
@@ -6685,6 +6770,20 @@ fn multiply_vectors(left: &[f32], right: &[f32]) -> Result<Vec<f32>, crate::Runt
         .zip(right.iter())
         .map(|(left, right)| left * right)
         .collect())
+}
+
+fn multiply_vectors_in_place(left: &mut [f32], right: &[f32]) -> Result<(), crate::RuntimeError> {
+    if left.len() != right.len() {
+        return Err(crate::RuntimeError::Backend(format!(
+            "vector width mismatch: left={} right={}",
+            left.len(),
+            right.len()
+        )));
+    }
+    for (left, right) in left.iter_mut().zip(right.iter().copied()) {
+        *left *= right;
+    }
+    Ok(())
 }
 
 fn scale_in_place(values: &mut [f32], scale: f32) {
@@ -6742,6 +6841,34 @@ fn feed_forward_activation(
         GgufDecoderFamily::Gemma4 => gelu_glu(gate, up),
         _ => silu_glu(gate, up),
     }
+}
+
+fn feed_forward_activation_in_place(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    gate: &mut [f32],
+    up: &[f32],
+) -> Result<(), crate::RuntimeError> {
+    if gate.len() != up.len() {
+        return Err(crate::RuntimeError::Backend(format!(
+            "vector width mismatch: left={} right={}",
+            gate.len(),
+            up.len()
+        )));
+    }
+    match family_metadata.family {
+        GgufDecoderFamily::Gemma4 => {
+            for (gate, up) in gate.iter_mut().zip(up.iter().copied()) {
+                *gate = approximate_gelu(*gate) * up;
+            }
+        }
+        _ => {
+            for (gate, up) in gate.iter_mut().zip(up.iter().copied()) {
+                let activated = *gate / (1.0 + (-*gate).exp());
+                *gate = activated * up;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn apply_final_logit_softcapping_in_place(logits: &mut [f32], softcap: Option<f32>) {
