@@ -20,6 +20,7 @@
 
 use std::{
     any::Any,
+    borrow::Cow,
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
@@ -651,7 +652,7 @@ impl MetalBuffer {
             return Err(RuntimeError::Backend(format!(
                 "metal buffer write length mismatch: expected {} values, actual {}",
                 self.spec.storage_size(),
-                values.len()
+                values.len(),
             )));
         }
         let byte_len = values.len().saturating_mul(size_of_dtype(self.spec.dtype()));
@@ -2133,20 +2134,34 @@ impl MetalBackend {
         let cache_write_index =
             cache.append_entry(self, flattened_key.as_slice(), flattened_value.as_slice())?;
 
-        let (expanded_key, expanded_value) =
-            expand_kv_cache_for_attention(cache, query_head_count, kv_head_count, head_dim)?;
         let flash_attention_path = flash_preferred && causal && self.supports_flash_attention();
-        let output_values = scaled_dot_product_attention_values(
-            roped_query.as_slice(),
-            expanded_key.as_slice(),
-            expanded_value.as_slice(),
-            query_dims.as_slice(),
-            &[1, query_head_count, cache.len(), head_dim],
-            &[1, query_head_count, cache.len(), head_dim],
-            scale,
-            false,
-            flash_attention_path,
-        )?;
+        let output_values = match cache.kv_cache_encoding_policy().family {
+            KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => {
+                decode_attention_over_dense_kv_cache_rows(
+                    roped_query.as_slice(),
+                    cache,
+                    query_head_count,
+                    kv_head_count,
+                    head_dim,
+                    scale,
+                )?
+            }
+            KvCacheEncodingFamily::TurboQuant => {
+                let (expanded_key, expanded_value) =
+                    expand_kv_cache_for_attention(cache, query_head_count, kv_head_count, head_dim)?;
+                scaled_dot_product_attention_values(
+                    roped_query.as_slice(),
+                    expanded_key.as_slice(),
+                    expanded_value.as_slice(),
+                    query_dims.as_slice(),
+                    &[1, query_head_count, cache.len(), head_dim],
+                    &[1, query_head_count, cache.len(), head_dim],
+                    scale,
+                    false,
+                    flash_attention_path,
+                )?
+            }
+        };
         Ok((
             query_dims,
             output_values,
@@ -4858,6 +4873,157 @@ fn expand_kv_cache_for_attention(
         }
     }
     Ok((keys, values))
+}
+
+fn decode_attention_over_dense_kv_cache_rows(
+    query: &[f32],
+    cache: &MetalKvCacheMirror,
+    query_head_count: usize,
+    kv_head_count: usize,
+    head_dim: usize,
+    scale: f32,
+) -> Result<Vec<f32>, RuntimeError> {
+    let token_count = cache.len();
+    let row_width = cache.width();
+    let expected_row_width = kv_head_count.saturating_mul(head_dim);
+    if row_width != expected_row_width {
+        return Err(RuntimeError::Backend(format!(
+            "metal dense decode attention cache row width mismatch: expected {}, actual {}",
+            expected_row_width, row_width
+        )));
+    }
+    if query.len() != query_head_count.saturating_mul(head_dim) {
+        return Err(RuntimeError::Backend(format!(
+            "metal dense decode attention query length mismatch: expected {}, actual {}",
+            query_head_count.saturating_mul(head_dim),
+            query.len()
+        )));
+    }
+    if token_count == 0 {
+        return Ok(vec![0.0; query_head_count.saturating_mul(head_dim)]);
+    }
+
+    let byte_len = token_count.saturating_mul(cache.row_byte_len);
+    cache.key_buffer.with_bytes_at_offset(0, byte_len, |key_bytes| {
+        let key_rows = dense_kv_bytes_as_f32_cow(key_bytes)?;
+        cache.value_buffer.with_bytes_at_offset(0, byte_len, |value_bytes| {
+            let value_rows = dense_kv_bytes_as_f32_cow(value_bytes)?;
+            dense_decode_attention_from_row_major_cache(
+                query,
+                key_rows.as_ref(),
+                value_rows.as_ref(),
+                query_head_count,
+                kv_head_count,
+                head_dim,
+                scale,
+            )
+        })
+    })
+}
+
+fn dense_kv_bytes_as_f32_cow(bytes: &[u8]) -> Result<Cow<'_, [f32]>, RuntimeError> {
+    if bytes.len() % size_of::<f32>() != 0 {
+        return Err(RuntimeError::Backend(format!(
+            "metal dense kv cache bytes require 4-byte alignment, actual {}",
+            bytes.len()
+        )));
+    }
+    let (prefix, aligned, suffix) = unsafe { bytes.align_to::<f32>() };
+    if prefix.is_empty() && suffix.is_empty() {
+        Ok(Cow::Borrowed(aligned))
+    } else {
+        Ok(Cow::Owned(bytes_to_f32_vec(bytes)?))
+    }
+}
+
+fn dense_decode_attention_from_row_major_cache(
+    query: &[f32],
+    key_rows: &[f32],
+    value_rows: &[f32],
+    query_head_count: usize,
+    kv_head_count: usize,
+    head_dim: usize,
+    scale: f32,
+) -> Result<Vec<f32>, RuntimeError> {
+    let token_count = key_rows.len() / kv_head_count.saturating_mul(head_dim).max(1);
+    let row_width = kv_head_count.saturating_mul(head_dim);
+    if key_rows.len() != token_count.saturating_mul(row_width)
+        || value_rows.len() != token_count.saturating_mul(row_width)
+    {
+        return Err(RuntimeError::Backend(String::from(
+            "metal dense decode attention row-major cache length mismatch",
+        )));
+    }
+    if kv_head_count == 0 {
+        return Err(RuntimeError::Backend(String::from(
+            "metal dense decode attention requires at least one kv head",
+        )));
+    }
+
+    let group_size = query_head_count / kv_head_count.max(1);
+    let mut output = vec![0.0; query_head_count.saturating_mul(head_dim)];
+    for head_index in 0..query_head_count {
+        let kv_head_index = if group_size == 0 {
+            0
+        } else {
+            head_index / group_size
+        }
+        .min(kv_head_count.saturating_sub(1));
+        let query_start = head_index.saturating_mul(head_dim);
+        let query_end = query_start + head_dim;
+        let q = &query[query_start..query_end];
+        let output_slice = &mut output[query_start..query_end];
+        let mut max_logit = f32::NEG_INFINITY;
+        let mut denom = 0.0f32;
+        for token_index in 0..token_count {
+            let row_start = token_index.saturating_mul(row_width) + kv_head_index.saturating_mul(head_dim);
+            let row_end = row_start + head_dim;
+            let key = &key_rows[row_start..row_end];
+            let value = &value_rows[row_start..row_end];
+            let logit = dense_row_dot(q, key)? * scale;
+            accumulate_dense_online_softmax_value(
+                output_slice,
+                value,
+                logit,
+                &mut max_logit,
+                &mut denom,
+            )?;
+        }
+        let normalizer = 1.0 / denom.max(f32::EPSILON);
+        for value in output_slice.iter_mut() {
+            *value *= normalizer;
+        }
+    }
+    Ok(output)
+}
+
+fn accumulate_dense_online_softmax_value(
+    output: &mut [f32],
+    value: &[f32],
+    logit: f32,
+    max_logit: &mut f32,
+    denom: &mut f32,
+) -> Result<(), RuntimeError> {
+    if output.len() != value.len() {
+        return Err(RuntimeError::Backend(format!(
+            "metal dense decode attention value width mismatch: output {} value {}",
+            output.len(),
+            value.len()
+        )));
+    }
+    let next_max = (*max_logit).max(logit);
+    let rescale = if *denom == 0.0 {
+        0.0
+    } else {
+        (*max_logit - next_max).exp()
+    };
+    let weight = (logit - next_max).exp();
+    for (output_value, value_value) in output.iter_mut().zip(value.iter()) {
+        *output_value = *output_value * rescale + *value_value * weight;
+    }
+    *denom = *denom * rescale + weight;
+    *max_logit = next_max;
+    Ok(())
 }
 
 fn device_supports_flash_attention(descriptor: &DeviceDescriptor) -> bool {

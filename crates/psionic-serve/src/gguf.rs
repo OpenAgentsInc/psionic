@@ -2638,6 +2638,7 @@ impl TextGenerationExecutor for MetalGemma4TextGenerationService {
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
+            &mut self.shared_prefixes,
             request,
         )
     }
@@ -2681,16 +2682,19 @@ impl ManagedTextGenerationRuntime for MetalGemma4TextGenerationService {
 }
 
 #[derive(Debug)]
-struct MetalGemma4StepPlan {
-    q_buffer: MetalBuffer,
-    k_buffer: MetalBuffer,
-    v_buffer: MetalBuffer,
+struct MetalGemma4LayerStepPlan {
     cos_buffer: MetalBuffer,
     sin_buffer: MetalBuffer,
+    identity_cos_buffer: MetalBuffer,
+    identity_sin_buffer: MetalBuffer,
     query_buffer: MetalBuffer,
     key_buffer: MetalBuffer,
     value_buffer: MetalBuffer,
     attention_values: Vec<f32>,
+}
+
+struct MetalGemma4StepPlan {
+    layer_plans: Vec<Option<MetalGemma4LayerStepPlan>>,
 }
 
 fn build_gemma4_metal_layer_caches_from_host_cache(
@@ -2752,6 +2756,7 @@ fn run_metal_gemma4_generation_request(
     backend: &mut MetalBackend,
     models: &mut InMemoryGenerationModelRegistry<MetalGemma4GenerationModel>,
     sessions: &mut InMemoryGenerationSessionStore,
+    shared_prefixes: &mut SharedPrefixStore,
     request: &GenerationRequest,
 ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
     if !super::generation_product_supported(request) {
@@ -2800,6 +2805,14 @@ fn run_metal_gemma4_generation_request(
 
         let expected_kv_width = loaded_model.cache_width();
         let mut session_tokens = Vec::new();
+        let compatibility = super::prefix_compatibility_for_request(&loaded_model, request);
+        let prefix_policy = super::default_prefix_cache_policy();
+        let mut prefix_state = crate::PrefixCacheState::None;
+        let mut prefix_cache_refusal_reason = None;
+        let mut prefix_cache_invalidation_trigger = None;
+        let mut prefix_tokens_reused = 0usize;
+        let mut prefix_identity = None;
+        let mut shared_prefix_eligible = false;
         let previous_kv_state = if let Some(session_id) = &request.session_id {
             if request.reset_session {
                 sessions.reset(session_id)?;
@@ -2812,8 +2825,16 @@ fn run_metal_gemma4_generation_request(
                 effective_served_artifact_digest.as_str(),
             )?;
             session_tokens = state.tokens().to_vec();
+            if state.cache().is_empty() {
+                shared_prefix_eligible = true;
+            } else {
+                prefix_state = crate::PrefixCacheState::Bypassed;
+                prefix_cache_refusal_reason =
+                    Some(crate::PrefixCacheRefusalReason::SessionBoundState);
+            }
             state.cache().state()
         } else {
+            shared_prefix_eligible = true;
             psionic_runtime::KvCacheState::default()
         };
         let preserve_prefix_tokens = usize::from(
@@ -2827,7 +2848,29 @@ fn run_metal_gemma4_generation_request(
             request.options.context_overflow_policy,
             preserve_prefix_tokens,
         )?;
-        let mut cache = if let Some(session_id) = &request.session_id {
+        let mut prompt_logits = Vec::new();
+        let mut last_logits = Vec::new();
+        let mut cache = if shared_prefix_eligible {
+            let lookup =
+                super::controlled_prefix_lookup(shared_prefixes, &compatibility, &prompt_tokens, request);
+            prefix_state = lookup.state;
+            prefix_cache_refusal_reason = lookup.refusal_reason;
+            prefix_cache_invalidation_trigger = lookup.invalidation_trigger;
+            prefix_tokens_reused = lookup.reused_tokens;
+            prefix_identity = lookup.identity;
+            prompt_logits = lookup.prompt_logits;
+            last_logits = if lookup.last_logits.is_empty() {
+                prompt_logits.last().cloned().unwrap_or_default()
+            } else {
+                lookup.last_logits
+            };
+            lookup.cache.unwrap_or_else(|| {
+                crate::InMemoryKvCache::new(
+                    loaded_model.descriptor().config.max_context,
+                    expected_kv_width,
+                )
+            })
+        } else if let Some(session_id) = &request.session_id {
             sessions.state(session_id)?.cache().clone()
         } else {
             crate::InMemoryKvCache::new(
@@ -2859,17 +2902,26 @@ fn run_metal_gemma4_generation_request(
             &kv_cache_encoding_policy,
         )?;
         let mut step_plan = loaded_model.inner.build_decode_step_plan(backend)?;
-        let mut prompt_logits = Vec::new();
-        let mut last_logits = Vec::new();
+        let logits_output_mode = metal_gemma4_decode_logits_output_mode(request);
+        let prompt_logits_output_mode = if shared_prefix_eligible {
+            MetalLogitsOutputMode::RawLogits
+        } else {
+            logits_output_mode
+        };
+        let use_greedy_selected_token = logits_output_mode == MetalLogitsOutputMode::GreedyToken;
+        let mut last_selected_token = None;
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
-        let mut token_history = cache
-            .entries()
-            .iter()
-            .map(|entry| entry.token.as_u32())
-            .collect::<Vec<_>>();
+        if use_greedy_selected_token && !last_logits.is_empty() {
+            last_selected_token = super::select_argmax_token(last_logits.as_slice()).map(TokenId);
+        }
 
-        for token in prompt_tokens.as_slice() {
+        for (relative_prompt_index, token) in prompt_tokens.as_slice()[prefix_tokens_reused..]
+            .iter()
+            .enumerate()
+        {
+            let prompt_index = prefix_tokens_reused + relative_prompt_index;
+            let produce_prompt_logits = prompt_index + 1 == prompt_tokens.len();
             let step = loaded_model.inner.forward_step_with_layer_caches(
                 backend,
                 *token,
@@ -2882,18 +2934,32 @@ fn run_metal_gemma4_generation_request(
                 None,
                 None,
                 None,
-                true,
-                MetalLogitsOutputMode::RawLogits,
+                produce_prompt_logits,
+                prompt_logits_output_mode,
             )?;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             cache.append(*token, step.key, step.value)?;
-            token_history.push(token.as_u32());
-            last_logits = step.logits;
-            prompt_logits.push(last_logits.clone());
+            if produce_prompt_logits {
+                if use_greedy_selected_token {
+                    if step.logits.is_empty() {
+                        last_selected_token = step.selected_token;
+                    } else {
+                        last_logits = step.logits;
+                        prompt_logits.push(last_logits.clone());
+                        last_selected_token =
+                            super::select_argmax_token(last_logits.as_slice()).map(TokenId);
+                    }
+                } else {
+                    last_logits = step.logits;
+                    prompt_logits.push(last_logits.clone());
+                }
+            }
         }
 
         let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
+        let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
+            .then(|| cache.clone());
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
         let mut generated_tokens = Vec::new();
@@ -2907,15 +2973,25 @@ fn run_metal_gemma4_generation_request(
                 break super::TerminationReason::ContextLimit;
             }
 
-            let next_token = match sampler.select_next_token(
-                loaded_model.tokenizer(),
-                &last_logits,
-                &cache,
-                generated_tokens.as_slice(),
-            )? {
-                super::GenerationSelection::Token(token) => token,
-                super::GenerationSelection::Terminate => {
-                    break super::TerminationReason::EndOfSequence;
+            let next_token = if use_greedy_selected_token {
+                last_selected_token.ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from(
+                            "metal gemma4 greedy decode path did not produce a selected token",
+                        ),
+                    ))
+                })?
+            } else {
+                match sampler.select_next_token(
+                    loaded_model.tokenizer(),
+                    &last_logits,
+                    &cache,
+                    generated_tokens.as_slice(),
+                )? {
+                    super::GenerationSelection::Token(token) => token,
+                    super::GenerationSelection::Terminate => {
+                        break super::TerminationReason::EndOfSequence;
+                    }
                 }
             };
             if loaded_model.is_end_of_sequence(next_token) {
@@ -2936,13 +3012,16 @@ fn run_metal_gemma4_generation_request(
                 None,
                 None,
                 true,
-                MetalLogitsOutputMode::RawLogits,
+                logits_output_mode,
             )?;
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             cache.append(next_token, step.key, step.value)?;
-            token_history.push(next_token.as_u32());
-            last_logits = step.logits;
+            if use_greedy_selected_token {
+                last_selected_token = step.selected_token;
+            } else {
+                last_logits = step.logits;
+            }
             let emitted_at = Instant::now();
             if first_token_emitted_at.is_none() {
                 first_token_emitted_at = Some(emitted_at);
@@ -2959,6 +3038,20 @@ fn run_metal_gemma4_generation_request(
                 break super::TerminationReason::EndOfSequence;
             }
         };
+
+        if shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len() {
+            if let Some(prompt_cache) = prompt_cache.as_ref() {
+                let recorded_identity = shared_prefixes.record(
+                    compatibility,
+                    &prompt_tokens,
+                    &prompt_logits,
+                    prompt_cache,
+                );
+                if prefix_state != crate::PrefixCacheState::Hit || prefix_identity.is_none() {
+                    prefix_identity = Some(recorded_identity);
+                }
+            }
+        }
 
         let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let generated = TokenSequence::new(generated_tokens);
@@ -3009,7 +3102,7 @@ fn run_metal_gemma4_generation_request(
             kv_cache_encoding: Some(psionic_runtime::KvCacheEncodingAccounting::active(
                 kv_cache_encoding_policy.clone(),
             )),
-            prefix_tokens_reused: Some(0),
+            prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
@@ -3031,10 +3124,10 @@ fn run_metal_gemma4_generation_request(
             kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
             kv_ownership: cache.ownership_since(&request_kv_checkpoint),
             prefix_cache_control: Some(request.prefix_cache_control.clone()),
-            prefix_cache_state: Some(crate::PrefixCacheState::Bypassed),
-            prefix_cache_refusal_reason: None,
-            prefix_cache_policy: Some(crate::default_prefix_cache_policy()),
-            prefix_cache_identity: None,
+            prefix_cache_state: Some(prefix_state),
+            prefix_cache_refusal_reason,
+            prefix_cache_policy: Some(prefix_policy),
+            prefix_cache_identity: prefix_identity,
             compile_path: None,
             delivery_proof: crate::build_delivery_proof(
                 delivery_plan_digest,
@@ -3053,8 +3146,8 @@ fn run_metal_gemma4_generation_request(
                 request.session_id.as_ref(),
                 request.reset_session,
                 &previous_kv_state,
-                crate::PrefixCacheState::Bypassed,
-                None,
+                prefix_state,
+                prefix_cache_invalidation_trigger,
             ),
             scheduler: None,
             structured_output: structured_output_report,
@@ -3382,63 +3475,67 @@ impl MetalGemma4ModelInner {
         &self,
         backend: &mut MetalBackend,
     ) -> Result<MetalGemma4StepPlan, ReferenceTextGenerationError> {
-        let head_count = self.descriptor.config.block.attention.head_count;
-        let head_dim = self.descriptor.config.block.attention.head_dim;
-        let q_rows = head_count.saturating_mul(head_dim);
-        let kv_rows = self
+        let layer_plans = self
             .layers
             .iter()
-            .filter(|layer| layer.attention_geometry.has_kv())
-            .map(|layer| layer.attention_geometry.kv_width())
-            .max()
-            .unwrap_or(self.descriptor.config.kv_width());
-        let rotary_pairs = head_dim / 2;
-        Ok(MetalGemma4StepPlan {
-            q_buffer: backend
-                .input_buffer(Shape::new(vec![q_rows]), vec![0.0; q_rows])
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            k_buffer: backend
-                .input_buffer(Shape::new(vec![kv_rows]), vec![0.0; kv_rows])
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            v_buffer: backend
-                .input_buffer(Shape::new(vec![kv_rows]), vec![0.0; kv_rows])
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            cos_buffer: backend
-                .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            sin_buffer: backend
-                .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            query_buffer: backend
-                .input_buffer(
-                    Shape::new(vec![1, head_count, 1, head_dim]),
-                    vec![0.0; q_rows],
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            key_buffer: backend
-                .input_buffer(
-                    Shape::new(vec![
-                        1,
-                        self.descriptor.config.block.attention.kv_head_count,
-                        1,
-                        head_dim,
-                    ]),
-                    vec![0.0; kv_rows],
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            value_buffer: backend
-                .input_buffer(
-                    Shape::new(vec![
-                        1,
-                        self.descriptor.config.block.attention.kv_head_count,
-                        1,
-                        head_dim,
-                    ]),
-                    vec![0.0; kv_rows],
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?,
-            attention_values: vec![0.0; q_rows],
-        })
+            .map(|layer| {
+                let q_rows = layer
+                    .attention_geometry
+                    .head_count
+                    .saturating_mul(layer.attention_geometry.head_dim);
+                let kv_rows = layer.attention_geometry.kv_width();
+                let rotary_pairs = layer.attention_geometry.head_dim / 2;
+                Ok(Some(MetalGemma4LayerStepPlan {
+                    cos_buffer: backend
+                        .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    sin_buffer: backend
+                        .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    identity_cos_buffer: backend
+                        .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![1.0; rotary_pairs])
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    identity_sin_buffer: backend
+                        .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    query_buffer: backend
+                        .input_buffer(
+                            Shape::new(vec![
+                                1,
+                                layer.attention_geometry.head_count,
+                                1,
+                                layer.attention_geometry.head_dim,
+                            ]),
+                            vec![0.0; q_rows],
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    key_buffer: backend
+                        .input_buffer(
+                            Shape::new(vec![
+                                1,
+                                layer.attention_geometry.kv_head_count,
+                                1,
+                                layer.attention_geometry.head_dim,
+                            ]),
+                            vec![0.0; kv_rows],
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    value_buffer: backend
+                        .input_buffer(
+                            Shape::new(vec![
+                                1,
+                                layer.attention_geometry.kv_head_count,
+                                1,
+                                layer.attention_geometry.head_dim,
+                            ]),
+                            vec![0.0; kv_rows],
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    attention_values: vec![0.0; q_rows],
+                }))
+            })
+            .collect::<Result<Vec<_>, ReferenceTextGenerationError>>()?;
+        Ok(MetalGemma4StepPlan { layer_plans })
     }
 
     fn forward_step(
@@ -3509,6 +3606,15 @@ impl MetalGemma4ModelInner {
                     "gemma4 metal layer cache count mismatch: expected {}, actual {}",
                     self.layers.len(),
                     layer_caches.len()
+                )),
+            ));
+        }
+        if step_plan.layer_plans.len() != self.layers.len() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "gemma4 metal step-plan layer count mismatch: expected {}, actual {}",
+                    self.layers.len(),
+                    step_plan.layer_plans.len()
                 )),
             ));
         }
@@ -3681,14 +3787,22 @@ impl MetalGemma4ModelInner {
                         ),
                         &self.family_metadata,
                     );
-                    step_plan.q_buffer.write_f32(q.values.as_slice())?;
-                    step_plan.k_buffer.write_f32(k.values.as_slice())?;
-                    step_plan.v_buffer.write_f32(v.values.as_slice())?;
-                    step_plan.cos_buffer.write_f32(cos_values.as_slice())?;
-                    step_plan.sin_buffer.write_f32(sin_values.as_slice())?;
-                    step_plan.query_buffer.write_f32(q.values.as_slice())?;
-                    step_plan.key_buffer.write_f32(k.values.as_slice())?;
-                    step_plan.value_buffer.write_f32(v.values.as_slice())?;
+                    let layer_step_plan = step_plan
+                        .layer_plans
+                        .get_mut(layer_index)
+                        .and_then(Option::as_mut)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 metal layer {layer_index} is missing a decode step plan"
+                                ),
+                            ))
+                        })?;
+                    layer_step_plan.cos_buffer.write_f32(cos_values.as_slice())?;
+                    layer_step_plan.sin_buffer.write_f32(sin_values.as_slice())?;
+                    layer_step_plan.query_buffer.write_f32(q.values.as_slice())?;
+                    layer_step_plan.key_buffer.write_f32(k.values.as_slice())?;
+                    layer_step_plan.value_buffer.write_f32(v.values.as_slice())?;
                     let layer_cache = layer_caches
                         .get_mut(layer_index)
                         .and_then(Option::as_mut)
@@ -3701,11 +3815,11 @@ impl MetalGemma4ModelInner {
                         })?;
                     let attention = backend
                         .decode_attention_f32(
-                            &step_plan.query_buffer,
-                            &step_plan.key_buffer,
-                            &step_plan.value_buffer,
-                            &step_plan.cos_buffer,
-                            &step_plan.sin_buffer,
+                            &layer_step_plan.query_buffer,
+                            &layer_step_plan.key_buffer,
+                            &layer_step_plan.value_buffer,
+                            &layer_step_plan.cos_buffer,
+                            &layer_step_plan.sin_buffer,
                             layer_cache,
                             attention_scale(
                                 &self.family_metadata,
@@ -3716,7 +3830,7 @@ impl MetalGemma4ModelInner {
                             true,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
-                    step_plan.attention_values = attention
+                    layer_step_plan.attention_values = attention
                         .output
                         .read_f32()
                         .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -3740,7 +3854,7 @@ impl MetalGemma4ModelInner {
                                     )),
                                 )
                             })?,
-                        Some(step_plan.attention_values.as_slice()),
+                        Some(layer_step_plan.attention_values.as_slice()),
                     )
                 } else {
                     let mut q = layer.attention_query_weight.matvec(backend, &hidden_norm)?;
@@ -3797,7 +3911,59 @@ impl MetalGemma4ModelInner {
                                 ),
                             ))
                         })?;
-                    (q, reused_k, reused_v, None)
+                    let layer_step_plan = step_plan
+                        .layer_plans
+                        .get_mut(layer_index)
+                        .and_then(Option::as_mut)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 metal layer {layer_index} is missing a reused-kv decode step plan"
+                                ),
+                            ))
+                        })?;
+                    layer_step_plan.query_buffer.write_f32(q.values.as_slice())?;
+                    layer_step_plan.key_buffer.write_f32(reused_k)?;
+                    layer_step_plan.value_buffer.write_f32(reused_v)?;
+                    let source_layer_cache = layer_caches
+                        .get(reuse_layer_index)
+                        .and_then(Option::as_ref)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} expected a device kv cache mirror from layer {reuse_layer_index}"
+                                ),
+                            ))
+                        })?;
+                    let mut source_cache_view = source_layer_cache.truncated(cache.len());
+                    let attention = backend
+                        .decode_attention_f32(
+                            &layer_step_plan.query_buffer,
+                            &layer_step_plan.key_buffer,
+                            &layer_step_plan.value_buffer,
+                            &layer_step_plan.identity_cos_buffer,
+                            &layer_step_plan.identity_sin_buffer,
+                            &mut source_cache_view,
+                            attention_scale(
+                                &self.family_metadata,
+                                layer.attention_geometry.head_dim,
+                            ),
+                            true,
+                            false,
+                            true,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    layer_step_plan.attention_values = attention
+                        .output
+                        .read_f32()
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    kernel_count = kernel_count.saturating_add(1);
+                    (
+                        q,
+                        reused_k,
+                        reused_v,
+                        Some(layer_step_plan.attention_values.as_slice()),
+                    )
                 };
 
             let attention_values = if let Some(values) = fresh_attention_values {
@@ -5493,6 +5659,7 @@ pub struct DistributedGemma4TextGenerationService {
     backend: DistributedGemma4FrontBackend,
     models: InMemoryGenerationModelRegistry<DistributedGemma4GenerationModel>,
     sessions: InMemoryGenerationSessionStore,
+    shared_prefixes: SharedPrefixStore,
     backend_health: super::BackendHealthTracker,
     model_descriptor: DecoderModelDescriptor,
     runtime_support: GgufDecoderRuntimeSupport,
@@ -5534,6 +5701,7 @@ impl DistributedGemma4TextGenerationService {
             backend,
             models,
             sessions: InMemoryGenerationSessionStore::new(),
+            shared_prefixes: SharedPrefixStore::default(),
             backend_health,
             model_descriptor,
             runtime_support,
@@ -5688,6 +5856,7 @@ impl TextGenerationExecutor for DistributedGemma4TextGenerationService {
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
+            &mut self.shared_prefixes,
             request,
         );
         self.backend
@@ -5907,6 +6076,7 @@ fn run_distributed_gemma4_generation_request(
     backend: &mut DistributedGemma4FrontBackend,
     models: &mut InMemoryGenerationModelRegistry<DistributedGemma4GenerationModel>,
     sessions: &mut InMemoryGenerationSessionStore,
+    shared_prefixes: &mut SharedPrefixStore,
     request: &GenerationRequest,
 ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
     if !super::generation_product_supported(request) {
@@ -5955,6 +6125,14 @@ fn run_distributed_gemma4_generation_request(
 
         let expected_kv_width = loaded_model.cache_width();
         let mut session_tokens = Vec::new();
+        let compatibility = super::prefix_compatibility_for_request(&loaded_model, request);
+        let prefix_policy = super::default_prefix_cache_policy();
+        let mut prefix_state = crate::PrefixCacheState::None;
+        let mut prefix_cache_refusal_reason = None;
+        let mut prefix_cache_invalidation_trigger = None;
+        let mut prefix_tokens_reused = 0usize;
+        let mut prefix_identity = None;
+        let mut shared_prefix_eligible = false;
         let previous_kv_state = if let Some(session_id) = &request.session_id {
             if request.reset_session {
                 sessions.reset(session_id)?;
@@ -5967,8 +6145,16 @@ fn run_distributed_gemma4_generation_request(
                 effective_served_artifact_digest.as_str(),
             )?;
             session_tokens = state.tokens().to_vec();
+            if state.cache().is_empty() {
+                shared_prefix_eligible = true;
+            } else {
+                prefix_state = crate::PrefixCacheState::Bypassed;
+                prefix_cache_refusal_reason =
+                    Some(crate::PrefixCacheRefusalReason::SessionBoundState);
+            }
             state.cache().state()
         } else {
+            shared_prefix_eligible = true;
             psionic_runtime::KvCacheState::default()
         };
         let preserve_prefix_tokens = usize::from(
@@ -5982,7 +6168,29 @@ fn run_distributed_gemma4_generation_request(
             request.options.context_overflow_policy,
             preserve_prefix_tokens,
         )?;
-        let mut cache = if let Some(session_id) = &request.session_id {
+        let mut prompt_logits = Vec::new();
+        let mut last_logits = Vec::new();
+        let mut cache = if shared_prefix_eligible {
+            let lookup =
+                super::controlled_prefix_lookup(shared_prefixes, &compatibility, &prompt_tokens, request);
+            prefix_state = lookup.state;
+            prefix_cache_refusal_reason = lookup.refusal_reason;
+            prefix_cache_invalidation_trigger = lookup.invalidation_trigger;
+            prefix_tokens_reused = lookup.reused_tokens;
+            prefix_identity = lookup.identity;
+            prompt_logits = lookup.prompt_logits;
+            last_logits = if lookup.last_logits.is_empty() {
+                prompt_logits.last().cloned().unwrap_or_default()
+            } else {
+                lookup.last_logits
+            };
+            lookup.cache.unwrap_or_else(|| {
+                crate::InMemoryKvCache::new(
+                    loaded_model.descriptor().config.max_context,
+                    expected_kv_width,
+                )
+            })
+        } else if let Some(session_id) = &request.session_id {
             sessions.state(session_id)?.cache().clone()
         } else {
             crate::InMemoryKvCache::new(
@@ -6014,12 +6222,10 @@ fn run_distributed_gemma4_generation_request(
             &kv_cache_encoding_policy,
         )?;
         let mut step_plan = loaded_model.inner.build_decode_step_plan(&mut backend.metal)?;
-        let mut prompt_logits = Vec::new();
-        let mut last_logits = Vec::new();
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
 
-        for token in prompt_tokens.as_slice() {
+        for token in &prompt_tokens.as_slice()[prefix_tokens_reused..] {
             let prefix_step = loaded_model.inner.forward_step_with_layer_caches(
                 &mut backend.metal,
                 *token,
@@ -6056,6 +6262,8 @@ fn run_distributed_gemma4_generation_request(
         }
 
         let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
+        let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
+            .then(|| cache.clone());
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
         let mut generated_tokens = Vec::new();
@@ -6134,6 +6342,20 @@ fn run_distributed_gemma4_generation_request(
             }
         };
 
+        if shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len() {
+            if let Some(prompt_cache) = prompt_cache.as_ref() {
+                let recorded_identity = shared_prefixes.record(
+                    compatibility,
+                    &prompt_tokens,
+                    &prompt_logits,
+                    prompt_cache,
+                );
+                if prefix_state != crate::PrefixCacheState::Hit || prefix_identity.is_none() {
+                    prefix_identity = Some(recorded_identity);
+                }
+            }
+        }
+
         let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let generated = TokenSequence::new(generated_tokens);
         if let Some(session_id) = &request.session_id {
@@ -6184,7 +6406,7 @@ fn run_distributed_gemma4_generation_request(
             kv_cache_encoding: Some(psionic_runtime::KvCacheEncodingAccounting::active(
                 kv_cache_encoding_policy.clone(),
             )),
-            prefix_tokens_reused: Some(0),
+            prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
@@ -6206,10 +6428,10 @@ fn run_distributed_gemma4_generation_request(
             kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
             kv_ownership: cache.ownership_since(&request_kv_checkpoint),
             prefix_cache_control: Some(request.prefix_cache_control.clone()),
-            prefix_cache_state: Some(crate::PrefixCacheState::Bypassed),
-            prefix_cache_refusal_reason: None,
-            prefix_cache_policy: Some(crate::default_prefix_cache_policy()),
-            prefix_cache_identity: None,
+            prefix_cache_state: Some(prefix_state),
+            prefix_cache_refusal_reason,
+            prefix_cache_policy: Some(prefix_policy),
+            prefix_cache_identity: prefix_identity,
             compile_path: None,
             delivery_proof: crate::build_delivery_proof(
                 delivery_plan_digest,
@@ -6228,8 +6450,8 @@ fn run_distributed_gemma4_generation_request(
                 request.session_id.as_ref(),
                 request.reset_session,
                 &previous_kv_state,
-                crate::PrefixCacheState::Bypassed,
-                None,
+                prefix_state,
+                prefix_cache_invalidation_trigger,
             ),
             scheduler: None,
             structured_output: structured_output_report,
@@ -6319,6 +6541,7 @@ fn run_cuda_gemma4_generation_request(
     backend: &mut CudaBackend,
     models: &mut InMemoryGenerationModelRegistry<CudaGemma4GenerationModel>,
     sessions: &mut InMemoryGenerationSessionStore,
+    shared_prefixes: &mut SharedPrefixStore,
     request: &GenerationRequest,
 ) -> Result<GenerationResponse, ReferenceTextGenerationError> {
     if !super::generation_product_supported(request) {
@@ -6370,6 +6593,14 @@ fn run_cuda_gemma4_generation_request(
 
         let expected_kv_width = loaded_model.cache_width();
         let mut session_tokens = Vec::new();
+        let compatibility = super::prefix_compatibility_for_request(&loaded_model, request);
+        let prefix_policy = super::default_prefix_cache_policy();
+        let mut prefix_state = crate::PrefixCacheState::None;
+        let mut prefix_cache_refusal_reason = None;
+        let mut prefix_cache_invalidation_trigger = None;
+        let mut prefix_tokens_reused = 0usize;
+        let mut prefix_identity = None;
+        let mut shared_prefix_eligible = false;
         let previous_kv_state = if let Some(session_id) = &request.session_id {
             if request.reset_session {
                 sessions.reset(session_id)?;
@@ -6382,8 +6613,16 @@ fn run_cuda_gemma4_generation_request(
                 effective_served_artifact_digest.as_str(),
             )?;
             session_tokens = state.tokens().to_vec();
+            if state.cache().is_empty() {
+                shared_prefix_eligible = true;
+            } else {
+                prefix_state = crate::PrefixCacheState::Bypassed;
+                prefix_cache_refusal_reason =
+                    Some(crate::PrefixCacheRefusalReason::SessionBoundState);
+            }
             state.cache().state()
         } else {
+            shared_prefix_eligible = true;
             psionic_runtime::KvCacheState::default()
         };
         let preserve_prefix_tokens = usize::from(
@@ -6397,7 +6636,30 @@ fn run_cuda_gemma4_generation_request(
             request.options.context_overflow_policy,
             preserve_prefix_tokens,
         )?;
-        let mut cache = if let Some(session_id) = &request.session_id {
+        let mut prompt_logits = Vec::new();
+        let mut last_logits = Vec::new();
+        let mut cache = if shared_prefix_eligible {
+            let lookup =
+                super::controlled_prefix_lookup(shared_prefixes, &compatibility, &prompt_tokens, request);
+            prefix_state = lookup.state;
+            prefix_cache_refusal_reason = lookup.refusal_reason;
+            prefix_cache_invalidation_trigger = lookup.invalidation_trigger;
+            prefix_tokens_reused = lookup.reused_tokens;
+            prefix_identity = lookup.identity;
+            prompt_logits = lookup.prompt_logits;
+            last_logits = if lookup.last_logits.is_empty() {
+                prompt_logits.last().cloned().unwrap_or_default()
+            } else {
+                lookup.last_logits
+            };
+            lookup.cache.unwrap_or_else(|| {
+                crate::InMemoryKvCache::with_policy(
+                    loaded_model.descriptor().config.max_context,
+                    expected_kv_width,
+                    super::default_generation_kv_cache_policy(&loaded_model),
+                )
+            })
+        } else if let Some(session_id) = &request.session_id {
             sessions.state(session_id)?.cache().clone()
         } else {
             crate::InMemoryKvCache::with_policy(
@@ -6425,12 +6687,10 @@ fn run_cuda_gemma4_generation_request(
             request.options.max_output_tokens.saturating_add(1),
         )?;
         let mut step_plan = loaded_model.inner.build_decode_step_plan(backend)?;
-        let mut prompt_logits = Vec::new();
-        let mut last_logits = Vec::new();
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
 
-        for token in prompt_tokens.as_slice() {
+        for token in &prompt_tokens.as_slice()[prefix_tokens_reused..] {
             let step = loaded_model.inner.forward_step_with_layer_caches(
                 backend,
                 *token,
@@ -6467,6 +6727,8 @@ fn run_cuda_gemma4_generation_request(
         }
 
         let prefill_handoff_state = gemma4_cuda_layer_cache_state(layer_caches.as_slice());
+        let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
+            .then(|| cache.clone());
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
         let mut generated_tokens = Vec::new();
@@ -6545,6 +6807,20 @@ fn run_cuda_gemma4_generation_request(
             }
         };
 
+        if shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len() {
+            if let Some(prompt_cache) = prompt_cache.as_ref() {
+                let recorded_identity = shared_prefixes.record(
+                    compatibility,
+                    &prompt_tokens,
+                    &prompt_logits,
+                    prompt_cache,
+                );
+                if prefix_state != crate::PrefixCacheState::Hit || prefix_identity.is_none() {
+                    prefix_identity = Some(recorded_identity);
+                }
+            }
+        }
+
         let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let generated = TokenSequence::new(generated_tokens);
         if let Some(session_id) = &request.session_id {
@@ -6610,7 +6886,7 @@ fn run_cuda_gemma4_generation_request(
             kv_cache: Some(kv_cache),
             kv_residency: kv_residency.clone(),
             kv_cache_encoding: None,
-            prefix_tokens_reused: Some(0),
+            prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
@@ -6632,10 +6908,10 @@ fn run_cuda_gemma4_generation_request(
             kv_cache_encoding_policy: None,
             kv_ownership: cache.ownership_since(&request_kv_checkpoint),
             prefix_cache_control: Some(request.prefix_cache_control.clone()),
-            prefix_cache_state: Some(crate::PrefixCacheState::Bypassed),
-            prefix_cache_refusal_reason: None,
-            prefix_cache_policy: Some(crate::default_prefix_cache_policy()),
-            prefix_cache_identity: None,
+            prefix_cache_state: Some(prefix_state),
+            prefix_cache_refusal_reason,
+            prefix_cache_policy: Some(prefix_policy),
+            prefix_cache_identity: prefix_identity,
             compile_path: None,
             delivery_proof: crate::build_delivery_proof(
                 delivery_plan_digest,
@@ -6654,8 +6930,8 @@ fn run_cuda_gemma4_generation_request(
                 request.session_id.as_ref(),
                 request.reset_session,
                 &previous_kv_state,
-                crate::PrefixCacheState::Bypassed,
-                None,
+                prefix_state,
+                prefix_cache_invalidation_trigger,
             ),
             scheduler: None,
             structured_output: structured_output_report,
@@ -7040,6 +7316,7 @@ impl TextGenerationExecutor for CudaGemma4TextGenerationService {
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
+            &mut self.shared_prefixes,
             &request,
         )?;
         Ok(self.promoted_revisions.attach_to_response(response))
