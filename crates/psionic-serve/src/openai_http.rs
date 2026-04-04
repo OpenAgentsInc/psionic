@@ -7514,13 +7514,22 @@ async fn handle_generic_chat_completions(
     options.structured_output =
         structured_output_from_tool_contract(tool_contract.as_ref(), model.family)?
             .or(structured_output);
-    let generation_request = GenerationRequest::new_text(
-        request_id.clone(),
-        model.descriptor.clone(),
-        None,
-        rendered.text,
-        options,
-    )
+    let generation_request = match rendered.input {
+        crate::GenerationInput::Text(text) => GenerationRequest::new_text(
+            request_id.clone(),
+            model.descriptor.clone(),
+            None,
+            text,
+            options,
+        ),
+        crate::GenerationInput::Tokens(tokens) => GenerationRequest::new_tokens(
+            request_id.clone(),
+            model.descriptor.clone(),
+            None,
+            tokens,
+            options,
+        ),
+    }
     .with_prefix_cache_control(request.psionic_prefix_cache.clone().unwrap_or_default());
 
     let response = worker_for_route(state.as_ref(), &route.selection)?
@@ -7915,13 +7924,22 @@ async fn handle_generic_responses(
     options.structured_output =
         structured_output_from_tool_contract(tool_contract.as_ref(), model.family)?
             .or(structured_output);
-    let generation_request = GenerationRequest::new_text(
-        request_id.clone(),
-        model.descriptor.clone(),
-        None,
-        rendered.text,
-        options,
-    )
+    let generation_request = match rendered.input {
+        crate::GenerationInput::Text(text) => GenerationRequest::new_text(
+            request_id.clone(),
+            model.descriptor.clone(),
+            None,
+            text,
+            options,
+        ),
+        crate::GenerationInput::Tokens(tokens) => GenerationRequest::new_tokens(
+            request_id.clone(),
+            model.descriptor.clone(),
+            None,
+            tokens,
+            options,
+        ),
+    }
     .with_prefix_cache_control(request.psionic_prefix_cache.clone().unwrap_or_default());
 
     let response = worker_for_route(state.as_ref(), &route.selection)?
@@ -9186,6 +9204,7 @@ fn insert_cluster_execution_headers(
 
 #[derive(Clone, Debug)]
 struct GenericRenderedPrompt {
+    input: crate::GenerationInput,
     text: String,
     stop_sequences: Vec<String>,
 }
@@ -9920,6 +9939,7 @@ fn render_prompt_for_model(
                 })
             })?;
         return Ok(GenericRenderedPrompt {
+            input: crate::GenerationInput::Text(text.clone()),
             text,
             stop_sequences: vec![
                 String::from(HARMONY_RETURN_STOP),
@@ -9941,14 +9961,26 @@ fn render_prompt_for_model(
                 .iter()
                 .all(|message| message.role != PromptMessageRole::Tool) =>
         {
+            let text = fallback_prompt_text(messages);
             return Ok(GenericRenderedPrompt {
-                text: fallback_prompt_text(messages),
+                input: crate::GenerationInput::Text(text.clone()),
+                text,
                 stop_sequences: Vec::new(),
             });
         }
         Err(error) => return Err(error.into()),
     };
+    let input = renderer
+        .tokenize_rendered_prompt(rendered.text.as_str())
+        .map(crate::GenerationInput::Tokens)
+        .map_err(|error| {
+            OpenAiCompatHttpError::Internal(format!(
+                "model `{}` failed to tokenize rendered prompt: {error}",
+                model.model_key
+            ))
+        })?;
     Ok(GenericRenderedPrompt {
+        input,
         text: rendered.text,
         stop_sequences: rendered.stop_sequences,
     })

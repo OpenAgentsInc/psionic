@@ -262,6 +262,23 @@ conformance work:
   attention geometry, including narrower sliding-window layers and wider
   full-attention layers, instead of assuming one uniform KV shape across the
   whole stack.
+- the same live `gemma4:e4b` lane now also fixes the prompt path that had left
+  the real local Ollama GGUF in a half-wired state:
+  - if the artifact omits `tokenizer.chat_template`, Psionic now falls back to
+    the checked-in bounded Gemma 4 template instead of collapsing to the raw
+    plain-text fallback prompt
+  - rendered Gemma prompts now flow into generation as token IDs, so literal
+    `<bos>` text in the rendered template does not get retokenized into a
+    duplicated BOS boundary
+  - the SentencePiece runtime now preserves Gemma-special tokens, byte
+    fallbacks, and whole-piece preference closely enough to match the real
+    tokenizer fixture and produce live grammatical output instead of prompt
+    echo or gibberish
+- with those fixes in place, the live 4080 CUDA server now answers a real
+  `/v1/chat/completions` request for `gemma4:e4b` with a grammatical English
+  sentence rather than prompt replay. The bounded proof prompt
+  `Reply with exactly one short grammatical English sentence.` returned
+  `The cat slept soundly on the warm rug.` on `2026-04-03`.
 - the same bounded `gemma4:e4b` lane now also accepts typed promoted adapter
   revisions from the Gemma trainer without restart, revalidates checkpoint and
   adapter truth before activation, surfaces the active served revision in

@@ -151,17 +151,65 @@ impl TokenizerBoundary for GgufRuntimeTokenizer {
 #[derive(Clone, Debug)]
 struct SentencePieceRuntimeTokenizer {
     vocabulary: TokenVocabulary,
-    lookup: BTreeMap<String, TokenId>,
+    ordinary_pieces: HashMap<String, SentencePieceRuntimePiece>,
+    special_encoder: HashMap<String, u32>,
+    special_decoder: HashMap<u32, String>,
+    special_regex: Option<Regex>,
+    byte_fallback: HashMap<u8, TokenId>,
+    max_piece_byte_len: usize,
     add_bos: bool,
     add_eos: bool,
     eos_token_ids: Vec<TokenId>,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SentencePieceRuntimePiece {
+    token: TokenId,
+    score: f32,
+}
+
 impl SentencePieceRuntimeTokenizer {
     fn from_gguf(tokenizer: &GgufTokenizerMetadata) -> Self {
+        let rank_like_scores = sentencepiece_scores_look_rank_like(tokenizer);
+        let mut ordinary_pieces = HashMap::new();
+        let mut special_encoder = HashMap::new();
+        let mut special_decoder = HashMap::new();
+        let mut byte_fallback = HashMap::new();
+        let mut max_piece_byte_len = 0usize;
+
+        for (index, token) in tokenizer.vocabulary.tokens().iter().enumerate() {
+            let token_id = TokenId(index as u32);
+            let token_type = tokenizer.token_types.get(index).copied();
+            if gguf_token_is_special(token, token_type) {
+                special_encoder.insert(token.clone(), token_id.as_u32());
+                special_decoder.insert(token_id.as_u32(), token.clone());
+                continue;
+            }
+            ordinary_pieces.insert(
+                token.clone(),
+                SentencePieceRuntimePiece {
+                    token: token_id,
+                    score: if rank_like_scores {
+                        0.0
+                    } else {
+                        tokenizer.scores.get(index).copied().unwrap_or(0.0)
+                    },
+                },
+            );
+            if let Some(byte) = sentencepiece_byte_fallback_value(token) {
+                byte_fallback.insert(byte, token_id);
+            }
+            max_piece_byte_len = max_piece_byte_len.max(token.len());
+        }
+
         Self {
             vocabulary: runtime_vocabulary(tokenizer),
-            lookup: runtime_lookup(tokenizer),
+            ordinary_pieces,
+            special_regex: build_special_regex(&special_encoder).ok().flatten(),
+            special_encoder,
+            special_decoder,
+            byte_fallback,
+            max_piece_byte_len,
             add_bos: tokenizer.add_bos,
             add_eos: tokenizer.add_eos,
             eos_token_ids: tokenizer.vocabulary.eos_token_ids().to_vec(),
@@ -179,21 +227,24 @@ impl SentencePieceRuntimeTokenizer {
         if add_bos {
             tokens.push(self.vocabulary.bos_id());
         }
-        for piece in text.split_whitespace() {
-            let normalized = normalize_piece(piece);
-            if normalized.is_empty() {
-                continue;
+        let mut start = 0usize;
+        let mut ordinary_starts_at_input_boundary = true;
+        while start < text.len() {
+            let next_special = self.find_next_special(text, start);
+            let end = next_special.map_or(text.len(), |(match_start, _, _)| match_start);
+            self.encode_ordinary_segment(
+                &text[start..end],
+                ordinary_starts_at_input_boundary,
+                &mut tokens,
+            );
+            match next_special {
+                Some((_, special_end, token_id)) => {
+                    tokens.push(TokenId(token_id));
+                    start = special_end;
+                    ordinary_starts_at_input_boundary = false;
+                }
+                None => break,
             }
-            if let Some(token) = self.lookup.get(normalized.as_str()) {
-                tokens.push(*token);
-                continue;
-            }
-            let with_boundary = format!("▁{normalized}");
-            if let Some(token) = self.lookup.get(with_boundary.as_str()) {
-                tokens.push(*token);
-                continue;
-            }
-            tokens.push(self.vocabulary.unknown_id());
         }
         if add_eos {
             tokens.push(self.vocabulary.eos_id());
@@ -210,6 +261,118 @@ impl SentencePieceRuntimeTokenizer {
     fn is_end_of_sequence(&self, token: TokenId) -> bool {
         self.eos_token_ids.contains(&token) || token == self.vocabulary.eos_id()
     }
+
+    fn find_next_special(&self, text: &str, start: usize) -> Option<(usize, usize, u32)> {
+        let regex = self.special_regex.as_ref()?;
+        let matched = regex.find_from_pos(text, start).ok().flatten()?;
+        let token = self
+            .special_encoder
+            .get(&text[matched.start()..matched.end()])?;
+        Some((matched.start(), matched.end(), *token))
+    }
+
+    fn encode_ordinary_segment(
+        &self,
+        text: &str,
+        starts_at_input_boundary: bool,
+        out: &mut Vec<TokenId>,
+    ) {
+        if text.is_empty() {
+            return;
+        }
+        let normalized = normalize_sentencepiece_segment(text, starts_at_input_boundary);
+        if normalized.is_empty() {
+            return;
+        }
+        out.extend(self.encode_sentencepiece_segment(normalized.as_str()));
+    }
+
+    fn encode_sentencepiece_segment(&self, normalized: &str) -> Vec<TokenId> {
+        if normalized.is_empty() {
+            return Vec::new();
+        }
+        let boundaries = char_boundaries(normalized);
+        let last = boundaries.len().saturating_sub(1);
+        let mut states = vec![None; boundaries.len()];
+        let mut choices = vec![None; boundaries.len()];
+        states[0] = Some(SentencePiecePathState {
+            score: 0.0,
+            token_count: 0,
+        });
+
+        for boundary_index in 0..last {
+            let Some(current_state) = states[boundary_index] else {
+                continue;
+            };
+            let start = boundaries[boundary_index];
+            let mut matched = false;
+            for next_index in boundary_index + 1..=last {
+                let end = boundaries[next_index];
+                if self.max_piece_byte_len > 0
+                    && end.saturating_sub(start) > self.max_piece_byte_len
+                {
+                    break;
+                }
+                let piece = &normalized[start..end];
+                let Some(entry) = self.ordinary_pieces.get(piece) else {
+                    continue;
+                };
+                matched = true;
+                let candidate_state = SentencePiecePathState {
+                    score: current_state.score + entry.score,
+                    token_count: current_state.token_count + 1,
+                };
+                if sentencepiece_state_is_better(candidate_state, states[next_index]) {
+                    states[next_index] = Some(candidate_state);
+                    choices[next_index] = Some(SentencePiecePathChoice {
+                        previous_index: boundary_index,
+                        tokens: vec![entry.token],
+                    });
+                }
+            }
+            if matched {
+                continue;
+            }
+            let next_index = boundary_index + 1;
+            let piece = &normalized[start..boundaries[next_index]];
+            let fallback_tokens = self
+                .byte_fallback_tokens(piece)
+                .unwrap_or_else(|| vec![self.vocabulary.unknown_id()]);
+            let candidate_state = SentencePiecePathState {
+                score: current_state.score - 1_000.0,
+                token_count: current_state.token_count + fallback_tokens.len(),
+            };
+            if sentencepiece_state_is_better(candidate_state, states[next_index]) {
+                states[next_index] = Some(candidate_state);
+                choices[next_index] = Some(SentencePiecePathChoice {
+                    previous_index: boundary_index,
+                    tokens: fallback_tokens,
+                });
+            }
+        }
+
+        let mut reconstructed = Vec::new();
+        let mut cursor = last;
+        while cursor > 0 {
+            let Some(choice) = choices[cursor].clone() else {
+                return vec![self.vocabulary.unknown_id()];
+            };
+            for token in choice.tokens.iter().rev() {
+                reconstructed.push(*token);
+            }
+            cursor = choice.previous_index;
+        }
+        reconstructed.reverse();
+        reconstructed
+    }
+
+    fn byte_fallback_tokens(&self, piece: &str) -> Option<Vec<TokenId>> {
+        let mut tokens = Vec::with_capacity(piece.len());
+        for byte in piece.as_bytes() {
+            tokens.push(*self.byte_fallback.get(byte)?);
+        }
+        Some(tokens)
+    }
 }
 
 impl TokenizerBoundary for SentencePieceRuntimeTokenizer {
@@ -218,30 +381,55 @@ impl TokenizerBoundary for SentencePieceRuntimeTokenizer {
     }
 
     fn decode(&self, tokens: &[TokenId]) -> String {
-        let mut pieces = Vec::new();
+        let mut decoded = Vec::new();
         for token in tokens {
             if is_runtime_special_token(&self.vocabulary, self.eos_token_ids.as_slice(), *token) {
+                continue;
+            }
+            let token_id = token.as_u32();
+            if let Some(special) = self.special_decoder.get(&token_id) {
+                decoded.extend_from_slice(special.as_bytes());
                 continue;
             }
             let Some(piece) = self.vocabulary.token(*token) else {
                 continue;
             };
-            pieces.push(piece.trim_start_matches('▁').to_string());
+            if let Some(byte) = sentencepiece_byte_fallback_value(piece) {
+                decoded.push(byte);
+                continue;
+            }
+            let expanded = piece.replace('▁', " ");
+            decoded.extend_from_slice(expanded.as_bytes());
         }
-        pieces.join(" ")
+        let mut text = String::from_utf8_lossy(decoded.as_slice()).into_owned();
+        if text.starts_with(' ') {
+            text.remove(0);
+        }
+        text
     }
 
     fn append_decoded_token(&self, text: &mut String, token: TokenId) {
         if is_runtime_special_token(&self.vocabulary, self.eos_token_ids.as_slice(), token) {
             return;
         }
+        let token_id = token.as_u32();
+        if let Some(special) = self.special_decoder.get(&token_id) {
+            text.push_str(special);
+            return;
+        }
         let Some(piece) = self.vocabulary.token(token) else {
             return;
         };
-        if !text.is_empty() {
-            text.push(' ');
+        if let Some(byte) = sentencepiece_byte_fallback_value(piece) {
+            text.push_str(String::from_utf8_lossy(&[byte]).as_ref());
+            return;
         }
-        text.push_str(piece.trim_start_matches('▁'));
+        let expanded = piece.replace('▁', " ");
+        if text.is_empty() {
+            text.push_str(expanded.strip_prefix(' ').unwrap_or(expanded.as_str()));
+        } else {
+            text.push_str(expanded.as_str());
+        }
     }
 
     fn vocabulary(&self) -> &TokenVocabulary {
@@ -848,4 +1036,242 @@ fn normalize_piece(piece: &str) -> String {
     piece
         .trim_matches(|character: char| character.is_ascii_punctuation())
         .to_ascii_lowercase()
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SentencePiecePathState {
+    score: f32,
+    token_count: usize,
+}
+
+#[derive(Clone, Debug)]
+struct SentencePiecePathChoice {
+    previous_index: usize,
+    tokens: Vec<TokenId>,
+}
+
+fn sentencepiece_state_is_better(
+    candidate: SentencePiecePathState,
+    incumbent: Option<SentencePiecePathState>,
+) -> bool {
+    let Some(incumbent) = incumbent else {
+        return true;
+    };
+    candidate.score > incumbent.score
+        || ((candidate.score - incumbent.score).abs() <= f32::EPSILON
+            && candidate.token_count < incumbent.token_count)
+}
+
+fn sentencepiece_scores_look_rank_like(tokenizer: &GgufTokenizerMetadata) -> bool {
+    let mut ordinary_sample_count = 0usize;
+    let mut rank_like_count = 0usize;
+    for (index, token) in tokenizer.vocabulary.tokens().iter().enumerate() {
+        let token_type = tokenizer.token_types.get(index).copied();
+        if gguf_token_is_special(token, token_type) {
+            continue;
+        }
+        let Some(score) = tokenizer.scores.get(index).copied() else {
+            continue;
+        };
+        ordinary_sample_count += 1;
+        if (score - index as f32).abs() <= f32::EPSILON {
+            rank_like_count += 1;
+        }
+        if ordinary_sample_count >= 4096 {
+            break;
+        }
+    }
+    ordinary_sample_count >= 512
+        && rank_like_count.saturating_mul(100) >= ordinary_sample_count.saturating_mul(95)
+}
+
+fn normalize_sentencepiece_segment(text: &str, starts_at_input_boundary: bool) -> String {
+    let mut normalized = String::with_capacity(text.len().saturating_add(1));
+    let mut pending_dummy_prefix = starts_at_input_boundary;
+    let mut previous_was_space = false;
+    for character in text.chars() {
+        match character {
+            ' ' | '\t' | '\r' => {
+                if !previous_was_space {
+                    normalized.push('▁');
+                    previous_was_space = true;
+                }
+                pending_dummy_prefix = false;
+            }
+            _ => {
+                if pending_dummy_prefix && !character.is_whitespace() {
+                    normalized.push('▁');
+                }
+                normalized.push(character);
+                pending_dummy_prefix = false;
+                previous_was_space = false;
+            }
+        }
+    }
+    normalized
+}
+
+fn char_boundaries(text: &str) -> Vec<usize> {
+    let mut boundaries = text
+        .char_indices()
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    boundaries.push(text.len());
+    boundaries
+}
+
+fn sentencepiece_byte_fallback_value(token: &str) -> Option<u8> {
+    let hex = token.strip_prefix("<0x")?.strip_suffix('>')?;
+    if hex.len() != 2 {
+        return None;
+    }
+    u8::from_str_radix(hex, 16).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        GgufContent, GgufRuntimeTokenizer, GgufTokenizerMetadata, GgufTokenizerModel, TokenId,
+        TokenizerBoundary,
+    };
+
+    use super::SentencePieceRuntimeTokenizer;
+
+    fn sentencepiece_test_tokenizer() -> GgufTokenizerMetadata {
+        GgufTokenizerMetadata {
+            model: GgufTokenizerModel::SentencePiece,
+            vocabulary: crate::GgufTokenizerVocabulary {
+                tokens: vec![
+                    String::from("<unk>"),
+                    String::from("<bos>"),
+                    String::from("<eos>"),
+                    String::from("<pad>"),
+                    String::from("<|turn>"),
+                    String::from("<turn|>"),
+                    String::from("developer"),
+                    String::from("\n"),
+                    String::from("Be"),
+                    String::from("▁terse"),
+                    String::from("."),
+                    String::from("▁Reply"),
+                    String::from("▁with"),
+                    String::from("▁exact"),
+                    String::from("ly"),
+                    String::from("▁one"),
+                    String::from("▁short"),
+                    String::from("▁grammatical"),
+                    String::from("▁English"),
+                    String::from("▁sentence"),
+                ],
+                bos_token_id: Some(TokenId(1)),
+                eos_token_ids: vec![TokenId(2)],
+                pad_token_id: Some(TokenId(3)),
+                unknown_token_id: Some(TokenId(0)),
+            },
+            scores: vec![
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.1, -0.2, -0.3, -0.4,
+                -0.5, -0.6, -0.7, -0.8, -0.9,
+            ],
+            token_types: vec![2, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            merges: Vec::new(),
+            add_bos: false,
+            add_eos: false,
+            pretokenizer: Some(crate::GgufTokenizerPretokenizer::Gemma4),
+            token_type_count: None,
+            digest: String::from("sentencepiece-test"),
+        }
+    }
+
+    #[test]
+    fn sentencepiece_runtime_encodes_special_tokens_and_subwords() {
+        let tokenizer = SentencePieceRuntimeTokenizer::from_gguf(&sentencepiece_test_tokenizer());
+        let encoded = tokenizer.encode("<|turn>developer\nBe terse.<turn|>");
+        assert_eq!(
+            encoded.as_slice(),
+            &[
+                TokenId(4),
+                TokenId(6),
+                TokenId(7),
+                TokenId(8),
+                TokenId(9),
+                TokenId(10),
+                TokenId(5),
+            ]
+        );
+    }
+
+    #[test]
+    fn sentencepiece_runtime_decodes_without_inserting_fake_spaces() {
+        let tokenizer = SentencePieceRuntimeTokenizer::from_gguf(&sentencepiece_test_tokenizer());
+        let decoded = tokenizer.decode(&[
+            TokenId(11),
+            TokenId(12),
+            TokenId(13),
+            TokenId(14),
+            TokenId(15),
+            TokenId(16),
+            TokenId(17),
+            TokenId(18),
+            TokenId(19),
+            TokenId(10),
+        ]);
+        assert_eq!(
+            decoded,
+            "Reply with exactly one short grammatical English sentence."
+        );
+    }
+
+    #[test]
+    fn gemma4_real_runtime_sentencepiece_prompt_avoids_unknown_collapse_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = std::env::var("PSIONIC_GEMMA4_PILOT_GGUF_PATH")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+        else {
+            return Ok(());
+        };
+        if !std::path::Path::new(path.as_str()).exists() {
+            return Ok(());
+        }
+        let content = GgufContent::read_path(std::path::Path::new(path.as_str()))?;
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&content.load_tokenizer()?)?;
+        let encoded =
+            tokenizer.encode("Reply with exactly one short grammatical English sentence.");
+        assert!(!encoded.as_slice().is_empty());
+        assert!(
+            encoded
+                .as_slice()
+                .iter()
+                .all(|token| *token != tokenizer.vocabulary().unknown_id())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gemma4_real_runtime_sentencepiece_prefers_whole_pieces_when_scores_are_rank_like()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = std::env::var("PSIONIC_GEMMA4_PILOT_GGUF_PATH")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+        else {
+            return Ok(());
+        };
+        if !std::path::Path::new(path.as_str()).exists() {
+            return Ok(());
+        }
+        let content = GgufContent::read_path(std::path::Path::new(path.as_str()))?;
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&content.load_tokenizer()?)?;
+        let encoded =
+            tokenizer.encode("Reply with exactly one short grammatical English sentence.");
+        assert!(
+            encoded.len() < 20,
+            "expected subword pieces, got {encoded:?}"
+        );
+        let first_token = encoded.as_slice()[0];
+        let first_piece = &tokenizer.vocabulary().tokens()[first_token.as_u32() as usize];
+        assert_eq!(first_piece, "▁Reply");
+        Ok(())
+    }
 }

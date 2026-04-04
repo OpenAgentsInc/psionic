@@ -1446,18 +1446,80 @@ impl CpuDenseGgufGenerationModel {
             token_embedding.clone()
         };
         let descriptor = adapter.descriptor().clone();
+        let dense_gemma4_per_layer_inputs = if matches!(
+            adapter.family_metadata().family,
+            GgufDecoderFamily::Gemma4
+        ) {
+            DenseGemma4PerLayerInputs::load(&artifact)?
+        } else {
+            None
+        };
         let mut cache_offset = 0usize;
+        let mut last_swa_cache_offset = None;
+        let mut last_full_cache_offset = None;
         let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
         for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
+            let query_weight_name =
+                required_tensor_name(layout.attention_query_weight.as_deref(), "attention_query_weight")?;
+            let key_weight_name =
+                required_tensor_name(layout.attention_key_weight.as_deref(), "attention_key_weight")?;
+            let query_rows = artifact.paged_tensor(query_weight_name)?.metadata().shape.dims()[0];
+            let key_rows = artifact.paged_tensor(key_weight_name)?.metadata().shape.dims()[0];
+            let layer_head_dim = query_rows
+                .checked_div(descriptor.config.block.attention.head_count)
+                .unwrap_or(0);
+            let is_swa = gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
+            let has_kv = gemma4_layer_has_kv(
+                &descriptor,
+                adapter.family_metadata(),
+                layer_index,
+            );
+            let cache_write_offset = has_kv.then_some(cache_offset);
+            let cache_read_offset = if has_kv {
+                cache_offset
+            } else if is_swa {
+                last_swa_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                    ),
+                })?
+            } else {
+                last_full_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                    format: String::from("gguf"),
+                    message: format!(
+                        "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                    ),
+                })?
+            };
+            let reuse_layer_index = if has_kv {
+                None
+            } else {
+                Some(gemma4_reused_kv_layer_index(
+                    &descriptor,
+                    adapter.family_metadata(),
+                    layer_index,
+                    is_swa,
+                )?)
+            };
             let layer = DenseGgufLayer::load(
                 &artifact,
                 layout,
                 &descriptor,
                 adapter.family_metadata(),
                 layer_index,
-                cache_offset,
+                cache_read_offset,
+                cache_write_offset,
+                reuse_layer_index,
             )?;
-            cache_offset = cache_offset.saturating_add(layer.kv_width());
+            if layer.attention_geometry.has_kv() {
+                if is_swa {
+                    last_swa_cache_offset = layer.attention_geometry.cache_write_offset;
+                } else {
+                    last_full_cache_offset = layer.attention_geometry.cache_write_offset;
+                }
+            }
+            cache_offset = cache_offset.saturating_add(layer.cache_write_width());
             layers.push(layer);
         }
         let inner = DenseGgufModelInner {
@@ -1465,6 +1527,8 @@ impl CpuDenseGgufGenerationModel {
             family_metadata: adapter.family_metadata().clone(),
             tokenizer,
             token_embedding,
+            gemma4_per_layer_inputs: dense_gemma4_per_layer_inputs,
+            rope_freq_factors: load_named_optional_dense_vector(&artifact, "rope_freqs.weight")?,
             output_norm: load_dense_vector(
                 &artifact,
                 adapter.tensor_layout().output_norm.as_str(),
@@ -1619,6 +1683,8 @@ struct DenseGgufModelInner {
     family_metadata: GgufDecoderFamilyMetadata,
     tokenizer: GgufRuntimeTokenizer,
     token_embedding: ProjectionMatrix,
+    gemma4_per_layer_inputs: Option<DenseGemma4PerLayerInputs>,
+    rope_freq_factors: Option<Vec<f32>>,
     output_norm: Vec<f32>,
     output: ProjectionMatrix,
     layers: Vec<DenseGgufLayer>,
@@ -1627,10 +1693,18 @@ struct DenseGgufModelInner {
 }
 
 impl DenseGgufModelInner {
+    fn rope_freq_factors_for_layer(&self, layer_index: usize, head_dim: usize) -> Option<&[f32]> {
+        (self.family_metadata.family == GgufDecoderFamily::Gemma4
+            && !gemma4_layer_is_swa(&self.family_metadata, layer_index, head_dim))
+            .then_some(self.rope_freq_factors.as_deref())
+            .flatten()
+    }
+
     fn cache_width(&self) -> usize {
         self.layers
-            .last()
+            .iter()
             .map(|layer| layer.attention_geometry.cache_end())
+            .max()
             .unwrap_or(0)
     }
 
@@ -1643,8 +1717,25 @@ impl DenseGgufModelInner {
         let mut bytes_moved = self.token_embedding.byte_length() as u64;
         let mut kernel_count = 1usize;
         let mut hidden = self.token_embedding.decode_row(token.as_u32() as usize)?;
+        scale_in_place(
+            &mut hidden,
+            input_embedding_scale(&self.family_metadata, self.descriptor.config.hidden_size),
+        );
+        let gemma4_per_layer_inputs = if let Some(per_layer_inputs) = self.gemma4_per_layer_inputs.as_ref() {
+            Some(per_layer_inputs.project(
+                token,
+                hidden.as_slice(),
+                self.layers.len(),
+                self.descriptor.config.hidden_size,
+                self.family_metadata.rms_norm_epsilon,
+            )?)
+        } else {
+            None
+        };
         let mut cache_key = vec![0.0; self.cache_width()];
         let mut cache_value = vec![0.0; self.cache_width()];
+        let mut live_keys: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
+        let mut live_values: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
 
         for (layer_index, layer) in self.layers.iter().enumerate() {
             let residual = hidden.clone();
@@ -1661,21 +1752,14 @@ impl DenseGgufModelInner {
             if let Some(bias) = layer.attention_query_bias.as_ref() {
                 add_bias_in_place(&mut q, bias.as_slice());
             }
-
-            let mut k = Vec::new();
-            layer
-                .attention_key_weight
-                .matvec(hidden_norm.as_slice(), &mut k)?;
-            if let Some(bias) = layer.attention_key_bias.as_ref() {
-                add_bias_in_place(&mut k, bias.as_slice());
-            }
-
-            let mut v = Vec::new();
-            layer
-                .attention_value_weight
-                .matvec(hidden_norm.as_slice(), &mut v)?;
-            if let Some(bias) = layer.attention_value_bias.as_ref() {
-                add_bias_in_place(&mut v, bias.as_slice());
+            if let Some(norm) = layer.attention_query_norm.as_ref() {
+                q = per_head_rms_norm(
+                    q.as_slice(),
+                    layer.attention_geometry.head_count,
+                    layer.attention_geometry.head_dim,
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
             }
 
             apply_rope_neox(
@@ -1684,21 +1768,90 @@ impl DenseGgufModelInner {
                 layer.attention_geometry.head_dim,
                 layer.attention_geometry.rotary_dim,
                 position,
+                layer.attention_geometry.rope_theta,
+                self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
                 &self.family_metadata,
             );
-            apply_rope_neox(
-                &mut k,
-                layer.attention_geometry.kv_head_count,
-                layer.attention_geometry.head_dim,
-                layer.attention_geometry.rotary_dim,
-                position,
-                &self.family_metadata,
-            );
+            let (k, v) = if layer.attention_geometry.has_kv() {
+                let mut k = Vec::new();
+                layer
+                    .attention_key_weight
+                    .matvec(hidden_norm.as_slice(), &mut k)?;
+                if let Some(bias) = layer.attention_key_bias.as_ref() {
+                    add_bias_in_place(&mut k, bias.as_slice());
+                }
+                if let Some(norm) = layer.attention_key_norm.as_ref() {
+                    k = per_head_rms_norm(
+                        k.as_slice(),
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                }
 
-            let cache_offset = layer.attention_geometry.cache_offset;
-            let kv_width = layer.kv_width();
-            cache_key[cache_offset..cache_offset + kv_width].copy_from_slice(k.as_slice());
-            cache_value[cache_offset..cache_offset + kv_width].copy_from_slice(v.as_slice());
+                let mut v = Vec::new();
+                layer
+                    .attention_value_weight
+                    .matvec(hidden_norm.as_slice(), &mut v)?;
+                if let Some(bias) = layer.attention_value_bias.as_ref() {
+                    add_bias_in_place(&mut v, bias.as_slice());
+                }
+                if self.family_metadata.family == GgufDecoderFamily::Gemma4 {
+                    v = per_head_rms_norm_unit(
+                        v.as_slice(),
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                }
+                apply_rope_neox(
+                    &mut k,
+                    layer.attention_geometry.kv_head_count,
+                    layer.attention_geometry.head_dim,
+                    layer.attention_geometry.rotary_dim,
+                    position,
+                    layer.attention_geometry.rope_theta,
+                    self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
+                    &self.family_metadata,
+                );
+                if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                    let kv_width = layer.attention_geometry.kv_width();
+                    cache_key[cache_offset..cache_offset + kv_width].copy_from_slice(k.as_slice());
+                    cache_value[cache_offset..cache_offset + kv_width]
+                        .copy_from_slice(v.as_slice());
+                }
+                live_keys[layer_index] = Some(k.clone());
+                live_values[layer_index] = Some(v.clone());
+                (k, v)
+            } else {
+                let reuse_layer_index = layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                        "gemma4 layer {layer_index} is missing reused kv source metadata"
+                    )))
+                })?;
+                let reused_k = live_keys
+                    .get(reuse_layer_index)
+                    .and_then(|value| value.clone())
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 layer {layer_index} expected live key cache from layer {reuse_layer_index}"
+                            ),
+                        ))
+                    })?;
+                let reused_v = live_values
+                    .get(reuse_layer_index)
+                    .and_then(|value| value.clone())
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 layer {layer_index} expected live value cache from layer {reuse_layer_index}"
+                            ),
+                        ))
+                    })?;
+                (reused_k, reused_v)
+            };
 
             let attention = attend_impl(
                 layer_index,
@@ -1709,8 +1862,9 @@ impl DenseGgufModelInner {
                 layer.attention_geometry.head_count,
                 layer.attention_geometry.kv_head_count,
                 layer.attention_geometry.head_dim,
-                cache_offset,
+                layer.attention_geometry.cache_read_offset,
                 layer.attention_geometry.sliding_window,
+                attention_scale(&self.family_metadata, layer.attention_geometry.head_dim),
             );
             let mut attention_out = Vec::new();
             layer
@@ -1718,6 +1872,13 @@ impl DenseGgufModelInner {
                 .matvec(attention.as_slice(), &mut attention_out)?;
             if let Some(bias) = layer.attention_output_bias.as_ref() {
                 add_bias_in_place(&mut attention_out, bias.as_slice());
+            }
+            if let Some(norm) = layer.attention_post_norm.as_ref() {
+                attention_out = rms_norm(
+                    attention_out.as_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
             }
             hidden = add_vectors(attention_out.as_slice(), residual.as_slice())?;
 
@@ -1735,22 +1896,71 @@ impl DenseGgufModelInner {
             layer
                 .feed_forward_up_weight
                 .matvec(ffn_input.as_slice(), &mut up)?;
-            let activated = silu_glu(gate.as_slice(), up.as_slice());
+            let activated =
+                feed_forward_activation(&self.family_metadata, gate.as_slice(), up.as_slice());
             let mut ffn_out = Vec::new();
             layer
                 .feed_forward_down_weight
                 .matvec(activated.as_slice(), &mut ffn_out)?;
+            if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
+                ffn_out = rms_norm(
+                    ffn_out.as_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+            }
             hidden = add_vectors(ffn_out.as_slice(), ffn_residual.as_slice())?;
+
+            if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
+                if let (Some(input_gate), Some(proj), Some(post_norm)) = (
+                    layer.per_layer_input_gate.as_ref(),
+                    layer.per_layer_proj.as_ref(),
+                    layer.per_layer_post_norm.as_ref(),
+                ) {
+                    let mut gated = Vec::new();
+                    input_gate.matvec(hidden.as_slice(), &mut gated)?;
+                    for value in &mut gated {
+                        *value = approximate_gelu(*value);
+                    }
+                    let gated = multiply_vectors(
+                        gated.as_slice(),
+                        self.gemma4_per_layer_inputs
+                            .as_ref()
+                            .expect("per-layer config")
+                            .layer_slice(per_layer_inputs.as_slice(), layer_index),
+                    )?;
+                    let mut projected = Vec::new();
+                    proj.matvec(gated.as_slice(), &mut projected)?;
+                    let projected = rms_norm(
+                        projected.as_slice(),
+                        post_norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                    hidden = add_vectors(hidden.as_slice(), projected.as_slice())?;
+                    bytes_moved = bytes_moved
+                        .saturating_add(input_gate.byte_length() as u64)
+                        .saturating_add(proj.byte_length() as u64);
+                    kernel_count = kernel_count.saturating_add(2);
+                }
+            }
+            if let Some(scale) = layer.layer_output_scale {
+                scale_in_place(&mut hidden, scale);
+            }
 
             bytes_moved = bytes_moved
                 .saturating_add(layer.attention_query_weight.byte_length() as u64)
-                .saturating_add(layer.attention_key_weight.byte_length() as u64)
-                .saturating_add(layer.attention_value_weight.byte_length() as u64)
                 .saturating_add(layer.attention_output_weight.byte_length() as u64)
                 .saturating_add(layer.feed_forward_gate_weight.byte_length() as u64)
                 .saturating_add(layer.feed_forward_up_weight.byte_length() as u64)
                 .saturating_add(layer.feed_forward_down_weight.byte_length() as u64);
-            kernel_count = kernel_count.saturating_add(7);
+            if layer.attention_geometry.has_kv() {
+                bytes_moved = bytes_moved
+                    .saturating_add(layer.attention_key_weight.byte_length() as u64)
+                    .saturating_add(layer.attention_value_weight.byte_length() as u64);
+                kernel_count = kernel_count.saturating_add(7);
+            } else {
+                kernel_count = kernel_count.saturating_add(5);
+            }
         }
 
         let final_hidden = rms_norm(
@@ -1760,6 +1970,10 @@ impl DenseGgufModelInner {
         );
         let mut logits = Vec::new();
         self.output.matvec(final_hidden.as_slice(), &mut logits)?;
+        apply_final_logit_softcapping_in_place(
+            logits.as_mut_slice(),
+            self.family_metadata.final_logit_softcapping,
+        );
         bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
         kernel_count = kernel_count.saturating_add(1);
 
@@ -1780,8 +1994,11 @@ struct DenseAttentionGeometry {
     kv_head_count: usize,
     head_dim: usize,
     rotary_dim: usize,
+    rope_theta: f32,
     sliding_window: Option<usize>,
-    cache_offset: usize,
+    cache_read_offset: usize,
+    cache_write_offset: Option<usize>,
+    reuse_layer_index: Option<usize>,
 }
 
 impl DenseAttentionGeometry {
@@ -1789,8 +2006,18 @@ impl DenseAttentionGeometry {
         self.kv_head_count.saturating_mul(self.head_dim)
     }
 
+    fn cache_write_width(&self) -> usize {
+        self.cache_write_offset
+            .map(|_| self.kv_width())
+            .unwrap_or(0)
+    }
+
     fn cache_end(&self) -> usize {
-        self.cache_offset.saturating_add(self.kv_width())
+        self.cache_read_offset.saturating_add(self.kv_width())
+    }
+
+    fn has_kv(&self) -> bool {
+        self.cache_write_offset.is_some()
     }
 }
 
@@ -1800,16 +2027,24 @@ struct DenseGgufLayer {
     attention_norm: Vec<f32>,
     attention_query_weight: ProjectionMatrix,
     attention_query_bias: Option<Vec<f32>>,
+    attention_query_norm: Option<Vec<f32>>,
     attention_key_weight: ProjectionMatrix,
     attention_key_bias: Option<Vec<f32>>,
+    attention_key_norm: Option<Vec<f32>>,
     attention_value_weight: ProjectionMatrix,
     attention_value_bias: Option<Vec<f32>>,
     attention_output_weight: ProjectionMatrix,
     attention_output_bias: Option<Vec<f32>>,
+    attention_post_norm: Option<Vec<f32>>,
     feed_forward_norm: Vec<f32>,
     feed_forward_gate_weight: ProjectionMatrix,
     feed_forward_up_weight: ProjectionMatrix,
     feed_forward_down_weight: ProjectionMatrix,
+    feed_forward_post_norm: Option<Vec<f32>>,
+    layer_output_scale: Option<f32>,
+    per_layer_input_gate: Option<ProjectionMatrix>,
+    per_layer_proj: Option<ProjectionMatrix>,
+    per_layer_post_norm: Option<Vec<f32>>,
 }
 
 impl DenseGgufLayer {
@@ -1819,7 +2054,9 @@ impl DenseGgufLayer {
         descriptor: &DecoderModelDescriptor,
         family_metadata: &GgufDecoderFamilyMetadata,
         layer_index: usize,
-        cache_offset: usize,
+        cache_read_offset: usize,
+        cache_write_offset: Option<usize>,
+        reuse_layer_index: Option<usize>,
     ) -> Result<Self, ModelLoadError> {
         let attention_query_weight = ProjectionMatrix::load(
             artifact,
@@ -1849,7 +2086,9 @@ impl DenseGgufLayer {
             attention_query_weight.rows(),
             attention_key_weight.rows(),
             attention_value_weight.rows(),
-            cache_offset,
+            cache_read_offset,
+            cache_write_offset,
+            reuse_layer_index,
         )?;
         Ok(Self {
             attention_geometry,
@@ -1859,10 +2098,18 @@ impl DenseGgufLayer {
                 artifact,
                 layout.attention_query_bias.as_deref(),
             )?,
+            attention_query_norm: load_optional_dense_vector(
+                artifact,
+                layout.attention_query_norm.as_deref(),
+            )?,
             attention_key_weight,
             attention_key_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_key_bias.as_deref(),
+            )?,
+            attention_key_norm: load_optional_dense_vector(
+                artifact,
+                layout.attention_key_norm.as_deref(),
             )?,
             attention_value_weight,
             attention_value_bias: load_optional_dense_vector(
@@ -1879,6 +2126,10 @@ impl DenseGgufLayer {
             attention_output_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_output_bias.as_deref(),
+            )?,
+            attention_post_norm: load_optional_dense_vector(
+                artifact,
+                layout.attention_post_norm.as_deref(),
             )?,
             feed_forward_norm: load_dense_vector(
                 artifact,
@@ -1905,11 +2156,109 @@ impl DenseGgufLayer {
                     "feed_forward_down_weight",
                 )?,
             )?,
+            feed_forward_post_norm: load_optional_dense_vector(
+                artifact,
+                layout.feed_forward_post_norm.as_deref(),
+            )?,
+            layer_output_scale: load_optional_dense_scalar(
+                artifact,
+                layout.layer_output_scale.as_deref(),
+            )?,
+            per_layer_input_gate: load_named_optional_projection_matrix(
+                artifact,
+                format!("blk.{layer_index}.inp_gate.weight").as_str(),
+            )?,
+            per_layer_proj: load_named_optional_projection_matrix(
+                artifact,
+                format!("blk.{layer_index}.proj.weight").as_str(),
+            )?,
+            per_layer_post_norm: load_named_optional_dense_vector(
+                artifact,
+                format!("blk.{layer_index}.post_norm.weight").as_str(),
+            )?,
         })
     }
 
-    fn kv_width(&self) -> usize {
-        self.attention_geometry.kv_width()
+    fn cache_write_width(&self) -> usize {
+        self.attention_geometry.cache_write_width()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct DenseGemma4PerLayerInputs {
+    token_embedding: ProjectionMatrix,
+    model_proj: ProjectionMatrix,
+    proj_norm: Vec<f32>,
+    width: usize,
+}
+
+impl DenseGemma4PerLayerInputs {
+    fn load(artifact: &GgufBlobArtifact) -> Result<Option<Self>, ModelLoadError> {
+        let Some(token_embedding) =
+            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?
+        else {
+            return Ok(None);
+        };
+        let model_proj = ProjectionMatrix::load(artifact, "per_layer_model_proj.weight")?;
+        let proj_norm = load_dense_vector(artifact, "per_layer_proj_norm.weight")?;
+        Ok(Some(Self {
+            token_embedding,
+            model_proj,
+            width: proj_norm.len(),
+            proj_norm,
+        }))
+    }
+
+    fn project(
+        &self,
+        token: TokenId,
+        hidden: &[f32],
+        layer_count: usize,
+        hidden_size: usize,
+        epsilon: f32,
+    ) -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let mut token_inputs = self.token_embedding.decode_row(token.as_u32() as usize)?;
+        let expected_len = self.width.saturating_mul(layer_count);
+        if token_inputs.len() != expected_len {
+            return Err(ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                format!(
+                    "gemma4 per-layer token embedding width mismatch: expected {expected_len}, actual {}",
+                    token_inputs.len()
+                ),
+            )));
+        }
+        scale_in_place(&mut token_inputs, (self.width as f32).sqrt());
+
+        let mut projected = Vec::new();
+        self.model_proj.matvec(hidden, &mut projected)?;
+        if projected.len() != expected_len {
+            return Err(ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                format!(
+                    "gemma4 per-layer model projection width mismatch: expected {expected_len}, actual {}",
+                    projected.len()
+                ),
+            )));
+        }
+        scale_in_place(&mut projected, (hidden_size as f32).sqrt().recip());
+
+        let layer_mix_scale = 2.0_f32.sqrt().recip();
+        let mut combined = vec![0.0_f32; expected_len];
+        for layer_index in 0..layer_count {
+            let start = layer_index.saturating_mul(self.width);
+            let end = start.saturating_add(self.width);
+            let normalized = rms_norm(&projected[start..end], self.proj_norm.as_slice(), epsilon);
+            for index in 0..self.width {
+                combined[start + index] =
+                    (normalized[index] + token_inputs[start + index]) * layer_mix_scale;
+            }
+        }
+        Ok(combined)
+    }
+
+    fn layer_slice<'a>(&self, values: &'a [f32], layer_index: usize) -> &'a [f32] {
+        let start = layer_index.saturating_mul(self.width);
+        let end = start.saturating_add(self.width);
+        &values[start..end]
     }
 }
 
@@ -2475,9 +2824,52 @@ impl CudaGemma4GenerationModel {
             .unwrap_or(adapter.tensor_layout().token_embedding.as_str());
         let output = CudaQuantizedProjectionMatrix::load(backend, &artifact, output_name)?;
         let descriptor = adapter.descriptor().clone();
+        let gemma4_per_layer_inputs = CudaGemma4PerLayerInputs::load(backend, &artifact)?;
         let mut cache_offset = 0usize;
+        let mut last_swa_cache_offset = None;
+        let mut last_full_cache_offset = None;
         let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
         for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
+            let query_weight_name =
+                required_tensor_name(layout.attention_query_weight.as_deref(), "attention_query_weight")?;
+            let key_weight_name =
+                required_tensor_name(layout.attention_key_weight.as_deref(), "attention_key_weight")?;
+            let query_rows = artifact.paged_tensor(query_weight_name)?.metadata().shape.dims()[0];
+            let layer_head_dim = query_rows
+                .checked_div(descriptor.config.block.attention.head_count)
+                .unwrap_or(0);
+            let is_swa = gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
+            let has_kv = gemma4_layer_has_kv(
+                &descriptor,
+                adapter.family_metadata(),
+                layer_index,
+            );
+            let cache_write_offset = has_kv.then_some(cache_offset);
+            let cache_read_offset = if has_kv {
+                cache_offset
+            } else if is_swa {
+                last_swa_cache_offset.ok_or_else(|| ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                    )),
+                ))?
+            } else {
+                last_full_cache_offset.ok_or_else(|| ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                    )),
+                ))?
+            };
+            let reuse_layer_index = if has_kv {
+                None
+            } else {
+                Some(gemma4_reused_kv_layer_index(
+                    &descriptor,
+                    adapter.family_metadata(),
+                    layer_index,
+                    is_swa,
+                )?)
+            };
             let layer = CudaGemma4Layer::load(
                 backend,
                 &artifact,
@@ -2485,9 +2877,18 @@ impl CudaGemma4GenerationModel {
                 &descriptor,
                 adapter.family_metadata(),
                 layer_index,
-                cache_offset,
+                cache_read_offset,
+                cache_write_offset,
+                reuse_layer_index,
             )?;
-            cache_offset = cache_offset.saturating_add(layer.kv_width());
+            if layer.attention_geometry.has_kv() {
+                if is_swa {
+                    last_swa_cache_offset = layer.attention_geometry.cache_write_offset;
+                } else {
+                    last_full_cache_offset = layer.attention_geometry.cache_write_offset;
+                }
+            }
+            cache_offset = cache_offset.saturating_add(layer.cache_write_width());
             layers.push(layer);
         }
         let inner = CudaGemma4ModelInner {
@@ -2495,6 +2896,8 @@ impl CudaGemma4GenerationModel {
             family_metadata: adapter.family_metadata().clone(),
             tokenizer,
             token_embedding,
+            gemma4_per_layer_inputs,
+            rope_freq_factors: load_named_optional_dense_vector(&artifact, "rope_freqs.weight")?,
             output_norm: load_dense_vector(
                 &artifact,
                 adapter.tensor_layout().output_norm.as_str(),
@@ -2657,6 +3060,8 @@ struct CudaGemma4ModelInner {
     family_metadata: GgufDecoderFamilyMetadata,
     tokenizer: GgufRuntimeTokenizer,
     token_embedding: ProjectionMatrix,
+    gemma4_per_layer_inputs: Option<CudaGemma4PerLayerInputs>,
+    rope_freq_factors: Option<Vec<f32>>,
     output_norm: Vec<f32>,
     output: CudaQuantizedProjectionMatrix,
     layers: Vec<CudaGemma4Layer>,
@@ -2665,10 +3070,17 @@ struct CudaGemma4ModelInner {
 }
 
 impl CudaGemma4ModelInner {
+    fn rope_freq_factors_for_layer(&self, layer_index: usize, head_dim: usize) -> Option<&[f32]> {
+        (!gemma4_layer_is_swa(&self.family_metadata, layer_index, head_dim))
+            .then_some(self.rope_freq_factors.as_deref())
+            .flatten()
+    }
+
     fn cache_width(&self) -> usize {
         self.layers
-            .last()
+            .iter()
             .map(|layer| layer.attention_geometry.cache_end())
+            .max()
             .unwrap_or(0)
     }
 
@@ -2685,8 +3097,26 @@ impl CudaGemma4ModelInner {
             .token_embedding
             .decode_row(token.as_u32() as usize)
             .map_err(ReferenceTextGenerationError::Runtime)?;
+        scale_in_place(
+            &mut hidden,
+            input_embedding_scale(&self.family_metadata, self.descriptor.config.hidden_size),
+        );
+        let gemma4_per_layer_inputs = if let Some(per_layer_inputs) = self.gemma4_per_layer_inputs.as_ref() {
+            Some(per_layer_inputs.project(
+                backend,
+                token,
+                hidden.as_slice(),
+                self.layers.len(),
+                self.descriptor.config.hidden_size,
+                self.family_metadata.rms_norm_epsilon,
+            )?)
+        } else {
+            None
+        };
         let mut cache_key = vec![0.0; self.cache_width()];
         let mut cache_value = vec![0.0; self.cache_width()];
+        let mut live_keys: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
+        let mut live_values: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
 
         for (layer_index, layer) in self.layers.iter().enumerate() {
             let residual = hidden.clone();
@@ -2702,19 +3132,14 @@ impl CudaGemma4ModelInner {
             if let Some(bias) = layer.attention_query_bias.as_ref() {
                 add_bias_in_place(&mut q.values, bias.as_slice());
             }
-
-            let mut k = layer
-                .attention_key_weight
-                .matvec(backend, hidden_norm.as_slice())?;
-            if let Some(bias) = layer.attention_key_bias.as_ref() {
-                add_bias_in_place(&mut k.values, bias.as_slice());
-            }
-
-            let mut v = layer
-                .attention_value_weight
-                .matvec(backend, hidden_norm.as_slice())?;
-            if let Some(bias) = layer.attention_value_bias.as_ref() {
-                add_bias_in_place(&mut v.values, bias.as_slice());
+            if let Some(norm) = layer.attention_query_norm.as_ref() {
+                q.values = per_head_rms_norm(
+                    q.values.as_slice(),
+                    layer.attention_geometry.head_count,
+                    layer.attention_geometry.head_dim,
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
             }
 
             apply_rope_neox(
@@ -2723,21 +3148,100 @@ impl CudaGemma4ModelInner {
                 layer.attention_geometry.head_dim,
                 layer.attention_geometry.rotary_dim,
                 position,
+                layer.attention_geometry.rope_theta,
+                self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
                 &self.family_metadata,
             );
-            apply_rope_neox(
-                &mut k.values,
-                layer.attention_geometry.kv_head_count,
-                layer.attention_geometry.head_dim,
-                layer.attention_geometry.rotary_dim,
-                position,
-                &self.family_metadata,
-            );
+            let (k, v) = if layer.attention_geometry.has_kv() {
+                let mut k = layer
+                    .attention_key_weight
+                    .matvec(backend, hidden_norm.as_slice())?;
+                if let Some(bias) = layer.attention_key_bias.as_ref() {
+                    add_bias_in_place(&mut k.values, bias.as_slice());
+                }
+                if let Some(norm) = layer.attention_key_norm.as_ref() {
+                    k.values = per_head_rms_norm(
+                        k.values.as_slice(),
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                }
 
-            let cache_offset = layer.attention_geometry.cache_offset;
-            let kv_width = layer.kv_width();
-            cache_key[cache_offset..cache_offset + kv_width].copy_from_slice(k.values.as_slice());
-            cache_value[cache_offset..cache_offset + kv_width].copy_from_slice(v.values.as_slice());
+                let mut v = layer
+                    .attention_value_weight
+                    .matvec(backend, hidden_norm.as_slice())?;
+                if let Some(bias) = layer.attention_value_bias.as_ref() {
+                    add_bias_in_place(&mut v.values, bias.as_slice());
+                }
+                if self.family_metadata.family == GgufDecoderFamily::Gemma4 {
+                    v.values = per_head_rms_norm_unit(
+                        v.values.as_slice(),
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                }
+                apply_rope_neox(
+                    &mut k.values,
+                    layer.attention_geometry.kv_head_count,
+                    layer.attention_geometry.head_dim,
+                    layer.attention_geometry.rotary_dim,
+                    position,
+                    layer.attention_geometry.rope_theta,
+                    self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
+                    &self.family_metadata,
+                );
+                if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                    let kv_width = layer.attention_geometry.kv_width();
+                    cache_key[cache_offset..cache_offset + kv_width]
+                        .copy_from_slice(k.values.as_slice());
+                    cache_value[cache_offset..cache_offset + kv_width]
+                        .copy_from_slice(v.values.as_slice());
+                }
+                live_keys[layer_index] = Some(k.values.clone());
+                live_values[layer_index] = Some(v.values.clone());
+                (k, v)
+            } else {
+                let reuse_layer_index = layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                        "gemma4 layer {layer_index} is missing reused kv source metadata"
+                    )))
+                })?;
+                let reused_k = live_keys
+                    .get(reuse_layer_index)
+                    .and_then(|value| value.clone())
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 layer {layer_index} expected live key cache from layer {reuse_layer_index}"
+                            ),
+                        ))
+                    })?;
+                let reused_v = live_values
+                    .get(reuse_layer_index)
+                    .and_then(|value| value.clone())
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 layer {layer_index} expected live value cache from layer {reuse_layer_index}"
+                            ),
+                        ))
+                    })?;
+                (
+                    CudaProjectionStep {
+                        values: reused_k,
+                        kernel_count: 0,
+                        bytes_moved: 0,
+                    },
+                    CudaProjectionStep {
+                        values: reused_v,
+                        kernel_count: 0,
+                        bytes_moved: 0,
+                    },
+                )
+            };
 
             let attention = attend_impl(
                 layer_index,
@@ -2748,14 +3252,22 @@ impl CudaGemma4ModelInner {
                 layer.attention_geometry.head_count,
                 layer.attention_geometry.kv_head_count,
                 layer.attention_geometry.head_dim,
-                cache_offset,
+                layer.attention_geometry.cache_read_offset,
                 layer.attention_geometry.sliding_window,
+                attention_scale(&self.family_metadata, layer.attention_geometry.head_dim),
             );
             let mut attention_out = layer
                 .attention_output_weight
                 .matvec(backend, attention.as_slice())?;
             if let Some(bias) = layer.attention_output_bias.as_ref() {
                 add_bias_in_place(&mut attention_out.values, bias.as_slice());
+            }
+            if let Some(norm) = layer.attention_post_norm.as_ref() {
+                attention_out.values = rms_norm(
+                    attention_out.values.as_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
             }
             hidden = add_vectors(attention_out.values.as_slice(), residual.as_slice())
                 .map_err(ReferenceTextGenerationError::Runtime)?;
@@ -2772,29 +3284,82 @@ impl CudaGemma4ModelInner {
             let up = layer
                 .feed_forward_up_weight
                 .matvec(backend, ffn_input.as_slice())?;
-            let activated = silu_glu(gate.values.as_slice(), up.values.as_slice());
-            let ffn_out = layer
+            let activated = feed_forward_activation(
+                &self.family_metadata,
+                gate.values.as_slice(),
+                up.values.as_slice(),
+            );
+            let mut ffn_out = layer
                 .feed_forward_down_weight
                 .matvec(backend, activated.as_slice())?;
+            if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
+                ffn_out.values = rms_norm(
+                    ffn_out.values.as_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+            }
             hidden = add_vectors(ffn_out.values.as_slice(), ffn_residual.as_slice())
                 .map_err(ReferenceTextGenerationError::Runtime)?;
 
+            if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
+                if let (Some(input_gate), Some(proj), Some(post_norm)) = (
+                    layer.per_layer_input_gate.as_ref(),
+                    layer.per_layer_proj.as_ref(),
+                    layer.per_layer_post_norm.as_ref(),
+                ) {
+                    let mut gated = input_gate.matvec(backend, hidden.as_slice())?;
+                    for value in &mut gated.values {
+                        *value = approximate_gelu(*value);
+                    }
+                    let gated_values = multiply_vectors(
+                        gated.values.as_slice(),
+                        self.gemma4_per_layer_inputs
+                            .as_ref()
+                            .expect("per-layer config")
+                            .layer_slice(per_layer_inputs.values.as_slice(), layer_index),
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    let mut projected = proj.matvec(backend, gated_values.as_slice())?;
+                    projected.values = rms_norm(
+                        projected.values.as_slice(),
+                        post_norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                    hidden = add_vectors(hidden.as_slice(), projected.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    bytes_moved = bytes_moved
+                        .saturating_add(gated.bytes_moved)
+                        .saturating_add(projected.bytes_moved);
+                    kernel_count = kernel_count
+                        .saturating_add(gated.kernel_count)
+                        .saturating_add(projected.kernel_count);
+                }
+            }
+            if let Some(scale) = layer.layer_output_scale {
+                scale_in_place(&mut hidden, scale);
+            }
+
             bytes_moved = bytes_moved
                 .saturating_add(q.bytes_moved)
-                .saturating_add(k.bytes_moved)
-                .saturating_add(v.bytes_moved)
                 .saturating_add(attention_out.bytes_moved)
                 .saturating_add(gate.bytes_moved)
                 .saturating_add(up.bytes_moved)
                 .saturating_add(ffn_out.bytes_moved);
             kernel_count = kernel_count
                 .saturating_add(q.kernel_count)
-                .saturating_add(k.kernel_count)
-                .saturating_add(v.kernel_count)
                 .saturating_add(attention_out.kernel_count)
                 .saturating_add(gate.kernel_count)
                 .saturating_add(up.kernel_count)
                 .saturating_add(ffn_out.kernel_count);
+            if layer.attention_geometry.has_kv() {
+                bytes_moved = bytes_moved
+                    .saturating_add(k.bytes_moved)
+                    .saturating_add(v.bytes_moved);
+                kernel_count = kernel_count
+                    .saturating_add(k.kernel_count)
+                    .saturating_add(v.kernel_count);
+            }
         }
 
         let final_hidden = rms_norm(
@@ -2802,7 +3367,11 @@ impl CudaGemma4ModelInner {
             self.output_norm.as_slice(),
             self.family_metadata.rms_norm_epsilon,
         );
-        let logits = self.output.matvec(backend, final_hidden.as_slice())?;
+        let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
+        apply_final_logit_softcapping_in_place(
+            logits.values.as_mut_slice(),
+            self.family_metadata.final_logit_softcapping,
+        );
         bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
         kernel_count = kernel_count.saturating_add(logits.kernel_count);
 
@@ -2823,16 +3392,24 @@ struct CudaGemma4Layer {
     attention_norm: Vec<f32>,
     attention_query_weight: CudaQuantizedProjectionMatrix,
     attention_query_bias: Option<Vec<f32>>,
+    attention_query_norm: Option<Vec<f32>>,
     attention_key_weight: CudaQuantizedProjectionMatrix,
     attention_key_bias: Option<Vec<f32>>,
+    attention_key_norm: Option<Vec<f32>>,
     attention_value_weight: CudaQuantizedProjectionMatrix,
     attention_value_bias: Option<Vec<f32>>,
     attention_output_weight: CudaQuantizedProjectionMatrix,
     attention_output_bias: Option<Vec<f32>>,
+    attention_post_norm: Option<Vec<f32>>,
     feed_forward_norm: Vec<f32>,
     feed_forward_gate_weight: CudaQuantizedProjectionMatrix,
     feed_forward_up_weight: CudaQuantizedProjectionMatrix,
     feed_forward_down_weight: CudaQuantizedProjectionMatrix,
+    feed_forward_post_norm: Option<Vec<f32>>,
+    layer_output_scale: Option<f32>,
+    per_layer_input_gate: Option<CudaQuantizedProjectionMatrix>,
+    per_layer_proj: Option<CudaQuantizedProjectionMatrix>,
+    per_layer_post_norm: Option<Vec<f32>>,
 }
 
 impl CudaGemma4Layer {
@@ -2843,7 +3420,9 @@ impl CudaGemma4Layer {
         descriptor: &DecoderModelDescriptor,
         family_metadata: &GgufDecoderFamilyMetadata,
         layer_index: usize,
-        cache_offset: usize,
+        cache_read_offset: usize,
+        cache_write_offset: Option<usize>,
+        reuse_layer_index: Option<usize>,
     ) -> Result<Self, ReferenceTextGenerationError> {
         let attention_query_weight = CudaQuantizedProjectionMatrix::load(
             backend,
@@ -2876,7 +3455,9 @@ impl CudaGemma4Layer {
             attention_query_weight.rows(),
             attention_key_weight.rows(),
             attention_value_weight.rows(),
-            cache_offset,
+            cache_read_offset,
+            cache_write_offset,
+            reuse_layer_index,
         )?;
         Ok(Self {
             attention_geometry,
@@ -2886,10 +3467,18 @@ impl CudaGemma4Layer {
                 artifact,
                 layout.attention_query_bias.as_deref(),
             )?,
+            attention_query_norm: load_optional_dense_vector(
+                artifact,
+                layout.attention_query_norm.as_deref(),
+            )?,
             attention_key_weight,
             attention_key_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_key_bias.as_deref(),
+            )?,
+            attention_key_norm: load_optional_dense_vector(
+                artifact,
+                layout.attention_key_norm.as_deref(),
             )?,
             attention_value_weight,
             attention_value_bias: load_optional_dense_vector(
@@ -2907,6 +3496,10 @@ impl CudaGemma4Layer {
             attention_output_bias: load_optional_dense_vector(
                 artifact,
                 layout.attention_output_bias.as_deref(),
+            )?,
+            attention_post_norm: load_optional_dense_vector(
+                artifact,
+                layout.attention_post_norm.as_deref(),
             )?,
             feed_forward_norm: load_dense_vector(
                 artifact,
@@ -2936,11 +3529,123 @@ impl CudaGemma4Layer {
                     "feed_forward_down_weight",
                 )?,
             )?,
+            feed_forward_post_norm: load_optional_dense_vector(
+                artifact,
+                layout.feed_forward_post_norm.as_deref(),
+            )?,
+            layer_output_scale: load_optional_dense_scalar(
+                artifact,
+                layout.layer_output_scale.as_deref(),
+            )?,
+            per_layer_input_gate: load_named_optional_cuda_quantized_projection_matrix(
+                backend,
+                artifact,
+                format!("blk.{layer_index}.inp_gate.weight").as_str(),
+            )?,
+            per_layer_proj: load_named_optional_cuda_quantized_projection_matrix(
+                backend,
+                artifact,
+                format!("blk.{layer_index}.proj.weight").as_str(),
+            )?,
+            per_layer_post_norm: load_named_optional_dense_vector(
+                artifact,
+                format!("blk.{layer_index}.post_norm.weight").as_str(),
+            )?,
         })
     }
 
-    fn kv_width(&self) -> usize {
-        self.attention_geometry.kv_width()
+    fn cache_write_width(&self) -> usize {
+        self.attention_geometry.cache_write_width()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4PerLayerInputs {
+    token_embedding: ProjectionMatrix,
+    model_proj: CudaQuantizedProjectionMatrix,
+    proj_norm: Vec<f32>,
+    width: usize,
+}
+
+impl CudaGemma4PerLayerInputs {
+    fn load(
+        backend: &mut CudaBackend,
+        artifact: &GgufBlobArtifact,
+    ) -> Result<Option<Self>, ReferenceTextGenerationError> {
+        let Some(token_embedding) =
+            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?
+        else {
+            return Ok(None);
+        };
+        let model_proj =
+            CudaQuantizedProjectionMatrix::load(backend, artifact, "per_layer_model_proj.weight")?;
+        let proj_norm = load_dense_vector(artifact, "per_layer_proj_norm.weight")?;
+        Ok(Some(Self {
+            token_embedding,
+            model_proj,
+            width: proj_norm.len(),
+            proj_norm,
+        }))
+    }
+
+    fn project(
+        &self,
+        backend: &mut CudaBackend,
+        token: TokenId,
+        hidden: &[f32],
+        layer_count: usize,
+        hidden_size: usize,
+        epsilon: f32,
+    ) -> Result<CudaProjectionStep, ReferenceTextGenerationError> {
+        let mut token_inputs = self
+            .token_embedding
+            .decode_row(token.as_u32() as usize)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let expected_len = self.width.saturating_mul(layer_count);
+        if token_inputs.len() != expected_len {
+            return Err(ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                format!(
+                    "gemma4 per-layer token embedding width mismatch: expected {expected_len}, actual {}",
+                    token_inputs.len()
+                ),
+            )));
+        }
+        scale_in_place(&mut token_inputs, (self.width as f32).sqrt());
+
+        let mut projected = self.model_proj.matvec(backend, hidden)?;
+        if projected.values.len() != expected_len {
+            return Err(ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                format!(
+                    "gemma4 per-layer model projection width mismatch: expected {expected_len}, actual {}",
+                    projected.values.len()
+                ),
+            )));
+        }
+        scale_in_place(&mut projected.values, (hidden_size as f32).sqrt().recip());
+
+        let layer_mix_scale = 2.0_f32.sqrt().recip();
+        let mut combined = vec![0.0_f32; expected_len];
+        for layer_index in 0..layer_count {
+            let start = layer_index.saturating_mul(self.width);
+            let end = start.saturating_add(self.width);
+            let normalized = rms_norm(
+                &projected.values[start..end],
+                self.proj_norm.as_slice(),
+                epsilon,
+            );
+            for index in 0..self.width {
+                combined[start + index] =
+                    (normalized[index] + token_inputs[start + index]) * layer_mix_scale;
+            }
+        }
+        projected.values = combined;
+        Ok(projected)
+    }
+
+    fn layer_slice<'a>(&self, values: &'a [f32], layer_index: usize) -> &'a [f32] {
+        let start = layer_index.saturating_mul(self.width);
+        let end = start.saturating_add(self.width);
+        &values[start..end]
     }
 }
 
@@ -3014,6 +3719,10 @@ impl CudaQuantizedProjectionMatrix {
 
     fn rows(&self) -> usize {
         self.rows
+    }
+
+    fn byte_length(&self) -> usize {
+        self.weights.byte_len()
     }
 }
 
@@ -3595,6 +4304,75 @@ fn load_optional_dense_vector(
         .transpose()
 }
 
+fn load_optional_dense_scalar(
+    artifact: &GgufBlobArtifact,
+    name: Option<&str>,
+) -> Result<Option<f32>, ModelLoadError> {
+    load_optional_dense_vector(artifact, name)?.map(|values| match values.as_slice() {
+        [value] => Ok(*value),
+        actual => Err(ModelLoadError::InvalidTensorShape {
+            name: name.expect("scalar tensor name").to_string(),
+            expected: vec![1],
+            actual: vec![actual.len()],
+        }),
+    }).transpose()
+}
+
+fn load_named_optional_dense_vector(
+    artifact: &GgufBlobArtifact,
+    name: &str,
+) -> Result<Option<Vec<f32>>, ModelLoadError> {
+    artifact
+        .content()
+        .tensor_info(name)
+        .map(|_| load_dense_vector(artifact, name))
+        .transpose()
+}
+
+fn load_named_optional_projection_matrix(
+    artifact: &GgufBlobArtifact,
+    name: &str,
+) -> Result<Option<ProjectionMatrix>, ModelLoadError> {
+    artifact
+        .content()
+        .tensor_info(name)
+        .map(|_| ProjectionMatrix::load(artifact, name))
+        .transpose()
+}
+
+fn load_named_optional_cuda_quantized_projection_matrix(
+    backend: &mut CudaBackend,
+    artifact: &GgufBlobArtifact,
+    name: &str,
+) -> Result<Option<CudaQuantizedProjectionMatrix>, ReferenceTextGenerationError> {
+    artifact
+        .content()
+        .tensor_info(name)
+        .map(|_| CudaQuantizedProjectionMatrix::load(backend, artifact, name))
+        .transpose()
+}
+
+fn family_fact_usize(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    key: &str,
+) -> Option<usize> {
+    family_metadata
+        .family_facts
+        .get(key)
+        .and_then(GgufMetadataValue::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+}
+
+fn family_fact_f32(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    key: &str,
+) -> Option<f32> {
+    family_metadata
+        .family_facts
+        .get(key)
+        .and_then(GgufMetadataValue::as_f32)
+}
+
 fn required_tensor_name<'a>(name: Option<&'a str>, field: &str) -> Result<&'a str, ModelLoadError> {
     name.ok_or_else(|| ModelLoadError::ArtifactFormat {
         format: String::from("gguf"),
@@ -3614,6 +4392,61 @@ fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {
         .zip(weight.iter())
         .map(|(value, weight)| value * scale * weight)
         .collect()
+}
+
+fn per_head_rms_norm(
+    input: &[f32],
+    head_count: usize,
+    head_dim: usize,
+    weight: &[f32],
+    epsilon: f32,
+) -> Vec<f32> {
+    let mut normalized = vec![0.0_f32; input.len()];
+    for head_index in 0..head_count {
+        let start = head_index.saturating_mul(head_dim);
+        let end = start.saturating_add(head_dim);
+        if end > input.len() {
+            break;
+        }
+        let input_head = &input[start..end];
+        let output_head = &mut normalized[start..end];
+        let mean_square =
+            input_head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
+        let scale = (mean_square + epsilon).sqrt().recip();
+        for ((out, value), norm) in output_head
+            .iter_mut()
+            .zip(input_head.iter().copied())
+            .zip(weight.iter().copied())
+        {
+            *out = value * scale * norm;
+        }
+    }
+    normalized
+}
+
+fn per_head_rms_norm_unit(
+    input: &[f32],
+    head_count: usize,
+    head_dim: usize,
+    epsilon: f32,
+) -> Vec<f32> {
+    let mut normalized = vec![0.0_f32; input.len()];
+    for head_index in 0..head_count {
+        let start = head_index.saturating_mul(head_dim);
+        let end = start.saturating_add(head_dim);
+        if end > input.len() {
+            break;
+        }
+        let input_head = &input[start..end];
+        let output_head = &mut normalized[start..end];
+        let mean_square =
+            input_head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
+        let scale = (mean_square + epsilon).sqrt().recip();
+        for (out, value) in output_head.iter_mut().zip(input_head.iter().copied()) {
+            *out = value * scale;
+        }
+    }
+    normalized
 }
 
 fn add_vectors(left: &[f32], right: &[f32]) -> Result<Vec<f32>, crate::RuntimeError> {
@@ -3637,6 +4470,57 @@ fn add_bias_in_place(values: &mut [f32], bias: &[f32]) {
     }
 }
 
+fn multiply_vectors(left: &[f32], right: &[f32]) -> Result<Vec<f32>, crate::RuntimeError> {
+    if left.len() != right.len() {
+        return Err(crate::RuntimeError::Backend(format!(
+            "vector width mismatch: left={} right={}",
+            left.len(),
+            right.len()
+        )));
+    }
+    Ok(left
+        .iter()
+        .zip(right.iter())
+        .map(|(left, right)| left * right)
+        .collect())
+}
+
+fn scale_in_place(values: &mut [f32], scale: f32) {
+    if (scale - 1.0).abs() <= f32::EPSILON {
+        return;
+    }
+    for value in values {
+        *value *= scale;
+    }
+}
+
+fn input_embedding_scale(family_metadata: &GgufDecoderFamilyMetadata, hidden_size: usize) -> f32 {
+    match family_metadata.family {
+        GgufDecoderFamily::Gemma4 => (hidden_size as f32).sqrt(),
+        _ => 1.0,
+    }
+}
+
+fn attention_scale(family_metadata: &GgufDecoderFamilyMetadata, head_dim: usize) -> f32 {
+    match family_metadata.family {
+        GgufDecoderFamily::Gemma4 => 1.0,
+        _ => 1.0 / (head_dim as f32).sqrt(),
+    }
+}
+
+fn approximate_gelu(value: f32) -> f32 {
+    let cubic = value * value * value;
+    let inner = (std::f32::consts::FRAC_2_PI.sqrt()) * (value + 0.044_715 * cubic);
+    0.5 * value * (1.0 + inner.tanh())
+}
+
+fn gelu_glu(gate: &[f32], up: &[f32]) -> Vec<f32> {
+    gate.iter()
+        .zip(up.iter())
+        .map(|(gate, up)| approximate_gelu(*gate) * *up)
+        .collect()
+}
+
 fn silu_glu(gate: &[f32], up: &[f32]) -> Vec<f32> {
     gate.iter()
         .zip(up.iter())
@@ -3645,6 +4529,26 @@ fn silu_glu(gate: &[f32], up: &[f32]) -> Vec<f32> {
             activated * *up
         })
         .collect()
+}
+
+fn feed_forward_activation(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    gate: &[f32],
+    up: &[f32],
+) -> Vec<f32> {
+    match family_metadata.family {
+        GgufDecoderFamily::Gemma4 => gelu_glu(gate, up),
+        _ => silu_glu(gate, up),
+    }
+}
+
+fn apply_final_logit_softcapping_in_place(logits: &mut [f32], softcap: Option<f32>) {
+    let Some(softcap) = softcap.filter(|softcap| *softcap > 0.0) else {
+        return;
+    };
+    for logit in logits {
+        *logit = (*logit / softcap).tanh() * softcap;
+    }
 }
 
 fn dot(left: &[f32], right: &[f32]) -> f32 {
@@ -3671,15 +4575,11 @@ fn attend_impl(
     head_dim: usize,
     layer_offset: usize,
     sliding_window: Option<usize>,
+    attention_scale: f32,
 ) -> Vec<f32> {
     let group_size = head_count / kv_head_count.max(1);
-    let scale = 1.0 / (head_dim as f32).sqrt();
 
-    let cached_entries = if layer_index % 2 == 0 {
-        cache.entries().to_vec()
-    } else {
-        cache.entries().iter().rev().cloned().collect()
-    };
+    let cached_entries = cache.entries().to_vec();
     let cached_entries = if let Some(window) = sliding_window {
         let retained = window.saturating_sub(1);
         cached_entries
@@ -3705,9 +4605,9 @@ fn attend_impl(
         for entry in &cached_entries {
             let start = layer_offset + kv_head_index * head_dim;
             let end = start + head_dim;
-            weights.push(dot(q, &entry.key[start..end]) * scale);
+            weights.push(dot(q, &entry.key[start..end]) * attention_scale);
         }
-        weights.push(dot(q, local_key) * scale);
+        weights.push(dot(q, local_key) * attention_scale);
 
         let max_weight = weights.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         for weight in &mut weights {
@@ -3736,7 +4636,9 @@ fn dense_attention_geometry(
     query_width: usize,
     key_width: usize,
     value_width: usize,
-    cache_offset: usize,
+    cache_read_offset: usize,
+    cache_write_offset: Option<usize>,
+    reuse_layer_index: Option<usize>,
 ) -> Result<DenseAttentionGeometry, ModelLoadError> {
     let head_count = descriptor.config.block.attention.head_count;
     if head_count == 0 || query_width == 0 || query_width % head_count != 0 {
@@ -3763,14 +4665,119 @@ fn dense_attention_geometry(
     }
     let kv_head_count = key_width / head_dim;
     let sliding_window = layer_sliding_window(family_metadata, layer_index, head_dim);
+    let is_swa = gemma4_layer_is_swa(family_metadata, layer_index, head_dim);
     Ok(DenseAttentionGeometry {
         head_count,
         kv_head_count,
         head_dim,
-        rotary_dim: descriptor.config.block.attention.rotary_dim.min(head_dim),
+        rotary_dim: layer_rotary_dim(descriptor, family_metadata, is_swa, head_dim),
+        rope_theta: layer_rope_theta(family_metadata, is_swa),
         sliding_window,
-        cache_offset,
+        cache_read_offset,
+        cache_write_offset,
+        reuse_layer_index,
     })
+}
+
+fn gemma4_layer_is_swa(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+    head_dim: usize,
+) -> bool {
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return false;
+    }
+    let pattern_key = format!(
+        "{}.attention.sliding_window_pattern",
+        family_metadata.architecture
+    );
+    if let Some(enabled) = family_metadata
+        .family_facts
+        .get(pattern_key.as_str())
+        .and_then(GgufMetadataValue::as_array)
+        .and_then(|values| values.get(layer_index))
+        .and_then(GgufMetadataValue::as_bool)
+    {
+        return enabled;
+    }
+    family_metadata
+        .attention_key_length
+        .is_some_and(|full_head_dim| head_dim < full_head_dim)
+}
+
+fn gemma4_layer_has_kv(
+    descriptor: &DecoderModelDescriptor,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+) -> bool {
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return true;
+    }
+    let shared_kv_layers = family_fact_usize(
+        family_metadata,
+        format!("{}.attention.shared_kv_layers", family_metadata.architecture).as_str(),
+    )
+    .unwrap_or(0);
+    let kv_layers = descriptor.config.layer_count.saturating_sub(shared_kv_layers);
+    layer_index < kv_layers
+}
+
+fn gemma4_reused_kv_layer_index(
+    descriptor: &DecoderModelDescriptor,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+    is_swa: bool,
+) -> Result<usize, ModelLoadError> {
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return Ok(layer_index);
+    }
+    let shared_kv_layers = family_fact_usize(
+        family_metadata,
+        format!("{}.attention.shared_kv_layers", family_metadata.architecture).as_str(),
+    )
+    .unwrap_or(0);
+    let kv_layers = descriptor.config.layer_count.saturating_sub(shared_kv_layers);
+    if layer_index < kv_layers {
+        return Ok(layer_index);
+    }
+    kv_layers
+        .checked_sub(if is_swa { 2 } else { 1 })
+        .ok_or_else(|| ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "gemma4 layer {layer_index} cannot map reused kv source with kv_layers={kv_layers}"
+            ),
+        })
+}
+
+fn layer_rope_theta(family_metadata: &GgufDecoderFamilyMetadata, is_swa: bool) -> f32 {
+    if family_metadata.family == GgufDecoderFamily::Gemma4 && is_swa {
+        return family_fact_f32(
+            family_metadata,
+            format!("{}.rope.freq_base_swa", family_metadata.architecture).as_str(),
+        )
+        .unwrap_or(family_metadata.rope_theta);
+    }
+    family_metadata.rope_theta
+}
+
+fn layer_rotary_dim(
+    descriptor: &DecoderModelDescriptor,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    is_swa: bool,
+    head_dim: usize,
+) -> usize {
+    if family_metadata.family == GgufDecoderFamily::Gemma4 {
+        let key = if is_swa {
+            format!("{}.rope.dimension_count_swa", family_metadata.architecture)
+        } else {
+            format!("{}.rope.dimension_count", family_metadata.architecture)
+        };
+        return family_fact_usize(family_metadata, key.as_str())
+            .unwrap_or(descriptor.config.block.attention.rotary_dim)
+            .min(head_dim);
+    }
+    descriptor.config.block.attention.rotary_dim.min(head_dim)
 }
 
 fn layer_sliding_window(
@@ -3806,6 +4813,8 @@ fn apply_rope_neox(
     head_dim: usize,
     rotary_dim: usize,
     position: usize,
+    rope_theta: f32,
+    freq_factors: Option<&[f32]>,
     metadata: &GgufDecoderFamilyMetadata,
 ) {
     let rotary_dim = rotary_dim.min(head_dim).max(2);
@@ -3820,9 +4829,9 @@ fn apply_rope_neox(
         .map_or(0.0, |_| 1.0);
     let corr_dims = metadata
         .rope_original_context_length
-        .map(|original| rope_yarn_corr_dims(rotary_dim, original, metadata.rope_theta))
+        .map(|original| rope_yarn_corr_dims(rotary_dim, original, rope_theta))
         .unwrap_or([0.0, rotary_dim as f32 - 1.0]);
-    let theta_scale = metadata.rope_theta.powf(-2.0 / rotary_dim as f32);
+    let theta_scale = rope_theta.powf(-2.0 / rotary_dim as f32);
     for head_index in 0..head_count {
         let head_base = head_index.saturating_mul(head_dim);
         for i0 in (0..rotary_dim).step_by(2) {
@@ -3832,9 +4841,14 @@ fn apply_rope_neox(
             if index1 >= head_base + head_dim || index1 >= values.len() {
                 continue;
             }
+            let freq_factor = freq_factors
+                .and_then(|factors| factors.get(pair))
+                .copied()
+                .filter(|value| *value > 0.0)
+                .unwrap_or(1.0);
             let theta_base = position as f32 * theta_scale.powf(pair as f32);
             let (cos_theta, sin_theta) =
-                rope_yarn(theta_base, freq_scale, corr_dims, i0, ext_factor, 1.0);
+                rope_yarn(theta_base / freq_factor, freq_scale, corr_dims, i0, ext_factor, 1.0);
             let x0 = values[index0];
             let x1 = values[index1];
             values[index0] = x0 * cos_theta - x1 * sin_theta;

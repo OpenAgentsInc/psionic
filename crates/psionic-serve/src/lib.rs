@@ -9908,6 +9908,30 @@ fn truncate_generated_text_with_match(
         return None;
     }
 
+    let token_stop_hit = stop_sequences
+        .iter()
+        .filter(|stop| !stop.is_empty())
+        .filter_map(|stop| {
+            let encoded = tokenizer.encode(stop);
+            let stop_tokens = encoded.as_slice();
+            if stop_tokens.is_empty() || stop_tokens.len() > generated_tokens.len() {
+                return None;
+            }
+            generated_tokens
+                .windows(stop_tokens.len())
+                .position(|window| window == stop_tokens)
+                .map(|index| (index, stop.as_str()))
+        })
+        .min_by_key(|(index, _)| *index);
+    if let Some((stop_index, matched_stop_sequence)) = token_stop_hit {
+        generated_tokens.truncate(stop_index);
+        let truncated = tokenizer.decode(generated_tokens).trim_end().to_string();
+        return Some(TruncatedGeneratedText {
+            truncated,
+            matched_stop_sequence: matched_stop_sequence.to_string(),
+        });
+    }
+
     let text = tokenizer.decode(generated_tokens);
     let stop_hit = stop_sequences
         .iter()
@@ -14090,6 +14114,75 @@ mod tests {
         );
         assert_eq!(response.termination, TerminationReason::EndOfSequence);
         Ok(())
+    }
+
+    #[test]
+    fn truncate_generated_text_stops_on_special_token_sequences_hidden_from_decode() {
+        #[derive(Clone, Debug)]
+        struct HiddenSpecialStopTokenizer {
+            fixture: FixtureWordTokenizer,
+        }
+
+        impl HiddenSpecialStopTokenizer {
+            fn new() -> Self {
+                Self {
+                    fixture: FixtureWordTokenizer::new(),
+                }
+            }
+        }
+
+        impl TokenizerBoundary for HiddenSpecialStopTokenizer {
+            fn encode(&self, text: &str) -> TokenSequence {
+                match text {
+                    "<turn|>" => TokenSequence::new(vec![TokenId(99)]),
+                    "hello world" => TokenSequence::new(vec![TokenId(10), TokenId(11)]),
+                    _ => TokenSequence::new(Vec::new()),
+                }
+            }
+
+            fn decode(&self, tokens: &[TokenId]) -> String {
+                let mut text = String::new();
+                for token in tokens {
+                    match token.as_u32() {
+                        10 => text.push_str("hello "),
+                        11 => text.push_str("world "),
+                        12 => text.push_str("reply "),
+                        13 => text.push_str("echo "),
+                        99 => {}
+                        _ => {}
+                    }
+                }
+                text.trim_end().to_string()
+            }
+
+            fn append_decoded_token(&self, text: &mut String, token: TokenId) {
+                text.push_str(self.decode(&[token]).as_str());
+            }
+
+            fn vocabulary(&self) -> &psionic_models::TokenVocabulary {
+                self.fixture.vocabulary()
+            }
+        }
+
+        let tokenizer = HiddenSpecialStopTokenizer::new();
+        let mut generated_tokens = vec![
+            TokenId(10),
+            TokenId(11),
+            TokenId(99),
+            TokenId(12),
+            TokenId(13),
+        ];
+
+        let truncated = super::truncate_generated_text_with_match(
+            &tokenizer,
+            &mut generated_tokens,
+            &[String::from("<turn|>")],
+        )
+        .expect("special stop sequence should truncate");
+
+        assert_eq!(truncated.truncated, "hello world");
+        assert_eq!(truncated.matched_stop_sequence, "<turn|>");
+        assert_eq!(generated_tokens, vec![TokenId(10), TokenId(11)]);
     }
 
     #[test]

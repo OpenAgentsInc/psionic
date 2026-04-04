@@ -2667,6 +2667,28 @@ impl GgufChatTemplateMetadata {
     }
 }
 
+fn builtin_chat_template_for_decoder_family(family: GgufDecoderFamily) -> Option<&'static str> {
+    match family {
+        GgufDecoderFamily::Gemma4 => Some(include_str!("testdata/gemma4_chat_template.jinja")),
+        _ => None,
+    }
+}
+
+fn resolve_gguf_decoder_chat_templates(
+    content: &GgufContent,
+    family: GgufDecoderFamily,
+) -> Result<GgufChatTemplateMetadata, ModelLoadError> {
+    let chat_templates = content.load_chat_templates()?;
+    if !chat_templates.is_empty() {
+        return Ok(chat_templates);
+    }
+    Ok(builtin_chat_template_for_decoder_family(family)
+        .map(|template| {
+            GgufChatTemplateMetadata::new(Some(template.to_string()), BTreeMap::new())
+        })
+        .unwrap_or(chat_templates))
+}
+
 /// Prompt message role used by the supported GGUF prompt-rendering surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2935,6 +2957,42 @@ impl GgufPromptTemplateRenderer {
                 .map(|value| (*value).to_string())
                 .collect(),
         })
+    }
+
+    /// Tokenizes one rendered prompt while avoiding duplicate BOS/EOS insertion
+    /// when the rendered template already carries those literal special tokens.
+    pub fn tokenize_rendered_prompt(
+        &self,
+        rendered_text: &str,
+    ) -> Result<TokenSequence, GgufRuntimeTokenizerError> {
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&self.tokenizer)?;
+        let add_bos = self.tokenizer.add_bos
+            && !self.starts_with_literal_special_token(
+                rendered_text,
+                self.tokenizer.vocabulary.bos_token_id(),
+            );
+        let add_eos = self.tokenizer.add_eos
+            && !self.ends_with_literal_special_token(
+                rendered_text,
+                self.tokenizer.vocabulary.eos_token_ids().first().copied(),
+            );
+        Ok(tokenizer.encode_with_special_tokens(rendered_text, add_bos, add_eos))
+    }
+
+    fn starts_with_literal_special_token(
+        &self,
+        text: &str,
+        token_id: Option<TokenId>,
+    ) -> bool {
+        token_id
+            .and_then(|token_id| self.tokenizer.vocabulary.tokens().get(token_id.as_u32() as usize))
+            .is_some_and(|token| text.starts_with(token))
+    }
+
+    fn ends_with_literal_special_token(&self, text: &str, token_id: Option<TokenId>) -> bool {
+        token_id
+            .and_then(|token_id| self.tokenizer.vocabulary.tokens().get(token_id.as_u32() as usize))
+            .is_some_and(|token| text.ends_with(token))
     }
 
     fn render_phi3(&self, messages: &[PromptMessage]) -> Result<String, PromptRenderError> {
@@ -3447,6 +3505,9 @@ pub struct GgufDecoderFamilyMetadata {
     /// Per-head value width when the artifact declares it explicitly.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attention_value_length: Option<usize>,
+    /// Final logit tanh softcap when the artifact declares it explicitly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub final_logit_softcapping: Option<f32>,
     /// Whether the artifact uses tied token embedding / LM head weights.
     pub tie_word_embeddings: bool,
     /// Whether the adapter expects explicit Q/K/V bias tensors.
@@ -3668,6 +3729,12 @@ pub struct GgufDecoderLayerTensorLayout {
     /// Feed-forward norm tensor.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub feed_forward_norm: Option<String>,
+    /// Post-feed-forward norm tensor when present.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feed_forward_post_norm: Option<String>,
+    /// Layer output scale tensor when present.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layer_output_scale: Option<String>,
     /// Router tensor when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub feed_forward_router_weight: Option<String>,
@@ -4662,7 +4729,7 @@ impl GgufDecoderAdapterLoader {
         validate_supported_decoder_family_features(metadata, family, architecture.as_str())?;
 
         let tokenizer = content.load_tokenizer()?;
-        let chat_templates = content.load_chat_templates()?;
+        let chat_templates = resolve_gguf_decoder_chat_templates(content, family)?;
         let bundle = GgufWeightBundleLoader.describe_artifact(artifact)?;
         let family_metadata =
             build_gguf_decoder_family_metadata(metadata, content, &family, architecture)?;
@@ -5452,6 +5519,7 @@ fn build_gguf_decoder_family_metadata(
     let sliding_window_key = format!("{architecture}.attention.sliding_window");
     let attention_key_length_key = format!("{architecture}.attention.key_length");
     let attention_value_length_key = format!("{architecture}.attention.value_length");
+    let final_logit_softcapping_key = format!("{architecture}.final_logit_softcapping");
     let tie_word_embeddings_key = format!("{architecture}.tie_word_embeddings");
     let expert_count_key = format!("{architecture}.expert_count");
     let expert_used_count_key = format!("{architecture}.expert_used_count");
@@ -5476,6 +5544,10 @@ fn build_gguf_decoder_family_metadata(
         attention_value_length: read_optional_gguf_usize(
             metadata,
             attention_value_length_key.as_str(),
+        )?,
+        final_logit_softcapping: read_optional_gguf_f32(
+            metadata,
+            final_logit_softcapping_key.as_str(),
         )?,
         tie_word_embeddings: read_optional_gguf_bool(metadata, tie_word_embeddings_key.as_str())?
             .unwrap_or(false)
@@ -5893,6 +5965,8 @@ fn build_gguf_decoder_tensor_layout(
                             .clone(),
                     ),
                     feed_forward_norm: Some(post_attention_norm.name.clone()),
+                    feed_forward_post_norm: None,
+                    layer_output_scale: None,
                     feed_forward_router_weight: None,
                     feed_forward_router_bias: None,
                     feed_forward_gate_experts_weight: None,
@@ -6039,6 +6113,8 @@ fn build_gguf_decoder_tensor_layout(
                         .clone(),
                 ),
                 feed_forward_norm: Some(post_attention_norm.name.clone()),
+                feed_forward_post_norm: None,
+                layer_output_scale: None,
                 feed_forward_router_weight: None,
                 feed_forward_router_bias: None,
                 feed_forward_gate_experts_weight: None,
@@ -6215,6 +6291,8 @@ fn build_gguf_decoder_tensor_layout(
                     content,
                     &format!("{prefix}.post_attention_norm.weight"),
                 ),
+                feed_forward_post_norm: None,
+                layer_output_scale: None,
                 feed_forward_router_weight: Some(router_weight.name.clone()),
                 feed_forward_router_bias: optional_tensor_name(
                     content,
@@ -6258,14 +6336,20 @@ fn build_gguf_decoder_tensor_layout(
                     .clone(),
             ),
             attention_query_bias: query_bias,
-            attention_query_norm: None,
+            attention_query_norm: optional_tensor_name(
+                content,
+                &format!("{prefix}.attn_q_norm.weight"),
+            ),
             attention_key_weight: Some(
                 required_tensor_info(content, &format!("{prefix}.attn_k.weight"))?
                     .name
                     .clone(),
             ),
             attention_key_bias: key_bias,
-            attention_key_norm: None,
+            attention_key_norm: optional_tensor_name(
+                content,
+                &format!("{prefix}.attn_k_norm.weight"),
+            ),
             attention_value_weight: Some(
                 required_tensor_info(content, &format!("{prefix}.attn_v.weight"))?
                     .name
@@ -6281,7 +6365,13 @@ fn build_gguf_decoder_tensor_layout(
                     .clone(),
             ),
             attention_output_bias: None,
-            attention_post_norm: None,
+            attention_post_norm: optional_tensor_name_any(
+                content,
+                &[
+                    format!("{prefix}.post_attention_norm.weight"),
+                    format!("{prefix}.attn_post_norm.weight"),
+                ],
+            ),
             attention_sinks_weight: None,
             feed_forward_gate_weight: Some(
                 required_tensor_info(content, &format!("{prefix}.ffn_gate.weight"))?
@@ -6302,6 +6392,17 @@ fn build_gguf_decoder_tensor_layout(
                 required_tensor_info(content, &format!("{prefix}.ffn_norm.weight"))?
                     .name
                     .clone(),
+            ),
+            feed_forward_post_norm: optional_tensor_name_any(
+                content,
+                &[
+                    format!("{prefix}.post_ffw_norm.weight"),
+                    format!("{prefix}.ffn_post_norm.weight"),
+                ],
+            ),
+            layer_output_scale: optional_tensor_name(
+                content,
+                &format!("{prefix}.layer_output_scale.weight"),
             ),
             feed_forward_router_weight: None,
             feed_forward_router_bias: None,
@@ -6357,6 +6458,12 @@ fn required_tensor_info<'a>(
 
 fn optional_tensor_name(content: &GgufContent, name: &str) -> Option<String> {
     content.tensor_info(name).map(|tensor| tensor.name.clone())
+}
+
+fn optional_tensor_name_any(content: &GgufContent, names: &[String]) -> Option<String> {
+    names
+        .iter()
+        .find_map(|name| optional_tensor_name(content, name.as_str()))
 }
 
 fn tensor_matrix_shape(tensor: &GgufTensorInfo) -> Result<(usize, usize), ModelLoadError> {
@@ -9497,6 +9604,51 @@ mod tests {
     }
 
     #[test]
+    fn gguf_prompt_template_renderer_tokenize_rendered_prompt_avoids_double_bos()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = golden_prompt_fixture("gemma4_e4b").expect("gemma4 fixture");
+        let tokenizer_fixture = golden_tokenizer_fixture("gemma4_e4b").expect("gemma4 fixture");
+        let path = gemma4_pilot_fixture_path(tokenizer_fixture.source_path);
+        if !Path::new(path.as_str()).exists() {
+            return Ok(());
+        }
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let variant = fixture
+            .template_variant("gemma4_e4b.default")
+            .expect("variant");
+        let render_case = variant
+            .render_case("gemma4_e4b.default_developer")
+            .expect("render case");
+        let tokenizer = content.load_tokenizer()?;
+        let bos_id = tokenizer
+            .vocabulary
+            .bos_token_id()
+            .expect("gemma4 tokenizer bos token id");
+        let renderer = GgufPromptTemplateRenderer::new(
+            tokenizer,
+            super::resolve_gguf_decoder_chat_templates(&content, GgufDecoderFamily::Gemma4)?,
+        );
+
+        let rendered = renderer.render(
+            None,
+            prompt_messages_from_fixture(render_case.messages).as_slice(),
+            render_case.add_generation_prompt,
+        )?;
+        let tokens = renderer.tokenize_rendered_prompt(rendered.text.as_str())?;
+
+        assert_eq!(tokens.as_slice().first(), Some(&bos_id));
+        assert_eq!(
+            tokens
+                .as_slice()
+                .iter()
+                .filter(|token| **token == bos_id)
+                .count(),
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
     fn golden_prompt_window_cases_reference_real_render_cases()
     -> Result<(), Box<dyn std::error::Error>> {
         for fixture in golden_prompt_fixtures() {
@@ -9776,6 +9928,7 @@ mod tests {
             sliding_window: None,
             attention_key_length: None,
             attention_value_length: None,
+            final_logit_softcapping: None,
             tie_word_embeddings: false,
             attention_qkv_biases: false,
             expert_count: Some(64),
@@ -9825,6 +9978,35 @@ mod tests {
     }
 
     #[test]
+    fn gguf_decoder_inspection_infers_builtin_gemma4_chat_template_when_missing()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_gemma4_missing_template.gguf");
+        write_test_gguf(
+            &path,
+            GgufVersion::V3,
+            &gemma4_decoder_metadata("Tiny Gemma4", None),
+            &decoder_family_tensors(1, false, false),
+        )?;
+
+        let inspection = GgufDecoderAdapterLoader.inspect_path(&path)?;
+
+        assert_eq!(
+            inspection.chat_templates.default_template(),
+            Some(gemma4_chat_template())
+        );
+        assert_eq!(
+            inspection
+                .descriptor
+                .artifact_identity
+                .as_ref()
+                .and_then(|identity| identity.chat_template_digest.as_deref()),
+            Some(inspection.chat_templates.digest())
+        );
+        Ok(())
+    }
+
+    #[test]
     fn gguf_real_gemma4_family_facts_capture_dense_multimodal_shape()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_tokenizer_fixture("gemma4_e4b").expect("gemma4 fixture");
@@ -9850,6 +10032,33 @@ mod tests {
                 .get("gemma4.vision.block_count")
                 .and_then(GgufMetadataValue::as_u64),
             Some(16)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_real_gemma4_layout_preserves_post_norms_and_layer_output_scale()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = golden_tokenizer_fixture("gemma4_e4b").expect("gemma4 fixture");
+        let path = gemma4_pilot_fixture_path(fixture.source_path);
+        let artifact = GgufBlobArtifact::open_path(
+            Path::new(path.as_str()),
+            LocalBlobOpenOptions::default(),
+        )?;
+        let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
+        let layer = &adapter.tensor_layout().layers[0];
+
+        assert_eq!(
+            layer.attention_post_norm.as_deref(),
+            Some("blk.0.post_attention_norm.weight")
+        );
+        assert_eq!(
+            layer.feed_forward_post_norm.as_deref(),
+            Some("blk.0.post_ffw_norm.weight")
+        );
+        assert_eq!(
+            layer.layer_output_scale.as_deref(),
+            Some("blk.0.layer_output_scale.weight")
         );
         Ok(())
     }
@@ -9986,6 +10195,7 @@ mod tests {
             sliding_window: None,
             attention_key_length: None,
             attention_value_length: None,
+            final_logit_softcapping: None,
             tie_word_embeddings: false,
             attention_qkv_biases: false,
             expert_count: None,
@@ -11898,6 +12108,78 @@ mod tests {
             ),
         ];
         metadata.extend(qwen35_tokenizer_metadata_entries());
+        if let Some(chat_template) = chat_template {
+            metadata.push((
+                String::from("tokenizer.chat_template"),
+                GgufMetadataValue::String(chat_template.to_string()),
+            ));
+        }
+        metadata
+    }
+
+    fn gemma4_decoder_metadata(
+        name: &str,
+        chat_template: Option<&str>,
+    ) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = vec![
+            (
+                String::from("general.architecture"),
+                GgufMetadataValue::String(String::from("gemma4")),
+            ),
+            (
+                String::from("general.name"),
+                GgufMetadataValue::String(name.to_string()),
+            ),
+            (
+                String::from("gemma4.context_length"),
+                GgufMetadataValue::U32(64),
+            ),
+            (
+                String::from("gemma4.embedding_length"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("gemma4.feed_forward_length"),
+                GgufMetadataValue::U32(8),
+            ),
+            (
+                String::from("gemma4.block_count"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("gemma4.attention.head_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("gemma4.attention.head_count_kv"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("gemma4.attention.layer_norm_rms_epsilon"),
+                GgufMetadataValue::F32(1e-6),
+            ),
+            (
+                String::from("gemma4.attention.sliding_window"),
+                GgufMetadataValue::U32(512),
+            ),
+            (
+                String::from("gemma4.rope.dimension_count"),
+                GgufMetadataValue::U32(2),
+            ),
+            (
+                String::from("gemma4.rope.freq_base"),
+                GgufMetadataValue::F32(1_000_000.0),
+            ),
+            (
+                String::from("gemma4.rope.freq_base_swa"),
+                GgufMetadataValue::F32(10_000.0),
+            ),
+            (
+                String::from("gemma4.embedding_length_per_layer_input"),
+                GgufMetadataValue::U32(2),
+            ),
+        ];
+        metadata.extend(sentencepiece_tokenizer_metadata_entries());
         if let Some(chat_template) = chat_template {
             metadata.push((
                 String::from("tokenizer.chat_template"),
