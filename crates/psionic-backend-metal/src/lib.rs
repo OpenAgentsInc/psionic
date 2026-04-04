@@ -223,6 +223,21 @@ pub struct MetalQuantizedMatvecResult {
     pub values: Vec<f32>,
 }
 
+/// One quantized row-wise matrix-vector request that shares a staged input.
+#[derive(Clone, Copy)]
+pub struct MetalQuantizedMatvecRequest<'a> {
+    /// Quantized weight buffer.
+    pub weights: &'a MetalBuffer,
+    /// Byte offset into the packed weight buffer.
+    pub byte_offset: usize,
+    /// Quantization mode for the packed rows.
+    pub mode: psionic_core::QuantizationMode,
+    /// Number of logical output rows.
+    pub rows: usize,
+    /// Number of logical input columns.
+    pub columns: usize,
+}
+
 /// Explicit decode-attention execution evidence returned by the Metal backend.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetalDecodeAttentionStats {
@@ -639,11 +654,11 @@ impl MetalBuffer {
                 values.len()
             )));
         }
-        let mut bytes = Vec::with_capacity(self.byte_len);
-        for value in values {
-            bytes.extend_from_slice(&value.to_ne_bytes());
-        }
-        self.write_bytes(&bytes)
+        let byte_len = values.len().saturating_mul(size_of_dtype(self.spec.dtype()));
+        let bytes = unsafe {
+            std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len)
+        };
+        self.write_bytes(bytes)
     }
 
     /// Writes a prefix of contiguous `f32` values into an `f32` buffer.
@@ -667,15 +682,11 @@ impl MetalBuffer {
                 self.spec.storage_size()
             )));
         }
-        let mut bytes = Vec::with_capacity(
-            values
-                .len()
-                .saturating_mul(size_of_dtype(self.spec.dtype())),
-        );
-        for value in values {
-            bytes.extend_from_slice(&value.to_ne_bytes());
-        }
-        self.write_bytes_at_offset(0, bytes.as_slice())
+        let byte_len = values.len().saturating_mul(size_of_dtype(self.spec.dtype()));
+        let bytes = unsafe {
+            std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len)
+        };
+        self.write_bytes_at_offset(0, bytes)
     }
 
     /// Reads contiguous `f32` values from an `f32` buffer.
@@ -692,11 +703,11 @@ impl MetalBuffer {
                 self.storage_kind
             )));
         }
-        let bytes = self.read_bytes()?;
-        let mut values = Vec::with_capacity(bytes.len() / size_of_dtype(self.spec.dtype()));
-        for chunk in bytes.chunks_exact(size_of_dtype(self.spec.dtype())) {
-            values.push(f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
-        }
+        let mut values = Vec::with_capacity(self.spec.storage_size());
+        self.with_bytes(|bytes| {
+            extend_f32_values_from_bytes(&mut values, bytes);
+            Ok(())
+        })?;
         Ok(values)
     }
 
@@ -729,14 +740,25 @@ impl MetalBuffer {
         output.clear();
         output.reserve(element_count.saturating_sub(output.capacity()));
         self.with_bytes_at_offset(0, byte_len, |bytes| {
-            output.extend(
-                bytes
-                    .chunks_exact(size_of_dtype(self.spec.dtype()))
-                    .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])),
-            );
+            extend_f32_values_from_bytes(output, bytes);
             Ok(())
         })
     }
+}
+
+fn extend_f32_values_from_bytes(output: &mut Vec<f32>, bytes: &[u8]) {
+    let element_size = size_of::<f32>();
+    let (prefix, aligned, suffix) = unsafe { bytes.align_to::<f32>() };
+    if prefix.is_empty() && suffix.is_empty() {
+        output.extend_from_slice(aligned);
+        return;
+    }
+
+    output.extend(
+        bytes.chunks_exact(element_size).map(|chunk| {
+            f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+        }),
+    );
 }
 
 impl BufferHandle for MetalBuffer {
@@ -1261,6 +1283,77 @@ impl MetalBackend {
         backend.run_quantized_matvec(weights, byte_offset, mode, rows, columns, input)
     }
 
+    /// Executes multiple quantized row-wise matrix-vector products that share
+    /// the same staged dense input.
+    pub fn quantized_matvec_batch(
+        &mut self,
+        requests: &[MetalQuantizedMatvecRequest<'_>],
+        input: &[f32],
+    ) -> Result<Vec<MetalQuantizedMatvecResult>, RuntimeError> {
+        if requests.is_empty() {
+            return Ok(Vec::new());
+        }
+        for request in requests {
+            let Some((elements_per_block, bytes_per_block)) = request.mode.ggml_block_spec() else {
+                return Err(RuntimeError::Backend(format!(
+                    "metal quantized matvec does not support mode {:?}",
+                    request.mode
+                )));
+            };
+            if request.columns == 0 || request.columns % elements_per_block != 0 {
+                return Err(RuntimeError::Backend(format!(
+                    "metal quantized matvec requires block-aligned width {} for {:?}",
+                    request.columns, request.mode
+                )));
+            }
+            if input.len() != request.columns {
+                return Err(RuntimeError::Backend(format!(
+                    "metal quantized matvec input width mismatch: expected {}, actual {}",
+                    request.columns,
+                    input.len()
+                )));
+            }
+            let row_stride = (request.columns / elements_per_block)
+                .checked_mul(bytes_per_block)
+                .ok_or_else(|| {
+                    RuntimeError::Backend(String::from("metal quantized matvec row stride overflow"))
+                })?;
+            let required_bytes = request.rows.saturating_mul(row_stride);
+            let end_offset = request.byte_offset.saturating_add(required_bytes);
+            match request.weights.storage_kind() {
+                BufferStorageKind::QuantizedBlocks {
+                    mode: stored_mode, ..
+                } if stored_mode == request.mode => {}
+                BufferStorageKind::QuantizedBlocks {
+                    mode: stored_mode, ..
+                } => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal quantized matvec mode mismatch: requested {:?}, stored {stored_mode:?}",
+                        request.mode
+                    )));
+                }
+                storage_kind => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal quantized matvec requires quantized block storage, actual {:?}",
+                        storage_kind
+                    )));
+                }
+            }
+            if request.weights.byte_len() < end_offset {
+                return Err(RuntimeError::Backend(format!(
+                    "metal quantized matvec byte length mismatch: required {end_offset}, actual {}",
+                    request.weights.byte_len(),
+                )));
+            }
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.run_quantized_matvec_batch(requests, input)
+    }
+
     /// Executes one quantized row-wise matrix-vector product and returns only
     /// the requested logits output shape on the host path.
     pub fn quantized_matvec_select_logits_output(
@@ -1372,12 +1465,17 @@ impl MetalBackend {
 
     /// Reduces each contiguous `f32` row to its argmax index.
     pub fn argmax_f32(
-        &self,
+        &mut self,
         input: &MetalBuffer,
         row_count: usize,
         column_count: usize,
     ) -> Result<Vec<u32>, RuntimeError> {
-        argmax_dense_rows(input, row_count, column_count, "metal argmax")
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.run_argmax_f32(input, row_count, column_count)
     }
 
     /// Selects the top-k values from each contiguous `f32` row.
@@ -1393,7 +1491,7 @@ impl MetalBackend {
 
     /// Selects the bounded output shape required for one logits buffer.
     pub fn select_logits_output_f32(
-        &self,
+        &mut self,
         input: &MetalBuffer,
         row_count: usize,
         column_count: usize,
@@ -2785,6 +2883,46 @@ impl AvailableMetalBackend {
             return Ok(buffer);
         }
 
+        self.allocate_without_clear(spec)
+    }
+
+    fn allocate_for_overwrite(&mut self, spec: &TensorSpec) -> Result<MetalBuffer, RuntimeError> {
+        if spec.device().kind() != DeviceKind::Metal {
+            return Err(RuntimeError::Backend(format!(
+                "metal allocator requires a Metal tensor spec, actual device kind {}",
+                spec.device().kind()
+            )));
+        }
+        if spec.device().ordinal() != self.descriptor.device.ordinal() {
+            return Err(RuntimeError::Backend(format!(
+                "metal allocator requires device ordinal {}, actual {}",
+                self.descriptor.device.ordinal(),
+                spec.device().ordinal()
+            )));
+        }
+
+        if let Some(buffer) = self.pool.take(spec) {
+            return Ok(buffer);
+        }
+
+        self.allocate_without_clear(spec)
+    }
+
+    fn allocate_without_clear(&mut self, spec: &TensorSpec) -> Result<MetalBuffer, RuntimeError> {
+        if spec.device().kind() != DeviceKind::Metal {
+            return Err(RuntimeError::Backend(format!(
+                "metal allocator requires a Metal tensor spec, actual device kind {}",
+                spec.device().kind()
+            )));
+        }
+        if spec.device().ordinal() != self.descriptor.device.ordinal() {
+            return Err(RuntimeError::Backend(format!(
+                "metal allocator requires device ordinal {}, actual {}",
+                self.descriptor.device.ordinal(),
+                spec.device().ordinal()
+            )));
+        }
+
         let byte_len = spec
             .storage_size()
             .checked_mul(size_of_dtype(spec.dtype()))
@@ -2911,6 +3049,35 @@ impl AvailableMetalBackend {
         Ok(buffer)
     }
 
+    fn borrowed_dense_input_buffer(
+        &mut self,
+        values: &[f32],
+    ) -> Result<Option<MetalBuffer>, RuntimeError> {
+        let storage_mode = self.platform.storage_mode();
+        if !matches!(storage_mode, MetalStorageMode::Shared) {
+            return Ok(None);
+        }
+        let byte_len = values
+            .len()
+            .checked_mul(std::mem::size_of::<f32>())
+            .ok_or_else(|| RuntimeError::Backend(String::from("metal input byte size overflow")))?;
+        let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len) };
+        Ok(Some(MetalBuffer {
+            spec: TensorSpec::new(
+                Shape::new(vec![values.len()]),
+                DType::F32,
+                self.descriptor.device.clone(),
+            ),
+            byte_len,
+            storage_kind: BufferStorageKind::DenseF32,
+            storage_mode,
+            host_visible: true,
+            host_writable: false,
+            _keepalive: None,
+            platform: self.platform.buffer_from_bytes_no_copy(bytes, storage_mode)?,
+        }))
+    }
+
     fn run_quantized_matvec(
         &mut self,
         weights: &MetalBuffer,
@@ -2921,13 +3088,24 @@ impl AvailableMetalBackend {
         input: &[f32],
     ) -> Result<MetalQuantizedMatvecResult, RuntimeError> {
         let device = self.descriptor.device.clone();
-        let mut input_buffer = self.allocate(&TensorSpec::new(
-            Shape::new(vec![columns]),
+        let mut owned_input_buffer = None;
+        let input_buffer = if let Some(buffer) = self.borrowed_dense_input_buffer(input)? {
+            buffer
+        } else {
+            let mut buffer = self.allocate_for_overwrite(&TensorSpec::new(
+                Shape::new(vec![columns]),
+                DType::F32,
+                device.clone(),
+            ))?;
+            buffer.write_f32(input)?;
+            owned_input_buffer = Some(buffer.clone());
+            buffer
+        };
+        let output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![rows]),
             DType::F32,
             device.clone(),
         ))?;
-        input_buffer.write_f32(input)?;
-        let output = self.allocate(&TensorSpec::new(Shape::new(vec![rows]), DType::F32, device))?;
         let mut submission = MetalSubmission {
             encoded_operations: 0,
             synchronized_buffers: 0,
@@ -2953,9 +3131,84 @@ impl AvailableMetalBackend {
             submission.synchronized_buffers += 1;
         }
         submission.commit(MetalCommandWait::Completed)?;
-        Ok(MetalQuantizedMatvecResult {
-            values: output.read_f32()?,
-        })
+        let values = output.read_f32()?;
+        if let Some(buffer) = owned_input_buffer {
+            self.pool.recycle(buffer);
+        }
+        self.pool.recycle(output);
+        Ok(MetalQuantizedMatvecResult { values })
+    }
+
+    fn run_quantized_matvec_batch(
+        &mut self,
+        requests: &[MetalQuantizedMatvecRequest<'_>],
+        input: &[f32],
+    ) -> Result<Vec<MetalQuantizedMatvecResult>, RuntimeError> {
+        if requests.is_empty() {
+            return Ok(Vec::new());
+        }
+        let device = self.descriptor.device.clone();
+        let mut owned_input_buffer = None;
+        let input_buffer = if let Some(buffer) = self.borrowed_dense_input_buffer(input)? {
+            buffer
+        } else {
+            let mut buffer = self.allocate_for_overwrite(&TensorSpec::new(
+                Shape::new(vec![input.len()]),
+                DType::F32,
+                device.clone(),
+            ))?;
+            buffer.write_f32(input)?;
+            owned_input_buffer = Some(buffer.clone());
+            buffer
+        };
+
+        let mut outputs = Vec::with_capacity(requests.len());
+        let mut submission = MetalSubmission {
+            encoded_operations: 0,
+            synchronized_buffers: 0,
+            platform: self
+                .platform
+                .begin_submission(String::from("psionic.quantized_matvec.batch"))?,
+        };
+
+        for request in requests {
+            let output = self.allocate_for_overwrite(&TensorSpec::new(
+                Shape::new(vec![request.rows]),
+                DType::F32,
+                device.clone(),
+            ))?;
+            self.platform.encode_quantized_matvec(
+                &mut submission.platform,
+                request.weights,
+                request.byte_offset,
+                request.mode,
+                request.rows,
+                request.columns,
+                &input_buffer,
+                &output,
+            )?;
+            submission.encoded_operations += 1;
+            if self
+                .platform
+                .synchronize_output(&mut submission.platform, &output)?
+            {
+                submission.synchronized_buffers += 1;
+            }
+            outputs.push(output);
+        }
+
+        submission.commit(MetalCommandWait::Completed)?;
+        let mut values = Vec::with_capacity(outputs.len());
+        for output in outputs {
+            values.push(MetalQuantizedMatvecResult {
+                values: output.read_f32()?,
+            });
+            self.pool.recycle(output);
+        }
+        if let Some(buffer) = owned_input_buffer {
+            self.pool.recycle(buffer);
+        }
+        Ok(values)
     }
 
     fn run_quantized_matvec_select_logits_output(
@@ -2969,53 +3222,113 @@ impl AvailableMetalBackend {
         output_mode: MetalLogitsOutputMode,
     ) -> Result<MetalLogitsSelectionResult, RuntimeError> {
         let device = self.descriptor.device.clone();
-        let mut input_buffer = self.allocate(&TensorSpec::new(
-            Shape::new(vec![columns]),
-            DType::F32,
-            device.clone(),
-        ))?;
-        input_buffer.write_f32(input)?;
-        let output = self.allocate(&TensorSpec::new(Shape::new(vec![rows]), DType::F32, device))?;
-        let mut submission = MetalSubmission {
-            encoded_operations: 0,
-            synchronized_buffers: 0,
-            platform: self
-                .platform
-                .begin_submission(String::from("psionic.quantized_matvec"))?,
+        let mut owned_input_buffer = None;
+        let input_buffer = if let Some(buffer) = self.borrowed_dense_input_buffer(input)? {
+            buffer
+        } else {
+            let mut buffer = self.allocate_for_overwrite(&TensorSpec::new(
+                Shape::new(vec![columns]),
+                DType::F32,
+                device.clone(),
+            ))?;
+            buffer.write_f32(input)?;
+            owned_input_buffer = Some(buffer.clone());
+            buffer
         };
-        self.platform.encode_quantized_matvec(
-            &mut submission.platform,
-            weights,
-            byte_offset,
-            mode,
-            rows,
-            columns,
-            &input_buffer,
-            &output,
-        )?;
-        submission.encoded_operations += 1;
-        if self
-            .platform
-            .synchronize_output(&mut submission.platform, &output)?
-        {
-            submission.synchronized_buffers += 1;
-        }
-        submission.commit(MetalCommandWait::Completed)?;
         match output_mode {
             MetalLogitsOutputMode::GreedyToken => {
-                let selected_tokens = argmax_dense_rows(&output, 1, rows, "metal argmax")?;
+                let output = self.allocate_for_overwrite(&TensorSpec::new(
+                    Shape::new(vec![rows]),
+                    DType::F32,
+                    device.clone(),
+                ))?;
+                let selected = self.allocate_for_overwrite(&TensorSpec::new(
+                    Shape::new(vec![1]),
+                    DType::F32,
+                    device,
+                ))?;
+                let mut submission = MetalSubmission {
+                    encoded_operations: 0,
+                    synchronized_buffers: 0,
+                    platform: self
+                        .platform
+                        .begin_submission(String::from("psionic.quantized_matvec.greedy"))?,
+                };
+                self.platform.encode_quantized_matvec(
+                    &mut submission.platform,
+                    weights,
+                    byte_offset,
+                    mode,
+                    rows,
+                    columns,
+                    &input_buffer,
+                    &output,
+                )?;
+                submission.encoded_operations += 1;
+                self.platform.encode_argmax_f32(
+                    &mut submission.platform,
+                    &output,
+                    &selected,
+                    1,
+                    rows,
+                )?;
+                submission.encoded_operations += 1;
+                if self
+                    .platform
+                    .synchronize_output(&mut submission.platform, &selected)?
+                {
+                    submission.synchronized_buffers += 1;
+                }
+                submission.commit(MetalCommandWait::Completed)?;
+                let selected_tokens =
+                    read_argmax_indices_from_f32_buffer(&selected, 1, "metal argmax")?;
+                if let Some(buffer) = owned_input_buffer {
+                    self.pool.recycle(buffer);
+                }
+                self.pool.recycle(output);
+                self.pool.recycle(selected);
                 Ok(MetalLogitsSelectionResult {
                     selected_tokens,
                     candidates: None,
                     logits: None,
                     metrics: MetalLogitsSelectionMetrics {
                         output_mode,
-                        readback_bytes: std::mem::size_of::<u32>().try_into().unwrap_or(u64::MAX),
-                        raw_logits_materialized: false,
+                        readback_bytes: std::mem::size_of::<f32>().try_into().unwrap_or(u64::MAX),
+                        raw_logits_materialized: true,
                     },
                 })
             }
             MetalLogitsOutputMode::TopKCandidates(top_k) => {
+                let output = self.allocate_for_overwrite(&TensorSpec::new(
+                    Shape::new(vec![rows]),
+                    DType::F32,
+                    device.clone(),
+                ))?;
+                let mut submission = MetalSubmission {
+                    encoded_operations: 0,
+                    synchronized_buffers: 0,
+                    platform: self
+                        .platform
+                        .begin_submission(String::from("psionic.quantized_matvec"))?,
+                };
+                self.platform.encode_quantized_matvec(
+                    &mut submission.platform,
+                    weights,
+                    byte_offset,
+                    mode,
+                    rows,
+                    columns,
+                    &input_buffer,
+                    &output,
+                )?;
+                submission.encoded_operations += 1;
+                if self
+                    .platform
+                    .synchronize_output(&mut submission.platform, &output)?
+                {
+                    submission.synchronized_buffers += 1;
+                }
+                submission.commit(MetalCommandWait::Completed)?;
                 let candidates = top_k_dense_rows(&output, 1, rows, top_k, "metal top_k")?;
                 let selected_tokens = candidates
                     .indices
@@ -3034,6 +3347,10 @@ impl AvailableMetalBackend {
                     )
                     .try_into()
                     .unwrap_or(u64::MAX);
+                if let Some(buffer) = owned_input_buffer {
+                    self.pool.recycle(buffer);
+                }
+                self.pool.recycle(output);
                 Ok(MetalLogitsSelectionResult {
                     selected_tokens,
                     candidates: Some(candidates),
@@ -3046,9 +3363,43 @@ impl AvailableMetalBackend {
                 })
             }
             MetalLogitsOutputMode::RawLogits => {
+                let output = self.allocate_for_overwrite(&TensorSpec::new(
+                    Shape::new(vec![rows]),
+                    DType::F32,
+                    device.clone(),
+                ))?;
+                let mut submission = MetalSubmission {
+                    encoded_operations: 0,
+                    synchronized_buffers: 0,
+                    platform: self
+                        .platform
+                        .begin_submission(String::from("psionic.quantized_matvec"))?,
+                };
+                self.platform.encode_quantized_matvec(
+                    &mut submission.platform,
+                    weights,
+                    byte_offset,
+                    mode,
+                    rows,
+                    columns,
+                    &input_buffer,
+                    &output,
+                )?;
+                submission.encoded_operations += 1;
+                if self
+                    .platform
+                    .synchronize_output(&mut submission.platform, &output)?
+                {
+                    submission.synchronized_buffers += 1;
+                }
+                submission.commit(MetalCommandWait::Completed)?;
                 let logits = output.read_f32()?;
                 let selected_tokens =
                     argmax_values(logits.as_slice(), 1, rows, "metal raw logits")?;
+                if let Some(buffer) = owned_input_buffer {
+                    self.pool.recycle(buffer);
+                }
+                self.pool.recycle(output);
                 Ok(MetalLogitsSelectionResult {
                     selected_tokens,
                     candidates: None,
@@ -3066,6 +3417,46 @@ impl AvailableMetalBackend {
         }
     }
 
+    fn run_argmax_f32(
+        &mut self,
+        input: &MetalBuffer,
+        row_count: usize,
+        column_count: usize,
+    ) -> Result<Vec<u32>, RuntimeError> {
+        validate_dense_row_selection(input, row_count, column_count, "metal argmax")?;
+        let device = self.descriptor.device.clone();
+        let output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![row_count]),
+            DType::F32,
+            device,
+        ))?;
+        let mut submission = MetalSubmission {
+            encoded_operations: 0,
+            synchronized_buffers: 0,
+            platform: self
+                .platform
+                .begin_submission(String::from("psionic.argmax_f32"))?,
+        };
+        self.platform.encode_argmax_f32(
+            &mut submission.platform,
+            input,
+            &output,
+            row_count,
+            column_count,
+        )?;
+        submission.encoded_operations += 1;
+        if self
+            .platform
+            .synchronize_output(&mut submission.platform, &output)?
+        {
+            submission.synchronized_buffers += 1;
+        }
+        submission.commit(MetalCommandWait::Completed)?;
+        let indices = read_argmax_indices_from_f32_buffer(&output, row_count, "metal argmax")?;
+        self.pool.recycle(output);
+        Ok(indices)
+    }
+
     fn run_grouped_quantized_matvec(
         &mut self,
         weights: &MetalBuffer,
@@ -3077,7 +3468,7 @@ impl AvailableMetalBackend {
         input: &MetalBuffer,
     ) -> Result<Vec<f32>, RuntimeError> {
         let total_rows = selected_ids.len().saturating_mul(rows_per_expert);
-        let output = self.allocate(&TensorSpec::new(
+        let output = self.allocate_for_overwrite(&TensorSpec::new(
             Shape::new(vec![total_rows]),
             DType::F32,
             self.descriptor.device.clone(),
@@ -3108,7 +3499,9 @@ impl AvailableMetalBackend {
             submission.synchronized_buffers += 1;
         }
         submission.commit(MetalCommandWait::Completed)?;
-        output.read_f32()
+        let values = output.read_f32()?;
+        self.pool.recycle(output);
+        Ok(values)
     }
 
     fn run_expert_matvec_f32_ids(
@@ -3975,6 +4368,58 @@ fn argmax_dense_rows(
         })?);
     }
     Ok(indices)
+}
+
+fn read_argmax_indices_from_f32_buffer(
+    input: &MetalBuffer,
+    row_count: usize,
+    label: &str,
+) -> Result<Vec<u32>, RuntimeError> {
+    if input.storage_kind() != BufferStorageKind::DenseF32 || input.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "{label} requires dense f32 storage, actual {:?}",
+            input.storage_kind()
+        )));
+    }
+    if input.spec().storage_size() != row_count {
+        return Err(RuntimeError::Backend(format!(
+            "{label} row-count mismatch: expected {row_count}, actual {}",
+            input.spec().storage_size()
+        )));
+    }
+    let values = input.read_f32()?;
+    let mut indices = Vec::with_capacity(values.len());
+    for value in values {
+        if !value.is_finite() || value < 0.0 {
+            return Err(RuntimeError::Backend(format!(
+                "{label} produced invalid argmax index {value}",
+            )));
+        }
+        indices.push(value as u32);
+    }
+    Ok(indices)
+}
+
+fn read_packed_argmax_index(input: &MetalBuffer, label: &str) -> Result<u32, RuntimeError> {
+    if input.spec().dtype() != DType::I32 || input.spec().storage_size() != 2 {
+        return Err(RuntimeError::Backend(format!(
+            "{label} requires a packed i32[2] buffer, actual {:?} with {} elements",
+            input.spec().dtype(),
+            input.spec().storage_size()
+        )));
+    }
+    let bytes = input.read_bytes()?;
+    if bytes.len() != std::mem::size_of::<u64>() {
+        return Err(RuntimeError::Backend(format!(
+            "{label} packed buffer size mismatch: expected {}, actual {}",
+            std::mem::size_of::<u64>(),
+            bytes.len()
+        )));
+    }
+    let packed = u64::from_ne_bytes(bytes.as_slice().try_into().map_err(|_| {
+        RuntimeError::Backend(String::from("metal argmax packed result was not eight bytes"))
+    })?);
+    Ok(u32::MAX - (packed as u32))
 }
 
 fn top_k_dense_rows(
@@ -5081,6 +5526,11 @@ mod platform {
     struct DensePipelines {
         add: ComputePipelineState,
         matmul: ComputePipelineState,
+        argmax_f32: ComputePipelineState,
+        quantized_matvec_argmax_q4_k: ComputePipelineState,
+        quantized_matvec_argmax_q6_k: ComputePipelineState,
+        quantized_matvec_argmax_q8_0: ComputePipelineState,
+        quantized_matvec_argmax_mxfp4: ComputePipelineState,
         quantized_matvec_q4_k: ComputePipelineState,
         quantized_matvec_q6_k: ComputePipelineState,
         quantized_matvec_q8_0: ComputePipelineState,
@@ -5308,6 +5758,37 @@ mod platform {
             Ok(())
         }
 
+        pub(super) fn encode_argmax_f32(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            input: &PlatformBuffer,
+            output: &PlatformBuffer,
+            row_count: usize,
+            column_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.command_buffer.new_compute_command_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&input.raw), 0);
+            encoder.set_buffer(1, Some(&output.raw), 0);
+
+            let row_count = u32::try_from(row_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal argmax row count overflow"))
+            })?;
+            let column_count = u32::try_from(column_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal argmax column count overflow"))
+            })?;
+            encoder.set_bytes(2, 4, (&row_count as *const u32).cast());
+            encoder.set_bytes(3, 4, (&column_count as *const u32).cast());
+
+            let threadgroup_size = argmax_threadgroup_size(pipeline)?;
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(row_count), 1, 1),
+                threadgroup_size,
+            );
+            encoder.end_encoding();
+            Ok(())
+        }
+
         pub(super) fn encode_quantized_matvec(
             &mut self,
             pipeline: &ComputePipelineState,
@@ -5336,6 +5817,46 @@ mod platform {
             })?;
             let byte_offset = u64::try_from(byte_offset).map_err(|_| {
                 RuntimeError::Backend(String::from("metal quantized matvec byte offset overflow"))
+            })?;
+            encoder.set_bytes(3, 4, (&rows as *const u32).cast());
+            encoder.set_bytes(4, 4, (&columns as *const u32).cast());
+            encoder.set_bytes(5, 4, (&row_stride as *const u32).cast());
+            encoder.set_bytes(6, 8, (&byte_offset as *const u64).cast());
+
+            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            encoder.dispatch_thread_groups(MTLSize::new(u64::from(rows), 1, 1), threadgroup_size);
+            encoder.end_encoding();
+            Ok(())
+        }
+
+        pub(super) fn encode_quantized_matvec_argmax(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            weights: &PlatformBuffer,
+            byte_offset: usize,
+            input: &PlatformBuffer,
+            selected: &PlatformBuffer,
+            rows: usize,
+            columns: usize,
+            row_stride: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.command_buffer.new_compute_command_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&weights.raw), 0);
+            encoder.set_buffer(1, Some(&input.raw), 0);
+            encoder.set_buffer(2, Some(&selected.raw), 0);
+
+            let rows = u32::try_from(rows).map_err(|_| {
+                RuntimeError::Backend(String::from("metal quantized argmax rows overflow"))
+            })?;
+            let columns = u32::try_from(columns).map_err(|_| {
+                RuntimeError::Backend(String::from("metal quantized argmax columns overflow"))
+            })?;
+            let row_stride = u32::try_from(row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from("metal quantized argmax row stride overflow"))
+            })?;
+            let byte_offset = u64::try_from(byte_offset).map_err(|_| {
+                RuntimeError::Backend(String::from("metal quantized argmax byte offset overflow"))
             })?;
             encoder.set_bytes(3, 4, (&rows as *const u32).cast());
             encoder.set_bytes(4, 4, (&columns as *const u32).cast());
@@ -5650,6 +6171,24 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_argmax_f32(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            input: &MetalBuffer,
+            output: &MetalBuffer,
+            row_count: usize,
+            column_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.argmax_f32;
+            submission.encode_argmax_f32(
+                pipeline,
+                &input.platform,
+                &output.platform,
+                row_count,
+                column_count,
+            )
+        }
+
         pub(super) fn encode_quantized_matvec(
             &mut self,
             submission: &mut PlatformSubmission,
@@ -5680,6 +6219,42 @@ mod platform {
                 byte_offset,
                 &input.platform,
                 &output.platform,
+                rows,
+                columns,
+                row_stride,
+            )
+        }
+
+        pub(super) fn encode_quantized_matvec_argmax(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            weights: &MetalBuffer,
+            byte_offset: usize,
+            mode: QuantizationMode,
+            rows: usize,
+            columns: usize,
+            input: &MetalBuffer,
+            selected: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let row_stride = quantized_row_stride(mode, columns)?;
+            let pipelines = self.pipelines()?;
+            let pipeline = match mode {
+                QuantizationMode::GgmlQ4K => &pipelines.quantized_matvec_argmax_q4_k,
+                QuantizationMode::GgmlQ6K => &pipelines.quantized_matvec_argmax_q6_k,
+                QuantizationMode::GgmlQ8_0 => &pipelines.quantized_matvec_argmax_q8_0,
+                QuantizationMode::GgmlMxfp4 => &pipelines.quantized_matvec_argmax_mxfp4,
+                _ => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal quantized argmax does not support mode {mode:?}",
+                    )));
+                }
+            };
+            submission.encode_quantized_matvec_argmax(
+                pipeline,
+                &weights.platform,
+                byte_offset,
+                &input.platform,
+                &selected.platform,
                 rows,
                 columns,
                 row_stride,
@@ -6036,6 +6611,39 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!("missing Metal matmul kernel: {error}"))
             })?;
+        let argmax_f32 = library
+            .get_function("psionic_argmax_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal argmax kernel: {error}"))
+            })?;
+        let quantized_matvec_argmax_q8_0 = library
+            .get_function("psionic_quantized_matvec_argmax_q8_0", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q8_0 quantized argmax kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_argmax_q4_k = library
+            .get_function("psionic_quantized_matvec_argmax_q4_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q4_k quantized argmax kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_argmax_q6_k = library
+            .get_function("psionic_quantized_matvec_argmax_q6_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q6_k quantized argmax kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_argmax_mxfp4 = library
+            .get_function("psionic_quantized_matvec_argmax_mxfp4", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal mxfp4 quantized argmax kernel: {error}"
+                ))
+            })?;
         let quantized_matvec_q8_0 = library
             .get_function("psionic_quantized_matvec_q8_0", None)
             .map_err(|error| {
@@ -6101,6 +6709,39 @@ mod platform {
                 .new_compute_pipeline_state_with_function(&matmul)
                 .map_err(|error| {
                     RuntimeError::Backend(format!("metal matmul pipeline build failed: {error}"))
+                })?,
+            argmax_f32: device
+                .new_compute_pipeline_state_with_function(&argmax_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!("metal argmax pipeline build failed: {error}"))
+                })?,
+            quantized_matvec_argmax_q4_k: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_q4_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q4_k quantized argmax pipeline build failed: {error}"
+                    ))
+                })?,
+            quantized_matvec_argmax_q6_k: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_q6_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q6_k quantized argmax pipeline build failed: {error}"
+                    ))
+                })?,
+            quantized_matvec_argmax_q8_0: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_q8_0)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q8_0 quantized argmax pipeline build failed: {error}"
+                    ))
+                })?,
+            quantized_matvec_argmax_mxfp4: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_mxfp4)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal mxfp4 quantized argmax pipeline build failed: {error}"
+                    ))
                 })?,
             quantized_matvec_q4_k: device
                 .new_compute_pipeline_state_with_function(&quantized_matvec_q4_k)
@@ -6184,6 +6825,22 @@ mod platform {
         Ok(MTLSize::new(width, 1, 1))
     }
 
+    fn argmax_threadgroup_size(pipeline: &ComputePipelineState) -> Result<MTLSize, RuntimeError> {
+        const ARGMAX_THREADS: u64 = 128;
+        let max_threads = pipeline.max_total_threads_per_threadgroup();
+        if max_threads == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal argmax kernel reported zero max threads per threadgroup",
+            )));
+        }
+        if u64::from(max_threads) < ARGMAX_THREADS {
+            return Err(RuntimeError::Backend(format!(
+                "metal argmax kernel requires at least {ARGMAX_THREADS} threads per threadgroup, actual {max_threads}",
+            )));
+        }
+        Ok(MTLSize::new(ARGMAX_THREADS, 1, 1))
+    }
+
     fn map_command_status(status: MTLCommandBufferStatus) -> MetalCommandStatus {
         match status {
             MTLCommandBufferStatus::NotEnqueued => MetalCommandStatus::NotEnqueued,
@@ -6209,6 +6866,7 @@ mod platform {
 using namespace metal;
 
 constant uint PSIONIC_QUANTIZED_ROW_THREADS = 32;
+constant uint PSIONIC_ARGMAX_THREADS = 128;
 
 kernel void psionic_add(
     const device float* left [[buffer(0)]],
@@ -6245,6 +6903,56 @@ kernel void psionic_matmul(
     output[(row * n) + col] = sum;
 }
 
+kernel void psionic_argmax_f32(
+    const device float* input [[buffer(0)]],
+    device float* output [[buffer(1)]],
+    constant uint& row_count [[buffer(2)]],
+    constant uint& column_count [[buffer(3)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= row_count) {
+        return;
+    }
+
+    threadgroup float partial_values[PSIONIC_ARGMAX_THREADS];
+    threadgroup uint partial_indices[PSIONIC_ARGMAX_THREADS];
+
+    uint row_offset = row * column_count;
+    float best_value = -INFINITY;
+    uint best_index = 0;
+    for (uint index = tid; index < column_count; index += PSIONIC_ARGMAX_THREADS) {
+        float value = input[row_offset + index];
+        if (value > best_value || (value == best_value && index < best_index)) {
+            best_value = value;
+            best_index = index;
+        }
+    }
+
+    partial_values[tid] = best_value;
+    partial_indices[tid] = best_index;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (uint stride = PSIONIC_ARGMAX_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            float candidate_value = partial_values[tid + stride];
+            uint candidate_index = partial_indices[tid + stride];
+            if (candidate_value > partial_values[tid]
+                || (candidate_value == partial_values[tid]
+                    && candidate_index < partial_indices[tid])) {
+                partial_values[tid] = candidate_value;
+                partial_indices[tid] = candidate_index;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (tid == 0) {
+        output[row] = float(partial_indices[0]);
+    }
+}
+
 constant short PSIONIC_MXFP4_VALUES[16] = {
     0, 1, 2, 3, 4, 6, 8, 12,
     0, -1, -2, -3, -4, -6, -8, -12
@@ -6253,6 +6961,21 @@ constant short PSIONIC_MXFP4_VALUES[16] = {
 inline float psionic_mxfp4_scale(uchar exponent_bits) {
     uint bits = exponent_bits == 0 ? 0x00400000u : (uint(exponent_bits) << 23);
     return as_type<float>(bits) * 0.5f;
+}
+
+inline uint psionic_ordered_f32_bits(float value) {
+    uint bits = as_type<uint>(value);
+    return (bits & 0x80000000u) != 0 ? ~bits : (bits ^ 0x80000000u);
+}
+
+inline void psionic_update_quantized_argmax(
+    device atomic_ulong* selected,
+    float value,
+    uint row
+) {
+    (void)selected;
+    (void)value;
+    (void)row;
 }
 
 inline float psionic_q8_0_block_dot(
@@ -6317,10 +7040,27 @@ inline float psionic_q4_k_block_dot(
         float low_min = minimum * float(low.y);
         float low_input_sum = 0.0f;
         float low_quant_sum = 0.0f;
-        for (uint index = 0; index < 32; index++) {
-            float input_value = input[input_offset + index];
-            low_input_sum += input_value;
-            low_quant_sum += input_value * float(quant_chunk[index] & 0x0f);
+        for (uint index = 0; index < 32; index += 4) {
+            float4 input_values = float4(
+                input[input_offset + index + 0],
+                input[input_offset + index + 1],
+                input[input_offset + index + 2],
+                input[input_offset + index + 3]
+            );
+            uchar4 quant_values = uchar4(
+                quant_chunk[index + 0],
+                quant_chunk[index + 1],
+                quant_chunk[index + 2],
+                quant_chunk[index + 3]
+            );
+            float4 quant_low = float4(
+                float(quant_values[0] & 0x0f),
+                float(quant_values[1] & 0x0f),
+                float(quant_values[2] & 0x0f),
+                float(quant_values[3] & 0x0f)
+            );
+            low_input_sum += input_values[0] + input_values[1] + input_values[2] + input_values[3];
+            low_quant_sum += dot(input_values, quant_low);
         }
         sum += (low_quant_sum * low_scale) - (low_input_sum * low_min);
         input_offset += 32;
@@ -6331,10 +7071,27 @@ inline float psionic_q4_k_block_dot(
         float high_min = minimum * float(high.y);
         float high_input_sum = 0.0f;
         float high_quant_sum = 0.0f;
-        for (uint index = 0; index < 32; index++) {
-            float input_value = input[input_offset + index];
-            high_input_sum += input_value;
-            high_quant_sum += input_value * float((quant_chunk[index] >> 4) & 0x0f);
+        for (uint index = 0; index < 32; index += 4) {
+            float4 input_values = float4(
+                input[input_offset + index + 0],
+                input[input_offset + index + 1],
+                input[input_offset + index + 2],
+                input[input_offset + index + 3]
+            );
+            uchar4 quant_values = uchar4(
+                quant_chunk[index + 0],
+                quant_chunk[index + 1],
+                quant_chunk[index + 2],
+                quant_chunk[index + 3]
+            );
+            float4 quant_high = float4(
+                float((quant_values[0] >> 4) & 0x0f),
+                float((quant_values[1] >> 4) & 0x0f),
+                float((quant_values[2] >> 4) & 0x0f),
+                float((quant_values[3] >> 4) & 0x0f)
+            );
+            high_input_sum += input_values[0] + input_values[1] + input_values[2] + input_values[3];
+            high_quant_sum += dot(input_values, quant_high);
         }
         sum += (high_quant_sum * high_scale) - (high_input_sum * high_min);
         input_offset += 32;
@@ -6361,26 +7118,30 @@ inline float psionic_q6_k_block_dot(
         const device uchar* scales_chunk = scales + (chunk * 8);
         const device float* input_chunk = input + (chunk * 128);
 
-        for (uint l = 0; l < 32; l++) {
-            uint is = l / 16;
-            int q1 = int(ql_chunk[l] & 0x0f) | (int((qh_chunk[l] >> 0) & 0x03) << 4);
-            int q2 = int(ql_chunk[l + 32] & 0x0f) | (int((qh_chunk[l] >> 2) & 0x03) << 4);
-            int q3 = int(ql_chunk[l] >> 4) | (int((qh_chunk[l] >> 4) & 0x03) << 4);
-            int q4 = int(ql_chunk[l + 32] >> 4) | (int((qh_chunk[l] >> 6) & 0x03) << 4);
-            q1 -= 32;
-            q2 -= 32;
-            q3 -= 32;
-            q4 -= 32;
-
+        for (uint group = 0; group < 2; group++) {
+            uint is = group;
             float scale_1 = scale * float(as_type<char>(scales_chunk[is]));
             float scale_2 = scale * float(as_type<char>(scales_chunk[is + 2]));
             float scale_3 = scale * float(as_type<char>(scales_chunk[is + 4]));
             float scale_4 = scale * float(as_type<char>(scales_chunk[is + 6]));
+            uint group_offset = group * 16;
 
-            sum += input_chunk[l] * (scale_1 * float(q1));
-            sum += input_chunk[l + 32] * (scale_2 * float(q2));
-            sum += input_chunk[l + 64] * (scale_3 * float(q3));
-            sum += input_chunk[l + 96] * (scale_4 * float(q4));
+            for (uint lane = 0; lane < 16; lane++) {
+                uint l = group_offset + lane;
+                int q1 = int(ql_chunk[l] & 0x0f) | (int((qh_chunk[l] >> 0) & 0x03) << 4);
+                int q2 = int(ql_chunk[l + 32] & 0x0f) | (int((qh_chunk[l] >> 2) & 0x03) << 4);
+                int q3 = int(ql_chunk[l] >> 4) | (int((qh_chunk[l] >> 4) & 0x03) << 4);
+                int q4 = int(ql_chunk[l + 32] >> 4) | (int((qh_chunk[l] >> 6) & 0x03) << 4);
+                q1 -= 32;
+                q2 -= 32;
+                q3 -= 32;
+                q4 -= 32;
+
+                sum += input_chunk[l] * (scale_1 * float(q1));
+                sum += input_chunk[l + 32] * (scale_2 * float(q2));
+                sum += input_chunk[l + 64] * (scale_3 * float(q3));
+                sum += input_chunk[l + 96] * (scale_4 * float(q4));
+            }
         }
     }
 
@@ -6396,24 +7157,128 @@ kernel void psionic_quantized_matvec_q4_k(
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
-    uint tid [[thread_index_in_threadgroup]]
+    ushort lane [[thread_index_in_simdgroup]]
 ) {
     uint row = tgpig.x;
     if (row >= rows) {
         return;
     }
-    if (tid != 0) {
-        return;
+    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    uint block_count = columns / 256;
+
+    const short ix = short(lane / 8);
+    const short it = short(lane % 8);
+    const short iq = short(it / 4);
+    const short ir = short(it % 4);
+
+    float sum = 0.0f;
+
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 4) {
+        const device uchar* block = row_weights + (block_index * 144);
+        const device float* block_input = input + block_index * 256 + 64 * uint(iq) + 8 * uint(ir);
+
+        float yl[16];
+        float yh[16];
+        float4 sumy = float4(0.0f);
+
+        for (short i = 0; i < 8; ++i) {
+            yl[i + 0] = block_input[i + 0];
+            yl[i + 8] = block_input[i + 32];
+            yh[i + 0] = block_input[i + 128];
+            yh[i + 8] = block_input[i + 160];
+            sumy[0] += yl[i + 0];
+            sumy[1] += yl[i + 8];
+            sumy[2] += yh[i + 0];
+            sumy[3] += yh[i + 8];
+        }
+
+        const device ushort* scales = (const device ushort*)(block + 4) + iq;
+        const device ushort* q1 = (const device ushort*)(block + 16) + 16 * iq + 4 * ir;
+        const device half* dh = (const device half*)block;
+
+        constexpr ushort kmask1 = 0x3f3f;
+        constexpr ushort kmask2 = 0x0f0f;
+        constexpr ushort kmask3 = 0xc0c0;
+
+        ushort sc16[4];
+        thread const uchar* sc8 = (thread const uchar*)sc16;
+
+        sc16[0] = scales[0] & kmask1;
+        sc16[1] = scales[2] & kmask1;
+        sc16[2] = ((scales[4] >> 0) & kmask2) | ((scales[0] & kmask3) >> 2);
+        sc16[3] = ((scales[4] >> 4) & kmask2) | ((scales[2] & kmask3) >> 2);
+
+        const device ushort* q2 = q1 + 32;
+        float4 acc1 = float4(0.0f);
+        float4 acc2 = float4(0.0f);
+
+        for (short i = 0; i < 4; ++i) {
+            acc1[0] += yl[2 * i + 0] * float(q1[i] & 0x000F);
+            acc1[1] += yl[2 * i + 1] * float(q1[i] & 0x0F00);
+            acc1[2] += yl[2 * i + 8] * float(q1[i] & 0x00F0);
+            acc1[3] += yl[2 * i + 9] * float(q1[i] & 0xF000);
+            acc2[0] += yh[2 * i + 0] * float(q2[i] & 0x000F);
+            acc2[1] += yh[2 * i + 1] * float(q2[i] & 0x0F00);
+            acc2[2] += yh[2 * i + 8] * float(q2[i] & 0x00F0);
+            acc2[3] += yh[2 * i + 9] * float(q2[i] & 0xF000);
+        }
+
+        sum += float(dh[0]) * (
+                (acc1[0] + (1.0f / 256.0f) * acc1[1]) * float(sc8[0]) +
+                (acc1[2] + (1.0f / 256.0f) * acc1[3]) * float(sc8[1]) * (1.0f / 16.0f) +
+                (acc2[0] + (1.0f / 256.0f) * acc2[1]) * float(sc8[4]) +
+                (acc2[2] + (1.0f / 256.0f) * acc2[3]) * float(sc8[5]) * (1.0f / 16.0f)
+            ) -
+            float(dh[1]) * (
+                sumy[0] * float(sc8[2]) +
+                sumy[1] * float(sc8[3]) +
+                sumy[2] * float(sc8[6]) +
+                sumy[3] * float(sc8[7])
+            );
     }
 
+    float total = simd_sum(sum);
+    if (lane == 0) {
+        output[row] = total;
+    }
+}
+
+kernel void psionic_quantized_matvec_argmax_q4_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device atomic_ulong* selected [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows || tid != 0) {
+        if (row >= rows) {
+            return;
+        }
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
     const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
-    float sum = 0.0f;
     uint block_count = columns / 256;
-    for (uint block_index = 0; block_index < block_count; block_index++) {
+    float sum = 0.0f;
+    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
         const device uchar* block = row_weights + (block_index * 144);
         sum += psionic_q4_k_block_dot(block, input + block_index * 256);
     }
-    output[row] = sum;
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        psionic_update_quantized_argmax(selected, partial[0], row);
+    }
 }
 
 kernel void psionic_quantized_matvec_q6_k(
@@ -6425,24 +7290,105 @@ kernel void psionic_quantized_matvec_q6_k(
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
-    uint tid [[thread_index_in_threadgroup]]
+    ushort lane [[thread_index_in_simdgroup]]
 ) {
     uint row = tgpig.x;
     if (row >= rows) {
         return;
     }
-    if (tid != 0) {
-        return;
+    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    uint block_count = columns / 256;
+
+    const short tid = short(lane / 2);
+    const short ix = short(lane % 2);
+    const short ip = short(tid / 8);
+    const short il = short(tid % 8);
+    const short l0 = short(4 * il);
+    const short is = short(8 * ip + l0 / 16);
+    const short y_offset = short(128 * ip + l0);
+    const short q_offset_l = short(64 * ip + l0);
+    const short q_offset_h = short(32 * ip + l0);
+
+    float sum = 0.0f;
+
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 2) {
+        const device uchar* block = row_weights + (block_index * 210);
+        const device uchar* q1 = block + q_offset_l;
+        const device uchar* q2 = q1 + 32;
+        const device uchar* qh = block + 128 + q_offset_h;
+        const device uchar* scales = block + 192 + is;
+        ushort scale_bits = ushort(block[208]) | (ushort(block[209]) << 8);
+        float scale = float(as_type<half>(scale_bits));
+        const device float* block_input = input + block_index * 256 + y_offset;
+
+        float4 sums = float4(0.0f);
+        for (short l = 0; l < 4; ++l) {
+            float y0 = block_input[l + 0];
+            float y1 = block_input[l + 32];
+            float y2 = block_input[l + 64];
+            float y3 = block_input[l + 96];
+
+            int qv0 = int(q1[l] & 0x0f) | (int((qh[l] >> 0) & 0x03) << 4);
+            int qv1 = int(q2[l] & 0x0f) | (int((qh[l] >> 2) & 0x03) << 4);
+            int qv2 = int(q1[l] >> 4) | (int((qh[l] >> 4) & 0x03) << 4);
+            int qv3 = int(q2[l] >> 4) | (int((qh[l] >> 6) & 0x03) << 4);
+
+            sums[0] += y0 * float(qv0 - 32);
+            sums[1] += y1 * float(qv1 - 32);
+            sums[2] += y2 * float(qv2 - 32);
+            sums[3] += y3 * float(qv3 - 32);
+        }
+
+        sum += scale * (
+            sums[0] * float(as_type<char>(scales[0])) +
+            sums[1] * float(as_type<char>(scales[2])) +
+            sums[2] * float(as_type<char>(scales[4])) +
+            sums[3] * float(as_type<char>(scales[6]))
+        );
     }
 
+    float total = simd_sum(sum);
+    if (lane == 0) {
+        output[row] = total;
+    }
+}
+
+kernel void psionic_quantized_matvec_argmax_q6_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device atomic_ulong* selected [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows || tid != 0) {
+        if (row >= rows) {
+            return;
+        }
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
     const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
-    float sum = 0.0f;
     uint block_count = columns / 256;
-    for (uint block_index = 0; block_index < block_count; block_index++) {
+    float sum = 0.0f;
+    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
         const device uchar* block = row_weights + (block_index * 210);
         sum += psionic_q6_k_block_dot(block, input + block_index * 256);
     }
-    output[row] = sum;
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        psionic_update_quantized_argmax(selected, partial[0], row);
+    }
 }
 
 kernel void psionic_quantized_matvec_q8_0(
@@ -6481,6 +7427,42 @@ kernel void psionic_quantized_matvec_q8_0(
     }
 }
 
+kernel void psionic_quantized_matvec_argmax_q8_0(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device atomic_ulong* selected [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
+    ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
+    uint block_count = columns / 32;
+    float sum = 0.0f;
+    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+        const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
+        sum += psionic_q8_0_block_dot(block, input + block_index * 32);
+    }
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        psionic_update_quantized_argmax(selected, partial[0], row);
+    }
+}
+
 kernel void psionic_quantized_matvec_mxfp4(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
@@ -6514,6 +7496,42 @@ kernel void psionic_quantized_matvec_mxfp4(
     }
     if (tid == 0) {
         output[row] = partial[0];
+    }
+}
+
+kernel void psionic_quantized_matvec_argmax_mxfp4(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device atomic_ulong* selected [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
+    ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
+    uint block_count = columns / 32;
+    float sum = 0.0f;
+    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+        const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
+        sum += psionic_mxfp4_block_dot(block, input + block_index * 32);
+    }
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        psionic_update_quantized_argmax(selected, partial[0], row);
     }
 }
 

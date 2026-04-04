@@ -15,7 +15,9 @@ use psionic_adapters::{
 };
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot};
 use psionic_backend_cuda::{CudaBackend, CudaBuffer};
-use psionic_backend_metal::{MetalBackend, MetalBuffer};
+use psionic_backend_metal::{
+    MetalBackend, MetalBuffer, MetalLogitsOutputMode, MetalQuantizedMatvecRequest,
+};
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::QuantizationMode;
 use psionic_models::{
@@ -1626,6 +1628,7 @@ impl super::CompiledWordGenerationModel for CpuDenseGgufGenerationModel {
             key: step.key,
             value: step.value,
             logits: step.logits,
+            selected_token: None,
             hidden: Some(step.final_hidden),
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -2836,6 +2839,24 @@ impl MetalGemma4GenerationModel {
     }
 }
 
+fn metal_gemma4_can_use_greedy_selected_token(request: &GenerationRequest) -> bool {
+    request.adapter_serving.is_none()
+        && request.options.structured_output.is_none()
+        && request.options.repeat_penalty.is_none()
+        && request.options.presence_penalty.is_none()
+        && request.options.frequency_penalty.is_none()
+        && (request.options.decode_strategy == crate::DecodeStrategy::Greedy
+            || request.options.sampling_policy().effective_temperature() <= 1e-6)
+}
+
+fn metal_gemma4_decode_logits_output_mode(request: &GenerationRequest) -> MetalLogitsOutputMode {
+    if metal_gemma4_can_use_greedy_selected_token(request) {
+        MetalLogitsOutputMode::GreedyToken
+    } else {
+        MetalLogitsOutputMode::RawLogits
+    }
+}
+
 impl crate::GenerationModelHandle for MetalGemma4GenerationModel {
     fn descriptor(&self) -> &DecoderModelDescriptor {
         &self.inner.descriptor
@@ -2893,11 +2914,61 @@ impl super::CompiledWordGenerationModel for MetalGemma4GenerationModel {
                 kv_width: cache.width(),
             });
         }
-        let step = self.inner.forward_step(backend, token, position, cache)?;
+        let step =
+            self.inner
+                .forward_step(backend, token, position, cache, MetalLogitsOutputMode::RawLogits)?;
         Ok(GenerationStepOutput {
             key: step.key,
             value: step.value,
             logits: step.logits,
+            selected_token: step.selected_token,
+            hidden: Some(step.final_hidden),
+            execution_plan_digest: Some(self.inner.plan_digest.clone()),
+            compile_path: None,
+            kernel_count: step.kernel_count,
+            bytes_moved: step.bytes_moved,
+            plan_cache_hits: 0,
+            plan_cache_misses: 0,
+            gpt_oss_perf: None,
+        })
+    }
+
+    fn execute_step_for_request(
+        &self,
+        backend: &mut Self::Backend,
+        request: &GenerationRequest,
+        token: TokenId,
+        position: usize,
+        cache: &crate::InMemoryKvCache,
+    ) -> Result<GenerationStepOutput, ReferenceTextGenerationError> {
+        let config = &self.inner.descriptor.config;
+        if token.as_u32() as usize >= config.vocab_size {
+            return Err(ReferenceTextGenerationError::InvalidToken {
+                token: token.as_u32(),
+                vocab_size: config.vocab_size,
+            });
+        }
+        if position >= config.max_context {
+            return Err(ReferenceTextGenerationError::InvalidPosition {
+                position,
+                max_context: config.max_context,
+            });
+        }
+        if cache.width() != self.inner.cache_width() {
+            return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+                expected_kv_width: self.inner.cache_width(),
+                kv_width: cache.width(),
+            });
+        }
+        let logits_output_mode = metal_gemma4_decode_logits_output_mode(request);
+        let step = self
+            .inner
+            .forward_step(backend, token, position, cache, logits_output_mode)?;
+        Ok(GenerationStepOutput {
+            key: step.key,
+            value: step.value,
+            logits: step.logits,
+            selected_token: step.selected_token,
             hidden: Some(step.final_hidden),
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -2958,6 +3029,7 @@ impl MetalGemma4ModelInner {
         token: TokenId,
         position: usize,
         cache: &crate::InMemoryKvCache,
+        logits_output_mode: MetalLogitsOutputMode,
     ) -> Result<MetalGemma4ForwardStep, ReferenceTextGenerationError> {
         let step = self.forward_stage_step(
             backend,
@@ -2970,6 +3042,7 @@ impl MetalGemma4ModelInner {
             None,
             None,
             true,
+            logits_output_mode,
         )?;
         let final_hidden = step.lm_head_hidden.ok_or_else(|| {
             ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
@@ -2980,6 +3053,7 @@ impl MetalGemma4ModelInner {
             key: step.key,
             value: step.value,
             logits: step.logits,
+            selected_token: step.selected_token,
             final_hidden,
             kernel_count: step.kernel_count,
             bytes_moved: step.bytes_moved,
@@ -2998,6 +3072,7 @@ impl MetalGemma4ModelInner {
         forwarded_key: Option<&[f32]>,
         forwarded_value: Option<&[f32]>,
         produce_logits: bool,
+        logits_output_mode: MetalLogitsOutputMode,
     ) -> Result<MetalGemma4StageStep, ReferenceTextGenerationError> {
         if start_layer > end_layer || end_layer > self.layers.len() {
             return Err(ReferenceTextGenerationError::Runtime(
@@ -3080,43 +3155,45 @@ impl MetalGemma4ModelInner {
             .skip(start_layer)
             .take(end_layer.saturating_sub(start_layer))
         {
-            let residual = hidden.clone();
             let hidden_norm = rms_norm(
                 hidden.as_slice(),
                 layer.attention_norm.as_slice(),
                 self.family_metadata.rms_norm_epsilon,
             );
+            let residual = std::mem::take(&mut hidden);
 
-            let mut q = layer
-                .attention_query_weight
-                .matvec(backend, &hidden_norm)?;
-            if let Some(bias) = layer.attention_query_bias.as_ref() {
-                add_bias_in_place(&mut q.values, bias.as_slice());
-            }
-            if let Some(norm) = layer.attention_query_norm.as_ref() {
-                per_head_rms_norm_in_place(
-                    q.values.as_mut_slice(),
+            let mut kv_kernel_count = 0usize;
+            let mut kv_bytes_moved = 0u64;
+            let (mut q, k_values, v_values) = if layer.attention_geometry.has_kv() {
+                let (mut q, mut k, mut v) = MetalQuantizedProjectionMatrix::matvec_triplet(
+                    &layer.attention_query_weight,
+                    &layer.attention_key_weight,
+                    &layer.attention_value_weight,
+                    backend,
+                    &hidden_norm,
+                )?;
+                if let Some(bias) = layer.attention_query_bias.as_ref() {
+                    add_bias_in_place(&mut q.values, bias.as_slice());
+                }
+                if let Some(norm) = layer.attention_query_norm.as_ref() {
+                    per_head_rms_norm_in_place(
+                        q.values.as_mut_slice(),
+                        layer.attention_geometry.head_count,
+                        layer.attention_geometry.head_dim,
+                        norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                }
+                apply_rope_neox(
+                    &mut q.values,
                     layer.attention_geometry.head_count,
                     layer.attention_geometry.head_dim,
-                    norm.as_slice(),
-                    self.family_metadata.rms_norm_epsilon,
+                    layer.attention_geometry.rotary_dim,
+                    position,
+                    layer.attention_geometry.rope_theta,
+                    self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
+                    &self.family_metadata,
                 );
-            }
-
-            apply_rope_neox(
-                &mut q.values,
-                layer.attention_geometry.head_count,
-                layer.attention_geometry.head_dim,
-                layer.attention_geometry.rotary_dim,
-                position,
-                layer.attention_geometry.rope_theta,
-                self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
-                &self.family_metadata,
-            );
-            let (k, v) = if layer.attention_geometry.has_kv() {
-                let mut k = layer
-                    .attention_key_weight
-                    .matvec(backend, &hidden_norm)?;
                 if let Some(bias) = layer.attention_key_bias.as_ref() {
                     add_bias_in_place(&mut k.values, bias.as_slice());
                 }
@@ -3130,9 +3207,6 @@ impl MetalGemma4ModelInner {
                     );
                 }
 
-                let mut v = layer
-                    .attention_value_weight
-                    .matvec(backend, &hidden_norm)?;
                 if let Some(bias) = layer.attention_value_bias.as_ref() {
                     add_bias_in_place(&mut v.values, bias.as_slice());
                 }
@@ -3162,10 +3236,61 @@ impl MetalGemma4ModelInner {
                     cache_value[cache_offset..cache_offset + kv_width]
                         .copy_from_slice(v.values.as_slice());
                 }
-                live_keys[layer_index] = Some(k.values.clone());
-                live_values[layer_index] = Some(v.values.clone());
-                (k, v)
+                kv_kernel_count = kv_kernel_count
+                    .saturating_add(k.kernel_count)
+                    .saturating_add(v.kernel_count);
+                kv_bytes_moved = kv_bytes_moved
+                    .saturating_add(k.bytes_moved)
+                    .saturating_add(v.bytes_moved);
+                live_keys[layer_index] = Some(k.values);
+                live_values[layer_index] = Some(v.values);
+                (
+                    q,
+                    live_keys[layer_index]
+                        .as_deref()
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} lost live key cache after publication"
+                                ),
+                            ))
+                        })?,
+                    live_values[layer_index]
+                        .as_deref()
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} lost live value cache after publication"
+                                ),
+                            ))
+                        })?,
+                )
             } else {
+                let mut q = layer
+                    .attention_query_weight
+                    .matvec(backend, &hidden_norm)?;
+                if let Some(bias) = layer.attention_query_bias.as_ref() {
+                    add_bias_in_place(&mut q.values, bias.as_slice());
+                }
+                if let Some(norm) = layer.attention_query_norm.as_ref() {
+                    per_head_rms_norm_in_place(
+                        q.values.as_mut_slice(),
+                        layer.attention_geometry.head_count,
+                        layer.attention_geometry.head_dim,
+                        norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                }
+                apply_rope_neox(
+                    &mut q.values,
+                    layer.attention_geometry.head_count,
+                    layer.attention_geometry.head_dim,
+                    layer.attention_geometry.rotary_dim,
+                    position,
+                    layer.attention_geometry.rope_theta,
+                    self.rope_freq_factors_for_layer(layer_index, layer.attention_geometry.head_dim),
+                    &self.family_metadata,
+                );
                 let reuse_layer_index =
                     layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
                         ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
@@ -3176,7 +3301,7 @@ impl MetalGemma4ModelInner {
                     })?;
                 let reused_k = live_keys
                     .get(reuse_layer_index)
-                    .and_then(|value| value.clone())
+                    .and_then(Option::as_deref)
                     .ok_or_else(|| {
                         ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
                             format!(
@@ -3186,7 +3311,7 @@ impl MetalGemma4ModelInner {
                     })?;
                 let reused_v = live_values
                     .get(reuse_layer_index)
-                    .and_then(|value| value.clone())
+                    .and_then(Option::as_deref)
                     .ok_or_else(|| {
                         ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
                             format!(
@@ -3194,25 +3319,14 @@ impl MetalGemma4ModelInner {
                             ),
                         ))
                     })?;
-                (
-                    MetalProjectionStep {
-                        values: reused_k,
-                        kernel_count: 0,
-                        bytes_moved: 0,
-                    },
-                    MetalProjectionStep {
-                        values: reused_v,
-                        kernel_count: 0,
-                        bytes_moved: 0,
-                    },
-                )
+                (q, reused_k, reused_v)
             };
 
             let attention = attend_impl(
                 layer_index,
                 q.values.as_slice(),
-                k.values.as_slice(),
-                v.values.as_slice(),
+                k_values,
+                v_values,
                 cache,
                 layer.attention_geometry.head_count,
                 layer.attention_geometry.kv_head_count,
@@ -3238,18 +3352,18 @@ impl MetalGemma4ModelInner {
                 .map_err(ReferenceTextGenerationError::Runtime)?;
             hidden = attention_out.values;
 
-            let ffn_residual = hidden.clone();
             let ffn_input = rms_norm(
                 hidden.as_slice(),
                 layer.feed_forward_norm.as_slice(),
                 self.family_metadata.rms_norm_epsilon,
             );
-            let mut gate = layer
-                .feed_forward_gate_weight
-                .matvec(backend, &ffn_input)?;
-            let up = layer
-                .feed_forward_up_weight
-                .matvec(backend, &ffn_input)?;
+            let ffn_residual = std::mem::take(&mut hidden);
+            let (mut gate, up) = MetalQuantizedProjectionMatrix::matvec_pair(
+                &layer.feed_forward_gate_weight,
+                &layer.feed_forward_up_weight,
+                backend,
+                &ffn_input,
+            )?;
             feed_forward_activation_in_place(
                 &self.family_metadata,
                 gate.values.as_mut_slice(),
@@ -3321,37 +3435,56 @@ impl MetalGemma4ModelInner {
                 .saturating_add(up.kernel_count)
                 .saturating_add(ffn_out.kernel_count);
             if layer.attention_geometry.has_kv() {
-                bytes_moved = bytes_moved
-                    .saturating_add(k.bytes_moved)
-                    .saturating_add(v.bytes_moved);
-                kernel_count = kernel_count
-                    .saturating_add(k.kernel_count)
-                    .saturating_add(v.kernel_count);
+                bytes_moved = bytes_moved.saturating_add(kv_bytes_moved);
+                kernel_count = kernel_count.saturating_add(kv_kernel_count);
             }
         }
 
-        let (logits, lm_head_hidden) = if produce_logits {
+        let (logits, selected_token, lm_head_hidden) = if produce_logits {
             let final_hidden = rms_norm(
                 hidden.as_slice(),
                 self.output_norm.as_slice(),
                 self.family_metadata.rms_norm_epsilon,
             );
-            let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
-            apply_final_logit_softcapping_in_place(
-                logits.values.as_mut_slice(),
-                self.family_metadata.final_logit_softcapping,
-            );
-            bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
-            kernel_count = kernel_count.saturating_add(logits.kernel_count);
-            (logits.values, Some(final_hidden))
+            match logits_output_mode {
+                MetalLogitsOutputMode::GreedyToken => {
+                    let selection = self
+                        .output
+                        .select_logits_output(backend, final_hidden.as_slice(), logits_output_mode)?;
+                    bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                    kernel_count = kernel_count.saturating_add(1);
+                    let token = selection.selected_tokens.first().copied().ok_or_else(|| {
+                        ReferenceTextGenerationError::MissingOutput("metal gemma4 greedy token")
+                    })?;
+                    (Vec::new(), Some(TokenId(token)), Some(final_hidden))
+                }
+                MetalLogitsOutputMode::RawLogits => {
+                    let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
+                    apply_final_logit_softcapping_in_place(
+                        logits.values.as_mut_slice(),
+                        self.family_metadata.final_logit_softcapping,
+                    );
+                    bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
+                    kernel_count = kernel_count.saturating_add(logits.kernel_count);
+                    (logits.values, None, Some(final_hidden))
+                }
+                MetalLogitsOutputMode::TopKCandidates(_) => {
+                    return Err(ReferenceTextGenerationError::Runtime(
+                        crate::RuntimeError::Backend(String::from(
+                            "metal gemma4 top-k logits output mode is not yet wired into the generic generation loop",
+                        )),
+                    ));
+                }
+            }
         } else {
-            (Vec::new(), None)
+            (Vec::new(), None, None)
         };
 
         Ok(MetalGemma4StageStep {
             key: cache_key,
             value: cache_value,
             logits,
+            selected_token,
             hidden,
             lm_head_hidden,
             kernel_count,
@@ -3695,6 +3828,140 @@ impl MetalQuantizedProjectionMatrix {
         })
     }
 
+    fn matvec_pair(
+        left: &Self,
+        right: &Self,
+        backend: &mut MetalBackend,
+        input: &[f32],
+    ) -> Result<(MetalProjectionStep, MetalProjectionStep), ReferenceTextGenerationError> {
+        let results = backend
+            .quantized_matvec_batch(
+                &[
+                    MetalQuantizedMatvecRequest {
+                        weights: &left.weights,
+                        byte_offset: 0,
+                        mode: left.mode,
+                        rows: left.rows,
+                        columns: left.columns,
+                    },
+                    MetalQuantizedMatvecRequest {
+                        weights: &right.weights,
+                        byte_offset: 0,
+                        mode: right.mode,
+                        rows: right.rows,
+                        columns: right.columns,
+                    },
+                ],
+                input,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let mut results = results.into_iter();
+        let left_values = results.next().ok_or_else(|| {
+            ReferenceTextGenerationError::MissingOutput("metal quantized matvec pair left")
+        })?;
+        let right_values = results.next().ok_or_else(|| {
+            ReferenceTextGenerationError::MissingOutput("metal quantized matvec pair right")
+        })?;
+        Ok((
+            MetalProjectionStep {
+                values: left_values.values,
+                kernel_count: 1,
+                bytes_moved: left.byte_length() as u64,
+            },
+            MetalProjectionStep {
+                values: right_values.values,
+                kernel_count: 1,
+                bytes_moved: right.byte_length() as u64,
+            },
+        ))
+    }
+
+    fn matvec_triplet(
+        first: &Self,
+        second: &Self,
+        third: &Self,
+        backend: &mut MetalBackend,
+        input: &[f32],
+    ) -> Result<
+        (MetalProjectionStep, MetalProjectionStep, MetalProjectionStep),
+        ReferenceTextGenerationError,
+    > {
+        let results = backend
+            .quantized_matvec_batch(
+                &[
+                    MetalQuantizedMatvecRequest {
+                        weights: &first.weights,
+                        byte_offset: 0,
+                        mode: first.mode,
+                        rows: first.rows,
+                        columns: first.columns,
+                    },
+                    MetalQuantizedMatvecRequest {
+                        weights: &second.weights,
+                        byte_offset: 0,
+                        mode: second.mode,
+                        rows: second.rows,
+                        columns: second.columns,
+                    },
+                    MetalQuantizedMatvecRequest {
+                        weights: &third.weights,
+                        byte_offset: 0,
+                        mode: third.mode,
+                        rows: third.rows,
+                        columns: third.columns,
+                    },
+                ],
+                input,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let mut results = results.into_iter();
+        let first_values = results.next().ok_or_else(|| {
+            ReferenceTextGenerationError::MissingOutput("metal quantized matvec triplet first")
+        })?;
+        let second_values = results.next().ok_or_else(|| {
+            ReferenceTextGenerationError::MissingOutput("metal quantized matvec triplet second")
+        })?;
+        let third_values = results.next().ok_or_else(|| {
+            ReferenceTextGenerationError::MissingOutput("metal quantized matvec triplet third")
+        })?;
+        Ok((
+            MetalProjectionStep {
+                values: first_values.values,
+                kernel_count: 1,
+                bytes_moved: first.byte_length() as u64,
+            },
+            MetalProjectionStep {
+                values: second_values.values,
+                kernel_count: 1,
+                bytes_moved: second.byte_length() as u64,
+            },
+            MetalProjectionStep {
+                values: third_values.values,
+                kernel_count: 1,
+                bytes_moved: third.byte_length() as u64,
+            },
+        ))
+    }
+
+    fn select_logits_output(
+        &self,
+        backend: &mut MetalBackend,
+        input: &[f32],
+        output_mode: MetalLogitsOutputMode,
+    ) -> Result<psionic_backend_metal::MetalLogitsSelectionResult, ReferenceTextGenerationError> {
+        backend
+            .quantized_matvec_select_logits_output(
+                &self.weights,
+                0,
+                self.mode,
+                self.rows,
+                self.columns,
+                input,
+                output_mode,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)
+    }
+
     fn rows(&self) -> usize {
         self.rows
     }
@@ -3716,6 +3983,7 @@ struct MetalGemma4StageStep {
     key: Vec<f32>,
     value: Vec<f32>,
     logits: Vec<f32>,
+    selected_token: Option<TokenId>,
     hidden: Vec<f32>,
     lm_head_hidden: Option<Vec<f32>>,
     kernel_count: usize,
@@ -3727,6 +3995,7 @@ struct MetalGemma4ForwardStep {
     key: Vec<f32>,
     value: Vec<f32>,
     logits: Vec<f32>,
+    selected_token: Option<TokenId>,
     final_hidden: Vec<f32>,
     kernel_count: usize,
     bytes_moved: u64,
@@ -4435,6 +4704,7 @@ impl super::CompiledWordGenerationModel for DistributedGemma4GenerationModel {
             None,
             None,
             false,
+            MetalLogitsOutputMode::RawLogits,
         )?;
         let remote_step = backend.remote_suffix_step(
             self.inner.descriptor.model.model_id.as_str(),
@@ -4449,6 +4719,7 @@ impl super::CompiledWordGenerationModel for DistributedGemma4GenerationModel {
             key: prefix_step.key,
             value: prefix_step.value,
             logits: remote_step.logits,
+            selected_token: None,
             hidden: None,
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -5082,6 +5353,7 @@ impl super::CompiledWordGenerationModel for CudaGemma4GenerationModel {
             key: step.key,
             value: step.value,
             logits: step.logits,
+            selected_token: None,
             hidden: Some(step.final_hidden),
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -6607,6 +6879,9 @@ fn model_load_runtime_error(error: ModelLoadError) -> crate::RuntimeError {
 }
 
 fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {
+    #[cfg(target_os = "macos")]
+    let mean_square = macos_sum_squares(input) / input.len() as f32;
+    #[cfg(not(target_os = "macos"))]
     let mean_square = input.iter().map(|value| value * value).sum::<f32>() / input.len() as f32;
     let scale = (mean_square + epsilon).sqrt().recip();
     input
@@ -6617,10 +6892,38 @@ fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Vec<f32> {
 }
 
 fn rms_norm_in_place(values: &mut [f32], weight: &[f32], epsilon: f32) {
-    let mean_square = values.iter().map(|value| value * value).sum::<f32>() / values.len() as f32;
-    let scale = (mean_square + epsilon).sqrt().recip();
-    for (value, weight) in values.iter_mut().zip(weight.iter().copied()) {
-        *value *= scale * weight;
+    #[cfg(target_os = "macos")]
+    {
+        let mean_square = macos_sum_squares(values) / values.len() as f32;
+        let scale = (mean_square + epsilon).sqrt().recip();
+        unsafe {
+            vDSP_vsmul(
+                values.as_ptr(),
+                1,
+                &scale,
+                values.as_mut_ptr(),
+                1,
+                values.len(),
+            );
+            vDSP_vmul(
+                values.as_ptr(),
+                1,
+                weight.as_ptr(),
+                1,
+                values.as_mut_ptr(),
+                1,
+                values.len(),
+            );
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mean_square =
+            values.iter().map(|value| value * value).sum::<f32>() / values.len() as f32;
+        let scale = (mean_square + epsilon).sqrt().recip();
+        for (value, weight) in values.iter_mut().zip(weight.iter().copied()) {
+            *value *= scale * weight;
+        }
     }
 }
 
@@ -6661,17 +6964,31 @@ fn per_head_rms_norm_in_place(
     weight: &[f32],
     epsilon: f32,
 ) {
-    for head_index in 0..head_count {
-        let start = head_index.saturating_mul(head_dim);
-        let end = start.saturating_add(head_dim);
-        if end > values.len() {
-            break;
+    for head in values.chunks_exact_mut(head_dim).take(head_count) {
+        #[cfg(target_os = "macos")]
+        {
+            let mean_square = macos_sum_squares(head) / head_dim as f32;
+            let scale = (mean_square + epsilon).sqrt().recip();
+            unsafe {
+                vDSP_vsmul(head.as_ptr(), 1, &scale, head.as_mut_ptr(), 1, head.len());
+                vDSP_vmul(
+                    head.as_ptr(),
+                    1,
+                    weight.as_ptr(),
+                    1,
+                    head.as_mut_ptr(),
+                    1,
+                    head.len(),
+                );
+            }
         }
-        let head = &mut values[start..end];
-        let mean_square = head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
-        let scale = (mean_square + epsilon).sqrt().recip();
-        for (value, norm) in head.iter_mut().zip(weight.iter().copied()) {
-            *value *= scale * norm;
+        #[cfg(not(target_os = "macos"))]
+        {
+            let mean_square = head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
+            let scale = (mean_square + epsilon).sqrt().recip();
+            for (value, norm) in head.iter_mut().zip(weight.iter().copied()) {
+                *value *= scale * norm;
+            }
         }
     }
 }
@@ -6707,17 +7024,22 @@ fn per_head_rms_norm_unit_in_place(
     head_dim: usize,
     epsilon: f32,
 ) {
-    for head_index in 0..head_count {
-        let start = head_index.saturating_mul(head_dim);
-        let end = start.saturating_add(head_dim);
-        if end > values.len() {
-            break;
+    for head in values.chunks_exact_mut(head_dim).take(head_count) {
+        #[cfg(target_os = "macos")]
+        {
+            let mean_square = macos_sum_squares(head) / head_dim as f32;
+            let scale = (mean_square + epsilon).sqrt().recip();
+            unsafe {
+                vDSP_vsmul(head.as_ptr(), 1, &scale, head.as_mut_ptr(), 1, head.len());
+            }
         }
-        let head = &mut values[start..end];
-        let mean_square = head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
-        let scale = (mean_square + epsilon).sqrt().recip();
-        for value in head {
-            *value *= scale;
+        #[cfg(not(target_os = "macos"))]
+        {
+            let mean_square = head.iter().map(|value| value * value).sum::<f32>() / head_dim as f32;
+            let scale = (mean_square + epsilon).sqrt().recip();
+            for value in head {
+                *value *= scale;
+            }
         }
     }
 }
@@ -6745,10 +7067,28 @@ fn add_vectors_in_place(left: &mut [f32], right: &[f32]) -> Result<(), crate::Ru
             right.len()
         )));
     }
-    for (left, right) in left.iter_mut().zip(right.iter().copied()) {
-        *left += right;
+    #[cfg(target_os = "macos")]
+    {
+        unsafe {
+            vDSP_vadd(
+                left.as_ptr(),
+                1,
+                right.as_ptr(),
+                1,
+                left.as_mut_ptr(),
+                1,
+                left.len(),
+            );
+        }
+        return Ok(());
     }
-    Ok(())
+    #[cfg(not(target_os = "macos"))]
+    {
+        for (left, right) in left.iter_mut().zip(right.iter().copied()) {
+            *left += right;
+        }
+        Ok(())
+    }
 }
 
 fn add_bias_in_place(values: &mut [f32], bias: &[f32]) {
@@ -6780,18 +7120,53 @@ fn multiply_vectors_in_place(left: &mut [f32], right: &[f32]) -> Result<(), crat
             right.len()
         )));
     }
-    for (left, right) in left.iter_mut().zip(right.iter().copied()) {
-        *left *= right;
+    #[cfg(target_os = "macos")]
+    {
+        unsafe {
+            vDSP_vmul(
+                left.as_ptr(),
+                1,
+                right.as_ptr(),
+                1,
+                left.as_mut_ptr(),
+                1,
+                left.len(),
+            );
+        }
+        return Ok(());
     }
-    Ok(())
+    #[cfg(not(target_os = "macos"))]
+    {
+        for (left, right) in left.iter_mut().zip(right.iter().copied()) {
+            *left *= right;
+        }
+        Ok(())
+    }
 }
 
 fn scale_in_place(values: &mut [f32], scale: f32) {
     if (scale - 1.0).abs() <= f32::EPSILON {
         return;
     }
-    for value in values {
-        *value *= scale;
+    #[cfg(target_os = "macos")]
+    {
+        unsafe {
+            vDSP_vsmul(
+                values.as_ptr(),
+                1,
+                &scale,
+                values.as_mut_ptr(),
+                1,
+                values.len(),
+            );
+        }
+        return;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        for value in values {
+            *value *= scale;
+        }
     }
 }
 
@@ -6809,10 +7184,109 @@ fn attention_scale(family_metadata: &GgufDecoderFamilyMetadata, head_dim: usize)
     }
 }
 
+const APPROXIMATE_GELU_TANH_COEFFICIENT: f32 = 0.797_884_6;
+
+#[cfg(target_os = "macos")]
+const MACOS_VFORCE_CHUNK_LEN: usize = 1024;
+
+#[cfg(target_os = "macos")]
+#[link(name = "Accelerate", kind = "framework")]
+unsafe extern "C" {
+    fn vDSP_svesq(input: *const f32, input_stride: isize, output: *mut f32, count: usize);
+    fn vDSP_dotpr(
+        left: *const f32,
+        left_stride: isize,
+        right: *const f32,
+        right_stride: isize,
+        output: *mut f32,
+        count: usize,
+    );
+    fn vDSP_vsmul(
+        input: *const f32,
+        input_stride: isize,
+        scale: *const f32,
+        output: *mut f32,
+        output_stride: isize,
+        count: usize,
+    );
+    fn vDSP_vmul(
+        left: *const f32,
+        left_stride: isize,
+        right: *const f32,
+        right_stride: isize,
+        output: *mut f32,
+        output_stride: isize,
+        count: usize,
+    );
+    fn vDSP_vadd(
+        left: *const f32,
+        left_stride: isize,
+        right: *const f32,
+        right_stride: isize,
+        output: *mut f32,
+        output_stride: isize,
+        count: usize,
+    );
+    fn vvtanhf(output: *mut f32, input: *const f32, count: *const i32);
+}
+
+#[cfg(target_os = "macos")]
+fn macos_sum_squares(values: &[f32]) -> f32 {
+    let mut output = 0.0_f32;
+    // SAFETY: the input and output pointers are valid for the specified element counts.
+    unsafe {
+        vDSP_svesq(values.as_ptr(), 1, &mut output, values.len());
+    }
+    output
+}
+
 fn approximate_gelu(value: f32) -> f32 {
     let cubic = value * value * value;
-    let inner = (std::f32::consts::FRAC_2_PI.sqrt()) * (value + 0.044_715 * cubic);
+    let inner = APPROXIMATE_GELU_TANH_COEFFICIENT * (value + 0.044_715 * cubic);
     0.5 * value * (1.0 + inner.tanh())
+}
+
+#[cfg(target_os = "macos")]
+fn feed_forward_activation_in_place_macos_gemma4(
+    gate: &mut [f32],
+    up: &[f32],
+) -> Result<(), crate::RuntimeError> {
+    if gate.len() != up.len() {
+        return Err(crate::RuntimeError::Backend(format!(
+            "vector width mismatch: left={} right={}",
+            gate.len(),
+            up.len()
+        )));
+    }
+
+    let mut tanh_input = [0.0_f32; MACOS_VFORCE_CHUNK_LEN];
+    let mut tanh_output = [0.0_f32; MACOS_VFORCE_CHUNK_LEN];
+    for (gate_chunk, up_chunk) in gate
+        .chunks_mut(MACOS_VFORCE_CHUNK_LEN)
+        .zip(up.chunks(MACOS_VFORCE_CHUNK_LEN))
+    {
+        let chunk_len = i32::try_from(gate_chunk.len()).map_err(|_| {
+            crate::RuntimeError::Backend(String::from(
+                "gemma4 macos GELU chunk length does not fit vForce count type",
+            ))
+        })?;
+        for (slot, value) in tanh_input.iter_mut().zip(gate_chunk.iter().copied()) {
+            let cubic = value * value * value;
+            *slot = APPROXIMATE_GELU_TANH_COEFFICIENT * (value + 0.044_715 * cubic);
+        }
+        // SAFETY: the buffers are valid for `chunk_len` contiguous `f32` values.
+        unsafe {
+            vvtanhf(tanh_output.as_mut_ptr(), tanh_input.as_ptr(), &chunk_len);
+        }
+        for ((gate, up), tanh_value) in gate_chunk
+            .iter_mut()
+            .zip(up_chunk.iter().copied())
+            .zip(tanh_output.iter().copied())
+        {
+            *gate = 0.5 * *gate * (1.0 + tanh_value) * up;
+        }
+    }
+    Ok(())
 }
 
 fn gelu_glu(gate: &[f32], up: &[f32]) -> Vec<f32> {
@@ -6857,8 +7331,16 @@ fn feed_forward_activation_in_place(
     }
     match family_metadata.family {
         GgufDecoderFamily::Gemma4 => {
-            for (gate, up) in gate.iter_mut().zip(up.iter().copied()) {
-                *gate = approximate_gelu(*gate) * up;
+            #[cfg(target_os = "macos")]
+            {
+                feed_forward_activation_in_place_macos_gemma4(gate, up)
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                for (gate, up) in gate.iter_mut().zip(up.iter().copied()) {
+                    *gate = approximate_gelu(*gate) * up;
+                }
+                Ok(())
             }
         }
         _ => {
@@ -6866,9 +7348,9 @@ fn feed_forward_activation_in_place(
                 let activated = *gate / (1.0 + (-*gate).exp());
                 *gate = activated * up;
             }
+            Ok(())
         }
     }
-    Ok(())
 }
 
 fn apply_final_logit_softcapping_in_place(logits: &mut [f32], softcap: Option<f32>) {
@@ -6881,16 +7363,55 @@ fn apply_final_logit_softcapping_in_place(logits: &mut [f32], softcap: Option<f3
 }
 
 fn dot(left: &[f32], right: &[f32]) -> f32 {
-    left.iter()
-        .zip(right.iter())
-        .map(|(left, right)| left * right)
-        .sum()
+    #[cfg(target_os = "macos")]
+    {
+        unsafe {
+            let mut output = 0.0_f32;
+            vDSP_dotpr(left.as_ptr(), 1, right.as_ptr(), 1, &mut output, left.len());
+            output
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        left.iter()
+            .zip(right.iter())
+            .map(|(left, right)| left * right)
+            .sum()
+    }
 }
 
 fn axpy(destination: &mut [f32], source: &[f32], alpha: f32) {
     for (destination, source) in destination.iter_mut().zip(source.iter().copied()) {
         *destination += source * alpha;
     }
+}
+
+fn accumulate_online_softmax_value(
+    destination: &mut [f32],
+    source: &[f32],
+    logit: f32,
+    max_logit: &mut f32,
+    denom: &mut f32,
+) {
+    if *max_logit == f32::NEG_INFINITY {
+        *max_logit = logit;
+        *denom = 1.0;
+        destination.copy_from_slice(source);
+        return;
+    }
+
+    if logit <= *max_logit {
+        let weight = (logit - *max_logit).exp();
+        *denom += weight;
+        axpy(destination, source, weight);
+        return;
+    }
+
+    let rescale = (*max_logit - logit).exp();
+    scale_in_place(destination, rescale);
+    *denom = *denom * rescale + 1.0;
+    *max_logit = logit;
+    axpy(destination, source, 1.0);
 }
 
 fn attend_impl(
@@ -6908,52 +7429,50 @@ fn attend_impl(
 ) -> Vec<f32> {
     let group_size = head_count / kv_head_count.max(1);
 
-    let cached_entries = cache.entries().to_vec();
     let cached_entries = if let Some(window) = sliding_window {
         let retained = window.saturating_sub(1);
-        cached_entries
-            .into_iter()
-            .rev()
-            .take(retained)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
+        let start = cache.entries().len().saturating_sub(retained);
+        &cache.entries()[start..]
     } else {
-        cached_entries
+        cache.entries()
     };
 
     let mut output = vec![0.0; head_count.saturating_mul(head_dim)];
     for head_index in 0..head_count {
-        let kv_head_index = head_index / group_size.max(1);
+        let kv_head_index = if group_size == 0 {
+            0
+        } else {
+            head_index / group_size
+        }
+        .min(kv_head_count.saturating_sub(1));
         let q = &query[head_index * head_dim..(head_index + 1) * head_dim];
         let local_key = &key[kv_head_index * head_dim..(kv_head_index + 1) * head_dim];
         let local_value = &value[kv_head_index * head_dim..(kv_head_index + 1) * head_dim];
 
-        let mut weights = Vec::with_capacity(cached_entries.len().saturating_add(1));
-        for entry in &cached_entries {
-            let start = layer_offset + kv_head_index * head_dim;
-            let end = start + head_dim;
-            weights.push(dot(q, &entry.key[start..end]) * attention_scale);
-        }
-        weights.push(dot(q, local_key) * attention_scale);
-
-        let max_weight = weights.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        for weight in &mut weights {
-            *weight = (*weight - max_weight).exp();
-        }
-        let denom = weights.iter().copied().sum::<f32>().max(f32::EPSILON);
-        for weight in &mut weights {
-            *weight /= denom;
-        }
-
         let output_slice = &mut output[head_index * head_dim..(head_index + 1) * head_dim];
-        for (entry, weight) in cached_entries.iter().zip(weights.iter().copied()) {
+        let mut max_logit = f32::NEG_INFINITY;
+        let mut denom = 0.0;
+        for entry in cached_entries {
             let start = layer_offset + kv_head_index * head_dim;
             let end = start + head_dim;
-            axpy(output_slice, &entry.value[start..end], weight);
+            let logit = dot(q, &entry.key[start..end]) * attention_scale;
+            accumulate_online_softmax_value(
+                output_slice,
+                &entry.value[start..end],
+                logit,
+                &mut max_logit,
+                &mut denom,
+            );
         }
-        axpy(output_slice, local_value, *weights.last().unwrap_or(&0.0));
+        let local_logit = dot(q, local_key) * attention_scale;
+        accumulate_online_softmax_value(
+            output_slice,
+            local_value,
+            local_logit,
+            &mut max_logit,
+            &mut denom,
+        );
+        scale_in_place(output_slice, 1.0 / denom.max(f32::EPSILON));
     }
     output
 }
@@ -7161,6 +7680,7 @@ fn apply_rope_neox(
     metadata: &GgufDecoderFamilyMetadata,
 ) {
     let rotary_dim = rotary_dim.min(head_dim).max(2);
+    let rotary_half = rotary_dim / 2;
     let freq_scale = metadata
         .rope_scaling_factor
         .filter(|value| *value > 0.0)
@@ -7175,33 +7695,27 @@ fn apply_rope_neox(
         .map(|original| rope_yarn_corr_dims(rotary_dim, original, rope_theta))
         .unwrap_or([0.0, rotary_dim as f32 - 1.0]);
     let theta_scale = rope_theta.powf(-2.0 / rotary_dim as f32);
-    for head_index in 0..head_count {
-        let head_base = head_index.saturating_mul(head_dim);
-        for i0 in (0..rotary_dim).step_by(2) {
-            let pair = i0 / 2;
-            let index0 = head_base + pair;
-            let index1 = head_base + pair + rotary_dim / 2;
-            if index1 >= head_base + head_dim || index1 >= values.len() {
-                continue;
-            }
-            let freq_factor = freq_factors
-                .and_then(|factors| factors.get(pair))
-                .copied()
-                .filter(|value| *value > 0.0)
-                .unwrap_or(1.0);
-            let theta_base = position as f32 * theta_scale.powf(pair as f32);
-            let (cos_theta, sin_theta) = rope_yarn(
-                theta_base / freq_factor,
-                freq_scale,
-                corr_dims,
-                i0,
-                ext_factor,
-                1.0,
-            );
-            let x0 = values[index0];
-            let x1 = values[index1];
-            values[index0] = x0 * cos_theta - x1 * sin_theta;
-            values[index1] = x0 * sin_theta + x1 * cos_theta;
+    for pair in 0..rotary_half {
+        let i0 = pair * 2;
+        let freq_factor = freq_factors
+            .and_then(|factors| factors.get(pair))
+            .copied()
+            .filter(|value| *value > 0.0)
+            .unwrap_or(1.0);
+        let theta_base = position as f32 * theta_scale.powf(pair as f32);
+        let (cos_theta, sin_theta) = rope_yarn(
+            theta_base / freq_factor,
+            freq_scale,
+            corr_dims,
+            i0,
+            ext_factor,
+            1.0,
+        );
+        for head in values.chunks_exact_mut(head_dim).take(head_count) {
+            let x0 = head[pair];
+            let x1 = head[pair + rotary_half];
+            head[pair] = x0 * cos_theta - x1 * sin_theta;
+            head[pair + rotary_half] = x0 * sin_theta + x1 * cos_theta;
         }
     }
 }
@@ -7298,9 +7812,10 @@ mod tests {
     use super::{
         CpuGgufServiceKind, CpuGgufTextGenerationService, DistributedGemma4RemoteStepResponse,
         PromotedGemmaRevisionEntry, PromotedGemmaRevisionState,
+        attend_impl, axpy,
         decode_distributed_gemma4_remote_step_response,
-        encode_distributed_gemma4_remote_step_response, gemma_served_revision_identity,
-        validate_gemma_exported_revision,
+        dot, encode_distributed_gemma4_remote_step_response,
+        gemma_served_revision_identity, validate_gemma_exported_revision,
     };
     use crate::{
         AdapterServingBinding, CompiledWordGenerationModel, GenerationLoadState,
@@ -7357,6 +7872,161 @@ mod tests {
                 tensor_type,
                 bytes,
             }
+        }
+    }
+
+    fn reference_dense_attend_impl(
+        query: &[f32],
+        key: &[f32],
+        value: &[f32],
+        cache: &crate::InMemoryKvCache,
+        head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        layer_offset: usize,
+        sliding_window: Option<usize>,
+        attention_scale: f32,
+    ) -> Vec<f32> {
+        let group_size = head_count / kv_head_count.max(1);
+        let cached_entries = if let Some(window) = sliding_window {
+            let retained = window.saturating_sub(1);
+            let start = cache.entries().len().saturating_sub(retained);
+            &cache.entries()[start..]
+        } else {
+            cache.entries()
+        };
+        let mut output = vec![0.0; head_count.saturating_mul(head_dim)];
+        for head_index in 0..head_count {
+            let kv_head_index = if group_size == 0 {
+                0
+            } else {
+                head_index / group_size
+            }
+            .min(kv_head_count.saturating_sub(1));
+            let q = &query[head_index * head_dim..(head_index + 1) * head_dim];
+            let local_key = &key[kv_head_index * head_dim..(kv_head_index + 1) * head_dim];
+            let local_value = &value[kv_head_index * head_dim..(kv_head_index + 1) * head_dim];
+
+            let mut weights = Vec::with_capacity(cached_entries.len().saturating_add(1));
+            for entry in cached_entries {
+                let start = layer_offset + kv_head_index * head_dim;
+                let end = start + head_dim;
+                weights.push(dot(q, &entry.key[start..end]) * attention_scale);
+            }
+            weights.push(dot(q, local_key) * attention_scale);
+
+            let max_weight = weights.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            for weight in &mut weights {
+                *weight = (*weight - max_weight).exp();
+            }
+            let denom = weights.iter().copied().sum::<f32>().max(f32::EPSILON);
+            for weight in &mut weights {
+                *weight /= denom;
+            }
+
+            let output_slice = &mut output[head_index * head_dim..(head_index + 1) * head_dim];
+            for (entry, weight) in cached_entries.iter().zip(weights.iter().copied()) {
+                let start = layer_offset + kv_head_index * head_dim;
+                let end = start + head_dim;
+                axpy(output_slice, &entry.value[start..end], weight);
+            }
+            axpy(output_slice, local_value, *weights.last().unwrap_or(&0.0));
+        }
+        output
+    }
+
+    #[test]
+    fn dense_attend_impl_matches_reference_for_grouped_kv_heads() {
+        let mut cache = crate::InMemoryKvCache::new(8, 4);
+        cache
+            .append(TokenId(11), vec![0.1, -0.2, 0.3, 0.4], vec![1.0, 2.0, -1.0, 0.5])
+            .expect("first cache append");
+        cache
+            .append(
+                TokenId(12),
+                vec![0.6, 0.2, -0.3, 0.8],
+                vec![0.25, -0.5, 1.25, 0.75],
+            )
+            .expect("second cache append");
+        let query = vec![0.5, -0.25, -0.1, 0.75, 0.3, 0.2, -0.4, 0.6];
+        let key = vec![0.15, 0.45, -0.35, 0.55];
+        let value = vec![0.8, -0.3, 1.1, 0.9];
+
+        let expected = reference_dense_attend_impl(
+            query.as_slice(),
+            key.as_slice(),
+            value.as_slice(),
+            &cache,
+            4,
+            2,
+            2,
+            0,
+            None,
+            0.5,
+        );
+        let actual = attend_impl(
+            0,
+            query.as_slice(),
+            key.as_slice(),
+            value.as_slice(),
+            &cache,
+            4,
+            2,
+            2,
+            0,
+            None,
+            0.5,
+        );
+
+        for (expected, actual) in expected.iter().zip(actual.iter()) {
+            assert!((*expected - *actual).abs() < 1e-6_f32);
+        }
+    }
+
+    #[test]
+    fn dense_attend_impl_matches_reference_with_sliding_window() {
+        let mut cache = crate::InMemoryKvCache::new(8, 2);
+        cache
+            .append(TokenId(21), vec![0.2, -0.1], vec![0.5, 1.5])
+            .expect("append cache entry 1");
+        cache
+            .append(TokenId(22), vec![0.8, 0.4], vec![-0.25, 0.75])
+            .expect("append cache entry 2");
+        cache
+            .append(TokenId(23), vec![-0.3, 0.9], vec![1.25, -0.5])
+            .expect("append cache entry 3");
+        let query = vec![0.25, -0.4, 0.8, 0.1];
+        let key = vec![0.5, -0.25];
+        let value = vec![1.0, 0.75];
+
+        let expected = reference_dense_attend_impl(
+            query.as_slice(),
+            key.as_slice(),
+            value.as_slice(),
+            &cache,
+            2,
+            1,
+            2,
+            0,
+            Some(2),
+            1.0,
+        );
+        let actual = attend_impl(
+            0,
+            query.as_slice(),
+            key.as_slice(),
+            value.as_slice(),
+            &cache,
+            2,
+            1,
+            2,
+            0,
+            Some(2),
+            1.0,
+        );
+
+        for (expected, actual) in expected.iter().zip(actual.iter()) {
+            assert!((*expected - *actual).abs() < 1e-6_f32);
         }
     }
 
