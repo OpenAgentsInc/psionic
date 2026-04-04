@@ -8,7 +8,9 @@
 > old proxy-only distributed proof with one real split-execution proof for
 > `gemma4:e4b`; `#892` then promoted `gemma4:26b` from topology-only sparse
 > publication into admitted sparse distributed execution when the generic
-> server is given a real multi-node sparse schedule.
+> server is given a real multi-node sparse schedule; `#896` then turned the
+> old Metal refusal-only contract into live native Apple-Silicon execution and
+> added one live mixed-device `metal+cuda` split-execution proof.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -75,8 +77,10 @@ Psionic now publishes exactly one bounded dense `Gemma 4` lane:
   `e4b` only, with `input_audio` publication and explicit refusal on the
   current generic OpenAI surface until a real audio processor lands
 - distributed proof surface = one real `pipeline_sharded` `gemma4:e4b`
-  execution path across two CUDA machines, with request headers and receipts
-  that publish the realized clustered topology
+  execution path across two CUDA machines, plus one live mixed-device
+  `pipeline_sharded` path with a Mac Metal prefix stage and a remote CUDA
+  suffix stage, with request headers and receipts that publish the realized
+  clustered topology
 
 This published lane is not the claim "Psionic supports Gemma 4" in the broad
 sense. It is the smaller claim that Psionic can admit one dense `Gemma 4`
@@ -157,7 +161,10 @@ After `#872`, the generic OpenAI-compatible server also publishes one explicit
 - execution engine = `psionic`
 - residency mode = `metal_accelerated`
 - fallback policy = `refuse`
-- current execution posture = explicit request-time refusal
+- current execution posture = live native single-node execution on Apple
+  Silicon for dense `gemma4:e4b`
+- mixed-device posture = one admitted `metal+cuda` split path when the Mac
+  front is given one reachable CUDA suffix peer
 
 What that means:
 
@@ -165,10 +172,10 @@ What that means:
   of leaving Apple Silicon behavior implied or undefined.
 - `/health` and `/v1/models` publish the same backend, execution, and refusal
   truth that the server will actually enforce at request time.
-- `/v1/chat/completions` and `/v1/responses` fail closed with one explicit
-  refusal reason instead of silently falling back to CPU or CUDA.
-- This does not widen the published Gemma claim from one admitted CUDA
-  execution lane into successful native Metal decode.
+- `/v1/chat/completions` and `/v1/responses` now execute honestly on the
+  single-node Metal path instead of silently falling back to CPU or CUDA.
+- the same Mac row can also become one real split-execution front for a remote
+  CUDA suffix worker without pretending the whole request stayed local.
 
 ## Explicit Non-Goals
 
@@ -180,7 +187,6 @@ The first `Gemma 4` claim does not include:
 - `31B Dense`
 - default or single-node `gemma4:26b` sparse execution without an admitted
   distributed schedule
-- successful native Metal execution
 - full parity with `llama.cpp`
 - full parity with `ollama`
 
@@ -279,6 +285,16 @@ conformance work:
   sentence rather than prompt replay. The bounded proof prompt
   `Reply with exactly one short grammatical English sentence.` returned
   `The cat slept soundly on the warm rug.` on `2026-04-03`.
+- the same real `gemma4:e4b` artifact now also answers that same bounded
+  `/v1/chat/completions` prompt on the native Metal path on macOS, returning
+  `The cat slept soundly on the warm rug.` on `2026-04-03`.
+- the same bounded prompt now also completes as one live mixed-device
+  split-execution request on `2026-04-03`, with a Mac Metal prefix stage and
+  a Tailnet RTX 4080 CUDA suffix stage returning
+  `The cat slept soundly on the warm rug.` together with
+  `psionic_cluster_execution.disposition = sharded`,
+  `execution_topology.kind = pipeline_sharded`, and
+  `execution_topology.effective_backend = metal+cuda`.
 - the same bounded `gemma4:e4b` lane now also accepts typed promoted adapter
   revisions from the Gemma trainer without restart, revalidates checkpoint and
   adapter truth before activation, surfaces the active served revision in
@@ -415,6 +431,9 @@ Those runs are the current publication bar. They prove:
   artifact is supplied explicitly
 - one real split-execution Gemma proof across two CUDA workers, with
   machine-checkable receipt and header publication for the clustered topology
+- one live single-node native Metal proof on the real `e4b` GGUF
+- one live mixed-device split-execution proof on the real `e4b` GGUF, with a
+  Mac Metal front and a remote RTX 4080 CUDA suffix worker
 - bootstrap-routed mesh publication that keeps remote `Gemma 4` route truth
   explicit instead of widening the thin-client claim into split execution
 - family-agnostic publication of clustered execution mode and topology on

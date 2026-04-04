@@ -5081,6 +5081,8 @@ mod platform {
     struct DensePipelines {
         add: ComputePipelineState,
         matmul: ComputePipelineState,
+        quantized_matvec_q4_k: ComputePipelineState,
+        quantized_matvec_q6_k: ComputePipelineState,
         quantized_matvec_q8_0: ComputePipelineState,
         quantized_matvec_mxfp4: ComputePipelineState,
         grouped_quantized_matvec_q8_0: ComputePipelineState,
@@ -5662,6 +5664,8 @@ mod platform {
             let row_stride = quantized_row_stride(mode, columns)?;
             let pipelines = self.pipelines()?;
             let pipeline = match mode {
+                QuantizationMode::GgmlQ4K => &pipelines.quantized_matvec_q4_k,
+                QuantizationMode::GgmlQ6K => &pipelines.quantized_matvec_q6_k,
                 QuantizationMode::GgmlQ8_0 => &pipelines.quantized_matvec_q8_0,
                 QuantizationMode::GgmlMxfp4 => &pipelines.quantized_matvec_mxfp4,
                 _ => {
@@ -5932,6 +5936,16 @@ mod platform {
                     execution: QuantizationExecution::Native,
                 },
                 QuantizationSupport {
+                    mode: QuantizationMode::GgmlQ4K,
+                    load_path: QuantizationLoadPath::BackendQuantized,
+                    execution: QuantizationExecution::DequantizeToF32,
+                },
+                QuantizationSupport {
+                    mode: QuantizationMode::GgmlQ6K,
+                    load_path: QuantizationLoadPath::BackendQuantized,
+                    execution: QuantizationExecution::DequantizeToF32,
+                },
+                QuantizationSupport {
                     mode: QuantizationMode::GgmlQ8_0,
                     load_path: QuantizationLoadPath::BackendQuantized,
                     execution: QuantizationExecution::DequantizeToF32,
@@ -6029,6 +6043,20 @@ mod platform {
                     "missing Metal q8_0 quantized matvec kernel: {error}"
                 ))
             })?;
+        let quantized_matvec_q4_k = library
+            .get_function("psionic_quantized_matvec_q4_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q4_k quantized matvec kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_q6_k = library
+            .get_function("psionic_quantized_matvec_q6_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q6_k quantized matvec kernel: {error}"
+                ))
+            })?;
         let quantized_matvec_mxfp4 = library
             .get_function("psionic_quantized_matvec_mxfp4", None)
             .map_err(|error| {
@@ -6073,6 +6101,20 @@ mod platform {
                 .new_compute_pipeline_state_with_function(&matmul)
                 .map_err(|error| {
                     RuntimeError::Backend(format!("metal matmul pipeline build failed: {error}"))
+                })?,
+            quantized_matvec_q4_k: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_q4_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q4_k quantized matvec pipeline build failed: {error}"
+                    ))
+                })?,
+            quantized_matvec_q6_k: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_q6_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q6_k quantized matvec pipeline build failed: {error}"
+                    ))
                 })?,
             quantized_matvec_q8_0: device
                 .new_compute_pipeline_state_with_function(&quantized_matvec_q8_0)
@@ -6238,6 +6280,169 @@ inline float psionic_mxfp4_block_dot(
         sum += input[pair_index + 16] * float(PSIONIC_MXFP4_VALUES[(packed >> 4) & 0x0f]) * scale;
     }
     return sum;
+}
+
+inline uchar2 psionic_q4_k_scale_min(
+    uint index,
+    const device uchar* packed
+) {
+    if (index < 4) {
+        return uchar2(packed[index] & 63, packed[index + 4] & 63);
+    }
+    return uchar2(
+        (packed[index + 4] & 0x0f) | ((packed[index - 4] >> 6) << 4),
+        (packed[index + 4] >> 4) | ((packed[index] >> 6) << 4)
+    );
+}
+
+inline float psionic_q4_k_block_dot(
+    const device uchar* block,
+    const device float* input
+) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    ushort min_bits = ushort(block[2]) | (ushort(block[3]) << 8);
+    float minimum = float(as_type<half>(min_bits));
+    const device uchar* scales = block + 4;
+    const device uchar* quants = block + 16;
+    float sum = 0.0f;
+    uint input_offset = 0;
+    uint scale_index = 0;
+
+    for (uint chunk = 0; chunk < 4; chunk++) {
+        const device uchar* quant_chunk = quants + (chunk * 32);
+
+        uchar2 low = psionic_q4_k_scale_min(scale_index, scales);
+        float low_scale = scale * float(low.x);
+        float low_min = minimum * float(low.y);
+        float low_input_sum = 0.0f;
+        float low_quant_sum = 0.0f;
+        for (uint index = 0; index < 32; index++) {
+            float input_value = input[input_offset + index];
+            low_input_sum += input_value;
+            low_quant_sum += input_value * float(quant_chunk[index] & 0x0f);
+        }
+        sum += (low_quant_sum * low_scale) - (low_input_sum * low_min);
+        input_offset += 32;
+        scale_index += 1;
+
+        uchar2 high = psionic_q4_k_scale_min(scale_index, scales);
+        float high_scale = scale * float(high.x);
+        float high_min = minimum * float(high.y);
+        float high_input_sum = 0.0f;
+        float high_quant_sum = 0.0f;
+        for (uint index = 0; index < 32; index++) {
+            float input_value = input[input_offset + index];
+            high_input_sum += input_value;
+            high_quant_sum += input_value * float((quant_chunk[index] >> 4) & 0x0f);
+        }
+        sum += (high_quant_sum * high_scale) - (high_input_sum * high_min);
+        input_offset += 32;
+        scale_index += 1;
+    }
+
+    return sum;
+}
+
+inline float psionic_q6_k_block_dot(
+    const device uchar* block,
+    const device float* input
+) {
+    const device uchar* ql = block;
+    const device uchar* qh = block + 128;
+    const device uchar* scales = block + 192;
+    ushort scale_bits = ushort(block[208]) | (ushort(block[209]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    float sum = 0.0f;
+
+    for (uint chunk = 0; chunk < 2; chunk++) {
+        const device uchar* ql_chunk = ql + (chunk * 64);
+        const device uchar* qh_chunk = qh + (chunk * 32);
+        const device uchar* scales_chunk = scales + (chunk * 8);
+        const device float* input_chunk = input + (chunk * 128);
+
+        for (uint l = 0; l < 32; l++) {
+            uint is = l / 16;
+            int q1 = int(ql_chunk[l] & 0x0f) | (int((qh_chunk[l] >> 0) & 0x03) << 4);
+            int q2 = int(ql_chunk[l + 32] & 0x0f) | (int((qh_chunk[l] >> 2) & 0x03) << 4);
+            int q3 = int(ql_chunk[l] >> 4) | (int((qh_chunk[l] >> 4) & 0x03) << 4);
+            int q4 = int(ql_chunk[l + 32] >> 4) | (int((qh_chunk[l] >> 6) & 0x03) << 4);
+            q1 -= 32;
+            q2 -= 32;
+            q3 -= 32;
+            q4 -= 32;
+
+            float scale_1 = scale * float(as_type<char>(scales_chunk[is]));
+            float scale_2 = scale * float(as_type<char>(scales_chunk[is + 2]));
+            float scale_3 = scale * float(as_type<char>(scales_chunk[is + 4]));
+            float scale_4 = scale * float(as_type<char>(scales_chunk[is + 6]));
+
+            sum += input_chunk[l] * (scale_1 * float(q1));
+            sum += input_chunk[l + 32] * (scale_2 * float(q2));
+            sum += input_chunk[l + 64] * (scale_3 * float(q3));
+            sum += input_chunk[l + 96] * (scale_4 * float(q4));
+        }
+    }
+
+    return sum;
+}
+
+kernel void psionic_quantized_matvec_q4_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows) {
+        return;
+    }
+    if (tid != 0) {
+        return;
+    }
+
+    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    float sum = 0.0f;
+    uint block_count = columns / 256;
+    for (uint block_index = 0; block_index < block_count; block_index++) {
+        const device uchar* block = row_weights + (block_index * 144);
+        sum += psionic_q4_k_block_dot(block, input + block_index * 256);
+    }
+    output[row] = sum;
+}
+
+kernel void psionic_quantized_matvec_q6_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows) {
+        return;
+    }
+    if (tid != 0) {
+        return;
+    }
+
+    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    float sum = 0.0f;
+    uint block_count = columns / 256;
+    for (uint block_index = 0; block_index < block_count; block_index++) {
+        const device uchar* block = row_weights + (block_index * 210);
+        sum += psionic_q6_k_block_dot(block, input + block_index * 256);
+    }
+    output[row] = sum;
 }
 
 kernel void psionic_quantized_matvec_q8_0(
@@ -6963,8 +7168,50 @@ mod tests {
         bytes
     }
 
+    fn sample_q4_k_row(scale: f32, minimum: f32, offset: u8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(144);
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes.extend_from_slice(&f32_to_f16_bits(minimum).to_le_bytes());
+        for index in 0..12_u8 {
+            bytes.push(offset.wrapping_add(index.wrapping_mul(7)));
+        }
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (15_u8).wrapping_sub(index & 0x0f) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        bytes
+    }
+
+    fn sample_q6_k_row(scale: f32, offset: i8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(210);
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (index.wrapping_mul(3)) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        for index in 0..64_u8 {
+            let b0 = index & 0x03;
+            let b1 = (index.wrapping_add(1)) & 0x03;
+            let b2 = (index.wrapping_add(2)) & 0x03;
+            let b3 = (index.wrapping_add(3)) & 0x03;
+            bytes.push(b0 | (b1 << 2) | (b2 << 4) | (b3 << 6));
+        }
+        for index in 0..16_i8 {
+            bytes.push(offset.saturating_add(index).to_le_bytes()[0]);
+        }
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes
+    }
+
     fn sample_reference_vector() -> Vec<f32> {
         (0..32).map(|index| (index as f32 + 1.0) * 0.25).collect()
+    }
+
+    fn sample_reference_vector_256() -> Vec<f32> {
+        (0..256)
+            .map(|index| (index as f32 + 1.0) * 0.03125)
+            .collect()
     }
 
     fn expected_grouped_expert_outputs(
@@ -7596,6 +7843,16 @@ mod tests {
                     execution: QuantizationExecution::Native,
                 },
                 QuantizationSupport {
+                    mode: QuantizationMode::GgmlQ4K,
+                    load_path: QuantizationLoadPath::BackendQuantized,
+                    execution: QuantizationExecution::DequantizeToF32,
+                },
+                QuantizationSupport {
+                    mode: QuantizationMode::GgmlQ6K,
+                    load_path: QuantizationLoadPath::BackendQuantized,
+                    execution: QuantizationExecution::DequantizeToF32,
+                },
+                QuantizationSupport {
                     mode: QuantizationMode::GgmlQ8_0,
                     load_path: QuantizationLoadPath::BackendQuantized,
                     execution: QuantizationExecution::DequantizeToF32,
@@ -8179,6 +8436,64 @@ mod tests {
             &[2.0, 4.0, 6.0, 8.0, 2.0, 4.0, 6.0, 8.0],
             1.0e-5,
         );
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_executes_q4_k_quantized_matvec_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let row_a = sample_q4_k_row(0.5, 0.125, 3);
+        let row_b = sample_q4_k_row(0.75, 0.25, 9);
+        let reference = sample_reference_vector_256();
+        let expected_a =
+            psionic_backend_cpu::quantized_row_dot(&reference, QuantizationMode::GgmlQ4K, &row_a)?;
+        let expected_b =
+            psionic_backend_cpu::quantized_row_dot(&reference, QuantizationMode::GgmlQ4K, &row_b)?;
+
+        let weights = backend.quantized_buffer(
+            Shape::new(vec![2, 256]),
+            QuantizationMode::GgmlQ4K,
+            [row_a, row_b].concat(),
+        )?;
+        let values =
+            backend.quantized_matvec(&weights, QuantizationMode::GgmlQ4K, 2, 256, &reference)?;
+        assert_close(values.as_slice(), &[expected_a, expected_b], 1.0e-4);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_executes_q6_k_quantized_matvec_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let row_a = sample_q6_k_row(0.375, -3);
+        let row_b = sample_q6_k_row(0.625, 4);
+        let reference = sample_reference_vector_256();
+        let expected_a =
+            psionic_backend_cpu::quantized_row_dot(&reference, QuantizationMode::GgmlQ6K, &row_a)?;
+        let expected_b =
+            psionic_backend_cpu::quantized_row_dot(&reference, QuantizationMode::GgmlQ6K, &row_b)?;
+
+        let weights = backend.quantized_buffer(
+            Shape::new(vec![2, 256]),
+            QuantizationMode::GgmlQ6K,
+            [row_a, row_b].concat(),
+        )?;
+        let values =
+            backend.quantized_matvec(&weights, QuantizationMode::GgmlQ6K, 2, 256, &reference)?;
+        assert_close(values.as_slice(), &[expected_a, expected_b], 1.0e-4);
         Ok(())
     }
 

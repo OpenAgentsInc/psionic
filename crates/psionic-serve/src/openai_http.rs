@@ -78,14 +78,17 @@ use crate::{
     ContinuousBatchGenerationResult, CpuGgufTextGenerationService, CpuModelEmbeddingsService,
     CudaGemma4TextGenerationService, CudaGgufGptOssTextGenerationService,
     CudaGgufQwen35TextGenerationService, CudaGptOssTextGenerationError, DecodeStrategy,
-    DecoderModelDescriptor, EmbeddingMetrics, EmbeddingNormalization, EmbeddingProvenance,
-    EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor, GenerationMetrics, GenerationOptions,
-    GenerationRequest, GgufDecoderAdapterLoader, GptOssPerformanceMetrics,
+    DecoderModelDescriptor, DistributedGemma4PeerConfig, DistributedGemma4RemoteResetRequest,
+    DistributedGemma4RemoteStepRequest, DistributedGemma4RemoteStepResponse,
+    DistributedGemma4TextGenerationService, EmbeddingMetrics, EmbeddingNormalization,
+    EmbeddingProvenance, EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor,
+    GenerationMetrics, GenerationOptions, GenerationRequest, GgufDecoderAdapterLoader,
+    GptOssPerformanceMetrics, MetalGemma4TextGenerationService,
     MetalGgufGptOssTextGenerationService, MetalGptOssTextGenerationError, ModelEmbeddingsError,
     PromptRenderError, ReferenceTextGenerationError, TEXT_GENERATION_PRODUCT_ID, TerminationReason,
     TextGenerationExecutor, TokenSequence, continuous_batch_text_generation_execution_profile,
     default_embeddings_execution_profile, default_generation_scheduler_policy,
-    default_text_generation_execution_profile,
+    default_text_generation_execution_profile, encode_distributed_gemma4_remote_step_response,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
@@ -1105,6 +1108,69 @@ impl BootstrapProxyMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DistributedGemma4Role {
+    Front,
+    Worker,
+}
+
+fn distributed_gemma4_role_from_env() -> Result<Option<DistributedGemma4Role>, String> {
+    let Some(raw_role) = env::var_os("PSIONIC_GEMMA4_DISTRIBUTED_ROLE") else {
+        return Ok(None);
+    };
+    let raw_role = raw_role.to_string_lossy();
+    match raw_role.as_ref() {
+        "front" => Ok(Some(DistributedGemma4Role::Front)),
+        "worker" => Ok(Some(DistributedGemma4Role::Worker)),
+        value => Err(format!(
+            "unsupported `PSIONIC_GEMMA4_DISTRIBUTED_ROLE` `{value}`; expected `front` or `worker`"
+        )),
+    }
+}
+
+fn distributed_gemma4_front_peer_from_env() -> Result<Option<DistributedGemma4PeerConfig>, String> {
+    if !matches!(
+        distributed_gemma4_role_from_env()?,
+        Some(DistributedGemma4Role::Front)
+    ) {
+        return Ok(None);
+    }
+    let peer_base_url = env::var("PSIONIC_GEMMA4_DISTRIBUTED_PEER_BASE_URL").map_err(|_| {
+        String::from(
+            "`PSIONIC_GEMMA4_DISTRIBUTED_PEER_BASE_URL` is required when `PSIONIC_GEMMA4_DISTRIBUTED_ROLE=front`",
+        )
+    })?;
+    let split_layer = env::var("PSIONIC_GEMMA4_DISTRIBUTED_SPLIT_LAYER")
+        .ok()
+        .map(|value| {
+            value.parse::<usize>().map_err(|error| {
+                format!(
+                    "failed to parse `PSIONIC_GEMMA4_DISTRIBUTED_SPLIT_LAYER` `{value}` as usize: {error}"
+                )
+            })
+        })
+        .transpose()?
+        .unwrap_or(21);
+    Ok(Some(DistributedGemma4PeerConfig {
+        peer_base_url: peer_base_url.trim_end_matches('/').to_string(),
+        split_layer,
+        shared_key: distributed_gemma4_shared_key_from_env(),
+    }))
+}
+
+fn distributed_gemma4_shared_key_from_env() -> Option<String> {
+    env::var("PSIONIC_GEMMA4_DISTRIBUTED_SHARED_KEY")
+        .ok()
+        .filter(|value| !value.is_empty())
+}
+
+fn distributed_gemma4_worker_enabled() -> Result<bool, String> {
+    Ok(matches!(
+        distributed_gemma4_role_from_env()?,
+        Some(DistributedGemma4Role::Worker)
+    ))
+}
+
 #[derive(Clone)]
 struct BootstrapProxyState {
     base_url: String,
@@ -1883,7 +1949,8 @@ enum OpenAiCompatRuntimeKind {
     GgufDecoderCudaGemma4SparseDistributed,
     GgufDecoderCudaQwen35,
     GgufDecoderPendingTopologyRefusal,
-    GgufDecoderMetalGemma4Refusal,
+    GgufDecoderMetalGemma4,
+    GgufDecoderMetalGemma4DistributedFront,
     SafetensorsEmbeddings,
 }
 
@@ -1892,6 +1959,7 @@ struct OpenAiCompatModelLoadPlan {
     path: PathBuf,
     runtime_kind: OpenAiCompatRuntimeKind,
     sparse_cluster_schedule: Option<SparseExpertClusterSchedule>,
+    distributed_peer: Option<DistributedGemma4PeerConfig>,
 }
 
 #[derive(Clone)]
@@ -2955,6 +3023,8 @@ fn qwen35_structured_output_unavailable_detail(execution_engine_label: &str) -> 
 enum OpenAiCompatGenerationService {
     Cpu(CpuGgufTextGenerationService),
     Gemma4Cuda(CudaGemma4TextGenerationService),
+    Gemma4Metal(MetalGemma4TextGenerationService),
+    Gemma4DistributedFront(DistributedGemma4TextGenerationService),
     Gemma4SparseDistributed(CudaGemma4SparseDistributedTextGenerationService),
     Qwen35Cuda(CudaGgufQwen35TextGenerationService),
 }
@@ -3017,6 +3087,18 @@ enum OpenAiCompatWorkerCommand {
         model_key: String,
         request: EmbeddingRequest,
         reply: oneshot::Sender<Result<EmbeddingResponse, ModelEmbeddingsError>>,
+    },
+    Gemma4PipelineStep {
+        model_key: String,
+        request: DistributedGemma4RemoteStepRequest,
+        reply: oneshot::Sender<
+            Result<DistributedGemma4RemoteStepResponse, ReferenceTextGenerationError>,
+        >,
+    },
+    Gemma4PipelineReset {
+        model_key: String,
+        request: DistributedGemma4RemoteResetRequest,
+        reply: oneshot::Sender<Result<(), ReferenceTextGenerationError>>,
     },
 }
 
@@ -3462,6 +3544,14 @@ impl OpenAiCompatServer {
                 "/psionic/management/console",
                 get(generic_management_console),
             )
+            .route(
+                "/psionic/internal/gemma4/pipeline/step",
+                post(generic_internal_gemma4_pipeline_step),
+            )
+            .route(
+                "/psionic/internal/gemma4/pipeline/reset",
+                post(generic_internal_gemma4_pipeline_reset),
+            )
             .route("/v1/models", get(generic_list_models))
             .route("/v1/chat/completions", post(generic_chat_completions))
             .route("/v1/responses", post(generic_responses))
@@ -3519,6 +3609,51 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
+                        OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4 => {
+                            match MetalGemma4TextGenerationService::from_gguf_path(
+                                &load_plan.path,
+                            ) {
+                                Ok(service) => {
+                                    let model_key =
+                                        service.model_descriptor().model.model_id.clone();
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Gemma4Metal(service),
+                                    );
+                                }
+                                Err(error) => {
+                                    let _ = ready_tx.send(Err::<(), String>(error.to_string()));
+                                    return;
+                                }
+                            }
+                        }
+                        OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4DistributedFront => {
+                            let Some(peer) = load_plan.distributed_peer.clone() else {
+                                let _ = ready_tx.send(Err::<(), String>(String::from(
+                                    "distributed gemma4 metal front runtime requires peer configuration",
+                                )));
+                                return;
+                            };
+                            match DistributedGemma4TextGenerationService::from_gguf_path(
+                                &load_plan.path,
+                                peer,
+                            ) {
+                                Ok(service) => {
+                                    let model_key =
+                                        service.model_descriptor().model.model_id.clone();
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Gemma4DistributedFront(
+                                            service,
+                                        ),
+                                    );
+                                }
+                                Err(error) => {
+                                    let _ = ready_tx.send(Err::<(), String>(error.to_string()));
+                                    return;
+                                }
+                            }
+                        }
                         OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4SparseDistributed => {
                             let Some(schedule) = load_plan.sparse_cluster_schedule.clone() else {
                                 let _ = ready_tx.send(Err::<(), String>(String::from(
@@ -3564,8 +3699,7 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
-                        OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
-                        | OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal => {}
+                        OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal => {}
                         OpenAiCompatRuntimeKind::SafetensorsEmbeddings => {
                             match CpuModelEmbeddingsService::from_safetensors_artifact(
                                 &load_plan.path,
@@ -3592,7 +3726,63 @@ impl OpenAiCompatWorker {
                     else {
                         break;
                     };
-                    pending_commands.push_back(command);
+                    match command {
+                        OpenAiCompatWorkerCommand::Gemma4PipelineStep {
+                            model_key,
+                            request,
+                            reply,
+                        } => {
+                            let result = match generation_services.get_mut(model_key.as_str()) {
+                                Some(OpenAiCompatGenerationService::Gemma4Cuda(service)) => {
+                                    service.distributed_worker_step(&request)
+                                }
+                                Some(OpenAiCompatGenerationService::Gemma4SparseDistributed(
+                                    service,
+                                )) => service.inner.distributed_worker_step(&request),
+                                Some(_) => Err(ReferenceTextGenerationError::Runtime(
+                                    psionic_runtime::RuntimeError::Backend(format!(
+                                        "model `{model_key}` does not support distributed gemma4 suffix execution",
+                                    )),
+                                )),
+                                None => Err(ReferenceTextGenerationError::UnsupportedModel(
+                                    model_key.clone(),
+                                )),
+                            };
+                            let _ = reply.send(result);
+                            continue;
+                        }
+                        OpenAiCompatWorkerCommand::Gemma4PipelineReset {
+                            model_key,
+                            request,
+                            reply,
+                        } => {
+                            let result = match generation_services.get_mut(model_key.as_str()) {
+                                Some(OpenAiCompatGenerationService::Gemma4Cuda(service)) => {
+                                    service.distributed_worker_reset(request.request_id.as_str());
+                                    Ok(())
+                                }
+                                Some(OpenAiCompatGenerationService::Gemma4SparseDistributed(
+                                    service,
+                                )) => {
+                                    service
+                                        .inner
+                                        .distributed_worker_reset(request.request_id.as_str());
+                                    Ok(())
+                                }
+                                Some(_) => Err(ReferenceTextGenerationError::Runtime(
+                                    psionic_runtime::RuntimeError::Backend(format!(
+                                        "model `{model_key}` does not support distributed gemma4 suffix reset",
+                                    )),
+                                )),
+                                None => Err(ReferenceTextGenerationError::UnsupportedModel(
+                                    model_key.clone(),
+                                )),
+                            };
+                            let _ = reply.send(result);
+                            continue;
+                        }
+                        command => pending_commands.push_back(command),
+                    }
                     while let Ok(command) = receiver.try_recv() {
                         pending_commands.push_back(command);
                     }
@@ -3600,6 +3790,12 @@ impl OpenAiCompatWorker {
                     let Some(model_key) = pending_commands.front().map(|command| match command {
                         OpenAiCompatWorkerCommand::Generate { model_key, .. } => model_key.clone(),
                         OpenAiCompatWorkerCommand::Embed { model_key, .. } => model_key.clone(),
+                        OpenAiCompatWorkerCommand::Gemma4PipelineStep { model_key, .. } => {
+                            model_key.clone()
+                        }
+                        OpenAiCompatWorkerCommand::Gemma4PipelineReset { model_key, .. } => {
+                            model_key.clone()
+                        }
                     }) else {
                         continue;
                     };
@@ -3670,6 +3866,12 @@ impl OpenAiCompatWorker {
                         OpenAiCompatGenerationService::Gemma4Cuda(service) => {
                             service.generate_continuous_batch(requests)
                         }
+                        OpenAiCompatGenerationService::Gemma4Metal(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
+                        OpenAiCompatGenerationService::Gemma4DistributedFront(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
                         OpenAiCompatGenerationService::Gemma4SparseDistributed(service) => {
                             service.generate_continuous_batch(requests)
                         }
@@ -3737,6 +3939,54 @@ impl OpenAiCompatWorker {
             ModelEmbeddingsError::Runtime(psionic_runtime::RuntimeError::Backend(String::from(
                 "generic OpenAI worker dropped the response channel",
             )))
+        })?
+    }
+
+    async fn gemma4_pipeline_step(
+        &self,
+        model_key: String,
+        request: DistributedGemma4RemoteStepRequest,
+    ) -> Result<DistributedGemma4RemoteStepResponse, ReferenceTextGenerationError> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        self.sender
+            .send(OpenAiCompatWorkerCommand::Gemma4PipelineStep {
+                model_key,
+                request,
+                reply: reply_tx,
+            })
+            .map_err(|_| {
+                ReferenceTextGenerationError::Runtime(psionic_runtime::RuntimeError::Backend(
+                    String::from("generic OpenAI worker is no longer available"),
+                ))
+            })?;
+        reply_rx.await.map_err(|_| {
+            ReferenceTextGenerationError::Runtime(psionic_runtime::RuntimeError::Backend(
+                String::from("generic OpenAI worker dropped the pipeline step response channel"),
+            ))
+        })?
+    }
+
+    async fn gemma4_pipeline_reset(
+        &self,
+        model_key: String,
+        request: DistributedGemma4RemoteResetRequest,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        self.sender
+            .send(OpenAiCompatWorkerCommand::Gemma4PipelineReset {
+                model_key,
+                request,
+                reply: reply_tx,
+            })
+            .map_err(|_| {
+                ReferenceTextGenerationError::Runtime(psionic_runtime::RuntimeError::Backend(
+                    String::from("generic OpenAI worker is no longer available"),
+                ))
+            })?;
+        reply_rx.await.map_err(|_| {
+            ReferenceTextGenerationError::Runtime(psionic_runtime::RuntimeError::Backend(
+                String::from("generic OpenAI worker dropped the pipeline reset response channel"),
+            ))
         })?
     }
 }
@@ -7438,6 +7688,100 @@ async fn generic_chat_completions(
     }
 }
 
+fn require_distributed_gemma4_internal_access(
+    headers: &HeaderMap,
+) -> Result<(), OpenAiCompatHttpError> {
+    if !distributed_gemma4_worker_enabled().map_err(OpenAiCompatHttpError::BadRequest)? {
+        return Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "distributed gemma4 worker mode is not enabled on this server",
+        )));
+    }
+    let Some(expected_key) = distributed_gemma4_shared_key_from_env() else {
+        return Ok(());
+    };
+    let provided = headers
+        .get("x-psionic-distributed-key")
+        .and_then(|value| value.to_str().ok());
+    if provided == Some(expected_key.as_str()) {
+        Ok(())
+    } else {
+        Err(OpenAiCompatHttpError::BadRequest(String::from(
+            "missing or invalid distributed gemma4 shared key",
+        )))
+    }
+}
+
+fn local_worker_for_internal_route(
+    state: &OpenAiCompatState,
+) -> Result<&OpenAiCompatWorker, OpenAiCompatHttpError> {
+    state
+        .workers
+        .get(OPENAI_COMPAT_WORKER_ID)
+        .ok_or_else(|| OpenAiCompatHttpError::Internal(String::from("local worker is unavailable")))
+}
+
+async fn generic_internal_gemma4_pipeline_step(
+    State(state): State<Arc<OpenAiCompatState>>,
+    headers: HeaderMap,
+    Json(request): Json<DistributedGemma4RemoteStepRequest>,
+) -> Response {
+    match handle_generic_internal_gemma4_pipeline_step(state, &headers, request).await {
+        Ok(response) => response,
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn handle_generic_internal_gemma4_pipeline_step(
+    state: Arc<OpenAiCompatState>,
+    headers: &HeaderMap,
+    request: DistributedGemma4RemoteStepRequest,
+) -> Result<Response, OpenAiCompatHttpError> {
+    require_distributed_gemma4_internal_access(headers)?;
+    let response = local_worker_for_internal_route(state.as_ref())?
+        .gemma4_pipeline_step(request.model_id.clone(), request)
+        .await
+        .map_err(|error| {
+            OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+        })?;
+    let body = encode_distributed_gemma4_remote_step_response(&response).map_err(|error| {
+        OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+    })?;
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(
+            axum::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/octet-stream"),
+        )
+        .body(axum::body::Body::from(body))
+        .map_err(|error| OpenAiCompatHttpError::BadRequest(error.to_string()))
+}
+
+async fn generic_internal_gemma4_pipeline_reset(
+    State(state): State<Arc<OpenAiCompatState>>,
+    headers: HeaderMap,
+    Json(request): Json<DistributedGemma4RemoteResetRequest>,
+) -> Response {
+    match handle_generic_internal_gemma4_pipeline_reset(state, &headers, request).await {
+        Ok(response) => response,
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn handle_generic_internal_gemma4_pipeline_reset(
+    state: Arc<OpenAiCompatState>,
+    headers: &HeaderMap,
+    request: DistributedGemma4RemoteResetRequest,
+) -> Result<Response, OpenAiCompatHttpError> {
+    require_distributed_gemma4_internal_access(headers)?;
+    local_worker_for_internal_route(state.as_ref())?
+        .gemma4_pipeline_reset(request.model_id.clone(), request)
+        .await
+        .map_err(|error| {
+            OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+        })?;
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
 async fn handle_generic_chat_completions(
     state: Arc<OpenAiCompatState>,
     request: ChatCompletionRequest,
@@ -9598,6 +9942,7 @@ fn load_generic_decoder_model(
     let descriptor = inspection.descriptor().clone();
     let family = inspection.family_metadata().family;
     let sparse_expert_topology = routed_sparse_expert_topology_from_inspection(&inspection);
+    let distributed_front = distributed_gemma4_front_peer_from_env()?;
     let pending_topology_refusal = matches!(
         inspection.admission().kind,
         GgufDecoderServingAdmissionKind::PendingExpertTopology
@@ -9627,7 +9972,11 @@ fn load_generic_decoder_model(
             ));
         }
         (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4, _) => {
-            OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal
+            if distributed_front.is_some() {
+                OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4DistributedFront
+            } else {
+                OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4
+            }
         }
         (OpenAiCompatBackend::Metal, _, _) => {
             return Err(format!(
@@ -9649,6 +9998,7 @@ fn load_generic_decoder_model(
         backend,
         &execution_profile,
         sparse_expert_topology.as_ref(),
+        distributed_front.is_some(),
     );
     let loaded_model = OpenAiCompatLoadedModel {
         model_key: descriptor.model.model_id.clone(),
@@ -9665,7 +10015,7 @@ fn load_generic_decoder_model(
                 canonical_name.as_str(),
             ),
             execution_refusal_reason: match backend {
-                OpenAiCompatBackend::Metal => generic_metal_execution_refusal_reason(family),
+                OpenAiCompatBackend::Metal => None,
                 OpenAiCompatBackend::Cpu | OpenAiCompatBackend::Cuda => pending_topology_refusal,
             },
             cluster_execution_modes,
@@ -9691,6 +10041,7 @@ fn load_generic_decoder_model(
             path: model_path.to_path_buf(),
             runtime_kind,
             sparse_cluster_schedule: None,
+            distributed_peer: distributed_front,
         },
     ))
 }
@@ -9725,6 +10076,7 @@ fn load_generic_embeddings_model(
             path: model_path.to_path_buf(),
             runtime_kind: OpenAiCompatRuntimeKind::SafetensorsEmbeddings,
             sparse_cluster_schedule: None,
+            distributed_peer: None,
         },
     ))
 }
@@ -9780,11 +10132,41 @@ fn generic_decoder_cluster_execution_truth(
     backend: OpenAiCompatBackend,
     execution_profile: &ExecutionCapabilityProfile,
     sparse_expert_topology: Option<&RoutedSparseExpertTopology>,
+    distributed_front: bool,
 ) -> (
     Vec<RoutedClusterExecutionMode>,
     Vec<ExecutionTopologyKind>,
     Option<ClusterExecutionCapabilityProfile>,
 ) {
+    if sparse_expert_topology.is_none()
+        && distributed_front
+        && matches!(
+            (backend, family),
+            (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
+        )
+    {
+        let capability_profile = ClusterExecutionCapabilityProfile::new("metal+cuda")
+            .with_supported_lanes(vec![ClusterExecutionLane::PipelineSharded])
+            .with_serving_semantics_capability(
+                ClusterServingSemantics::new(
+                    ClusterExecutionLane::PipelineSharded,
+                    execution_profile.clone(),
+                    ClusterWarmRoutePosture::TopologyPinned,
+                )
+                .with_detail(
+                    "dense split requests stay on one fixed Mac-prefix plus CUDA-suffix topology",
+                ),
+            )
+            .with_detail(
+                "gemma4 dense distributed execution is published as one pipeline-sharded mixed-device path",
+            );
+        return (
+            vec![RoutedClusterExecutionMode::DenseSplit],
+            vec![ExecutionTopologyKind::PipelineSharded],
+            Some(capability_profile),
+        );
+    }
+
     if !matches!(
         (backend, family),
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
@@ -10739,11 +11121,10 @@ mod tests {
         generic_list_models, generic_management_coordination_feed,
         generic_management_coordination_post, generic_management_coordination_redact,
         generic_management_coordination_search, generic_management_coordination_status,
-        generic_management_status, generic_metal_execution_refusal_reason,
-        gpt_oss_local_serving_truth, handle_generic_chat_completions, handle_generic_embeddings,
-        handle_generic_responses, insert_local_serving_truth_headers, load_generic_decoder_model,
-        local_loaded_model_for_route, model_endpoint_paths, prompt_request_cache_key,
-        refused_local_backend_error, render_prompt_for_model,
+        generic_management_status, gpt_oss_local_serving_truth, handle_generic_chat_completions,
+        handle_generic_embeddings, handle_generic_responses, insert_local_serving_truth_headers,
+        load_generic_decoder_model, local_loaded_model_for_route, model_endpoint_paths,
+        prompt_request_cache_key, refused_local_backend_error, render_prompt_for_model,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
         resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
@@ -10899,6 +11280,7 @@ mod tests {
                 OpenAiCompatBackend::Cuda,
                 &dense_profile,
                 None,
+                false,
             );
         assert_eq!(dense_modes, vec![RoutedClusterExecutionMode::DenseSplit]);
         assert_eq!(
@@ -10938,6 +11320,7 @@ mod tests {
                 OpenAiCompatBackend::Cuda,
                 &sparse_profile,
                 Some(&sparse_topology),
+                false,
             );
         assert_eq!(sparse_modes, vec![RoutedClusterExecutionMode::SparseExpert]);
         assert_eq!(
@@ -10959,6 +11342,39 @@ mod tests {
                     ))
                     .with_detail(
                         "gemma4 sparse distributed execution is published as one tensor-sharded sparse expert path",
+                    )
+            )
+        );
+    }
+
+    #[test]
+    fn generic_decoder_cluster_execution_truth_surfaces_mixed_device_front_path() {
+        let profile = ExecutionCapabilityProfile::single_request_latency_optimized();
+        let (modes, topologies, capability_profile) =
+            super::generic_decoder_cluster_execution_truth(
+                GgufDecoderFamily::Gemma4,
+                OpenAiCompatBackend::Metal,
+                &profile,
+                None,
+                true,
+            );
+        assert_eq!(modes, vec![RoutedClusterExecutionMode::DenseSplit]);
+        assert_eq!(topologies, vec![ExecutionTopologyKind::PipelineSharded]);
+        assert_eq!(
+            capability_profile,
+            Some(
+                ClusterExecutionCapabilityProfile::new("metal+cuda")
+                    .with_supported_lanes(vec![ClusterExecutionLane::PipelineSharded])
+                    .with_serving_semantics_capability(ClusterServingSemantics::new(
+                        ClusterExecutionLane::PipelineSharded,
+                        profile.clone(),
+                        ClusterWarmRoutePosture::TopologyPinned,
+                    )
+                    .with_detail(
+                        "dense split requests stay on one fixed Mac-prefix plus CUDA-suffix topology",
+                    ))
+                    .with_detail(
+                        "gemma4 dense distributed execution is published as one pipeline-sharded mixed-device path",
                     )
             )
         );
@@ -13123,32 +13539,27 @@ mod tests {
     }
 
     #[test]
-    fn generic_metal_gemma4_load_plan_publishes_refusal_contract()
+    fn generic_metal_gemma4_load_plan_publishes_native_execution_contract()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let gemma_path = temp.path().join("tiny-gemma4-metal.gguf");
         write_test_gguf(
             &gemma_path,
-            dense_gemma4_metadata("tiny pilot gemma4 metal").as_slice(),
-            dense_decoder_tensors(false, 3, 4).as_slice(),
+            dense_gemma4_metal_metadata_with_chat_template("tiny pilot gemma4 metal").as_slice(),
+            dense_gemma4_metal_decoder_tensors_with_vocab(7, 5).as_slice(),
         )?;
 
-        let refusal_reason = generic_metal_execution_refusal_reason(GgufDecoderFamily::Gemma4)
-            .expect("gemma4 metal refusal reason should be published");
         let (loaded_model, accepted_names, load_plan) =
             load_generic_decoder_model(&gemma_path, 0, OpenAiCompatBackend::Metal)?;
 
         assert_eq!(
             load_plan.runtime_kind,
-            OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4Refusal
+            OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4
         );
         assert_eq!(loaded_model.backend_label(), "metal");
         assert_eq!(loaded_model.execution_mode_label(), "native");
         assert_eq!(loaded_model.execution_engine_label(), "psionic");
-        assert_eq!(
-            loaded_model.execution_refusal_reason(),
-            Some(refusal_reason.as_str())
-        );
+        assert_eq!(loaded_model.execution_refusal_reason(), None);
         assert_eq!(
             model_endpoint_paths(&loaded_model),
             vec!["/v1/chat/completions", "/v1/responses"]
@@ -13880,20 +14291,20 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_gemma4_metal_lane_publishes_refusal_contract_and_fails_closed()
+    fn generic_server_gemma4_metal_publication_and_generation_are_honest_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
         let temp = tempfile::tempdir()?;
         let gemma_path = temp.path().join("tiny-gemma4-metal-server.gguf");
         write_test_gguf(
             &gemma_path,
-            dense_gemma4_metadata("tiny gemma4 metal refusal").as_slice(),
-            dense_decoder_tensors(false, 3, 4).as_slice(),
+            dense_gemma4_metal_metadata_with_chat_template("tiny gemma4 metal").as_slice(),
+            dense_gemma4_metal_decoder_tensors_with_vocab(7, 5).as_slice(),
         )?;
-
-        let refusal_reason = generic_metal_execution_refusal_reason(GgufDecoderFamily::Gemma4)
-            .expect("gemma4 metal refusal reason should be published");
-        let expected_error_message =
-            refused_local_backend_error("metal", refusal_reason.as_str()).to_string();
 
         let mut config = OpenAiCompatConfig::new(&gemma_path);
         config.backend = OpenAiCompatBackend::Metal;
@@ -13915,10 +14326,7 @@ mod tests {
             BatchExecutionPosture::SingleRequestOnly
         );
         assert!(health.0.scheduler_policy.is_none());
-        assert_eq!(
-            health.0.execution_refusal_reason,
-            Some(refusal_reason.clone())
-        );
+        assert_eq!(health.0.execution_refusal_reason, None);
 
         let model_id = health.0.default_model.clone();
         let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
@@ -13936,70 +14344,51 @@ mod tests {
         assert_eq!(model.psionic_residency_mode, Some("metal_accelerated"));
         assert_eq!(model.psionic_fallback_policy, Some("refuse"));
         assert!(model.psionic_scheduler_policy.is_none());
+        assert_eq!(model.psionic_execution_refusal_reason, None);
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(model.id.clone()),
+                messages: vec![
+                    ChatCompletionMessage::text("system", "Be terse."),
+                    ChatCompletionMessage::text("user", "hello"),
+                ],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
         assert_eq!(
-            model.psionic_execution_refusal_reason,
-            Some(refusal_reason.clone())
+            header_value(response.headers(), "x-psionic-served-backend"),
+            Some(String::from("metal"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-mode"),
+            Some(String::from("native"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-engine"),
+            Some(String::from("psionic"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-batch-posture"),
+            Some(String::from("single_request_only"))
         );
 
-        let chat_error = runtime
-            .block_on(handle_generic_chat_completions(
-                std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(model.id.clone()),
-                    messages: vec![ChatCompletionMessage::text("user", "hello")],
-                    temperature: Some(0.0),
-                    max_tokens: Some(1),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    response_format: None,
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("gemma4 metal lane should fail closed for chat completions");
-        let chat_response = chat_error.into_response();
-        assert_eq!(chat_response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        let chat_payload = runtime.block_on(response_json(chat_response))?;
-        assert_eq!(
-            chat_payload["error"]["message"],
-            serde_json::json!(expected_error_message)
-        );
-
-        let responses_error = runtime
-            .block_on(handle_generic_responses(
-                std::sync::Arc::clone(&server.state),
-                ResponsesRequest {
-                    model: Some(model.id.clone()),
-                    instructions: None,
-                    conversation: None,
-                    input: ResponsesInput::Text(String::from("hello")),
-                    temperature: Some(0.0),
-                    max_output_tokens: Some(1),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    previous_response_id: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_response_state: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("gemma4 metal lane should fail closed for responses");
-        let responses_response = responses_error.into_response();
-        assert_eq!(responses_response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        let responses_payload = runtime.block_on(response_json(responses_response))?;
-        assert_eq!(
-            responses_payload["error"]["message"],
-            serde_json::json!(expected_error_message)
-        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert_eq!(payload["model"], serde_json::json!(model.id));
+        assert!(payload["choices"][0]["message"]["content"].is_string());
+        assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
         Ok(())
     }
 
@@ -19947,6 +20336,18 @@ mod tests {
         metadata
     }
 
+    fn dense_gemma4_metal_metadata_with_chat_template(
+        name: &str,
+    ) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = dense_gemma4_metadata_with_chat_template(name);
+        set_family_u32(&mut metadata, "gemma4", "context_length", 128);
+        set_family_u32(&mut metadata, "gemma4", "embedding_length", 32);
+        set_family_u32(&mut metadata, "gemma4", "feed_forward_length", 64);
+        set_family_u32(&mut metadata, "gemma4", "attention.head_count", 2);
+        set_family_u32(&mut metadata, "gemma4", "attention.head_count_kv", 1);
+        metadata
+    }
+
     fn sparse_gemma4_26b_metadata_with_chat_template(
         name: &str,
     ) -> Vec<(String, GgufMetadataValue)> {
@@ -20545,15 +20946,26 @@ mod tests {
         metadata
     }
 
+    fn set_family_u32(
+        metadata: &mut [(String, GgufMetadataValue)],
+        architecture: &str,
+        suffix: &str,
+        value: u32,
+    ) {
+        let key = format!("{architecture}.{suffix}");
+        if let Some((_, metadata_value)) =
+            metadata.iter_mut().find(|(candidate, _)| candidate == &key)
+        {
+            *metadata_value = GgufMetadataValue::U32(value);
+        }
+    }
+
     fn set_context_length(
         metadata: &mut [(String, GgufMetadataValue)],
         architecture: &str,
         context_length: u32,
     ) {
-        let key = format!("{architecture}.context_length");
-        if let Some((_, value)) = metadata.iter_mut().find(|(candidate, _)| candidate == &key) {
-            *value = GgufMetadataValue::U32(context_length);
-        }
+        set_family_u32(metadata, architecture, "context_length", context_length);
     }
 
     fn dense_family_header(architecture: &str, name: &str) -> Vec<(String, GgufMetadataValue)> {
@@ -20803,6 +21215,58 @@ mod tests {
         ]
     }
 
+    fn dense_gemma4_metal_decoder_tensors_with_vocab(
+        vocab_size: usize,
+        hello_token_index: usize,
+    ) -> Vec<TestGgufTensor> {
+        dense_gemma4_metal_decoder_tensors_with_vocab_and_output(vocab_size, hello_token_index, 0)
+    }
+
+    fn dense_gemma4_metal_decoder_tensors_with_vocab_and_output(
+        vocab_size: usize,
+        hello_token_index: usize,
+        _output_token_index: usize,
+    ) -> Vec<TestGgufTensor> {
+        let hidden_size = 32;
+        let feed_forward_size = 64;
+        vec![
+            dense_tensor(
+                "token_embd.weight",
+                vec![vocab_size, hidden_size],
+                token_embedding_values_with_hidden(vocab_size, hidden_size, hello_token_index),
+            ),
+            dense_tensor(
+                "output_norm.weight",
+                vec![hidden_size],
+                vec![1.0; hidden_size],
+            ),
+            quantized_q8_0_tensor("output.weight", vec![vocab_size, hidden_size]),
+            dense_tensor(
+                "blk.0.attn_norm.weight",
+                vec![hidden_size],
+                vec![1.0; hidden_size],
+            ),
+            quantized_q8_0_tensor("blk.0.attn_q.weight", vec![hidden_size, hidden_size]),
+            quantized_q8_0_tensor("blk.0.attn_k.weight", vec![16, hidden_size]),
+            quantized_q8_0_tensor("blk.0.attn_v.weight", vec![16, hidden_size]),
+            quantized_q8_0_tensor("blk.0.attn_output.weight", vec![hidden_size, hidden_size]),
+            quantized_q8_0_tensor(
+                "blk.0.ffn_gate.weight",
+                vec![feed_forward_size, hidden_size],
+            ),
+            quantized_q8_0_tensor(
+                "blk.0.ffn_down.weight",
+                vec![hidden_size, feed_forward_size],
+            ),
+            quantized_q8_0_tensor("blk.0.ffn_up.weight", vec![feed_forward_size, hidden_size]),
+            dense_tensor(
+                "blk.0.ffn_norm.weight",
+                vec![hidden_size],
+                vec![1.0; hidden_size],
+            ),
+        ]
+    }
+
     fn dense_decoder_tensors_with_vocab(
         include_qkv_bias: bool,
         vocab_size: usize,
@@ -20957,14 +21421,30 @@ mod tests {
     }
 
     fn token_embedding_values(vocab_size: usize, hello_token_index: usize) -> Vec<f32> {
-        let mut values = vec![0.0; vocab_size * 4];
-        values[hello_token_index.saturating_mul(4)] = 2.0;
+        token_embedding_values_with_hidden(vocab_size, 4, hello_token_index)
+    }
+
+    fn token_embedding_values_with_hidden(
+        vocab_size: usize,
+        hidden_size: usize,
+        hello_token_index: usize,
+    ) -> Vec<f32> {
+        let mut values = vec![0.0; vocab_size * hidden_size];
+        values[hello_token_index.saturating_mul(hidden_size)] = 2.0;
         values
     }
 
     fn output_values(vocab_size: usize, output_token_index: usize) -> Vec<f32> {
-        let mut values = vec![0.0; vocab_size * 4];
-        values[output_token_index.saturating_mul(4)] = 1.0;
+        output_values_with_hidden(vocab_size, 4, output_token_index)
+    }
+
+    fn output_values_with_hidden(
+        vocab_size: usize,
+        hidden_size: usize,
+        output_token_index: usize,
+    ) -> Vec<f32> {
+        let mut values = vec![0.0; vocab_size * hidden_size];
+        values[output_token_index.saturating_mul(hidden_size)] = 1.0;
         values
     }
 
