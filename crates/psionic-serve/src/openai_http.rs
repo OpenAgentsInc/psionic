@@ -15,6 +15,7 @@ use std::{
 };
 
 use axum::{
+    body::Bytes,
     Json, Router,
     extract::{Query, State},
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
@@ -89,6 +90,7 @@ use crate::{
     TextGenerationExecutor, TokenSequence, continuous_batch_text_generation_execution_profile,
     default_embeddings_execution_profile, default_generation_scheduler_policy,
     default_text_generation_execution_profile, encode_distributed_gemma4_remote_step_response,
+    decode_distributed_gemma4_remote_step_request,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
@@ -7735,9 +7737,9 @@ fn local_worker_for_internal_route(
 async fn generic_internal_gemma4_pipeline_step(
     State(state): State<Arc<OpenAiCompatState>>,
     headers: HeaderMap,
-    Json(request): Json<DistributedGemma4RemoteStepRequest>,
+    body: Bytes,
 ) -> Response {
-    match handle_generic_internal_gemma4_pipeline_step(state, &headers, request).await {
+    match handle_generic_internal_gemma4_pipeline_step(state, &headers, body).await {
         Ok(response) => response,
         Err(error) => error.into_response(),
     }
@@ -7746,9 +7748,12 @@ async fn generic_internal_gemma4_pipeline_step(
 async fn handle_generic_internal_gemma4_pipeline_step(
     state: Arc<OpenAiCompatState>,
     headers: &HeaderMap,
-    request: DistributedGemma4RemoteStepRequest,
+    body: Bytes,
 ) -> Result<Response, OpenAiCompatHttpError> {
     require_distributed_gemma4_internal_access(headers)?;
+    let request = decode_distributed_gemma4_remote_step_request(body.as_ref()).map_err(|error| {
+        OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+    })?;
     let response = local_worker_for_internal_route(state.as_ref())?
         .gemma4_pipeline_step(request.model_id.clone(), request)
         .await

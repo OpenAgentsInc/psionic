@@ -16,10 +16,11 @@ use psionic_adapters::{
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot};
 use psionic_backend_cuda::{CudaBackend, CudaBuffer};
 use psionic_backend_metal::{
-    MetalBackend, MetalBuffer, MetalLogitsOutputMode, MetalQuantizedMatvecRequest,
+    MetalBackend, MetalBuffer, MetalKvCacheMirror, MetalLogitsOutputMode,
+    MetalQuantizedMatvecRequest,
 };
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
-use psionic_core::QuantizationMode;
+use psionic_core::{QuantizationMode, Shape};
 use psionic_models::{
     DecoderModelDescriptor, GgufBlobArtifact, GgufDecoderAdapterLoader, GgufDecoderFamily,
     GgufDecoderFamilyMetadata, GgufDecoderLayerTensorLayout, GgufMetadataValue,
@@ -35,6 +36,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    CompiledWordGenerationModel,
     ContinuousBatchGenerationResult, CpuGgufGptOssTextGenerationService, GenerationEventStream,
     GenerationInput, GenerationModelHandle, GenerationRequest, GenerationResponse,
     GenerationStepOutput, GenerationStreamChunk, GenerationStreamEvent, GenerationStreamStatus,
@@ -1628,7 +1630,6 @@ impl super::CompiledWordGenerationModel for CpuDenseGgufGenerationModel {
             key: step.key,
             value: step.value,
             logits: step.logits,
-            selected_token: None,
             hidden: Some(step.final_hidden),
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -2633,11 +2634,10 @@ impl TextGenerationExecutor for MetalGemma4TextGenerationService {
     type Error = ReferenceTextGenerationError;
 
     fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
-        super::run_generation_request(
+        run_metal_gemma4_generation_request(
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
-            &mut self.shared_prefixes,
             request,
         )
     }
@@ -2678,6 +2678,409 @@ impl ManagedTextGenerationRuntime for MetalGemma4TextGenerationService {
     ) -> Result<LoadedModelView, ReferenceTextGenerationError> {
         Self::unload_model(self, model_id)
     }
+}
+
+#[derive(Debug)]
+struct MetalGemma4StepPlan {
+    q_buffer: MetalBuffer,
+    k_buffer: MetalBuffer,
+    v_buffer: MetalBuffer,
+    cos_buffer: MetalBuffer,
+    sin_buffer: MetalBuffer,
+    query_buffer: MetalBuffer,
+    key_buffer: MetalBuffer,
+    value_buffer: MetalBuffer,
+    attention_values: Vec<f32>,
+}
+
+fn build_gemma4_metal_layer_caches_from_host_cache(
+    backend: &mut MetalBackend,
+    model: &MetalGemma4ModelInner,
+    cache: &crate::InMemoryKvCache,
+    reserve_tokens: usize,
+    kv_cache_encoding_policy: &psionic_runtime::KvCacheEncodingPolicy,
+) -> Result<Vec<Option<MetalKvCacheMirror>>, ReferenceTextGenerationError> {
+    if cache.width() != model.cache_width() {
+        return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+            expected_kv_width: model.cache_width(),
+            kv_width: cache.width(),
+        });
+    }
+
+    model
+        .layers
+        .iter()
+        .map(|layer| {
+            let Some(cache_offset) = layer.attention_geometry.cache_write_offset else {
+                return Ok(None);
+            };
+            let layer_kv_width = layer.attention_geometry.kv_width();
+            let mut keys = Vec::with_capacity(cache.len().saturating_mul(layer_kv_width));
+            let mut values = Vec::with_capacity(cache.len().saturating_mul(layer_kv_width));
+            for entry in cache.entries() {
+                keys.extend_from_slice(&entry.key[cache_offset..cache_offset + layer_kv_width]);
+                values.extend_from_slice(&entry.value[cache_offset..cache_offset + layer_kv_width]);
+            }
+            backend
+                .kv_cache_mirror_from_host_rows(
+                    layer_kv_width,
+                    cache.max_context(),
+                    cache.len(),
+                    keys.as_slice(),
+                    values.as_slice(),
+                    reserve_tokens,
+                    kv_cache_encoding_policy.clone(),
+                )
+                .map(Some)
+                .map_err(ReferenceTextGenerationError::Runtime)
+        })
+        .collect()
+}
+
+fn gemma4_metal_layer_cache_state(
+    layer_caches: &[Option<MetalKvCacheMirror>],
+) -> psionic_runtime::KvCacheState {
+    layer_caches
+        .iter()
+        .flatten()
+        .next()
+        .map(MetalKvCacheMirror::state)
+        .unwrap_or_default()
+}
+
+fn run_metal_gemma4_generation_request(
+    backend: &mut MetalBackend,
+    models: &mut InMemoryGenerationModelRegistry<MetalGemma4GenerationModel>,
+    sessions: &mut InMemoryGenerationSessionStore,
+    request: &GenerationRequest,
+) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+    if !super::generation_product_supported(request) {
+        return Err(ReferenceTextGenerationError::UnsupportedProduct(
+            request.product_id.clone(),
+        ));
+    }
+
+    let loaded_model = models
+        .active(request.model.model.model_id.as_str())
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::UnsupportedModel(request.model.model.model_id.clone())
+        })?
+        .clone();
+    if loaded_model.descriptor() != &request.model {
+        return Err(ReferenceTextGenerationError::UnsupportedModel(
+            request.model.model.model_id.clone(),
+        ));
+    }
+
+    let model_id = request.model.model.model_id.as_str();
+    let load_state = models
+        .load_state(model_id)
+        .unwrap_or(super::GenerationLoadState::Warm);
+    let request_start = super::current_time_millis();
+    let generation_start = Instant::now();
+    models.begin_request(model_id, request_start)?;
+    let memory_plan = models.memory_plan(model_id).cloned();
+    let residency_policy = Some(models.residency_policy().clone());
+    let residency_snapshot = Some(models.memory_snapshot());
+    let served_artifact = super::served_artifact_identity_for_decoder_backend(
+        loaded_model.descriptor(),
+        loaded_model.backend_compatibility(),
+        &[],
+    );
+    let effective_served_artifact_digest =
+        super::effective_generation_served_artifact_digest(&served_artifact, None);
+
+    let result = (|| -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        let prompt_eval_start = Instant::now();
+        let tokenizer = loaded_model.tokenizer();
+        let prompt_tokens = loaded_model.encode_prompt_input(&request.prompt)?;
+        if prompt_tokens.is_empty() {
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+
+        let expected_kv_width = loaded_model.cache_width();
+        let mut session_tokens = Vec::new();
+        let previous_kv_state = if let Some(session_id) = &request.session_id {
+            if request.reset_session {
+                sessions.reset(session_id)?;
+            }
+            let state = sessions.state(session_id)?;
+            super::validate_session_model(
+                state,
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+            )?;
+            session_tokens = state.tokens().to_vec();
+            state.cache().state()
+        } else {
+            psionic_runtime::KvCacheState::default()
+        };
+        let preserve_prefix_tokens = usize::from(
+            prompt_tokens.as_slice().first().copied() == Some(tokenizer.vocabulary().bos_id()),
+        );
+        let (prompt_tokens, context_window) = super::apply_context_window(
+            &prompt_tokens,
+            loaded_model.descriptor().config.max_context,
+            previous_kv_state.tokens,
+            request.options.max_output_tokens,
+            request.options.context_overflow_policy,
+            preserve_prefix_tokens,
+        )?;
+        let mut cache = if let Some(session_id) = &request.session_id {
+            sessions.state(session_id)?.cache().clone()
+        } else {
+            crate::InMemoryKvCache::new(
+                loaded_model.descriptor().config.max_context,
+                expected_kv_width,
+            )
+        };
+        if cache.width() != expected_kv_width {
+            return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+                expected_kv_width,
+                kv_width: cache.width(),
+            });
+        }
+        cache.bind_owner(super::request_kv_owner(
+            request,
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        let request_kv_checkpoint = cache.checkpoint();
+        let kv_cache_encoding_policy = super::default_generation_kv_cache_encoding_policy(
+            &loaded_model,
+            loaded_model.backend_compatibility(),
+        );
+        let mut layer_caches = build_gemma4_metal_layer_caches_from_host_cache(
+            backend,
+            &loaded_model.inner,
+            &cache,
+            request.options.max_output_tokens.saturating_add(1),
+            &kv_cache_encoding_policy,
+        )?;
+        let mut step_plan = loaded_model.inner.build_decode_step_plan(backend)?;
+        let mut prompt_logits = Vec::new();
+        let mut last_logits = Vec::new();
+        let mut kernel_count = 0usize;
+        let mut bytes_moved = 0u64;
+        let mut token_history = cache
+            .entries()
+            .iter()
+            .map(|entry| entry.token.as_u32())
+            .collect::<Vec<_>>();
+
+        for token in prompt_tokens.as_slice() {
+            let step = loaded_model.inner.forward_step_with_layer_caches(
+                backend,
+                *token,
+                cache.len(),
+                &cache,
+                layer_caches.as_mut_slice(),
+                &mut step_plan,
+                0,
+                loaded_model.inner.layers.len(),
+                None,
+                None,
+                None,
+                true,
+                MetalLogitsOutputMode::RawLogits,
+            )?;
+            kernel_count = kernel_count.saturating_add(step.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+            cache.append(*token, step.key, step.value)?;
+            token_history.push(token.as_u32());
+            last_logits = step.logits;
+            prompt_logits.push(last_logits.clone());
+        }
+
+        let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
+        let mut sampler = super::GenerationSampler::new(&request.options)?;
+        let structured_output_report = sampler.structured_output_report();
+        let mut generated_tokens = Vec::new();
+        let mut first_token_emitted_at = None;
+        let mut last_token_emitted_at = None;
+        let termination = loop {
+            if generated_tokens.len() >= request.options.max_output_tokens {
+                break super::TerminationReason::MaxOutputTokens;
+            }
+            if cache.len() >= cache.max_context() {
+                break super::TerminationReason::ContextLimit;
+            }
+
+            let next_token = match sampler.select_next_token(
+                loaded_model.tokenizer(),
+                &last_logits,
+                &cache,
+                generated_tokens.as_slice(),
+            )? {
+                super::GenerationSelection::Token(token) => token,
+                super::GenerationSelection::Terminate => {
+                    break super::TerminationReason::EndOfSequence;
+                }
+            };
+            if loaded_model.is_end_of_sequence(next_token) {
+                break super::TerminationReason::EndOfSequence;
+            }
+
+            generated_tokens.push(next_token);
+            let step = loaded_model.inner.forward_step_with_layer_caches(
+                backend,
+                next_token,
+                cache.len(),
+                &cache,
+                layer_caches.as_mut_slice(),
+                &mut step_plan,
+                0,
+                loaded_model.inner.layers.len(),
+                None,
+                None,
+                None,
+                true,
+                MetalLogitsOutputMode::RawLogits,
+            )?;
+            kernel_count = kernel_count.saturating_add(step.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
+            cache.append(next_token, step.key, step.value)?;
+            token_history.push(next_token.as_u32());
+            last_logits = step.logits;
+            let emitted_at = Instant::now();
+            if first_token_emitted_at.is_none() {
+                first_token_emitted_at = Some(emitted_at);
+            }
+            last_token_emitted_at = Some(emitted_at);
+
+            if super::truncate_generated_text(
+                loaded_model.tokenizer(),
+                &mut generated_tokens,
+                &request.options.stop_sequences,
+            )
+            .is_some()
+            {
+                break super::TerminationReason::EndOfSequence;
+            }
+        };
+
+        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
+        let generated = TokenSequence::new(generated_tokens);
+        if let Some(session_id) = &request.session_id {
+            session_tokens.extend_from_slice(prompt_tokens.as_slice());
+            session_tokens.extend_from_slice(generated.as_slice());
+            sessions.replace_cache(
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+                cache.clone(),
+                TokenSequence::new(session_tokens),
+            )?;
+        }
+        let text = loaded_model.tokenizer().decode(generated.as_slice());
+        let usage = super::GenerationUsage {
+            input_tokens: prompt_tokens.len(),
+            output_tokens: generated.len(),
+            cache_tokens: cache.len(),
+        };
+        let kv_cache = psionic_runtime::KvCacheAccounting::from_states(&previous_kv_state, cache.state());
+        let total_duration_ns = super::elapsed_ns(generation_start);
+        let time_to_first_token_ns = first_token_emitted_at
+            .map(|first_token_at| first_token_at.duration_since(generation_start))
+            .and_then(|duration| duration.as_nanos().try_into().ok());
+        let inter_token_latency_ns = super::average_inter_token_latency_ns(
+            first_token_emitted_at,
+            last_token_emitted_at,
+            usage.output_tokens,
+        );
+        let prefill_decode_handoff = super::local_prefill_decode_handoff(&prefill_handoff_state);
+        let kv_residency = super::host_only_kv_residency(cache.policy(), cache.state());
+        let metrics = crate::GenerationMetrics {
+            total_duration_ns: Some(total_duration_ns),
+            load_duration_ns: Some(match load_state {
+                super::GenerationLoadState::Cold => loaded_model.load_duration_ns(),
+                super::GenerationLoadState::Warm => 0,
+            }),
+            prompt_eval_count: Some(usage.input_tokens),
+            prompt_eval_duration_ns: Some(prompt_eval_duration_ns),
+            context_window: Some(context_window),
+            eval_count: Some(usage.output_tokens),
+            eval_duration_ns: Some(total_duration_ns.saturating_sub(prompt_eval_duration_ns)),
+            time_to_first_token_ns,
+            inter_token_latency_ns,
+            kv_cache: Some(kv_cache),
+            kv_residency: kv_residency.clone(),
+            kv_cache_encoding: Some(psionic_runtime::KvCacheEncodingAccounting::active(
+                kv_cache_encoding_policy.clone(),
+            )),
+            prefix_tokens_reused: Some(0),
+            termination_detail: None,
+            qwen35_cuda_decode: None,
+            gpt_oss_perf: None,
+        };
+        let delivery_plan_digest = loaded_model.plan_digest().to_string();
+        let provenance = crate::GenerationProvenance {
+            served_artifact,
+            adapter_serving: request.adapter_serving.clone(),
+            served_revision: None,
+            execution_plan_digest: delivery_plan_digest.clone(),
+            cluster_execution: None,
+            load_state,
+            isolation_policy: crate::LocalServingIsolationPolicy::in_process_runtime(),
+            streaming_policy: None,
+            memory_plan,
+            residency_policy,
+            residency_snapshot,
+            kv_cache_policy: Some(cache.policy().clone()),
+            kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
+            kv_ownership: cache.ownership_since(&request_kv_checkpoint),
+            prefix_cache_control: Some(request.prefix_cache_control.clone()),
+            prefix_cache_state: Some(crate::PrefixCacheState::Bypassed),
+            prefix_cache_refusal_reason: None,
+            prefix_cache_policy: Some(crate::default_prefix_cache_policy()),
+            prefix_cache_identity: None,
+            compile_path: None,
+            delivery_proof: crate::build_delivery_proof(
+                delivery_plan_digest,
+                kernel_count,
+                bytes_moved,
+                0,
+                0,
+                metrics.kv_cache.as_ref().map(|value| value.growth.clone()),
+                prefill_decode_handoff,
+                kv_residency,
+            ),
+            cache_observations: crate::generation_cache_observations(
+                loaded_model.descriptor(),
+                None,
+                load_state,
+                request.session_id.as_ref(),
+                request.reset_session,
+                &previous_kv_state,
+                crate::PrefixCacheState::Bypassed,
+                None,
+            ),
+            scheduler: None,
+            structured_output: structured_output_report,
+            psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
+        };
+        let structured_output_value = sampler.structured_output_value(text.as_str())?;
+        let response = GenerationResponse::new(
+            request,
+            request.session_id.clone(),
+            generated,
+            text,
+            usage.input_tokens,
+            usage.cache_tokens,
+            termination,
+        )
+        .with_metrics_and_provenance(metrics, provenance);
+        Ok(if let Some(value) = structured_output_value {
+            response.with_structured_output_value(value)
+        } else {
+            response
+        })
+    })();
+
+    let _ = models.finish_request(model_id, super::current_time_millis());
+    result
 }
 
 #[derive(Clone, Debug)]
@@ -2921,54 +3324,6 @@ impl super::CompiledWordGenerationModel for MetalGemma4GenerationModel {
             key: step.key,
             value: step.value,
             logits: step.logits,
-            selected_token: step.selected_token,
-            hidden: Some(step.final_hidden),
-            execution_plan_digest: Some(self.inner.plan_digest.clone()),
-            compile_path: None,
-            kernel_count: step.kernel_count,
-            bytes_moved: step.bytes_moved,
-            plan_cache_hits: 0,
-            plan_cache_misses: 0,
-            gpt_oss_perf: None,
-        })
-    }
-
-    fn execute_step_for_request(
-        &self,
-        backend: &mut Self::Backend,
-        request: &GenerationRequest,
-        token: TokenId,
-        position: usize,
-        cache: &crate::InMemoryKvCache,
-    ) -> Result<GenerationStepOutput, ReferenceTextGenerationError> {
-        let config = &self.inner.descriptor.config;
-        if token.as_u32() as usize >= config.vocab_size {
-            return Err(ReferenceTextGenerationError::InvalidToken {
-                token: token.as_u32(),
-                vocab_size: config.vocab_size,
-            });
-        }
-        if position >= config.max_context {
-            return Err(ReferenceTextGenerationError::InvalidPosition {
-                position,
-                max_context: config.max_context,
-            });
-        }
-        if cache.width() != self.inner.cache_width() {
-            return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
-                expected_kv_width: self.inner.cache_width(),
-                kv_width: cache.width(),
-            });
-        }
-        let logits_output_mode = metal_gemma4_decode_logits_output_mode(request);
-        let step = self
-            .inner
-            .forward_step(backend, token, position, cache, logits_output_mode)?;
-        Ok(GenerationStepOutput {
-            key: step.key,
-            value: step.value,
-            logits: step.logits,
-            selected_token: step.selected_token,
             hidden: Some(step.final_hidden),
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -3023,6 +3378,69 @@ impl MetalGemma4ModelInner {
             .unwrap_or(0)
     }
 
+    fn build_decode_step_plan(
+        &self,
+        backend: &mut MetalBackend,
+    ) -> Result<MetalGemma4StepPlan, ReferenceTextGenerationError> {
+        let head_count = self.descriptor.config.block.attention.head_count;
+        let head_dim = self.descriptor.config.block.attention.head_dim;
+        let q_rows = head_count.saturating_mul(head_dim);
+        let kv_rows = self
+            .layers
+            .iter()
+            .filter(|layer| layer.attention_geometry.has_kv())
+            .map(|layer| layer.attention_geometry.kv_width())
+            .max()
+            .unwrap_or(self.descriptor.config.kv_width());
+        let rotary_pairs = head_dim / 2;
+        Ok(MetalGemma4StepPlan {
+            q_buffer: backend
+                .input_buffer(Shape::new(vec![q_rows]), vec![0.0; q_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            k_buffer: backend
+                .input_buffer(Shape::new(vec![kv_rows]), vec![0.0; kv_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            v_buffer: backend
+                .input_buffer(Shape::new(vec![kv_rows]), vec![0.0; kv_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            cos_buffer: backend
+                .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            sin_buffer: backend
+                .input_buffer(Shape::new(vec![1, rotary_pairs]), vec![0.0; rotary_pairs])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            query_buffer: backend
+                .input_buffer(
+                    Shape::new(vec![1, head_count, 1, head_dim]),
+                    vec![0.0; q_rows],
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            key_buffer: backend
+                .input_buffer(
+                    Shape::new(vec![
+                        1,
+                        self.descriptor.config.block.attention.kv_head_count,
+                        1,
+                        head_dim,
+                    ]),
+                    vec![0.0; kv_rows],
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            value_buffer: backend
+                .input_buffer(
+                    Shape::new(vec![
+                        1,
+                        self.descriptor.config.block.attention.kv_head_count,
+                        1,
+                        head_dim,
+                    ]),
+                    vec![0.0; kv_rows],
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            attention_values: vec![0.0; q_rows],
+        })
+    }
+
     fn forward_step(
         &self,
         backend: &mut MetalBackend,
@@ -3057,6 +3475,502 @@ impl MetalGemma4ModelInner {
             final_hidden,
             kernel_count: step.kernel_count,
             bytes_moved: step.bytes_moved,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn forward_step_with_layer_caches(
+        &self,
+        backend: &mut MetalBackend,
+        token: TokenId,
+        position: usize,
+        cache: &crate::InMemoryKvCache,
+        layer_caches: &mut [Option<MetalKvCacheMirror>],
+        step_plan: &mut MetalGemma4StepPlan,
+        start_layer: usize,
+        end_layer: usize,
+        input_hidden: Option<&[f32]>,
+        forwarded_key: Option<&[f32]>,
+        forwarded_value: Option<&[f32]>,
+        produce_logits: bool,
+        logits_output_mode: MetalLogitsOutputMode,
+    ) -> Result<MetalGemma4StageStep, ReferenceTextGenerationError> {
+        if start_layer > end_layer || end_layer > self.layers.len() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "invalid gemma4 metal stage range [{start_layer}..{end_layer}) for {} layers",
+                    self.layers.len()
+                )),
+            ));
+        }
+        if layer_caches.len() != self.layers.len() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "gemma4 metal layer cache count mismatch: expected {}, actual {}",
+                    self.layers.len(),
+                    layer_caches.len()
+                )),
+            ));
+        }
+
+        let mut bytes_moved = self.token_embedding.byte_length() as u64;
+        let mut kernel_count = 1usize;
+        let mut embedding_hidden = self
+            .token_embedding
+            .decode_row(token.as_u32() as usize)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        scale_in_place(
+            &mut embedding_hidden,
+            input_embedding_scale(&self.family_metadata, self.descriptor.config.hidden_size),
+        );
+        let mut hidden = if let Some(input_hidden) = input_hidden {
+            if input_hidden.len() != self.descriptor.config.hidden_size {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 metal stage input hidden width mismatch: expected {}, actual {}",
+                        self.descriptor.config.hidden_size,
+                        input_hidden.len()
+                    )),
+                ));
+            }
+            input_hidden.to_vec()
+        } else {
+            embedding_hidden.clone()
+        };
+        let gemma4_per_layer_inputs =
+            if let Some(per_layer_inputs) = self.gemma4_per_layer_inputs.as_ref() {
+                Some(per_layer_inputs.project(
+                    backend,
+                    token,
+                    embedding_hidden.as_slice(),
+                    self.layers.len(),
+                    self.descriptor.config.hidden_size,
+                    self.family_metadata.rms_norm_epsilon,
+                )?)
+            } else {
+                None
+            };
+        let mut cache_key = forwarded_key
+            .map(|values| values.to_vec())
+            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
+        let mut cache_value = forwarded_value
+            .map(|values| values.to_vec())
+            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
+        if cache_key.len() != self.cache_width() || cache_value.len() != self.cache_width() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "gemma4 metal forwarded kv width mismatch: expected {}, actual key={} value={}",
+                    self.cache_width(),
+                    cache_key.len(),
+                    cache_value.len()
+                )),
+            ));
+        }
+        let mut live_keys: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
+        let mut live_values: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
+        if start_layer > 0 {
+            for (layer_index, layer) in self.layers.iter().enumerate().take(start_layer) {
+                if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                    let kv_width = layer.attention_geometry.kv_width();
+                    live_keys[layer_index] =
+                        Some(cache_key[cache_offset..cache_offset + kv_width].to_vec());
+                    live_values[layer_index] =
+                        Some(cache_value[cache_offset..cache_offset + kv_width].to_vec());
+                }
+            }
+        }
+
+        for (layer_index, layer) in self
+            .layers
+            .iter()
+            .enumerate()
+            .skip(start_layer)
+            .take(end_layer.saturating_sub(start_layer))
+        {
+            let hidden_norm = rms_norm(
+                hidden.as_slice(),
+                layer.attention_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+            let residual = std::mem::take(&mut hidden);
+
+            let mut kv_kernel_count = 0usize;
+            let mut kv_bytes_moved = 0u64;
+            let (mut q, k_values, v_values, fresh_attention_values) =
+                if layer.attention_geometry.has_kv() {
+                    let (mut q, mut k, mut v) = MetalQuantizedProjectionMatrix::matvec_triplet(
+                        &layer.attention_query_weight,
+                        &layer.attention_key_weight,
+                        &layer.attention_value_weight,
+                        backend,
+                        &hidden_norm,
+                    )?;
+                    if let Some(bias) = layer.attention_query_bias.as_ref() {
+                        add_bias_in_place(&mut q.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_query_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            q.values.as_mut_slice(),
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.head_dim,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+                    if let Some(bias) = layer.attention_key_bias.as_ref() {
+                        add_bias_in_place(&mut k.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_key_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            k.values.as_mut_slice(),
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+                    if let Some(bias) = layer.attention_value_bias.as_ref() {
+                        add_bias_in_place(&mut v.values, bias.as_slice());
+                    }
+                    per_head_rms_norm_unit_in_place(
+                        v.values.as_mut_slice(),
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                    let mut cache_layer_key = k.values.clone();
+                    apply_rope_neox(
+                        &mut cache_layer_key,
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+                    if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                        let kv_width = layer.attention_geometry.kv_width();
+                        cache_key[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(cache_layer_key.as_slice());
+                        cache_value[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(v.values.as_slice());
+                    }
+                    kv_kernel_count = kv_kernel_count
+                        .saturating_add(k.kernel_count)
+                        .saturating_add(v.kernel_count)
+                        .saturating_add(1);
+                    kv_bytes_moved = kv_bytes_moved
+                        .saturating_add(k.bytes_moved)
+                        .saturating_add(v.bytes_moved)
+                        .saturating_add(layer.attention_geometry.kv_width() as u64);
+                    live_keys[layer_index] = Some(cache_layer_key);
+                    live_values[layer_index] = Some(v.values.clone());
+
+                    let (cos_values, sin_values) = metal_gemma4_rope_cos_sin_values(
+                        position,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+                    step_plan.q_buffer.write_f32(q.values.as_slice())?;
+                    step_plan.k_buffer.write_f32(k.values.as_slice())?;
+                    step_plan.v_buffer.write_f32(v.values.as_slice())?;
+                    step_plan.cos_buffer.write_f32(cos_values.as_slice())?;
+                    step_plan.sin_buffer.write_f32(sin_values.as_slice())?;
+                    step_plan.query_buffer.write_f32(q.values.as_slice())?;
+                    step_plan.key_buffer.write_f32(k.values.as_slice())?;
+                    step_plan.value_buffer.write_f32(v.values.as_slice())?;
+                    let layer_cache = layer_caches
+                        .get_mut(layer_index)
+                        .and_then(Option::as_mut)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 metal layer {layer_index} is missing a device kv cache mirror"
+                                ),
+                            ))
+                        })?;
+                    let attention = backend
+                        .decode_attention_f32(
+                            &step_plan.query_buffer,
+                            &step_plan.key_buffer,
+                            &step_plan.value_buffer,
+                            &step_plan.cos_buffer,
+                            &step_plan.sin_buffer,
+                            layer_cache,
+                            attention_scale(
+                                &self.family_metadata,
+                                layer.attention_geometry.head_dim,
+                            ),
+                            true,
+                            false,
+                            true,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    step_plan.attention_values = attention
+                        .output
+                        .read_f32()
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (
+                        q,
+                        live_keys[layer_index]
+                            .as_deref()
+                            .ok_or_else(|| {
+                                ReferenceTextGenerationError::Runtime(
+                                    crate::RuntimeError::Backend(format!(
+                                        "gemma4 layer {layer_index} lost live key cache after publication"
+                                    )),
+                                )
+                            })?,
+                        live_values[layer_index]
+                            .as_deref()
+                            .ok_or_else(|| {
+                                ReferenceTextGenerationError::Runtime(
+                                    crate::RuntimeError::Backend(format!(
+                                        "gemma4 layer {layer_index} lost live value cache after publication"
+                                    )),
+                                )
+                            })?,
+                        Some(step_plan.attention_values.as_slice()),
+                    )
+                } else {
+                    let mut q = layer.attention_query_weight.matvec(backend, &hidden_norm)?;
+                    if let Some(bias) = layer.attention_query_bias.as_ref() {
+                        add_bias_in_place(&mut q.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_query_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            q.values.as_mut_slice(),
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.head_dim,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+                    apply_rope_neox(
+                        &mut q.values,
+                        layer.attention_geometry.head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+                    let reuse_layer_index =
+                        layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} is missing reused kv source metadata"
+                                ),
+                            ))
+                        })?;
+                    let reused_k = live_keys
+                        .get(reuse_layer_index)
+                        .and_then(Option::as_deref)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} expected live key cache from layer {reuse_layer_index}"
+                                ),
+                            ))
+                        })?;
+                    let reused_v = live_values
+                        .get(reuse_layer_index)
+                        .and_then(Option::as_deref)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} expected live value cache from layer {reuse_layer_index}"
+                                ),
+                            ))
+                        })?;
+                    (q, reused_k, reused_v, None)
+                };
+
+            let attention_values = if let Some(values) = fresh_attention_values {
+                values.to_vec()
+            } else {
+                attend_impl(
+                    layer_index,
+                    q.values.as_slice(),
+                    k_values,
+                    v_values,
+                    cache,
+                    layer.attention_geometry.head_count,
+                    layer.attention_geometry.kv_head_count,
+                    layer.attention_geometry.head_dim,
+                    layer.attention_geometry.cache_read_offset,
+                    layer.attention_geometry.sliding_window,
+                    attention_scale(&self.family_metadata, layer.attention_geometry.head_dim),
+                )
+            };
+            let mut attention_out = layer
+                .attention_output_weight
+                .matvec(backend, attention_values.as_slice())?;
+            if let Some(bias) = layer.attention_output_bias.as_ref() {
+                add_bias_in_place(&mut attention_out.values, bias.as_slice());
+            }
+            if let Some(norm) = layer.attention_post_norm.as_ref() {
+                rms_norm_in_place(
+                    attention_out.values.as_mut_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+            }
+            add_vectors_in_place(attention_out.values.as_mut_slice(), residual.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = attention_out.values;
+
+            let ffn_input = rms_norm(
+                hidden.as_slice(),
+                layer.feed_forward_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+            let ffn_residual = std::mem::take(&mut hidden);
+            let (mut gate, up) = MetalQuantizedProjectionMatrix::matvec_pair(
+                &layer.feed_forward_gate_weight,
+                &layer.feed_forward_up_weight,
+                backend,
+                &ffn_input,
+            )?;
+            feed_forward_activation_in_place(
+                &self.family_metadata,
+                gate.values.as_mut_slice(),
+                up.values.as_slice(),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+            let mut ffn_out = layer
+                .feed_forward_down_weight
+                .matvec(backend, gate.values.as_slice())?;
+            if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
+                rms_norm_in_place(
+                    ffn_out.values.as_mut_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+            }
+            add_vectors_in_place(ffn_out.values.as_mut_slice(), ffn_residual.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = ffn_out.values;
+
+            if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
+                if let (Some(input_gate), Some(proj), Some(post_norm)) = (
+                    layer.per_layer_input_gate.as_ref(),
+                    layer.per_layer_proj.as_ref(),
+                    layer.per_layer_post_norm.as_ref(),
+                ) {
+                    let mut gated = input_gate.matvec(backend, hidden.as_slice())?;
+                    for value in &mut gated.values {
+                        *value = approximate_gelu(*value);
+                    }
+                    multiply_vectors_in_place(
+                        gated.values.as_mut_slice(),
+                        self.gemma4_per_layer_inputs
+                            .as_ref()
+                            .expect("per-layer config")
+                            .layer_slice(per_layer_inputs.values.as_slice(), layer_index),
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    let mut projected = proj.matvec(backend, gated.values.as_slice())?;
+                    rms_norm_in_place(
+                        projected.values.as_mut_slice(),
+                        post_norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                    add_vectors_in_place(hidden.as_mut_slice(), projected.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    bytes_moved = bytes_moved
+                        .saturating_add(gated.bytes_moved)
+                        .saturating_add(projected.bytes_moved);
+                    kernel_count = kernel_count
+                        .saturating_add(gated.kernel_count)
+                        .saturating_add(projected.kernel_count);
+                }
+            }
+            if let Some(scale) = layer.layer_output_scale {
+                scale_in_place(&mut hidden, scale);
+            }
+
+            bytes_moved = bytes_moved
+                .saturating_add(q.bytes_moved)
+                .saturating_add(attention_out.bytes_moved)
+                .saturating_add(gate.bytes_moved)
+                .saturating_add(up.bytes_moved)
+                .saturating_add(ffn_out.bytes_moved);
+            kernel_count = kernel_count
+                .saturating_add(q.kernel_count)
+                .saturating_add(attention_out.kernel_count)
+                .saturating_add(gate.kernel_count)
+                .saturating_add(up.kernel_count)
+                .saturating_add(ffn_out.kernel_count);
+            if layer.attention_geometry.has_kv() {
+                bytes_moved = bytes_moved.saturating_add(kv_bytes_moved);
+                kernel_count = kernel_count.saturating_add(kv_kernel_count);
+            }
+        }
+
+        let (logits, selected_token, lm_head_hidden) = if produce_logits {
+            let final_hidden = rms_norm(
+                hidden.as_slice(),
+                self.output_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+            match logits_output_mode {
+                MetalLogitsOutputMode::GreedyToken => {
+                    let selection = self
+                        .output
+                        .select_logits_output(backend, final_hidden.as_slice(), logits_output_mode)?;
+                    bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                    kernel_count = kernel_count.saturating_add(1);
+                    let token = selection.selected_tokens.first().copied().ok_or_else(|| {
+                        ReferenceTextGenerationError::MissingOutput("metal gemma4 greedy token")
+                    })?;
+                    (Vec::new(), Some(TokenId(token)), Some(final_hidden))
+                }
+                MetalLogitsOutputMode::RawLogits => {
+                    let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
+                    apply_final_logit_softcapping_in_place(
+                        logits.values.as_mut_slice(),
+                        self.family_metadata.final_logit_softcapping,
+                    );
+                    bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
+                    kernel_count = kernel_count.saturating_add(logits.kernel_count);
+                    (logits.values, None, Some(final_hidden))
+                }
+                MetalLogitsOutputMode::TopKCandidates(_) => {
+                    return Err(ReferenceTextGenerationError::Runtime(
+                        crate::RuntimeError::Backend(String::from(
+                            "metal gemma4 top-k logits output mode is not yet wired into the custom generation loop",
+                        )),
+                    ));
+                }
+            }
+        } else {
+            (Vec::new(), None, None)
+        };
+
+        Ok(MetalGemma4StageStep {
+            key: cache_key,
+            value: cache_value,
+            logits,
+            selected_token,
+            hidden,
+            lm_head_hidden,
+            kernel_count,
+            bytes_moved,
         })
     }
 
@@ -4048,6 +4962,248 @@ pub struct DistributedGemma4RemoteStepResponse {
     pub bytes_moved: u64,
 }
 
+pub(crate) fn encode_distributed_gemma4_remote_step_request(
+    request: &DistributedGemma4RemoteStepRequest,
+) -> Result<Vec<u8>, ReferenceTextGenerationError> {
+    let request_id = request.request_id.as_bytes();
+    let model_id = request.model_id.as_bytes();
+    let request_id_len = u64::try_from(request_id.len()).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step request id exceeds u64 length",
+        )))
+    })?;
+    let model_id_len = u64::try_from(model_id.len()).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step model id exceeds u64 length",
+        )))
+    })?;
+    let position = u64::try_from(request.position).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step position exceeds u64",
+        )))
+    })?;
+    let split_layer = u64::try_from(request.split_layer).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step split layer exceeds u64",
+        )))
+    })?;
+    let input_hidden_len = u64::try_from(request.input_hidden.len()).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step hidden length exceeds u64",
+        )))
+    })?;
+    let forwarded_key_len = u64::try_from(request.forwarded_key.len()).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step forwarded key length exceeds u64",
+        )))
+    })?;
+    let forwarded_value_len = u64::try_from(request.forwarded_value.len()).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step forwarded value length exceeds u64",
+        )))
+    })?;
+    let floats_len = request
+        .input_hidden
+        .len()
+        .saturating_add(request.forwarded_key.len())
+        .saturating_add(request.forwarded_value.len());
+    let mut encoded = Vec::with_capacity(
+        60usize
+            .saturating_add(request_id.len())
+            .saturating_add(model_id.len())
+            .saturating_add(floats_len.saturating_mul(std::mem::size_of::<f32>())),
+    );
+    encoded.extend_from_slice(&request_id_len.to_le_bytes());
+    encoded.extend_from_slice(&model_id_len.to_le_bytes());
+    encoded.extend_from_slice(&request.token.to_le_bytes());
+    encoded.extend_from_slice(&position.to_le_bytes());
+    encoded.extend_from_slice(&split_layer.to_le_bytes());
+    encoded.extend_from_slice(&input_hidden_len.to_le_bytes());
+    encoded.extend_from_slice(&forwarded_key_len.to_le_bytes());
+    encoded.extend_from_slice(&forwarded_value_len.to_le_bytes());
+    encoded.extend_from_slice(request_id);
+    encoded.extend_from_slice(model_id);
+    for value in &request.input_hidden {
+        encoded.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in &request.forwarded_key {
+        encoded.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in &request.forwarded_value {
+        encoded.extend_from_slice(&value.to_le_bytes());
+    }
+    Ok(encoded)
+}
+
+pub(crate) fn decode_distributed_gemma4_remote_step_request(
+    bytes: &[u8],
+) -> Result<DistributedGemma4RemoteStepRequest, ReferenceTextGenerationError> {
+    const HEADER_LEN: usize = 60;
+    if bytes.len() < HEADER_LEN {
+        return Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(format!(
+                "distributed gemma4 remote step request is truncated: expected at least {HEADER_LEN} bytes, got {}",
+                bytes.len()
+            )),
+        ));
+    }
+    let request_id_len = u64::from_le_bytes(bytes[0..8].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step request id length header is malformed",
+        )))
+    })?);
+    let model_id_len = u64::from_le_bytes(bytes[8..16].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step model id length header is malformed",
+        )))
+    })?);
+    let token = u32::from_le_bytes(bytes[16..20].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step token header is malformed",
+        )))
+    })?);
+    let position = u64::from_le_bytes(bytes[20..28].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step position header is malformed",
+        )))
+    })?);
+    let split_layer = u64::from_le_bytes(bytes[28..36].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step split-layer header is malformed",
+        )))
+    })?);
+    let input_hidden_len = u64::from_le_bytes(bytes[36..44].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step hidden-length header is malformed",
+        )))
+    })?);
+    let forwarded_key_len = u64::from_le_bytes(bytes[44..52].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step key-length header is malformed",
+        )))
+    })?);
+    let forwarded_value_len = u64::from_le_bytes(bytes[52..60].try_into().map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step value-length header is malformed",
+        )))
+    })?);
+    let request_id_len = usize::try_from(request_id_len).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step request id length exceeds usize",
+        )))
+    })?;
+    let model_id_len = usize::try_from(model_id_len).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step model id length exceeds usize",
+        )))
+    })?;
+    let position = usize::try_from(position).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step position exceeds usize",
+        )))
+    })?;
+    let split_layer = usize::try_from(split_layer).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step split layer exceeds usize",
+        )))
+    })?;
+    let input_hidden_len = usize::try_from(input_hidden_len).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step hidden length exceeds usize",
+        )))
+    })?;
+    let forwarded_key_len = usize::try_from(forwarded_key_len).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step key length exceeds usize",
+        )))
+    })?;
+    let forwarded_value_len = usize::try_from(forwarded_value_len).map_err(|_| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "distributed gemma4 remote step value length exceeds usize",
+        )))
+    })?;
+    let string_bytes = request_id_len
+        .checked_add(model_id_len)
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "distributed gemma4 remote step string section overflow",
+            )))
+        })?;
+    let float_count = input_hidden_len
+        .checked_add(forwarded_key_len)
+        .and_then(|value| value.checked_add(forwarded_value_len))
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "distributed gemma4 remote step float section overflow",
+            )))
+        })?;
+    let expected_len = HEADER_LEN
+        .checked_add(string_bytes)
+        .and_then(|value| value.checked_add(float_count.saturating_mul(std::mem::size_of::<f32>())))
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "distributed gemma4 remote step total payload length overflow",
+            )))
+        })?;
+    if bytes.len() != expected_len {
+        return Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(format!(
+                "distributed gemma4 remote step request length mismatch: expected {expected_len} bytes, got {}",
+                bytes.len()
+            )),
+        ));
+    }
+    let request_id_start = HEADER_LEN;
+    let request_id_end = request_id_start + request_id_len;
+    let model_id_end = request_id_end + model_id_len;
+    let request_id = std::str::from_utf8(&bytes[request_id_start..request_id_end])
+        .map_err(|error| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                "distributed gemma4 remote step request id is not valid utf-8: {error}",
+            )))
+        })?
+        .to_owned();
+    let model_id = std::str::from_utf8(&bytes[request_id_end..model_id_end])
+        .map_err(|error| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                "distributed gemma4 remote step model id is not valid utf-8: {error}",
+            )))
+        })?
+        .to_owned();
+    let mut cursor = model_id_end;
+    let mut read_f32_vec = |len: usize| -> Result<Vec<f32>, ReferenceTextGenerationError> {
+        let byte_len = len.checked_mul(std::mem::size_of::<f32>()).ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "distributed gemma4 remote step float byte length overflow",
+            )))
+        })?;
+        let end = cursor.checked_add(byte_len).ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "distributed gemma4 remote step cursor overflow",
+            )))
+        })?;
+        let mut values = Vec::with_capacity(len);
+        for chunk in bytes[cursor..end].chunks_exact(std::mem::size_of::<f32>()) {
+            values.push(f32::from_le_bytes(chunk.try_into().expect("f32 chunk width")));
+        }
+        cursor = end;
+        Ok(values)
+    };
+    let input_hidden = read_f32_vec(input_hidden_len)?;
+    let forwarded_key = read_f32_vec(forwarded_key_len)?;
+    let forwarded_value = read_f32_vec(forwarded_value_len)?;
+    Ok(DistributedGemma4RemoteStepRequest {
+        request_id,
+        model_id,
+        token,
+        position,
+        split_layer,
+        input_hidden,
+        forwarded_key,
+        forwarded_value,
+    })
+}
+
 pub(crate) fn encode_distributed_gemma4_remote_step_response(
     response: &DistributedGemma4RemoteStepResponse,
 ) -> Result<Vec<u8>, ReferenceTextGenerationError> {
@@ -4282,15 +5438,8 @@ impl DistributedGemma4FrontBackend {
                 "distributed gemma4 backend attempted a remote step without an active request id",
             )))
         })?;
-        let mut request = self.client.post(format!(
-            "{}/psionic/internal/gemma4/pipeline/step",
-            self.peer.peer_base_url
-        ));
-        if let Some(shared_key) = self.peer.shared_key.as_deref() {
-            request = request.header("x-psionic-distributed-key", shared_key);
-        }
-        let response = request
-            .json(&DistributedGemma4RemoteStepRequest {
+        let body = encode_distributed_gemma4_remote_step_request(
+            &DistributedGemma4RemoteStepRequest {
                 request_id: request_id.clone(),
                 model_id: self.peer_model_key.clone(),
                 token: token.as_u32(),
@@ -4299,7 +5448,18 @@ impl DistributedGemma4FrontBackend {
                 input_hidden: input_hidden.to_vec(),
                 forwarded_key: forwarded_key.to_vec(),
                 forwarded_value: forwarded_value.to_vec(),
-            })
+            },
+        )?;
+        let mut request = self.client.post(format!(
+            "{}/psionic/internal/gemma4/pipeline/step",
+            self.peer.peer_base_url
+        ));
+        if let Some(shared_key) = self.peer.shared_key.as_deref() {
+            request = request.header("x-psionic-distributed-key", shared_key);
+        }
+        let response = request
+            .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+            .body(body)
             .send()
             .map_err(|error| {
                 ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
@@ -4524,14 +5684,10 @@ impl TextGenerationExecutor for DistributedGemma4TextGenerationService {
 
     fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
         self.backend.begin_request(request.request_id.as_str());
-        // Local prompt-prefix reuse is unsafe on the distributed front because the
-        // remote suffix does not receive mirrored prefix KV state from that cache.
-        let mut shared_prefixes = SharedPrefixStore::default();
-        let result = super::run_generation_request(
+        let result = run_distributed_gemma4_generation_request(
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
-            &mut shared_prefixes,
             request,
         );
         self.backend
@@ -4719,7 +5875,6 @@ impl super::CompiledWordGenerationModel for DistributedGemma4GenerationModel {
             key: prefix_step.key,
             value: prefix_step.value,
             logits: remote_step.logits,
-            selected_token: None,
             hidden: None,
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -4748,6 +5903,788 @@ impl super::CompiledWordGenerationModel for DistributedGemma4GenerationModel {
     }
 }
 
+fn run_distributed_gemma4_generation_request(
+    backend: &mut DistributedGemma4FrontBackend,
+    models: &mut InMemoryGenerationModelRegistry<DistributedGemma4GenerationModel>,
+    sessions: &mut InMemoryGenerationSessionStore,
+    request: &GenerationRequest,
+) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+    if !super::generation_product_supported(request) {
+        return Err(ReferenceTextGenerationError::UnsupportedProduct(
+            request.product_id.clone(),
+        ));
+    }
+
+    let loaded_model = models
+        .active(request.model.model.model_id.as_str())
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::UnsupportedModel(request.model.model.model_id.clone())
+        })?
+        .clone();
+    if loaded_model.descriptor() != &request.model {
+        return Err(ReferenceTextGenerationError::UnsupportedModel(
+            request.model.model.model_id.clone(),
+        ));
+    }
+
+    let model_id = request.model.model.model_id.as_str();
+    let load_state = models
+        .load_state(model_id)
+        .unwrap_or(super::GenerationLoadState::Warm);
+    let request_start = super::current_time_millis();
+    let generation_start = Instant::now();
+    models.begin_request(model_id, request_start)?;
+    let memory_plan = models.memory_plan(model_id).cloned();
+    let residency_policy = Some(models.residency_policy().clone());
+    let residency_snapshot = Some(models.memory_snapshot());
+    let served_artifact = super::served_artifact_identity_for_decoder_backend(
+        loaded_model.descriptor(),
+        loaded_model.backend_compatibility(),
+        &[],
+    );
+    let effective_served_artifact_digest =
+        super::effective_generation_served_artifact_digest(&served_artifact, None);
+
+    let result = (|| -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        let prompt_eval_start = Instant::now();
+        let tokenizer = loaded_model.tokenizer();
+        let prompt_tokens = loaded_model.encode_prompt_input(&request.prompt)?;
+        if prompt_tokens.is_empty() {
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+
+        let expected_kv_width = loaded_model.cache_width();
+        let mut session_tokens = Vec::new();
+        let previous_kv_state = if let Some(session_id) = &request.session_id {
+            if request.reset_session {
+                sessions.reset(session_id)?;
+            }
+            let state = sessions.state(session_id)?;
+            super::validate_session_model(
+                state,
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+            )?;
+            session_tokens = state.tokens().to_vec();
+            state.cache().state()
+        } else {
+            psionic_runtime::KvCacheState::default()
+        };
+        let preserve_prefix_tokens = usize::from(
+            prompt_tokens.as_slice().first().copied() == Some(tokenizer.vocabulary().bos_id()),
+        );
+        let (prompt_tokens, context_window) = super::apply_context_window(
+            &prompt_tokens,
+            loaded_model.descriptor().config.max_context,
+            previous_kv_state.tokens,
+            request.options.max_output_tokens,
+            request.options.context_overflow_policy,
+            preserve_prefix_tokens,
+        )?;
+        let mut cache = if let Some(session_id) = &request.session_id {
+            sessions.state(session_id)?.cache().clone()
+        } else {
+            crate::InMemoryKvCache::new(
+                loaded_model.descriptor().config.max_context,
+                expected_kv_width,
+            )
+        };
+        if cache.width() != expected_kv_width {
+            return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+                expected_kv_width,
+                kv_width: cache.width(),
+            });
+        }
+        cache.bind_owner(super::request_kv_owner(
+            request,
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        let request_kv_checkpoint = cache.checkpoint();
+        let kv_cache_encoding_policy = super::default_generation_kv_cache_encoding_policy(
+            &loaded_model,
+            loaded_model.backend_compatibility(),
+        );
+        let mut layer_caches = build_gemma4_metal_layer_caches_from_host_cache(
+            &mut backend.metal,
+            &loaded_model.inner,
+            &cache,
+            request.options.max_output_tokens.saturating_add(1),
+            &kv_cache_encoding_policy,
+        )?;
+        let mut step_plan = loaded_model.inner.build_decode_step_plan(&mut backend.metal)?;
+        let mut prompt_logits = Vec::new();
+        let mut last_logits = Vec::new();
+        let mut kernel_count = 0usize;
+        let mut bytes_moved = 0u64;
+
+        for token in prompt_tokens.as_slice() {
+            let prefix_step = loaded_model.inner.forward_step_with_layer_caches(
+                &mut backend.metal,
+                *token,
+                cache.len(),
+                &cache,
+                layer_caches.as_mut_slice(),
+                &mut step_plan,
+                0,
+                loaded_model.split_layer,
+                None,
+                None,
+                None,
+                false,
+                MetalLogitsOutputMode::RawLogits,
+            )?;
+            let remote_step = backend.remote_suffix_step(
+                loaded_model.descriptor().model.model_id.as_str(),
+                *token,
+                cache.len(),
+                prefix_step.hidden.as_slice(),
+                prefix_step.key.as_slice(),
+                prefix_step.value.as_slice(),
+                loaded_model.split_layer,
+            )?;
+            cache.append(*token, prefix_step.key, prefix_step.value)?;
+            kernel_count = kernel_count
+                .saturating_add(prefix_step.kernel_count)
+                .saturating_add(remote_step.kernel_count);
+            bytes_moved = bytes_moved
+                .saturating_add(prefix_step.bytes_moved)
+                .saturating_add(remote_step.bytes_moved);
+            last_logits = remote_step.logits;
+            prompt_logits.push(last_logits.clone());
+        }
+
+        let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
+        let mut sampler = super::GenerationSampler::new(&request.options)?;
+        let structured_output_report = sampler.structured_output_report();
+        let mut generated_tokens = Vec::new();
+        let mut first_token_emitted_at = None;
+        let mut last_token_emitted_at = None;
+        let termination = loop {
+            if generated_tokens.len() >= request.options.max_output_tokens {
+                break super::TerminationReason::MaxOutputTokens;
+            }
+            if cache.len() >= cache.max_context() {
+                break super::TerminationReason::ContextLimit;
+            }
+
+            let next_token = match sampler.select_next_token(
+                loaded_model.tokenizer(),
+                &last_logits,
+                &cache,
+                generated_tokens.as_slice(),
+            )? {
+                super::GenerationSelection::Token(token) => token,
+                super::GenerationSelection::Terminate => {
+                    break super::TerminationReason::EndOfSequence;
+                }
+            };
+            if loaded_model.is_end_of_sequence(next_token) {
+                break super::TerminationReason::EndOfSequence;
+            }
+
+            generated_tokens.push(next_token);
+            let prefix_step = loaded_model.inner.forward_step_with_layer_caches(
+                &mut backend.metal,
+                next_token,
+                cache.len(),
+                &cache,
+                layer_caches.as_mut_slice(),
+                &mut step_plan,
+                0,
+                loaded_model.split_layer,
+                None,
+                None,
+                None,
+                false,
+                MetalLogitsOutputMode::RawLogits,
+            )?;
+            let remote_step = backend.remote_suffix_step(
+                loaded_model.descriptor().model.model_id.as_str(),
+                next_token,
+                cache.len(),
+                prefix_step.hidden.as_slice(),
+                prefix_step.key.as_slice(),
+                prefix_step.value.as_slice(),
+                loaded_model.split_layer,
+            )?;
+            cache.append(next_token, prefix_step.key, prefix_step.value)?;
+            kernel_count = kernel_count
+                .saturating_add(prefix_step.kernel_count)
+                .saturating_add(remote_step.kernel_count);
+            bytes_moved = bytes_moved
+                .saturating_add(prefix_step.bytes_moved)
+                .saturating_add(remote_step.bytes_moved);
+            last_logits = remote_step.logits;
+            let emitted_at = Instant::now();
+            if first_token_emitted_at.is_none() {
+                first_token_emitted_at = Some(emitted_at);
+            }
+            last_token_emitted_at = Some(emitted_at);
+
+            if super::truncate_generated_text(
+                loaded_model.tokenizer(),
+                &mut generated_tokens,
+                &request.options.stop_sequences,
+            )
+            .is_some()
+            {
+                break super::TerminationReason::EndOfSequence;
+            }
+        };
+
+        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
+        let generated = TokenSequence::new(generated_tokens);
+        if let Some(session_id) = &request.session_id {
+            session_tokens.extend_from_slice(prompt_tokens.as_slice());
+            session_tokens.extend_from_slice(generated.as_slice());
+            sessions.replace_cache(
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+                cache.clone(),
+                TokenSequence::new(session_tokens),
+            )?;
+        }
+        let text = loaded_model.tokenizer().decode(generated.as_slice());
+        let usage = super::GenerationUsage {
+            input_tokens: prompt_tokens.len(),
+            output_tokens: generated.len(),
+            cache_tokens: cache.len(),
+        };
+        let kv_cache =
+            psionic_runtime::KvCacheAccounting::from_states(&previous_kv_state, cache.state());
+        let total_duration_ns = super::elapsed_ns(generation_start);
+        let time_to_first_token_ns = first_token_emitted_at
+            .map(|first_token_at| first_token_at.duration_since(generation_start))
+            .and_then(|duration| duration.as_nanos().try_into().ok());
+        let inter_token_latency_ns = super::average_inter_token_latency_ns(
+            first_token_emitted_at,
+            last_token_emitted_at,
+            usage.output_tokens,
+        );
+        let prefill_decode_handoff = super::local_prefill_decode_handoff(&prefill_handoff_state);
+        let kv_residency = super::host_only_kv_residency(cache.policy(), cache.state());
+        let metrics = crate::GenerationMetrics {
+            total_duration_ns: Some(total_duration_ns),
+            load_duration_ns: Some(match load_state {
+                super::GenerationLoadState::Cold => loaded_model.load_duration_ns(),
+                super::GenerationLoadState::Warm => 0,
+            }),
+            prompt_eval_count: Some(usage.input_tokens),
+            prompt_eval_duration_ns: Some(prompt_eval_duration_ns),
+            context_window: Some(context_window),
+            eval_count: Some(usage.output_tokens),
+            eval_duration_ns: Some(total_duration_ns.saturating_sub(prompt_eval_duration_ns)),
+            time_to_first_token_ns,
+            inter_token_latency_ns,
+            kv_cache: Some(kv_cache),
+            kv_residency: kv_residency.clone(),
+            kv_cache_encoding: Some(psionic_runtime::KvCacheEncodingAccounting::active(
+                kv_cache_encoding_policy.clone(),
+            )),
+            prefix_tokens_reused: Some(0),
+            termination_detail: None,
+            qwen35_cuda_decode: None,
+            gpt_oss_perf: None,
+        };
+        let delivery_plan_digest = loaded_model.plan_digest().to_string();
+        let provenance = crate::GenerationProvenance {
+            served_artifact,
+            adapter_serving: request.adapter_serving.clone(),
+            served_revision: None,
+            execution_plan_digest: delivery_plan_digest.clone(),
+            cluster_execution: None,
+            load_state,
+            isolation_policy: crate::LocalServingIsolationPolicy::in_process_runtime(),
+            streaming_policy: None,
+            memory_plan,
+            residency_policy,
+            residency_snapshot,
+            kv_cache_policy: Some(cache.policy().clone()),
+            kv_cache_encoding_policy: Some(kv_cache_encoding_policy),
+            kv_ownership: cache.ownership_since(&request_kv_checkpoint),
+            prefix_cache_control: Some(request.prefix_cache_control.clone()),
+            prefix_cache_state: Some(crate::PrefixCacheState::Bypassed),
+            prefix_cache_refusal_reason: None,
+            prefix_cache_policy: Some(crate::default_prefix_cache_policy()),
+            prefix_cache_identity: None,
+            compile_path: None,
+            delivery_proof: crate::build_delivery_proof(
+                delivery_plan_digest,
+                kernel_count,
+                bytes_moved,
+                0,
+                0,
+                metrics.kv_cache.as_ref().map(|value| value.growth.clone()),
+                prefill_decode_handoff,
+                kv_residency,
+            ),
+            cache_observations: crate::generation_cache_observations(
+                loaded_model.descriptor(),
+                None,
+                load_state,
+                request.session_id.as_ref(),
+                request.reset_session,
+                &previous_kv_state,
+                crate::PrefixCacheState::Bypassed,
+                None,
+            ),
+            scheduler: None,
+            structured_output: structured_output_report,
+            psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
+        };
+        let structured_output_value = sampler.structured_output_value(text.as_str())?;
+        let response = GenerationResponse::new(
+            request,
+            request.session_id.clone(),
+            generated,
+            text,
+            usage.input_tokens,
+            usage.cache_tokens,
+            termination,
+        )
+        .with_metrics_and_provenance(metrics, provenance);
+        Ok(if let Some(value) = structured_output_value {
+            response.with_structured_output_value(value)
+        } else {
+            response
+        })
+    })();
+
+    let _ = models.finish_request(model_id, super::current_time_millis());
+    result
+}
+
+fn build_gemma4_cuda_layer_caches_from_host_cache(
+    backend: &mut CudaBackend,
+    model: &CudaGemma4ModelInner,
+    cache: &crate::InMemoryKvCache,
+    reserve_tokens: usize,
+) -> Result<Vec<Option<CudaGemma4LayerCacheState>>, ReferenceTextGenerationError> {
+    if cache.width() != model.cache_width() {
+        return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+            expected_kv_width: model.cache_width(),
+            kv_width: cache.width(),
+        });
+    }
+
+    model
+        .layers
+        .iter()
+        .map(|layer| {
+            let Some(cache_offset) = layer.attention_geometry.cache_write_offset else {
+                return Ok(None);
+            };
+            let layer_kv_width = layer.attention_geometry.kv_width();
+            let mut state =
+                CudaGemma4LayerCacheState::new(backend, layer_kv_width, cache.len().saturating_add(reserve_tokens))?;
+            if cache.len() > 0 {
+                let mut keys = Vec::with_capacity(cache.len().saturating_mul(layer_kv_width));
+                let mut values = Vec::with_capacity(cache.len().saturating_mul(layer_kv_width));
+                for entry in cache.entries() {
+                    keys.extend_from_slice(&entry.key[cache_offset..cache_offset + layer_kv_width]);
+                    values
+                        .extend_from_slice(&entry.value[cache_offset..cache_offset + layer_kv_width]);
+                }
+                state
+                    .key_cache
+                    .write_f32(keys.as_slice())
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                state
+                    .value_cache
+                    .write_f32(values.as_slice())
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                state.len = cache.len();
+            }
+            Ok(Some(state))
+        })
+        .collect()
+}
+
+fn gemma4_cuda_layer_cache_state(
+    layer_caches: &[Option<CudaGemma4LayerCacheState>],
+) -> psionic_runtime::KvCacheState {
+    layer_caches
+        .iter()
+        .flatten()
+        .next()
+        .map(CudaGemma4LayerCacheState::state)
+        .unwrap_or_default()
+}
+
+fn run_cuda_gemma4_generation_request(
+    backend: &mut CudaBackend,
+    models: &mut InMemoryGenerationModelRegistry<CudaGemma4GenerationModel>,
+    sessions: &mut InMemoryGenerationSessionStore,
+    request: &GenerationRequest,
+) -> Result<GenerationResponse, ReferenceTextGenerationError> {
+    if !super::generation_product_supported(request) {
+        return Err(ReferenceTextGenerationError::UnsupportedProduct(
+            request.product_id.clone(),
+        ));
+    }
+
+    let loaded_model = models
+        .active(request.model.model.model_id.as_str())
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::UnsupportedModel(request.model.model.model_id.clone())
+        })?
+        .clone();
+    if loaded_model.descriptor() != &request.model {
+        return Err(ReferenceTextGenerationError::UnsupportedModel(
+            request.model.model.model_id.clone(),
+        ));
+    }
+
+    let model_id = request.model.model.model_id.as_str();
+    let load_state = models
+        .load_state(model_id)
+        .unwrap_or(super::GenerationLoadState::Warm);
+    let request_start = super::current_time_millis();
+    let generation_start = Instant::now();
+    models.begin_request(model_id, request_start)?;
+    let memory_plan = models.memory_plan(model_id).cloned();
+    let residency_policy = Some(models.residency_policy().clone());
+    let residency_snapshot = Some(models.memory_snapshot());
+    let served_artifact = super::served_artifact_identity_for_decoder_backend(
+        loaded_model.descriptor(),
+        loaded_model.backend_compatibility(),
+        &[],
+    );
+    let effective_served_artifact_digest =
+        super::effective_generation_served_artifact_digest(
+            &served_artifact,
+            request.adapter_serving.as_ref(),
+        );
+
+    let result = (|| -> Result<GenerationResponse, ReferenceTextGenerationError> {
+        let prompt_eval_start = Instant::now();
+        let tokenizer = loaded_model.tokenizer();
+        let prompt_tokens = loaded_model.encode_prompt_input(&request.prompt)?;
+        if prompt_tokens.is_empty() {
+            return Err(ReferenceTextGenerationError::EmptyPrompt);
+        }
+
+        let expected_kv_width = loaded_model.cache_width();
+        let mut session_tokens = Vec::new();
+        let previous_kv_state = if let Some(session_id) = &request.session_id {
+            if request.reset_session {
+                sessions.reset(session_id)?;
+            }
+            let state = sessions.state(session_id)?;
+            super::validate_session_model(
+                state,
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+            )?;
+            session_tokens = state.tokens().to_vec();
+            state.cache().state()
+        } else {
+            psionic_runtime::KvCacheState::default()
+        };
+        let preserve_prefix_tokens = usize::from(
+            prompt_tokens.as_slice().first().copied() == Some(tokenizer.vocabulary().bos_id()),
+        );
+        let (prompt_tokens, context_window) = super::apply_context_window(
+            &prompt_tokens,
+            loaded_model.descriptor().config.max_context,
+            previous_kv_state.tokens,
+            request.options.max_output_tokens,
+            request.options.context_overflow_policy,
+            preserve_prefix_tokens,
+        )?;
+        let mut cache = if let Some(session_id) = &request.session_id {
+            sessions.state(session_id)?.cache().clone()
+        } else {
+            crate::InMemoryKvCache::with_policy(
+                loaded_model.descriptor().config.max_context,
+                expected_kv_width,
+                super::default_generation_kv_cache_policy(&loaded_model),
+            )
+        };
+        if cache.width() != expected_kv_width {
+            return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
+                expected_kv_width,
+                kv_width: cache.width(),
+            });
+        }
+        cache.bind_owner(super::request_kv_owner(
+            request,
+            psionic_runtime::BatchExecutionPosture::SingleRequestOnly,
+            None,
+        ));
+        let request_kv_checkpoint = cache.checkpoint();
+        let mut layer_caches = build_gemma4_cuda_layer_caches_from_host_cache(
+            backend,
+            &loaded_model.inner,
+            &cache,
+            request.options.max_output_tokens.saturating_add(1),
+        )?;
+        let mut step_plan = loaded_model.inner.build_decode_step_plan(backend)?;
+        let mut prompt_logits = Vec::new();
+        let mut last_logits = Vec::new();
+        let mut kernel_count = 0usize;
+        let mut bytes_moved = 0u64;
+
+        for token in prompt_tokens.as_slice() {
+            let step = loaded_model.inner.forward_step_with_layer_caches(
+                backend,
+                *token,
+                cache.len(),
+                &cache,
+                layer_caches.as_mut_slice(),
+                &mut step_plan,
+                0,
+                loaded_model.inner.layers.len(),
+                None,
+                None,
+                None,
+                true,
+            )?;
+            let mut step_output = GenerationStepOutput {
+                key: step.key,
+                value: step.value,
+                logits: step.logits,
+                hidden: step.lm_head_hidden.clone(),
+                execution_plan_digest: Some(loaded_model.inner.plan_digest.clone()),
+                compile_path: None,
+                kernel_count: step.kernel_count,
+                bytes_moved: step.bytes_moved,
+                plan_cache_hits: 0,
+                plan_cache_misses: 0,
+                gpt_oss_perf: None,
+            };
+            loaded_model.adjust_step_output(&mut step_output, request)?;
+            kernel_count = kernel_count.saturating_add(step_output.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(step_output.bytes_moved);
+            cache.append(*token, step_output.key, step_output.value)?;
+            last_logits = step_output.logits;
+            prompt_logits.push(last_logits.clone());
+        }
+
+        let prefill_handoff_state = gemma4_cuda_layer_cache_state(layer_caches.as_slice());
+        let mut sampler = super::GenerationSampler::new(&request.options)?;
+        let structured_output_report = sampler.structured_output_report();
+        let mut generated_tokens = Vec::new();
+        let mut first_token_emitted_at = None;
+        let mut last_token_emitted_at = None;
+        let termination = loop {
+            if generated_tokens.len() >= request.options.max_output_tokens {
+                break super::TerminationReason::MaxOutputTokens;
+            }
+            if cache.len() >= cache.max_context() {
+                break super::TerminationReason::ContextLimit;
+            }
+
+            let next_token = match sampler.select_next_token(
+                loaded_model.tokenizer(),
+                &last_logits,
+                &cache,
+                generated_tokens.as_slice(),
+            )? {
+                super::GenerationSelection::Token(token) => token,
+                super::GenerationSelection::Terminate => {
+                    break super::TerminationReason::EndOfSequence;
+                }
+            };
+            if loaded_model.is_end_of_sequence(next_token) {
+                break super::TerminationReason::EndOfSequence;
+            }
+
+            generated_tokens.push(next_token);
+            let step = loaded_model.inner.forward_step_with_layer_caches(
+                backend,
+                next_token,
+                cache.len(),
+                &cache,
+                layer_caches.as_mut_slice(),
+                &mut step_plan,
+                0,
+                loaded_model.inner.layers.len(),
+                None,
+                None,
+                None,
+                true,
+            )?;
+            let mut step_output = GenerationStepOutput {
+                key: step.key,
+                value: step.value,
+                logits: step.logits,
+                hidden: step.lm_head_hidden.clone(),
+                execution_plan_digest: Some(loaded_model.inner.plan_digest.clone()),
+                compile_path: None,
+                kernel_count: step.kernel_count,
+                bytes_moved: step.bytes_moved,
+                plan_cache_hits: 0,
+                plan_cache_misses: 0,
+                gpt_oss_perf: None,
+            };
+            loaded_model.adjust_step_output(&mut step_output, request)?;
+            kernel_count = kernel_count.saturating_add(step_output.kernel_count);
+            bytes_moved = bytes_moved.saturating_add(step_output.bytes_moved);
+            cache.append(next_token, step_output.key, step_output.value)?;
+            last_logits = step_output.logits;
+            let emitted_at = Instant::now();
+            if first_token_emitted_at.is_none() {
+                first_token_emitted_at = Some(emitted_at);
+            }
+            last_token_emitted_at = Some(emitted_at);
+
+            if super::truncate_generated_text(
+                loaded_model.tokenizer(),
+                &mut generated_tokens,
+                &request.options.stop_sequences,
+            )
+            .is_some()
+            {
+                break super::TerminationReason::EndOfSequence;
+            }
+        };
+
+        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
+        let generated = TokenSequence::new(generated_tokens);
+        if let Some(session_id) = &request.session_id {
+            session_tokens.extend_from_slice(prompt_tokens.as_slice());
+            session_tokens.extend_from_slice(generated.as_slice());
+            sessions.replace_cache(
+                session_id,
+                loaded_model.descriptor(),
+                effective_served_artifact_digest.as_str(),
+                cache.clone(),
+                TokenSequence::new(session_tokens),
+            )?;
+        }
+        let text = loaded_model.tokenizer().decode(generated.as_slice());
+        let usage = super::GenerationUsage {
+            input_tokens: prompt_tokens.len(),
+            output_tokens: generated.len(),
+            cache_tokens: cache.len(),
+        };
+        let current_host_state = cache.state();
+        let device_state = gemma4_cuda_layer_cache_state(layer_caches.as_slice());
+        let kv_cache = psionic_runtime::KvCacheAccounting::from_states(
+            &previous_kv_state,
+            current_host_state.clone(),
+        );
+        let total_duration_ns = super::elapsed_ns(generation_start);
+        let time_to_first_token_ns = first_token_emitted_at
+            .map(|first_token_at| first_token_at.duration_since(generation_start))
+            .and_then(|duration| duration.as_nanos().try_into().ok());
+        let inter_token_latency_ns = super::average_inter_token_latency_ns(
+            first_token_emitted_at,
+            last_token_emitted_at,
+            usage.output_tokens,
+        );
+        let prefill_decode_handoff = super::local_prefill_decode_handoff(&prefill_handoff_state);
+        let write_back_growth = psionic_runtime::KvCacheGrowth {
+            tokens: current_host_state
+                .tokens
+                .saturating_sub(previous_kv_state.tokens),
+            bytes: current_host_state.bytes.saturating_sub(previous_kv_state.bytes),
+            pages: current_host_state.pages.saturating_sub(previous_kv_state.pages),
+        };
+        let kv_residency = super::host_device_kv_residency(
+            cache.policy(),
+            current_host_state,
+            device_state,
+            previous_kv_state.tokens > 0,
+            Some(write_back_growth),
+        );
+        let metrics = crate::GenerationMetrics {
+            total_duration_ns: Some(total_duration_ns),
+            load_duration_ns: Some(match load_state {
+                super::GenerationLoadState::Cold => loaded_model.load_duration_ns(),
+                super::GenerationLoadState::Warm => 0,
+            }),
+            prompt_eval_count: Some(usage.input_tokens),
+            prompt_eval_duration_ns: Some(prompt_eval_duration_ns),
+            context_window: Some(context_window),
+            eval_count: Some(usage.output_tokens),
+            eval_duration_ns: Some(total_duration_ns.saturating_sub(prompt_eval_duration_ns)),
+            time_to_first_token_ns,
+            inter_token_latency_ns,
+            kv_cache: Some(kv_cache),
+            kv_residency: kv_residency.clone(),
+            kv_cache_encoding: None,
+            prefix_tokens_reused: Some(0),
+            termination_detail: None,
+            qwen35_cuda_decode: None,
+            gpt_oss_perf: None,
+        };
+        let delivery_plan_digest = loaded_model.plan_digest().to_string();
+        let provenance = crate::GenerationProvenance {
+            served_artifact,
+            adapter_serving: request.adapter_serving.clone(),
+            served_revision: None,
+            execution_plan_digest: delivery_plan_digest.clone(),
+            cluster_execution: None,
+            load_state,
+            isolation_policy: crate::LocalServingIsolationPolicy::in_process_runtime(),
+            streaming_policy: None,
+            memory_plan,
+            residency_policy,
+            residency_snapshot,
+            kv_cache_policy: Some(cache.policy().clone()),
+            kv_cache_encoding_policy: None,
+            kv_ownership: cache.ownership_since(&request_kv_checkpoint),
+            prefix_cache_control: Some(request.prefix_cache_control.clone()),
+            prefix_cache_state: Some(crate::PrefixCacheState::Bypassed),
+            prefix_cache_refusal_reason: None,
+            prefix_cache_policy: Some(crate::default_prefix_cache_policy()),
+            prefix_cache_identity: None,
+            compile_path: None,
+            delivery_proof: crate::build_delivery_proof(
+                delivery_plan_digest,
+                kernel_count,
+                bytes_moved,
+                0,
+                0,
+                metrics.kv_cache.as_ref().map(|value| value.growth.clone()),
+                prefill_decode_handoff,
+                kv_residency.clone(),
+            ),
+            cache_observations: crate::generation_cache_observations(
+                loaded_model.descriptor(),
+                None,
+                load_state,
+                request.session_id.as_ref(),
+                request.reset_session,
+                &previous_kv_state,
+                crate::PrefixCacheState::Bypassed,
+                None,
+            ),
+            scheduler: None,
+            structured_output: structured_output_report,
+            psion_served_evidence: None,
+            psion_served_output_claim_posture: None,
+        };
+        let structured_output_value = sampler.structured_output_value(text.as_str())?;
+        let response = GenerationResponse::new(
+            request,
+            request.session_id.clone(),
+            generated,
+            text,
+            usage.input_tokens,
+            usage.cache_tokens,
+            termination,
+        )
+        .with_metrics_and_provenance(metrics, provenance);
+        Ok(if let Some(value) = structured_output_value {
+            response.with_structured_output_value(value)
+        } else {
+            response
+        })
+    })();
+
+    let finish_at = super::current_time_millis();
+    let _ = models.finish_request(model_id, finish_at);
+    result
+}
+
 pub struct CudaGemma4TextGenerationService {
     backend: CudaBackend,
     models: InMemoryGenerationModelRegistry<CudaGemma4GenerationModel>,
@@ -4758,7 +6695,7 @@ pub struct CudaGemma4TextGenerationService {
     runtime_support: GgufDecoderRuntimeSupport,
     adapters: Arc<Mutex<DenseAdapterRuntimeStore>>,
     promoted_revisions: PromotedGemmaRevisionState,
-    distributed_caches: BTreeMap<String, crate::InMemoryKvCache>,
+    distributed_requests: BTreeMap<String, DistributedCudaGemma4RequestState>,
 }
 
 impl CudaGemma4TextGenerationService {
@@ -4791,7 +6728,7 @@ impl CudaGemma4TextGenerationService {
             runtime_support,
             adapters,
             promoted_revisions: PromotedGemmaRevisionState::default(),
-            distributed_caches: BTreeMap::new(),
+            distributed_requests: BTreeMap::new(),
         })
     }
 
@@ -5026,35 +6963,54 @@ impl CudaGemma4TextGenerationService {
                 ReferenceTextGenerationError::UnsupportedModel(request.model_id.clone())
             })?
             .clone();
-        let cache = self
-            .distributed_caches
-            .entry(request.request_id.clone())
-            .or_insert_with(|| {
-                crate::InMemoryKvCache::new(
-                    model.descriptor().config.max_context,
-                    model.cache_width(),
-                )
-            });
-        if cache.width() != model.cache_width() {
+        if !self.distributed_requests.contains_key(request.request_id.as_str()) {
+            let cache = crate::InMemoryKvCache::with_policy(
+                model.descriptor().config.max_context,
+                model.cache_width(),
+                super::default_generation_kv_cache_policy(&model),
+            );
+            let layer_caches = build_gemma4_cuda_layer_caches_from_host_cache(
+                &mut self.backend,
+                &model.inner,
+                &cache,
+                1,
+            )?;
+            let step_plan = model.inner.build_decode_step_plan(&mut self.backend)?;
+            self.distributed_requests.insert(
+                request.request_id.clone(),
+                DistributedCudaGemma4RequestState {
+                    cache,
+                    layer_caches,
+                    step_plan,
+                },
+            );
+        }
+        let state = self
+            .distributed_requests
+            .get_mut(request.request_id.as_str())
+            .expect("distributed gemma4 request state");
+        if state.cache.width() != model.cache_width() {
             return Err(ReferenceTextGenerationError::UnsupportedCacheGeometry {
                 expected_kv_width: model.cache_width(),
-                kv_width: cache.width(),
+                kv_width: state.cache.width(),
             });
         }
-        if cache.len() != request.position {
+        if state.cache.len() != request.position {
             return Err(ReferenceTextGenerationError::Runtime(
                 crate::RuntimeError::Backend(format!(
                     "distributed gemma4 remote cache position mismatch: expected {}, actual {}",
                     request.position,
-                    cache.len()
+                    state.cache.len()
                 )),
             ));
         }
-        let step = model.inner.forward_stage_step(
+        let step = model.inner.forward_step_with_layer_caches(
             &mut self.backend,
             TokenId(request.token),
             request.position,
-            cache,
+            &state.cache,
+            state.layer_caches.as_mut_slice(),
+            &mut state.step_plan,
             request.split_layer,
             model.inner.layers.len(),
             Some(request.input_hidden.as_slice()),
@@ -5062,7 +7018,7 @@ impl CudaGemma4TextGenerationService {
             Some(request.forwarded_value.as_slice()),
             true,
         )?;
-        cache.append(TokenId(request.token), step.key, step.value)?;
+        state.cache.append(TokenId(request.token), step.key, step.value)?;
         Ok(DistributedGemma4RemoteStepResponse {
             logits: step.logits,
             kernel_count: step.kernel_count,
@@ -5071,7 +7027,7 @@ impl CudaGemma4TextGenerationService {
     }
 
     pub fn distributed_worker_reset(&mut self, request_id: &str) {
-        self.distributed_caches.remove(request_id);
+        self.distributed_requests.remove(request_id);
     }
 }
 
@@ -5080,11 +7036,10 @@ impl TextGenerationExecutor for CudaGemma4TextGenerationService {
 
     fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, Self::Error> {
         let request = self.request_with_active_revision(request.clone());
-        let response = super::run_generation_request(
+        let response = run_cuda_gemma4_generation_request(
             &mut self.backend,
             &mut self.models,
             &mut self.sessions,
-            &mut self.shared_prefixes,
             &request,
         )?;
         Ok(self.promoted_revisions.attach_to_response(response))
@@ -5353,7 +7308,6 @@ impl super::CompiledWordGenerationModel for CudaGemma4GenerationModel {
             key: step.key,
             value: step.value,
             logits: step.logits,
-            selected_token: None,
             hidden: Some(step.final_hidden),
             execution_plan_digest: Some(self.inner.plan_digest.clone()),
             compile_path: None,
@@ -5465,6 +7419,571 @@ impl CudaGemma4ModelInner {
             final_hidden,
             kernel_count: step.kernel_count,
             bytes_moved: step.bytes_moved,
+        })
+    }
+
+    fn build_decode_step_plan(
+        &self,
+        backend: &mut CudaBackend,
+    ) -> Result<CudaGemma4StepPlan, ReferenceTextGenerationError> {
+        let head_count = self.descriptor.config.block.attention.head_count;
+        let head_dim = self.descriptor.config.block.attention.head_dim;
+        let q_rows = head_count.saturating_mul(head_dim);
+        let kv_rows = self
+            .layers
+            .iter()
+            .filter(|layer| layer.attention_geometry.has_kv())
+            .map(|layer| layer.attention_geometry.kv_width())
+            .max()
+            .unwrap_or(self.descriptor.config.kv_width());
+        Ok(CudaGemma4StepPlan {
+            qkv_buffer: backend
+                .input_buffer(Shape::new(vec![q_rows.saturating_add(kv_rows.saturating_mul(2))]), vec![0.0; q_rows.saturating_add(kv_rows.saturating_mul(2))])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            query_buffer: backend
+                .input_buffer(Shape::new(vec![q_rows]), vec![0.0; q_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            key_buffer: backend
+                .input_buffer(Shape::new(vec![kv_rows]), vec![0.0; kv_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            value_buffer: backend
+                .input_buffer(Shape::new(vec![kv_rows]), vec![0.0; kv_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            attention_buffer: backend
+                .input_buffer(Shape::new(vec![q_rows]), vec![0.0; q_rows])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn forward_step_with_layer_caches(
+        &self,
+        backend: &mut CudaBackend,
+        token: TokenId,
+        position: usize,
+        _cache: &crate::InMemoryKvCache,
+        layer_caches: &mut [Option<CudaGemma4LayerCacheState>],
+        step_plan: &mut CudaGemma4StepPlan,
+        start_layer: usize,
+        end_layer: usize,
+        input_hidden: Option<&[f32]>,
+        forwarded_key: Option<&[f32]>,
+        forwarded_value: Option<&[f32]>,
+        produce_logits: bool,
+    ) -> Result<CudaGemma4StageStep, ReferenceTextGenerationError> {
+        if start_layer > end_layer || end_layer > self.layers.len() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "invalid gemma4 cuda stage range [{start_layer}..{end_layer}) for {} layers",
+                    self.layers.len()
+                )),
+            ));
+        }
+        if layer_caches.len() != self.layers.len() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "gemma4 cuda layer cache count mismatch: expected {}, actual {}",
+                    self.layers.len(),
+                    layer_caches.len()
+                )),
+            ));
+        }
+
+        let mut bytes_moved = self.token_embedding.byte_length() as u64;
+        let mut kernel_count = 1usize;
+        let mut embedding_hidden = self
+            .token_embedding
+            .decode_row(token.as_u32() as usize)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        scale_in_place(
+            &mut embedding_hidden,
+            input_embedding_scale(&self.family_metadata, self.descriptor.config.hidden_size),
+        );
+        let mut hidden = if let Some(input_hidden) = input_hidden {
+            if input_hidden.len() != self.descriptor.config.hidden_size {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 cuda stage input hidden width mismatch: expected {}, actual {}",
+                        self.descriptor.config.hidden_size,
+                        input_hidden.len()
+                    )),
+                ));
+            }
+            input_hidden.to_vec()
+        } else {
+            embedding_hidden.clone()
+        };
+        let gemma4_per_layer_inputs =
+            if let Some(per_layer_inputs) = self.gemma4_per_layer_inputs.as_ref() {
+                Some(per_layer_inputs.project(
+                    backend,
+                    token,
+                    embedding_hidden.as_slice(),
+                    self.layers.len(),
+                    self.descriptor.config.hidden_size,
+                    self.family_metadata.rms_norm_epsilon,
+                )?)
+            } else {
+                None
+            };
+        let mut cache_key = forwarded_key
+            .map(|values| values.to_vec())
+            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
+        let mut cache_value = forwarded_value
+            .map(|values| values.to_vec())
+            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
+        if cache_key.len() != self.cache_width() || cache_value.len() != self.cache_width() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "gemma4 cuda forwarded kv width mismatch: expected {}, actual key={} value={}",
+                    self.cache_width(),
+                    cache_key.len(),
+                    cache_value.len()
+                )),
+            ));
+        }
+
+        let mut live_keys: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
+        let mut live_values: Vec<Option<Vec<f32>>> = vec![None; self.layers.len()];
+        let mut pending_cache_writes: Vec<Option<(Vec<f32>, Vec<f32>)>> = vec![None; self.layers.len()];
+        if start_layer > 0 {
+            for (layer_index, layer) in self.layers.iter().enumerate().take(start_layer) {
+                if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                    let kv_width = layer.attention_geometry.kv_width();
+                    let layer_key = cache_key[cache_offset..cache_offset + kv_width].to_vec();
+                    let layer_value = cache_value[cache_offset..cache_offset + kv_width].to_vec();
+                    live_keys[layer_index] = Some(layer_key.clone());
+                    live_values[layer_index] = Some(layer_value.clone());
+                    pending_cache_writes[layer_index] = Some((layer_key, layer_value));
+                }
+            }
+        }
+
+        for (layer_index, layer) in self
+            .layers
+            .iter()
+            .enumerate()
+            .skip(start_layer)
+            .take(end_layer.saturating_sub(start_layer))
+        {
+            let residual = hidden.clone();
+            let hidden_norm = rms_norm(
+                hidden.as_slice(),
+                layer.attention_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+
+            let (attention_values, q_kernel_count, q_bytes_moved, kv_kernel_count, kv_bytes_moved) =
+                if layer.attention_geometry.has_kv() {
+                    let mut q = layer.attention_query_weight.matvec(backend, &hidden_norm)?;
+                    if let Some(bias) = layer.attention_query_bias.as_ref() {
+                        add_bias_in_place(&mut q.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_query_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            q.values.as_mut_slice(),
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.head_dim,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+                    apply_rope_neox(
+                        &mut q.values,
+                        layer.attention_geometry.head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+
+                    let mut k = layer.attention_key_weight.matvec(backend, &hidden_norm)?;
+                    if let Some(bias) = layer.attention_key_bias.as_ref() {
+                        add_bias_in_place(&mut k.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_key_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            k.values.as_mut_slice(),
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+                    apply_rope_neox(
+                        &mut k.values,
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+
+                    let mut v = layer.attention_value_weight.matvec(backend, &hidden_norm)?;
+                    if let Some(bias) = layer.attention_value_bias.as_ref() {
+                        add_bias_in_place(&mut v.values, bias.as_slice());
+                    }
+                    if self.family_metadata.family == GgufDecoderFamily::Gemma4 {
+                        per_head_rms_norm_unit_in_place(
+                            v.values.as_mut_slice(),
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+
+                    if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                        let kv_width = layer.attention_geometry.kv_width();
+                        cache_key[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(k.values.as_slice());
+                        cache_value[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(v.values.as_slice());
+                    }
+                    live_keys[layer_index] = Some(k.values.clone());
+                    live_values[layer_index] = Some(v.values.clone());
+                    pending_cache_writes[layer_index] =
+                        Some((k.values.clone(), v.values.clone()));
+
+                    let layer_cache = layer_caches
+                        .get_mut(layer_index)
+                        .and_then(Option::as_mut)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 cuda layer {layer_index} is missing a device kv cache state"
+                                ),
+                            ))
+                        })?;
+                    layer_cache.ensure_capacity(backend, position.saturating_add(1))?;
+                    step_plan
+                        .query_buffer
+                        .write_f32_at_offset(0, q.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    step_plan
+                        .key_buffer
+                        .write_f32_at_offset(0, k.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    step_plan
+                        .value_buffer
+                        .write_f32_at_offset(0, v.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    let mut submission = backend
+                        .begin_submission()
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .attention_decode(
+                            &step_plan.query_buffer,
+                            0,
+                            &step_plan.key_buffer,
+                            0,
+                            &step_plan.value_buffer,
+                            0,
+                            &layer_cache.key_cache,
+                            &layer_cache.value_cache,
+                            layer_cache.width,
+                            0,
+                            position,
+                            layer.attention_geometry.sliding_window.unwrap_or(0),
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            None,
+                            &step_plan.attention_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (
+                        step_plan
+                            .attention_buffer
+                            .read_f32()
+                            .map_err(ReferenceTextGenerationError::Runtime)?,
+                        q.kernel_count,
+                        q.bytes_moved,
+                        k.kernel_count
+                            .saturating_add(v.kernel_count)
+                            .saturating_add(1),
+                        k.bytes_moved
+                            .saturating_add(v.bytes_moved)
+                            .saturating_add(step_plan.attention_buffer.byte_len() as u64),
+                    )
+                } else {
+                    let mut q = layer.attention_query_weight.matvec(backend, &hidden_norm)?;
+                    if let Some(bias) = layer.attention_query_bias.as_ref() {
+                        add_bias_in_place(&mut q.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_query_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            q.values.as_mut_slice(),
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.head_dim,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
+                        );
+                    }
+                    apply_rope_neox(
+                        &mut q.values,
+                        layer.attention_geometry.head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+                    let reuse_layer_index =
+                        layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} is missing reused kv source metadata"
+                                ),
+                            ))
+                        })?;
+                    let reused_k = live_keys
+                        .get(reuse_layer_index)
+                        .and_then(Option::as_deref)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} expected live key cache from layer {reuse_layer_index}"
+                                ),
+                            ))
+                        })?;
+                    let reused_v = live_values
+                        .get(reuse_layer_index)
+                        .and_then(Option::as_deref)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} expected live value cache from layer {reuse_layer_index}"
+                                ),
+                            ))
+                        })?;
+                    let source_cache = layer_caches
+                        .get_mut(reuse_layer_index)
+                        .and_then(Option::as_mut)
+                        .ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 layer {layer_index} expected device kv cache state from layer {reuse_layer_index}"
+                                ),
+                            ))
+                        })?;
+                    source_cache.ensure_capacity(backend, position.saturating_add(1))?;
+                    step_plan
+                        .query_buffer
+                        .write_f32_at_offset(0, q.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    step_plan
+                        .key_buffer
+                        .write_f32_at_offset(0, reused_k)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    step_plan
+                        .value_buffer
+                        .write_f32_at_offset(0, reused_v)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    let mut submission = backend
+                        .begin_submission()
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .attention_decode(
+                            &step_plan.query_buffer,
+                            0,
+                            &step_plan.key_buffer,
+                            0,
+                            &step_plan.value_buffer,
+                            0,
+                            &source_cache.key_cache,
+                            &source_cache.value_cache,
+                            source_cache.width,
+                            0,
+                            position,
+                            layer.attention_geometry.sliding_window.unwrap_or(0),
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            None,
+                            &step_plan.attention_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    submission
+                        .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (
+                        step_plan
+                            .attention_buffer
+                            .read_f32()
+                            .map_err(ReferenceTextGenerationError::Runtime)?,
+                        q.kernel_count,
+                        q.bytes_moved,
+                        1,
+                        step_plan.attention_buffer.byte_len() as u64,
+                    )
+                };
+
+            let mut attention_out = layer
+                .attention_output_weight
+                .matvec(backend, attention_values.as_slice())?;
+            if let Some(bias) = layer.attention_output_bias.as_ref() {
+                add_bias_in_place(&mut attention_out.values, bias.as_slice());
+            }
+            if let Some(norm) = layer.attention_post_norm.as_ref() {
+                rms_norm_in_place(
+                    attention_out.values.as_mut_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+            }
+            add_vectors_in_place(attention_out.values.as_mut_slice(), residual.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = attention_out.values;
+
+            let ffn_residual = hidden.clone();
+            let ffn_input = rms_norm(
+                hidden.as_slice(),
+                layer.feed_forward_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+            let gate = layer.feed_forward_gate_weight.matvec(backend, &ffn_input)?;
+            let up = layer.feed_forward_up_weight.matvec(backend, &ffn_input)?;
+            let activated = feed_forward_activation(
+                &self.family_metadata,
+                gate.values.as_slice(),
+                up.values.as_slice(),
+            );
+            let mut ffn_out = layer
+                .feed_forward_down_weight
+                .matvec(backend, activated.as_slice())?;
+            if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
+                rms_norm_in_place(
+                    ffn_out.values.as_mut_slice(),
+                    norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+            }
+            add_vectors_in_place(ffn_out.values.as_mut_slice(), ffn_residual.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            hidden = ffn_out.values;
+
+            if let Some(per_layer_inputs) = gemma4_per_layer_inputs.as_ref() {
+                if let (Some(input_gate), Some(proj), Some(post_norm)) = (
+                    layer.per_layer_input_gate.as_ref(),
+                    layer.per_layer_proj.as_ref(),
+                    layer.per_layer_post_norm.as_ref(),
+                ) {
+                    let mut gated = input_gate.matvec(backend, hidden.as_slice())?;
+                    for value in &mut gated.values {
+                        *value = approximate_gelu(*value);
+                    }
+                    let gated_values = multiply_vectors(
+                        gated.values.as_slice(),
+                        self.gemma4_per_layer_inputs
+                            .as_ref()
+                            .expect("per-layer config")
+                            .layer_slice(per_layer_inputs.values.as_slice(), layer_index),
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    let mut projected = proj.matvec(backend, gated_values.as_slice())?;
+                    rms_norm_in_place(
+                        projected.values.as_mut_slice(),
+                        post_norm.as_slice(),
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                    hidden = add_vectors(hidden.as_slice(), projected.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    bytes_moved = bytes_moved
+                        .saturating_add(gated.bytes_moved)
+                        .saturating_add(projected.bytes_moved);
+                    kernel_count = kernel_count
+                        .saturating_add(gated.kernel_count)
+                        .saturating_add(projected.kernel_count);
+                }
+            }
+            if let Some(scale) = layer.layer_output_scale {
+                scale_in_place(&mut hidden, scale);
+            }
+
+            bytes_moved = bytes_moved
+                .saturating_add(q_bytes_moved)
+                .saturating_add(kv_bytes_moved)
+                .saturating_add(attention_out.bytes_moved)
+                .saturating_add(gate.bytes_moved)
+                .saturating_add(up.bytes_moved)
+                .saturating_add(ffn_out.bytes_moved);
+            kernel_count = kernel_count
+                .saturating_add(q_kernel_count)
+                .saturating_add(kv_kernel_count)
+                .saturating_add(attention_out.kernel_count)
+                .saturating_add(gate.kernel_count)
+                .saturating_add(up.kernel_count)
+                .saturating_add(ffn_out.kernel_count);
+        }
+
+        for (layer_index, pending) in pending_cache_writes.into_iter().enumerate() {
+            let Some((pending_key, pending_value)) = pending else {
+                continue;
+            };
+            let layer_cache = layer_caches
+                .get_mut(layer_index)
+                .and_then(Option::as_mut)
+                .ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                        "gemma4 cuda layer {layer_index} is missing a device kv cache state during writeback"
+                    )))
+                })?;
+            layer_cache.ensure_capacity(backend, layer_cache.len.saturating_add(1))?;
+            let write_offset = layer_cache.len.saturating_mul(layer_cache.width);
+            layer_cache
+                .key_cache
+                .write_f32_at_offset(write_offset, pending_key.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            layer_cache
+                .value_cache
+                .write_f32_at_offset(write_offset, pending_value.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            layer_cache.len = layer_cache.len.saturating_add(1);
+        }
+
+        let (logits, lm_head_hidden) = if produce_logits {
+            let final_hidden = rms_norm(
+                hidden.as_slice(),
+                self.output_norm.as_slice(),
+                self.family_metadata.rms_norm_epsilon,
+            );
+            let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
+            apply_final_logit_softcapping_in_place(
+                logits.values.as_mut_slice(),
+                self.family_metadata.final_logit_softcapping,
+            );
+            bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
+            kernel_count = kernel_count.saturating_add(logits.kernel_count);
+            (logits.values, Some(final_hidden))
+        } else {
+            (Vec::new(), None)
+        };
+
+        Ok(CudaGemma4StageStep {
+            key: cache_key,
+            value: cache_value,
+            logits,
+            hidden,
+            lm_head_hidden,
+            kernel_count,
+            bytes_moved,
         })
     }
 
@@ -6209,6 +8728,107 @@ struct CudaGemma4ForwardStep {
     final_hidden: Vec<f32>,
     kernel_count: usize,
     bytes_moved: u64,
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4LayerCacheState {
+    key_cache: CudaBuffer,
+    value_cache: CudaBuffer,
+    width: usize,
+    len: usize,
+    capacity_tokens: usize,
+}
+
+impl CudaGemma4LayerCacheState {
+    fn new(
+        backend: &mut CudaBackend,
+        width: usize,
+        capacity_tokens: usize,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let cache_len = width.saturating_mul(capacity_tokens);
+        Ok(Self {
+            key_cache: backend
+                .input_buffer(Shape::new(vec![cache_len]), vec![0.0; cache_len])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            value_cache: backend
+                .input_buffer(Shape::new(vec![cache_len]), vec![0.0; cache_len])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            width,
+            len: 0,
+            capacity_tokens,
+        })
+    }
+
+    fn ensure_capacity(
+        &mut self,
+        backend: &mut CudaBackend,
+        required_tokens: usize,
+    ) -> Result<(), ReferenceTextGenerationError> {
+        if required_tokens <= self.capacity_tokens {
+            return Ok(());
+        }
+        let new_capacity = required_tokens
+            .max(self.capacity_tokens.saturating_mul(2))
+            .checked_next_power_of_two()
+            .unwrap_or(required_tokens);
+        let new_len = self.width.saturating_mul(new_capacity);
+        let new_key_cache = backend
+            .input_buffer(Shape::new(vec![new_len]), vec![0.0; new_len])
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let new_value_cache = backend
+            .input_buffer(Shape::new(vec![new_len]), vec![0.0; new_len])
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if self.len > 0 {
+            let copy_bytes = self
+                .len
+                .saturating_mul(self.width)
+                .saturating_mul(std::mem::size_of::<f32>());
+            let mut submission = backend
+                .begin_submission()
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            submission
+                .copy_buffer_region(&self.key_cache, 0, &new_key_cache, 0, copy_bytes)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            submission
+                .copy_buffer_region(&self.value_cache, 0, &new_value_cache, 0, copy_bytes)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            submission
+                .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        self.key_cache = new_key_cache;
+        self.value_cache = new_value_cache;
+        self.capacity_tokens = new_capacity;
+        Ok(())
+    }
+
+    fn state(&self) -> psionic_runtime::KvCacheState {
+        let bytes = self
+            .len
+            .saturating_mul(self.width)
+            .saturating_mul(std::mem::size_of::<f32>());
+        psionic_runtime::KvCacheState {
+            tokens: self.len,
+            bytes: bytes as u64,
+            pages: self.len,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaGemma4StepPlan {
+    qkv_buffer: CudaBuffer,
+    query_buffer: CudaBuffer,
+    key_buffer: CudaBuffer,
+    value_buffer: CudaBuffer,
+    attention_buffer: CudaBuffer,
+}
+
+#[derive(Debug)]
+struct DistributedCudaGemma4RequestState {
+    cache: crate::InMemoryKvCache,
+    layer_caches: Vec<Option<CudaGemma4LayerCacheState>>,
+    step_plan: CudaGemma4StepPlan,
 }
 
 fn gguf_local_blob_open_options() -> LocalBlobOpenOptions {
@@ -7720,6 +10340,54 @@ fn apply_rope_neox(
     }
 }
 
+fn metal_gemma4_rope_cos_sin_values(
+    position: usize,
+    head_dim: usize,
+    rotary_dim: usize,
+    rope_theta: f32,
+    freq_factors: Option<&[f32]>,
+    metadata: &GgufDecoderFamilyMetadata,
+) -> (Vec<f32>, Vec<f32>) {
+    let rotary_dim = rotary_dim.min(head_dim).max(2);
+    let half_dim = head_dim / 2;
+    let freq_scale = metadata
+        .rope_scaling_factor
+        .filter(|value| *value > 0.0)
+        .map_or(1.0, |value| 1.0 / value);
+    let ext_factor = metadata
+        .rope_scaling_factor
+        .zip(metadata.rope_original_context_length)
+        .filter(|(factor, original)| *factor > 1.0 && *original > 0)
+        .map_or(0.0, |_| 1.0);
+    let corr_dims = metadata
+        .rope_original_context_length
+        .map(|original| rope_yarn_corr_dims(rotary_dim, original, rope_theta))
+        .unwrap_or([0.0, rotary_dim as f32 - 1.0]);
+    let theta_scale = rope_theta.powf(-2.0 / rotary_dim as f32);
+    let mut cos = vec![1.0; half_dim];
+    let mut sin = vec![0.0; half_dim];
+    for pair in 0..(rotary_dim / 2) {
+        let i0 = pair * 2;
+        let freq_factor = freq_factors
+            .and_then(|factors| factors.get(pair))
+            .copied()
+            .filter(|value| *value > 0.0)
+            .unwrap_or(1.0);
+        let theta_base = position as f32 * theta_scale.powf(pair as f32);
+        let (cos_theta, sin_theta) = rope_yarn(
+            theta_base / freq_factor,
+            freq_scale,
+            corr_dims,
+            i0,
+            ext_factor,
+            1.0,
+        );
+        cos[pair] = cos_theta;
+        sin[pair] = sin_theta;
+    }
+    (cos, sin)
+}
+
 fn rope_yarn_corr_dims(n_dims: usize, n_ctx_orig: usize, freq_base: f32) -> [f32; 2] {
     let corr_dim = |n_rot: f32| {
         n_dims as f32
@@ -7810,11 +10478,14 @@ impl GenerationEventStream for CompletedGenerationStream {
 #[cfg(test)]
 mod tests {
     use super::{
-        CpuGgufServiceKind, CpuGgufTextGenerationService, DistributedGemma4RemoteStepResponse,
+        CpuGgufServiceKind, CpuGgufTextGenerationService, DistributedGemma4RemoteStepRequest,
+        DistributedGemma4RemoteStepResponse,
         PromotedGemmaRevisionEntry, PromotedGemmaRevisionState,
         attend_impl, axpy,
+        decode_distributed_gemma4_remote_step_request,
         decode_distributed_gemma4_remote_step_response,
         dot, encode_distributed_gemma4_remote_step_response,
+        encode_distributed_gemma4_remote_step_request,
         gemma_served_revision_identity, validate_gemma_exported_revision,
     };
     use crate::{
@@ -8044,6 +10715,69 @@ mod tests {
         assert_eq!(decoded.logits, response.logits);
         assert_eq!(decoded.kernel_count, response.kernel_count);
         assert_eq!(decoded.bytes_moved, response.bytes_moved);
+    }
+
+    #[test]
+    fn distributed_gemma4_remote_step_request_binary_roundtrips() {
+        let request = DistributedGemma4RemoteStepRequest {
+            request_id: String::from("req-123"),
+            model_id: String::from("gemma4-e4b"),
+            token: 42,
+            position: 7,
+            split_layer: 11,
+            input_hidden: vec![1.25, -3.5, 0.0, 9.75],
+            forwarded_key: vec![0.5, 1.5, 2.5],
+            forwarded_value: vec![-1.0, 3.0],
+        };
+        let encoded = encode_distributed_gemma4_remote_step_request(&request)
+            .expect("request should encode");
+        let decoded = decode_distributed_gemma4_remote_step_request(encoded.as_slice())
+            .expect("request should decode");
+        assert_eq!(decoded.request_id, request.request_id);
+        assert_eq!(decoded.model_id, request.model_id);
+        assert_eq!(decoded.token, request.token);
+        assert_eq!(decoded.position, request.position);
+        assert_eq!(decoded.split_layer, request.split_layer);
+        assert_eq!(decoded.input_hidden, request.input_hidden);
+        assert_eq!(decoded.forwarded_key, request.forwarded_key);
+        assert_eq!(decoded.forwarded_value, request.forwarded_value);
+    }
+
+    #[test]
+    fn distributed_gemma4_remote_step_request_binary_rejects_truncated_header() {
+        let error = decode_distributed_gemma4_remote_step_request(&[1, 2, 3])
+            .expect_err("truncated header should fail");
+        assert!(matches!(error, ReferenceTextGenerationError::Runtime(_)));
+        assert!(
+            error
+                .to_string()
+                .contains("distributed gemma4 remote step request is truncated")
+        );
+    }
+
+    #[test]
+    fn distributed_gemma4_remote_step_request_binary_rejects_size_mismatch() {
+        let mut encoded =
+            encode_distributed_gemma4_remote_step_request(&DistributedGemma4RemoteStepRequest {
+                request_id: String::from("req"),
+                model_id: String::from("model"),
+                token: 1,
+                position: 2,
+                split_layer: 3,
+                input_hidden: vec![1.0, 2.0],
+                forwarded_key: vec![3.0],
+                forwarded_value: vec![4.0],
+            })
+            .expect("request should encode");
+        encoded.pop();
+        let error = decode_distributed_gemma4_remote_step_request(encoded.as_slice())
+            .expect_err("truncated payload should fail");
+        assert!(matches!(error, ReferenceTextGenerationError::Runtime(_)));
+        assert!(
+            error
+                .to_string()
+                .contains("distributed gemma4 remote step request length mismatch")
+        );
     }
 
     #[test]
