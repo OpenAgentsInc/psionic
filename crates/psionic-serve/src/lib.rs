@@ -26,8 +26,8 @@ mod psion_capability_withdrawal;
 mod psion_family_serve_vocabulary;
 mod psion_generic_load_and_generate;
 mod psion_rvllm_attention_backend;
-mod psion_rvllm_cublaslt_plan_cache;
 mod psion_rvllm_cublas_warmup;
+mod psion_rvllm_cublaslt_plan_cache;
 mod psion_rvllm_cuda_graph_pool;
 mod psion_rvllm_direct_engine_comparator;
 mod psion_rvllm_fa3_decode_attention_backend;
@@ -84,8 +84,8 @@ pub use psion_capability_withdrawal::*;
 pub use psion_family_serve_vocabulary::*;
 pub use psion_generic_load_and_generate::*;
 pub use psion_rvllm_attention_backend::*;
-pub use psion_rvllm_cublaslt_plan_cache::*;
 pub use psion_rvllm_cublas_warmup::*;
+pub use psion_rvllm_cublaslt_plan_cache::*;
 pub use psion_rvllm_cuda_graph_pool::*;
 pub use psion_rvllm_direct_engine_comparator::*;
 pub use psion_rvllm_fa3_decode_attention_backend::*;
@@ -3336,6 +3336,14 @@ pub enum KvCacheError {
         /// Actual value width.
         actual_value: usize,
     },
+    /// A caller attempted to overwrite a token position that does not exist.
+    #[error("kv position out of range: position={position} len={len}")]
+    PositionOutOfRange {
+        /// Requested token position.
+        position: usize,
+        /// Current cache length.
+        len: usize,
+    },
 }
 
 /// In-memory per-session KV cache with an explicit logical page layout.
@@ -3641,6 +3649,38 @@ impl InMemoryKvCache {
         if let Some(page) = self.pages.last_mut() {
             page.token_count = page.token_count.saturating_add(1);
         }
+        Ok(())
+    }
+
+    /// Appends a token placeholder when the runtime will materialize KV rows later.
+    pub(crate) fn append_token_without_kv(&mut self, token: TokenId) -> Result<(), KvCacheError> {
+        self.append(token, vec![0.0; self.width], vec![0.0; self.width])
+    }
+
+    /// Replaces one existing KV entry in place.
+    pub(crate) fn set_entry_kv(
+        &mut self,
+        token_index: usize,
+        key: Vec<f32>,
+        value: Vec<f32>,
+    ) -> Result<(), KvCacheError> {
+        if key.len() != self.width || value.len() != self.width {
+            return Err(KvCacheError::WidthMismatch {
+                expected: self.width,
+                actual_key: key.len(),
+                actual_value: value.len(),
+            });
+        }
+        let len = self.entries.len();
+        let entry = self
+            .entries
+            .get_mut(token_index)
+            .ok_or(KvCacheError::PositionOutOfRange {
+                position: token_index,
+                len,
+            })?;
+        entry.key = key;
+        entry.value = value;
         Ok(())
     }
 
@@ -4735,6 +4775,9 @@ fn kv_cache_diagnostic(error: &KvCacheError) -> LocalRuntimeDiagnostic {
             error.to_string(),
         ),
         KvCacheError::WidthMismatch { .. } => {
+            LocalRuntimeDiagnostic::new(LocalRuntimeErrorCode::Internal, 500, error.to_string())
+        }
+        KvCacheError::PositionOutOfRange { .. } => {
             LocalRuntimeDiagnostic::new(LocalRuntimeErrorCode::Internal, 500, error.to_string())
         }
     }

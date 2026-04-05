@@ -407,6 +407,53 @@ PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH=/abs/path/to/gemma4-31b.gguf \
   cargo test -p psionic-models gemma4_31b --manifest-path Cargo.toml --no-default-features
 ```
 
+Repo-owned benchmark harness:
+
+```bash
+cargo run -p psionic-serve --example gemma4_bench -- \
+  --model-path /abs/path/to/gemma-4-e2b-it-Q8_0.gguf \
+  --mode single \
+  --backend metal \
+  --json
+
+cargo run -p psionic-serve --example gemma4_bench -- \
+  --model-path /abs/path/to/gemma-4-e4b-it-Q4_K_M.gguf \
+  --mode distributed-dense \
+  --peer-base-url http://127.0.0.1:18080 \
+  --split-layer 21 \
+  --json
+
+cargo run -p psionic-serve --example gemma4_bench -- \
+  --model-path /abs/path/to/gemma-4-31B-it-Q4_K_M.gguf \
+  --mode single \
+  --backend cuda \
+  --json
+
+cargo run -p psionic-serve --example gemma4_bench -- \
+  --model-path /abs/path/to/gemma-4-26B-A4B-it-Q4_K_M.gguf \
+  --mode distributed-sparse \
+  --json
+```
+
+That harness prints or writes one machine-readable benchmark receipt with:
+
+- load seconds
+- total seconds
+- time to first token
+- output-token count
+- decode tokens per second
+- backend and topology truth
+
+The supported benchmark matrix is explicit:
+
+- `gemma4:e2b`: dense single-node
+- `gemma4:e4b`: dense single-node and dense split execution
+- `gemma4:31b`: dense single-node and dense split execution
+- `gemma4:26b`: admitted distributed sparse only
+
+The harness refuses unsupported combinations instead of pretending every
+Gemma 4 row is interchangeable.
+
 Those runs are the current publication bar. They prove:
 
 - bounded prompt-render and fixture alignment for the real `gemma4:e4b`
