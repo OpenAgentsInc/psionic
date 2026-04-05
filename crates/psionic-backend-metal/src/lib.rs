@@ -24,7 +24,7 @@ use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
-    sync::Arc,
+    sync::{Arc, OnceLock},
     thread,
 };
 
@@ -58,6 +58,9 @@ const FLASH_ATTENTION_FEATURE_FLAG: &str = "flash_attention";
 const METAL_POOL_MAX_CACHED_BUFFERS: usize = 128;
 const METAL_POOL_MAX_CACHED_BYTES: u64 = 64 * 1024 * 1024;
 const METAL_EXECUTION_PLAN_CACHE_MAX_ENTRIES: usize = 64;
+const METAL_DECODE_SIMDGROUP_THREADS: u64 = 32;
+const METAL_DECODE_MAX_SIMDGROUPS: usize = 16;
+const METAL_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP: usize = 8;
 const METAL_EXECUTION_PLAN_CACHE_MAX_CACHED_BYTES: u64 = 1024 * 1024;
 #[cfg(target_os = "macos")]
 const METAL_KERNEL_CACHE_MAX_ENTRIES: usize = 1;
@@ -72,6 +75,25 @@ const METAL_TEXT_GENERATION_KERNEL_CACHE_MAX_CACHED_BYTES: u64 = 64 * 1024 * 102
 const METAL_TEXT_GENERATION_MIN_AVAILABLE_BYTES: u64 = 128 * 1024 * 1024;
 const GGML_Q8_1_BLOCK_ELEMENTS: usize = 32;
 const GGML_Q8_1_BLOCK_BYTES: usize = 36;
+
+fn metal_decode_env_simdgroups() -> Option<usize> {
+    static OVERRIDE: OnceLock<Option<usize>> = OnceLock::new();
+    *OVERRIDE.get_or_init(|| {
+        std::env::var("PSIONIC_METAL_DECODE_SIMDGROUPS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| (1..=METAL_DECODE_MAX_SIMDGROUPS).contains(value))
+    })
+}
+
+fn metal_decode_active_simdgroups(token_count: usize) -> usize {
+    metal_decode_env_simdgroups()
+        .unwrap_or_else(|| token_count.clamp(1, METAL_DECODE_MAX_SIMDGROUPS))
+}
+
+pub fn quantized_argmax_candidate_count(rows: usize) -> usize {
+    rows.div_ceil(METAL_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP)
+}
 
 /// Exact plan surface currently supported for the first accelerated
 /// `psionic.embeddings` milestone.
@@ -2068,8 +2090,8 @@ impl MetalBackend {
         Ok(())
     }
 
-    /// Encodes one quantized row-wise matrix-vector product and writes the
-    /// greedy selected token into a packed eight-byte buffer.
+    /// Encodes one quantized row-wise matrix-vector product and writes one
+    /// packed `(value_key, row)` candidate per row block into an `i32` buffer.
     pub fn encode_quantized_matvec_argmax_submission(
         &mut self,
         submission: &mut MetalSubmission,
@@ -2081,7 +2103,7 @@ impl MetalBackend {
         input: &MetalBuffer,
         selected: &MetalBuffer,
     ) -> Result<(), RuntimeError> {
-        validate_quantized_matvec_request(
+        validate_quantized_matvec_argmax_request(
             weights,
             byte_offset,
             mode,
@@ -2090,13 +2112,6 @@ impl MetalBackend {
             input,
             selected,
         )?;
-        if selected.byte_len() != std::mem::size_of::<u64>() {
-            return Err(RuntimeError::Backend(format!(
-                "metal quantized argmax selected buffer must be {} bytes, actual {}",
-                std::mem::size_of::<u64>(),
-                selected.byte_len(),
-            )));
-        }
         let Some(backend) = self.selected_backend_mut() else {
             return Err(RuntimeError::Backend(String::from(
                 "metal backend unavailable: no selected execution device",
@@ -2512,6 +2527,7 @@ impl MetalBackend {
                 "metal backend unavailable: no selected execution device",
             )));
         };
+        let active_simdgroups = metal_decode_active_simdgroups(cache.len());
         backend.platform.encode_decode_attention_dense(
             &mut submission.platform,
             query,
@@ -2521,6 +2537,7 @@ impl MetalBackend {
             head_dim,
             scale,
             output,
+            active_simdgroups,
         )?;
         submission.encoded_operations += 1;
         Ok(())
@@ -2551,6 +2568,47 @@ impl MetalBackend {
             output,
             row_count,
             column_count,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one argmax reduction over packed `(value_key, row)` `i32` candidates.
+    pub fn encode_argmax_candidates_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        input: &MetalBuffer,
+        output: &MetalBuffer,
+        candidate_count: usize,
+    ) -> Result<(), RuntimeError> {
+        if input.spec().dtype() != DType::I32 || output.spec().dtype() != DType::I32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal argmax candidates requires i32 buffers",
+            )));
+        }
+        if input.spec().storage_size() < candidate_count.saturating_mul(2) {
+            return Err(RuntimeError::Backend(format!(
+                "metal argmax candidates input is too small: need {} i32 values, actual {}",
+                candidate_count.saturating_mul(2),
+                input.spec().storage_size()
+            )));
+        }
+        if output.spec().storage_size() < 2 {
+            return Err(RuntimeError::Backend(format!(
+                "metal argmax candidates output is too small: need 2 i32 values, actual {}",
+                output.spec().storage_size()
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_argmax_candidates(
+            &mut submission.platform,
+            input,
+            output,
+            candidate_count,
         )?;
         submission.encoded_operations += 1;
         Ok(())
@@ -5540,28 +5598,35 @@ fn read_argmax_indices_from_f32_buffer(
     Ok(indices)
 }
 
-fn read_packed_argmax_index(input: &MetalBuffer, label: &str) -> Result<u32, RuntimeError> {
+/// Reads one argmax index from a Metal `i32[2]` candidate buffer.
+pub fn read_argmax_candidate_index(input: &MetalBuffer, label: &str) -> Result<u32, RuntimeError> {
     if input.spec().dtype() != DType::I32 || input.spec().storage_size() != 2 {
         return Err(RuntimeError::Backend(format!(
-            "{label} requires a packed i32[2] buffer, actual {:?} with {} elements",
+            "{label} requires an i32[2] candidate buffer, actual {:?} with {} elements",
             input.spec().dtype(),
             input.spec().storage_size()
         )));
     }
     let bytes = input.read_bytes()?;
-    if bytes.len() != std::mem::size_of::<u64>() {
+    if bytes.len() != std::mem::size_of::<u32>() * 2 {
         return Err(RuntimeError::Backend(format!(
-            "{label} packed buffer size mismatch: expected {}, actual {}",
-            std::mem::size_of::<u64>(),
+            "{label} candidate buffer size mismatch: expected {}, actual {}",
+            std::mem::size_of::<u32>() * 2,
             bytes.len()
         )));
     }
-    let packed = u64::from_ne_bytes(bytes.as_slice().try_into().map_err(|_| {
+    let first = u32::from_ne_bytes(bytes[0..4].try_into().map_err(|_| {
         RuntimeError::Backend(String::from(
-            "metal argmax packed result was not eight bytes",
+            "metal argmax candidate result was missing the first u32",
         ))
     })?);
-    Ok(u32::MAX - (packed as u32))
+    let second = u32::from_ne_bytes(bytes[4..8].try_into().map_err(|_| {
+        RuntimeError::Backend(String::from(
+            "metal argmax candidate result was missing the second u32",
+        ))
+    })?);
+    let _ = first;
+    Ok(second)
 }
 
 fn top_k_dense_rows(
@@ -6304,6 +6369,73 @@ fn validate_quantized_matvec_request(
     Ok(row_stride)
 }
 
+fn validate_quantized_matvec_argmax_request(
+    weights: &MetalBuffer,
+    byte_offset: usize,
+    mode: psionic_core::QuantizationMode,
+    rows: usize,
+    columns: usize,
+    input: &MetalBuffer,
+    selected: &MetalBuffer,
+) -> Result<usize, RuntimeError> {
+    let row_stride = quantized_row_stride(mode, columns)?;
+    let required_bytes = rows.saturating_mul(row_stride);
+    let end_offset = byte_offset.saturating_add(required_bytes);
+    match weights.storage_kind() {
+        BufferStorageKind::QuantizedBlocks {
+            mode: stored_mode, ..
+        } if stored_mode == mode => {}
+        BufferStorageKind::QuantizedBlocks {
+            mode: stored_mode, ..
+        } => {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized matvec argmax mode mismatch: requested {mode:?}, stored {stored_mode:?}",
+            )));
+        }
+        storage_kind => {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized matvec argmax requires quantized block storage, actual {:?}",
+                storage_kind
+            )));
+        }
+    }
+    if weights.byte_len() < end_offset {
+        return Err(RuntimeError::Backend(format!(
+            "metal quantized matvec argmax byte length mismatch: required {end_offset}, actual {}",
+            weights.byte_len(),
+        )));
+    }
+    if input.storage_kind() != BufferStorageKind::DenseF32 || input.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal quantized matvec argmax input requires dense f32 storage, actual {:?}",
+            input.storage_kind()
+        )));
+    }
+    if input.spec().storage_size() < columns {
+        return Err(RuntimeError::Backend(format!(
+            "metal quantized matvec argmax input width mismatch: required at least {columns}, actual {}",
+            input.spec().storage_size()
+        )));
+    }
+    let candidate_count = quantized_argmax_candidate_count(rows);
+    let required_elements = candidate_count.saturating_mul(2);
+    if selected.spec().dtype() != DType::I32 || selected.spec().storage_size() < required_elements {
+        return Err(RuntimeError::Backend(format!(
+            "metal quantized matvec argmax selected buffer requires at least {required_elements} i32 elements, actual {:?} with {} elements",
+            selected.spec().dtype(),
+            selected.spec().storage_size()
+        )));
+    }
+    let required_bytes = required_elements.saturating_mul(std::mem::size_of::<u32>());
+    if selected.byte_len() < required_bytes {
+        return Err(RuntimeError::Backend(format!(
+            "metal quantized matvec argmax selected buffer must be at least {required_bytes} bytes, actual {}",
+            selected.byte_len()
+        )));
+    }
+    Ok(row_stride)
+}
+
 fn validate_grouped_quantized_matvec_request(
     weights: &MetalBuffer,
     mode: psionic_core::QuantizationMode,
@@ -6858,6 +6990,7 @@ mod platform {
         rope_neox_position_f32: ComputePipelineState,
         decode_attention_dense_f32: ComputePipelineState,
         argmax_f32: ComputePipelineState,
+        argmax_candidates_u32: ComputePipelineState,
         quantized_matvec_argmax_q4_k: ComputePipelineState,
         quantized_matvec_argmax_q6_k: ComputePipelineState,
         quantized_matvec_argmax_q8_0: ComputePipelineState,
@@ -7531,6 +7664,7 @@ mod platform {
             token_count: usize,
             head_dim: usize,
             scale: f32,
+            active_simdgroups: usize,
         ) -> Result<(), RuntimeError> {
             let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
@@ -7561,14 +7695,20 @@ mod platform {
             let head_dim = u32::try_from(head_dim).map_err(|_| {
                 RuntimeError::Backend(String::from("metal decode attention head dim overflow"))
             })?;
+            let active_simdgroups = u32::try_from(active_simdgroups).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal decode attention active simdgroup count overflow",
+                ))
+            })?;
             encoder.set_bytes(4, 4, (&query_head_count as *const u32).cast());
             encoder.set_bytes(5, 4, (&kv_head_count as *const u32).cast());
             encoder.set_bytes(6, 4, (&token_count as *const u32).cast());
             encoder.set_bytes(7, 4, (&head_dim as *const u32).cast());
             encoder.set_bytes(8, 4, (&scale as *const f32).cast());
+            encoder.set_bytes(9, 4, (&active_simdgroups as *const u32).cast());
             encoder.dispatch_thread_groups(
                 MTLSize::new(u64::from(query_head_count), 1, 1),
-                decode_attention_threadgroup_size(pipeline)?,
+                decode_attention_threadgroup_size(pipeline, active_simdgroups as usize)?,
             );
             Ok(())
         }
@@ -7600,6 +7740,30 @@ mod platform {
             let threadgroup_size = argmax_threadgroup_size(pipeline)?;
             encoder
                 .dispatch_thread_groups(MTLSize::new(u64::from(row_count), 1, 1), threadgroup_size);
+            Ok(())
+        }
+
+        pub(super) fn encode_argmax_candidates(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            input: &PlatformBuffer,
+            input_byte_offset: usize,
+            output: &PlatformBuffer,
+            output_byte_offset: usize,
+            candidate_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&input.raw), to_metal_size(input_byte_offset)?);
+            encoder.set_buffer(1, Some(&output.raw), to_metal_size(output_byte_offset)?);
+
+            let candidate_count = u32::try_from(candidate_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal argmax candidate count overflow"))
+            })?;
+            encoder.set_bytes(2, 4, (&candidate_count as *const u32).cast());
+
+            let threadgroup_size = argmax_threadgroup_size(pipeline)?;
+            encoder.dispatch_thread_groups(MTLSize::new(1, 1, 1), threadgroup_size);
             Ok(())
         }
 
@@ -7682,8 +7846,16 @@ mod platform {
             encoder.set_bytes(6, 8, (&byte_offset as *const u64).cast());
             encoder.set_bytes(7, 4, (&active_threads as *const u32).cast());
 
+            let candidate_count = crate::quantized_argmax_candidate_count(rows as usize);
             let threadgroup_size = MTLSize::new(u64::from(active_threads), 1, 1);
-            encoder.dispatch_thread_groups(MTLSize::new(u64::from(rows), 1, 1), threadgroup_size);
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::try_from(candidate_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal quantized argmax candidate count overflow",
+                    ))
+                })?, 1, 1),
+                threadgroup_size,
+            );
             Ok(())
         }
 
@@ -8192,6 +8364,7 @@ mod platform {
             head_dim: usize,
             scale: f32,
             output: &MetalBuffer,
+            active_simdgroups: usize,
         ) -> Result<(), RuntimeError> {
             let pipeline = &self.pipelines()?.decode_attention_dense_f32;
             submission.encode_decode_attention_dense(
@@ -8209,6 +8382,7 @@ mod platform {
                 cache.len(),
                 head_dim,
                 scale,
+                active_simdgroups,
             )
         }
 
@@ -8255,6 +8429,24 @@ mod platform {
                 output.byte_offset,
                 row_count,
                 column_count,
+            )
+        }
+
+        pub(super) fn encode_argmax_candidates(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            input: &MetalBuffer,
+            output: &MetalBuffer,
+            candidate_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.argmax_candidates_u32;
+            submission.encode_argmax_candidates(
+                pipeline,
+                &input.platform,
+                input.byte_offset,
+                &output.platform,
+                output.byte_offset,
+                candidate_count,
             )
         }
 
@@ -8754,6 +8946,13 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!("missing Metal argmax kernel: {error}"))
             })?;
+        let argmax_candidates_u32 = library
+            .get_function("psionic_argmax_candidates_u32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal argmax candidates kernel: {error}"
+                ))
+            })?;
         let quantized_matvec_argmax_q8_0 = library
             .get_function("psionic_quantized_matvec_argmax_q8_0", None)
             .map_err(|error| {
@@ -8927,6 +9126,13 @@ mod platform {
                 .new_compute_pipeline_state_with_function(&argmax_f32)
                 .map_err(|error| {
                     RuntimeError::Backend(format!("metal argmax pipeline build failed: {error}"))
+                })?,
+            argmax_candidates_u32: device
+                .new_compute_pipeline_state_with_function(&argmax_candidates_u32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal argmax candidates pipeline build failed: {error}"
+                    ))
                 })?,
             quantized_matvec_argmax_q4_k: device
                 .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_q4_k)
@@ -9110,20 +9316,27 @@ mod platform {
 
     fn decode_attention_threadgroup_size(
         pipeline: &ComputePipelineState,
+        active_simdgroups: usize,
     ) -> Result<MTLSize, RuntimeError> {
-        const ATTENTION_THREADS: u64 = 32 * 8;
+        let active_simdgroups = active_simdgroups.clamp(1, crate::METAL_DECODE_MAX_SIMDGROUPS);
+        let attention_threads = crate::METAL_DECODE_SIMDGROUP_THREADS
+            * u64::try_from(active_simdgroups).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal decode-attention simdgroup count overflow",
+                ))
+            })?;
         let max_threads = pipeline.max_total_threads_per_threadgroup();
         if max_threads == 0 {
             return Err(RuntimeError::Backend(String::from(
                 "metal decode-attention kernel reported zero max threads per threadgroup",
             )));
         }
-        if u64::from(max_threads) < ATTENTION_THREADS {
+        if u64::from(max_threads) < attention_threads {
             return Err(RuntimeError::Backend(format!(
-                "metal decode-attention kernel requires at least {ATTENTION_THREADS} threads per threadgroup, actual {max_threads}",
+                "metal decode-attention kernel requires at least {attention_threads} threads per threadgroup, actual {max_threads}",
             )));
         }
-        Ok(MTLSize::new(ATTENTION_THREADS, 1, 1))
+        Ok(MTLSize::new(attention_threads, 1, 1))
     }
 
     fn map_command_status(status: MTLCommandBufferStatus) -> MetalCommandStatus {
@@ -9152,9 +9365,10 @@ using namespace metal;
 
 constant uint PSIONIC_QUANTIZED_ROW_THREADS = 32;
 constant uint PSIONIC_ARGMAX_THREADS = 128;
+constant uint PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP = 8;
 constant uint PSIONIC_RMS_NORM_THREADS = 256;
 constant uint PSIONIC_DECODE_THREADS = 32;
-constant uint PSIONIC_DECODE_SIMDGROUPS = 8;
+constant uint PSIONIC_DECODE_MAX_SIMDGROUPS = 16;
 constant uint PSIONIC_DECODE_MAX_HEAD_DIM = 256;
 constant uint PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD = PSIONIC_DECODE_MAX_HEAD_DIM / PSIONIC_DECODE_THREADS;
 
@@ -9447,12 +9661,15 @@ kernel void psionic_decode_attention_dense_f32(
     constant uint& token_count [[buffer(6)]],
     constant uint& head_dim [[buffer(7)]],
     constant float& scale [[buffer(8)]],
+    constant uint& active_simdgroups [[buffer(9)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint simd_gid [[simdgroup_index_in_threadgroup]],
     uint lane [[thread_index_in_simdgroup]]
 ) {
     uint head = tgpig.x;
-    if (head >= query_head_count || head_dim > PSIONIC_DECODE_MAX_HEAD_DIM) {
+    if (head >= query_head_count || head_dim > PSIONIC_DECODE_MAX_HEAD_DIM ||
+        active_simdgroups == 0 || active_simdgroups > PSIONIC_DECODE_MAX_SIMDGROUPS ||
+        simd_gid >= active_simdgroups) {
         return;
     }
     uint values_per_thread = (head_dim + PSIONIC_DECODE_THREADS - 1) / PSIONIC_DECODE_THREADS;
@@ -9469,10 +9686,10 @@ kernel void psionic_decode_attention_dense_f32(
     float q_fragment[PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD];
     float out_fragment[PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD];
     threadgroup float partial_outputs
-        [PSIONIC_DECODE_SIMDGROUPS * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD * PSIONIC_DECODE_THREADS];
-    threadgroup float partial_max[PSIONIC_DECODE_SIMDGROUPS];
-    threadgroup float partial_denom[PSIONIC_DECODE_SIMDGROUPS];
-    threadgroup float block_factors[PSIONIC_DECODE_SIMDGROUPS];
+        [PSIONIC_DECODE_MAX_SIMDGROUPS * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD * PSIONIC_DECODE_THREADS];
+    threadgroup float partial_max[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    threadgroup float partial_denom[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    threadgroup float block_factors[PSIONIC_DECODE_MAX_SIMDGROUPS];
     threadgroup float global_denom_value;
     for (uint slot = 0; slot < PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD; ++slot) {
         q_fragment[slot] = 0.0f;
@@ -9487,7 +9704,7 @@ kernel void psionic_decode_attention_dense_f32(
 
     float max_logit = -INFINITY;
     float denom = 0.0f;
-    for (uint token = simd_gid; token < token_count; token += PSIONIC_DECODE_SIMDGROUPS) {
+    for (uint token = simd_gid; token < token_count; token += active_simdgroups) {
         uint token_base = token * cache_row_width + cache_head_base;
         float dot = 0.0f;
         for (uint slot = 0; slot < values_per_thread; ++slot) {
@@ -9523,13 +9740,13 @@ kernel void psionic_decode_attention_dense_f32(
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
     if (simd_gid == 0) {
-        float local_max = lane < PSIONIC_DECODE_SIMDGROUPS ? partial_max[lane] : -INFINITY;
+        float local_max = lane < active_simdgroups ? partial_max[lane] : -INFINITY;
         float global_max = simd_max(local_max);
         float factor =
-            lane < PSIONIC_DECODE_SIMDGROUPS ? fast::exp(partial_max[lane] - global_max) : 0.0f;
+            lane < active_simdgroups ? fast::exp(partial_max[lane] - global_max) : 0.0f;
         float global_denom =
-            simd_sum((lane < PSIONIC_DECODE_SIMDGROUPS ? partial_denom[lane] : 0.0f) * factor);
-        if (lane < PSIONIC_DECODE_SIMDGROUPS) {
+            simd_sum((lane < active_simdgroups ? partial_denom[lane] : 0.0f) * factor);
+        if (lane < active_simdgroups) {
             block_factors[lane] = factor;
         }
         if (lane == 0) {
@@ -9544,7 +9761,7 @@ kernel void psionic_decode_attention_dense_f32(
             uint dim = lane + slot * PSIONIC_DECODE_THREADS;
             if (dim < head_dim) {
                 float accumulated = 0.0f;
-                for (uint block = 0; block < PSIONIC_DECODE_SIMDGROUPS; ++block) {
+                for (uint block = 0; block < active_simdgroups; ++block) {
                     accumulated += partial_outputs
                         [(block * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD + slot) *
                                 PSIONIC_DECODE_THREADS +
@@ -9604,6 +9821,50 @@ kernel void psionic_argmax_f32(
 
     if (tid == 0) {
         output[row] = float(partial_indices[0]);
+    }
+}
+
+kernel void psionic_argmax_candidates_u32(
+    const device uint* input [[buffer(0)]],
+    device uint* output [[buffer(1)]],
+    constant uint& candidate_count [[buffer(2)]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    threadgroup uint partial_keys[PSIONIC_ARGMAX_THREADS];
+    threadgroup uint partial_rows[PSIONIC_ARGMAX_THREADS];
+
+    uint best_key = 0u;
+    uint best_row = 0xffffffffu;
+    for (uint index = tid; index < candidate_count; index += PSIONIC_ARGMAX_THREADS) {
+        uint key = input[index * 2];
+        uint row = input[index * 2 + 1];
+        if (key > best_key || (key == best_key && row < best_row)) {
+            best_key = key;
+            best_row = row;
+        }
+    }
+
+    partial_keys[tid] = best_key;
+    partial_rows[tid] = best_row;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (uint stride = PSIONIC_ARGMAX_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            uint candidate_key = partial_keys[tid + stride];
+            uint candidate_row = partial_rows[tid + stride];
+            if (candidate_key > partial_keys[tid]
+                || (candidate_key == partial_keys[tid]
+                    && candidate_row < partial_rows[tid])) {
+                partial_keys[tid] = candidate_key;
+                partial_rows[tid] = candidate_row;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (tid == 0) {
+        output[0] = partial_keys[0];
+        output[1] = partial_rows[0];
     }
 }
 
@@ -9882,10 +10143,35 @@ kernel void psionic_quantized_matvec_q4_k(
     }
 }
 
+inline uint psionic_ordered_float_key(float value) {
+    uint bits = as_type<uint>(isfinite(value) ? value : -INFINITY);
+    return (bits & 0x80000000u) != 0u ? ~bits : (bits | 0x80000000u);
+}
+
+inline bool psionic_argmax_candidate_better(
+    uint candidate_key,
+    uint candidate_row,
+    uint best_key,
+    uint best_row
+) {
+    return candidate_key > best_key || (candidate_key == best_key && candidate_row < best_row);
+}
+
+inline void psionic_write_argmax_candidate(
+    device uint* output,
+    uint candidate_index,
+    float value,
+    uint row
+) {
+    uint base = candidate_index * 2;
+    output[base] = psionic_ordered_float_key(value);
+    output[base + 1] = row;
+}
+
 kernel void psionic_quantized_matvec_argmax_q4_k(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device float* output [[buffer(2)]],
+    device uint* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
@@ -9894,30 +10180,46 @@ kernel void psionic_quantized_matvec_argmax_q4_k(
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
-    if (row >= rows || tid != 0) {
-        if (row >= rows) {
-            return;
-        }
+    uint candidate_index = tgpig.x;
+    uint base_row = candidate_index * PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP;
+    if (base_row >= rows) {
+        return;
     }
     threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
-    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    uint best_key = 0u;
+    uint best_row = 0xffffffffu;
     uint block_count = columns / 256;
-    float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
-        const device uchar* block = row_weights + (block_index * 144);
-        sum += psionic_q4_k_block_dot(block, input + block_index * 256);
-    }
-    partial[tid] = sum;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            partial[tid] += partial[tid + stride];
+    for (uint local_row = 0; local_row < PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP; ++local_row) {
+        uint row = base_row + local_row;
+        if (row >= rows) {
+            break;
         }
+        const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+        float sum = 0.0f;
+        for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+            const device uchar* block = row_weights + (block_index * 144);
+            sum += psionic_q4_k_block_dot(block, input + block_index * 256);
+        }
+        partial[tid] = sum;
         threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                partial[tid] += partial[tid + stride];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid == 0) {
+            uint candidate_key = psionic_ordered_float_key(partial[0]);
+            if (psionic_argmax_candidate_better(candidate_key, row, best_key, best_row)) {
+                best_key = candidate_key;
+                best_row = row;
+            }
+        }
     }
     if (tid == 0) {
-        output[row] = partial[0];
+        uint base = candidate_index * 2;
+        output[base] = best_key;
+        output[base + 1] = best_row;
     }
 }
 
@@ -9996,7 +10298,7 @@ kernel void psionic_quantized_matvec_q6_k(
 kernel void psionic_quantized_matvec_argmax_q6_k(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device float* output [[buffer(2)]],
+    device uint* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
@@ -10005,30 +10307,46 @@ kernel void psionic_quantized_matvec_argmax_q6_k(
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
-    if (row >= rows || tid != 0) {
-        if (row >= rows) {
-            return;
-        }
+    uint candidate_index = tgpig.x;
+    uint base_row = candidate_index * PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP;
+    if (base_row >= rows) {
+        return;
     }
     threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
-    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    uint best_key = 0u;
+    uint best_row = 0xffffffffu;
     uint block_count = columns / 256;
-    float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
-        const device uchar* block = row_weights + (block_index * 210);
-        sum += psionic_q6_k_block_dot(block, input + block_index * 256);
-    }
-    partial[tid] = sum;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            partial[tid] += partial[tid + stride];
+    for (uint local_row = 0; local_row < PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP; ++local_row) {
+        uint row = base_row + local_row;
+        if (row >= rows) {
+            break;
         }
+        const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+        float sum = 0.0f;
+        for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+            const device uchar* block = row_weights + (block_index * 210);
+            sum += psionic_q6_k_block_dot(block, input + block_index * 256);
+        }
+        partial[tid] = sum;
         threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                partial[tid] += partial[tid + stride];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid == 0) {
+            uint candidate_key = psionic_ordered_float_key(partial[0]);
+            if (psionic_argmax_candidate_better(candidate_key, row, best_key, best_row)) {
+                best_key = candidate_key;
+                best_row = row;
+            }
+        }
     }
     if (tid == 0) {
-        output[row] = partial[0];
+        uint base = candidate_index * 2;
+        output[base] = best_key;
+        output[base + 1] = best_row;
     }
 }
 
@@ -10072,7 +10390,7 @@ kernel void psionic_quantized_matvec_q8_0(
 kernel void psionic_quantized_matvec_argmax_q8_0(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device float* output [[buffer(2)]],
+    device uint* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
@@ -10081,28 +10399,46 @@ kernel void psionic_quantized_matvec_argmax_q8_0(
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
-    if (row >= rows) {
+    uint candidate_index = tgpig.x;
+    uint base_row = candidate_index * PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP;
+    if (base_row >= rows) {
         return;
     }
     threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
-    ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
-    float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
-        const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
-        sum += psionic_q8_0_block_dot(block, input + block_index * 32);
-    }
-    partial[tid] = sum;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            partial[tid] += partial[tid + stride];
+    uint best_key = 0u;
+    uint best_row = 0xffffffffu;
+    for (uint local_row = 0; local_row < PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP; ++local_row) {
+        uint row = base_row + local_row;
+        if (row >= rows) {
+            break;
         }
+        ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
+        float sum = 0.0f;
+        for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+            const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
+            sum += psionic_q8_0_block_dot(block, input + block_index * 32);
+        }
+        partial[tid] = sum;
         threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                partial[tid] += partial[tid + stride];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid == 0) {
+            uint candidate_key = psionic_ordered_float_key(partial[0]);
+            if (psionic_argmax_candidate_better(candidate_key, row, best_key, best_row)) {
+                best_key = candidate_key;
+                best_row = row;
+            }
+        }
     }
     if (tid == 0) {
-        output[row] = partial[0];
+        uint base = candidate_index * 2;
+        output[base] = best_key;
+        output[base + 1] = best_row;
     }
 }
 
@@ -10146,7 +10482,7 @@ kernel void psionic_quantized_matvec_mxfp4(
 kernel void psionic_quantized_matvec_argmax_mxfp4(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device float* output [[buffer(2)]],
+    device uint* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
@@ -10155,28 +10491,46 @@ kernel void psionic_quantized_matvec_argmax_mxfp4(
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
-    if (row >= rows) {
+    uint candidate_index = tgpig.x;
+    uint base_row = candidate_index * PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP;
+    if (base_row >= rows) {
         return;
     }
     threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
-    ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
-    float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
-        const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
-        sum += psionic_mxfp4_block_dot(block, input + block_index * 32);
-    }
-    partial[tid] = sum;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            partial[tid] += partial[tid + stride];
+    uint best_key = 0u;
+    uint best_row = 0xffffffffu;
+    for (uint local_row = 0; local_row < PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP; ++local_row) {
+        uint row = base_row + local_row;
+        if (row >= rows) {
+            break;
         }
+        ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
+        float sum = 0.0f;
+        for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+            const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
+            sum += psionic_mxfp4_block_dot(block, input + block_index * 32);
+        }
+        partial[tid] = sum;
         threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                partial[tid] += partial[tid + stride];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid == 0) {
+            uint candidate_key = psionic_ordered_float_key(partial[0]);
+            if (psionic_argmax_candidate_better(candidate_key, row, best_key, best_row)) {
+                best_key = candidate_key;
+                best_row = row;
+            }
+        }
     }
     if (tid == 0) {
-        output[row] = partial[0];
+        uint base = candidate_index * 2;
+        output[base] = best_key;
+        output[base + 1] = best_row;
     }
 }
 
@@ -10663,6 +11017,7 @@ mod platform {
             _token_count: usize,
             _head_dim: usize,
             _scale: f32,
+            _active_simdgroups: usize,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -10882,6 +11237,7 @@ mod platform {
             _head_dim: usize,
             _scale: f32,
             _output: &MetalBuffer,
+            _active_simdgroups: usize,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",

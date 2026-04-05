@@ -2713,6 +2713,7 @@ struct MetalGemma4StepPlan {
     per_layer_activated_buffer: Option<MetalBuffer>,
     per_layer_projected_buffer: Option<MetalBuffer>,
     logits_buffer: MetalBuffer,
+    argmax_candidates_buffer: MetalBuffer,
     selected_token_buffer: MetalBuffer,
 }
 
@@ -3785,8 +3786,14 @@ impl MetalGemma4ModelInner {
             logits_buffer: backend
                 .zeros_buffer(Shape::new(vec![self.output.rows()]))
                 .map_err(ReferenceTextGenerationError::Runtime)?,
+            argmax_candidates_buffer: backend
+                .zeros_i32_buffer(Shape::new(vec![
+                    psionic_backend_metal::quantized_argmax_candidate_count(self.output.rows())
+                        .saturating_mul(2),
+                ]))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
             selected_token_buffer: backend
-                .zeros_buffer(Shape::new(vec![1]))
+                .zeros_i32_buffer(Shape::new(vec![2]))
                 .map_err(ReferenceTextGenerationError::Runtime)?,
         })
     }
@@ -4521,7 +4528,7 @@ impl MetalGemma4ModelInner {
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 backend
-                    .encode_quantized_matvec_submission(
+                    .encode_quantized_matvec_argmax_submission(
                         &mut submission,
                         &self.output.weights,
                         0,
@@ -4529,16 +4536,15 @@ impl MetalGemma4ModelInner {
                         self.output.rows,
                         self.output.columns,
                         &step_plan.norm_buffer,
-                        &step_plan.logits_buffer,
+                        &step_plan.argmax_candidates_buffer,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 backend
-                    .encode_argmax_f32_submission(
+                    .encode_argmax_candidates_submission(
                         &mut submission,
-                        &step_plan.logits_buffer,
+                        &step_plan.argmax_candidates_buffer,
                         &step_plan.selected_token_buffer,
-                        1,
-                        self.output.rows,
+                        psionic_backend_metal::quantized_argmax_candidate_count(self.output.rows),
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 submission
@@ -4590,23 +4596,13 @@ impl MetalGemma4ModelInner {
         if produce_logits {
             match logits_output_mode {
                 MetalLogitsOutputMode::GreedyToken => {
-                    let selected = step_plan
-                        .selected_token_buffer
-                        .read_f32()
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
-                    let Some(&value) = selected.first() else {
-                        return Err(ReferenceTextGenerationError::MissingOutput(
+                    selected_token = Some(TokenId(
+                        psionic_backend_metal::read_argmax_candidate_index(
+                            &step_plan.selected_token_buffer,
                             "metal gemma4 greedy token",
-                        ));
-                    };
-                    if !value.is_finite() || value < 0.0 {
-                        return Err(ReferenceTextGenerationError::Runtime(
-                            crate::RuntimeError::Backend(format!(
-                                "metal gemma4 greedy token index was invalid: {value}"
-                            )),
-                        ));
-                    }
-                    selected_token = Some(TokenId(value as u32));
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                    ));
                 }
                 MetalLogitsOutputMode::RawLogits => {
                     logits = step_plan
