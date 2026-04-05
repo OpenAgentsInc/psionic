@@ -13,7 +13,9 @@ use psionic_cluster::{
     Gemma4MoeDistributedLaneRequest, NodeEpoch, NodeId, NodeRole, SparseExpertHostInventoryRecord,
     SparseExpertHostInventorySnapshot,
 };
-use psionic_models::{GgufDecoderAdapterLoader, PromptMessage, PromptMessageRole};
+use psionic_models::{
+    GgufDecoderAdapterLoader, GgufDecoderFamily, PromptMessage, PromptMessageRole,
+};
 use psionic_serve::{
     CudaGemma4TextGenerationService, DistributedGemma4PeerConfig,
     DistributedGemma4TextGenerationService, GenerationMetrics, GenerationOptions,
@@ -508,7 +510,9 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
                 adapter.descriptor().model.model_id
             )
         })?;
-    if adapter.descriptor().model.model_id != "gemma4:26b" {
+    let canonical_sparse_model = adapter.descriptor().model.model_id == "gemma4:26b"
+        || adapter.family_metadata().family == GgufDecoderFamily::Gemma4;
+    if !canonical_sparse_model {
         return Err(format!(
             "distributed-sparse mode currently expects model id `gemma4:26b`, got `{}`",
             adapter.descriptor().model.model_id

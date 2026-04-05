@@ -1364,6 +1364,11 @@ pub fn quantized_row_dot(
             QuantizationMode::GgmlMxfp4 => dot_mxfp4_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_0 => dot_q4_0_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_1 => dot_q4_1_block(lhs_block, block_bytes)?,
+            QuantizationMode::GgmlQ5_0 => {
+                return Err(RuntimeError::Backend(String::from(
+                    "unsupported quantized matmul mode GgmlQ5_0",
+                )));
+            }
             QuantizationMode::GgmlQ4K => dot_q4_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ6K => dot_q6_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ8_0 => dot_q8_0_block(lhs_block, block_bytes)?,
@@ -1438,6 +1443,11 @@ pub fn decode_quantized_row_into(
             QuantizationMode::GgmlMxfp4 => decode_mxfp4_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_0 => decode_q4_0_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_1 => decode_q4_1_block_into(block_bytes, output)?,
+            QuantizationMode::GgmlQ5_0 => {
+                return Err(RuntimeError::Backend(String::from(
+                    "unsupported quantized decode mode GgmlQ5_0",
+                )));
+            }
             QuantizationMode::GgmlQ4K => decode_q4_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ6K => decode_q6_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ8_0 => decode_q8_0_block_into(block_bytes, output)?,
@@ -1570,18 +1580,16 @@ fn dot_q6_k_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
         for l in 0..32 {
             let is = l / 16;
             let q1 = (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
-            let q2 =
-                (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
+            let q2 = (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
             let q3 = (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
-            let q4 =
-                (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
+            let q4 = (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
             sum += lhs_chunk[l] * (scale * f32::from(scale_chunk[is] as i8) * f32::from(q1));
-            sum += lhs_chunk[l + 32]
-                * (scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
-            sum += lhs_chunk[l + 64]
-                * (scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
-            sum += lhs_chunk[l + 96]
-                * (scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4));
+            sum +=
+                lhs_chunk[l + 32] * (scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
+            sum +=
+                lhs_chunk[l + 64] * (scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
+            sum +=
+                lhs_chunk[l + 96] * (scale * f32::from(scale_chunk[is + 6] as i8) * f32::from(q4));
         }
     }
     Ok(sum)
@@ -1708,11 +1716,9 @@ fn decode_q6_k_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), Run
         for l in 0..32 {
             let is = l / 16;
             let q1 = (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
-            let q2 =
-                (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
+            let q2 = (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
             let q3 = (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
-            let q4 =
-                (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
+            let q4 = (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
             output[chunk_start + l] = scale * f32::from(scale_chunk[is] as i8) * f32::from(q1);
             output[chunk_start + l + 32] =
                 scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2);
@@ -1986,7 +1992,7 @@ mod tests {
 
     use std::collections::BTreeMap;
 
-    use psionic_backend_tests::{run_graph_backend_conformance, GraphBackendConformanceHarness};
+    use psionic_backend_tests::{GraphBackendConformanceHarness, run_graph_backend_conformance};
     use psionic_core::{
         BackendExtensionKind, DType, Device, QuantizationMode, Shape, TensorSpec, ViewSemantics,
     };
@@ -1996,7 +2002,7 @@ mod tests {
         ExecutionResult, HealthStatus, RuntimeError, ServedProductBackendPolicy,
     };
 
-    use super::{cpu_allocator_pool_policy, CpuAllocatorPool, CpuBackend, CpuBuffer};
+    use super::{CpuAllocatorPool, CpuBackend, CpuBuffer, cpu_allocator_pool_policy};
 
     impl GraphBackendConformanceHarness for CpuBackend {
         type Buffer = CpuBuffer;
@@ -2220,8 +2226,8 @@ mod tests {
     }
 
     #[test]
-    fn cpu_backend_refuses_parameter_golf_projection_loss_backend_extension(
-    ) -> Result<(), RuntimeError> {
+    fn cpu_backend_refuses_parameter_golf_projection_loss_backend_extension()
+    -> Result<(), RuntimeError> {
         let mut builder = GraphBuilder::new(Device::cpu());
         let logits = builder.input("logits", Shape::new(vec![1, 2, 4]), DType::F32);
         let target_ids = builder.input("target_ids", Shape::new(vec![1, 2]), DType::I32);

@@ -1460,6 +1460,8 @@ impl CpuDenseGgufGenerationModel {
         let mut cache_offset = 0usize;
         let mut last_swa_cache_offset = None;
         let mut last_full_cache_offset = None;
+        let mut last_swa_kv_layer_index = None;
+        let mut last_full_kv_layer_index = None;
         let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
         for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
             let query_weight_name = required_tensor_name(
@@ -1476,34 +1478,43 @@ impl CpuDenseGgufGenerationModel {
                 .unwrap_or(0);
             let is_swa =
                 gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
-            let has_kv = gemma4_layer_has_kv(&descriptor, adapter.family_metadata(), layer_index);
-            let cache_write_offset = has_kv.then_some(cache_offset);
-            let cache_read_offset = if has_kv {
-                cache_offset
+            let has_kv = gemma4_layer_has_kv(adapter.family_metadata(), layout);
+            let (cache_read_offset, cache_write_offset, reuse_layer_index) = if has_kv {
+                (cache_offset, Some(cache_offset), None)
             } else if is_swa {
-                last_swa_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
-                    format: String::from("gguf"),
-                    message: format!(
-                        "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
-                    ),
-                })?
+                (
+                    last_swa_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                        format: String::from("gguf"),
+                        message: format!(
+                            "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                        ),
+                    })?,
+                    None,
+                    Some(last_swa_kv_layer_index.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                        format: String::from("gguf"),
+                        message: format!(
+                            "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
+                        ),
+                    })?),
+                )
             } else {
-                last_full_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
-                    format: String::from("gguf"),
-                    message: format!(
-                        "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                (
+                    last_full_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                        format: String::from("gguf"),
+                        message: format!(
+                            "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                        ),
+                    })?,
+                    None,
+                    Some(
+                        last_full_kv_layer_index.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                            format: String::from("gguf"),
+                            message: format!(
+                                "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                            ),
+                        })?,
                     ),
-                })?
-            };
-            let reuse_layer_index = if has_kv {
-                None
-            } else {
-                Some(gemma4_reused_kv_layer_index(
-                    &descriptor,
-                    adapter.family_metadata(),
-                    layer_index,
-                    is_swa,
-                )?)
+                )
             };
             let layer = DenseGgufLayer::load(
                 &artifact,
@@ -1518,8 +1529,10 @@ impl CpuDenseGgufGenerationModel {
             if layer.attention_geometry.has_kv() {
                 if is_swa {
                     last_swa_cache_offset = layer.attention_geometry.cache_write_offset;
+                    last_swa_kv_layer_index = Some(layer_index);
                 } else {
                     last_full_cache_offset = layer.attention_geometry.cache_write_offset;
+                    last_full_kv_layer_index = Some(layer_index);
                 }
             }
             cache_offset = cache_offset.saturating_add(layer.cache_write_width());
@@ -2062,6 +2075,7 @@ impl DenseGgufLayer {
         cache_write_offset: Option<usize>,
         reuse_layer_index: Option<usize>,
     ) -> Result<Self, ModelLoadError> {
+        let has_kv = cache_write_offset.is_some();
         let attention_query_weight = ProjectionMatrix::load(
             artifact,
             required_tensor_name(
@@ -2069,27 +2083,48 @@ impl DenseGgufLayer {
                 "attention_query_weight",
             )?,
         )?;
-        let attention_key_weight = ProjectionMatrix::load(
-            artifact,
-            required_tensor_name(
-                layout.attention_key_weight.as_deref(),
+        let query_width = attention_query_weight.rows();
+        let head_dim = query_width
+            .checked_div(descriptor.config.block.attention.head_count)
+            .unwrap_or(0);
+        let attention_key_weight = if let Some(name) = layout.attention_key_weight.as_deref() {
+            ProjectionMatrix::load(artifact, name)?
+        } else if family_metadata.family == GgufDecoderFamily::Gemma4 && !has_kv {
+            attention_query_weight.clone()
+        } else {
+            return Err(ModelLoadError::MissingTensor(String::from(
                 "attention_key_weight",
-            )?,
-        )?;
-        let attention_value_weight = ProjectionMatrix::load(
-            artifact,
-            required_tensor_name(
-                layout.attention_value_weight.as_deref(),
+            )));
+        };
+        let key_width = if layout.attention_key_weight.is_some() {
+            attention_key_weight.rows()
+        } else {
+            gemma4_expected_kv_width(descriptor, family_metadata, layer_index, head_dim)
+        };
+        let attention_value_weight = if let Some(name) = layout.attention_value_weight.as_deref() {
+            ProjectionMatrix::load(artifact, name)?
+        } else if family_metadata.family == GgufDecoderFamily::Gemma4 {
+            attention_key_weight.clone()
+        } else if has_kv {
+            return Err(ModelLoadError::MissingTensor(String::from(
                 "attention_value_weight",
-            )?,
-        )?;
+            )));
+        } else {
+            attention_key_weight.clone()
+        };
+        let value_width =
+            if layout.attention_value_weight.is_some() || layout.attention_key_weight.is_some() {
+                attention_value_weight.rows()
+            } else {
+                key_width
+            };
         let attention_geometry = dense_attention_geometry(
             descriptor,
             family_metadata,
             layer_index,
-            attention_query_weight.rows(),
-            attention_key_weight.rows(),
-            attention_value_weight.rows(),
+            query_width,
+            key_width,
+            value_width,
             cache_read_offset,
             cache_write_offset,
             reuse_layer_index,
@@ -2198,13 +2233,16 @@ struct DenseGemma4PerLayerInputs {
 
 impl DenseGemma4PerLayerInputs {
     fn load(artifact: &GgufBlobArtifact) -> Result<Option<Self>, ModelLoadError> {
-        let Some(token_embedding) =
-            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?
+        let token_embedding =
+            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?;
+        let model_proj =
+            load_named_optional_projection_matrix(artifact, "per_layer_model_proj.weight")?;
+        let proj_norm = load_named_optional_dense_vector(artifact, "per_layer_proj_norm.weight")?;
+        let (Some(token_embedding), Some(model_proj), Some(proj_norm)) =
+            (token_embedding, model_proj, proj_norm)
         else {
             return Ok(None);
         };
-        let model_proj = ProjectionMatrix::load(artifact, "per_layer_model_proj.weight")?;
-        let proj_norm = load_dense_vector(artifact, "per_layer_proj_norm.weight")?;
         Ok(Some(Self {
             token_embedding,
             model_proj,
@@ -3313,6 +3351,8 @@ impl MetalGemma4GenerationModel {
         let mut cache_offset = 0usize;
         let mut last_swa_cache_offset = None;
         let mut last_full_cache_offset = None;
+        let mut last_swa_kv_layer_index = None;
+        let mut last_full_kv_layer_index = None;
         let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
         for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
             let query_weight_name = required_tensor_name(
@@ -3329,32 +3369,45 @@ impl MetalGemma4GenerationModel {
                 .unwrap_or(0);
             let is_swa =
                 gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
-            let has_kv = gemma4_layer_has_kv(&descriptor, adapter.family_metadata(), layer_index);
-            let cache_write_offset = has_kv.then_some(cache_offset);
-            let cache_read_offset = if has_kv {
-                cache_offset
+            let has_kv = gemma4_layer_has_kv(adapter.family_metadata(), layout);
+            let (cache_read_offset, cache_write_offset, reuse_layer_index) = if has_kv {
+                (cache_offset, Some(cache_offset), None)
             } else if is_swa {
-                last_swa_cache_offset.ok_or_else(|| {
-                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
-                        "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
-                    )))
-                })?
+                (
+                    last_swa_cache_offset.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                            ),
+                        ))
+                    })?,
+                    None,
+                    Some(last_swa_kv_layer_index.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
+                            ),
+                        ))
+                    })?),
+                )
             } else {
-                last_full_cache_offset.ok_or_else(|| {
-                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
-                        "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
-                    )))
-                })?
-            };
-            let reuse_layer_index = if has_kv {
-                None
-            } else {
-                Some(gemma4_reused_kv_layer_index(
-                    &descriptor,
-                    adapter.family_metadata(),
-                    layer_index,
-                    is_swa,
-                )?)
+                (
+                    last_full_cache_offset.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                            ),
+                        ))
+                    })?,
+                    None,
+                    Some(last_full_kv_layer_index.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                            ),
+                        ))
+                    })?),
+                )
             };
             let layer = MetalGemma4Layer::load(
                 backend,
@@ -3370,8 +3423,10 @@ impl MetalGemma4GenerationModel {
             if layer.attention_geometry.has_kv() {
                 if is_swa {
                     last_swa_cache_offset = layer.attention_geometry.cache_write_offset;
+                    last_swa_kv_layer_index = Some(layer_index);
                 } else {
                     last_full_cache_offset = layer.attention_geometry.cache_write_offset;
+                    last_full_kv_layer_index = Some(layer_index);
                 }
             }
             cache_offset = cache_offset.saturating_add(layer.cache_write_width());
@@ -3916,7 +3971,7 @@ impl MetalGemma4ModelInner {
             }
             input_hidden.to_vec()
         } else {
-            embedding_hidden
+            embedding_hidden.clone()
         };
         step_plan
             .hidden_buffer
@@ -4045,57 +4100,74 @@ impl MetalGemma4ModelInner {
                         ),
                     ))
                 })?;
-            let projected_buffer = step_plan.per_layer_inputs_buffer.as_ref().ok_or_else(|| {
+            let projected_buffer = step_plan.per_layer_inputs_buffer.as_mut().ok_or_else(|| {
                 ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
                     "gemma4 metal step-plan is missing the per-layer input projection buffer",
                 )))
             })?;
-            backend
-                .encode_quantized_matvec_submission(
-                    &mut submission,
-                    &per_layer_inputs.model_proj.weights,
-                    0,
-                    per_layer_inputs.model_proj.mode,
-                    per_layer_inputs.model_proj.rows,
-                    per_layer_inputs.model_proj.columns,
-                    &step_plan.hidden_buffer,
-                    projected_buffer,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            backend
-                .encode_scale_inplace_submission(
-                    &mut submission,
-                    projected_buffer,
-                    (hidden_size as f32).sqrt().recip(),
-                    total_per_layer_input_width,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            backend
-                .encode_per_head_rms_norm_submission(
-                    &mut submission,
-                    projected_buffer,
-                    per_layer_inputs.proj_norm.device(),
-                    self.layers.len(),
-                    per_layer_input_width,
-                    self.family_metadata.rms_norm_epsilon,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            backend
-                .encode_add_inplace_submission(
-                    &mut submission,
-                    projected_buffer,
-                    token_buffer,
-                    total_per_layer_input_width,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            backend
-                .encode_scale_inplace_submission(
-                    &mut submission,
-                    projected_buffer,
-                    2.0_f32.sqrt().recip(),
-                    total_per_layer_input_width,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
+            match &per_layer_inputs.model_proj {
+                MetalGemma4PerLayerProjectionMatrix::Quantized(model_proj) => {
+                    backend
+                        .encode_quantized_matvec_submission(
+                            &mut submission,
+                            &model_proj.weights,
+                            0,
+                            model_proj.mode,
+                            model_proj.rows,
+                            model_proj.columns,
+                            &step_plan.hidden_buffer,
+                            projected_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    backend
+                        .encode_scale_inplace_submission(
+                            &mut submission,
+                            projected_buffer,
+                            (hidden_size as f32).sqrt().recip(),
+                            total_per_layer_input_width,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    backend
+                        .encode_per_head_rms_norm_submission(
+                            &mut submission,
+                            projected_buffer,
+                            per_layer_inputs.proj_norm.device(),
+                            self.layers.len(),
+                            per_layer_input_width,
+                            self.family_metadata.rms_norm_epsilon,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    backend
+                        .encode_add_inplace_submission(
+                            &mut submission,
+                            projected_buffer,
+                            token_buffer,
+                            total_per_layer_input_width,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    backend
+                        .encode_scale_inplace_submission(
+                            &mut submission,
+                            projected_buffer,
+                            2.0_f32.sqrt().recip(),
+                            total_per_layer_input_width,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
+                MetalGemma4PerLayerProjectionMatrix::Host(_) => {
+                    let projected = per_layer_inputs.project(
+                        backend,
+                        token,
+                        embedding_hidden.as_slice(),
+                        self.layers.len(),
+                        hidden_size,
+                        self.family_metadata.rms_norm_epsilon,
+                    )?;
+                    projected_buffer
+                        .write_f32(projected.values.as_slice())
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
+            }
             bytes_moved =
                 bytes_moved.saturating_add(per_layer_inputs.model_proj.byte_length() as u64);
         }
@@ -6007,6 +6079,7 @@ impl MetalGemma4Layer {
         cache_write_offset: Option<usize>,
         reuse_layer_index: Option<usize>,
     ) -> Result<Self, ReferenceTextGenerationError> {
+        let has_kv = cache_write_offset.is_some();
         let attention_query_weight = MetalQuantizedProjectionMatrix::load(
             backend,
             artifact,
@@ -6015,47 +6088,68 @@ impl MetalGemma4Layer {
                 "attention_query_weight",
             )?,
         )?;
-        let attention_key_weight = MetalQuantizedProjectionMatrix::load(
-            backend,
-            artifact,
-            required_tensor_name(
-                layout.attention_key_weight.as_deref(),
-                "attention_key_weight",
-            )?,
-        )?;
-        let attention_value_weight = MetalQuantizedProjectionMatrix::load(
-            backend,
-            artifact,
-            required_tensor_name(
-                layout.attention_value_weight.as_deref(),
-                "attention_value_weight",
-            )?,
-        )?;
-        let attention_qkv_weight = MetalQuantizedProjectionMatrix::load_fused(
-            backend,
-            artifact,
-            &[
-                required_tensor_name(
-                    layout.attention_query_weight.as_deref(),
-                    "attention_query_weight",
-                )?,
-                required_tensor_name(
-                    layout.attention_key_weight.as_deref(),
-                    "attention_key_weight",
-                )?,
-                required_tensor_name(
-                    layout.attention_value_weight.as_deref(),
-                    "attention_value_weight",
-                )?,
-            ],
-        )?;
+        let query_width = attention_query_weight.rows();
+        let head_dim = query_width
+            .checked_div(descriptor.config.block.attention.head_count)
+            .unwrap_or(0);
+        let attention_key_weight = if let Some(name) = layout.attention_key_weight.as_deref() {
+            MetalQuantizedProjectionMatrix::load(backend, artifact, name)?
+        } else if family_metadata.family == GgufDecoderFamily::Gemma4 && !has_kv {
+            attention_query_weight.clone()
+        } else {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(String::from("missing attention_key_weight")),
+            ));
+        };
+        let key_width = if layout.attention_key_weight.is_some() {
+            attention_key_weight.rows()
+        } else {
+            gemma4_expected_kv_width(descriptor, family_metadata, layer_index, head_dim)
+        };
+        let attention_value_weight = if let Some(name) = layout.attention_value_weight.as_deref() {
+            MetalQuantizedProjectionMatrix::load(backend, artifact, name)?
+        } else if family_metadata.family == GgufDecoderFamily::Gemma4 {
+            attention_key_weight.clone()
+        } else if has_kv {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(String::from("missing attention_value_weight")),
+            ));
+        } else {
+            attention_key_weight.clone()
+        };
+        let value_width =
+            if layout.attention_value_weight.is_some() || layout.attention_key_weight.is_some() {
+                attention_value_weight.rows()
+            } else {
+                key_width
+            };
+        let attention_qkv_weight =
+            if let Some(value_weight_name) = layout.attention_value_weight.as_deref() {
+                MetalQuantizedProjectionMatrix::load_fused(
+                    backend,
+                    artifact,
+                    &[
+                        required_tensor_name(
+                            layout.attention_query_weight.as_deref(),
+                            "attention_query_weight",
+                        )?,
+                        required_tensor_name(
+                            layout.attention_key_weight.as_deref(),
+                            "attention_key_weight",
+                        )?,
+                        value_weight_name,
+                    ],
+                )?
+            } else {
+                None
+            };
         let attention_geometry = dense_attention_geometry(
             descriptor,
             family_metadata,
             layer_index,
-            attention_query_weight.rows(),
-            attention_key_weight.rows(),
-            attention_value_weight.rows(),
+            query_width,
+            key_width,
+            value_width,
             cache_read_offset,
             cache_write_offset,
             reuse_layer_index,
@@ -6192,7 +6286,7 @@ impl MetalGemma4Layer {
 #[derive(Clone, Debug)]
 struct MetalGemma4PerLayerInputs {
     token_embedding: ProjectionMatrix,
-    model_proj: MetalQuantizedProjectionMatrix,
+    model_proj: MetalGemma4PerLayerProjectionMatrix,
     proj_norm: MetalStaticVector,
     width: usize,
 }
@@ -6202,14 +6296,23 @@ impl MetalGemma4PerLayerInputs {
         backend: &mut MetalBackend,
         artifact: &GgufBlobArtifact,
     ) -> Result<Option<Self>, ReferenceTextGenerationError> {
-        let Some(token_embedding) =
-            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?
+        let token_embedding =
+            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?;
+        let model_proj = load_named_optional_metal_gemma4_projection_matrix(
+            backend,
+            artifact,
+            "per_layer_model_proj.weight",
+        )?;
+        let proj_norm = load_named_optional_metal_static_vector(
+            backend,
+            artifact,
+            "per_layer_proj_norm.weight",
+        )?;
+        let (Some(token_embedding), Some(model_proj), Some(proj_norm)) =
+            (token_embedding, model_proj, proj_norm)
         else {
             return Ok(None);
         };
-        let model_proj =
-            MetalQuantizedProjectionMatrix::load(backend, artifact, "per_layer_model_proj.weight")?;
-        let proj_norm = load_metal_static_vector(backend, artifact, "per_layer_proj_norm.weight")?;
         Ok(Some(Self {
             token_embedding,
             model_proj,
@@ -6603,6 +6706,56 @@ impl MetalQuantizedProjectionMatrix {
 
     fn byte_length(&self) -> usize {
         self.weights.byte_len()
+    }
+}
+
+#[derive(Clone, Debug)]
+enum MetalGemma4PerLayerProjectionMatrix {
+    Host(ProjectionMatrix),
+    Quantized(MetalQuantizedProjectionMatrix),
+}
+
+impl MetalGemma4PerLayerProjectionMatrix {
+    fn load(
+        backend: &mut MetalBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let storage = artifact.paged_tensor(name)?;
+        if storage.metadata().quantized_layout.is_some() {
+            return Ok(Self::Quantized(MetalQuantizedProjectionMatrix::load(
+                backend, artifact, name,
+            )?));
+        }
+        Ok(Self::Host(ProjectionMatrix::load(artifact, name)?))
+    }
+
+    fn matvec(
+        &self,
+        backend: &mut MetalBackend,
+        input: &[f32],
+    ) -> Result<MetalProjectionStep, ReferenceTextGenerationError> {
+        match self {
+            Self::Host(matrix) => {
+                let mut values = Vec::new();
+                matrix
+                    .matvec(input, &mut values)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                Ok(MetalProjectionStep {
+                    values,
+                    kernel_count: 0,
+                    bytes_moved: matrix.byte_length() as u64,
+                })
+            }
+            Self::Quantized(matrix) => matrix.matvec(backend, input),
+        }
+    }
+
+    fn byte_length(&self) -> usize {
+        match self {
+            Self::Host(matrix) => matrix.byte_length(),
+            Self::Quantized(matrix) => matrix.byte_length(),
+        }
     }
 }
 
@@ -9352,6 +9505,8 @@ impl CudaGemma4GenerationModel {
         let mut cache_offset = 0usize;
         let mut last_swa_cache_offset = None;
         let mut last_full_cache_offset = None;
+        let mut last_swa_kv_layer_index = None;
+        let mut last_full_kv_layer_index = None;
         let mut layers = Vec::with_capacity(adapter.tensor_layout().layers.len());
         for (layer_index, layout) in adapter.tensor_layout().layers.iter().enumerate() {
             let query_weight_name = required_tensor_name(
@@ -9368,32 +9523,45 @@ impl CudaGemma4GenerationModel {
                 .unwrap_or(0);
             let is_swa =
                 gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
-            let has_kv = gemma4_layer_has_kv(&descriptor, adapter.family_metadata(), layer_index);
-            let cache_write_offset = has_kv.then_some(cache_offset);
-            let cache_read_offset = if has_kv {
-                cache_offset
+            let has_kv = gemma4_layer_has_kv(adapter.family_metadata(), layout);
+            let (cache_read_offset, cache_write_offset, reuse_layer_index) = if has_kv {
+                (cache_offset, Some(cache_offset), None)
             } else if is_swa {
-                last_swa_cache_offset.ok_or_else(|| ReferenceTextGenerationError::Runtime(
-                    crate::RuntimeError::Backend(format!(
-                        "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
-                    )),
-                ))?
+                (
+                    last_swa_cache_offset.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                            ),
+                        ))
+                    })?,
+                    None,
+                    Some(last_swa_kv_layer_index.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
+                            ),
+                        ))
+                    })?),
+                )
             } else {
-                last_full_cache_offset.ok_or_else(|| ReferenceTextGenerationError::Runtime(
-                    crate::RuntimeError::Backend(format!(
-                        "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
-                    )),
-                ))?
-            };
-            let reuse_layer_index = if has_kv {
-                None
-            } else {
-                Some(gemma4_reused_kv_layer_index(
-                    &descriptor,
-                    adapter.family_metadata(),
-                    layer_index,
-                    is_swa,
-                )?)
+                (
+                    last_full_cache_offset.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                            ),
+                        ))
+                    })?,
+                    None,
+                    Some(last_full_kv_layer_index.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                            ),
+                        ))
+                    })?),
+                )
             };
             let layer = CudaGemma4Layer::load(
                 backend,
@@ -9409,8 +9577,10 @@ impl CudaGemma4GenerationModel {
             if layer.attention_geometry.has_kv() {
                 if is_swa {
                     last_swa_cache_offset = layer.attention_geometry.cache_write_offset;
+                    last_swa_kv_layer_index = Some(layer_index);
                 } else {
                     last_full_cache_offset = layer.attention_geometry.cache_write_offset;
+                    last_full_kv_layer_index = Some(layer_index);
                 }
             }
             cache_offset = cache_offset.saturating_add(layer.cache_write_width());
@@ -10614,6 +10784,7 @@ impl CudaGemma4Layer {
         cache_write_offset: Option<usize>,
         reuse_layer_index: Option<usize>,
     ) -> Result<Self, ReferenceTextGenerationError> {
+        let has_kv = cache_write_offset.is_some();
         let attention_query_weight = CudaQuantizedProjectionMatrix::load(
             backend,
             artifact,
@@ -10622,29 +10793,48 @@ impl CudaGemma4Layer {
                 "attention_query_weight",
             )?,
         )?;
-        let attention_key_weight = CudaQuantizedProjectionMatrix::load(
-            backend,
-            artifact,
-            required_tensor_name(
-                layout.attention_key_weight.as_deref(),
-                "attention_key_weight",
-            )?,
-        )?;
-        let attention_value_weight = CudaQuantizedProjectionMatrix::load(
-            backend,
-            artifact,
-            required_tensor_name(
-                layout.attention_value_weight.as_deref(),
-                "attention_value_weight",
-            )?,
-        )?;
+        let query_width = attention_query_weight.rows();
+        let head_dim = query_width
+            .checked_div(descriptor.config.block.attention.head_count)
+            .unwrap_or(0);
+        let attention_key_weight = if let Some(name) = layout.attention_key_weight.as_deref() {
+            CudaQuantizedProjectionMatrix::load(backend, artifact, name)?
+        } else if family_metadata.family == GgufDecoderFamily::Gemma4 && !has_kv {
+            attention_query_weight.clone()
+        } else {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(String::from("missing attention_key_weight")),
+            ));
+        };
+        let key_width = if layout.attention_key_weight.is_some() {
+            attention_key_weight.rows()
+        } else {
+            gemma4_expected_kv_width(descriptor, family_metadata, layer_index, head_dim)
+        };
+        let attention_value_weight = if let Some(name) = layout.attention_value_weight.as_deref() {
+            CudaQuantizedProjectionMatrix::load(backend, artifact, name)?
+        } else if family_metadata.family == GgufDecoderFamily::Gemma4 {
+            attention_key_weight.clone()
+        } else if has_kv {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(String::from("missing attention_value_weight")),
+            ));
+        } else {
+            attention_key_weight.clone()
+        };
+        let value_width =
+            if layout.attention_value_weight.is_some() || layout.attention_key_weight.is_some() {
+                attention_value_weight.rows()
+            } else {
+                key_width
+            };
         let attention_geometry = dense_attention_geometry(
             descriptor,
             family_metadata,
             layer_index,
-            attention_query_weight.rows(),
-            attention_key_weight.rows(),
-            attention_value_weight.rows(),
+            query_width,
+            key_width,
+            value_width,
             cache_read_offset,
             cache_write_offset,
             reuse_layer_index,
@@ -10752,7 +10942,7 @@ impl CudaGemma4Layer {
 #[derive(Clone, Debug)]
 struct CudaGemma4PerLayerInputs {
     token_embedding: ProjectionMatrix,
-    model_proj: CudaQuantizedProjectionMatrix,
+    model_proj: CudaGemma4PerLayerProjectionMatrix,
     proj_norm: Vec<f32>,
     width: usize,
 }
@@ -10762,14 +10952,19 @@ impl CudaGemma4PerLayerInputs {
         backend: &mut CudaBackend,
         artifact: &GgufBlobArtifact,
     ) -> Result<Option<Self>, ReferenceTextGenerationError> {
-        let Some(token_embedding) =
-            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?
+        let token_embedding =
+            load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?;
+        let model_proj = load_named_optional_cuda_gemma4_projection_matrix(
+            backend,
+            artifact,
+            "per_layer_model_proj.weight",
+        )?;
+        let proj_norm = load_named_optional_dense_vector(artifact, "per_layer_proj_norm.weight")?;
+        let (Some(token_embedding), Some(model_proj), Some(proj_norm)) =
+            (token_embedding, model_proj, proj_norm)
         else {
             return Ok(None);
         };
-        let model_proj =
-            CudaQuantizedProjectionMatrix::load(backend, artifact, "per_layer_model_proj.weight")?;
-        let proj_norm = load_dense_vector(artifact, "per_layer_proj_norm.weight")?;
         Ok(Some(Self {
             token_embedding,
             model_proj,
@@ -10913,6 +11108,56 @@ impl CudaQuantizedProjectionMatrix {
 
     fn byte_length(&self) -> usize {
         self.weights.byte_len()
+    }
+}
+
+#[derive(Clone, Debug)]
+enum CudaGemma4PerLayerProjectionMatrix {
+    Host(ProjectionMatrix),
+    Quantized(CudaQuantizedProjectionMatrix),
+}
+
+impl CudaGemma4PerLayerProjectionMatrix {
+    fn load(
+        backend: &mut CudaBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let storage = artifact.paged_tensor(name)?;
+        if storage.metadata().quantized_layout.is_some() {
+            return Ok(Self::Quantized(CudaQuantizedProjectionMatrix::load(
+                backend, artifact, name,
+            )?));
+        }
+        Ok(Self::Host(ProjectionMatrix::load(artifact, name)?))
+    }
+
+    fn matvec(
+        &self,
+        backend: &mut CudaBackend,
+        input: &[f32],
+    ) -> Result<CudaProjectionStep, ReferenceTextGenerationError> {
+        match self {
+            Self::Host(matrix) => {
+                let mut values = Vec::new();
+                matrix
+                    .matvec(input, &mut values)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                Ok(CudaProjectionStep {
+                    values,
+                    kernel_count: 0,
+                    bytes_moved: matrix.byte_length() as u64,
+                })
+            }
+            Self::Quantized(matrix) => matrix.matvec(backend, input),
+        }
+    }
+
+    fn byte_length(&self) -> usize {
+        match self {
+            Self::Host(matrix) => matrix.byte_length(),
+            Self::Quantized(matrix) => matrix.byte_length(),
+        }
     }
 }
 
@@ -11674,6 +11919,18 @@ fn load_named_optional_cuda_quantized_projection_matrix(
         .transpose()
 }
 
+fn load_named_optional_cuda_gemma4_projection_matrix(
+    backend: &mut CudaBackend,
+    artifact: &GgufBlobArtifact,
+    name: &str,
+) -> Result<Option<CudaGemma4PerLayerProjectionMatrix>, ReferenceTextGenerationError> {
+    artifact
+        .content()
+        .tensor_info(name)
+        .map(|_| CudaGemma4PerLayerProjectionMatrix::load(backend, artifact, name))
+        .transpose()
+}
+
 fn load_named_optional_metal_quantized_projection_matrix(
     backend: &mut MetalBackend,
     artifact: &GgufBlobArtifact,
@@ -11683,6 +11940,18 @@ fn load_named_optional_metal_quantized_projection_matrix(
         .content()
         .tensor_info(name)
         .map(|_| MetalQuantizedProjectionMatrix::load(backend, artifact, name))
+        .transpose()
+}
+
+fn load_named_optional_metal_gemma4_projection_matrix(
+    backend: &mut MetalBackend,
+    artifact: &GgufBlobArtifact,
+    name: &str,
+) -> Result<Option<MetalGemma4PerLayerProjectionMatrix>, ReferenceTextGenerationError> {
+    artifact
+        .content()
+        .tensor_info(name)
+        .map(|_| MetalGemma4PerLayerProjectionMatrix::load(backend, artifact, name))
         .transpose()
 }
 
@@ -12400,62 +12669,54 @@ fn gemma4_layer_is_swa(
 }
 
 fn gemma4_layer_has_kv(
-    descriptor: &DecoderModelDescriptor,
     family_metadata: &GgufDecoderFamilyMetadata,
-    layer_index: usize,
+    layout: &GgufDecoderLayerTensorLayout,
 ) -> bool {
     if family_metadata.family != GgufDecoderFamily::Gemma4 {
         return true;
     }
-    let shared_kv_layers = family_fact_usize(
-        family_metadata,
-        format!(
-            "{}.attention.shared_kv_layers",
-            family_metadata.architecture
-        )
-        .as_str(),
-    )
-    .unwrap_or(0);
-    let kv_layers = descriptor
-        .config
-        .layer_count
-        .saturating_sub(shared_kv_layers);
-    layer_index < kv_layers
+    layout.attention_key_weight.is_some()
 }
 
-fn gemma4_reused_kv_layer_index(
+fn gemma4_layer_kv_head_count(
     descriptor: &DecoderModelDescriptor,
     family_metadata: &GgufDecoderFamilyMetadata,
     layer_index: usize,
-    is_swa: bool,
-) -> Result<usize, ModelLoadError> {
-    if family_metadata.family != GgufDecoderFamily::Gemma4 {
-        return Ok(layer_index);
-    }
-    let shared_kv_layers = family_fact_usize(
-        family_metadata,
-        format!(
-            "{}.attention.shared_kv_layers",
-            family_metadata.architecture
-        )
-        .as_str(),
-    )
-    .unwrap_or(0);
-    let kv_layers = descriptor
+) -> usize {
+    let default = descriptor
         .config
-        .layer_count
-        .saturating_sub(shared_kv_layers);
-    if layer_index < kv_layers {
-        return Ok(layer_index);
+        .block
+        .attention
+        .kv_head_count
+        .max(1)
+        .min(descriptor.config.block.attention.head_count.max(1));
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return default;
     }
-    kv_layers
-        .checked_sub(if is_swa { 2 } else { 1 })
-        .ok_or_else(|| ModelLoadError::ArtifactFormat {
-            format: String::from("gguf"),
-            message: format!(
-                "gemma4 layer {layer_index} cannot map reused kv source with kv_layers={kv_layers}"
-            ),
-        })
+    let key = format!("{}.attention.head_count_kv", family_metadata.architecture);
+    if let Some(kv_head_count) = family_metadata
+        .family_facts
+        .get(key.as_str())
+        .and_then(GgufMetadataValue::as_array)
+        .and_then(|values| values.get(layer_index))
+        .and_then(GgufMetadataValue::as_u64)
+        .filter(|value| *value > 0)
+        .and_then(|value| usize::try_from(value).ok())
+    {
+        return kv_head_count;
+    }
+    family_fact_usize(family_metadata, key.as_str())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn gemma4_expected_kv_width(
+    descriptor: &DecoderModelDescriptor,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+    head_dim: usize,
+) -> usize {
+    gemma4_layer_kv_head_count(descriptor, family_metadata, layer_index).saturating_mul(head_dim)
 }
 
 fn layer_rope_theta(family_metadata: &GgufDecoderFamilyMetadata, is_swa: bool) -> f32 {

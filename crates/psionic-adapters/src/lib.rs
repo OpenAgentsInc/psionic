@@ -1246,6 +1246,7 @@ fn quantization_label(mode: QuantizationMode) -> &'static [u8] {
         QuantizationMode::GgmlMxfp4 => b"ggml_mxfp4",
         QuantizationMode::GgmlQ4_0 => b"ggml_q4_0",
         QuantizationMode::GgmlQ4_1 => b"ggml_q4_1",
+        QuantizationMode::GgmlQ5_0 => b"ggml_q5_0",
         QuantizationMode::GgmlQ4K => b"ggml_q4_k",
         QuantizationMode::GgmlQ6K => b"ggml_q6_k",
         QuantizationMode::GgmlQ8_0 => b"ggml_q8_0",
@@ -1396,7 +1397,7 @@ mod tests {
 
     use psionic_core::QuantizationMode;
     use psionic_datastream::{DatastreamEncoding, DatastreamManifest, DatastreamSubjectKind};
-    use safetensors::{serialize_to_file, tensor::TensorView, Dtype as SafeTensorsDType};
+    use safetensors::{Dtype as SafeTensorsDType, serialize_to_file, tensor::TensorView};
     use serde::Deserialize;
     use tempfile::tempdir;
 
@@ -1438,8 +1439,8 @@ mod tests {
     }
 
     #[test]
-    fn adapter_package_manifest_requires_adapter_package_stream(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn adapter_package_manifest_requires_adapter_package_stream()
+    -> Result<(), Box<dyn std::error::Error>> {
         let manifest = DatastreamManifest::from_bytes(
             "adapter-stream",
             DatastreamSubjectKind::Checkpoint,

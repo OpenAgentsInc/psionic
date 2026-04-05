@@ -454,6 +454,25 @@ The supported benchmark matrix is explicit:
 The harness refuses unsupported combinations instead of pretending every
 Gemma 4 row is interchangeable.
 
+Current official-artifact support on `main` is wider than the original retained
+pilot cut:
+
+- the GGUF tokenizer path now admits official `gemma4` tokenizer metadata
+- dense Gemma 4 inspection and load now tolerate the real official per-layer
+  metadata shape, including per-layer feed-forward widths, per-layer KV-head
+  counts, `V := K` layers, and true reused-KV layers
+- the official `ggml-org` `e2b` and `31b` artifacts now load and benchmark on
+  local Metal instead of failing at tokenizer admission
+- the official `26B-A4B` artifact now inspects through the sparse benchmark
+  harness instead of failing immediately on unsupported GGUF metadata
+
+One honest boundary remains:
+
+- the admitted `26B-A4B` sparse execution lane is still a CUDA-host benchmark
+  lane in this harness, so a local Apple-silicon box can validate GGUF support
+  and benchmark-surface admission but cannot honestly produce the final sparse
+  throughput receipt without a reachable CUDA peer or CUDA host
+
 Those runs are the current publication bar. They prove:
 
 - bounded prompt-render and fixture alignment for the real `gemma4:e4b`

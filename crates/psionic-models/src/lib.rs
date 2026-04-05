@@ -1678,13 +1678,13 @@ impl GgufTensorType {
             Self::MXFP4 => Some(QuantizationMode::GgmlMxfp4),
             Self::Q4_0 => Some(QuantizationMode::GgmlQ4_0),
             Self::Q4_1 => Some(QuantizationMode::GgmlQ4_1),
+            Self::Q5_0 => Some(QuantizationMode::GgmlQ5_0),
             Self::Q4K => Some(QuantizationMode::GgmlQ4K),
             Self::Q6K => Some(QuantizationMode::GgmlQ6K),
             Self::Q8_0 => Some(QuantizationMode::GgmlQ8_0),
             Self::F32
             | Self::F16
             | Self::BF16
-            | Self::Q5_0
             | Self::Q5_1
             | Self::Q8_1
             | Self::Q2K
@@ -2077,7 +2077,7 @@ impl GgufContent {
             GgufTokenizerModel::SentencePiece | GgufTokenizerModel::BertWordPiece => {
                 read_optional_tokenizer_string_array(&self.metadata, "tokenizer.ggml.merges")?
             }
-            GgufTokenizerModel::Gpt2Bpe => {
+            GgufTokenizerModel::Gpt2Bpe | GgufTokenizerModel::Gemma4Bpe => {
                 read_tokenizer_string_array(&self.metadata, "tokenizer.ggml.merges")?
             }
         };
@@ -2117,6 +2117,9 @@ impl GgufContent {
             }
             GgufTokenizerModel::Gpt2Bpe => {
                 Some(explicit_pretokenizer.unwrap_or(GgufTokenizerPretokenizer::Default))
+            }
+            GgufTokenizerModel::Gemma4Bpe => {
+                Some(explicit_pretokenizer.unwrap_or(GgufTokenizerPretokenizer::Gemma4))
             }
         };
         let token_type_count =
@@ -2436,6 +2439,8 @@ pub enum GgufTokenizerModel {
     SentencePiece,
     /// GPT-2 style byte-level BPE tokenizer using GGML `gpt2` metadata.
     Gpt2Bpe,
+    /// Gemma 4 byte-level BPE tokenizer using GGML `gemma4` metadata.
+    Gemma4Bpe,
     /// BERT-style wordpiece tokenizer using GGML `bert` metadata.
     BertWordPiece,
 }
@@ -2445,6 +2450,7 @@ impl GgufTokenizerModel {
         match value {
             "llama" => Ok(Self::SentencePiece),
             "gpt2" => Ok(Self::Gpt2Bpe),
+            "gemma4" => Ok(Self::Gemma4Bpe),
             "bert" => Ok(Self::BertWordPiece),
             other => Err(ModelLoadError::UnsupportedTokenizerModel {
                 model: other.to_string(),
@@ -2456,6 +2462,7 @@ impl GgufTokenizerModel {
         match self {
             Self::SentencePiece => "sentencepiece",
             Self::Gpt2Bpe => "gpt2_bpe",
+            Self::Gemma4Bpe => "gemma4_bpe",
             Self::BertWordPiece => "bert_wordpiece",
         }
     }
@@ -2683,9 +2690,7 @@ fn resolve_gguf_decoder_chat_templates(
         return Ok(chat_templates);
     }
     Ok(builtin_chat_template_for_decoder_family(family)
-        .map(|template| {
-            GgufChatTemplateMetadata::new(Some(template.to_string()), BTreeMap::new())
-        })
+        .map(|template| GgufChatTemplateMetadata::new(Some(template.to_string()), BTreeMap::new()))
         .unwrap_or(chat_templates))
 }
 
@@ -2979,19 +2984,25 @@ impl GgufPromptTemplateRenderer {
         Ok(tokenizer.encode_with_special_tokens(rendered_text, add_bos, add_eos))
     }
 
-    fn starts_with_literal_special_token(
-        &self,
-        text: &str,
-        token_id: Option<TokenId>,
-    ) -> bool {
+    fn starts_with_literal_special_token(&self, text: &str, token_id: Option<TokenId>) -> bool {
         token_id
-            .and_then(|token_id| self.tokenizer.vocabulary.tokens().get(token_id.as_u32() as usize))
+            .and_then(|token_id| {
+                self.tokenizer
+                    .vocabulary
+                    .tokens()
+                    .get(token_id.as_u32() as usize)
+            })
             .is_some_and(|token| text.starts_with(token))
     }
 
     fn ends_with_literal_special_token(&self, text: &str, token_id: Option<TokenId>) -> bool {
         token_id
-            .and_then(|token_id| self.tokenizer.vocabulary.tokens().get(token_id.as_u32() as usize))
+            .and_then(|token_id| {
+                self.tokenizer
+                    .vocabulary
+                    .tokens()
+                    .get(token_id.as_u32() as usize)
+            })
             .is_some_and(|token| text.ends_with(token))
     }
 
@@ -3291,6 +3302,12 @@ fn supported_prompt_template_family(digest: &str) -> Option<GgufPromptTemplateFa
             Some(GgufPromptTemplateFamily::Phi3)
         }
         "b41f8277605dd25c150524d580ccfa8f351608a385c01a4211fa0eadec4382c3" => {
+            Some(GgufPromptTemplateFamily::Gemma4)
+        }
+        "55572b8d3c8342044e25874c73fe5234b661fa0a57a57f6ef75b58e03d7d959a" => {
+            Some(GgufPromptTemplateFamily::Gemma4)
+        }
+        "2dfbfc7d538912f4ea11d29d85b4e25d7bc26386e53f57529f1d707c28b5828c" => {
             Some(GgufPromptTemplateFamily::Gemma4)
         }
         "af9c0233881b083b52ff773580215222b5440ac3d0beeeca99b76329b048f8db" => {
@@ -5581,13 +5598,16 @@ fn build_gguf_decoder_descriptor(
         read_required_gguf_usize(metadata, format!("{architecture}.block_count").as_str())?;
     let max_context =
         read_required_gguf_usize(metadata, format!("{architecture}.context_length").as_str())?;
-    let intermediate_size =
+    let intermediate_size = if matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
+        gemma4_descriptor_intermediate_size(metadata, architecture, layer_count)?
+    } else {
         family_metadata
             .expert_feed_forward_length
             .unwrap_or(read_required_gguf_usize(
                 metadata,
                 format!("{architecture}.feed_forward_length").as_str(),
-            )?);
+            )?)
+    };
     let head_count = read_required_gguf_usize(
         metadata,
         format!("{architecture}.attention.head_count").as_str(),
@@ -5596,6 +5616,8 @@ fn build_gguf_decoder_descriptor(
     let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
     let kv_head_count = if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
         qwen35_kv_head_count(content, metadata, architecture, head_count, head_dim)?
+    } else if matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
+        gemma4_kv_head_count(metadata, architecture, head_count)?
     } else {
         read_optional_gguf_usize(metadata, kv_head_count_key.as_str())?.unwrap_or(head_count)
     };
@@ -6324,6 +6346,26 @@ fn build_gguf_decoder_tensor_layout(
             continue;
         }
 
+        let attention_key_weight = if matches!(family_metadata.family, GgufDecoderFamily::Gemma4) {
+            optional_tensor_name(content, &format!("{prefix}.attn_k.weight"))
+        } else {
+            Some(
+                required_tensor_info(content, &format!("{prefix}.attn_k.weight"))?
+                    .name
+                    .clone(),
+            )
+        };
+        let attention_value_weight = if matches!(family_metadata.family, GgufDecoderFamily::Gemma4)
+        {
+            optional_tensor_name(content, &format!("{prefix}.attn_v.weight"))
+        } else {
+            Some(
+                required_tensor_info(content, &format!("{prefix}.attn_v.weight"))?
+                    .name
+                    .clone(),
+            )
+        };
+
         layers.push(GgufDecoderLayerTensorLayout {
             layer_index,
             layer_kind: GgufDecoderLayerKind::DenseAttention,
@@ -6340,21 +6382,13 @@ fn build_gguf_decoder_tensor_layout(
                 content,
                 &format!("{prefix}.attn_q_norm.weight"),
             ),
-            attention_key_weight: Some(
-                required_tensor_info(content, &format!("{prefix}.attn_k.weight"))?
-                    .name
-                    .clone(),
-            ),
+            attention_key_weight,
             attention_key_bias: key_bias,
             attention_key_norm: optional_tensor_name(
                 content,
                 &format!("{prefix}.attn_k_norm.weight"),
             ),
-            attention_value_weight: Some(
-                required_tensor_info(content, &format!("{prefix}.attn_v.weight"))?
-                    .name
-                    .clone(),
-            ),
+            attention_value_weight,
             attention_value_bias: value_bias,
             attention_qkv_weight: None,
             attention_qkv_bias: None,
@@ -6439,6 +6473,10 @@ fn gguf_tokenizer_family_label(tokenizer: &GgufTokenizerMetadata) -> String {
         GgufTokenizerModel::Gpt2Bpe => tokenizer.pretokenizer.as_ref().map_or_else(
             || String::from("gpt2_bpe"),
             |pretokenizer| format!("gpt2_bpe:{}", pretokenizer.digest_label()),
+        ),
+        GgufTokenizerModel::Gemma4Bpe => tokenizer.pretokenizer.as_ref().map_or_else(
+            || String::from("gemma4_bpe"),
+            |pretokenizer| format!("gemma4_bpe:{}", pretokenizer.digest_label()),
         ),
         GgufTokenizerModel::BertWordPiece => tokenizer.pretokenizer.as_ref().map_or_else(
             || String::from("bert_wordpiece"),
@@ -7736,10 +7774,11 @@ fn quantization_priority(quantization: QuantizationMode) -> u8 {
         QuantizationMode::Int8Symmetric => 1,
         QuantizationMode::GgmlQ4_0 => 2,
         QuantizationMode::GgmlQ4_1 => 3,
-        QuantizationMode::GgmlQ4K => 4,
-        QuantizationMode::GgmlQ6K => 5,
-        QuantizationMode::GgmlQ8_0 => 6,
-        QuantizationMode::GgmlMxfp4 => 7,
+        QuantizationMode::GgmlQ5_0 => 4,
+        QuantizationMode::GgmlQ4K => 5,
+        QuantizationMode::GgmlQ6K => 6,
+        QuantizationMode::GgmlQ8_0 => 7,
+        QuantizationMode::GgmlMxfp4 => 8,
     }
 }
 
@@ -7988,6 +8027,86 @@ fn qwen35_kv_head_count(
     Ok(head_count)
 }
 
+fn gemma4_feed_forward_lengths(
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+    architecture: &str,
+    layer_count: usize,
+) -> Result<Vec<usize>, ModelLoadError> {
+    let feed_forward_length_key = format!("{architecture}.feed_forward_length");
+    let mut per_layer = match metadata.get(feed_forward_length_key.as_str()) {
+        Some(GgufMetadataValue::Array(_)) => {
+            read_optional_gguf_usize_array(metadata, feed_forward_length_key.as_str())?
+        }
+        _ => Vec::new(),
+    };
+    if per_layer.is_empty() {
+        let width = read_required_gguf_usize(metadata, feed_forward_length_key.as_str())?;
+        return Ok(vec![width; layer_count]);
+    }
+    if per_layer.len() > layer_count {
+        per_layer.truncate(layer_count);
+    }
+    let fallback =
+        per_layer
+            .last()
+            .copied()
+            .ok_or_else(|| ModelLoadError::InvalidGgufMetadata {
+                key: feed_forward_length_key.clone(),
+                message: String::from("expected at least one feed-forward width"),
+            })?;
+    if fallback == 0 {
+        return Err(ModelLoadError::InvalidGgufMetadata {
+            key: feed_forward_length_key,
+            message: String::from("feed_forward_length must be greater than zero"),
+        });
+    }
+    per_layer.resize(layer_count, fallback);
+    if let Some((index, _)) = per_layer.iter().enumerate().find(|(_, value)| **value == 0) {
+        return Err(ModelLoadError::InvalidGgufMetadata {
+            key: format!("{architecture}.feed_forward_length"),
+            message: format!("feed_forward_length must be greater than zero at index {index}"),
+        });
+    }
+    Ok(per_layer)
+}
+
+fn gemma4_descriptor_intermediate_size(
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+    architecture: &str,
+    layer_count: usize,
+) -> Result<usize, ModelLoadError> {
+    gemma4_feed_forward_lengths(metadata, architecture, layer_count)?
+        .into_iter()
+        .max()
+        .ok_or_else(|| ModelLoadError::InvalidGgufMetadata {
+            key: format!("{architecture}.feed_forward_length"),
+            message: String::from("expected at least one feed-forward width"),
+        })
+}
+
+fn gemma4_kv_head_count(
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+    architecture: &str,
+    head_count: usize,
+) -> Result<usize, ModelLoadError> {
+    let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
+    let per_layer = match metadata.get(kv_head_count_key.as_str()) {
+        Some(GgufMetadataValue::Array(_)) => {
+            read_optional_gguf_usize_array(metadata, kv_head_count_key.as_str())?
+        }
+        _ => Vec::new(),
+    };
+    if let Some(kv_head_count) = per_layer.into_iter().max().filter(|value| *value > 0) {
+        return Ok(kv_head_count);
+    }
+    if let Some(kv_head_count) = read_optional_gguf_usize(metadata, kv_head_count_key.as_str())? {
+        if kv_head_count > 0 {
+            return Ok(kv_head_count);
+        }
+    }
+    Ok(head_count)
+}
+
 fn qwen35_full_attention_kv_width(
     key_rows: usize,
     head_dim: usize,
@@ -8011,6 +8130,8 @@ fn collect_decoder_family_facts(
 ) -> BTreeMap<String, GgufMetadataValue> {
     let fact_keys = match family {
         GgufDecoderFamily::Gemma4 => vec![
+            format!("{architecture}.feed_forward_length"),
+            format!("{architecture}.attention.head_count_kv"),
             format!("{architecture}.attention.shared_kv_layers"),
             format!("{architecture}.attention.sliding_window"),
             format!("{architecture}.attention.sliding_window_pattern"),
@@ -8475,6 +8596,9 @@ fn decode_ggml_quantized_values(
         QuantizationMode::GgmlMxfp4 => decode_mxfp4_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(layout, bytes),
+        QuantizationMode::GgmlQ5_0 => {
+            Err(ModelLoadError::UnsupportedQuantizedTensorMode { quantization })
+        }
         QuantizationMode::GgmlQ4K => decode_q4_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ6K => decode_q6_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(layout, bytes),
@@ -8638,6 +8762,7 @@ fn quantization_from_block_bytes(bytes_per_block: usize) -> QuantizationMode {
         17 => QuantizationMode::GgmlMxfp4,
         18 => QuantizationMode::GgmlQ4_0,
         20 => QuantizationMode::GgmlQ4_1,
+        22 => QuantizationMode::GgmlQ5_0,
         144 => QuantizationMode::GgmlQ4K,
         210 => QuantizationMode::GgmlQ6K,
         34 => QuantizationMode::GgmlQ8_0,
@@ -10041,10 +10166,8 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_tokenizer_fixture("gemma4_e4b").expect("gemma4 fixture");
         let path = gemma4_pilot_fixture_path(fixture.source_path);
-        let artifact = GgufBlobArtifact::open_path(
-            Path::new(path.as_str()),
-            LocalBlobOpenOptions::default(),
-        )?;
+        let artifact =
+            GgufBlobArtifact::open_path(Path::new(path.as_str()), LocalBlobOpenOptions::default())?;
         let adapter = GgufDecoderAdapterLoader.load_blob_artifact(&artifact)?;
         let layer = &adapter.tensor_layout().layers[0];
 

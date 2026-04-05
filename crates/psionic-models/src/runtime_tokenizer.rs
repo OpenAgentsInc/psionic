@@ -46,6 +46,7 @@ pub struct GgufRuntimeTokenizer {
 enum GgufRuntimeTokenizerKind {
     SentencePiece(SentencePieceRuntimeTokenizer),
     Gpt2Bpe(ByteLevelBpeRuntimeTokenizer),
+    Gemma4Bpe(ByteLevelBpeRuntimeTokenizer),
     BertWordPiece(WordPieceRuntimeTokenizer),
 }
 
@@ -56,6 +57,9 @@ impl GgufRuntimeTokenizer {
                 SentencePieceRuntimeTokenizer::from_gguf(tokenizer),
             ),
             GgufTokenizerModel::Gpt2Bpe => GgufRuntimeTokenizerKind::Gpt2Bpe(
+                ByteLevelBpeRuntimeTokenizer::from_gguf(tokenizer)?,
+            ),
+            GgufTokenizerModel::Gemma4Bpe => GgufRuntimeTokenizerKind::Gemma4Bpe(
                 ByteLevelBpeRuntimeTokenizer::from_gguf(tokenizer)?,
             ),
             GgufTokenizerModel::BertWordPiece => GgufRuntimeTokenizerKind::BertWordPiece(
@@ -79,6 +83,9 @@ impl GgufRuntimeTokenizer {
             GgufRuntimeTokenizerKind::Gpt2Bpe(tokenizer) => {
                 tokenizer.encode_with_special_tokens(text, add_bos, add_eos)
             }
+            GgufRuntimeTokenizerKind::Gemma4Bpe(tokenizer) => {
+                tokenizer.encode_with_special_tokens(text, add_bos, add_eos)
+            }
             GgufRuntimeTokenizerKind::BertWordPiece(tokenizer) => {
                 tokenizer.encode_with_special_tokens(text, add_bos, add_eos)
             }
@@ -92,6 +99,7 @@ impl GgufRuntimeTokenizer {
                 tokenizer.encode_with_defaults(text)
             }
             GgufRuntimeTokenizerKind::Gpt2Bpe(tokenizer) => tokenizer.encode_with_defaults(text),
+            GgufRuntimeTokenizerKind::Gemma4Bpe(tokenizer) => tokenizer.encode_with_defaults(text),
             GgufRuntimeTokenizerKind::BertWordPiece(tokenizer) => {
                 tokenizer.encode_with_defaults(text)
             }
@@ -105,6 +113,7 @@ impl GgufRuntimeTokenizer {
                 tokenizer.is_end_of_sequence(token)
             }
             GgufRuntimeTokenizerKind::Gpt2Bpe(tokenizer) => tokenizer.is_end_of_sequence(token),
+            GgufRuntimeTokenizerKind::Gemma4Bpe(tokenizer) => tokenizer.is_end_of_sequence(token),
             GgufRuntimeTokenizerKind::BertWordPiece(tokenizer) => {
                 tokenizer.is_end_of_sequence(token)
             }
@@ -121,6 +130,7 @@ impl TokenizerBoundary for GgufRuntimeTokenizer {
         match &self.inner {
             GgufRuntimeTokenizerKind::SentencePiece(tokenizer) => tokenizer.decode(tokens),
             GgufRuntimeTokenizerKind::Gpt2Bpe(tokenizer) => tokenizer.decode(tokens),
+            GgufRuntimeTokenizerKind::Gemma4Bpe(tokenizer) => tokenizer.decode(tokens),
             GgufRuntimeTokenizerKind::BertWordPiece(tokenizer) => tokenizer.decode(tokens),
         }
     }
@@ -133,6 +143,9 @@ impl TokenizerBoundary for GgufRuntimeTokenizer {
             GgufRuntimeTokenizerKind::Gpt2Bpe(tokenizer) => {
                 tokenizer.append_decoded_token(text, token)
             }
+            GgufRuntimeTokenizerKind::Gemma4Bpe(tokenizer) => {
+                tokenizer.append_decoded_token(text, token)
+            }
             GgufRuntimeTokenizerKind::BertWordPiece(tokenizer) => {
                 tokenizer.append_decoded_token(text, token)
             }
@@ -143,6 +156,7 @@ impl TokenizerBoundary for GgufRuntimeTokenizer {
         match &self.inner {
             GgufRuntimeTokenizerKind::SentencePiece(tokenizer) => tokenizer.vocabulary(),
             GgufRuntimeTokenizerKind::Gpt2Bpe(tokenizer) => tokenizer.vocabulary(),
+            GgufRuntimeTokenizerKind::Gemma4Bpe(tokenizer) => tokenizer.vocabulary(),
             GgufRuntimeTokenizerKind::BertWordPiece(tokenizer) => tokenizer.vocabulary(),
         }
     }
@@ -691,16 +705,9 @@ impl ByteLevelBpeTokenizerCore {
             }
 
             let raw_bytes = gguf_token_to_raw_bytes(token, &unicode_to_byte)?;
-            if ordinary_encoder
-                .insert(raw_bytes.clone(), token_id)
-                .is_some()
-            {
-                return Err(GgufRuntimeTokenizerError::InvalidTokenizer {
-                    message: format!(
-                        "duplicate ordinary token bytes for GGUF token id {token_id} (`{token}`)"
-                    ),
-                });
-            }
+            ordinary_encoder
+                .entry(raw_bytes.clone())
+                .or_insert(token_id);
             ordinary_decoder.insert(token_id, raw_bytes);
         }
 
@@ -946,19 +953,16 @@ fn gguf_token_to_raw_bytes(
     token: &str,
     unicode_to_byte: &HashMap<char, u8>,
 ) -> Result<Vec<u8>, GgufRuntimeTokenizerError> {
-    token
-        .chars()
-        .map(|character| {
-            unicode_to_byte.get(&character).copied().ok_or_else(|| {
-                GgufRuntimeTokenizerError::InvalidTokenizer {
-                    message: format!(
-                        "GGUF token contains non-byte-mapped character U+{:04X} in `{token}`",
-                        character as u32
-                    ),
-                }
-            })
-        })
-        .collect()
+    let mut raw_bytes = Vec::with_capacity(token.len());
+    for character in token.chars() {
+        if let Some(byte) = unicode_to_byte.get(&character).copied() {
+            raw_bytes.push(byte);
+            continue;
+        }
+        let mut utf8 = [0u8; 4];
+        raw_bytes.extend_from_slice(character.encode_utf8(&mut utf8).as_bytes());
+    }
+    Ok(raw_bytes)
 }
 
 fn byte_pair_encode(piece: &[u8], ranks: &HashMap<Vec<u8>, u32>) -> Vec<u32> {
@@ -1219,6 +1223,70 @@ mod tests {
             decoded,
             "Reply with exactly one short grammatical English sentence."
         );
+    }
+
+    #[test]
+    fn byte_level_gemma4_runtime_accepts_literal_newline_tokens() {
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&GgufTokenizerMetadata {
+            model: GgufTokenizerModel::Gemma4Bpe,
+            vocabulary: crate::GgufTokenizerVocabulary {
+                tokens: vec![
+                    String::from("<bos>"),
+                    String::from("<eos>"),
+                    String::from("hello"),
+                    String::from("\n"),
+                    String::from("world"),
+                ],
+                bos_token_id: Some(TokenId(0)),
+                eos_token_ids: vec![TokenId(1)],
+                pad_token_id: None,
+                unknown_token_id: None,
+            },
+            scores: Vec::new(),
+            token_types: Vec::new(),
+            merges: vec![String::from("h e")],
+            add_bos: false,
+            add_eos: false,
+            pretokenizer: Some(crate::GgufTokenizerPretokenizer::Gemma4),
+            token_type_count: None,
+            digest: String::from("gemma4-byte-level-test"),
+        })
+        .expect("gemma4 runtime tokenizer");
+        let encoded = tokenizer.encode("hello\nworld");
+        assert!(!encoded.as_slice().is_empty());
+        assert_eq!(tokenizer.decode(encoded.as_slice()), "hello\nworld");
+    }
+
+    #[test]
+    fn byte_level_gemma4_runtime_tolerates_duplicate_byte_equivalent_tokens() {
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&GgufTokenizerMetadata {
+            model: GgufTokenizerModel::Gemma4Bpe,
+            vocabulary: crate::GgufTokenizerVocabulary {
+                tokens: vec![
+                    String::from("<bos>"),
+                    String::from("<eos>"),
+                    String::from("\u{010A}"),
+                    String::from("\n"),
+                ],
+                bos_token_id: Some(TokenId(0)),
+                eos_token_ids: vec![TokenId(1)],
+                pad_token_id: None,
+                unknown_token_id: None,
+            },
+            scores: Vec::new(),
+            token_types: Vec::new(),
+            merges: Vec::new(),
+            add_bos: false,
+            add_eos: false,
+            pretokenizer: Some(crate::GgufTokenizerPretokenizer::Gemma4),
+            token_type_count: None,
+            digest: String::from("gemma4-duplicate-byte-token-test"),
+        })
+        .expect("gemma4 runtime tokenizer");
+        let encoded = tokenizer.encode("\n");
+        assert!(!encoded.as_slice().is_empty());
+        assert_eq!(tokenizer.decode(&[TokenId(2)]), "\n");
+        assert_eq!(tokenizer.decode(&[TokenId(3)]), "\n");
     }
 
     #[test]

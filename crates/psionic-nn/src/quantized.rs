@@ -398,7 +398,7 @@ impl QuantizedModule {
                         path: String::from(path),
                         dtype: spec.dtype(),
                         device: spec.device().clone(),
-                    })
+                    });
                 }
                 TensorData::QuantizedBlocks(_) => {
                     dequantize_tensor_data(path.as_str(), &spec, &data)?.into_owned()
@@ -916,6 +916,10 @@ fn decode_quantized_values(
         QuantizationMode::GgmlMxfp4 => decode_mxfp4_blocks(path, quantized),
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(path, quantized),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(path, quantized),
+        QuantizationMode::GgmlQ5_0 => Err(QuantizationError::UnsupportedMode {
+            mode: QuantizationMode::GgmlQ5_0,
+            detail: "ggml_q5_0 decode is not implemented in psionic-nn yet",
+        }),
         QuantizationMode::GgmlQ4K => decode_q4_k_blocks(path, quantized),
         QuantizationMode::GgmlQ6K => decode_q6_k_blocks(path, quantized),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(path, quantized),
@@ -1066,16 +1070,12 @@ fn decode_q6_k_blocks(
             let scale_chunk = &scales[chunk_index * 8..(chunk_index + 1) * 8];
             for l in 0..32 {
                 let is = l / 16;
-                let q1 =
-                    (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
-                let q2 = (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4))
-                    as i8)
-                    - 32;
-                let q3 =
-                    (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
-                let q4 = (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4))
-                    as i8)
-                    - 32;
+                let q1 = (((ql_chunk[l] & 0x0f) | (((qh_chunk[l] >> 0) & 0x03) << 4)) as i8) - 32;
+                let q2 =
+                    (((ql_chunk[l + 32] & 0x0f) | (((qh_chunk[l] >> 2) & 0x03) << 4)) as i8) - 32;
+                let q3 = (((ql_chunk[l] >> 4) | (((qh_chunk[l] >> 4) & 0x03) << 4)) as i8) - 32;
+                let q4 =
+                    (((ql_chunk[l + 32] >> 4) | (((qh_chunk[l] >> 6) & 0x03) << 4)) as i8) - 32;
                 output.push(scale * f32::from(scale_chunk[is] as i8) * f32::from(q1));
                 output.push(scale * f32::from(scale_chunk[is + 2] as i8) * f32::from(q2));
                 output.push(scale * f32::from(scale_chunk[is + 4] as i8) * f32::from(q3));
@@ -1206,8 +1206,8 @@ mod tests {
     }
 
     #[test]
-    fn module_quantize_reports_quantized_and_dense_paths_and_freezes_eval_copy(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn module_quantize_reports_quantized_and_dense_paths_and_freezes_eval_copy()
+    -> Result<(), Box<dyn std::error::Error>> {
         let linear = aligned_linear()?;
         let quantized = linear.module().quantize(QuantizationMode::Int8Symmetric)?;
 
@@ -1241,8 +1241,8 @@ mod tests {
     }
 
     #[test]
-    fn strict_quantize_refuses_unsupported_weight_families(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn strict_quantize_refuses_unsupported_weight_families()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut norm = Module::new("norm0", "layer_norm")?;
         norm.insert_parameter(
             "weight",
@@ -1310,8 +1310,8 @@ mod tests {
     }
 
     #[test]
-    fn quantized_linear_roundtrips_through_module_state_load(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn quantized_linear_roundtrips_through_module_state_load()
+    -> Result<(), Box<dyn std::error::Error>> {
         let linear = aligned_linear()?;
         let quantized = linear.quantize(QuantizationMode::Int8Symmetric)?;
         let weights = quantized.module().save_weights();
@@ -1328,8 +1328,8 @@ mod tests {
     }
 
     #[test]
-    fn quantized_embedding_can_wrap_loaded_quantized_module(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn quantized_embedding_can_wrap_loaded_quantized_module()
+    -> Result<(), Box<dyn std::error::Error>> {
         let embedding = aligned_embedding()?;
         let quantized = embedding.quantize(QuantizationMode::Int8Symmetric)?;
         let rewrapped =

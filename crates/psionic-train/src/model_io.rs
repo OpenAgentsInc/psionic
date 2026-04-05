@@ -11,17 +11,17 @@ use psionic_models::{
     LocalWeightBundleLoader, ModelLoadError, WeightTensorStorage,
 };
 use safetensors::{
-    serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensorError, SafeTensors,
+    Dtype as SafeTensorsDType, SafeTensorError, SafeTensors, serialize, tensor::TensorView,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    core_loop::TrainingCoreError, OptimizerStateResidency, TrainingOptimizerConfig,
-    TrainingOptimizerKind, TrainingOptimizerResidencyPolicy, TrainingOptimizerState,
-    TrainingParameterClass, TrainingParameterGroupSemantics, TrainingParameterGroupState,
-    TrainingSchedulerBinding, TrainingTensorBuffer,
+    OptimizerStateResidency, TrainingOptimizerConfig, TrainingOptimizerKind,
+    TrainingOptimizerResidencyPolicy, TrainingOptimizerState, TrainingParameterClass,
+    TrainingParameterGroupSemantics, TrainingParameterGroupState, TrainingSchedulerBinding,
+    TrainingTensorBuffer, core_loop::TrainingCoreError,
 };
 
 const SAFETENSORS_MANIFEST_KEY: &str = "psionic.model_io.bundle_manifest";
@@ -2672,6 +2672,7 @@ fn tokenizer_family_from_gguf(model: GgufTokenizerModel) -> TokenizerFamily {
     match model {
         GgufTokenizerModel::SentencePiece => TokenizerFamily::SentencePiece,
         GgufTokenizerModel::Gpt2Bpe => TokenizerFamily::BytePairEncoding,
+        GgufTokenizerModel::Gemma4Bpe => TokenizerFamily::BytePairEncoding,
         GgufTokenizerModel::BertWordPiece => TokenizerFamily::WordPiece,
     }
 }
@@ -2727,8 +2728,8 @@ mod tests {
     use crate::TrainingSchedulerConfig;
 
     #[test]
-    fn portable_model_bundle_roundtrips_training_groups_through_torch_json(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_roundtrips_training_groups_through_torch_json()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -2802,8 +2803,8 @@ mod tests {
     }
 
     #[test]
-    fn portable_model_bundle_select_and_remap_keeps_complete_groups_only(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_select_and_remap_keeps_complete_groups_only()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -2841,26 +2842,32 @@ mod tests {
         let selected = bundle.select_and_remap(&request)?;
         assert_eq!(selected.state_dict.tensors.len(), 3);
         assert_eq!(selected.state_dict.groups.len(), 1);
-        assert!(selected
-            .state_dict
-            .tensors
-            .contains_key("model.decoder.output.parameter"));
-        assert!(selected
-            .state_dict
-            .tensors
-            .contains_key("optimizer.decoder.output.first_moment"));
-        assert!(selected
-            .state_dict
-            .tensors
-            .contains_key("optimizer.decoder.output.second_moment"));
+        assert!(
+            selected
+                .state_dict
+                .tensors
+                .contains_key("model.decoder.output.parameter")
+        );
+        assert!(
+            selected
+                .state_dict
+                .tensors
+                .contains_key("optimizer.decoder.output.first_moment")
+        );
+        assert!(
+            selected
+                .state_dict
+                .tensors
+                .contains_key("optimizer.decoder.output.second_moment")
+        );
         assert_eq!(selected.to_training_groups()?.len(), 1);
         assert_eq!(selected.to_training_groups()?[0].group_id, "decoder.head");
         Ok(())
     }
 
     #[test]
-    fn portable_model_bundle_import_selection_refuses_incomplete_group(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_import_selection_refuses_incomplete_group()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -2895,8 +2902,8 @@ mod tests {
     }
 
     #[test]
-    fn portable_model_bundle_import_selection_refuses_remap_collisions(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_import_selection_refuses_remap_collisions()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -2945,8 +2952,8 @@ mod tests {
     }
 
     #[test]
-    fn portable_model_bundle_plan_safetensors_import_can_defer_materialization(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_plan_safetensors_import_can_defer_materialization()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -2970,10 +2977,11 @@ mod tests {
         let plan = PortableModelBundle::plan_safetensors_import(bytes.as_slice(), &request)?;
         assert_eq!(plan.tensor_count(), 3);
         assert_eq!(plan.deferred_tensor_count(), 3);
-        assert!(plan
-            .stable_signature_lines()
-            .iter()
-            .any(|line| line.starts_with("plan_digest=")));
+        assert!(
+            plan.stable_signature_lines()
+                .iter()
+                .any(|line| line.starts_with("plan_digest="))
+        );
 
         let TensorData::F32(values) = plan.materialize_tensor("model.decoder.head.parameter")?
         else {
@@ -2992,8 +3000,8 @@ mod tests {
     }
 
     #[test]
-    fn portable_model_bundle_import_torch_json_with_request_matches_select_and_remap(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_import_torch_json_with_request_matches_select_and_remap()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -3026,8 +3034,8 @@ mod tests {
     }
 
     #[test]
-    fn portable_model_bundle_publishes_explicit_compatibility_boundaries(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_publishes_explicit_compatibility_boundaries()
+    -> Result<(), Box<dyn Error>> {
         let groups = sample_training_groups()?;
         let bundle = PortableModelBundle::from_training_groups(
             "weather-agent",
@@ -3043,10 +3051,12 @@ mod tests {
         assert_eq!(contract.model_family, "weather-agent");
         assert_eq!(contract.revision, "compat-r1");
         assert_eq!(contract.state_dict_digest, bundle.state_dict.digest);
-        assert!(contract
-            .stable_signature_lines()
-            .iter()
-            .any(|line| line.starts_with("contract_digest=")));
+        assert!(
+            contract
+                .stable_signature_lines()
+                .iter()
+                .any(|line| line.starts_with("contract_digest="))
+        );
 
         let safetensors = contract
             .surfaces
@@ -3075,8 +3085,8 @@ mod tests {
     }
 
     #[test]
-    fn quantized_portable_bundle_marks_safetensors_boundary_unsupported(
-    ) -> Result<(), Box<dyn Error>> {
+    fn quantized_portable_bundle_marks_safetensors_boundary_unsupported()
+    -> Result<(), Box<dyn Error>> {
         let state_key = String::from("model.quantized.weight");
         let spec = TensorSpec::new(Shape::new(vec![32]), DType::F32, Device::cpu());
         let quantized = QuantizedTensorData::new(
@@ -3130,8 +3140,8 @@ mod tests {
     }
 
     #[test]
-    fn portable_model_bundle_roundtrips_new_optimizer_family_variants_through_safetensors(
-    ) -> Result<(), Box<dyn Error>> {
+    fn portable_model_bundle_roundtrips_new_optimizer_family_variants_through_safetensors()
+    -> Result<(), Box<dyn Error>> {
         let mut adam = TrainingParameterGroupState::new(
             "adam.block",
             TrainingParameterClass::Matrix,
