@@ -920,6 +920,10 @@ fn decode_quantized_values(
             mode: QuantizationMode::GgmlQ5_0,
             detail: "ggml_q5_0 decode is not implemented in psionic-nn yet",
         }),
+        QuantizationMode::GgmlQ5K => Err(QuantizationError::UnsupportedMode {
+            mode: QuantizationMode::GgmlQ5K,
+            detail: "ggml_q5_k decode is not implemented in psionic-nn yet",
+        }),
         QuantizationMode::GgmlQ4K => decode_q4_k_blocks(path, quantized),
         QuantizationMode::GgmlQ6K => decode_q6_k_blocks(path, quantized),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(path, quantized),

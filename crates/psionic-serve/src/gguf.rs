@@ -38,13 +38,14 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     CompiledWordGenerationModel, ContinuousBatchGenerationResult,
-    CpuGgufGptOssTextGenerationService, GenerationEventStream, GenerationInput,
-    GenerationModelHandle, GenerationRequest, GenerationResponse, GenerationStepOutput,
-    GenerationStreamChunk, GenerationStreamEvent, GenerationStreamStatus, GenerationStreamTerminal,
-    GenerationStreamingPolicy, InMemoryGenerationModelRegistry, InMemoryGenerationSessionStore,
-    LoadedModelView, LoadedModelsObservation, LocalRuntimeObservability,
-    ManagedTextGenerationRuntime, ReferenceTextGenerationError, ServedModelRevisionIdentity,
-    SessionId, SharedPrefixStore, StreamingTextGenerationExecutor, TextGenerationExecutor,
+    CpuGgufGptOssTextGenerationService, CpuGgufQwen35TextGenerationService,
+    GenerationEventStream, GenerationInput, GenerationModelHandle, GenerationRequest,
+    GenerationResponse, GenerationStepOutput, GenerationStreamChunk, GenerationStreamEvent,
+    GenerationStreamStatus, GenerationStreamTerminal, GenerationStreamingPolicy,
+    InMemoryGenerationModelRegistry, InMemoryGenerationSessionStore, LoadedModelView,
+    LoadedModelsObservation, LocalRuntimeObservability, ManagedTextGenerationRuntime,
+    ReferenceTextGenerationError, ServedModelRevisionIdentity, SessionId, SharedPrefixStore,
+    StreamingTextGenerationExecutor, TextGenerationExecutor,
     continuous_batch_text_generation_execution_profile, default_generation_scheduler_policy,
     default_generation_streaming_policy,
 };
@@ -77,7 +78,7 @@ pub struct CpuGgufTextGenerationService {
 enum CpuGgufServiceKind {
     GptOss(CpuGgufGptOssTextGenerationService),
     Dense(CpuDenseGgufTextGenerationService),
-    Qwen35(CpuQwen35ProxyTextGenerationService),
+    Qwen35(CpuGgufQwen35TextGenerationService),
 }
 
 #[derive(Clone, Debug)]
@@ -245,15 +246,17 @@ impl CpuGgufTextGenerationService {
             GgufDecoderFamily::GptOss => CpuGgufServiceKind::GptOss(
                 CpuGgufGptOssTextGenerationService::from_gguf_path(path)?,
             ),
+            GgufDecoderFamily::Qwen35 => {
+                CpuGgufServiceKind::Qwen35(CpuGgufQwen35TextGenerationService::from_gguf_path(
+                    path,
+                )?)
+            }
             GgufDecoderFamily::Llama
             | GgufDecoderFamily::Qwen
             | GgufDecoderFamily::Mistral
             | GgufDecoderFamily::Gemma4 => {
                 CpuGgufServiceKind::Dense(CpuDenseGgufTextGenerationService::from_gguf_path(path)?)
             }
-            GgufDecoderFamily::Qwen35 => CpuGgufServiceKind::Qwen35(
-                CpuQwen35ProxyTextGenerationService::from_gguf_path(path)?,
-            ),
         };
         Ok(Self { inner })
     }
@@ -14885,20 +14888,14 @@ mod tests {
     }
 
     #[test]
-    fn cpu_gguf_service_executes_qwen35_proxy_family() -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
-        let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx) = runtime.block_on(start_qwen35_proxy_test_server())?;
+    fn cpu_gguf_service_executes_qwen35_family() -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("tiny_qwen35.gguf");
         write_test_gguf(
             &path,
-            qwen35_decoder_metadata("tiny psionic qwen35 proxy").as_slice(),
+            qwen35_decoder_metadata("tiny psionic qwen35").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
 
         let mut service = CpuGgufTextGenerationService::from_gguf_path(&path)?;
         let descriptor = service.model_descriptor().clone();
@@ -14907,7 +14904,7 @@ mod tests {
             descriptor.clone(),
             None,
             "hello",
-            GenerationOptions::greedy(2),
+            GenerationOptions::greedy(1),
         );
 
         let response = service.generate(&request)?;
@@ -14915,23 +14912,16 @@ mod tests {
         let loaded = service.loaded_model_views();
 
         assert_eq!(descriptor.model.family, "qwen35");
-        assert_eq!(response.output.text, "proxy world");
+        assert_eq!(response.output.text, "world");
+        assert_eq!(response.output.tokens.as_slice().len(), 1);
         assert_eq!(support.family, GgufDecoderFamily::Qwen35);
         assert_eq!(support.supported_backends, vec![String::from("cpu")]);
         assert_eq!(
-            support.unsupported_features,
-            vec![
-                String::from("multimodal_inputs"),
-                String::from("video_inputs"),
-                String::from("tool_calling"),
-                String::from("structured_output_fallback"),
-                String::from("adapter_serving"),
-            ]
+            support.unsupported_backends,
+            vec![String::from("cuda"), String::from("metal")]
         );
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].summary.family.as_deref(), Some("qwen35"));
-
-        let _ = shutdown_tx.send(());
         Ok(())
     }
 
@@ -15749,36 +15739,31 @@ mod tests {
             ),
             (
                 String::from("qwen35.embedding_length"),
-                GgufMetadataValue::U32(8),
+                GgufMetadataValue::U32(32),
             ),
             (
                 String::from("qwen35.feed_forward_length"),
-                GgufMetadataValue::U32(16),
+                GgufMetadataValue::U32(32),
             ),
             (
                 String::from("qwen35.block_count"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(1),
             ),
             (
                 String::from("qwen35.attention.head_count"),
-                GgufMetadataValue::U32(2),
+                GgufMetadataValue::U32(4),
             ),
             (
                 String::from("qwen35.attention.head_count_kv"),
-                GgufMetadataValue::Array(vec![
-                    GgufMetadataValue::U32(0),
-                    GgufMetadataValue::U32(0),
-                    GgufMetadataValue::U32(0),
-                    GgufMetadataValue::U32(1),
-                ]),
+                GgufMetadataValue::Array(vec![GgufMetadataValue::U32(2)]),
             ),
             (
                 String::from("qwen35.attention.key_length"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.attention.value_length"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.attention.layer_norm_rms_epsilon"),
@@ -15786,7 +15771,7 @@ mod tests {
             ),
             (
                 String::from("qwen35.rope.dimension_count"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.rope.freq_base"),
@@ -15794,7 +15779,7 @@ mod tests {
             ),
             (
                 String::from("qwen35.full_attention_interval"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(1),
             ),
             (
                 String::from("qwen35.ssm.conv_kernel"),
@@ -15806,11 +15791,11 @@ mod tests {
             ),
             (
                 String::from("qwen35.ssm.inner_size"),
-                GgufMetadataValue::U32(8),
+                GgufMetadataValue::U32(32),
             ),
             (
                 String::from("qwen35.ssm.state_size"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.ssm.time_step_rank"),
@@ -16135,95 +16120,30 @@ mod tests {
     }
 
     fn qwen35_decoder_tensors() -> Vec<TestGgufTensor> {
-        let mut tensors = vec![
-            dense_f32_tensor("token_embd.weight", vec![10, 8]),
-            dense_f32_tensor("output_norm.weight", vec![8]),
-            dense_f32_tensor("output.weight", vec![10, 8]),
-        ];
-
-        for layer_index in 0..4 {
-            let prefix = format!("blk.{layer_index}");
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.attn_norm.weight"),
-                vec![8],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.ffn_gate.weight"),
-                vec![16, 8],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.ffn_up.weight"),
-                vec![16, 8],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.ffn_down.weight"),
-                vec![8, 16],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.post_attention_norm.weight"),
-                vec![8],
-            ));
-
-            if layer_index < 3 {
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_qkv.weight"),
-                    vec![24, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_gate.weight"),
-                    vec![8, 8],
-                ));
-                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_a"), vec![2]));
-                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_dt"), vec![2]));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_alpha.weight"),
-                    vec![2, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_beta.weight"),
-                    vec![2, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_conv1d.weight"),
-                    vec![24, 4],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_norm.weight"),
-                    vec![4],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_out.weight"),
-                    vec![8, 8],
-                ));
-            } else {
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_q.weight"),
-                    vec![16, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_k.weight"),
-                    vec![4, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_v.weight"),
-                    vec![4, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_output.weight"),
-                    vec![8, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_q_norm.weight"),
-                    vec![4],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_k_norm.weight"),
-                    vec![4],
-                ));
-            }
-        }
-
-        tensors
+        vec![
+            dense_tensor("token_embd.weight", vec![10, 32], {
+                let mut values = vec![0.0; 10 * 32];
+                values[6 * 32] = 2.0;
+                values
+            }),
+            dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("output.weight", vec![10, 32], {
+                let mut values = vec![0.0; 10 * 32];
+                values[7 * 32] = 1.0;
+                values
+            }),
+            dense_tensor("blk.0.attn_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.0.ffn_gate.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.ffn_up.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.ffn_down.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.post_attention_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.0.attn_q.weight", vec![64, 32], vec![0.0; 64 * 32]),
+            dense_tensor("blk.0.attn_k.weight", vec![16, 32], vec![0.0; 16 * 32]),
+            dense_tensor("blk.0.attn_v.weight", vec![16, 32], vec![0.0; 16 * 32]),
+            dense_tensor("blk.0.attn_output.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.attn_q_norm.weight", vec![8], vec![1.0; 8]),
+            dense_tensor("blk.0.attn_k_norm.weight", vec![8], vec![1.0; 8]),
+        ]
     }
 
     fn token_embedding_values(hello_token_index: usize) -> Vec<f32> {

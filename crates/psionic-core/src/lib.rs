@@ -1460,6 +1460,8 @@ pub enum QuantizationMode {
     GgmlQ4_1,
     /// GGML/GGUF Q5_0 block quantization.
     GgmlQ5_0,
+    /// GGML/GGUF Q5_K block quantization.
+    GgmlQ5K,
     /// GGML/GGUF Q4_K block quantization.
     GgmlQ4K,
     /// GGML/GGUF Q6_K block quantization.
@@ -1479,6 +1481,7 @@ impl QuantizationMode {
             Self::GgmlQ4_0 => "ggml_q4_0",
             Self::GgmlQ4_1 => "ggml_q4_1",
             Self::GgmlQ5_0 => "ggml_q5_0",
+            Self::GgmlQ5K => "ggml_q5_k",
             Self::GgmlQ4K => "ggml_q4_k",
             Self::GgmlQ6K => "ggml_q6_k",
             Self::GgmlQ8_0 => "ggml_q8_0",
@@ -1493,6 +1496,7 @@ impl QuantizationMode {
             Self::GgmlQ4_0 => Some((32, 18)),
             Self::GgmlQ4_1 => Some((32, 20)),
             Self::GgmlQ5_0 => Some((32, 22)),
+            Self::GgmlQ5K => Some((256, 176)),
             Self::GgmlQ4K => Some((256, 144)),
             Self::GgmlQ6K => Some((256, 210)),
             Self::GgmlQ8_0 => Some((32, 34)),

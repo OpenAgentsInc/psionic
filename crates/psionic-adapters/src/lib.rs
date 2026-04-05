@@ -1247,6 +1247,7 @@ fn quantization_label(mode: QuantizationMode) -> &'static [u8] {
         QuantizationMode::GgmlQ4_0 => b"ggml_q4_0",
         QuantizationMode::GgmlQ4_1 => b"ggml_q4_1",
         QuantizationMode::GgmlQ5_0 => b"ggml_q5_0",
+        QuantizationMode::GgmlQ5K => b"ggml_q5_k",
         QuantizationMode::GgmlQ4K => b"ggml_q4_k",
         QuantizationMode::GgmlQ6K => b"ggml_q6_k",
         QuantizationMode::GgmlQ8_0 => b"ggml_q8_0",

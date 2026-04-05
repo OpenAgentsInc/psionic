@@ -10387,8 +10387,6 @@ fn generic_decoder_serving_truth(
         (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
     ) {
         OpenAiCompatServingTruth::metal_native()
-    } else if matches!(family, GgufDecoderFamily::Qwen35) {
-        OpenAiCompatServingTruth::cpu_llama_cpp_proxy()
     } else {
         OpenAiCompatServingTruth::cpu_native()
     }
@@ -10398,6 +10396,9 @@ fn generic_decoder_execution_profile(
     family: GgufDecoderFamily,
     backend: OpenAiCompatBackend,
 ) -> ExecutionCapabilityProfile {
+    if matches!((backend, family), (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen35)) {
+        return default_text_generation_execution_profile();
+    }
     if matches!(
         (backend, family),
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
@@ -10414,8 +10415,10 @@ fn generic_decoder_scheduler_policy(
     family: GgufDecoderFamily,
     backend: OpenAiCompatBackend,
 ) -> Option<GenerationSchedulerPolicy> {
-    (matches!(backend, OpenAiCompatBackend::Cpu) && !matches!(family, GgufDecoderFamily::Qwen35))
-        .then(default_generation_scheduler_policy)
+    matches!(backend, OpenAiCompatBackend::Cpu)
+        .then_some(())
+        .filter(|_| !matches!(family, GgufDecoderFamily::Qwen35))
+        .map(|_| default_generation_scheduler_policy())
 }
 
 fn generic_decoder_cluster_execution_truth(
@@ -15531,49 +15534,60 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_qwen35_proxy_publication_and_generation_are_honest()
+    fn generic_server_qwen35_native_cpu_publication_and_generation_are_honest()
     -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, observed_requests) =
-            runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let qwen35_path = temp.path().join("tiny-qwen35.gguf");
         write_test_gguf(
             &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_metadata("tiny native qwen35").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
-        drop(_proxy_env);
 
         let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
         assert_eq!(health.0.backend, "cpu");
-        assert_eq!(health.0.execution_mode, "proxy");
-        assert_eq!(health.0.execution_engine, "llama.cpp");
-        assert_eq!(health.0.residency_mode, "llama_cpp_proxy");
-        assert_eq!(health.0.hybrid_offload, "unsupported");
-        assert_eq!(health.0.fallback_policy, "proxy_only");
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+        assert_eq!(health.0.residency_mode, CPU_SERVER_RESIDENCY_MODE);
+        assert_eq!(health.0.hybrid_offload, CPU_SERVER_HYBRID_OFFLOAD_MODE);
+        assert_eq!(health.0.fallback_policy, CPU_SERVER_FALLBACK_POLICY);
         assert_eq!(
             health.0.execution_profile.batch_posture,
             BatchExecutionPosture::SingleRequestOnly
         );
         assert!(health.0.scheduler_policy.is_none());
-        assert_eq!(health.0.structured_output_fallbacks, None);
-        assert!(
+        assert_eq!(
+            health.0.structured_output_fallbacks,
+            Some(vec![
+                "choice_set",
+                "regex_subset",
+                "gbnf_subset",
+                "json_schema_subset",
+                "json_object",
+                "tagged_json_schema",
+            ])
+        );
+        assert_eq!(
             health
                 .0
                 .structured_output_capabilities
                 .as_ref()
-                .is_some_and(|capabilities| {
+                .map(|capabilities| {
                     capabilities
                         .iter()
-                        .all(|capability| capability.support_level.label() == "unsupported")
-                })
+                        .map(|capability| capability.kind.label())
+                        .collect::<Vec<_>>()
+                }),
+            Some(vec![
+                "choice",
+                "regex",
+                "grammar",
+                "json_schema",
+                "json_object",
+                "tagged_structure",
+            ])
         );
         assert_eq!(
             health.0.tool_calling.as_ref().map(|capability| (
@@ -15583,10 +15597,10 @@ mod tests {
                 capability.argument_validation,
             )),
             Some((
-                "unsupported",
-                vec!["none"],
-                "not_available",
-                "not_available",
+                "fallback",
+                vec!["none", "auto", "required", "named"],
+                "tagged_json_schema",
+                "json_schema_subset",
             ))
         );
         assert!(health.0.response_state.is_some());
@@ -15617,30 +15631,63 @@ mod tests {
             .data
             .iter()
             .find(|model| model.id == "tiny-qwen35.gguf")
-            .expect("qwen35 proxy model should be listed");
+            .expect("qwen35 model should be listed");
         assert_eq!(model.psionic_model_family, "qwen35");
         assert_eq!(model.psionic_served_backend, Some("cpu"));
-        assert_eq!(model.psionic_execution_mode, Some("proxy"));
-        assert_eq!(model.psionic_execution_engine, Some("llama.cpp"));
-        assert_eq!(model.psionic_residency_mode, Some("llama_cpp_proxy"));
-        assert_eq!(model.psionic_hybrid_offload, Some("unsupported"));
-        assert_eq!(model.psionic_fallback_policy, Some("proxy_only"));
-        assert_eq!(model.psionic_structured_outputs, None);
-        assert!(
+        assert_eq!(model.psionic_execution_mode, Some("native"));
+        assert_eq!(model.psionic_execution_engine, Some("psionic"));
+        assert_eq!(model.psionic_residency_mode, Some(CPU_SERVER_RESIDENCY_MODE));
+        assert_eq!(
+            model.psionic_hybrid_offload,
+            Some(CPU_SERVER_HYBRID_OFFLOAD_MODE)
+        );
+        assert_eq!(model.psionic_fallback_policy, Some(CPU_SERVER_FALLBACK_POLICY));
+        assert_eq!(
+            model.psionic_structured_outputs.as_deref(),
+            Some(
+                [
+                    "choice_set",
+                    "regex_subset",
+                    "gbnf_subset",
+                    "json_schema_subset",
+                    "json_object",
+                    "tagged_json_schema",
+                ]
+                .as_slice(),
+            )
+        );
+        assert_eq!(
             model
                 .psionic_structured_output_capabilities
                 .as_ref()
-                .is_some_and(|capabilities| {
+                .map(|capabilities| {
                     capabilities
                         .iter()
-                        .all(|capability| capability.support_level.label() == "unsupported")
-                })
+                        .map(|capability| capability.kind.label())
+                        .collect::<Vec<_>>()
+                }),
+            Some(vec![
+                "choice",
+                "regex",
+                "grammar",
+                "json_schema",
+                "json_object",
+                "tagged_structure",
+            ])
         );
-        assert!(
-            model
-                .psionic_tool_calling
-                .as_ref()
-                .is_some_and(|capability| capability.support_level.label() == "unsupported")
+        assert_eq!(
+            model.psionic_tool_calling.as_ref().map(|capability| (
+                capability.support_level.label(),
+                capability.supported_modes.clone(),
+                capability.parser,
+                capability.argument_validation,
+            )),
+            Some((
+                "fallback",
+                vec!["none", "auto", "required", "named"],
+                "tagged_json_schema",
+                "json_schema_subset",
+            ))
         );
         assert_eq!(
             model
@@ -15691,69 +15738,46 @@ mod tests {
         ))?;
         assert_eq!(
             header_value(response.headers(), "x-psionic-execution-mode"),
-            Some(String::from("proxy"))
+            Some(String::from("native"))
         );
         assert_eq!(
             header_value(response.headers(), "x-psionic-execution-engine"),
-            Some(String::from("llama.cpp"))
+            Some(String::from("psionic"))
         );
         assert_eq!(
             header_value(response.headers(), "x-psionic-residency-mode"),
-            Some(String::from("llama_cpp_proxy"))
+            Some(String::from(CPU_SERVER_RESIDENCY_MODE))
         );
         assert_eq!(
             header_value(response.headers(), "x-psionic-fallback-policy"),
-            Some(String::from("proxy_only"))
+            Some(String::from(CPU_SERVER_FALLBACK_POLICY))
         );
         assert_eq!(
             header_value(response.headers(), "x-psionic-batch-posture"),
             Some(String::from("single_request_only"))
         );
-        assert_eq!(
-            header_value(response.headers(), "x-psionic-scheduling-class"),
-            None
-        );
+        assert_eq!(header_value(response.headers(), "x-psionic-scheduling-class"), None);
         let payload = runtime.block_on(response_json(response))?;
         assert_eq!(
             payload["choices"][0]["message"]["content"],
-            serde_json::json!("proxy world")
+            serde_json::json!("world")
         );
-        assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(2));
-
-        let observed_requests = observed_requests
-            .lock()
-            .expect("observed qwen35 proxy requests should be readable");
-        assert!(observed_requests.iter().any(|body| {
-            body.get("n_predict") == Some(&serde_json::json!(2))
-                && body["prompt"]
-                    .as_str()
-                    .is_some_and(|prompt| prompt.contains("hello"))
-        }));
-
-        let _ = shutdown_tx.send(());
+        assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
         Ok(())
     }
 
     #[test]
-    fn generic_server_qwen35_proxy_forwards_sampling_controls()
+    fn generic_server_qwen35_native_cpu_accepts_sampling_controls()
     -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, observed_requests) =
-            runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let qwen35_path = temp.path().join("tiny-qwen35.gguf");
         write_test_gguf(
             &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_metadata("tiny native qwen35").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
-        drop(_proxy_env);
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&server.state),
@@ -15789,83 +15813,24 @@ mod tests {
         let payload = runtime.block_on(response_json(response))?;
         assert_eq!(
             payload["choices"][0]["message"]["content"],
-            serde_json::json!("proxy world")
+            serde_json::json!("world")
         );
-
-        let observed_requests = observed_requests
-            .lock()
-            .expect("observed qwen35 proxy requests should be readable");
-        assert!(observed_requests.iter().any(|body| {
-            body.get("n_predict") == Some(&serde_json::json!(5))
-                && body.get("temperature").is_none()
-                && body.get("top_k") == Some(&serde_json::json!(23))
-                && body
-                    .get("top_p")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 0.85).abs() < 1e-6)
-                && body
-                    .get("min_p")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 0.1).abs() < 1e-6)
-                && body
-                    .get("typical_p")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 0.72).abs() < 1e-6)
-                && body.get("mirostat") == Some(&serde_json::json!(1))
-                && body
-                    .get("mirostat_tau")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 5.5).abs() < 1e-6)
-                && body
-                    .get("mirostat_eta")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 0.15).abs() < 1e-6)
-                && body
-                    .get("repeat_penalty")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 1.15).abs() < 1e-6)
-                && body.get("repeat_last_n") == Some(&serde_json::json!(32))
-                && body
-                    .get("presence_penalty")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 0.25).abs() < 1e-6)
-                && body
-                    .get("frequency_penalty")
-                    .and_then(serde_json::Value::as_f64)
-                    .is_some_and(|value| (value - 0.5).abs() < 1e-6)
-                && body.get("seed") == Some(&serde_json::json!(42))
-                && body
-                    .get("stop")
-                    .and_then(serde_json::Value::as_array)
-                    .is_some_and(|values| values.contains(&serde_json::json!("done")))
-                && body["prompt"]
-                    .as_str()
-                    .is_some_and(|prompt| prompt.contains("sample with controls"))
-        }));
-
-        let _ = shutdown_tx.send(());
+        assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
         Ok(())
     }
 
     #[test]
-    fn generic_server_qwen35_proxy_streaming_plain_text_emits_multiple_delta_chunks()
+    fn generic_server_qwen35_native_cpu_streaming_plain_text_emits_terminal_delta()
     -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let qwen35_path = temp.path().join("tiny-qwen35-streaming.gguf");
         write_test_gguf(
             &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy stream").as_slice(),
+            qwen35_decoder_metadata("tiny native qwen35 stream").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
-        drop(_proxy_env);
 
         let response = runtime.block_on(handle_generic_chat_completions(
             std::sync::Arc::clone(&server.state),
@@ -15889,33 +15854,23 @@ mod tests {
         let body = runtime.block_on(response_text(response))?;
         let events = sse_json_events(body.as_str())?;
 
-        assert_eq!(events.len(), 3);
+        assert_eq!(events.len(), 2);
         assert_eq!(
             events[0]["choices"][0]["delta"]["content"],
-            serde_json::json!("proxy ")
-        );
-        assert_eq!(
-            events[1]["choices"][0]["delta"]["content"],
             serde_json::json!("world")
         );
         assert_eq!(
-            events[2]["choices"][0]["finish_reason"],
+            events[1]["choices"][0]["finish_reason"],
             serde_json::json!("stop")
         );
         assert!(body.contains("[DONE]"));
-
-        let _ = shutdown_tx.send(());
         Ok(())
     }
 
     #[test]
     fn generic_server_qwen35_headers_remain_model_specific_when_default_model_is_native()
     -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let llama_path = temp.path().join("tiny-llama.gguf");
         let qwen35_path = temp.path().join("tiny-qwen35.gguf");
@@ -15926,15 +15881,12 @@ mod tests {
         )?;
         write_test_gguf(
             &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_metadata("tiny native qwen35").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
         let mut config = OpenAiCompatConfig::new(&llama_path);
         config.add_model_path(&qwen35_path);
         let server = OpenAiCompatServer::from_config(&config)?;
-        drop(_proxy_env);
 
         let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
         assert_eq!(health.0.execution_mode, "native");
@@ -15961,110 +15913,22 @@ mod tests {
         ))?;
         assert_eq!(
             header_value(response.headers(), "x-psionic-execution-mode"),
-            Some(String::from("proxy"))
+            Some(String::from("native"))
         );
         assert_eq!(
             header_value(response.headers(), "x-psionic-execution-engine"),
-            Some(String::from("llama.cpp"))
+            Some(String::from("psionic"))
         );
         assert_eq!(
             header_value(response.headers(), "x-psionic-batch-posture"),
             Some(String::from("single_request_only"))
         );
+        assert_eq!(header_value(response.headers(), "x-psionic-scheduling-class"), None);
         let payload = runtime.block_on(response_json(response))?;
         assert_eq!(
             payload["choices"][0]["message"]["content"],
-            serde_json::json!("proxy world")
+            serde_json::json!("world")
         );
-
-        let _ = shutdown_tx.send(());
-        Ok(())
-    }
-
-    #[test]
-    fn generic_server_qwen35_fails_closed_for_tools_and_structured_outputs()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
-        let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, _) = runtime.block_on(start_qwen35_proxy_test_server())?;
-        let temp = tempfile::tempdir()?;
-        let qwen35_path = temp.path().join("tiny-qwen35.gguf");
-        write_test_gguf(
-            &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
-            qwen35_decoder_tensors().as_slice(),
-        )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
-        let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
-        drop(_proxy_env);
-
-        let tool_error = runtime
-            .block_on(handle_generic_chat_completions(
-                std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(String::from("tiny-qwen35")),
-                    messages: vec![ChatCompletionMessage::text("user", "hello")],
-                    temperature: Some(0.0),
-                    max_tokens: Some(2),
-                    stop: None,
-                    stream: false,
-                    tools: vec![weather_tool_definition()],
-                    tool_choice: None,
-                    response_format: None,
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("qwen35 tool calling should fail closed");
-        let tool_payload = runtime.block_on(response_json(tool_error.into_response()))?;
-        assert!(
-            tool_payload["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("lacks tool-calling support")
-        );
-
-        let structured_output_error = runtime
-            .block_on(handle_generic_chat_completions(
-                std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(String::from("tiny-qwen35")),
-                    messages: vec![ChatCompletionMessage::text("user", "hello")],
-                    temperature: Some(0.0),
-                    max_tokens: Some(2),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    response_format: Some(ChatCompletionResponseFormatRequest {
-                        kind: String::from("json_object"),
-                        json_schema: None,
-                        schema: None,
-                    }),
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("qwen35 structured output should fail closed");
-        let structured_output_payload =
-            runtime.block_on(response_json(structured_output_error.into_response()))?;
-        assert!(
-            structured_output_payload["error"]["message"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("lacks structured-output support")
-        );
-
-        let _ = shutdown_tx.send(());
         Ok(())
     }
 
@@ -17221,76 +17085,58 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_qwen35_projects_multimodal_inputs_through_real_template_markers()
+    fn generic_server_qwen35_refuses_multimodal_inputs_without_projection_facts()
     -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, observed_requests) =
-            runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let qwen35_path = temp.path().join("tiny-qwen35.gguf");
         write_test_gguf(
             &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_metadata("tiny native qwen35").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
-        drop(_proxy_env);
-
-        let response = runtime
+        let request = ChatCompletionRequest {
+            model: Some(String::from("tiny-qwen35")),
+            messages: vec![ChatCompletionMessage::multimodal(
+                "user",
+                vec![
+                    ChatCompletionContentPart::text("hello "),
+                    ChatCompletionContentPart::image_url(
+                        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+                    ),
+                    ChatCompletionContentPart::text(" compare "),
+                    ChatCompletionContentPart::video_url(
+                        "https://example.invalid/pilot.mp4",
+                    ),
+                ],
+            )],
+            temperature: Some(0.0),
+            max_tokens: Some(2),
+            stop: None,
+            stream: false,
+            tools: Vec::new(),
+            tool_choice: None,
+            response_format: None,
+            psionic_grammar: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_prefix_cache: None,
+            ..Default::default()
+        };
+        let multimodal_error = runtime
             .block_on(handle_generic_chat_completions(
                 std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(String::from("tiny-qwen35")),
-                    messages: vec![ChatCompletionMessage::multimodal(
-                        "user",
-                        vec![
-                            ChatCompletionContentPart::text("hello "),
-                            ChatCompletionContentPart::image_url(
-                                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
-                            ),
-                            ChatCompletionContentPart::text(" compare "),
-                            ChatCompletionContentPart::video_url(
-                                "https://example.invalid/pilot.mp4",
-                            ),
-                        ],
-                    )],
-                    temperature: Some(0.0),
-                    max_tokens: Some(2),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    response_format: None,
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
+                request,
             ))
-            .expect("qwen35 multimodal input should project through the prompt surface");
-        let payload = runtime.block_on(response_json(response))?;
+            .expect_err("qwen35 multimodal input should fail closed without projection facts");
+        let payload = runtime.block_on(response_json(multimodal_error.into_response()))?;
         assert_eq!(
-            payload["choices"][0]["message"]["content"],
-            serde_json::json!("proxy world")
+            payload["error"]["message"],
+            serde_json::json!(
+                "multimodal inputs are unavailable because the loaded qwen35 artifact lacks multimodal projection facts"
+            )
         );
-
-        let observed_requests = observed_requests
-            .lock()
-            .expect("observed qwen35 proxy requests should be readable");
-        assert!(observed_requests.iter().any(|body| {
-            body.get("n_predict") == Some(&serde_json::json!(2))
-                && body["prompt"].as_str().is_some_and(|prompt| {
-                    prompt.contains(
-                        "hello <|vision_start|><|image_pad|><|vision_end|> compare <|vision_start|><|video_pad|><|vision_end|>"
-                    )
-                })
-        }));
 
         let system_error = runtime
             .block_on(handle_generic_chat_completions(
@@ -17359,72 +17205,58 @@ mod tests {
             audio_payload["error"]["message"],
             serde_json::json!("qwen35 multimodal projection supports image and video parts only")
         );
-
-        let _ = shutdown_tx.send(());
         Ok(())
     }
 
     #[test]
-    fn generic_responses_qwen35_projects_multimodal_message_input()
+    fn generic_responses_qwen35_refuse_multimodal_message_input_without_projection_facts()
     -> Result<(), Box<dyn std::error::Error>> {
-        let _proxy_lock = qwen35_proxy_test_lock()
-            .lock()
-            .expect("qwen35 proxy test lock should not be poisoned");
         let runtime = tokio::runtime::Runtime::new()?;
-        let (base_url, shutdown_tx, observed_requests) =
-            runtime.block_on(start_qwen35_proxy_test_server())?;
         let temp = tempfile::tempdir()?;
         let qwen35_path = temp.path().join("tiny-qwen35.gguf");
         write_test_gguf(
             &qwen35_path,
-            qwen35_decoder_metadata("tiny qwen35 proxy").as_slice(),
+            qwen35_decoder_metadata("tiny native qwen35").as_slice(),
             qwen35_decoder_tensors().as_slice(),
         )?;
-
-        let _proxy_env = ScopedEnvVar::set("PSIONIC_QWEN35_PROXY_BASE_URL", base_url.as_str());
         let server = OpenAiCompatServer::from_config(&OpenAiCompatConfig::new(&qwen35_path))?;
-        drop(_proxy_env);
-
-        let response = runtime.block_on(handle_generic_responses(
-            std::sync::Arc::clone(&server.state),
-            ResponsesRequest {
-                model: Some(String::from("tiny-qwen35")),
-                instructions: None,
-                conversation: None,
-                input: ResponsesInput::Messages(vec![ChatCompletionMessage::multimodal(
-                    "user",
-                    vec![
-                        ChatCompletionContentPart::text("describe "),
-                        ChatCompletionContentPart::image_url("https://example.invalid/dog.png"),
-                    ],
-                )]),
-                temperature: Some(0.0),
-                max_output_tokens: Some(2),
-                stop: None,
-                stream: false,
-                tools: Vec::new(),
-                tool_choice: None,
-                previous_response_id: None,
-                psionic_structured_output: None,
-                psionic_reasoning: None,
-                psionic_response_state: None,
-                psionic_prefix_cache: None,
-                ..Default::default()
-            },
-        ))?;
-        let payload = runtime.block_on(response_json(response))?;
-        assert_eq!(payload["output_text"], serde_json::json!("proxy world"));
-
-        let observed_requests = observed_requests
-            .lock()
-            .expect("observed qwen35 proxy requests should be readable");
-        assert!(observed_requests.iter().any(|body| {
-            body["prompt"].as_str().is_some_and(|prompt| {
-                prompt.contains("describe <|vision_start|><|image_pad|><|vision_end|>")
-            })
-        }));
-
-        let _ = shutdown_tx.send(());
+        let request = ResponsesRequest {
+            model: Some(String::from("tiny-qwen35")),
+            instructions: None,
+            conversation: None,
+            input: ResponsesInput::Messages(vec![ChatCompletionMessage::multimodal(
+                "user",
+                vec![
+                    ChatCompletionContentPart::text("describe "),
+                    ChatCompletionContentPart::image_url("https://example.invalid/dog.png"),
+                ],
+            )]),
+            temperature: Some(0.0),
+            max_output_tokens: Some(2),
+            stop: None,
+            stream: false,
+            tools: Vec::new(),
+            tool_choice: None,
+            previous_response_id: None,
+            psionic_structured_output: None,
+            psionic_reasoning: None,
+            psionic_response_state: None,
+            psionic_prefix_cache: None,
+            ..Default::default()
+        };
+        let response = runtime
+            .block_on(handle_generic_responses(
+                std::sync::Arc::clone(&server.state),
+                request,
+            ))
+            .expect_err("qwen35 responses multimodal input should fail closed");
+        let payload = runtime.block_on(response_json(response.into_response()))?;
+        assert_eq!(
+            payload["error"]["message"],
+            serde_json::json!(
+                "multimodal inputs are unavailable because the loaded qwen35 artifact lacks multimodal projection facts"
+            )
+        );
         Ok(())
     }
 
@@ -21160,36 +20992,31 @@ mod tests {
             ),
             (
                 String::from("qwen35.embedding_length"),
-                GgufMetadataValue::U32(8),
+                GgufMetadataValue::U32(32),
             ),
             (
                 String::from("qwen35.feed_forward_length"),
-                GgufMetadataValue::U32(16),
+                GgufMetadataValue::U32(32),
             ),
             (
                 String::from("qwen35.block_count"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(1),
             ),
             (
                 String::from("qwen35.attention.head_count"),
-                GgufMetadataValue::U32(2),
+                GgufMetadataValue::U32(4),
             ),
             (
                 String::from("qwen35.attention.head_count_kv"),
-                GgufMetadataValue::Array(vec![
-                    GgufMetadataValue::U32(0),
-                    GgufMetadataValue::U32(0),
-                    GgufMetadataValue::U32(0),
-                    GgufMetadataValue::U32(1),
-                ]),
+                GgufMetadataValue::Array(vec![GgufMetadataValue::U32(2)]),
             ),
             (
                 String::from("qwen35.attention.key_length"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.attention.value_length"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.attention.layer_norm_rms_epsilon"),
@@ -21197,7 +21024,7 @@ mod tests {
             ),
             (
                 String::from("qwen35.rope.dimension_count"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.rope.freq_base"),
@@ -21205,7 +21032,7 @@ mod tests {
             ),
             (
                 String::from("qwen35.full_attention_interval"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(1),
             ),
             (
                 String::from("qwen35.ssm.conv_kernel"),
@@ -21217,11 +21044,11 @@ mod tests {
             ),
             (
                 String::from("qwen35.ssm.inner_size"),
-                GgufMetadataValue::U32(8),
+                GgufMetadataValue::U32(32),
             ),
             (
                 String::from("qwen35.ssm.state_size"),
-                GgufMetadataValue::U32(4),
+                GgufMetadataValue::U32(8),
             ),
             (
                 String::from("qwen35.ssm.time_step_rank"),
@@ -21724,95 +21551,30 @@ mod tests {
     }
 
     fn qwen35_decoder_tensors() -> Vec<TestGgufTensor> {
-        let mut tensors = vec![
-            dense_f32_tensor("token_embd.weight", vec![10, 8]),
-            dense_f32_tensor("output_norm.weight", vec![8]),
-            dense_f32_tensor("output.weight", vec![10, 8]),
-        ];
-
-        for layer_index in 0..4 {
-            let prefix = format!("blk.{layer_index}");
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.attn_norm.weight"),
-                vec![8],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.ffn_gate.weight"),
-                vec![16, 8],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.ffn_up.weight"),
-                vec![16, 8],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.ffn_down.weight"),
-                vec![8, 16],
-            ));
-            tensors.push(dense_f32_tensor(
-                &format!("{prefix}.post_attention_norm.weight"),
-                vec![8],
-            ));
-
-            if layer_index < 3 {
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_qkv.weight"),
-                    vec![24, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_gate.weight"),
-                    vec![8, 8],
-                ));
-                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_a"), vec![2]));
-                tensors.push(dense_f32_tensor(&format!("{prefix}.ssm_dt"), vec![2]));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_alpha.weight"),
-                    vec![2, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_beta.weight"),
-                    vec![2, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_conv1d.weight"),
-                    vec![24, 4],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_norm.weight"),
-                    vec![4],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.ssm_out.weight"),
-                    vec![8, 8],
-                ));
-            } else {
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_q.weight"),
-                    vec![16, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_k.weight"),
-                    vec![4, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_v.weight"),
-                    vec![4, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_output.weight"),
-                    vec![8, 8],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_q_norm.weight"),
-                    vec![4],
-                ));
-                tensors.push(dense_f32_tensor(
-                    &format!("{prefix}.attn_k_norm.weight"),
-                    vec![4],
-                ));
-            }
-        }
-
-        tensors
+        vec![
+            dense_tensor(
+                "token_embd.weight",
+                vec![10, 32],
+                token_embedding_values_with_hidden(10, 32, 6),
+            ),
+            dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor(
+                "output.weight",
+                vec![10, 32],
+                output_values_with_hidden(10, 32, 7),
+            ),
+            dense_tensor("blk.0.attn_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.0.ffn_gate.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.ffn_up.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.ffn_down.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.post_attention_norm.weight", vec![32], vec![1.0; 32]),
+            dense_tensor("blk.0.attn_q.weight", vec![64, 32], vec![0.0; 64 * 32]),
+            dense_tensor("blk.0.attn_k.weight", vec![16, 32], vec![0.0; 16 * 32]),
+            dense_tensor("blk.0.attn_v.weight", vec![16, 32], vec![0.0; 16 * 32]),
+            dense_tensor("blk.0.attn_output.weight", vec![32, 32], vec![0.0; 32 * 32]),
+            dense_tensor("blk.0.attn_q_norm.weight", vec![8], vec![1.0; 8]),
+            dense_tensor("blk.0.attn_k_norm.weight", vec![8], vec![1.0; 8]),
+        ]
     }
 
     fn qwen35_native_full_attention_decoder_tensors() -> Vec<TestGgufTensor> {

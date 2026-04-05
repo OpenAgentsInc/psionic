@@ -1679,6 +1679,7 @@ impl GgufTensorType {
             Self::Q4_0 => Some(QuantizationMode::GgmlQ4_0),
             Self::Q4_1 => Some(QuantizationMode::GgmlQ4_1),
             Self::Q5_0 => Some(QuantizationMode::GgmlQ5_0),
+            Self::Q5K => Some(QuantizationMode::GgmlQ5K),
             Self::Q4K => Some(QuantizationMode::GgmlQ4K),
             Self::Q6K => Some(QuantizationMode::GgmlQ6K),
             Self::Q8_0 => Some(QuantizationMode::GgmlQ8_0),
@@ -1689,7 +1690,6 @@ impl GgufTensorType {
             | Self::Q8_1
             | Self::Q2K
             | Self::Q3K
-            | Self::Q5K
             | Self::Q8K
             | Self::Unknown(_) => None,
         }
@@ -3317,6 +3317,9 @@ fn supported_prompt_template_family(digest: &str) -> Option<GgufPromptTemplateFa
             Some(GgufPromptTemplateFamily::Qwen35)
         }
         "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715" => {
+            Some(GgufPromptTemplateFamily::Qwen35)
+        }
+        "e60df41481b6ad20571cda7e2e1290cfee25670f1b50973f74576c9354c66336" => {
             Some(GgufPromptTemplateFamily::Qwen35)
         }
         "9db2cf47ce03bfd0aab6ec59942503714fa0372f09f7e1d54cbcd71a1110b863" => {
@@ -6218,7 +6221,13 @@ fn build_gguf_decoder_tensor_layout(
                     ));
                 }
 
-                let ssm_dt = required_tensor_info(content, &format!("{prefix}.ssm_dt"))?;
+                let ssm_dt = required_tensor_info_any(
+                    content,
+                    &[
+                        format!("{prefix}.ssm_dt"),
+                        format!("{prefix}.ssm_dt.bias"),
+                    ],
+                )?;
                 let ssm_dt_width = tensor_vector_shape(ssm_dt)?;
                 if ssm_dt_width != ssm_time_step_rank {
                     return Err(artifact_format_error(
@@ -6826,6 +6835,16 @@ fn required_tensor_info<'a>(
     content
         .tensor_info(name)
         .ok_or_else(|| ModelLoadError::MissingTensor(name.to_string()))
+}
+
+fn required_tensor_info_any<'a>(
+    content: &'a GgufContent,
+    names: &[String],
+) -> Result<&'a GgufTensorInfo, ModelLoadError> {
+    names
+        .iter()
+        .find_map(|name| content.tensor_info(name))
+        .ok_or_else(|| ModelLoadError::MissingTensor(names.join(" | ")))
 }
 
 fn optional_tensor_name(content: &GgufContent, name: &str) -> Option<String> {
@@ -8109,10 +8128,11 @@ fn quantization_priority(quantization: QuantizationMode) -> u8 {
         QuantizationMode::GgmlQ4_0 => 2,
         QuantizationMode::GgmlQ4_1 => 3,
         QuantizationMode::GgmlQ5_0 => 4,
-        QuantizationMode::GgmlQ4K => 5,
-        QuantizationMode::GgmlQ6K => 6,
-        QuantizationMode::GgmlQ8_0 => 7,
-        QuantizationMode::GgmlMxfp4 => 8,
+        QuantizationMode::GgmlQ5K => 5,
+        QuantizationMode::GgmlQ4K => 6,
+        QuantizationMode::GgmlQ6K => 7,
+        QuantizationMode::GgmlQ8_0 => 8,
+        QuantizationMode::GgmlMxfp4 => 9,
     }
 }
 
@@ -8339,7 +8359,12 @@ fn qwen35_kv_head_count(
     head_dim: usize,
 ) -> Result<usize, ModelLoadError> {
     let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
-    let per_layer = read_optional_gguf_usize_array(metadata, kv_head_count_key.as_str())?;
+    let per_layer = match metadata.get(kv_head_count_key.as_str()) {
+        Some(GgufMetadataValue::Array(_)) => {
+            read_optional_gguf_usize_array(metadata, kv_head_count_key.as_str())?
+        }
+        _ => Vec::new(),
+    };
     if let Some(kv_head_count) = per_layer.iter().copied().find(|value| *value > 0) {
         return Ok(kv_head_count);
     }
@@ -8967,6 +8992,7 @@ fn decode_ggml_quantized_values(
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(layout, bytes),
         QuantizationMode::GgmlQ5_0 => decode_q5_0_blocks(layout, bytes),
+        QuantizationMode::GgmlQ5K => decode_q5_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ4K => decode_q4_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ6K => decode_q6_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(layout, bytes),
@@ -9095,6 +9121,46 @@ fn decode_q4_k_blocks(
     })
 }
 
+fn decode_q5_k_blocks(
+    layout: QuantizedBlockLayout,
+    bytes: &[u8],
+) -> Result<Vec<f32>, ModelLoadError> {
+    decode_fixed_width_blocks(layout, bytes, 176, |block, output| {
+        let scale = decode_f16([block[0], block[1]]);
+        let minimum = decode_f16([block[2], block[3]]);
+        let scales = &block[4..16];
+        let high_bits = &block[16..48];
+        let quants = &block[48..176];
+        let mut scale_index = 0usize;
+        let mut low_mask = 1u8;
+        let mut high_mask = 2u8;
+        for quant_chunk in quants.chunks_exact(32) {
+            let (low_scale, low_min) = decode_q4_k_scale_min(scale_index, scales);
+            let low_scale = scale * f32::from(low_scale);
+            let low_min = minimum * f32::from(low_min);
+            let (high_scale_value, high_min_value) =
+                decode_q4_k_scale_min(scale_index.saturating_add(1), scales);
+            let high_scale = scale * f32::from(high_scale_value);
+            let high_min = minimum * f32::from(high_min_value);
+            for (index, quant) in quant_chunk.iter().enumerate() {
+                let lifted = if (high_bits[index] & low_mask) != 0 { 16 } else { 0 };
+                output.push(low_scale * f32::from((quant & 0x0f) + lifted) - low_min);
+            }
+            for (index, quant) in quant_chunk.iter().enumerate() {
+                let lifted = if (high_bits[index] & high_mask) != 0 {
+                    16
+                } else {
+                    0
+                };
+                output.push(high_scale * f32::from(((quant >> 4) & 0x0f) + lifted) - high_min);
+            }
+            scale_index = scale_index.saturating_add(2);
+            low_mask <<= 2;
+            high_mask <<= 2;
+        }
+    })
+}
+
 fn decode_q6_k_blocks(
     layout: QuantizedBlockLayout,
     bytes: &[u8],
@@ -9152,6 +9218,7 @@ fn quantization_from_block_bytes(bytes_per_block: usize) -> QuantizationMode {
         18 => QuantizationMode::GgmlQ4_0,
         20 => QuantizationMode::GgmlQ4_1,
         22 => QuantizationMode::GgmlQ5_0,
+        176 => QuantizationMode::GgmlQ5K,
         144 => QuantizationMode::GgmlQ4K,
         210 => QuantizationMode::GgmlQ6K,
         34 => QuantizationMode::GgmlQ8_0,
@@ -9356,6 +9423,19 @@ mod tests {
     fn qwen35_pilot_fixture_path(default_path: &str) -> String {
         std::env::var("PSIONIC_QWEN35_PILOT_GGUF_PATH")
             .unwrap_or_else(|_| String::from(default_path))
+    }
+
+    fn qwen35_27b_validation_fixture_path() -> Option<String> {
+        std::env::var("PSIONIC_QWEN35_27B_GGUF_PATH")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| {
+                let default = "/Users/christopherdavid/models/qwen3.5/Qwen3.5-27B-Q4_K_M.gguf";
+                Path::new(default)
+                    .exists()
+                    .then(|| String::from(default))
+            })
     }
 
     #[test]
@@ -10740,6 +10820,97 @@ mod tests {
     }
 
     #[test]
+    fn gguf_real_qwen35_27b_tokenizer_and_template_are_admitted_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = qwen35_27b_validation_fixture_path() else {
+            return Ok(());
+        };
+
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let tokenizer = content.load_tokenizer()?;
+        let templates = content.load_chat_templates()?;
+
+        assert_eq!(
+            tokenizer.pretokenizer,
+            Some(GgufTokenizerPretokenizer::Qwen35)
+        );
+        assert_eq!(tokenizer.vocabulary.pad_token_id(), Some(TokenId(248055)));
+        assert_eq!(
+            templates.default_template().map(digest_chat_template),
+            Some(String::from(
+                "e60df41481b6ad20571cda7e2e1290cfee25670f1b50973f74576c9354c66336"
+            ))
+        );
+
+        let family = super::classify_gguf_decoder_family(content.metadata(), "qwen35")?;
+        assert_eq!(family, GgufDecoderFamily::Qwen35);
+        super::validate_supported_decoder_family_features(content.metadata(), family, "qwen35")?;
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_real_qwen35_27b_prompt_renderer_accepts_default_template_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = qwen35_27b_validation_fixture_path() else {
+            return Ok(());
+        };
+
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let renderer =
+            GgufPromptTemplateRenderer::new(content.load_tokenizer()?, content.load_chat_templates()?);
+        let rendered = renderer.render(
+            None,
+            &[PromptMessage::new(PromptMessageRole::User, "hello")],
+            true,
+        )?;
+
+        assert_eq!(rendered.family, GgufPromptTemplateFamily::Qwen35);
+        assert!(rendered.text.contains("<|im_start|>user\nhello<|im_end|>"));
+        assert!(rendered.text.contains("<|im_start|>assistant\n"));
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_real_qwen35_27b_leaves_multimodal_projection_unset_when_family_facts_are_missing()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Some(path) = qwen35_27b_validation_fixture_path() else {
+            return Ok(());
+        };
+
+        let content = GgufContent::read_path(Path::new(path.as_str()))?;
+        let family_metadata = GgufDecoderFamilyMetadata {
+            family: GgufDecoderFamily::Qwen35,
+            architecture: String::from("qwen35"),
+            display_name: None,
+            rope_theta: 0.0,
+            rope_scaling_factor: None,
+            rope_original_context_length: None,
+            rms_norm_epsilon: 0.0,
+            sliding_window: None,
+            attention_key_length: None,
+            attention_value_length: None,
+            final_logit_softcapping: None,
+            tie_word_embeddings: false,
+            attention_qkv_biases: false,
+            expert_count: None,
+            expert_used_count: None,
+            expert_feed_forward_length: None,
+            family_facts: collect_decoder_family_facts(
+                content.metadata(),
+                &GgufDecoderFamily::Qwen35,
+                "qwen35",
+            ),
+        };
+
+        assert!(
+            family_metadata
+                .qwen35_multimodal_projection_config()
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn gguf_prompt_template_renderer_matches_gpt_oss_fixture_render_case()
     -> Result<(), Box<dyn std::error::Error>> {
         let fixture = golden_prompt_fixture("gpt_oss").expect("gpt-oss fixture");
@@ -11676,6 +11847,31 @@ mod tests {
         assert_eq!(
             adapter.chat_templates().default_template(),
             Some(qwen35_chat_template())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gguf_decoder_adapter_loader_accepts_qwen35_scalar_kv_heads_and_ssm_dt_bias()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_qwen35_scalar_kv.gguf");
+        write_test_gguf(
+            &path,
+            GgufVersion::V3,
+            &qwen35_decoder_metadata_scalar_kv(
+                "Tiny Qwen3.5 scalar kv",
+                Some(qwen35_chat_template()),
+            ),
+            &qwen35_decoder_tensors_with_ssm_dt_bias(),
+        )?;
+
+        let adapter = GgufDecoderAdapterLoader.load_path(&path)?;
+        assert_eq!(adapter.descriptor().model.family, "qwen35");
+        assert_eq!(adapter.descriptor().config.block.attention.kv_head_count, 1);
+        assert_eq!(
+            adapter.tensor_layout().layers[0].ssm_dt.as_deref(),
+            Some("blk.0.ssm_dt.bias")
         );
         Ok(())
     }
@@ -12629,6 +12825,26 @@ mod tests {
         metadata
     }
 
+    fn qwen35_decoder_metadata_scalar_kv(
+        name: &str,
+        chat_template: Option<&str>,
+    ) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = qwen35_decoder_metadata(name, chat_template);
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.attention.head_count_kv")
+        {
+            *value = GgufMetadataValue::U32(1);
+        }
+        if let Some((_, value)) = metadata
+            .iter_mut()
+            .find(|(key, _)| key == "qwen35.ssm.v_head_reordered")
+        {
+            *value = GgufMetadataValue::Bool(false);
+        }
+        metadata
+    }
+
     fn gemma4_decoder_metadata(
         name: &str,
         chat_template: Option<&str>,
@@ -13274,6 +13490,24 @@ mod tests {
         }
 
         tensors
+    }
+
+    fn qwen35_decoder_tensors_with_ssm_dt_bias() -> Vec<TestGgufTensor> {
+        qwen35_decoder_tensors()
+            .into_iter()
+            .map(|tensor| {
+                if tensor.name.ends_with(".ssm_dt") {
+                    TestGgufTensor::new(
+                        format!("{}.bias", tensor.name),
+                        tensor.shape.clone(),
+                        tensor.tensor_type,
+                        tensor.bytes.clone(),
+                    )
+                } else {
+                    tensor
+                }
+            })
+            .collect()
     }
 
     fn gpt_oss_decoder_tensors(expert_width: usize) -> Vec<TestGgufTensor> {

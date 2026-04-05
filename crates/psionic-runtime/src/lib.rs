@@ -9757,6 +9757,7 @@ const fn quantization_family_label(mode: QuantizationMode) -> &'static str {
         QuantizationMode::GgmlQ4_0 => "ggml_q4_0",
         QuantizationMode::GgmlQ4_1 => "ggml_q4_1",
         QuantizationMode::GgmlQ5_0 => "ggml_q5_0",
+        QuantizationMode::GgmlQ5K => "ggml_q5_k",
         QuantizationMode::GgmlQ4K => "ggml_q4_k",
         QuantizationMode::GgmlQ6K => "ggml_q6_k",
         QuantizationMode::GgmlQ8_0 => "ggml_q8_0",
