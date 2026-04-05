@@ -163,6 +163,24 @@ impl DenseBenchBackend {
             other => other,
         }
     }
+
+    fn resolve_sparse(self) -> Result<Self, String> {
+        match self {
+            Self::Auto => Ok(self.resolve_single()),
+            Self::Metal | Self::Cuda => Ok(self),
+            Self::Distributed => Err(String::from(
+                "distributed-sparse benchmarks require a local backend; use auto, metal, or cuda",
+            )),
+        }
+    }
+
+    fn openai_backend(self) -> OpenAiCompatBackend {
+        match self.resolve_single() {
+            Self::Cuda => OpenAiCompatBackend::Cuda,
+            Self::Metal => OpenAiCompatBackend::Metal,
+            Self::Auto | Self::Distributed => unreachable!("backend should be resolved before use"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -284,14 +302,6 @@ impl BenchConfig {
                 "distributed-dense benchmarks require --peer-base-url",
             ));
         }
-        if matches!(mode, BenchMode::DistributedSparse)
-            && !matches!(backend, DenseBenchBackend::Auto)
-        {
-            return Err(String::from(
-                "distributed-sparse benchmarks do not accept --backend; they always use the admitted CUDA sparse lane",
-            ));
-        }
-
         Ok(Self {
             model_path,
             mode,
@@ -493,6 +503,7 @@ fn run_dense_benchmark(
 }
 
 async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
+    let backend = config.backend.resolve_sparse()?;
     let adapter = GgufDecoderAdapterLoader
         .inspect_path(config.model_path.as_path())
         .map_err(|error| {
@@ -518,15 +529,33 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
             adapter.descriptor().model.model_id
         ));
     }
+    let served_artifact_digest = adapter
+        .descriptor()
+        .weights
+        .primary_artifact_digest()
+        .unwrap_or(adapter.descriptor().weights.digest.as_str())
+        .to_string();
+    let served_artifact_digest = psionic_serve::gguf_served_artifact_digest(
+        config.model_path.as_path(),
+        backend.openai_backend(),
+    )
+    .unwrap_or(served_artifact_digest);
     let load_started = Instant::now();
     let mut server_config = OpenAiCompatConfig::new(config.model_path.as_path());
-    server_config.backend = OpenAiCompatBackend::Cuda;
+    server_config.backend = backend.openai_backend();
     server_config
         .admit_gemma4_26b_sparse_distributed_lane(
-            &sample_sparse_cluster_state(),
+            &sample_sparse_cluster_state(
+                backend.runtime_label(),
+                served_artifact_digest.as_str(),
+            ),
             &Gemma4MoeDistributedLaneRequest::new(
                 NodeId::new("scheduler"),
-                sample_gemma4_26b_sparse_inventory(),
+                sample_gemma4_26b_sparse_inventory(
+                    backend.runtime_label(),
+                    served_artifact_digest.as_str(),
+                    topology.expert_count,
+                ),
             )
             .with_minimum_free_memory_bytes_per_host(16 * 1024 * 1024 * 1024),
         )
@@ -570,9 +599,17 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
             }))
             .send()
             .await
-            .map_err(|error| format!("sparse Gemma 4 request failed: {error}"))?
-            .error_for_status()
             .map_err(|error| format!("sparse Gemma 4 request failed: {error}"))?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|error| format!("<failed to read error body: {error}>"));
+            return Err(format!(
+                "sparse Gemma 4 request failed with {status}: {body}"
+            ));
+        }
         let total_s = started.elapsed().as_secs_f64();
         let payload = response
             .json::<serde_json::Value>()
@@ -627,7 +664,8 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
         config,
         adapter.descriptor().model.model_id.clone(),
         format!(
-            "cuda/experts={}x{}",
+            "{}/experts={}x{}",
+            backend.runtime_label(),
             topology.expert_count,
             topology.active_expert_count.unwrap_or(0)
         ),
@@ -841,15 +879,22 @@ fn ready_sparse_membership(
     )
 }
 
-fn ready_sparse_cuda_telemetry(node_id: &str, free_memory_bytes: u64) -> ClusterNodeTelemetry {
+fn ready_sparse_telemetry(
+    node_id: &str,
+    runtime_backend: &str,
+    free_memory_bytes: u64,
+) -> ClusterNodeTelemetry {
     ClusterNodeTelemetry::new(NodeId::new(node_id))
         .with_memory(Some(64 * 1024 * 1024 * 1024), Some(free_memory_bytes))
         .with_cpu_logical_cores(16)
         .with_accelerator_count(1)
-        .with_backend_readiness("cuda", ClusterBackendReadinessStatus::Ready)
+        .with_backend_readiness(runtime_backend, ClusterBackendReadinessStatus::Ready)
 }
 
-fn sample_sparse_cluster_state() -> ClusterState {
+fn sample_sparse_cluster_state(
+    runtime_backend: &str,
+    served_artifact_digest: &str,
+) -> ClusterState {
     let cluster_id = sample_sparse_cluster_id();
     let mut snapshot = ClusterSnapshot::new(cluster_id.clone());
     snapshot.memberships.insert(
@@ -863,13 +908,13 @@ fn sample_sparse_cluster_state() -> ClusterState {
         );
         snapshot.telemetry.insert(
             NodeId::new(worker),
-            ready_sparse_cuda_telemetry(worker, 48 * 1024 * 1024 * 1024),
+            ready_sparse_telemetry(worker, runtime_backend, 48 * 1024 * 1024 * 1024),
         );
         snapshot.artifact_residency.insert(
-            ClusterArtifactResidencyKey::new(NodeId::new(worker), "artifact-1"),
+            ClusterArtifactResidencyKey::new(NodeId::new(worker), served_artifact_digest),
             ClusterArtifactResidencyRecord::new(
                 NodeId::new(worker),
-                ClusterArtifactReference::new("decoder", "artifact-1"),
+                ClusterArtifactReference::new("decoder", served_artifact_digest),
                 ClusterArtifactResidencyStatus::Resident,
             ),
         );
@@ -877,23 +922,28 @@ fn sample_sparse_cluster_state() -> ClusterState {
     ClusterState::from_snapshot(snapshot)
 }
 
-fn sample_gemma4_26b_sparse_inventory() -> SparseExpertHostInventorySnapshot {
+fn sample_gemma4_26b_sparse_inventory(
+    runtime_backend: &str,
+    served_artifact_digest: &str,
+    expert_count: usize,
+) -> SparseExpertHostInventorySnapshot {
+    let split_point = (expert_count / 2).max(1);
     SparseExpertHostInventorySnapshot::new(
         psionic_serve::TEXT_GENERATION_PRODUCT_ID,
         "gemma4:26b",
-        "cuda",
-        "artifact-1",
+        runtime_backend,
+        served_artifact_digest,
     )
     .with_sharded_model_manifest_digest("gemma4-26b-manifest")
     .with_host(SparseExpertHostInventoryRecord::new(
         NodeId::new("worker-a"),
         0,
-        32,
+        split_point,
     ))
     .with_host(SparseExpertHostInventoryRecord::new(
         NodeId::new("worker-b"),
-        32,
-        64,
+        split_point,
+        expert_count,
     ))
 }
 
@@ -907,5 +957,5 @@ Usage: cargo run -p psionic-serve --example gemma4_bench -- \\\n\
 Notes:\n\
   - single runs dense Gemma 4 on one local backend.\n\
   - distributed-dense runs the Metal+CUDA split-execution lane and requires --peer-base-url.\n\
-  - distributed-sparse runs the admitted Gemma 4 26B sparse lane through the generic server.\n"
+  - distributed-sparse runs the admitted Gemma 4 26B sparse lane through the generic server on the selected local backend.\n"
 }

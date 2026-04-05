@@ -1364,11 +1364,7 @@ pub fn quantized_row_dot(
             QuantizationMode::GgmlMxfp4 => dot_mxfp4_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_0 => dot_q4_0_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4_1 => dot_q4_1_block(lhs_block, block_bytes)?,
-            QuantizationMode::GgmlQ5_0 => {
-                return Err(RuntimeError::Backend(String::from(
-                    "unsupported quantized matmul mode GgmlQ5_0",
-                )));
-            }
+            QuantizationMode::GgmlQ5_0 => dot_q5_0_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ4K => dot_q4_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ6K => dot_q6_k_block(lhs_block, block_bytes)?,
             QuantizationMode::GgmlQ8_0 => dot_q8_0_block(lhs_block, block_bytes)?,
@@ -1443,11 +1439,7 @@ pub fn decode_quantized_row_into(
             QuantizationMode::GgmlMxfp4 => decode_mxfp4_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_0 => decode_q4_0_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4_1 => decode_q4_1_block_into(block_bytes, output)?,
-            QuantizationMode::GgmlQ5_0 => {
-                return Err(RuntimeError::Backend(String::from(
-                    "unsupported quantized decode mode GgmlQ5_0",
-                )));
-            }
+            QuantizationMode::GgmlQ5_0 => decode_q5_0_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ4K => decode_q4_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ6K => decode_q6_k_block_into(block_bytes, output)?,
             QuantizationMode::GgmlQ8_0 => decode_q8_0_block_into(block_bytes, output)?,
@@ -1514,6 +1506,27 @@ fn dot_q4_1_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
         let high = min + f32::from(quant >> 4) * scale;
         sum += lhs[pair_index] * low;
         sum += lhs[pair_index + 16] * high;
+    }
+    Ok(sum)
+}
+
+fn dot_q5_0_block(lhs: &[f32], bytes: &[u8]) -> Result<f32, RuntimeError> {
+    if bytes.len() != 22 || lhs.len() != 32 {
+        return Err(RuntimeError::Backend(String::from(
+            "q5_0 block dot requires 32 lhs values and 22 bytes",
+        )));
+    }
+    let scale = decode_f16_le(bytes[0], bytes[1]);
+    let qh = u32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]);
+    let quants = &bytes[6..22];
+    let mut sum = 0.0;
+    for (pair_index, quant) in quants.iter().copied().enumerate() {
+        let high_bit_low = (((qh >> pair_index) << 4) & 0x10) as u8;
+        let high_bit_high = ((qh >> (pair_index + 12)) & 0x10) as u8;
+        let low = (((quant & 0x0f) | high_bit_low) as i32 - 16) as f32;
+        let high = (((quant >> 4) | high_bit_high) as i32 - 16) as f32;
+        sum += lhs[pair_index] * (low * scale);
+        sum += lhs[pair_index + 16] * (high * scale);
     }
     Ok(sum)
 }
@@ -1661,6 +1674,27 @@ fn decode_q4_1_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), Run
     for (pair_index, quant) in quants.iter().copied().enumerate() {
         output[start + pair_index] = min + f32::from(quant & 0x0f) * scale;
         output[start + pair_index + 16] = min + f32::from(quant >> 4) * scale;
+    }
+    Ok(())
+}
+
+fn decode_q5_0_block_into(bytes: &[u8], output: &mut Vec<f32>) -> Result<(), RuntimeError> {
+    if bytes.len() != 22 {
+        return Err(RuntimeError::Backend(String::from(
+            "q5_0 block decode requires 22 bytes",
+        )));
+    }
+    let scale = decode_f16_le(bytes[0], bytes[1]);
+    let qh = u32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]);
+    let start = output.len();
+    output.resize(start + 32, 0.0);
+    for (pair_index, quant) in bytes[6..22].iter().copied().enumerate() {
+        let high_bit_low = (((qh >> pair_index) << 4) & 0x10) as u8;
+        let high_bit_high = ((qh >> (pair_index + 12)) & 0x10) as u8;
+        let low = i32::from((quant & 0x0f) | high_bit_low) - 16;
+        let high = i32::from((quant >> 4) | high_bit_high) - 16;
+        output[start + pair_index] = (low as f32) * scale;
+        output[start + pair_index + 16] = (high as f32) * scale;
     }
     Ok(())
 }
@@ -2610,6 +2644,10 @@ mod tests {
             sample_repeated_q4_1_rows(3),
         )?;
         assert_quantized_matmul_matches_dense_reference(
+            QuantizationMode::GgmlQ5_0,
+            sample_repeated_q5_0_rows(3),
+        )?;
+        assert_quantized_matmul_matches_dense_reference(
             QuantizationMode::GgmlQ8_0,
             sample_repeated_q8_0_rows(3),
         )?;
@@ -2670,6 +2708,23 @@ mod tests {
             .sum();
         assert!((dot_q6_k - expected_q6_k).abs() <= 1e-4);
         assert_eq!(decoded_q6_k.len(), 256);
+        Ok(())
+    }
+
+    #[test]
+    fn cpu_quantized_row_helpers_cover_q5_0() -> Result<(), RuntimeError> {
+        let reference = sample_q8_0_like_reference_vector();
+        let q5_0 = sample_q5_0_row();
+        let mut decoded = Vec::new();
+        super::decode_quantized_row_into(QuantizationMode::GgmlQ5_0, &q5_0, &mut decoded)?;
+        let dot = super::quantized_row_dot(&reference, QuantizationMode::GgmlQ5_0, &q5_0)?;
+        let expected: f32 = reference
+            .iter()
+            .zip(decoded.iter())
+            .map(|(lhs, rhs)| lhs * rhs)
+            .sum();
+        assert!((dot - expected).abs() <= 1e-4);
+        assert_eq!(decoded.len(), 32);
         Ok(())
     }
 
@@ -2809,6 +2864,14 @@ mod tests {
             .collect()
     }
 
+    fn sample_repeated_q5_0_rows(rows: usize) -> Vec<u8> {
+        sample_q5_0_row()
+            .into_iter()
+            .cycle()
+            .take(rows * 22)
+            .collect()
+    }
+
     fn sample_q4_0_row() -> Vec<u8> {
         [0x00_u8, 0x40]
             .into_iter()
@@ -2834,6 +2897,18 @@ mod tests {
 
     fn sample_q4_1_row() -> Vec<u8> {
         [0x00_u8, 0x40, 0x00, 0xbc]
+            .into_iter()
+            .chain(
+                [0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe]
+                    .into_iter()
+                    .cycle()
+                    .take(16),
+            )
+            .collect()
+    }
+
+    fn sample_q5_0_row() -> Vec<u8> {
+        [0x00_u8, 0x40, 0x00, 0x00, 0x00, 0x00]
             .into_iter()
             .chain(
                 [0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe]

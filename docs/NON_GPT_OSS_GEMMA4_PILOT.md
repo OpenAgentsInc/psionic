@@ -463,15 +463,21 @@ pilot cut:
   counts, `V := K` layers, and true reused-KV layers
 - the official `ggml-org` `e2b` and `31b` artifacts now load and benchmark on
   local Metal instead of failing at tokenizer admission
-- the official `26B-A4B` artifact now inspects through the sparse benchmark
-  harness instead of failing immediately on unsupported GGUF metadata
+- the official `26B-A4B` artifact now runs through the admitted sparse
+  benchmark harness on local Metal instead of failing immediately on
+  unsupported GGUF metadata or unsupported `Q5_0` execution
 
 One honest boundary remains:
 
-- the admitted `26B-A4B` sparse execution lane is still a CUDA-host benchmark
-  lane in this harness, so a local Apple-silicon box can validate GGUF support
-  and benchmark-surface admission but cannot honestly produce the final sparse
-  throughput receipt without a reachable CUDA peer or CUDA host
+- the admitted `26B-A4B` sparse execution lane on Apple silicon is still a
+  fallback-heavy path because unsupported Metal quantized rows now run through
+  the host quantized projection path rather than a native Metal kernel
+- that means the lane is now honest and benchmarkable on one Mac, but it is not
+  yet the performance ceiling for sparse Gemma 4 on Apple hardware
+- current local receipt on `main` for
+  `gemma-4-26B-A4B-it-Q4_K_M.gguf --mode distributed-sparse --backend metal`:
+  load `30.7068 s`, total `43.0130 s` for `16` output tokens, about
+  `0.372 tok/s` end-to-end
 
 Those runs are the current publication bar. They prove:
 

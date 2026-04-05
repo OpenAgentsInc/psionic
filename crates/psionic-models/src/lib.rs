@@ -3674,6 +3674,8 @@ pub enum GgufDecoderLayerKind {
     DenseAttention,
     /// GPT-OSS MoE block.
     GptOssMoe,
+    /// Gemma 4 routed-expert block.
+    Gemma4Moe,
     /// Qwen3.5 hybrid gated-attention plus SSM block.
     Qwen35Hybrid,
     /// Qwen3.5 full-attention block.
@@ -4781,7 +4783,8 @@ impl GgufDecoderAdapterLoader {
         if matches!(
             inspection.admission.kind,
             GgufDecoderServingAdmissionKind::PendingExpertTopology
-        ) {
+        ) && !matches!(inspection.family_metadata.family, GgufDecoderFamily::Gemma4)
+        {
             if let Some(requirements) = inspection.family_metadata.expert_topology_requirements() {
                 return Err(ModelLoadError::UnsupportedGgufDecoderExpertTopology {
                     family: requirements.family,
@@ -5713,7 +5716,8 @@ fn build_gguf_decoder_tensor_layout(
         if matches!(
             requirements.runtime_contract,
             GgufDecoderExpertRuntimeContract::FamilySpecificPlacement
-        ) {
+        ) && !matches!(family_metadata.family, GgufDecoderFamily::Gemma4)
+        {
             return Err(ModelLoadError::UnsupportedGgufDecoderExpertTopology {
                 family: requirements.family,
                 runtime_contract: requirements.runtime_contract,
@@ -5801,6 +5805,301 @@ fn build_gguf_decoder_tensor_layout(
         } else {
             None
         };
+        if matches!(family_metadata.family, GgufDecoderFamily::Gemma4)
+            && content
+                .tensor_info(&format!("{prefix}.ffn_gate_inp.weight"))
+                .is_some()
+        {
+            let expert_count = family_metadata.expert_count.ok_or_else(|| {
+                ModelLoadError::MissingGgufMetadata {
+                    key: format!("{}.expert_count", family_metadata.architecture),
+                }
+            })?;
+            let expert_width = family_metadata
+                .expert_feed_forward_length
+                .unwrap_or(config.block.feed_forward.intermediate_size);
+            let query_weight = required_tensor_info(content, &format!("{prefix}.attn_q.weight"))?;
+            let (query_rows, query_columns) = tensor_matrix_shape(query_weight)?;
+            let layer_head_dim = gemma4_layer_head_dim(
+                query_rows,
+                config.block.attention.head_count,
+                query_weight.name.as_str(),
+            )?;
+            let kv_width = gemma4_kv_head_count_for_layer(
+                metadata,
+                architecture,
+                config.block.attention.head_count,
+                layer_index,
+            )?
+            .saturating_mul(layer_head_dim);
+            if query_columns != config.hidden_size {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{query_rows}, {query_columns}] does not match expected [*, {}]",
+                        query_weight.name, config.hidden_size
+                    ),
+                ));
+            }
+            if let Some(key_weight) = content.tensor_info(&format!("{prefix}.attn_k.weight")) {
+                let (key_rows, key_columns) = tensor_matrix_shape(key_weight)?;
+                if key_rows != kv_width || key_columns != config.hidden_size {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{key_rows}, {key_columns}] does not match expected [{kv_width}, {}]",
+                            key_weight.name, config.hidden_size
+                        ),
+                    ));
+                }
+            }
+            if let Some(value_weight) = content.tensor_info(&format!("{prefix}.attn_v.weight")) {
+                let (value_rows, value_columns) = tensor_matrix_shape(value_weight)?;
+                if value_rows != kv_width || value_columns != config.hidden_size {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{value_rows}, {value_columns}] does not match expected [{kv_width}, {}]",
+                            value_weight.name, config.hidden_size
+                        ),
+                    ));
+                }
+            }
+            let output_weight =
+                required_tensor_info(content, &format!("{prefix}.attn_output.weight"))?;
+            let (output_rows, output_columns) = tensor_matrix_shape(output_weight)?;
+            if output_rows != config.hidden_size || output_columns != query_rows {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{output_rows}, {output_columns}] does not match expected [{}, {query_rows}]",
+                        output_weight.name, config.hidden_size
+                    ),
+                ));
+            }
+            let router_weight =
+                required_tensor_info(content, &format!("{prefix}.ffn_gate_inp.weight"))?;
+            let (router_rows, router_columns) = tensor_matrix_shape(router_weight)?;
+            if router_rows != expert_count || router_columns != config.hidden_size {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{router_rows}, {router_columns}] does not match expected [{expert_count}, {}]",
+                        router_weight.name, config.hidden_size
+                    ),
+                ));
+            }
+            let gate_experts = content.tensor_info(&format!("{prefix}.ffn_gate_exps.weight"));
+            let up_experts = content.tensor_info(&format!("{prefix}.ffn_up_exps.weight"));
+            let fused_gate_up_experts =
+                content.tensor_info(&format!("{prefix}.ffn_gate_up_exps.weight"));
+            let (gate_experts, up_experts) = if let (Some(gate_experts), Some(up_experts)) =
+                (gate_experts, up_experts)
+            {
+                let (gate_expert_count, gate_rows, gate_columns) =
+                    tensor_rank3_shape(gate_experts)?;
+                if gate_expert_count != expert_count
+                    || gate_rows != expert_width
+                    || gate_columns != config.hidden_size
+                {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{gate_expert_count}, {gate_rows}, {gate_columns}] does not match expected [{expert_count}, {expert_width}, {}]",
+                            gate_experts.name, config.hidden_size
+                        ),
+                    ));
+                }
+                let (up_expert_count, up_rows, up_columns) = tensor_rank3_shape(up_experts)?;
+                if up_expert_count != expert_count
+                    || up_rows != expert_width
+                    || up_columns != config.hidden_size
+                {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{up_expert_count}, {up_rows}, {up_columns}] does not match expected [{expert_count}, {expert_width}, {}]",
+                            up_experts.name, config.hidden_size
+                        ),
+                    ));
+                }
+                (Some(gate_experts), Some(up_experts))
+            } else if let Some(fused_gate_up_experts) = fused_gate_up_experts {
+                let (expert_outer, fused_rows, fused_columns) =
+                    tensor_rank3_shape(fused_gate_up_experts)?;
+                if expert_outer != expert_count
+                    || fused_rows != expert_width.saturating_mul(2)
+                    || fused_columns != config.hidden_size
+                {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{expert_outer}, {fused_rows}, {fused_columns}] does not match expected [{expert_count}, {}, {}]",
+                            fused_gate_up_experts.name,
+                            expert_width.saturating_mul(2),
+                            config.hidden_size
+                        ),
+                    ));
+                }
+                (Some(fused_gate_up_experts), None)
+            } else {
+                return Err(ModelLoadError::MissingTensor(format!(
+                    "{prefix}.ffn_gate_exps.weight"
+                )));
+            };
+            let down_experts =
+                required_tensor_info(content, &format!("{prefix}.ffn_down_exps.weight"))?;
+            let (down_expert_count, down_rows, down_columns) = tensor_rank3_shape(down_experts)?;
+            if down_expert_count != expert_count
+                || down_rows != config.hidden_size
+                || down_columns != expert_width
+            {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{down_expert_count}, {down_rows}, {down_columns}] does not match expected [{expert_count}, {}, {expert_width}]",
+                        down_experts.name, config.hidden_size
+                    ),
+                ));
+            }
+            let shared_gate = required_tensor_info(content, &format!("{prefix}.ffn_gate.weight"))?;
+            let (shared_gate_rows, shared_gate_columns) = tensor_matrix_shape(shared_gate)?;
+            if shared_gate_rows != config.block.feed_forward.intermediate_size
+                || shared_gate_columns != config.hidden_size
+            {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{shared_gate_rows}, {shared_gate_columns}] does not match expected [{}, {}]",
+                        shared_gate.name,
+                        config.block.feed_forward.intermediate_size,
+                        config.hidden_size
+                    ),
+                ));
+            }
+            let shared_up = required_tensor_info(content, &format!("{prefix}.ffn_up.weight"))?;
+            let (shared_up_rows, shared_up_columns) = tensor_matrix_shape(shared_up)?;
+            if shared_up_rows != config.block.feed_forward.intermediate_size
+                || shared_up_columns != config.hidden_size
+            {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{shared_up_rows}, {shared_up_columns}] does not match expected [{}, {}]",
+                        shared_up.name,
+                        config.block.feed_forward.intermediate_size,
+                        config.hidden_size
+                    ),
+                ));
+            }
+            let shared_down = required_tensor_info(content, &format!("{prefix}.ffn_down.weight"))?;
+            let (shared_down_rows, shared_down_columns) = tensor_matrix_shape(shared_down)?;
+            if shared_down_rows != config.hidden_size
+                || shared_down_columns != config.block.feed_forward.intermediate_size
+            {
+                return Err(artifact_format_error(
+                    "gguf",
+                    format!(
+                        "{} shape [{shared_down_rows}, {shared_down_columns}] does not match expected [{}, {}]",
+                        shared_down.name,
+                        config.hidden_size,
+                        config.block.feed_forward.intermediate_size
+                    ),
+                ));
+            }
+
+            layers.push(GgufDecoderLayerTensorLayout {
+                layer_index,
+                layer_kind: GgufDecoderLayerKind::Gemma4Moe,
+                attention_norm: required_tensor_info(
+                    content,
+                    &format!("{prefix}.attn_norm.weight"),
+                )?
+                .name
+                .clone(),
+                attention_query_weight: Some(query_weight.name.clone()),
+                attention_query_bias: query_bias,
+                attention_query_norm: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.attn_q_norm.weight"),
+                ),
+                attention_key_weight: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.attn_k.weight"),
+                ),
+                attention_key_bias: key_bias,
+                attention_key_norm: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.attn_k_norm.weight"),
+                ),
+                attention_value_weight: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.attn_v.weight"),
+                ),
+                attention_value_bias: value_bias,
+                attention_qkv_weight: None,
+                attention_qkv_bias: None,
+                attention_gate_weight: None,
+                attention_output_weight: Some(output_weight.name.clone()),
+                attention_output_bias: None,
+                attention_post_norm: optional_tensor_name_any(
+                    content,
+                    &[
+                        format!("{prefix}.post_attention_norm.weight"),
+                        format!("{prefix}.attn_post_norm.weight"),
+                    ],
+                ),
+                attention_sinks_weight: None,
+                feed_forward_gate_weight: Some(shared_gate.name.clone()),
+                feed_forward_down_weight: Some(shared_down.name.clone()),
+                feed_forward_up_weight: Some(shared_up.name.clone()),
+                feed_forward_norm: Some(
+                    required_tensor_info(content, &format!("{prefix}.ffn_norm.weight"))?
+                        .name
+                        .clone(),
+                ),
+                feed_forward_post_norm: optional_tensor_name_any(
+                    content,
+                    &[
+                        format!("{prefix}.post_ffw_norm.weight"),
+                        format!("{prefix}.ffn_post_norm.weight"),
+                    ],
+                ),
+                layer_output_scale: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.layer_output_scale.weight"),
+                ),
+                feed_forward_router_weight: Some(router_weight.name.clone()),
+                feed_forward_router_bias: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.ffn_gate_inp.bias"),
+                ),
+                feed_forward_gate_experts_weight: gate_experts.map(|tensor| tensor.name.clone()),
+                feed_forward_gate_experts_bias: if up_experts.is_some() {
+                    optional_tensor_name(content, &format!("{prefix}.ffn_gate_exps.bias"))
+                } else {
+                    optional_tensor_name(content, &format!("{prefix}.ffn_gate_up_exps.bias"))
+                },
+                feed_forward_up_experts_weight: up_experts.map(|tensor| tensor.name.clone()),
+                feed_forward_up_experts_bias: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.ffn_up_exps.bias"),
+                ),
+                feed_forward_down_experts_weight: Some(down_experts.name.clone()),
+                feed_forward_down_experts_bias: optional_tensor_name(
+                    content,
+                    &format!("{prefix}.ffn_down_exps.bias"),
+                ),
+                ssm_a: None,
+                ssm_dt: None,
+                ssm_alpha_weight: None,
+                ssm_beta_weight: None,
+                ssm_conv1d_weight: None,
+                ssm_norm_weight: None,
+                ssm_out_weight: None,
+            });
+            continue;
+        }
         if matches!(family_metadata.family, GgufDecoderFamily::Qwen35) {
             let query_width = config
                 .block
@@ -6156,12 +6455,6 @@ fn build_gguf_decoder_tensor_layout(
             continue;
         }
         if matches!(family_metadata.family, GgufDecoderFamily::GptOss) {
-            let query_width = config
-                .block
-                .attention
-                .head_count
-                .saturating_mul(config.block.attention.head_dim);
-            let kv_width = config.kv_width();
             let expert_count = family_metadata.expert_count.ok_or_else(|| {
                 ModelLoadError::MissingGgufMetadata {
                     key: format!("{}.expert_count", family_metadata.architecture),
@@ -6172,11 +6465,23 @@ fn build_gguf_decoder_tensor_layout(
                 .unwrap_or(config.block.feed_forward.intermediate_size);
             let query_weight = required_tensor_info(content, &format!("{prefix}.attn_q.weight"))?;
             let (query_rows, query_columns) = tensor_matrix_shape(query_weight)?;
-            if query_rows != query_width || query_columns != config.hidden_size {
+            let layer_head_dim = gemma4_layer_head_dim(
+                query_rows,
+                config.block.attention.head_count,
+                query_weight.name.as_str(),
+            )?;
+            let kv_width = gemma4_kv_head_count_for_layer(
+                metadata,
+                architecture,
+                config.block.attention.head_count,
+                layer_index,
+            )?
+            .saturating_mul(layer_head_dim);
+            if query_columns != config.hidden_size {
                 return Err(artifact_format_error(
                     "gguf",
                     format!(
-                        "{} shape [{query_rows}, {query_columns}] does not match expected [{query_width}, {}]",
+                        "{} shape [{query_rows}, {query_columns}] does not match expected [*, {}]",
                         query_weight.name, config.hidden_size
                     ),
                 ));
@@ -6206,11 +6511,11 @@ fn build_gguf_decoder_tensor_layout(
             let output_weight =
                 required_tensor_info(content, &format!("{prefix}.attn_output.weight"))?;
             let (output_rows, output_columns) = tensor_matrix_shape(output_weight)?;
-            if output_rows != config.hidden_size || output_columns != query_width {
+            if output_rows != config.hidden_size || output_columns != query_rows {
                 return Err(artifact_format_error(
                     "gguf",
                     format!(
-                        "{} shape [{output_rows}, {output_columns}] does not match expected [{}, {query_width}]",
+                        "{} shape [{output_rows}, {output_columns}] does not match expected [{}, {query_rows}]",
                         output_weight.name, config.hidden_size
                     ),
                 ));
@@ -6227,36 +6532,64 @@ fn build_gguf_decoder_tensor_layout(
                     ),
                 ));
             }
-            let gate_experts =
-                required_tensor_info(content, &format!("{prefix}.ffn_gate_exps.weight"))?;
-            let (gate_expert_count, gate_rows, gate_columns) = tensor_rank3_shape(gate_experts)?;
-            if gate_expert_count != expert_count
-                || gate_rows != expert_width
-                || gate_columns != config.hidden_size
+            let gate_experts = content.tensor_info(&format!("{prefix}.ffn_gate_exps.weight"));
+            let up_experts = content.tensor_info(&format!("{prefix}.ffn_up_exps.weight"));
+            let fused_gate_up_experts =
+                content.tensor_info(&format!("{prefix}.ffn_gate_up_exps.weight"));
+            let (gate_experts, up_experts) = if let (Some(gate_experts), Some(up_experts)) =
+                (gate_experts, up_experts)
             {
-                return Err(artifact_format_error(
-                    "gguf",
-                    format!(
-                        "{} shape [{gate_expert_count}, {gate_rows}, {gate_columns}] does not match expected [{expert_count}, {expert_width}, {}]",
-                        gate_experts.name, config.hidden_size
-                    ),
-                ));
-            }
-            let up_experts =
-                required_tensor_info(content, &format!("{prefix}.ffn_up_exps.weight"))?;
-            let (up_expert_count, up_rows, up_columns) = tensor_rank3_shape(up_experts)?;
-            if up_expert_count != expert_count
-                || up_rows != expert_width
-                || up_columns != config.hidden_size
-            {
-                return Err(artifact_format_error(
-                    "gguf",
-                    format!(
-                        "{} shape [{up_expert_count}, {up_rows}, {up_columns}] does not match expected [{expert_count}, {expert_width}, {}]",
-                        up_experts.name, config.hidden_size
-                    ),
-                ));
-            }
+                let (gate_expert_count, gate_rows, gate_columns) =
+                    tensor_rank3_shape(gate_experts)?;
+                if gate_expert_count != expert_count
+                    || gate_rows != expert_width
+                    || gate_columns != config.hidden_size
+                {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{gate_expert_count}, {gate_rows}, {gate_columns}] does not match expected [{expert_count}, {expert_width}, {}]",
+                            gate_experts.name, config.hidden_size
+                        ),
+                    ));
+                }
+                let (up_expert_count, up_rows, up_columns) = tensor_rank3_shape(up_experts)?;
+                if up_expert_count != expert_count
+                    || up_rows != expert_width
+                    || up_columns != config.hidden_size
+                {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{up_expert_count}, {up_rows}, {up_columns}] does not match expected [{expert_count}, {expert_width}, {}]",
+                            up_experts.name, config.hidden_size
+                        ),
+                    ));
+                }
+                (Some(gate_experts), Some(up_experts))
+            } else if let Some(fused_gate_up_experts) = fused_gate_up_experts {
+                let (expert_outer, fused_rows, fused_columns) =
+                    tensor_rank3_shape(fused_gate_up_experts)?;
+                if expert_outer != expert_count
+                    || fused_rows != expert_width.saturating_mul(2)
+                    || fused_columns != config.hidden_size
+                {
+                    return Err(artifact_format_error(
+                        "gguf",
+                        format!(
+                            "{} shape [{expert_outer}, {fused_rows}, {fused_columns}] does not match expected [{expert_count}, {}, {}]",
+                            fused_gate_up_experts.name,
+                            expert_width.saturating_mul(2),
+                            config.hidden_size
+                        ),
+                    ));
+                }
+                (Some(fused_gate_up_experts), None)
+            } else {
+                return Err(ModelLoadError::MissingTensor(format!(
+                    "{prefix}.ffn_gate_exps.weight"
+                )));
+            };
             let down_experts =
                 required_tensor_info(content, &format!("{prefix}.ffn_down_exps.weight"))?;
             let (down_expert_count, down_rows, down_columns) = tensor_rank3_shape(down_experts)?;
@@ -6320,12 +6653,13 @@ fn build_gguf_decoder_tensor_layout(
                     content,
                     &format!("{prefix}.ffn_gate_inp.bias"),
                 ),
-                feed_forward_gate_experts_weight: Some(gate_experts.name.clone()),
-                feed_forward_gate_experts_bias: optional_tensor_name(
-                    content,
-                    &format!("{prefix}.ffn_gate_exps.bias"),
-                ),
-                feed_forward_up_experts_weight: Some(up_experts.name.clone()),
+                feed_forward_gate_experts_weight: gate_experts.map(|tensor| tensor.name.clone()),
+                feed_forward_gate_experts_bias: if up_experts.is_some() {
+                    optional_tensor_name(content, &format!("{prefix}.ffn_gate_exps.bias"))
+                } else {
+                    optional_tensor_name(content, &format!("{prefix}.ffn_gate_up_exps.bias"))
+                },
+                feed_forward_up_experts_weight: up_experts.map(|tensor| tensor.name.clone()),
                 feed_forward_up_experts_bias: optional_tensor_name(
                     content,
                     &format!("{prefix}.ffn_up_exps.bias"),
@@ -8107,6 +8441,42 @@ fn gemma4_kv_head_count(
     Ok(head_count)
 }
 
+fn gemma4_kv_head_count_for_layer(
+    metadata: &BTreeMap<String, GgufMetadataValue>,
+    architecture: &str,
+    head_count: usize,
+    layer_index: usize,
+) -> Result<usize, ModelLoadError> {
+    let kv_head_count_key = format!("{architecture}.attention.head_count_kv");
+    if let Some(kv_head_count) = metadata
+        .get(kv_head_count_key.as_str())
+        .and_then(GgufMetadataValue::as_array)
+        .and_then(|values| values.get(layer_index))
+        .and_then(GgufMetadataValue::as_u64)
+        .filter(|value| *value > 0)
+        .and_then(|value| usize::try_from(value).ok())
+    {
+        return Ok(kv_head_count);
+    }
+    gemma4_kv_head_count(metadata, architecture, head_count)
+}
+
+fn gemma4_layer_head_dim(
+    query_rows: usize,
+    head_count: usize,
+    tensor_name: &str,
+) -> Result<usize, ModelLoadError> {
+    if head_count == 0 || query_rows % head_count != 0 {
+        return Err(artifact_format_error(
+            "gguf",
+            format!(
+                "{tensor_name} row count {query_rows} is not divisible by gemma4 head count {head_count}"
+            ),
+        ));
+    }
+    Ok(query_rows / head_count)
+}
+
 fn qwen35_full_attention_kv_width(
     key_rows: usize,
     head_dim: usize,
@@ -8596,9 +8966,7 @@ fn decode_ggml_quantized_values(
         QuantizationMode::GgmlMxfp4 => decode_mxfp4_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_0 => decode_q4_0_blocks(layout, bytes),
         QuantizationMode::GgmlQ4_1 => decode_q4_1_blocks(layout, bytes),
-        QuantizationMode::GgmlQ5_0 => {
-            Err(ModelLoadError::UnsupportedQuantizedTensorMode { quantization })
-        }
+        QuantizationMode::GgmlQ5_0 => decode_q5_0_blocks(layout, bytes),
         QuantizationMode::GgmlQ4K => decode_q4_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ6K => decode_q6_k_blocks(layout, bytes),
         QuantizationMode::GgmlQ8_0 => decode_q8_0_blocks(layout, bytes),
@@ -8672,6 +9040,27 @@ fn decode_q4_1_blocks(
             let high = f32::from(((packed >> 4) & 0x0f) as i8) * scale + minimum;
             output[start + j] = low;
             output[start + j + half_block] = high;
+        }
+    })
+}
+
+fn decode_q5_0_blocks(
+    layout: QuantizedBlockLayout,
+    bytes: &[u8],
+) -> Result<Vec<f32>, ModelLoadError> {
+    let half_block = layout.elements_per_block / 2;
+    decode_fixed_width_blocks(layout, bytes, 22, |block, output| {
+        let scale = decode_f16([block[0], block[1]]);
+        let qh = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+        let start = output.len();
+        output.resize(start + (half_block * 2), 0.0);
+        for (j, packed) in block[6..22].iter().enumerate() {
+            let high_bit_low = (((qh >> j) << 4) & 0x10) as u8;
+            let high_bit_high = ((qh >> (j + 12)) & 0x10) as u8;
+            let low = i32::from((packed & 0x0f) | high_bit_low) - 16;
+            let high = i32::from((packed >> 4) | high_bit_high) - 16;
+            output[start + j] = (low as f32) * scale;
+            output[start + j + half_block] = (high as f32) * scale;
         }
     })
 }

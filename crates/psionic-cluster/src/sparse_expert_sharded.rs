@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    ClusterArtifactResidencyKey, ClusterArtifactResidencyStatus, ClusterMembershipStatus,
+    tensor_collective_communication_eligibility, ClusterArtifactResidencyKey,
+    ClusterArtifactResidencyStatus, ClusterMembershipStatus,
     ClusterReplicaLaneExpertTopologyRequirement, ClusterReplicaLaneKey, ClusterState, NodeId,
-    tensor_collective_communication_eligibility,
 };
 
 /// One explicit host entry inside a sparse expert-inventory snapshot.
@@ -226,8 +226,17 @@ impl Default for SparseExpertPlacementPolicy {
     }
 }
 
-fn default_sparse_expert_capability_profile() -> ClusterExecutionCapabilityProfile {
-    ClusterExecutionCapabilityProfile::new("cuda")
+fn sparse_expert_backend_detail(runtime_backend: &str) -> String {
+    format!(
+        "backend `{runtime_backend}` declares sparse expert placement over the tensor-collective mesh under explicit expert-host inventory truth"
+    )
+}
+
+fn default_sparse_expert_capability_profile(
+    runtime_backend: impl Into<String>,
+) -> ClusterExecutionCapabilityProfile {
+    let runtime_backend = runtime_backend.into();
+    ClusterExecutionCapabilityProfile::new(runtime_backend.clone())
         .with_supported_lanes(vec![
             ClusterExecutionLane::RemoteWholeRequest,
             ClusterExecutionLane::TensorSharded,
@@ -260,9 +269,7 @@ fn default_sparse_expert_capability_profile() -> ClusterExecutionCapabilityProfi
                 "sparse expert routing can only promise cache reuse while the same expert-placement digest and host inventory remain stable",
             ),
         )
-        .with_detail(
-            "backend `cuda` declares sparse expert placement over the tensor-collective mesh under explicit expert-host inventory truth",
-        )
+        .with_detail(sparse_expert_backend_detail(&runtime_backend))
 }
 
 /// Request for one sparse expert-placement decision.
@@ -297,7 +304,9 @@ impl SparseExpertExecutionRequest {
         Self {
             scheduler_node_id,
             requested_backend: expert_host_inventory.runtime_backend.clone(),
-            capability_profile: default_sparse_expert_capability_profile(),
+            capability_profile: default_sparse_expert_capability_profile(
+                expert_host_inventory.runtime_backend.clone(),
+            ),
             topology_requirement,
             expert_host_inventory,
             minimum_free_memory_bytes_per_host: None,
@@ -305,13 +314,12 @@ impl SparseExpertExecutionRequest {
         }
     }
 
-    /// Overrides the requested backend. Non-CUDA values remain explicitly
-    /// refused for the first truthful sparse lane.
+    /// Overrides the requested backend.
     #[must_use]
     pub fn with_requested_backend(mut self, requested_backend: impl Into<String>) -> Self {
         self.requested_backend = requested_backend.into();
         self.capability_profile =
-            ClusterExecutionCapabilityProfile::new(self.requested_backend.clone());
+            default_sparse_expert_capability_profile(self.requested_backend.clone());
         self
     }
 
@@ -418,7 +426,7 @@ impl SparseExpertPlacementPlan {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SparseExpertSchedulingFailureCode {
-    /// The request asked for a backend outside the first truthful CUDA scope.
+    /// The request asked for a backend outside the admitted sparse lane scope.
     UnsupportedBackend,
     /// The backend does not satisfy the required communication class.
     CommunicationClassIneligible,
@@ -731,7 +739,9 @@ pub fn schedule_gemma4_26b_distributed_lane(
             &state.topology_digest(),
             Some(state.artifact_residency_digest()),
             request.expert_host_inventory.stable_digest(),
-            tensor_collective_communication_eligibility(&default_sparse_expert_capability_profile()),
+            tensor_collective_communication_eligibility(&default_sparse_expert_capability_profile(
+                request.expert_host_inventory.runtime_backend.clone(),
+            )),
             Vec::new(),
         )));
     }
@@ -768,11 +778,11 @@ pub fn schedule_sparse_expert_execution(
     let communication_eligibility =
         tensor_collective_communication_eligibility(&request.capability_profile);
 
-    if request.requested_backend != "cuda" {
+    if !matches!(request.requested_backend.as_str(), "cuda" | "metal") {
         return Err(Box::new(sparse_expert_failure(
             SparseExpertSchedulingFailureCode::UnsupportedBackend,
             format!(
-                "backend `{}` is outside the first truthful sparse expert scope",
+                "backend `{}` is outside the admitted sparse expert scope; supported backends are `cuda` and `metal`",
                 request.requested_backend
             ),
             state,
@@ -1297,10 +1307,8 @@ pub fn realize_sparse_expert_cluster_execution(
         ));
 
         for window in routed_experts.windows(2) {
-            let [
-                (from_index, from_assignment, from_expert),
-                (to_index, to_assignment, to_expert),
-            ] = window
+            let [(from_index, from_assignment, from_expert), (to_index, to_assignment, to_expert)] =
+                window
             else {
                 continue;
             };
@@ -1427,11 +1435,11 @@ mod tests {
     };
 
     use super::{
-        Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule, SparseExpertExecutionRequest,
-        SparseExpertHostInventoryRecord, SparseExpertHostInventorySnapshot,
-        SparseExpertPlacementPolicy, SparseExpertSchedulingFailureCode, SparseShardArtifactCache,
-        SparseShardArtifactStatus, realize_sparse_expert_cluster_execution,
-        schedule_gemma4_26b_distributed_lane, schedule_sparse_expert_execution,
+        realize_sparse_expert_cluster_execution, schedule_gemma4_26b_distributed_lane,
+        schedule_sparse_expert_execution, Gemma4MoeDistributedLaneRequest,
+        SparseExpertClusterSchedule, SparseExpertExecutionRequest, SparseExpertHostInventoryRecord,
+        SparseExpertHostInventorySnapshot, SparseExpertPlacementPolicy,
+        SparseExpertSchedulingFailureCode, SparseShardArtifactCache, SparseShardArtifactStatus,
     };
 
     fn fixture_error(detail: &str) -> Error {
@@ -1464,15 +1472,19 @@ mod tests {
         )
     }
 
-    fn ready_cuda_telemetry(node_id: &str, free_memory_bytes: u64) -> ClusterNodeTelemetry {
+    fn ready_sparse_telemetry(
+        node_id: &str,
+        runtime_backend: &str,
+        free_memory_bytes: u64,
+    ) -> ClusterNodeTelemetry {
         ClusterNodeTelemetry::new(crate::NodeId::new(node_id))
             .with_memory(Some(64 * 1024 * 1024 * 1024), Some(free_memory_bytes))
             .with_cpu_logical_cores(16)
             .with_accelerator_count(1)
-            .with_backend_readiness("cuda", ClusterBackendReadinessStatus::Ready)
+            .with_backend_readiness(runtime_backend, ClusterBackendReadinessStatus::Ready)
     }
 
-    fn sample_state() -> ClusterState {
+    fn sample_state_for_backend(runtime_backend: &str) -> ClusterState {
         let cluster_id = sample_cluster_id();
         let mut snapshot = ClusterSnapshot::new(cluster_id.clone());
         snapshot.memberships.insert(
@@ -1486,7 +1498,7 @@ mod tests {
             );
             snapshot.telemetry.insert(
                 crate::NodeId::new(worker),
-                ready_cuda_telemetry(worker, 48 * 1024 * 1024 * 1024),
+                ready_sparse_telemetry(worker, runtime_backend, 48 * 1024 * 1024 * 1024),
             );
             snapshot.artifact_residency.insert(
                 ClusterArtifactResidencyKey::new(crate::NodeId::new(worker), "artifact-1"),
@@ -1500,6 +1512,10 @@ mod tests {
         ClusterState::from_snapshot(snapshot)
     }
 
+    fn sample_state() -> ClusterState {
+        sample_state_for_backend("cuda")
+    }
+
     fn sample_topology_requirement() -> crate::ClusterReplicaLaneExpertTopologyRequirement {
         crate::ClusterReplicaLaneExpertTopologyRequirement::new(
             "gemma4",
@@ -1511,11 +1527,11 @@ mod tests {
         .with_expert_feed_forward_length(4096)
     }
 
-    fn sample_inventory() -> SparseExpertHostInventorySnapshot {
+    fn sample_inventory_for_backend(runtime_backend: &str) -> SparseExpertHostInventorySnapshot {
         SparseExpertHostInventorySnapshot::new(
             "psionic.text_generation",
             "gemma4:26b",
-            "cuda",
+            runtime_backend,
             "artifact-1",
         )
         .with_sharded_model_manifest_digest("gemma4-26b-manifest")
@@ -1531,9 +1547,13 @@ mod tests {
         ))
     }
 
+    fn sample_inventory() -> SparseExpertHostInventorySnapshot {
+        sample_inventory_for_backend("cuda")
+    }
+
     #[test]
-    fn sparse_expert_scheduler_builds_native_placement_digest_and_lane_truth()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sparse_expert_scheduler_builds_native_placement_digest_and_lane_truth(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = sample_state();
         let request = SparseExpertExecutionRequest::new(
             crate::NodeId::new("scheduler"),
@@ -1579,26 +1599,22 @@ mod tests {
                 .as_deref(),
             Some("gemma4-26b-manifest")
         );
-        assert!(
-            schedule
-                .cluster_execution
-                .policy_digests
-                .iter()
-                .any(|digest| digest.kind == ClusterPolicyDigestKind::Placement)
-        );
-        assert!(
-            schedule
-                .cluster_execution
-                .policy_digests
-                .iter()
-                .any(|digest| digest.kind == ClusterPolicyDigestKind::Sharding)
-        );
+        assert!(schedule
+            .cluster_execution
+            .policy_digests
+            .iter()
+            .any(|digest| digest.kind == ClusterPolicyDigestKind::Placement));
+        assert!(schedule
+            .cluster_execution
+            .policy_digests
+            .iter()
+            .any(|digest| digest.kind == ClusterPolicyDigestKind::Sharding));
         Ok(())
     }
 
     #[test]
-    fn sparse_shard_materialization_reuses_cached_artifacts()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sparse_shard_materialization_reuses_cached_artifacts(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = sample_state();
         let request = SparseExpertExecutionRequest::new(
             crate::NodeId::new("scheduler"),
@@ -1638,18 +1654,16 @@ mod tests {
                 .map(|artifact| artifact.shard_artifact_digest.as_str())
                 .collect::<Vec<_>>()
         );
-        assert!(
-            second
-                .shard_artifacts
-                .iter()
-                .all(|artifact| artifact.artifact_status == SparseShardArtifactStatus::Reused)
-        );
+        assert!(second
+            .shard_artifacts
+            .iter()
+            .all(|artifact| artifact.artifact_status == SparseShardArtifactStatus::Reused));
         Ok(())
     }
 
     #[test]
-    fn sparse_expert_scheduler_refuses_unsatisfied_active_expert_layout()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn sparse_expert_scheduler_refuses_unsatisfied_active_expert_layout(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = sample_state();
         let request = SparseExpertExecutionRequest::new(
             crate::NodeId::new("scheduler"),
@@ -1696,8 +1710,8 @@ mod tests {
     }
 
     #[test]
-    fn gemma4_26b_distributed_lane_accepts_two_host_partitioned_inventory()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn gemma4_26b_distributed_lane_accepts_two_host_partitioned_inventory(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = sample_state();
         let request = Gemma4MoeDistributedLaneRequest::new(
             crate::NodeId::new("scheduler"),
@@ -1730,8 +1744,36 @@ mod tests {
     }
 
     #[test]
-    fn gemma4_26b_distributed_lane_refuses_wrong_model_identity()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn gemma4_26b_distributed_lane_accepts_two_host_partitioned_inventory_on_metal(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let state = sample_state_for_backend("metal");
+        let request = Gemma4MoeDistributedLaneRequest::new(
+            crate::NodeId::new("scheduler"),
+            sample_inventory_for_backend("metal"),
+        )
+        .with_minimum_free_memory_bytes_per_host(16 * 1024 * 1024 * 1024);
+
+        let schedule = schedule_gemma4_26b_distributed_lane(&state, &request).map_err(|error| {
+            fixture_error(&format!(
+                "expected gemma4 26b distributed lane schedule on metal: {error:?}"
+            ))
+        })?;
+
+        assert_eq!(schedule.runtime_backend, "metal");
+        assert_eq!(schedule.lane.model_id, "gemma4:26b");
+        assert_eq!(schedule.placement_plan.assignments.len(), 2);
+        assert!(schedule
+            .cluster_execution
+            .communication_eligibility
+            .as_ref()
+            .and_then(|eligibility| eligibility.detail.as_deref())
+            .is_some_and(|detail| detail.contains("backend `metal`")));
+        Ok(())
+    }
+
+    #[test]
+    fn gemma4_26b_distributed_lane_refuses_wrong_model_identity(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = sample_state();
         let request = Gemma4MoeDistributedLaneRequest::new(
             crate::NodeId::new("scheduler"),
@@ -1771,8 +1813,8 @@ mod tests {
     }
 
     #[test]
-    fn realized_sparse_cluster_execution_attaches_live_route_proof()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn realized_sparse_cluster_execution_attaches_live_route_proof(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let state = sample_state();
         let schedule = schedule_gemma4_26b_distributed_lane(
             &state,
