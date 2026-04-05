@@ -7475,7 +7475,7 @@ mod platform {
             encoder.set_bytes(4, 4, (&epsilon as *const f32).cast());
             encoder.dispatch_thread_groups(
                 MTLSize::new(u64::from(head_count), 1, 1),
-                rms_norm_threadgroup_size(pipeline)?,
+                rms_norm_threadgroup_size(pipeline, head_dim as usize)?,
             );
             Ok(())
         }
@@ -7510,7 +7510,7 @@ mod platform {
             encoder.set_bytes(5, 4, (&epsilon as *const f32).cast());
             encoder.dispatch_thread_groups(
                 MTLSize::new(u64::from(head_count), 1, 1),
-                rms_norm_threadgroup_size(pipeline)?,
+                rms_norm_threadgroup_size(pipeline, head_dim as usize)?,
             );
             Ok(())
         }
@@ -7543,7 +7543,7 @@ mod platform {
             encoder.set_bytes(3, 4, (&epsilon as *const f32).cast());
             encoder.dispatch_thread_groups(
                 MTLSize::new(u64::from(head_count), 1, 1),
-                rms_norm_threadgroup_size(pipeline)?,
+                rms_norm_threadgroup_size(pipeline, head_dim as usize)?,
             );
             Ok(())
         }
@@ -9282,20 +9282,31 @@ mod platform {
         Ok(MTLSize::new(width, 1, 1))
     }
 
-    fn rms_norm_threadgroup_size(pipeline: &ComputePipelineState) -> Result<MTLSize, RuntimeError> {
-        const RMS_THREADS: u64 = 256;
+    fn rms_norm_threadgroup_size(
+        pipeline: &ComputePipelineState,
+        row_size: usize,
+    ) -> Result<MTLSize, RuntimeError> {
+        let requested_threads = if row_size <= 512 {
+            32_u64
+        } else if row_size <= 1024 {
+            128_u64
+        } else {
+            let row_reads = row_size.saturating_add(3) / 4;
+            let rounded = ((row_reads.saturating_add(31)) / 32).saturating_mul(32);
+            rounded.clamp(256, 1024) as u64
+        };
         let max_threads = pipeline.max_total_threads_per_threadgroup();
         if max_threads == 0 {
             return Err(RuntimeError::Backend(String::from(
                 "metal rms-norm kernel reported zero max threads per threadgroup",
             )));
         }
-        if u64::from(max_threads) < RMS_THREADS {
+        if u64::from(max_threads) < requested_threads {
             return Err(RuntimeError::Backend(format!(
-                "metal rms-norm kernel requires at least {RMS_THREADS} threads per threadgroup, actual {max_threads}",
+                "metal rms-norm kernel requires at least {requested_threads} threads per threadgroup, actual {max_threads}",
             )));
         }
-        Ok(MTLSize::new(RMS_THREADS, 1, 1))
+        Ok(MTLSize::new(requested_threads, 1, 1))
     }
 
     fn argmax_threadgroup_size(pipeline: &ComputePipelineState) -> Result<MTLSize, RuntimeError> {
@@ -9366,7 +9377,8 @@ using namespace metal;
 constant uint PSIONIC_QUANTIZED_ROW_THREADS = 32;
 constant uint PSIONIC_ARGMAX_THREADS = 128;
 constant uint PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP = 8;
-constant uint PSIONIC_RMS_NORM_THREADS = 256;
+constant uint PSIONIC_RMS_NORM_MAX_THREADS = 1024;
+constant uint PSIONIC_RMS_NORM_MAX_SIMDGROUPS = PSIONIC_RMS_NORM_MAX_THREADS / 32;
 constant uint PSIONIC_DECODE_THREADS = 32;
 constant uint PSIONIC_DECODE_MAX_SIMDGROUPS = 31;
 constant uint PSIONIC_DECODE_MAX_HEAD_DIM = 256;
@@ -9484,6 +9496,7 @@ kernel void psionic_per_head_rms_norm_f32(
     constant float& epsilon [[buffer(4)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
     uint lane [[thread_index_in_simdgroup]],
     uint simd_gid [[simdgroup_index_in_threadgroup]]
 ) {
@@ -9491,11 +9504,13 @@ kernel void psionic_per_head_rms_norm_f32(
     if (head >= head_count) {
         return;
     }
-    threadgroup float partial[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    uint lsize = lsize3.x;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
     threadgroup float shared_scale[1];
+    uint active_simdgroups = (lsize + 31) / 32;
     uint base = head * head_dim;
     float sum = 0.0f;
-    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+    for (uint index = tid; index < head_dim; index += lsize) {
         float value = values[base + index];
         sum += value * value;
     }
@@ -9505,7 +9520,7 @@ kernel void psionic_per_head_rms_norm_f32(
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     if (simd_gid == 0) {
-        float total = lane < (PSIONIC_RMS_NORM_THREADS / PSIONIC_DECODE_THREADS)
+        float total = lane < active_simdgroups
             ? partial[lane]
             : 0.0f;
         total = simd_sum(total);
@@ -9515,7 +9530,7 @@ kernel void psionic_per_head_rms_norm_f32(
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     float scale = shared_scale[0];
-    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+    for (uint index = tid; index < head_dim; index += lsize) {
         values[base + index] = values[base + index] * scale * weight[index];
     }
 }
@@ -9529,6 +9544,7 @@ kernel void psionic_per_head_rms_norm_to_output_f32(
     constant float& epsilon [[buffer(5)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
     uint lane [[thread_index_in_simdgroup]],
     uint simd_gid [[simdgroup_index_in_threadgroup]]
 ) {
@@ -9536,11 +9552,13 @@ kernel void psionic_per_head_rms_norm_to_output_f32(
     if (head >= head_count) {
         return;
     }
-    threadgroup float partial[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    uint lsize = lsize3.x;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
     threadgroup float shared_scale[1];
+    uint active_simdgroups = (lsize + 31) / 32;
     uint base = head * head_dim;
     float sum = 0.0f;
-    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+    for (uint index = tid; index < head_dim; index += lsize) {
         float value = input[base + index];
         sum += value * value;
     }
@@ -9550,7 +9568,7 @@ kernel void psionic_per_head_rms_norm_to_output_f32(
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     if (simd_gid == 0) {
-        float total = lane < (PSIONIC_RMS_NORM_THREADS / PSIONIC_DECODE_THREADS)
+        float total = lane < active_simdgroups
             ? partial[lane]
             : 0.0f;
         total = simd_sum(total);
@@ -9560,7 +9578,7 @@ kernel void psionic_per_head_rms_norm_to_output_f32(
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     float scale = shared_scale[0];
-    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+    for (uint index = tid; index < head_dim; index += lsize) {
         output[base + index] = input[base + index] * scale * weight[index];
     }
 }
@@ -9572,6 +9590,7 @@ kernel void psionic_per_head_rms_norm_unit_f32(
     constant float& epsilon [[buffer(3)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
     uint lane [[thread_index_in_simdgroup]],
     uint simd_gid [[simdgroup_index_in_threadgroup]]
 ) {
@@ -9579,11 +9598,13 @@ kernel void psionic_per_head_rms_norm_unit_f32(
     if (head >= head_count) {
         return;
     }
-    threadgroup float partial[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    uint lsize = lsize3.x;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
     threadgroup float shared_scale[1];
+    uint active_simdgroups = (lsize + 31) / 32;
     uint base = head * head_dim;
     float sum = 0.0f;
-    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+    for (uint index = tid; index < head_dim; index += lsize) {
         float value = values[base + index];
         sum += value * value;
     }
@@ -9593,7 +9614,7 @@ kernel void psionic_per_head_rms_norm_unit_f32(
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     if (simd_gid == 0) {
-        float total = lane < (PSIONIC_RMS_NORM_THREADS / PSIONIC_DECODE_THREADS)
+        float total = lane < active_simdgroups
             ? partial[lane]
             : 0.0f;
         total = simd_sum(total);
@@ -9603,7 +9624,7 @@ kernel void psionic_per_head_rms_norm_unit_f32(
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     float scale = shared_scale[0];
-    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+    for (uint index = tid; index < head_dim; index += lsize) {
         values[base + index] = values[base + index] * scale;
     }
 }
@@ -9774,7 +9795,7 @@ kernel void psionic_decode_attention_dense_f32(
         float local_max = lane < active_simdgroups ? partial_max[lane] : -INFINITY;
         float global_max = simd_max(local_max);
         float factor =
-            lane < active_simdgroups ? fast::exp(partial_max[lane] - global_max) : 0.0f;
+            lane < active_simdgroups ? fast::exp2(partial_max[lane] - global_max) : 0.0f;
         float global_denom =
             simd_sum((lane < active_simdgroups ? partial_denom[lane] : 0.0f) * factor);
         if (lane < active_simdgroups) {
