@@ -124,6 +124,9 @@ into one generic engine claim.
   - execution target = dense `gemma4:e4b`
   - realized topology = `pipeline_sharded`
   - realized disposition = `sharded`
+  - Metal prefix execution now keeps the split-stage layer stack on the device
+    and only materializes the handoff hidden state and forwarded KV rows that
+    the remote suffix actually needs
   - request publication now exposes the clustered path directly in response
     headers and response or receipt provenance instead of inferring it from a
     remote route

@@ -2795,11 +2795,13 @@ fn materialize_metal_cache_entries_from_layer_caches(
             key[cache_offset..cache_offset + kv_width].copy_from_slice(layer_key.as_slice());
             value[cache_offset..cache_offset + kv_width].copy_from_slice(layer_value.as_slice());
         }
-        cache.set_entry_kv(token_index, key, value).map_err(|error| {
-            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
-                "failed to materialize gemma4 metal host cache entry {token_index}: {error}"
-            )))
-        })?;
+        cache
+            .set_entry_kv(token_index, key, value)
+            .map_err(|error| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                    "failed to materialize gemma4 metal host cache entry {token_index}: {error}"
+                )))
+            })?;
     }
     Ok(())
 }
@@ -2996,6 +2998,12 @@ fn run_metal_gemma4_generation_request(
                 cache.len(),
                 layer_caches.as_mut_slice(),
                 &mut step_plan,
+                0,
+                loaded_model.inner.layers.len(),
+                None,
+                None,
+                None,
+                false,
                 produce_prompt_logits,
                 prompt_logits_output_mode,
             )?;
@@ -3080,6 +3088,12 @@ fn run_metal_gemma4_generation_request(
                 cache.len(),
                 layer_caches.as_mut_slice(),
                 &mut step_plan,
+                0,
+                loaded_model.inner.layers.len(),
+                None,
+                None,
+                None,
+                false,
                 true,
                 logits_output_mode,
             )?;
@@ -3569,7 +3583,8 @@ impl MetalGemma4ModelInner {
             .layers
             .iter()
             .filter_map(|layer| {
-                layer.feed_forward_gate_up_weight
+                layer
+                    .feed_forward_gate_up_weight
                     .as_ref()
                     .map(MetalQuantizedProjectionMatrix::rows)
             })
@@ -3586,7 +3601,10 @@ impl MetalGemma4ModelInner {
             .as_ref()
             .map(|inputs| inputs.width.saturating_mul(self.layers.len()))
             .unwrap_or(0);
-        let per_layer_input_width = self.gemma4_per_layer_inputs.as_ref().map(|inputs| inputs.width);
+        let per_layer_input_width = self
+            .gemma4_per_layer_inputs
+            .as_ref()
+            .map(|inputs| inputs.width);
         let per_layer_inputs_buffer = (total_per_layer_input_width > 0)
             .then(|| backend.zeros_buffer(Shape::new(vec![total_per_layer_input_width])))
             .transpose()
@@ -3842,9 +3860,23 @@ impl MetalGemma4ModelInner {
         position: usize,
         layer_caches: &mut [Option<MetalKvCacheMirror>],
         step_plan: &mut MetalGemma4StepPlan,
+        start_layer: usize,
+        end_layer: usize,
+        input_hidden: Option<&[f32]>,
+        forwarded_key: Option<&[f32]>,
+        forwarded_value: Option<&[f32]>,
+        materialize_stage_outputs: bool,
         produce_logits: bool,
         logits_output_mode: MetalLogitsOutputMode,
     ) -> Result<MetalGemma4StageStep, ReferenceTextGenerationError> {
+        if start_layer > end_layer || end_layer > self.layers.len() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "invalid gemma4 metal stage range [{start_layer}..{end_layer}) for {} layers",
+                    self.layers.len()
+                )),
+            ));
+        }
         if layer_caches.len() != self.layers.len() {
             return Err(ReferenceTextGenerationError::Runtime(
                 crate::RuntimeError::Backend(format!(
@@ -3865,65 +3897,144 @@ impl MetalGemma4ModelInner {
         }
 
         let hidden_size = self.descriptor.config.hidden_size;
-        let mut hidden = self
+        let mut embedding_hidden = self
             .token_embedding
             .decode_row(token.as_u32() as usize)
             .map_err(ReferenceTextGenerationError::Runtime)?;
         scale_in_place(
-            &mut hidden,
+            &mut embedding_hidden,
             input_embedding_scale(&self.family_metadata, hidden_size),
         );
+        let hidden = if let Some(input_hidden) = input_hidden {
+            if input_hidden.len() != hidden_size {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 metal stage input hidden width mismatch: expected {hidden_size}, actual {}",
+                        input_hidden.len()
+                    )),
+                ));
+            }
+            input_hidden.to_vec()
+        } else {
+            embedding_hidden
+        };
         step_plan
             .hidden_buffer
             .write_f32(hidden.as_slice())
             .map_err(ReferenceTextGenerationError::Runtime)?;
 
-        let gemma4_per_layer_input_shape =
-            if let Some(per_layer_inputs) = self.gemma4_per_layer_inputs.as_ref() {
-                let mut token_inputs = per_layer_inputs
-                    .token_embedding
-                    .decode_row(token.as_u32() as usize)
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                let total_width = per_layer_inputs.width.saturating_mul(self.layers.len());
-                if token_inputs.len() != total_width {
-                    return Err(ReferenceTextGenerationError::Runtime(
-                        crate::RuntimeError::Backend(format!(
-                            "gemma4 per-layer token embedding width mismatch: expected {total_width}, actual {}",
-                            token_inputs.len()
-                        )),
-                    ));
+        let mut cache_key = forwarded_key
+            .map(|values| values.to_vec())
+            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
+        let mut cache_value = forwarded_value
+            .map(|values| values.to_vec())
+            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
+        if cache_key.len() != self.cache_width() || cache_value.len() != self.cache_width() {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "gemma4 metal forwarded kv width mismatch: expected {}, actual key={} value={}",
+                    self.cache_width(),
+                    cache_key.len(),
+                    cache_value.len()
+                )),
+            ));
+        }
+        if start_layer > 0
+            && materialize_stage_outputs
+            && (forwarded_key.is_none() || forwarded_value.is_none())
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(String::from(
+                    "gemma4 metal staged execution requires forwarded kv for earlier layers",
+                )),
+            ));
+        }
+        if start_layer > 0 {
+            for (layer_index, layer) in self.layers.iter().enumerate().take(start_layer) {
+                let Some(cache_offset) = layer.attention_geometry.cache_write_offset else {
+                    continue;
+                };
+                let kv_width = layer.attention_geometry.kv_width();
+                let layer_key = &cache_key[cache_offset..cache_offset + kv_width];
+                let layer_value = &cache_value[cache_offset..cache_offset + kv_width];
+                let layer_cache = layer_caches
+                    .get_mut(layer_index)
+                    .and_then(Option::as_mut)
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 metal layer {layer_index} is missing a device kv cache mirror"
+                            ),
+                        ))
+                    })?;
+                match layer_cache.len() {
+                    len if len == position => {
+                        layer_cache
+                            .append_entry(backend, layer_key, layer_value)
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
+                    len if len == position.saturating_add(1) => {}
+                    len => {
+                        return Err(ReferenceTextGenerationError::Runtime(
+                            crate::RuntimeError::Backend(format!(
+                                "gemma4 metal stage layer {layer_index} cache length mismatch: expected {position} or {}, actual {len}",
+                                position.saturating_add(1)
+                            )),
+                        ));
+                    }
                 }
-                scale_in_place(&mut token_inputs, (per_layer_inputs.width as f32).sqrt());
-                let token_buffer =
-                    step_plan
-                        .per_layer_inputs_token_buffer
-                        .as_mut()
-                        .ok_or_else(|| {
-                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                                String::from(
-                                    "gemma4 metal step-plan is missing the per-layer token input buffer",
-                                ),
-                            ))
-                        })?;
-                token_buffer
-                    .write_f32(token_inputs.as_slice())
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                Some((per_layer_inputs.width, total_width))
-            } else {
-                None
-            };
+            }
+        }
+
+        let gemma4_per_layer_input_shape = if let Some(per_layer_inputs) =
+            self.gemma4_per_layer_inputs.as_ref()
+        {
+            let mut token_inputs = per_layer_inputs
+                .token_embedding
+                .decode_row(token.as_u32() as usize)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            let total_width = per_layer_inputs.width.saturating_mul(self.layers.len());
+            if token_inputs.len() != total_width {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 per-layer token embedding width mismatch: expected {total_width}, actual {}",
+                        token_inputs.len()
+                    )),
+                ));
+            }
+            scale_in_place(&mut token_inputs, (per_layer_inputs.width as f32).sqrt());
+            let token_buffer = step_plan
+                .per_layer_inputs_token_buffer
+                .as_mut()
+                .ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from(
+                            "gemma4 metal step-plan is missing the per-layer token input buffer",
+                        ),
+                    ))
+                })?;
+            token_buffer
+                .write_f32(token_inputs.as_slice())
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            Some((per_layer_inputs.width, total_width))
+        } else {
+            None
+        };
 
         let mut submission = backend
-            .begin_submission(format!("psionic.gemma4.metal.local.layerstack.token{position}"))
+            .begin_submission(format!(
+                "psionic.gemma4.metal.local.layerstack.token{position}"
+            ))
             .map_err(ReferenceTextGenerationError::Runtime)?;
         let mut bytes_moved = self.token_embedding.byte_length() as u64;
 
-        if let (Some(per_layer_inputs), Some((per_layer_input_width, total_per_layer_input_width))) =
-            (
-                self.gemma4_per_layer_inputs.as_ref(),
-                gemma4_per_layer_input_shape,
-            )
-        {
+        if let (
+            Some(per_layer_inputs),
+            Some((per_layer_input_width, total_per_layer_input_width)),
+        ) = (
+            self.gemma4_per_layer_inputs.as_ref(),
+            gemma4_per_layer_input_shape,
+        ) {
             let token_buffer = step_plan
                 .per_layer_inputs_token_buffer
                 .as_ref()
@@ -4285,17 +4396,17 @@ impl MetalGemma4ModelInner {
             }
 
             backend
-                    .encode_quantized_matvec_submission(
-                        &mut submission,
-                        &layer.attention_output_weight.weights,
-                        0,
-                        layer.attention_output_weight.mode,
-                        layer.attention_output_weight.rows,
-                        layer.attention_output_weight.columns,
-                        &layer_plan.attention_buffer,
-                        &step_plan.residual_buffer,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                .encode_quantized_matvec_submission(
+                    &mut submission,
+                    &layer.attention_output_weight.weights,
+                    0,
+                    layer.attention_output_weight.mode,
+                    layer.attention_output_weight.rows,
+                    layer.attention_output_weight.columns,
+                    &layer_plan.attention_buffer,
+                    &step_plan.residual_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
             if let Some(bias) = layer.attention_output_bias.as_ref() {
                 backend
                     .encode_add_inplace_submission(
@@ -4422,7 +4533,15 @@ impl MetalGemma4ModelInner {
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
 
-            if let (Some(input_gate), Some(proj), Some(post_norm), Some(multiplier_buffer), Some(per_layer_gate_buffer), Some(per_layer_activated_buffer), Some(per_layer_projected_buffer)) = (
+            if let (
+                Some(input_gate),
+                Some(proj),
+                Some(post_norm),
+                Some(multiplier_buffer),
+                Some(per_layer_gate_buffer),
+                Some(per_layer_activated_buffer),
+                Some(per_layer_projected_buffer),
+            ) = (
                 layer.per_layer_input_gate.as_ref(),
                 layer.per_layer_proj.as_ref(),
                 layer.per_layer_post_norm.as_ref(),
@@ -4527,6 +4646,11 @@ impl MetalGemma4ModelInner {
                         self.family_metadata.rms_norm_epsilon,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
+                if materialize_stage_outputs {
+                    submission
+                        .synchronize_buffer(&step_plan.norm_buffer)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
                 backend
                     .encode_quantized_matvec_argmax_submission(
                         &mut submission,
@@ -4564,6 +4688,11 @@ impl MetalGemma4ModelInner {
                         self.family_metadata.rms_norm_epsilon,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
+                if materialize_stage_outputs {
+                    submission
+                        .synchronize_buffer(&step_plan.norm_buffer)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
                 backend
                     .encode_quantized_matvec_submission(
                         &mut submission,
@@ -4589,10 +4718,33 @@ impl MetalGemma4ModelInner {
                 ));
             }
         }
+        if materialize_stage_outputs {
+            submission
+                .synchronize_buffer(&step_plan.hidden_buffer)
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
 
         let report = submission
             .commit(psionic_backend_metal::MetalCommandWait::Completed)
             .map_err(ReferenceTextGenerationError::Runtime)?;
+        let hidden = if materialize_stage_outputs {
+            step_plan
+                .hidden_buffer
+                .read_f32()
+                .map_err(ReferenceTextGenerationError::Runtime)?
+        } else {
+            Vec::new()
+        };
+        let lm_head_hidden = if produce_logits && materialize_stage_outputs {
+            Some(
+                step_plan
+                    .norm_buffer
+                    .read_f32()
+                    .map_err(ReferenceTextGenerationError::Runtime)?,
+            )
+        } else {
+            None
+        };
         if produce_logits {
             match logits_output_mode {
                 MetalLogitsOutputMode::GreedyToken => {
@@ -4617,14 +4769,45 @@ impl MetalGemma4ModelInner {
                 MetalLogitsOutputMode::TopKCandidates(_) => {}
             }
         }
+        if materialize_stage_outputs {
+            for (layer_index, layer) in self
+                .layers
+                .iter()
+                .enumerate()
+                .skip(start_layer)
+                .take(end_layer.saturating_sub(start_layer))
+            {
+                let Some(cache_offset) = layer.attention_geometry.cache_write_offset else {
+                    continue;
+                };
+                let layer_cache = layer_caches
+                    .get(layer_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 metal layer {layer_index} is missing a device kv cache mirror"
+                            ),
+                        ))
+                    })?;
+                let (layer_key, layer_value) = layer_cache
+                    .read_entry(position)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                let kv_width = layer.attention_geometry.kv_width();
+                cache_key[cache_offset..cache_offset + kv_width]
+                    .copy_from_slice(layer_key.as_slice());
+                cache_value[cache_offset..cache_offset + kv_width]
+                    .copy_from_slice(layer_value.as_slice());
+            }
+        }
 
         Ok(MetalGemma4StageStep {
-            key: Vec::new(),
-            value: Vec::new(),
+            key: cache_key,
+            value: cache_value,
             logits,
             selected_token,
-            hidden: Vec::new(),
-            lm_head_hidden: None,
+            hidden,
+            lm_head_hidden,
             kernel_count: report.encoded_operations,
             bytes_moved,
         })
@@ -4672,6 +4855,26 @@ impl MetalGemma4ModelInner {
                     step_plan.layer_plans.len()
                 )),
             ));
+        }
+        if self.layers[start_layer..end_layer]
+            .iter()
+            .all(|layer| backend.supports_dense_decode_attention(layer.attention_geometry.head_dim))
+        {
+            return self.forward_local_step_with_layer_caches(
+                backend,
+                token,
+                position,
+                layer_caches,
+                step_plan,
+                start_layer,
+                end_layer,
+                input_hidden,
+                forwarded_key,
+                forwarded_value,
+                true,
+                produce_logits,
+                logits_output_mode,
+            );
         }
 
         let mut bytes_moved = self.token_embedding.byte_length() as u64;
@@ -4760,20 +4963,22 @@ impl MetalGemma4ModelInner {
             let mut q_kernel_count = 0usize;
             let mut q_bytes_moved = 0u64;
             let mut device_attention: Option<MetalDeviceAttentionStep> = None;
-            let (fallback_q, k_values, v_values, fresh_attention_values) =
-                if layer.attention_geometry.has_kv() {
-                    let layer_step_plan = step_plan
-                        .layer_plans
-                        .get_mut(layer_index)
-                        .and_then(Option::as_mut)
-                        .ok_or_else(|| {
-                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                                format!(
-                                    "gemma4 metal layer {layer_index} is missing a decode step plan"
-                                ),
-                            ))
-                        })?;
-                    let layer_cache = layer_caches
+            let (fallback_q, k_values, v_values, fresh_attention_values) = if layer
+                .attention_geometry
+                .has_kv()
+            {
+                let layer_step_plan = step_plan
+                    .layer_plans
+                    .get_mut(layer_index)
+                    .and_then(Option::as_mut)
+                    .ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 metal layer {layer_index} is missing a decode step plan"
+                            ),
+                        ))
+                    })?;
+                let layer_cache = layer_caches
                         .get_mut(layer_index)
                         .and_then(Option::as_mut)
                         .ok_or_else(|| {
@@ -4783,142 +4988,142 @@ impl MetalGemma4ModelInner {
                                 ),
                             ))
                         })?;
-                    if let Some(device_step) = metal_gemma4_device_attention_with_kv(
+                if let Some(device_step) = metal_gemma4_device_attention_with_kv(
+                    backend,
+                    layer,
+                    hidden_norm.as_slice(),
+                    position,
+                    layer_index,
+                    &self.family_metadata,
+                    layer_cache,
+                    layer_step_plan,
+                )? {
+                    if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                        let kv_width = layer.attention_geometry.kv_width();
+                        let key_values = device_step
+                            .key_values
+                            .as_deref()
+                            .expect("device attention with kv returns key values");
+                        let value_values = device_step
+                            .value_values
+                            .as_deref()
+                            .expect("device attention with kv returns value values");
+                        cache_key[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(key_values);
+                        cache_value[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(value_values);
+                        live_keys[layer_index] = Some(key_values.to_vec());
+                        live_values[layer_index] = Some(value_values.to_vec());
+                    }
+                    device_attention = Some(device_step);
+                    (None, &[][..], &[][..], None)
+                } else {
+                    let (mut q, mut k, mut v) = MetalQuantizedProjectionMatrix::matvec_triplet(
+                        &layer.attention_query_weight,
+                        &layer.attention_key_weight,
+                        &layer.attention_value_weight,
                         backend,
-                        layer,
-                        hidden_norm.as_slice(),
-                        position,
-                        layer_index,
-                        &self.family_metadata,
-                        layer_cache,
-                        layer_step_plan,
-                    )? {
-                        if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
-                            let kv_width = layer.attention_geometry.kv_width();
-                            let key_values = device_step
-                                .key_values
-                                .as_deref()
-                                .expect("device attention with kv returns key values");
-                            let value_values = device_step
-                                .value_values
-                                .as_deref()
-                                .expect("device attention with kv returns value values");
-                            cache_key[cache_offset..cache_offset + kv_width]
-                                .copy_from_slice(key_values);
-                            cache_value[cache_offset..cache_offset + kv_width]
-                                .copy_from_slice(value_values);
-                            live_keys[layer_index] = Some(key_values.to_vec());
-                            live_values[layer_index] = Some(value_values.to_vec());
-                        }
-                        device_attention = Some(device_step);
-                        (None, &[][..], &[][..], None)
-                    } else {
-                        let (mut q, mut k, mut v) = MetalQuantizedProjectionMatrix::matvec_triplet(
-                            &layer.attention_query_weight,
-                            &layer.attention_key_weight,
-                            &layer.attention_value_weight,
-                            backend,
-                            &hidden_norm,
-                        )?;
-                        if let Some(bias) = layer.attention_query_bias.as_ref() {
-                            add_bias_in_place(&mut q.values, bias.as_slice());
-                        }
-                        if let Some(norm) = layer.attention_query_norm.as_ref() {
-                            per_head_rms_norm_in_place(
-                                q.values.as_mut_slice(),
-                                layer.attention_geometry.head_count,
-                                layer.attention_geometry.head_dim,
-                                norm.as_slice(),
-                                self.family_metadata.rms_norm_epsilon,
-                            );
-                        }
-                        if let Some(bias) = layer.attention_key_bias.as_ref() {
-                            add_bias_in_place(&mut k.values, bias.as_slice());
-                        }
-                        if let Some(norm) = layer.attention_key_norm.as_ref() {
-                            per_head_rms_norm_in_place(
-                                k.values.as_mut_slice(),
-                                layer.attention_geometry.kv_head_count,
-                                layer.attention_geometry.head_dim,
-                                norm.as_slice(),
-                                self.family_metadata.rms_norm_epsilon,
-                            );
-                        }
-                        if let Some(bias) = layer.attention_value_bias.as_ref() {
-                            add_bias_in_place(&mut v.values, bias.as_slice());
-                        }
-                        per_head_rms_norm_unit_in_place(
-                            v.values.as_mut_slice(),
-                            layer.attention_geometry.kv_head_count,
+                        &hidden_norm,
+                    )?;
+                    if let Some(bias) = layer.attention_query_bias.as_ref() {
+                        add_bias_in_place(&mut q.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_query_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            q.values.as_mut_slice(),
+                            layer.attention_geometry.head_count,
                             layer.attention_geometry.head_dim,
+                            norm.as_slice(),
                             self.family_metadata.rms_norm_epsilon,
                         );
-                        let mut cache_layer_key = k.values.clone();
-                        apply_rope_neox(
-                            &mut cache_layer_key,
+                    }
+                    if let Some(bias) = layer.attention_key_bias.as_ref() {
+                        add_bias_in_place(&mut k.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_key_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            k.values.as_mut_slice(),
                             layer.attention_geometry.kv_head_count,
                             layer.attention_geometry.head_dim,
-                            layer.attention_geometry.rotary_dim,
-                            position,
-                            layer.attention_geometry.rope_theta,
-                            self.rope_freq_factors_for_layer(
-                                layer_index,
-                                layer.attention_geometry.head_dim,
-                            ),
-                            &self.family_metadata,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
                         );
-                        if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
-                            let kv_width = layer.attention_geometry.kv_width();
-                            cache_key[cache_offset..cache_offset + kv_width]
-                                .copy_from_slice(cache_layer_key.as_slice());
-                            cache_value[cache_offset..cache_offset + kv_width]
-                                .copy_from_slice(v.values.as_slice());
-                        }
-                        kv_kernel_count = kv_kernel_count
-                            .saturating_add(k.kernel_count)
-                            .saturating_add(v.kernel_count)
-                            .saturating_add(1);
-                        kv_bytes_moved = kv_bytes_moved
-                            .saturating_add(k.bytes_moved)
-                            .saturating_add(v.bytes_moved)
-                            .saturating_add(layer.attention_geometry.kv_width() as u64);
-                        live_keys[layer_index] = Some(cache_layer_key);
-                        live_values[layer_index] = Some(v.values.clone());
-
-                        let (cos_values, sin_values) = metal_gemma4_rope_cos_sin_values(
-                            position,
+                    }
+                    if let Some(bias) = layer.attention_value_bias.as_ref() {
+                        add_bias_in_place(&mut v.values, bias.as_slice());
+                    }
+                    per_head_rms_norm_unit_in_place(
+                        v.values.as_mut_slice(),
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        self.family_metadata.rms_norm_epsilon,
+                    );
+                    let mut cache_layer_key = k.values.clone();
+                    apply_rope_neox(
+                        &mut cache_layer_key,
+                        layer.attention_geometry.kv_head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
                             layer.attention_geometry.head_dim,
-                            layer.attention_geometry.rotary_dim,
-                            layer.attention_geometry.rope_theta,
-                            self.rope_freq_factors_for_layer(
-                                layer_index,
+                        ),
+                        &self.family_metadata,
+                    );
+                    if let Some(cache_offset) = layer.attention_geometry.cache_write_offset {
+                        let kv_width = layer.attention_geometry.kv_width();
+                        cache_key[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(cache_layer_key.as_slice());
+                        cache_value[cache_offset..cache_offset + kv_width]
+                            .copy_from_slice(v.values.as_slice());
+                    }
+                    kv_kernel_count = kv_kernel_count
+                        .saturating_add(k.kernel_count)
+                        .saturating_add(v.kernel_count)
+                        .saturating_add(1);
+                    kv_bytes_moved = kv_bytes_moved
+                        .saturating_add(k.bytes_moved)
+                        .saturating_add(v.bytes_moved)
+                        .saturating_add(layer.attention_geometry.kv_width() as u64);
+                    live_keys[layer_index] = Some(cache_layer_key);
+                    live_values[layer_index] = Some(v.values.clone());
+
+                    let (cos_values, sin_values) = metal_gemma4_rope_cos_sin_values(
+                        position,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+                    let attention = backend
+                        .decode_attention_values_f32(
+                            q.values.as_slice(),
+                            layer.attention_geometry.head_count,
+                            k.values.as_slice(),
+                            layer.attention_geometry.kv_head_count,
+                            v.values.as_slice(),
+                            cos_values.as_slice(),
+                            sin_values.as_slice(),
+                            layer_cache,
+                            attention_scale(
+                                &self.family_metadata,
                                 layer.attention_geometry.head_dim,
                             ),
-                            &self.family_metadata,
-                        );
-                        let attention = backend
-                            .decode_attention_values_f32(
-                                q.values.as_slice(),
-                                layer.attention_geometry.head_count,
-                                k.values.as_slice(),
-                                layer.attention_geometry.kv_head_count,
-                                v.values.as_slice(),
-                                cos_values.as_slice(),
-                                sin_values.as_slice(),
-                                layer_cache,
-                                attention_scale(
-                                    &self.family_metadata,
-                                    layer.attention_geometry.head_dim,
-                                ),
-                                true,
-                                false,
-                                true,
-                            )
-                            .map_err(ReferenceTextGenerationError::Runtime)?;
-                        layer_step_plan.attention_values = attention.output_values;
-                        q_kernel_count = q.kernel_count;
-                        q_bytes_moved = q.bytes_moved;
-                        (
+                            true,
+                            false,
+                            true,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    layer_step_plan.attention_values = attention.output_values;
+                    q_kernel_count = q.kernel_count;
+                    q_bytes_moved = q.bytes_moved;
+                    (
                             Some(q),
                             live_keys[layer_index].as_deref().ok_or_else(|| {
                                 ReferenceTextGenerationError::Runtime(
@@ -4936,9 +5141,9 @@ impl MetalGemma4ModelInner {
                             })?,
                             Some(layer_step_plan.attention_values.as_slice()),
                         )
-                    }
-                } else {
-                    let layer_step_plan = step_plan
+                }
+            } else {
+                let layer_step_plan = step_plan
                         .layer_plans
                         .get_mut(layer_index)
                         .and_then(Option::as_mut)
@@ -4949,15 +5154,15 @@ impl MetalGemma4ModelInner {
                                 ),
                             ))
                         })?;
-                    let reuse_layer_index =
-                        layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
-                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                                format!(
-                                    "gemma4 layer {layer_index} is missing reused kv source metadata"
-                                ),
-                            ))
-                        })?;
-                    let source_layer_cache = layer_caches
+                let reuse_layer_index =
+                    layer.attention_geometry.reuse_layer_index.ok_or_else(|| {
+                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                            format!(
+                                "gemma4 layer {layer_index} is missing reused kv source metadata"
+                            ),
+                        ))
+                    })?;
+                let source_layer_cache = layer_caches
                         .get(reuse_layer_index)
                         .and_then(Option::as_ref)
                         .ok_or_else(|| {
@@ -4967,47 +5172,47 @@ impl MetalGemma4ModelInner {
                                 ),
                             ))
                         })?;
-                    let source_cache_view = source_layer_cache.clone();
-                    if let Some(device_step) = metal_gemma4_device_attention_reuse(
-                        backend,
-                        layer,
-                        hidden_norm.as_slice(),
-                        position,
-                        layer_index,
-                        &self.family_metadata,
-                        &source_cache_view,
-                        layer_step_plan,
-                    )? {
-                        device_attention = Some(device_step);
-                        (None, &[][..], &[][..], None)
-                    } else {
-                        let mut q = layer.attention_query_weight.matvec(backend, &hidden_norm)?;
-                        if let Some(bias) = layer.attention_query_bias.as_ref() {
-                            add_bias_in_place(&mut q.values, bias.as_slice());
-                        }
-                        if let Some(norm) = layer.attention_query_norm.as_ref() {
-                            per_head_rms_norm_in_place(
-                                q.values.as_mut_slice(),
-                                layer.attention_geometry.head_count,
-                                layer.attention_geometry.head_dim,
-                                norm.as_slice(),
-                                self.family_metadata.rms_norm_epsilon,
-                            );
-                        }
-                        apply_rope_neox(
-                            &mut q.values,
+                let source_cache_view = source_layer_cache.clone();
+                if let Some(device_step) = metal_gemma4_device_attention_reuse(
+                    backend,
+                    layer,
+                    hidden_norm.as_slice(),
+                    position,
+                    layer_index,
+                    &self.family_metadata,
+                    &source_cache_view,
+                    layer_step_plan,
+                )? {
+                    device_attention = Some(device_step);
+                    (None, &[][..], &[][..], None)
+                } else {
+                    let mut q = layer.attention_query_weight.matvec(backend, &hidden_norm)?;
+                    if let Some(bias) = layer.attention_query_bias.as_ref() {
+                        add_bias_in_place(&mut q.values, bias.as_slice());
+                    }
+                    if let Some(norm) = layer.attention_query_norm.as_ref() {
+                        per_head_rms_norm_in_place(
+                            q.values.as_mut_slice(),
                             layer.attention_geometry.head_count,
                             layer.attention_geometry.head_dim,
-                            layer.attention_geometry.rotary_dim,
-                            position,
-                            layer.attention_geometry.rope_theta,
-                            self.rope_freq_factors_for_layer(
-                                layer_index,
-                                layer.attention_geometry.head_dim,
-                            ),
-                            &self.family_metadata,
+                            norm.as_slice(),
+                            self.family_metadata.rms_norm_epsilon,
                         );
-                        let reused_k = live_keys
+                    }
+                    apply_rope_neox(
+                        &mut q.values,
+                        layer.attention_geometry.head_count,
+                        layer.attention_geometry.head_dim,
+                        layer.attention_geometry.rotary_dim,
+                        position,
+                        layer.attention_geometry.rope_theta,
+                        self.rope_freq_factors_for_layer(
+                            layer_index,
+                            layer.attention_geometry.head_dim,
+                        ),
+                        &self.family_metadata,
+                    );
+                    let reused_k = live_keys
                             .get(reuse_layer_index)
                             .and_then(Option::as_deref)
                             .ok_or_else(|| {
@@ -5017,7 +5222,7 @@ impl MetalGemma4ModelInner {
                                     )),
                                 )
                             })?;
-                        let reused_v = live_values
+                    let reused_v = live_values
                             .get(reuse_layer_index)
                             .and_then(Option::as_deref)
                             .ok_or_else(|| {
@@ -5027,33 +5232,38 @@ impl MetalGemma4ModelInner {
                                     )),
                                 )
                             })?;
-                        let mut source_cache_view = source_layer_cache.clone();
-                        let attention = backend
-                            .decode_attention_values_f32(
-                                q.values.as_slice(),
-                                layer.attention_geometry.head_count,
-                                reused_k,
-                                layer.attention_geometry.kv_head_count,
-                                reused_v,
-                                layer_step_plan.identity_cos_values.as_slice(),
-                                layer_step_plan.identity_sin_values.as_slice(),
-                                &mut source_cache_view,
-                                attention_scale(
-                                    &self.family_metadata,
-                                    layer.attention_geometry.head_dim,
-                                ),
-                                true,
-                                false,
-                                true,
-                            )
-                            .map_err(ReferenceTextGenerationError::Runtime)?;
-                        layer_step_plan.attention_values = attention.output_values;
-                        q_kernel_count = q.kernel_count;
-                        q_bytes_moved = q.bytes_moved;
-                        kernel_count = kernel_count.saturating_add(1);
-                        (Some(q), reused_k, reused_v, Some(layer_step_plan.attention_values.as_slice()))
-                    }
-                };
+                    let mut source_cache_view = source_layer_cache.clone();
+                    let attention = backend
+                        .decode_attention_values_f32(
+                            q.values.as_slice(),
+                            layer.attention_geometry.head_count,
+                            reused_k,
+                            layer.attention_geometry.kv_head_count,
+                            reused_v,
+                            layer_step_plan.identity_cos_values.as_slice(),
+                            layer_step_plan.identity_sin_values.as_slice(),
+                            &mut source_cache_view,
+                            attention_scale(
+                                &self.family_metadata,
+                                layer.attention_geometry.head_dim,
+                            ),
+                            true,
+                            false,
+                            true,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    layer_step_plan.attention_values = attention.output_values;
+                    q_kernel_count = q.kernel_count;
+                    q_bytes_moved = q.bytes_moved;
+                    kernel_count = kernel_count.saturating_add(1);
+                    (
+                        Some(q),
+                        reused_k,
+                        reused_v,
+                        Some(layer_step_plan.attention_values.as_slice()),
+                    )
+                }
+            };
 
             let mut attention_out = if let Some(device_step) = device_attention {
                 MetalProjectionStep {
@@ -5362,7 +5572,7 @@ impl MetalGemma4ModelInner {
 
             let mut kv_kernel_count = 0usize;
             let mut kv_bytes_moved = 0u64;
-            let (mut q, k_values, v_values) = if layer.attention_geometry.has_kv() {
+            let (q, k_values, v_values) = if layer.attention_geometry.has_kv() {
                 let (mut q, mut k, mut v) = MetalQuantizedProjectionMatrix::matvec_triplet(
                     &layer.attention_query_weight,
                     &layer.attention_key_weight,
@@ -5852,7 +6062,11 @@ impl MetalGemma4Layer {
         )?;
         Ok(Self {
             attention_geometry,
-            attention_norm: load_metal_static_vector(backend, artifact, layout.attention_norm.as_str())?,
+            attention_norm: load_metal_static_vector(
+                backend,
+                artifact,
+                layout.attention_norm.as_str(),
+            )?,
             attention_query_weight,
             attention_qkv_weight,
             attention_query_bias: load_optional_metal_static_vector(
@@ -6664,7 +6878,9 @@ fn metal_gemma4_device_attention_reuse(
         .map_err(ReferenceTextGenerationError::Runtime)?;
 
     let mut submission = backend
-        .begin_submission(format!("psionic.gemma4.metal.attn.reuse.layer{layer_index}"))
+        .begin_submission(format!(
+            "psionic.gemma4.metal.attn.reuse.layer{layer_index}"
+        ))
         .map_err(ReferenceTextGenerationError::Runtime)?;
     backend
         .encode_quantized_matvec_submission(
