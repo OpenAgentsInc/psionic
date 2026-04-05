@@ -30,8 +30,8 @@ use std::{
 
 use psionic_compiler::compile_graph;
 use psionic_core::{
-    BackendExtensionKind, BackendExtensionOp, DType, DeviceKind, Shape, TensorData, TensorId,
-    TensorSpec,
+    BackendExtensionKind, BackendExtensionOp, DType, DeviceKind, QuantizationMode, Shape,
+    TensorData, TensorId, TensorSpec,
 };
 use psionic_ir::{ExecutionOp, ExecutionPlan, ExecutionStep, Graph};
 use psionic_runtime::{
@@ -224,6 +224,18 @@ pub struct MetalQuantizedMatvecResult {
     pub values: Vec<f32>,
 }
 
+/// Result of one projected decode-attention block that stayed on Metal until
+/// the final output projection was materialized on the host.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MetalProjectedAttentionResult {
+    /// Final projected attention output with logical shape `[output_rows]`.
+    pub values: Vec<f32>,
+    /// Live KV row written for the current token when the layer owns KV.
+    pub key_values: Option<Vec<f32>>,
+    /// Live value row written for the current token when the layer owns KV.
+    pub value_values: Option<Vec<f32>>,
+}
+
 /// One quantized row-wise matrix-vector request that shares a staged input.
 #[derive(Clone, Copy)]
 pub struct MetalQuantizedMatvecRequest<'a> {
@@ -269,6 +281,17 @@ pub struct MetalDecodeAttentionResult {
     pub stats: MetalDecodeAttentionStats,
     /// Reserved graph reuse evidence when the step used a steady-state runtime.
     pub graph_metrics: Option<MetalGraphReuseMetrics>,
+}
+
+/// Output of one backend-owned decode-attention step returned directly on the host path.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MetalDecodeAttentionHostResult {
+    /// Attention output values with logical shape `[1, query_heads, 1, head_dim]`.
+    pub output_values: Vec<f32>,
+    /// Observable KV state after the current decode step.
+    pub cache_state: KvCacheState,
+    /// Explicit decode-attention execution evidence.
+    pub stats: MetalDecodeAttentionStats,
 }
 
 /// Reserved graph family for steady-state Metal GPT-OSS execution.
@@ -507,6 +530,7 @@ pub struct MetalPromptResidencyMetrics {
 #[derive(Clone)]
 pub struct MetalBuffer {
     spec: TensorSpec,
+    byte_offset: usize,
     byte_len: usize,
     storage_kind: BufferStorageKind,
     storage_mode: MetalStorageMode,
@@ -520,6 +544,7 @@ impl fmt::Debug for MetalBuffer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MetalBuffer")
             .field("spec", &self.spec)
+            .field("byte_offset", &self.byte_offset)
             .field("byte_len", &self.byte_len)
             .field("storage_kind", &self.storage_kind)
             .field("storage_mode", &self.storage_mode)
@@ -531,6 +556,12 @@ impl fmt::Debug for MetalBuffer {
 }
 
 impl MetalBuffer {
+    /// Returns the logical byte offset inside the backing allocation.
+    #[must_use]
+    pub const fn byte_offset(&self) -> usize {
+        self.byte_offset
+    }
+
     /// Returns the backing allocation size in bytes.
     #[must_use]
     pub const fn byte_len(&self) -> usize {
@@ -563,7 +594,8 @@ impl MetalBuffer {
                 "metal buffer is not host writable",
             )));
         }
-        self.platform.write_bytes(bytes, self.storage_mode)
+        self.platform
+            .write_bytes_at_offset(self.byte_offset, bytes, self.storage_mode)
     }
 
     /// Writes raw bytes into a byte range inside the host-visible buffer contents.
@@ -585,13 +617,17 @@ impl MetalBuffer {
                 "metal buffer is not host writable",
             )));
         }
-        self.platform
-            .write_bytes_at_offset(byte_offset, bytes, self.storage_mode)
+        self.platform.write_bytes_at_offset(
+            self.byte_offset.saturating_add(byte_offset),
+            bytes,
+            self.storage_mode,
+        )
     }
 
     /// Reads raw bytes from the host-visible buffer contents.
     pub fn read_bytes(&self) -> Result<Vec<u8>, RuntimeError> {
-        self.platform.read_bytes(self.byte_len)
+        self.platform
+            .read_bytes_at_offset(self.byte_offset, self.byte_len)
     }
 
     /// Reads raw bytes from a byte range inside the buffer contents.
@@ -606,7 +642,8 @@ impl MetalBuffer {
                 byte_offset, byte_len, self.byte_len
             )));
         }
-        self.platform.read_bytes_at_offset(byte_offset, byte_len)
+        self.platform
+            .read_bytes_at_offset(self.byte_offset.saturating_add(byte_offset), byte_len)
     }
 
     /// Borrows a host-visible byte range without allocating a copy.
@@ -622,8 +659,11 @@ impl MetalBuffer {
                 byte_offset, byte_len, self.byte_len
             )));
         }
-        self.platform
-            .with_bytes_at_offset(byte_offset, byte_len, map)
+        self.platform.with_bytes_at_offset(
+            self.byte_offset.saturating_add(byte_offset),
+            byte_len,
+            map,
+        )
     }
 
     /// Borrows the full host-visible byte contents without allocating a copy.
@@ -655,10 +695,10 @@ impl MetalBuffer {
                 values.len(),
             )));
         }
-        let byte_len = values.len().saturating_mul(size_of_dtype(self.spec.dtype()));
-        let bytes = unsafe {
-            std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len)
-        };
+        let byte_len = values
+            .len()
+            .saturating_mul(size_of_dtype(self.spec.dtype()));
+        let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len) };
         self.write_bytes(bytes)
     }
 
@@ -683,10 +723,10 @@ impl MetalBuffer {
                 self.spec.storage_size()
             )));
         }
-        let byte_len = values.len().saturating_mul(size_of_dtype(self.spec.dtype()));
-        let bytes = unsafe {
-            std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len)
-        };
+        let byte_len = values
+            .len()
+            .saturating_mul(size_of_dtype(self.spec.dtype()));
+        let bytes = unsafe { std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), byte_len) };
         self.write_bytes_at_offset(0, bytes)
     }
 
@@ -745,6 +785,50 @@ impl MetalBuffer {
             Ok(())
         })
     }
+
+    /// Creates a dense `f32` logical view into a parent dense `f32` buffer.
+    pub fn dense_f32_view(
+        &self,
+        element_offset: usize,
+        element_count: usize,
+    ) -> Result<Self, RuntimeError> {
+        if self.spec.dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(format!(
+                "metal dense_f32_view requires F32 buffer, actual {:?}",
+                self.spec.dtype()
+            )));
+        }
+        if self.storage_kind != BufferStorageKind::DenseF32 {
+            return Err(RuntimeError::Backend(format!(
+                "metal dense_f32_view requires dense f32 storage, actual {:?}",
+                self.storage_kind
+            )));
+        }
+        let total_elements = self.spec.storage_size();
+        if element_offset.saturating_add(element_count) > total_elements {
+            return Err(RuntimeError::Backend(format!(
+                "metal dense_f32_view exceeds allocation: offset={} count={} allocation={}",
+                element_offset, element_count, total_elements
+            )));
+        }
+        Ok(Self {
+            spec: TensorSpec::new(
+                Shape::new(vec![element_count]),
+                DType::F32,
+                self.spec.device().clone(),
+            ),
+            byte_offset: self
+                .byte_offset
+                .saturating_add(element_offset.saturating_mul(size_of_dtype(DType::F32))),
+            byte_len: element_count.saturating_mul(size_of_dtype(DType::F32)),
+            storage_kind: self.storage_kind.clone(),
+            storage_mode: self.storage_mode,
+            host_visible: self.host_visible,
+            host_writable: self.host_writable,
+            _keepalive: self._keepalive.clone(),
+            platform: self.platform.clone(),
+        })
+    }
 }
 
 fn extend_f32_values_from_bytes(output: &mut Vec<f32>, bytes: &[u8]) {
@@ -756,9 +840,9 @@ fn extend_f32_values_from_bytes(output: &mut Vec<f32>, bytes: &[u8]) {
     }
 
     output.extend(
-        bytes.chunks_exact(element_size).map(|chunk| {
-            f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
-        }),
+        bytes
+            .chunks_exact(element_size)
+            .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])),
     );
 }
 
@@ -783,7 +867,7 @@ impl MetalSubmission {
     /// Fills a buffer with a constant byte value using a blit command.
     pub fn fill_buffer(&mut self, buffer: &MetalBuffer, value: u8) -> Result<(), RuntimeError> {
         self.platform
-            .fill_buffer(&buffer.platform, buffer.byte_len, value)?;
+            .fill_buffer(&buffer.platform, buffer.byte_offset, buffer.byte_len, value)?;
         self.encoded_operations += 1;
         Ok(())
     }
@@ -801,7 +885,13 @@ impl MetalSubmission {
             )));
         }
         self.platform
-            .copy_buffer(&source.platform, &destination.platform, source.byte_len)?;
+            .copy_buffer(
+                &source.platform,
+                source.byte_offset,
+                &destination.platform,
+                destination.byte_offset,
+                source.byte_len,
+            )?;
         self.encoded_operations += 1;
         Ok(())
     }
@@ -1142,6 +1232,32 @@ impl MetalBackend {
         Ok(buffer)
     }
 
+    /// Creates a zeroed dense `f32` buffer on the selected Metal device.
+    pub fn zeros_buffer(&mut self, shape: Shape) -> Result<MetalBuffer, RuntimeError> {
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        self.allocate(&TensorSpec::new(shape, DType::F32, device))
+    }
+
+    /// Creates a zeroed dense `i32` buffer on the selected Metal device.
+    pub fn zeros_i32_buffer(&mut self, shape: Shape) -> Result<MetalBuffer, RuntimeError> {
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        self.allocate(&TensorSpec::new(shape, DType::I32, device))
+    }
+
     /// Creates a backend-owned quantized GGML/GGUF buffer on the selected Metal device.
     pub fn quantized_buffer(
         &mut self,
@@ -1317,7 +1433,9 @@ impl MetalBackend {
             let row_stride = (request.columns / elements_per_block)
                 .checked_mul(bytes_per_block)
                 .ok_or_else(|| {
-                    RuntimeError::Backend(String::from("metal quantized matvec row stride overflow"))
+                    RuntimeError::Backend(String::from(
+                        "metal quantized matvec row stride overflow",
+                    ))
                 })?;
             let required_bytes = request.rows.saturating_mul(row_stride);
             let end_offset = request.byte_offset.saturating_add(required_bytes);
@@ -1353,6 +1471,82 @@ impl MetalBackend {
             )));
         };
         backend.run_quantized_matvec_batch(requests, input)
+    }
+
+    /// Executes one Gemma-style FFN block on Metal by keeping the
+    /// gate-projection, up-projection, GELU-GLU activation, and down-projection
+    /// on the device until the final projected vector is ready.
+    pub fn quantized_gelu_glu_projected(
+        &mut self,
+        gate_weights: &MetalBuffer,
+        gate_mode: QuantizationMode,
+        gate_rows: usize,
+        gate_columns: usize,
+        up_weights: &MetalBuffer,
+        up_mode: QuantizationMode,
+        up_rows: usize,
+        up_columns: usize,
+        down_weights: &MetalBuffer,
+        down_mode: QuantizationMode,
+        down_rows: usize,
+        down_columns: usize,
+        input: &[f32],
+    ) -> Result<Vec<f32>, RuntimeError> {
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.run_quantized_gelu_glu_projected(
+            gate_weights,
+            gate_mode,
+            gate_rows,
+            gate_columns,
+            up_weights,
+            up_mode,
+            up_rows,
+            up_columns,
+            down_weights,
+            down_mode,
+            down_rows,
+            down_columns,
+            input,
+        )
+    }
+
+    /// Executes one Gemma per-layer input block on Metal by keeping the input
+    /// gate projection, GELU-times-layer-slice multiply, and projection on the
+    /// device until the final projected vector is ready.
+    pub fn quantized_gelu_mul_projected(
+        &mut self,
+        gate_weights: &MetalBuffer,
+        gate_mode: QuantizationMode,
+        gate_rows: usize,
+        gate_columns: usize,
+        multiplier: &[f32],
+        projection_weights: &MetalBuffer,
+        projection_mode: QuantizationMode,
+        projection_rows: usize,
+        projection_columns: usize,
+        input: &[f32],
+    ) -> Result<Vec<f32>, RuntimeError> {
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.run_quantized_gelu_mul_projected(
+            gate_weights,
+            gate_mode,
+            gate_rows,
+            gate_columns,
+            multiplier,
+            projection_weights,
+            projection_mode,
+            projection_rows,
+            projection_columns,
+            input,
+        )
     }
 
     /// Executes one quantized row-wise matrix-vector product and returns only
@@ -1826,6 +2020,14 @@ impl MetalBackend {
         }
     }
 
+    /// Returns whether the backend can run the dense decode-attention kernel
+    /// directly on Metal for the provided head width.
+    #[must_use]
+    pub fn supports_dense_decode_attention(&self, head_dim: usize) -> bool {
+        matches!(head_dim, 64 | 96 | 128 | 256)
+            && self.selected_device().is_some()
+    }
+
     /// Encodes one quantized row-wise matrix-vector product into an existing submission.
     pub fn encode_quantized_matvec_submission(
         &mut self,
@@ -1861,6 +2063,494 @@ impl MetalBackend {
             columns,
             input,
             output,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one quantized row-wise matrix-vector product and writes the
+    /// greedy selected token into a packed eight-byte buffer.
+    pub fn encode_quantized_matvec_argmax_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        weights: &MetalBuffer,
+        byte_offset: usize,
+        mode: psionic_core::QuantizationMode,
+        rows: usize,
+        columns: usize,
+        input: &MetalBuffer,
+        selected: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_quantized_matvec_request(
+            weights,
+            byte_offset,
+            mode,
+            rows,
+            columns,
+            input,
+            selected,
+        )?;
+        if selected.byte_len() != std::mem::size_of::<u64>() {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized argmax selected buffer must be {} bytes, actual {}",
+                std::mem::size_of::<u64>(),
+                selected.byte_len(),
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_quantized_matvec_argmax(
+            &mut submission.platform,
+            weights,
+            byte_offset,
+            mode,
+            rows,
+            columns,
+            input,
+            selected,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Adds one dense bias vector into an existing dense buffer in place.
+    pub fn encode_add_inplace_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        bias: &MetalBuffer,
+        element_count: usize,
+    ) -> Result<(), RuntimeError> {
+        if values.spec().dtype() != DType::F32 || bias.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal add-inplace requires dense f32 buffers",
+            )));
+        }
+        if values.byte_len() != bias.byte_len() {
+            return Err(RuntimeError::Backend(format!(
+                "metal add-inplace byte length mismatch: values={} bias={}",
+                values.byte_len(),
+                bias.byte_len(),
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_add_inplace(
+            &mut submission.platform,
+            values,
+            bias,
+            element_count,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Copies one dense f32 slice into another dense f32 buffer.
+    pub fn encode_copy_f32_slice_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        source: &MetalBuffer,
+        destination: &MetalBuffer,
+        element_count: usize,
+        source_offset_elements: usize,
+        destination_offset_elements: usize,
+    ) -> Result<(), RuntimeError> {
+        if source.spec().dtype() != DType::F32 || destination.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal copy_f32_slice requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_copy_f32_slice(
+            &mut submission.platform,
+            source,
+            destination,
+            element_count,
+            source_offset_elements,
+            destination_offset_elements,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Multiplies a dense buffer by a scalar in place.
+    pub fn encode_scale_inplace_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        scale: f32,
+        element_count: usize,
+    ) -> Result<(), RuntimeError> {
+        if values.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal scale-inplace requires a dense f32 buffer",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_scale_inplace(
+            &mut submission.platform,
+            values,
+            scale,
+            element_count,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies GELU(gate) * up into an output buffer.
+    pub fn encode_gelu_glu_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        gate: &MetalBuffer,
+        up: &MetalBuffer,
+        output: &MetalBuffer,
+        element_count: usize,
+    ) -> Result<(), RuntimeError> {
+        if gate.spec().dtype() != DType::F32
+            || up.spec().dtype() != DType::F32
+            || output.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "metal gelu_glu requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_gelu_glu_f32(
+            &mut submission.platform,
+            gate,
+            up,
+            output,
+            element_count,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies per-head RMS normalization with learned weights in place.
+    pub fn encode_per_head_rms_norm_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        weight: &MetalBuffer,
+        head_count: usize,
+        head_dim: usize,
+        epsilon: f32,
+    ) -> Result<(), RuntimeError> {
+        if values.spec().dtype() != DType::F32 || weight.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal per-head rms-norm requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_per_head_rms_norm(
+            &mut submission.platform,
+            values,
+            weight,
+            head_count,
+            head_dim,
+            epsilon,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies per-head RMS normalization from one dense f32 buffer into another.
+    pub fn encode_per_head_rms_norm_to_output_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        input: &MetalBuffer,
+        weight: &MetalBuffer,
+        output: &MetalBuffer,
+        head_count: usize,
+        head_dim: usize,
+        epsilon: f32,
+    ) -> Result<(), RuntimeError> {
+        if input.spec().dtype() != DType::F32
+            || weight.spec().dtype() != DType::F32
+            || output.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "metal per-head rms-norm output path requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_per_head_rms_norm_to_output(
+            &mut submission.platform,
+            input,
+            weight,
+            output,
+            head_count,
+            head_dim,
+            epsilon,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies per-head RMS normalization with implicit unit weights in place.
+    pub fn encode_per_head_rms_norm_unit_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        head_count: usize,
+        head_dim: usize,
+        epsilon: f32,
+    ) -> Result<(), RuntimeError> {
+        if values.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal per-head unit rms-norm requires a dense f32 buffer",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_per_head_rms_norm_unit(
+            &mut submission.platform,
+            values,
+            head_count,
+            head_dim,
+            epsilon,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies non-interleaved NeoX-style RoPE in place.
+    pub fn encode_rope_neox_inplace_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        cos: &MetalBuffer,
+        sin: &MetalBuffer,
+        head_count: usize,
+        head_dim: usize,
+    ) -> Result<(), RuntimeError> {
+        if values.spec().dtype() != DType::F32
+            || cos.spec().dtype() != DType::F32
+            || sin.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(String::from(
+                "metal rope-neox requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_rope_neox_inplace(
+            &mut submission.platform,
+            values,
+            cos,
+            sin,
+            head_count,
+            head_dim,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies non-interleaved NeoX-style RoPE in place by deriving the
+    /// rotation directly on Metal from static per-layer parameters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_rope_neox_position_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        freq_factors: &MetalBuffer,
+        head_count: usize,
+        head_dim: usize,
+        rotary_half: usize,
+        position: usize,
+        theta_scale: f32,
+        freq_scale: f32,
+        corr_dims: [f32; 2],
+        ext_factor: f32,
+        yarn_mscale: f32,
+    ) -> Result<(), RuntimeError> {
+        if values.spec().dtype() != DType::F32 || freq_factors.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal rope-neox-position requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_rope_neox_position(
+            &mut submission.platform,
+            values,
+            freq_factors,
+            head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Appends one dense KV row from Metal buffers into a dense Metal KV cache.
+    pub fn encode_append_dense_kv_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        cache: &mut MetalKvCacheMirror,
+        key: &MetalBuffer,
+        value: &MetalBuffer,
+    ) -> Result<usize, RuntimeError> {
+        match cache.kv_cache_encoding_policy().family {
+            KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => {}
+            family => {
+                return Err(RuntimeError::Backend(format!(
+                    "metal dense kv append does not support cache encoding family {family:?}",
+                )));
+            }
+        }
+        if key.spec().dtype() != DType::F32 || value.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal dense kv append requires dense f32 key/value buffers",
+            )));
+        }
+        let expected_bytes = cache.width().saturating_mul(size_of::<f32>());
+        if key.byte_len() != expected_bytes || value.byte_len() != expected_bytes {
+            return Err(RuntimeError::Backend(format!(
+                "metal dense kv append width mismatch: expected {} bytes, actual key={} value={}",
+                expected_bytes,
+                key.byte_len(),
+                value.byte_len(),
+            )));
+        }
+        if cache.len() >= cache.max_context_tokens {
+            return Err(RuntimeError::Backend(format!(
+                "metal kv cache exceeded max context {}",
+                cache.max_context_tokens
+            )));
+        }
+        cache.ensure_capacity(self, cache.len().saturating_add(1))?;
+        let write_index = cache.len();
+        let byte_offset = write_index.saturating_mul(cache.row_byte_len);
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_copy_f32_with_offset(
+            &mut submission.platform,
+            key,
+            &cache.key_buffer,
+            cache.width(),
+            byte_offset / size_of::<f32>(),
+        )?;
+        backend.platform.encode_copy_f32_with_offset(
+            &mut submission.platform,
+            value,
+            &cache.value_buffer,
+            cache.width(),
+            byte_offset / size_of::<f32>(),
+        )?;
+        cache.len = cache.len.saturating_add(1);
+        submission.encoded_operations = submission.encoded_operations.saturating_add(2);
+        Ok(write_index)
+    }
+
+    /// Encodes one dense decode-attention step against a dense Metal KV cache.
+    pub fn encode_decode_attention_dense_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        query: &MetalBuffer,
+        cache: &MetalKvCacheMirror,
+        query_head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        scale: f32,
+        output: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        match cache.kv_cache_encoding_policy().family {
+            KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => {}
+            family => {
+                return Err(RuntimeError::Backend(format!(
+                    "metal dense decode attention does not support cache encoding family {family:?}",
+                )));
+            }
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_decode_attention_dense(
+            &mut submission.platform,
+            query,
+            cache,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            scale,
+            output,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one argmax reduction over dense f32 rows.
+    pub fn encode_argmax_f32_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        input: &MetalBuffer,
+        output: &MetalBuffer,
+        row_count: usize,
+        column_count: usize,
+    ) -> Result<(), RuntimeError> {
+        if input.spec().dtype() != DType::F32 || output.spec().dtype() != DType::F32 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal argmax requires dense f32 buffers",
+            )));
+        }
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_argmax_f32(
+            &mut submission.platform,
+            input,
+            output,
+            row_count,
+            column_count,
         )?;
         submission.encoded_operations += 1;
         Ok(())
@@ -2024,6 +2714,143 @@ impl MetalBackend {
         })
     }
 
+    /// Executes one decode-attention step from host-owned `f32` vectors while
+    /// still appending into the Metal KV cache mirror.
+    #[allow(clippy::too_many_arguments)]
+    pub fn decode_attention_values_f32(
+        &mut self,
+        query_values: &[f32],
+        query_head_count: usize,
+        key_values: &[f32],
+        kv_head_count: usize,
+        value_values: &[f32],
+        cos_values: &[f32],
+        sin_values: &[f32],
+        cache: &mut MetalKvCacheMirror,
+        scale: f32,
+        causal: bool,
+        interleaved: bool,
+        flash_preferred: bool,
+    ) -> Result<MetalDecodeAttentionHostResult, RuntimeError> {
+        if query_head_count == 0 || kv_head_count == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal decode_attention_values_f32 requires non-zero head counts",
+            )));
+        }
+        if query_values.len() % query_head_count != 0 {
+            return Err(RuntimeError::Backend(format!(
+                "metal decode_attention_values_f32 query width mismatch: values={} query_heads={query_head_count}",
+                query_values.len(),
+            )));
+        }
+        let head_dim = query_values.len() / query_head_count;
+        if head_dim == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal decode_attention_values_f32 requires non-zero head width",
+            )));
+        }
+        let expected_kv_values = kv_head_count.checked_mul(head_dim).ok_or_else(|| {
+            RuntimeError::Backend(String::from(
+                "metal decode_attention_values_f32 kv shape overflow",
+            ))
+        })?;
+        if key_values.len() != expected_kv_values || value_values.len() != expected_kv_values {
+            return Err(RuntimeError::Backend(format!(
+                "metal decode_attention_values_f32 kv width mismatch: expected {expected_kv_values}, actual key={} value={}",
+                key_values.len(),
+                value_values.len(),
+            )));
+        }
+        let rotary_pairs = head_dim / 2;
+        if cos_values.len() != rotary_pairs || sin_values.len() != rotary_pairs {
+            return Err(RuntimeError::Backend(format!(
+                "metal decode_attention_values_f32 rope width mismatch: expected {rotary_pairs}, actual cos={} sin={}",
+                cos_values.len(),
+                sin_values.len(),
+            )));
+        }
+
+        let query_dims = vec![1, query_head_count, 1, head_dim];
+        let key_dims = vec![1, kv_head_count, 1, head_dim];
+        let value_dims = vec![1, kv_head_count, 1, head_dim];
+        validate_decode_attention_shapes(
+            query_dims.as_slice(),
+            key_dims.as_slice(),
+            value_dims.as_slice(),
+            cache.width(),
+        )?;
+        let cos_dims = vec![1, rotary_pairs];
+
+        let roped_query = apply_rotary_embedding_values(
+            query_values,
+            query_dims.as_slice(),
+            cos_values,
+            sin_values,
+            cos_dims.as_slice(),
+            interleaved,
+        )?;
+        let roped_key = apply_rotary_embedding_values(
+            key_values,
+            key_dims.as_slice(),
+            cos_values,
+            sin_values,
+            cos_dims.as_slice(),
+            interleaved,
+        )?;
+
+        let flattened_key = flatten_decode_heads(roped_key.as_slice(), kv_head_count, head_dim)?;
+        let flattened_value = flatten_decode_heads(value_values, kv_head_count, head_dim)?;
+        let cache_write_index =
+            cache.append_entry(self, flattened_key.as_slice(), flattened_value.as_slice())?;
+
+        let flash_attention_path = flash_preferred && causal && self.supports_flash_attention();
+        let output_values = match cache.kv_cache_encoding_policy().family {
+            KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => {
+                decode_attention_over_dense_kv_cache_rows(
+                    roped_query.as_slice(),
+                    cache,
+                    query_head_count,
+                    kv_head_count,
+                    head_dim,
+                    scale,
+                )?
+            }
+            KvCacheEncodingFamily::TurboQuant => {
+                let (expanded_key, expanded_value) = expand_kv_cache_for_attention(
+                    cache,
+                    query_head_count,
+                    kv_head_count,
+                    head_dim,
+                )?;
+                scaled_dot_product_attention_values(
+                    roped_query.as_slice(),
+                    expanded_key.as_slice(),
+                    expanded_value.as_slice(),
+                    query_dims.as_slice(),
+                    &[1, query_head_count, cache.len(), head_dim],
+                    &[1, query_head_count, cache.len(), head_dim],
+                    scale,
+                    false,
+                    flash_attention_path,
+                )?
+            }
+        };
+
+        Ok(MetalDecodeAttentionHostResult {
+            output_values,
+            cache_state: cache.state(),
+            stats: MetalDecodeAttentionStats {
+                flash_attention_path,
+                rotary_applied: true,
+                used_device_kv: true,
+                cache_write_index,
+                cached_tokens: cache.len(),
+                query_head_count,
+                kv_head_count,
+            },
+        })
+    }
+
     /// Executes one decode-attention step through a reserved steady-state runtime.
     pub fn decode_attention_f32_reserved(
         &mut self,
@@ -2147,8 +2974,12 @@ impl MetalBackend {
                 )?
             }
             KvCacheEncodingFamily::TurboQuant => {
-                let (expanded_key, expanded_value) =
-                    expand_kv_cache_for_attention(cache, query_head_count, kv_head_count, head_dim)?;
+                let (expanded_key, expanded_value) = expand_kv_cache_for_attention(
+                    cache,
+                    query_head_count,
+                    kv_head_count,
+                    head_dim,
+                )?;
                 scaled_dot_product_attention_values(
                     roped_query.as_slice(),
                     expanded_key.as_slice(),
@@ -2945,6 +3776,7 @@ impl AvailableMetalBackend {
         let storage_mode = self.platform.storage_mode();
         Ok(MetalBuffer {
             spec: spec.clone(),
+            byte_offset: 0,
             byte_len,
             storage_kind: BufferStorageKind::DenseF32,
             storage_mode,
@@ -2966,7 +3798,7 @@ impl AvailableMetalBackend {
         let mut submission = self
             .platform
             .begin_submission(String::from("psionic.pool.clear"))?;
-        submission.fill_buffer(&buffer.platform, buffer.byte_len(), 0)?;
+        submission.fill_buffer(&buffer.platform, buffer.byte_offset, buffer.byte_len(), 0)?;
         submission.commit(MetalCommandWait::Completed)?;
         Ok(())
     }
@@ -2993,6 +3825,7 @@ impl AvailableMetalBackend {
                 let storage_mode = self.platform.storage_mode();
                 let mut buffer = MetalBuffer {
                     spec: spec.clone(),
+                    byte_offset: 0,
                     byte_len: data.bytes.len(),
                     storage_kind: BufferStorageKind::QuantizedBlocks {
                         mode: data.mode,
@@ -3027,6 +3860,7 @@ impl AvailableMetalBackend {
             if let Some(keepalive) = keepalive {
                 return Ok(MetalBuffer {
                     spec: spec.clone(),
+                    byte_offset: 0,
                     byte_len: bytes.len(),
                     storage_kind: BufferStorageKind::QuantizedBlocks {
                         mode,
@@ -3045,6 +3879,7 @@ impl AvailableMetalBackend {
         }
         let mut buffer = MetalBuffer {
             spec: spec.clone(),
+            byte_offset: 0,
             byte_len: bytes.len(),
             storage_kind: BufferStorageKind::QuantizedBlocks {
                 mode,
@@ -3083,13 +3918,16 @@ impl AvailableMetalBackend {
                 DType::F32,
                 self.descriptor.device.clone(),
             ),
+            byte_offset: 0,
             byte_len,
             storage_kind: BufferStorageKind::DenseF32,
             storage_mode,
             host_visible: true,
             host_writable: false,
             _keepalive: None,
-            platform: self.platform.buffer_from_bytes_no_copy(bytes, storage_mode)?,
+            platform: self
+                .platform
+                .buffer_from_bytes_no_copy(bytes, storage_mode)?,
         }))
     }
 
@@ -3226,6 +4064,293 @@ impl AvailableMetalBackend {
         Ok(values)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn run_quantized_gelu_glu_projected(
+        &mut self,
+        gate_weights: &MetalBuffer,
+        gate_mode: QuantizationMode,
+        gate_rows: usize,
+        gate_columns: usize,
+        up_weights: &MetalBuffer,
+        up_mode: QuantizationMode,
+        up_rows: usize,
+        up_columns: usize,
+        down_weights: &MetalBuffer,
+        down_mode: QuantizationMode,
+        down_rows: usize,
+        down_columns: usize,
+        input: &[f32],
+    ) -> Result<Vec<f32>, RuntimeError> {
+        if gate_rows == 0 || gate_columns == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal quantized_gelu_glu_projected requires non-empty gate projection",
+            )));
+        }
+        if gate_rows != up_rows || gate_columns != up_columns {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized_gelu_glu_projected gate/up mismatch: gate=({gate_rows},{gate_columns}) up=({up_rows},{up_columns})",
+            )));
+        }
+        if gate_columns != input.len() {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized_gelu_glu_projected input width mismatch: expected {}, actual {}",
+                gate_columns,
+                input.len()
+            )));
+        }
+        if down_columns != gate_rows {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized_gelu_glu_projected down projection width mismatch: expected {}, actual {}",
+                gate_rows, down_columns
+            )));
+        }
+
+        let device = self.descriptor.device.clone();
+        let mut owned_input_buffer = None;
+        let input_buffer = if let Some(buffer) = self.borrowed_dense_input_buffer(input)? {
+            buffer
+        } else {
+            let mut buffer = self.allocate_for_overwrite(&TensorSpec::new(
+                Shape::new(vec![input.len()]),
+                DType::F32,
+                device.clone(),
+            ))?;
+            buffer.write_f32(input)?;
+            owned_input_buffer = Some(buffer.clone());
+            buffer
+        };
+
+        let gate_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![gate_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+        let up_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![up_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+        let activated_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![gate_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+        let projected_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![down_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+
+        let mut submission = MetalSubmission {
+            encoded_operations: 0,
+            synchronized_buffers: 0,
+            platform: self
+                .platform
+                .begin_submission(String::from("psionic.quantized_gelu_glu.projected"))?,
+        };
+
+        self.platform.encode_quantized_matvec(
+            &mut submission.platform,
+            gate_weights,
+            0,
+            gate_mode,
+            gate_rows,
+            gate_columns,
+            &input_buffer,
+            &gate_output,
+        )?;
+        submission.encoded_operations += 1;
+
+        self.platform.encode_quantized_matvec(
+            &mut submission.platform,
+            up_weights,
+            0,
+            up_mode,
+            up_rows,
+            up_columns,
+            &input_buffer,
+            &up_output,
+        )?;
+        submission.encoded_operations += 1;
+
+        self.platform.encode_gelu_glu_f32(
+            &mut submission.platform,
+            &gate_output,
+            &up_output,
+            &activated_output,
+            gate_rows,
+        )?;
+        submission.encoded_operations += 1;
+
+        self.platform.encode_quantized_matvec(
+            &mut submission.platform,
+            down_weights,
+            0,
+            down_mode,
+            down_rows,
+            down_columns,
+            &activated_output,
+            &projected_output,
+        )?;
+        submission.encoded_operations += 1;
+
+        if self
+            .platform
+            .synchronize_output(&mut submission.platform, &projected_output)?
+        {
+            submission.synchronized_buffers += 1;
+        }
+        submission.commit(MetalCommandWait::Completed)?;
+
+        let values = projected_output.read_f32()?;
+        self.pool.recycle(gate_output);
+        self.pool.recycle(up_output);
+        self.pool.recycle(activated_output);
+        self.pool.recycle(projected_output);
+        if let Some(buffer) = owned_input_buffer {
+            self.pool.recycle(buffer);
+        }
+        Ok(values)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run_quantized_gelu_mul_projected(
+        &mut self,
+        gate_weights: &MetalBuffer,
+        gate_mode: QuantizationMode,
+        gate_rows: usize,
+        gate_columns: usize,
+        multiplier: &[f32],
+        projection_weights: &MetalBuffer,
+        projection_mode: QuantizationMode,
+        projection_rows: usize,
+        projection_columns: usize,
+        input: &[f32],
+    ) -> Result<Vec<f32>, RuntimeError> {
+        if gate_rows == 0 || gate_columns == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal quantized_gelu_mul_projected requires non-empty gate projection",
+            )));
+        }
+        if gate_columns != input.len() {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized_gelu_mul_projected input width mismatch: expected {}, actual {}",
+                gate_columns,
+                input.len()
+            )));
+        }
+        if multiplier.len() != gate_rows {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized_gelu_mul_projected multiplier width mismatch: expected {}, actual {}",
+                gate_rows,
+                multiplier.len()
+            )));
+        }
+        if projection_columns != gate_rows {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized_gelu_mul_projected projection width mismatch: expected {}, actual {}",
+                gate_rows, projection_columns
+            )));
+        }
+
+        let device = self.descriptor.device.clone();
+        let mut owned_input_buffer = None;
+        let input_buffer = if let Some(buffer) = self.borrowed_dense_input_buffer(input)? {
+            buffer
+        } else {
+            let mut buffer = self.allocate_for_overwrite(&TensorSpec::new(
+                Shape::new(vec![input.len()]),
+                DType::F32,
+                device.clone(),
+            ))?;
+            buffer.write_f32(input)?;
+            owned_input_buffer = Some(buffer.clone());
+            buffer
+        };
+
+        let mut multiplier_buffer = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![multiplier.len()]),
+            DType::F32,
+            device.clone(),
+        ))?;
+        multiplier_buffer.write_f32(multiplier)?;
+
+        let gate_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![gate_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+        let activated_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![gate_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+        let projected_output = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![projection_rows]),
+            DType::F32,
+            device.clone(),
+        ))?;
+
+        let mut submission = MetalSubmission {
+            encoded_operations: 0,
+            synchronized_buffers: 0,
+            platform: self
+                .platform
+                .begin_submission(String::from("psionic.quantized_gelu_mul.projected"))?,
+        };
+
+        self.platform.encode_quantized_matvec(
+            &mut submission.platform,
+            gate_weights,
+            0,
+            gate_mode,
+            gate_rows,
+            gate_columns,
+            &input_buffer,
+            &gate_output,
+        )?;
+        submission.encoded_operations += 1;
+
+        self.platform.encode_gelu_glu_f32(
+            &mut submission.platform,
+            &gate_output,
+            &multiplier_buffer,
+            &activated_output,
+            gate_rows,
+        )?;
+        submission.encoded_operations += 1;
+
+        self.platform.encode_quantized_matvec(
+            &mut submission.platform,
+            projection_weights,
+            0,
+            projection_mode,
+            projection_rows,
+            projection_columns,
+            &activated_output,
+            &projected_output,
+        )?;
+        submission.encoded_operations += 1;
+
+        if self
+            .platform
+            .synchronize_output(&mut submission.platform, &projected_output)?
+        {
+            submission.synchronized_buffers += 1;
+        }
+        submission.commit(MetalCommandWait::Completed)?;
+
+        let values = projected_output.read_f32()?;
+        self.pool.recycle(multiplier_buffer);
+        self.pool.recycle(gate_output);
+        self.pool.recycle(activated_output);
+        self.pool.recycle(projected_output);
+        if let Some(buffer) = owned_input_buffer {
+            self.pool.recycle(buffer);
+        }
+        Ok(values)
+    }
+
     fn run_quantized_matvec_select_logits_output(
         &mut self,
         weights: &MetalBuffer,
@@ -3296,7 +4421,7 @@ impl AvailableMetalBackend {
                 }
                 submission.commit(MetalCommandWait::Completed)?;
                 let selected_tokens =
-                    read_argmax_indices_from_f32_buffer(&selected, 1, "metal argmax")?;
+                    read_argmax_indices_from_f32_buffer(&selected, 1, "metal quantized argmax")?;
                 if let Some(buffer) = owned_input_buffer {
                     self.pool.recycle(buffer);
                 }
@@ -3309,7 +4434,7 @@ impl AvailableMetalBackend {
                     metrics: MetalLogitsSelectionMetrics {
                         output_mode,
                         readback_bytes: std::mem::size_of::<f32>().try_into().unwrap_or(u64::MAX),
-                        raw_logits_materialized: true,
+                        raw_logits_materialized: false,
                     },
                 })
             }
@@ -4432,7 +5557,9 @@ fn read_packed_argmax_index(input: &MetalBuffer, label: &str) -> Result<u32, Run
         )));
     }
     let packed = u64::from_ne_bytes(bytes.as_slice().try_into().map_err(|_| {
-        RuntimeError::Backend(String::from("metal argmax packed result was not eight bytes"))
+        RuntimeError::Backend(String::from(
+            "metal argmax packed result was not eight bytes",
+        ))
     })?);
     Ok(u32::MAX - (packed as u32))
 }
@@ -4904,21 +6031,25 @@ fn decode_attention_over_dense_kv_cache_rows(
     }
 
     let byte_len = token_count.saturating_mul(cache.row_byte_len);
-    cache.key_buffer.with_bytes_at_offset(0, byte_len, |key_bytes| {
-        let key_rows = dense_kv_bytes_as_f32_cow(key_bytes)?;
-        cache.value_buffer.with_bytes_at_offset(0, byte_len, |value_bytes| {
-            let value_rows = dense_kv_bytes_as_f32_cow(value_bytes)?;
-            dense_decode_attention_from_row_major_cache(
-                query,
-                key_rows.as_ref(),
-                value_rows.as_ref(),
-                query_head_count,
-                kv_head_count,
-                head_dim,
-                scale,
-            )
+    cache
+        .key_buffer
+        .with_bytes_at_offset(0, byte_len, |key_bytes| {
+            let key_rows = dense_kv_bytes_as_f32_cow(key_bytes)?;
+            cache
+                .value_buffer
+                .with_bytes_at_offset(0, byte_len, |value_bytes| {
+                    let value_rows = dense_kv_bytes_as_f32_cow(value_bytes)?;
+                    dense_decode_attention_from_row_major_cache(
+                        query,
+                        key_rows.as_ref(),
+                        value_rows.as_ref(),
+                        query_head_count,
+                        kv_head_count,
+                        head_dim,
+                        scale,
+                    )
+                })
         })
-    })
 }
 
 fn dense_kv_bytes_as_f32_cow(bytes: &[u8]) -> Result<Cow<'_, [f32]>, RuntimeError> {
@@ -4960,41 +6091,63 @@ fn dense_decode_attention_from_row_major_cache(
         )));
     }
 
-    let group_size = query_head_count / kv_head_count.max(1);
     let mut output = vec![0.0; query_head_count.saturating_mul(head_dim)];
     for head_index in 0..query_head_count {
-        let kv_head_index = if group_size == 0 {
-            0
-        } else {
-            head_index / group_size
-        }
-        .min(kv_head_count.saturating_sub(1));
         let query_start = head_index.saturating_mul(head_dim);
         let query_end = query_start + head_dim;
-        let q = &query[query_start..query_end];
-        let output_slice = &mut output[query_start..query_end];
-        let mut max_logit = f32::NEG_INFINITY;
-        let mut denom = 0.0f32;
-        for token_index in 0..token_count {
-            let row_start = token_index.saturating_mul(row_width) + kv_head_index.saturating_mul(head_dim);
-            let row_end = row_start + head_dim;
-            let key = &key_rows[row_start..row_end];
-            let value = &value_rows[row_start..row_end];
-            let logit = dense_row_dot(q, key)? * scale;
-            accumulate_dense_online_softmax_value(
-                output_slice,
-                value,
-                logit,
-                &mut max_logit,
-                &mut denom,
-            )?;
-        }
-        let normalizer = 1.0 / denom.max(f32::EPSILON);
-        for value in output_slice.iter_mut() {
-            *value *= normalizer;
-        }
+        dense_decode_attention_head_into(
+            &mut output[query_start..query_end],
+            &query[query_start..query_end],
+            key_rows,
+            value_rows,
+            query_head_count,
+            kv_head_count,
+            token_count,
+            row_width,
+            head_dim,
+            scale,
+            head_index,
+        )?;
     }
     Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn dense_decode_attention_head_into(
+    output_slice: &mut [f32],
+    query: &[f32],
+    key_rows: &[f32],
+    value_rows: &[f32],
+    query_head_count: usize,
+    kv_head_count: usize,
+    token_count: usize,
+    row_width: usize,
+    head_dim: usize,
+    scale: f32,
+    head_index: usize,
+) -> Result<(), RuntimeError> {
+    let group_size = query_head_count / kv_head_count.max(1);
+    let kv_head_index = if group_size == 0 {
+        0
+    } else {
+        head_index / group_size
+    }
+    .min(kv_head_count.saturating_sub(1));
+    let mut max_logit = f32::NEG_INFINITY;
+    let mut denom = 0.0f32;
+    for token_index in 0..token_count {
+        let row_start = token_index.saturating_mul(row_width) + kv_head_index.saturating_mul(head_dim);
+        let row_end = row_start + head_dim;
+        let key = &key_rows[row_start..row_end];
+        let value = &value_rows[row_start..row_end];
+        let logit = dense_row_dot(query, key)? * scale;
+        accumulate_dense_online_softmax_value(output_slice, value, logit, &mut max_logit, &mut denom)?;
+    }
+    let normalizer = 1.0 / denom.max(f32::EPSILON);
+    for value in output_slice.iter_mut() {
+        *value *= normalizer;
+    }
+    Ok(())
 }
 
 fn accumulate_dense_online_softmax_value(
@@ -5663,10 +6816,11 @@ fn prefix_cache_observation(prefix_state: PrefixCacheState) -> CacheObservation 
 
 #[cfg(target_os = "macos")]
 mod platform {
-    use std::ptr;
+    use std::{borrow::ToOwned, ptr};
 
     use metal::{
-        Buffer, CommandBuffer, CommandQueue, CompileOptions, ComputePipelineState,
+        Buffer, CommandBuffer, CommandQueue, CompileOptions, ComputeCommandEncoder,
+        ComputePipelineState,
         Device as MetalDevice, DeviceRef as MetalDeviceRef, MTLCommandBufferStatus,
         MTLDeviceLocation, MTLGPUFamily, MTLResourceOptions, MTLSize, NSRange,
     };
@@ -5680,8 +6834,8 @@ mod platform {
     use super::{
         DeviceSupportTier, FLASH_ATTENTION_FEATURE_FLAG, FamilySupport, LEGACY_FAMILY_FLAG,
         MODERN_FAMILY_FLAG, MetalBuffer, MetalCommandStatus, MetalCommandWait,
-        MetalDiscoveryReport, MetalKernelCache, MetalStorageMode, classify_support,
-        quantized_row_stride,
+        MetalDiscoveryReport, MetalKernelCache, MetalKvCacheMirror, MetalStorageMode,
+        classify_support, quantized_row_stride,
     };
 
     #[derive(Clone)]
@@ -5691,7 +6845,18 @@ mod platform {
 
     struct DensePipelines {
         add: ComputePipelineState,
+        add_inplace: ComputePipelineState,
+        copy_f32_slice: ComputePipelineState,
+        copy_f32_with_offset: ComputePipelineState,
+        gelu_glu_f32: ComputePipelineState,
+        scale_inplace: ComputePipelineState,
         matmul: ComputePipelineState,
+        per_head_rms_norm_f32: ComputePipelineState,
+        per_head_rms_norm_to_output_f32: ComputePipelineState,
+        per_head_rms_norm_unit_f32: ComputePipelineState,
+        rope_neox_f32: ComputePipelineState,
+        rope_neox_position_f32: ComputePipelineState,
+        decode_attention_dense_f32: ComputePipelineState,
         argmax_f32: ComputePipelineState,
         quantized_matvec_argmax_q4_k: ComputePipelineState,
         quantized_matvec_argmax_q6_k: ComputePipelineState,
@@ -5807,17 +6972,40 @@ mod platform {
 
     pub(super) struct PlatformSubmission {
         command_buffer: CommandBuffer,
+        compute_encoder: Option<ComputeCommandEncoder>,
     }
 
     impl PlatformSubmission {
+        fn compute_encoder(&mut self) -> &ComputeCommandEncoder {
+            if self.compute_encoder.is_none() {
+                self.compute_encoder =
+                    Some(self.command_buffer.new_compute_command_encoder().to_owned());
+            }
+            self.compute_encoder
+                .as_ref()
+                .expect("compute encoder is initialized")
+        }
+
+        fn end_compute_encoding(&mut self) {
+            if let Some(encoder) = self.compute_encoder.take() {
+                encoder.end_encoding();
+            }
+        }
+
         pub(super) fn fill_buffer(
             &mut self,
             buffer: &PlatformBuffer,
+            byte_offset: usize,
             byte_len: usize,
             value: u8,
         ) -> Result<(), RuntimeError> {
+            self.end_compute_encoding();
             let encoder = self.command_buffer.new_blit_command_encoder();
-            encoder.fill_buffer(&buffer.raw, byte_range(byte_len)?, value);
+            encoder.fill_buffer(
+                &buffer.raw,
+                NSRange::new(to_metal_size(byte_offset)?, to_metal_size(byte_len)?),
+                value,
+            );
             encoder.end_encoding();
             Ok(())
         }
@@ -5825,12 +7013,21 @@ mod platform {
         pub(super) fn copy_buffer(
             &mut self,
             source: &PlatformBuffer,
+            source_byte_offset: usize,
             destination: &PlatformBuffer,
+            destination_byte_offset: usize,
             byte_len: usize,
         ) -> Result<(), RuntimeError> {
+            self.end_compute_encoding();
             let encoder = self.command_buffer.new_blit_command_encoder();
             let size = to_metal_size(byte_len)?;
-            encoder.copy_from_buffer(&source.raw, 0, &destination.raw, 0, size);
+            encoder.copy_from_buffer(
+                &source.raw,
+                to_metal_size(source_byte_offset)?,
+                &destination.raw,
+                to_metal_size(destination_byte_offset)?,
+                size,
+            );
             encoder.end_encoding();
             Ok(())
         }
@@ -5843,6 +7040,7 @@ mod platform {
             if !matches!(storage_mode, MetalStorageMode::Managed) {
                 return Ok(false);
             }
+            self.end_compute_encoding();
             let encoder = self.command_buffer.new_blit_command_encoder();
             encoder.synchronize_resource(&buffer.raw);
             encoder.end_encoding();
@@ -5857,7 +7055,7 @@ mod platform {
             output: &PlatformBuffer,
             element_count: usize,
         ) -> Result<(), RuntimeError> {
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&left.raw), 0);
             encoder.set_buffer(1, Some(&right.raw), 0);
@@ -5880,7 +7078,201 @@ mod platform {
                 MTLSize::new(u64::from(element_count), 1, 1),
                 threadgroup_size,
             );
-            encoder.end_encoding();
+            Ok(())
+        }
+
+        pub(super) fn encode_add_inplace(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            bias: &PlatformBuffer,
+            bias_byte_offset: usize,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+            encoder.set_buffer(1, Some(&bias.raw), to_metal_size(bias_byte_offset)?);
+
+            let element_count = u32::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal add-inplace element count overflow"))
+            })?;
+            encoder.set_bytes(2, 4, (&element_count as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(element_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal add-inplace element count conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(
+                MTLSize::new(u64::from(element_count), 1, 1),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_scale_inplace(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            scale: f32,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+
+            let element_count = u32::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal scale-inplace element count overflow"))
+            })?;
+            encoder.set_bytes(1, 4, (&scale as *const f32).cast());
+            encoder.set_bytes(2, 4, (&element_count as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(element_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal scale-inplace element count conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(
+                MTLSize::new(u64::from(element_count), 1, 1),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_copy_f32_slice(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            source: &PlatformBuffer,
+            destination: &PlatformBuffer,
+            element_count: usize,
+            source_offset_elements: usize,
+            destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&source.raw), 0);
+            encoder.set_buffer(1, Some(&destination.raw), 0);
+
+            let element_count = u32::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal copy_f32_slice element count overflow"))
+            })?;
+            let source_offset_elements = u32::try_from(source_offset_elements).map_err(|_| {
+                RuntimeError::Backend(String::from("metal copy_f32_slice source offset overflow"))
+            })?;
+            let destination_offset_elements =
+                u32::try_from(destination_offset_elements).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal copy_f32_slice destination offset overflow",
+                    ))
+                })?;
+            encoder.set_bytes(2, 4, (&element_count as *const u32).cast());
+            encoder.set_bytes(3, 4, (&source_offset_elements as *const u32).cast());
+            encoder.set_bytes(4, 4, (&destination_offset_elements as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(element_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal copy_f32_slice element count conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(
+                MTLSize::new(u64::from(element_count), 1, 1),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_copy_f32_with_offset(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            source: &PlatformBuffer,
+            source_byte_offset: usize,
+            destination: &PlatformBuffer,
+            destination_byte_offset: usize,
+            element_count: usize,
+            destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&source.raw), to_metal_size(source_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&destination.raw),
+                to_metal_size(destination_byte_offset)?,
+            );
+
+            let element_count = u32::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal copy_f32 element count overflow"))
+            })?;
+            let destination_offset_elements =
+                u32::try_from(destination_offset_elements).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal copy_f32 destination offset overflow",
+                    ))
+                })?;
+            encoder.set_bytes(2, 4, (&element_count as *const u32).cast());
+            encoder.set_bytes(3, 4, (&destination_offset_elements as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(element_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal copy_f32 element count conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(
+                MTLSize::new(u64::from(element_count), 1, 1),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_gelu_glu_f32(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            gate: &PlatformBuffer,
+            gate_byte_offset: usize,
+            up: &PlatformBuffer,
+            up_byte_offset: usize,
+            output: &PlatformBuffer,
+            output_byte_offset: usize,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&gate.raw), to_metal_size(gate_byte_offset)?);
+            encoder.set_buffer(1, Some(&up.raw), to_metal_size(up_byte_offset)?);
+            encoder.set_buffer(2, Some(&output.raw), to_metal_size(output_byte_offset)?);
+
+            let element_count = u32::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal gelu_glu element count overflow"))
+            })?;
+            encoder.set_bytes(3, 4, (&element_count as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(element_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal gelu_glu element count conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(
+                MTLSize::new(u64::from(element_count), 1, 1),
+                threadgroup_size,
+            );
             Ok(())
         }
 
@@ -5894,7 +7286,7 @@ mod platform {
             k: usize,
             n: usize,
         ) -> Result<(), RuntimeError> {
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&left.raw), 0);
             encoder.set_buffer(1, Some(&right.raw), 0);
@@ -5920,7 +7312,264 @@ mod platform {
                 })?,
             )?;
             encoder.dispatch_threads(MTLSize::new(grid_width, 1, 1), threadgroup_size);
-            encoder.end_encoding();
+            Ok(())
+        }
+
+        pub(super) fn encode_per_head_rms_norm(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            weight: &PlatformBuffer,
+            weight_byte_offset: usize,
+            head_count: usize,
+            head_dim: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+            encoder.set_buffer(1, Some(&weight.raw), to_metal_size(weight_byte_offset)?);
+
+            let head_count = u32::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal per-head rms-norm head count overflow"))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal per-head rms-norm head dim overflow"))
+            })?;
+            encoder.set_bytes(2, 4, (&head_count as *const u32).cast());
+            encoder.set_bytes(3, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(4, 4, (&epsilon as *const f32).cast());
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(head_count), 1, 1),
+                rms_norm_threadgroup_size(pipeline)?,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_per_head_rms_norm_to_output(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            input: &PlatformBuffer,
+            input_byte_offset: usize,
+            weight: &PlatformBuffer,
+            weight_byte_offset: usize,
+            output: &PlatformBuffer,
+            output_byte_offset: usize,
+            head_count: usize,
+            head_dim: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&input.raw), to_metal_size(input_byte_offset)?);
+            encoder.set_buffer(1, Some(&weight.raw), to_metal_size(weight_byte_offset)?);
+            encoder.set_buffer(2, Some(&output.raw), to_metal_size(output_byte_offset)?);
+
+            let head_count = u32::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal per-head rms-norm head count overflow"))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal per-head rms-norm head dim overflow"))
+            })?;
+            encoder.set_bytes(3, 4, (&head_count as *const u32).cast());
+            encoder.set_bytes(4, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(5, 4, (&epsilon as *const f32).cast());
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(head_count), 1, 1),
+                rms_norm_threadgroup_size(pipeline)?,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_per_head_rms_norm_unit(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            head_count: usize,
+            head_dim: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+
+            let head_count = u32::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal per-head unit rms-norm head count overflow",
+                ))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal per-head unit rms-norm head dim overflow",
+                ))
+            })?;
+            encoder.set_bytes(1, 4, (&head_count as *const u32).cast());
+            encoder.set_bytes(2, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(3, 4, (&epsilon as *const f32).cast());
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(head_count), 1, 1),
+                rms_norm_threadgroup_size(pipeline)?,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_rope_neox_inplace(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            cos: &PlatformBuffer,
+            sin: &PlatformBuffer,
+            head_count: usize,
+            head_dim: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), 0);
+            encoder.set_buffer(1, Some(&cos.raw), 0);
+            encoder.set_buffer(2, Some(&sin.raw), 0);
+
+            let head_count = u32::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal rope head count overflow"))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal rope head dim overflow"))
+            })?;
+            let half_dim = head_dim / 2;
+            encoder.set_bytes(3, 4, (&head_count as *const u32).cast());
+            encoder.set_bytes(4, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(5, 4, (&half_dim as *const u32).cast());
+            let total_pairs = u64::from(head_count).saturating_mul(u64::from(half_dim));
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(total_pairs).map_err(|_| {
+                    RuntimeError::Backend(String::from("metal rope grid conversion overflow"))
+                })?,
+            )?;
+            encoder.dispatch_threads(MTLSize::new(total_pairs, 1, 1), threadgroup_size);
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_rope_neox_position(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            freq_factors: &PlatformBuffer,
+            freq_factors_byte_offset: usize,
+            head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&freq_factors.raw),
+                to_metal_size(freq_factors_byte_offset)?,
+            );
+
+            let head_count = u32::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal rope head count overflow"))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal rope head dim overflow"))
+            })?;
+            let half_dim = head_dim / 2;
+            let rotary_half = u32::try_from(rotary_half).map_err(|_| {
+                RuntimeError::Backend(String::from("metal rope rotary-half overflow"))
+            })?;
+            let position = u32::try_from(position).map_err(|_| {
+                RuntimeError::Backend(String::from("metal rope position overflow"))
+            })?;
+            encoder.set_bytes(2, 4, (&head_count as *const u32).cast());
+            encoder.set_bytes(3, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(4, 4, (&half_dim as *const u32).cast());
+            encoder.set_bytes(5, 4, (&rotary_half as *const u32).cast());
+            encoder.set_bytes(6, 4, (&position as *const u32).cast());
+            encoder.set_bytes(7, 4, (&theta_scale as *const f32).cast());
+            encoder.set_bytes(8, 4, (&freq_scale as *const f32).cast());
+            encoder.set_bytes(9, 4, (&corr_dims[0] as *const f32).cast());
+            encoder.set_bytes(10, 4, (&corr_dims[1] as *const f32).cast());
+            encoder.set_bytes(11, 4, (&ext_factor as *const f32).cast());
+            encoder.set_bytes(12, 4, (&yarn_mscale as *const f32).cast());
+            let total_pairs = u64::from(head_count).saturating_mul(u64::from(rotary_half));
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(total_pairs).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal rope-position grid conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(MTLSize::new(total_pairs, 1, 1), threadgroup_size);
+            Ok(())
+        }
+
+        pub(super) fn encode_decode_attention_dense(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            query: &PlatformBuffer,
+            query_byte_offset: usize,
+            key_cache: &PlatformBuffer,
+            key_cache_byte_offset: usize,
+            value_cache: &PlatformBuffer,
+            value_cache_byte_offset: usize,
+            output: &PlatformBuffer,
+            output_byte_offset: usize,
+            query_head_count: usize,
+            kv_head_count: usize,
+            token_count: usize,
+            head_dim: usize,
+            scale: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&query.raw), to_metal_size(query_byte_offset)?);
+            encoder.set_buffer(1, Some(&key_cache.raw), to_metal_size(key_cache_byte_offset)?);
+            encoder.set_buffer(
+                2,
+                Some(&value_cache.raw),
+                to_metal_size(value_cache_byte_offset)?,
+            );
+            encoder.set_buffer(3, Some(&output.raw), to_metal_size(output_byte_offset)?);
+
+            let query_head_count = u32::try_from(query_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal decode attention query head count overflow",
+                ))
+            })?;
+            let kv_head_count = u32::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal decode attention kv head count overflow",
+                ))
+            })?;
+            let token_count = u32::try_from(token_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal decode attention token count overflow",
+                ))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal decode attention head dim overflow"))
+            })?;
+            encoder.set_bytes(4, 4, (&query_head_count as *const u32).cast());
+            encoder.set_bytes(5, 4, (&kv_head_count as *const u32).cast());
+            encoder.set_bytes(6, 4, (&token_count as *const u32).cast());
+            encoder.set_bytes(7, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(8, 4, (&scale as *const f32).cast());
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(query_head_count), 1, 1),
+                decode_attention_threadgroup_size(pipeline)?,
+            );
             Ok(())
         }
 
@@ -5928,14 +7577,16 @@ mod platform {
             &mut self,
             pipeline: &ComputePipelineState,
             input: &PlatformBuffer,
+            input_byte_offset: usize,
             output: &PlatformBuffer,
+            output_byte_offset: usize,
             row_count: usize,
             column_count: usize,
         ) -> Result<(), RuntimeError> {
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
-            encoder.set_buffer(0, Some(&input.raw), 0);
-            encoder.set_buffer(1, Some(&output.raw), 0);
+            encoder.set_buffer(0, Some(&input.raw), to_metal_size(input_byte_offset)?);
+            encoder.set_buffer(1, Some(&output.raw), to_metal_size(output_byte_offset)?);
 
             let row_count = u32::try_from(row_count).map_err(|_| {
                 RuntimeError::Backend(String::from("metal argmax row count overflow"))
@@ -5947,11 +7598,8 @@ mod platform {
             encoder.set_bytes(3, 4, (&column_count as *const u32).cast());
 
             let threadgroup_size = argmax_threadgroup_size(pipeline)?;
-            encoder.dispatch_thread_groups(
-                MTLSize::new(u64::from(row_count), 1, 1),
-                threadgroup_size,
-            );
-            encoder.end_encoding();
+            encoder
+                .dispatch_thread_groups(MTLSize::new(u64::from(row_count), 1, 1), threadgroup_size);
             Ok(())
         }
 
@@ -5961,16 +7609,19 @@ mod platform {
             weights: &PlatformBuffer,
             byte_offset: usize,
             input: &PlatformBuffer,
+            input_byte_offset: usize,
             output: &PlatformBuffer,
+            output_byte_offset: usize,
             rows: usize,
             columns: usize,
             row_stride: usize,
+            active_threads: u32,
         ) -> Result<(), RuntimeError> {
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&weights.raw), 0);
-            encoder.set_buffer(1, Some(&input.raw), 0);
-            encoder.set_buffer(2, Some(&output.raw), 0);
+            encoder.set_buffer(1, Some(&input.raw), to_metal_size(input_byte_offset)?);
+            encoder.set_buffer(2, Some(&output.raw), to_metal_size(output_byte_offset)?);
 
             let rows = u32::try_from(rows).map_err(|_| {
                 RuntimeError::Backend(String::from("metal quantized matvec rows overflow"))
@@ -5988,10 +7639,10 @@ mod platform {
             encoder.set_bytes(4, 4, (&columns as *const u32).cast());
             encoder.set_bytes(5, 4, (&row_stride as *const u32).cast());
             encoder.set_bytes(6, 8, (&byte_offset as *const u64).cast());
+            encoder.set_bytes(7, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            let threadgroup_size = MTLSize::new(u64::from(active_threads), 1, 1);
             encoder.dispatch_thread_groups(MTLSize::new(u64::from(rows), 1, 1), threadgroup_size);
-            encoder.end_encoding();
             Ok(())
         }
 
@@ -6005,8 +7656,9 @@ mod platform {
             rows: usize,
             columns: usize,
             row_stride: usize,
+            active_threads: u32,
         ) -> Result<(), RuntimeError> {
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&weights.raw), 0);
             encoder.set_buffer(1, Some(&input.raw), 0);
@@ -6028,10 +7680,10 @@ mod platform {
             encoder.set_bytes(4, 4, (&columns as *const u32).cast());
             encoder.set_bytes(5, 4, (&row_stride as *const u32).cast());
             encoder.set_bytes(6, 8, (&byte_offset as *const u64).cast());
+            encoder.set_bytes(7, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            let threadgroup_size = MTLSize::new(u64::from(active_threads), 1, 1);
             encoder.dispatch_thread_groups(MTLSize::new(u64::from(rows), 1, 1), threadgroup_size);
-            encoder.end_encoding();
             Ok(())
         }
 
@@ -6047,7 +7699,7 @@ mod platform {
             selected_ids: &[i32],
         ) -> Result<(), RuntimeError> {
             let total_rows = selected_ids.len().saturating_mul(rows_per_expert);
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&weights.raw), 0);
             encoder.set_buffer(1, Some(&input.raw), 0);
@@ -6092,7 +7744,6 @@ mod platform {
                 ),
                 threadgroup_size,
             );
-            encoder.end_encoding();
             Ok(())
         }
 
@@ -6108,7 +7759,7 @@ mod platform {
             selected_ids: &[i32],
         ) -> Result<(), RuntimeError> {
             let total_rows = selected_ids.len().saturating_mul(rows_per_expert);
-            let encoder = self.command_buffer.new_compute_command_encoder();
+            let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&weights.raw), 0);
             encoder.set_buffer(1, Some(&input.raw), 0);
@@ -6157,14 +7808,14 @@ mod platform {
                 ),
                 threadgroup_size,
             );
-            encoder.end_encoding();
             Ok(())
         }
 
         pub(super) fn commit(
-            self,
+            mut self,
             wait: MetalCommandWait,
         ) -> Result<MetalCommandStatus, RuntimeError> {
+            self.end_compute_encoding();
             self.command_buffer.commit();
             match wait {
                 MetalCommandWait::None => {}
@@ -6250,7 +7901,10 @@ mod platform {
             if !label.is_empty() {
                 command_buffer.set_label(&label);
             }
-            Ok(PlatformSubmission { command_buffer })
+            Ok(PlatformSubmission {
+                command_buffer,
+                compute_encoder: None,
+            })
         }
 
         fn pipelines(&mut self) -> Result<&DensePipelines, RuntimeError> {
@@ -6311,6 +7965,253 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_add_inplace(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            bias: &MetalBuffer,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.add_inplace;
+            submission.encode_add_inplace(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                &bias.platform,
+                bias.byte_offset,
+                element_count,
+            )
+        }
+
+        pub(super) fn encode_gelu_glu_f32(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            gate: &MetalBuffer,
+            up: &MetalBuffer,
+            output: &MetalBuffer,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.gelu_glu_f32;
+            submission.encode_gelu_glu_f32(
+                pipeline,
+                &gate.platform,
+                gate.byte_offset,
+                &up.platform,
+                up.byte_offset,
+                &output.platform,
+                output.byte_offset,
+                element_count,
+            )
+        }
+
+        pub(super) fn encode_scale_inplace(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            scale: f32,
+            element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.scale_inplace;
+            submission.encode_scale_inplace(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                scale,
+                element_count,
+            )
+        }
+
+        pub(super) fn encode_copy_f32_slice(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            source: &MetalBuffer,
+            destination: &MetalBuffer,
+            element_count: usize,
+            source_offset_elements: usize,
+            destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.copy_f32_slice;
+            submission.encode_copy_f32_slice(
+                pipeline,
+                &source.platform,
+                &destination.platform,
+                element_count,
+                source_offset_elements,
+                destination_offset_elements,
+            )
+        }
+
+        pub(super) fn encode_per_head_rms_norm(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            weight: &MetalBuffer,
+            head_count: usize,
+            head_dim: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.per_head_rms_norm_f32;
+            submission.encode_per_head_rms_norm(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                &weight.platform,
+                weight.byte_offset,
+                head_count,
+                head_dim,
+                epsilon,
+            )
+        }
+
+        pub(super) fn encode_per_head_rms_norm_to_output(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            input: &MetalBuffer,
+            weight: &MetalBuffer,
+            output: &MetalBuffer,
+            head_count: usize,
+            head_dim: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.per_head_rms_norm_to_output_f32;
+            submission.encode_per_head_rms_norm_to_output(
+                pipeline,
+                &input.platform,
+                input.byte_offset,
+                &weight.platform,
+                weight.byte_offset,
+                &output.platform,
+                output.byte_offset,
+                head_count,
+                head_dim,
+                epsilon,
+            )
+        }
+
+        pub(super) fn encode_per_head_rms_norm_unit(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            head_count: usize,
+            head_dim: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.per_head_rms_norm_unit_f32;
+            submission.encode_per_head_rms_norm_unit(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                head_count,
+                head_dim,
+                epsilon,
+            )
+        }
+
+        pub(super) fn encode_rope_neox_inplace(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            cos: &MetalBuffer,
+            sin: &MetalBuffer,
+            head_count: usize,
+            head_dim: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.rope_neox_f32;
+            submission.encode_rope_neox_inplace(
+                pipeline,
+                &values.platform,
+                &cos.platform,
+                &sin.platform,
+                head_count,
+                head_dim,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_rope_neox_position(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            freq_factors: &MetalBuffer,
+            head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.rope_neox_position_f32;
+            submission.encode_rope_neox_position(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                &freq_factors.platform,
+                freq_factors.byte_offset,
+                head_count,
+                head_dim,
+                rotary_half,
+                position,
+                theta_scale,
+                freq_scale,
+                corr_dims,
+                ext_factor,
+                yarn_mscale,
+            )
+        }
+
+        pub(super) fn encode_copy_f32_with_offset(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            source: &MetalBuffer,
+            destination: &MetalBuffer,
+            element_count: usize,
+            destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.copy_f32_with_offset;
+            submission.encode_copy_f32_with_offset(
+                pipeline,
+                &source.platform,
+                source.byte_offset,
+                &destination.platform,
+                destination.byte_offset,
+                element_count,
+                destination_offset_elements,
+            )
+        }
+
+        pub(super) fn encode_decode_attention_dense(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            query: &MetalBuffer,
+            cache: &MetalKvCacheMirror,
+            query_head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            scale: f32,
+            output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.decode_attention_dense_f32;
+            submission.encode_decode_attention_dense(
+                pipeline,
+                &query.platform,
+                query.byte_offset,
+                &cache.key_buffer.platform,
+                cache.key_buffer.byte_offset,
+                &cache.value_buffer.platform,
+                cache.value_buffer.byte_offset,
+                &output.platform,
+                output.byte_offset,
+                query_head_count,
+                kv_head_count,
+                cache.len(),
+                head_dim,
+                scale,
+            )
+        }
+
         pub(super) fn encode_matmul(
             &mut self,
             submission: &mut PlatformSubmission,
@@ -6349,7 +8250,9 @@ mod platform {
             submission.encode_argmax_f32(
                 pipeline,
                 &input.platform,
+                input.byte_offset,
                 &output.platform,
+                output.byte_offset,
                 row_count,
                 column_count,
             )
@@ -6379,15 +8282,19 @@ mod platform {
                     )));
                 }
             };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
             submission.encode_quantized_matvec(
                 pipeline,
                 &weights.platform,
                 byte_offset,
                 &input.platform,
+                input.byte_offset,
                 &output.platform,
+                output.byte_offset,
                 rows,
                 columns,
                 row_stride,
+                active_threads,
             )
         }
 
@@ -6415,6 +8322,7 @@ mod platform {
                     )));
                 }
             };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
             submission.encode_quantized_matvec_argmax(
                 pipeline,
                 &weights.platform,
@@ -6424,6 +8332,7 @@ mod platform {
                 rows,
                 columns,
                 row_stride,
+                active_threads,
             )
         }
 
@@ -6772,10 +8681,73 @@ mod platform {
         let add = library
             .get_function("psionic_add", None)
             .map_err(|error| RuntimeError::Backend(format!("missing Metal add kernel: {error}")))?;
+        let add_inplace = library
+            .get_function("psionic_add_inplace", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal add_inplace kernel: {error}"))
+            })?;
+        let copy_f32_slice = library
+            .get_function("psionic_copy_f32_slice", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal copy_f32_slice kernel: {error}"))
+            })?;
+        let copy_f32_with_offset = library
+            .get_function("psionic_copy_f32_with_offset", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal copy_f32_with_offset kernel: {error}"))
+            })?;
+        let gelu_glu_f32 = library
+            .get_function("psionic_gelu_glu_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal gelu_glu kernel: {error}"))
+            })?;
+        let scale_inplace = library
+            .get_function("psionic_scale_inplace", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal scale_inplace kernel: {error}"))
+            })?;
         let matmul = library
             .get_function("psionic_matmul", None)
             .map_err(|error| {
                 RuntimeError::Backend(format!("missing Metal matmul kernel: {error}"))
+            })?;
+        let per_head_rms_norm_f32 = library
+            .get_function("psionic_per_head_rms_norm_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal per_head_rms_norm kernel: {error}"))
+            })?;
+        let per_head_rms_norm_to_output_f32 = library
+            .get_function("psionic_per_head_rms_norm_to_output_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal per_head_rms_norm_to_output kernel: {error}"
+                ))
+            })?;
+        let per_head_rms_norm_unit_f32 = library
+            .get_function("psionic_per_head_rms_norm_unit_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal per_head_rms_norm_unit kernel: {error}"
+                ))
+            })?;
+        let rope_neox_f32 = library
+            .get_function("psionic_rope_neox_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal rope_neox kernel: {error}"))
+            })?;
+        let rope_neox_position_f32 = library
+            .get_function("psionic_rope_neox_position_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal rope_neox_position kernel: {error}"
+                ))
+            })?;
+        let decode_attention_dense_f32 = library
+            .get_function("psionic_decode_attention_dense_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal decode_attention_dense kernel: {error}"
+                ))
             })?;
         let argmax_f32 = library
             .get_function("psionic_argmax_f32", None)
@@ -6871,10 +8843,85 @@ mod platform {
                 .map_err(|error| {
                     RuntimeError::Backend(format!("metal add pipeline build failed: {error}"))
                 })?,
+            add_inplace: device
+                .new_compute_pipeline_state_with_function(&add_inplace)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal add_inplace pipeline build failed: {error}"
+                    ))
+                })?,
+            copy_f32_slice: device
+                .new_compute_pipeline_state_with_function(&copy_f32_slice)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal copy_f32_slice pipeline build failed: {error}"
+                    ))
+                })?,
+            copy_f32_with_offset: device
+                .new_compute_pipeline_state_with_function(&copy_f32_with_offset)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal copy_f32_with_offset pipeline build failed: {error}"
+                    ))
+                })?,
+            gelu_glu_f32: device
+                .new_compute_pipeline_state_with_function(&gelu_glu_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!("metal gelu_glu pipeline build failed: {error}"))
+                })?,
+            scale_inplace: device
+                .new_compute_pipeline_state_with_function(&scale_inplace)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal scale_inplace pipeline build failed: {error}"
+                    ))
+                })?,
             matmul: device
                 .new_compute_pipeline_state_with_function(&matmul)
                 .map_err(|error| {
                     RuntimeError::Backend(format!("metal matmul pipeline build failed: {error}"))
+                })?,
+            per_head_rms_norm_f32: device
+                .new_compute_pipeline_state_with_function(&per_head_rms_norm_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal per_head_rms_norm pipeline build failed: {error}"
+                    ))
+                })?,
+            per_head_rms_norm_to_output_f32: device
+                .new_compute_pipeline_state_with_function(&per_head_rms_norm_to_output_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal per_head_rms_norm_to_output pipeline build failed: {error}"
+                    ))
+                })?,
+            per_head_rms_norm_unit_f32: device
+                .new_compute_pipeline_state_with_function(&per_head_rms_norm_unit_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal per_head_rms_norm_unit pipeline build failed: {error}"
+                    ))
+                })?,
+            rope_neox_f32: device
+                .new_compute_pipeline_state_with_function(&rope_neox_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal rope_neox pipeline build failed: {error}"
+                    ))
+                })?,
+            rope_neox_position_f32: device
+                .new_compute_pipeline_state_with_function(&rope_neox_position_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal rope_neox_position pipeline build failed: {error}"
+                    ))
+                })?,
+            decode_attention_dense_f32: device
+                .new_compute_pipeline_state_with_function(&decode_attention_dense_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal decode_attention_dense pipeline build failed: {error}"
+                    ))
                 })?,
             argmax_f32: device
                 .new_compute_pipeline_state_with_function(&argmax_f32)
@@ -6979,16 +9026,70 @@ mod platform {
         Ok(MTLSize::new(width.max(1), 1, 1))
     }
 
+    fn quantized_row_active_thread_count(
+        pipeline: &ComputePipelineState,
+        mode: QuantizationMode,
+        columns: usize,
+    ) -> Result<u32, RuntimeError> {
+        if matches!(mode, QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ6K) {
+            return Ok(32);
+        }
+        let Some((elements_per_block, _)) = mode.ggml_block_spec() else {
+            return Err(RuntimeError::Backend(format!(
+                "metal quantized kernel does not support mode {mode:?}",
+            )));
+        };
+        let block_count = columns / elements_per_block;
+        let desired = if block_count <= 12 {
+            8_u64
+        } else if block_count <= 24 {
+            16_u64
+        } else {
+            32_u64
+        };
+        let width = desired
+            .min(pipeline.thread_execution_width())
+            .min(u64::from(pipeline.max_total_threads_per_threadgroup()));
+        if width == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal quantized kernel reported zero thread execution width",
+            )));
+        }
+        u32::try_from(width).map_err(|_| {
+            RuntimeError::Backend(String::from(
+                "metal quantized active thread count conversion overflow",
+            ))
+        })
+    }
+
     fn quantized_row_threadgroup_size(
         pipeline: &ComputePipelineState,
     ) -> Result<MTLSize, RuntimeError> {
-        let width = pipeline.thread_execution_width().min(32);
+        let width = 8_u64
+            .min(pipeline.thread_execution_width())
+            .min(u64::from(pipeline.max_total_threads_per_threadgroup()));
         if width == 0 {
             return Err(RuntimeError::Backend(String::from(
                 "metal quantized kernel reported zero thread execution width",
             )));
         }
         Ok(MTLSize::new(width, 1, 1))
+    }
+
+    fn rms_norm_threadgroup_size(pipeline: &ComputePipelineState) -> Result<MTLSize, RuntimeError> {
+        const RMS_THREADS: u64 = 256;
+        let max_threads = pipeline.max_total_threads_per_threadgroup();
+        if max_threads == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal rms-norm kernel reported zero max threads per threadgroup",
+            )));
+        }
+        if u64::from(max_threads) < RMS_THREADS {
+            return Err(RuntimeError::Backend(format!(
+                "metal rms-norm kernel requires at least {RMS_THREADS} threads per threadgroup, actual {max_threads}",
+            )));
+        }
+        Ok(MTLSize::new(RMS_THREADS, 1, 1))
     }
 
     fn argmax_threadgroup_size(pipeline: &ComputePipelineState) -> Result<MTLSize, RuntimeError> {
@@ -7005,6 +9106,24 @@ mod platform {
             )));
         }
         Ok(MTLSize::new(ARGMAX_THREADS, 1, 1))
+    }
+
+    fn decode_attention_threadgroup_size(
+        pipeline: &ComputePipelineState,
+    ) -> Result<MTLSize, RuntimeError> {
+        const ATTENTION_THREADS: u64 = 32 * 8;
+        let max_threads = pipeline.max_total_threads_per_threadgroup();
+        if max_threads == 0 {
+            return Err(RuntimeError::Backend(String::from(
+                "metal decode-attention kernel reported zero max threads per threadgroup",
+            )));
+        }
+        if u64::from(max_threads) < ATTENTION_THREADS {
+            return Err(RuntimeError::Backend(format!(
+                "metal decode-attention kernel requires at least {ATTENTION_THREADS} threads per threadgroup, actual {max_threads}",
+            )));
+        }
+        Ok(MTLSize::new(ATTENTION_THREADS, 1, 1))
     }
 
     fn map_command_status(status: MTLCommandBufferStatus) -> MetalCommandStatus {
@@ -7033,6 +9152,11 @@ using namespace metal;
 
 constant uint PSIONIC_QUANTIZED_ROW_THREADS = 32;
 constant uint PSIONIC_ARGMAX_THREADS = 128;
+constant uint PSIONIC_RMS_NORM_THREADS = 256;
+constant uint PSIONIC_DECODE_THREADS = 32;
+constant uint PSIONIC_DECODE_SIMDGROUPS = 8;
+constant uint PSIONIC_DECODE_MAX_HEAD_DIM = 256;
+constant uint PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD = PSIONIC_DECODE_MAX_HEAD_DIM / PSIONIC_DECODE_THREADS;
 
 kernel void psionic_add(
     const device float* left [[buffer(0)]],
@@ -7045,6 +9169,75 @@ kernel void psionic_add(
         return;
     }
     output[gid] = left[gid] + right[gid];
+}
+
+kernel void psionic_add_inplace(
+    device float* values [[buffer(0)]],
+    const device float* bias [[buffer(1)]],
+    constant uint& element_count [[buffer(2)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= element_count) {
+        return;
+    }
+    values[gid] += bias[gid];
+}
+
+kernel void psionic_scale_inplace(
+    device float* values [[buffer(0)]],
+    constant float& scale [[buffer(1)]],
+    constant uint& element_count [[buffer(2)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= element_count) {
+        return;
+    }
+    values[gid] *= scale;
+}
+
+kernel void psionic_copy_f32_slice(
+    const device float* source [[buffer(0)]],
+    device float* destination [[buffer(1)]],
+    constant uint& element_count [[buffer(2)]],
+    constant uint& source_offset_elements [[buffer(3)]],
+    constant uint& destination_offset_elements [[buffer(4)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= element_count) {
+        return;
+    }
+    destination[destination_offset_elements + gid] = source[source_offset_elements + gid];
+}
+
+kernel void psionic_copy_f32_with_offset(
+    const device float* source [[buffer(0)]],
+    device float* destination [[buffer(1)]],
+    constant uint& element_count [[buffer(2)]],
+    constant uint& destination_offset_elements [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= element_count) {
+        return;
+    }
+    destination[destination_offset_elements + gid] = source[gid];
+}
+
+kernel void psionic_gelu_glu_f32(
+    const device float* gate [[buffer(0)]],
+    const device float* up [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& element_count [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= element_count) {
+        return;
+    }
+
+    float gate_value = gate[gid];
+    float cubic = gate_value * gate_value * gate_value;
+    float inner = 0.7978845608f * (gate_value + 0.044715f * cubic);
+    float activated = 0.5f * gate_value * (1.0f + tanh(inner));
+    output[gid] = activated * up[gid];
 }
 
 kernel void psionic_matmul(
@@ -7067,6 +9260,301 @@ kernel void psionic_matmul(
         sum += left[(row * k) + inner] * right[(inner * n) + col];
     }
     output[(row * n) + col] = sum;
+}
+
+kernel void psionic_per_head_rms_norm_f32(
+    device float* values [[buffer(0)]],
+    const device float* weight [[buffer(1)]],
+    constant uint& head_count [[buffer(2)]],
+    constant uint& head_dim [[buffer(3)]],
+    constant float& epsilon [[buffer(4)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint head = tgpig.x;
+    if (head >= head_count) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_RMS_NORM_THREADS];
+    uint base = head * head_dim;
+    float sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+        float value = values[base + index];
+        sum += value * value;
+    }
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_RMS_NORM_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    float scale = rsqrt((partial[0] / float(head_dim)) + epsilon);
+    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+        values[base + index] = values[base + index] * scale * weight[index];
+    }
+}
+
+kernel void psionic_per_head_rms_norm_to_output_f32(
+    const device float* input [[buffer(0)]],
+    const device float* weight [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& head_count [[buffer(3)]],
+    constant uint& head_dim [[buffer(4)]],
+    constant float& epsilon [[buffer(5)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint head = tgpig.x;
+    if (head >= head_count) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_RMS_NORM_THREADS];
+    uint base = head * head_dim;
+    float sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+        float value = input[base + index];
+        sum += value * value;
+    }
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_RMS_NORM_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    float scale = rsqrt((partial[0] / float(head_dim)) + epsilon);
+    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+        output[base + index] = input[base + index] * scale * weight[index];
+    }
+}
+
+kernel void psionic_per_head_rms_norm_unit_f32(
+    device float* values [[buffer(0)]],
+    constant uint& head_count [[buffer(1)]],
+    constant uint& head_dim [[buffer(2)]],
+    constant float& epsilon [[buffer(3)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint head = tgpig.x;
+    if (head >= head_count) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_RMS_NORM_THREADS];
+    uint base = head * head_dim;
+    float sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+        float value = values[base + index];
+        sum += value * value;
+    }
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = PSIONIC_RMS_NORM_THREADS / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    float scale = rsqrt((partial[0] / float(head_dim)) + epsilon);
+    for (uint index = tid; index < head_dim; index += PSIONIC_RMS_NORM_THREADS) {
+        values[base + index] = values[base + index] * scale;
+    }
+}
+
+kernel void psionic_rope_neox_f32(
+    device float* values [[buffer(0)]],
+    const device float* cos_values [[buffer(1)]],
+    const device float* sin_values [[buffer(2)]],
+    constant uint& head_count [[buffer(3)]],
+    constant uint& head_dim [[buffer(4)]],
+    constant uint& half_dim [[buffer(5)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    uint total = head_count * half_dim;
+    if (gid >= total) {
+        return;
+    }
+    uint head = gid / half_dim;
+    uint pair = gid % half_dim;
+    uint base = head * head_dim;
+    float x0 = values[base + pair];
+    float x1 = values[base + pair + half_dim];
+    float cos_theta = cos_values[pair];
+    float sin_theta = sin_values[pair];
+    values[base + pair] = x0 * cos_theta - x1 * sin_theta;
+    values[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+}
+
+inline float psionic_rope_yarn_ramp(float low, float high, uint i0) {
+    float y = ((float(i0 / 2) - low) / max(high - low, 0.001f));
+    return 1.0f - clamp(y, 0.0f, 1.0f);
+}
+
+kernel void psionic_rope_neox_position_f32(
+    device float* values [[buffer(0)]],
+    const device float* freq_factors [[buffer(1)]],
+    constant uint& head_count [[buffer(2)]],
+    constant uint& head_dim [[buffer(3)]],
+    constant uint& half_dim [[buffer(4)]],
+    constant uint& rotary_half [[buffer(5)]],
+    constant uint& position [[buffer(6)]],
+    constant float& theta_scale [[buffer(7)]],
+    constant float& freq_scale [[buffer(8)]],
+    constant float& corr_low [[buffer(9)]],
+    constant float& corr_high [[buffer(10)]],
+    constant float& ext_factor [[buffer(11)]],
+    constant float& yarn_mscale [[buffer(12)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    uint total = head_count * rotary_half;
+    if (gid >= total) {
+        return;
+    }
+    uint head = gid / rotary_half;
+    uint pair = gid % rotary_half;
+    uint base = head * head_dim;
+    float x0 = values[base + pair];
+    float x1 = values[base + pair + half_dim];
+    float freq_factor = freq_factors[pair];
+    if (!(freq_factor > 0.0f)) {
+        freq_factor = 1.0f;
+    }
+    float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+    float theta_interp = freq_scale * theta_extrap;
+    float theta = theta_interp;
+    float mscale = 1.0f;
+    if (ext_factor != 0.0f) {
+        float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+        theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+        mscale = yarn_mscale;
+    }
+    float cos_theta = cos(theta) * mscale;
+    float sin_theta = sin(theta) * mscale;
+    values[base + pair] = x0 * cos_theta - x1 * sin_theta;
+    values[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+}
+
+kernel void psionic_decode_attention_dense_f32(
+    const device float* query [[buffer(0)]],
+    const device float* keys [[buffer(1)]],
+    const device float* values [[buffer(2)]],
+    device float* output [[buffer(3)]],
+    constant uint& query_head_count [[buffer(4)]],
+    constant uint& kv_head_count [[buffer(5)]],
+    constant uint& token_count [[buffer(6)]],
+    constant uint& head_dim [[buffer(7)]],
+    constant float& scale [[buffer(8)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]]
+) {
+    uint head = tgpig.x;
+    if (head >= query_head_count || head_dim > PSIONIC_DECODE_MAX_HEAD_DIM) {
+        return;
+    }
+    uint values_per_thread = (head_dim + PSIONIC_DECODE_THREADS - 1) / PSIONIC_DECODE_THREADS;
+    if (values_per_thread > PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD) {
+        return;
+    }
+
+    uint group_size = max(query_head_count / max(kv_head_count, 1u), 1u);
+    uint kv_head = min(head / group_size, kv_head_count - 1);
+    uint query_base = head * head_dim;
+    uint cache_row_width = kv_head_count * head_dim;
+    uint cache_head_base = kv_head * head_dim;
+
+    float q_fragment[PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD];
+    float out_fragment[PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD];
+    threadgroup float partial_outputs
+        [PSIONIC_DECODE_SIMDGROUPS * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD * PSIONIC_DECODE_THREADS];
+    threadgroup float partial_max[PSIONIC_DECODE_SIMDGROUPS];
+    threadgroup float partial_denom[PSIONIC_DECODE_SIMDGROUPS];
+    threadgroup float block_factors[PSIONIC_DECODE_SIMDGROUPS];
+    threadgroup float global_denom_value;
+    for (uint slot = 0; slot < PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD; ++slot) {
+        q_fragment[slot] = 0.0f;
+        out_fragment[slot] = 0.0f;
+    }
+    for (uint slot = 0; slot < values_per_thread; ++slot) {
+        uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+        if (dim < head_dim) {
+            q_fragment[slot] = query[query_base + dim];
+        }
+    }
+
+    float max_logit = -INFINITY;
+    float denom = 0.0f;
+    for (uint token = simd_gid; token < token_count; token += PSIONIC_DECODE_SIMDGROUPS) {
+        uint token_base = token * cache_row_width + cache_head_base;
+        float dot = 0.0f;
+        for (uint slot = 0; slot < values_per_thread; ++slot) {
+            uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+            if (dim < head_dim) {
+                dot += q_fragment[slot] * keys[token_base + dim];
+            }
+        }
+        float logit = simd_sum(dot) * scale;
+        float next_max = max(max_logit, logit);
+        float factor = fast::exp(max_logit - next_max);
+        float weight = fast::exp(logit - next_max);
+        max_logit = next_max;
+        denom = denom * factor + weight;
+        for (uint slot = 0; slot < values_per_thread; ++slot) {
+            uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+            if (dim < head_dim) {
+                out_fragment[slot] =
+                    out_fragment[slot] * factor + weight * values[token_base + dim];
+            }
+        }
+    }
+
+    if (lane == 0) {
+        partial_max[simd_gid] = max_logit;
+        partial_denom[simd_gid] = denom;
+    }
+    for (uint slot = 0; slot < values_per_thread; ++slot) {
+        partial_outputs[(simd_gid * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD + slot) *
+                PSIONIC_DECODE_THREADS +
+            lane] = out_fragment[slot];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    if (simd_gid == 0) {
+        float local_max = lane < PSIONIC_DECODE_SIMDGROUPS ? partial_max[lane] : -INFINITY;
+        float global_max = simd_max(local_max);
+        float factor =
+            lane < PSIONIC_DECODE_SIMDGROUPS ? fast::exp(partial_max[lane] - global_max) : 0.0f;
+        float global_denom =
+            simd_sum((lane < PSIONIC_DECODE_SIMDGROUPS ? partial_denom[lane] : 0.0f) * factor);
+        if (lane < PSIONIC_DECODE_SIMDGROUPS) {
+            block_factors[lane] = factor;
+        }
+        if (lane == 0) {
+            global_denom_value = global_denom;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    if (simd_gid == 0) {
+        float normalizer = global_denom_value > 0.0f ? (1.0f / global_denom_value) : 0.0f;
+        for (uint slot = 0; slot < values_per_thread; ++slot) {
+            uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+            if (dim < head_dim) {
+                float accumulated = 0.0f;
+                for (uint block = 0; block < PSIONIC_DECODE_SIMDGROUPS; ++block) {
+                    accumulated += partial_outputs
+                        [(block * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD + slot) *
+                                PSIONIC_DECODE_THREADS +
+                            lane] *
+                        block_factors[block];
+                }
+                output[query_base + dim] = accumulated * normalizer;
+            }
+        }
+    }
 }
 
 kernel void psionic_argmax_f32(
@@ -7127,21 +9615,6 @@ constant short PSIONIC_MXFP4_VALUES[16] = {
 inline float psionic_mxfp4_scale(uchar exponent_bits) {
     uint bits = exponent_bits == 0 ? 0x00400000u : (uint(exponent_bits) << 23);
     return as_type<float>(bits) * 0.5f;
-}
-
-inline uint psionic_ordered_f32_bits(float value) {
-    uint bits = as_type<uint>(value);
-    return (bits & 0x80000000u) != 0 ? ~bits : (bits ^ 0x80000000u);
-}
-
-inline void psionic_update_quantized_argmax(
-    device atomic_ulong* selected,
-    float value,
-    uint row
-) {
-    (void)selected;
-    (void)value;
-    (void)row;
 }
 
 inline float psionic_q8_0_block_dot(
@@ -7412,11 +9885,12 @@ kernel void psionic_quantized_matvec_q4_k(
 kernel void psionic_quantized_matvec_argmax_q4_k(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device atomic_ulong* selected [[buffer(2)]],
+    device float* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -7430,20 +9904,20 @@ kernel void psionic_quantized_matvec_argmax_q4_k(
     const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
     uint block_count = columns / 256;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = row_weights + (block_index * 144);
         sum += psionic_q4_k_block_dot(block, input + block_index * 256);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
     }
     if (tid == 0) {
-        psionic_update_quantized_argmax(selected, partial[0], row);
+        output[row] = partial[0];
     }
 }
 
@@ -7522,11 +9996,12 @@ kernel void psionic_quantized_matvec_q6_k(
 kernel void psionic_quantized_matvec_argmax_q6_k(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device atomic_ulong* selected [[buffer(2)]],
+    device float* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -7540,20 +10015,20 @@ kernel void psionic_quantized_matvec_argmax_q6_k(
     const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
     uint block_count = columns / 256;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = row_weights + (block_index * 210);
         sum += psionic_q6_k_block_dot(block, input + block_index * 256);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
     }
     if (tid == 0) {
-        psionic_update_quantized_argmax(selected, partial[0], row);
+        output[row] = partial[0];
     }
 }
 
@@ -7565,6 +10040,7 @@ kernel void psionic_quantized_matvec_q8_0(
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -7576,13 +10052,13 @@ kernel void psionic_quantized_matvec_q8_0(
     ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
         sum += psionic_q8_0_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -7596,11 +10072,12 @@ kernel void psionic_quantized_matvec_q8_0(
 kernel void psionic_quantized_matvec_argmax_q8_0(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device atomic_ulong* selected [[buffer(2)]],
+    device float* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -7612,20 +10089,20 @@ kernel void psionic_quantized_matvec_argmax_q8_0(
     ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
         sum += psionic_q8_0_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
     }
     if (tid == 0) {
-        psionic_update_quantized_argmax(selected, partial[0], row);
+        output[row] = partial[0];
     }
 }
 
@@ -7637,6 +10114,7 @@ kernel void psionic_quantized_matvec_mxfp4(
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -7648,13 +10126,13 @@ kernel void psionic_quantized_matvec_mxfp4(
     ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
         sum += psionic_mxfp4_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -7668,11 +10146,12 @@ kernel void psionic_quantized_matvec_mxfp4(
 kernel void psionic_quantized_matvec_argmax_mxfp4(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
-    device atomic_ulong* selected [[buffer(2)]],
+    device float* output [[buffer(2)]],
     constant uint& rows [[buffer(3)]],
     constant uint& columns [[buffer(4)]],
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -7684,20 +10163,20 @@ kernel void psionic_quantized_matvec_argmax_mxfp4(
     ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
         sum += psionic_mxfp4_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
     }
     if (tid == 0) {
-        psionic_update_quantized_argmax(selected, partial[0], row);
+        output[row] = partial[0];
     }
 }
 
@@ -7901,8 +10380,8 @@ mod platform {
     };
 
     use super::{
-        MetalBuffer, MetalCommandStatus, MetalCommandWait, MetalDiscoveryReport, MetalStorageMode,
-        RuntimeError,
+        MetalBuffer, MetalCommandStatus, MetalCommandWait, MetalDiscoveryReport,
+        MetalKvCacheMirror, MetalStorageMode, RuntimeError,
     };
     use psionic_core::QuantizationMode;
 
@@ -7965,6 +10444,7 @@ mod platform {
         pub(super) fn fill_buffer(
             &mut self,
             _buffer: &PlatformBuffer,
+            _byte_offset: usize,
             _byte_len: usize,
             _value: u8,
         ) -> Result<(), RuntimeError> {
@@ -7976,7 +10456,9 @@ mod platform {
         pub(super) fn copy_buffer(
             &mut self,
             _source: &PlatformBuffer,
+            _source_byte_offset: usize,
             _destination: &PlatformBuffer,
+            _destination_byte_offset: usize,
             _byte_len: usize,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
@@ -8036,6 +10518,151 @@ mod platform {
             _columns: usize,
             _row_stride: usize,
             _selected_ids: &[i32],
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_gelu_glu_f32(
+            &mut self,
+            _pipeline: &(),
+            _gate: &PlatformBuffer,
+            _up: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_add_inplace(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _bias: &PlatformBuffer,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_scale_inplace(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _scale: f32,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_copy_f32_with_offset(
+            &mut self,
+            _pipeline: &(),
+            _source: &PlatformBuffer,
+            _destination: &PlatformBuffer,
+            _element_count: usize,
+            _destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_per_head_rms_norm(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _weight: &PlatformBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_per_head_rms_norm_to_output(
+            &mut self,
+            _pipeline: &(),
+            _input: &PlatformBuffer,
+            _weight: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_per_head_rms_norm_unit(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_rope_neox_inplace(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _cos: &PlatformBuffer,
+            _sin: &PlatformBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_rope_neox_position(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _freq_factors: &PlatformBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_decode_attention_dense(
+            &mut self,
+            _pipeline: &(),
+            _query: &PlatformBuffer,
+            _key_cache: &PlatformBuffer,
+            _value_cache: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _query_head_count: usize,
+            _kv_head_count: usize,
+            _token_count: usize,
+            _head_dim: usize,
+            _scale: f32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -8111,6 +10738,149 @@ mod platform {
             _submission: &mut PlatformSubmission,
             _left: &MetalBuffer,
             _right: &MetalBuffer,
+            _output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_gelu_glu_f32(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _gate: &MetalBuffer,
+            _up: &MetalBuffer,
+            _output: &MetalBuffer,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_add_inplace(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _bias: &MetalBuffer,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_scale_inplace(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _scale: f32,
+            _element_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_per_head_rms_norm(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _weight: &MetalBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_per_head_rms_norm_to_output(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _input: &MetalBuffer,
+            _weight: &MetalBuffer,
+            _output: &MetalBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_per_head_rms_norm_unit(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_rope_neox_inplace(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _cos: &MetalBuffer,
+            _sin: &MetalBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_rope_neox_position(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _freq_factors: &MetalBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_copy_f32_with_offset(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _source: &MetalBuffer,
+            _destination: &MetalBuffer,
+            _element_count: usize,
+            _destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_decode_attention_dense(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _query: &MetalBuffer,
+            _cache: &MetalKvCacheMirror,
+            _query_head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _scale: f32,
             _output: &MetalBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
