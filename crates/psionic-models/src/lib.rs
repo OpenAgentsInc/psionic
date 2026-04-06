@@ -2290,6 +2290,13 @@ impl PagedTensorStorage {
             .map_err(ModelLoadError::from)
     }
 
+    /// Prefaults a validated byte range in the underlying blob.
+    pub fn prefetch_range(&self, offset: usize, len: usize) -> Result<(), ModelLoadError> {
+        self.bytes
+            .prefetch_range(offset, len)
+            .map_err(ModelLoadError::from)
+    }
+
     /// Materializes the paged bytes into a loaded tensor.
     pub fn load(&self) -> Result<LoadedWeightTensor, ModelLoadError> {
         let bytes = self.bytes()?;

@@ -48,6 +48,7 @@ psionic-transformer = { path = "../psionic-transformer" }
 psionic-train = { path = "../psionic-train" }
 rand = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
+rayon = "1.11"
 serde = { workspace = true }
 serde_json = { workspace = true }
 safetensors = { workspace = true }

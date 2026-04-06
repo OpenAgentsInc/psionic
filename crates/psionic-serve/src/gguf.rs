@@ -33,21 +33,21 @@ use psionic_train::{
     GemmaE4bCudaAdapterCheckpoint, GemmaE4bCudaAdapterExportedArtifact,
     GemmaE4bServedBaseModelBinding,
 };
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
     CompiledWordGenerationModel, ContinuousBatchGenerationResult,
-    CpuGgufGptOssTextGenerationService, CpuGgufQwen35TextGenerationService,
-    GenerationEventStream, GenerationInput, GenerationModelHandle, GenerationRequest,
-    GenerationResponse, GenerationStepOutput, GenerationStreamChunk, GenerationStreamEvent,
-    GenerationStreamStatus, GenerationStreamTerminal, GenerationStreamingPolicy,
-    InMemoryGenerationModelRegistry, InMemoryGenerationSessionStore, LoadedModelView,
-    LoadedModelsObservation, LocalRuntimeObservability, ManagedTextGenerationRuntime,
-    ReferenceTextGenerationError, ServedModelRevisionIdentity, SessionId, SharedPrefixStore,
-    StreamingTextGenerationExecutor, TextGenerationExecutor,
-    continuous_batch_text_generation_execution_profile, default_generation_scheduler_policy,
-    default_generation_streaming_policy,
+    CpuGgufGptOssTextGenerationService, CpuGgufQwen35TextGenerationService, GenerationEventStream,
+    GenerationInput, GenerationModelHandle, GenerationRequest, GenerationResponse,
+    GenerationStepOutput, GenerationStreamChunk, GenerationStreamEvent, GenerationStreamStatus,
+    GenerationStreamTerminal, GenerationStreamingPolicy, InMemoryGenerationModelRegistry,
+    InMemoryGenerationSessionStore, LoadedModelView, LoadedModelsObservation,
+    LocalRuntimeObservability, ManagedTextGenerationRuntime, ReferenceTextGenerationError,
+    ServedModelRevisionIdentity, SessionId, SharedPrefixStore, StreamingTextGenerationExecutor,
+    TextGenerationExecutor, continuous_batch_text_generation_execution_profile,
+    default_generation_scheduler_policy, default_generation_streaming_policy,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -246,11 +246,9 @@ impl CpuGgufTextGenerationService {
             GgufDecoderFamily::GptOss => CpuGgufServiceKind::GptOss(
                 CpuGgufGptOssTextGenerationService::from_gguf_path(path)?,
             ),
-            GgufDecoderFamily::Qwen35 => {
-                CpuGgufServiceKind::Qwen35(CpuGgufQwen35TextGenerationService::from_gguf_path(
-                    path,
-                )?)
-            }
+            GgufDecoderFamily::Qwen35 => CpuGgufServiceKind::Qwen35(
+                CpuGgufQwen35TextGenerationService::from_gguf_path(path)?,
+            ),
             GgufDecoderFamily::Llama
             | GgufDecoderFamily::Qwen
             | GgufDecoderFamily::Mistral
@@ -2550,6 +2548,20 @@ impl QuantizedExpertTensor {
             output[row_index] = quantized_row_dot(input, self.mode, bytes)?;
         }
         Ok(())
+    }
+
+    fn prefetch_expert(&self, expert_index: usize) -> Result<(), crate::RuntimeError> {
+        if expert_index >= self.outer {
+            return Err(crate::RuntimeError::Backend(format!(
+                "expert index {expert_index} exceeds expert count {}",
+                self.outer
+            )));
+        }
+        let expert_byte_len = self.rows.saturating_mul(self.row_byte_len);
+        let offset = expert_index.saturating_mul(expert_byte_len);
+        self.storage
+            .prefetch_range(offset, expert_byte_len)
+            .map_err(model_load_runtime_error)
     }
 }
 
@@ -13233,11 +13245,9 @@ fn evaluate_sparse_moe_host(
     }
     let selected = top_k_indices(router_logits.as_slice(), active_expert_count.max(1));
     let routing = softmax_selected(router_logits.as_slice(), selected.as_slice());
+    prefetch_sparse_expert_set(selected.as_slice(), gate_experts, up_experts, down_experts)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
     let mut moe_out = vec![0.0; down_experts.rows];
-    let mut gate = Vec::new();
-    let mut up = Vec::new();
-    let mut gate_up = Vec::new();
-    let mut expert = Vec::new();
     let mut per_expert_kernels = 3usize;
     let mut bytes_moved = (router
         .values
@@ -13250,66 +13260,29 @@ fn evaluate_sparse_moe_host(
     } else {
         per_expert_kernels = 2;
     }
-    for (selected_index, expert_index) in selected.iter().copied().enumerate() {
-        let activated = if let Some(up_experts) = up_experts {
-            gate_experts
-                .expert_matvec(expert_index, expert_input, &mut gate)
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            if let Some(bias) = gate_bias {
-                add_expert_bias_in_place(
-                    gate.as_mut_slice(),
-                    bias,
-                    expert_index,
-                    gate_experts.rows,
-                );
-            }
-            up_experts
-                .expert_matvec(expert_index, expert_input, &mut up)
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            if let Some(bias) = up_bias {
-                add_expert_bias_in_place(up.as_mut_slice(), bias, expert_index, up_experts.rows);
-            }
-            feed_forward_activation(family_metadata, gate.as_slice(), up.as_slice())
-        } else {
-            gate_experts
-                .expert_matvec(expert_index, expert_input, &mut gate_up)
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            if let Some(bias) = gate_bias {
-                add_expert_bias_in_place(
-                    gate_up.as_mut_slice(),
-                    bias,
-                    expert_index,
-                    gate_experts.rows,
-                );
-            }
-            if gate_up.len() % 2 != 0 || gate_up.len() / 2 != down_experts.columns {
-                return Err(ReferenceTextGenerationError::Runtime(
-                    crate::RuntimeError::Backend(format!(
-                        "sparse fused gate_up width {} does not match expected twice expert width {}",
-                        gate_up.len(),
-                        down_experts.columns
-                    )),
-                ));
-            }
-            let split = gate_up.len() / 2;
-            let (gate, up) = gate_up.split_at(split);
-            feed_forward_activation(family_metadata, gate, up)
-        };
-        down_experts
-            .expert_matvec(expert_index, activated.as_slice(), &mut expert)
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        if let Some(bias) = down_bias {
-            add_expert_bias_in_place(expert.as_mut_slice(), bias, expert_index, down_experts.rows);
-        }
-        if let Some(scales) = down_scale {
-            scale_in_place(
-                expert.as_mut_slice(),
-                scales.get(expert_index).copied().unwrap_or(1.0),
-            );
-        }
-        let route = routing[selected_index];
+    let expert_outputs = selected
+        .par_iter()
+        .enumerate()
+        .map(|(selected_index, &expert_index)| {
+            compute_sparse_moe_host_expert(
+                family_metadata,
+                expert_index,
+                routing[selected_index],
+                expert_input,
+                gate_experts,
+                gate_bias,
+                up_experts,
+                up_bias,
+                down_experts,
+                down_bias,
+                down_scale,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    for expert in expert_outputs {
         for (dst, value) in moe_out.iter_mut().zip(expert.iter().copied()) {
-            *dst += value * route;
+            *dst += value;
         }
     }
     Ok(SparseMoeHostProjection {
@@ -13317,6 +13290,86 @@ fn evaluate_sparse_moe_host(
         kernel_count: 1 + selected.len().saturating_mul(per_expert_kernels),
         bytes_moved,
     })
+}
+
+fn prefetch_sparse_expert_set(
+    selected: &[usize],
+    gate_experts: &QuantizedExpertTensor,
+    up_experts: Option<&QuantizedExpertTensor>,
+    down_experts: &QuantizedExpertTensor,
+) -> Result<(), crate::RuntimeError> {
+    selected
+        .par_iter()
+        .try_for_each(|&expert_index| -> Result<(), crate::RuntimeError> {
+            gate_experts.prefetch_expert(expert_index)?;
+            if let Some(up_experts) = up_experts {
+                up_experts.prefetch_expert(expert_index)?;
+            }
+            down_experts.prefetch_expert(expert_index)?;
+            Ok(())
+        })
+}
+
+fn compute_sparse_moe_host_expert(
+    family_metadata: &GgufDecoderFamilyMetadata,
+    expert_index: usize,
+    route: f32,
+    expert_input: &[f32],
+    gate_experts: &QuantizedExpertTensor,
+    gate_bias: Option<&[f32]>,
+    up_experts: Option<&QuantizedExpertTensor>,
+    up_bias: Option<&[f32]>,
+    down_experts: &QuantizedExpertTensor,
+    down_bias: Option<&[f32]>,
+    down_scale: Option<&[f32]>,
+) -> Result<Vec<f32>, crate::RuntimeError> {
+    let activated = if let Some(up_experts) = up_experts {
+        let mut gate = Vec::new();
+        gate_experts.expert_matvec(expert_index, expert_input, &mut gate)?;
+        if let Some(bias) = gate_bias {
+            add_expert_bias_in_place(gate.as_mut_slice(), bias, expert_index, gate_experts.rows);
+        }
+        let mut up = Vec::new();
+        up_experts.expert_matvec(expert_index, expert_input, &mut up)?;
+        if let Some(bias) = up_bias {
+            add_expert_bias_in_place(up.as_mut_slice(), bias, expert_index, up_experts.rows);
+        }
+        feed_forward_activation(family_metadata, gate.as_slice(), up.as_slice())
+    } else {
+        let mut gate_up = Vec::new();
+        gate_experts.expert_matvec(expert_index, expert_input, &mut gate_up)?;
+        if let Some(bias) = gate_bias {
+            add_expert_bias_in_place(
+                gate_up.as_mut_slice(),
+                bias,
+                expert_index,
+                gate_experts.rows,
+            );
+        }
+        if gate_up.len() % 2 != 0 || gate_up.len() / 2 != down_experts.columns {
+            return Err(crate::RuntimeError::Backend(format!(
+                "sparse fused gate_up width {} does not match expected twice expert width {}",
+                gate_up.len(),
+                down_experts.columns
+            )));
+        }
+        let split = gate_up.len() / 2;
+        let (gate, up) = gate_up.split_at(split);
+        feed_forward_activation(family_metadata, gate, up)
+    };
+    let mut expert = Vec::new();
+    down_experts.expert_matvec(expert_index, activated.as_slice(), &mut expert)?;
+    if let Some(bias) = down_bias {
+        add_expert_bias_in_place(expert.as_mut_slice(), bias, expert_index, down_experts.rows);
+    }
+    if let Some(scales) = down_scale {
+        scale_in_place(
+            expert.as_mut_slice(),
+            scales.get(expert_index).copied().unwrap_or(1.0),
+        );
+    }
+    scale_in_place(expert.as_mut_slice(), route);
+    Ok(expert)
 }
 
 fn load_named_optional_projection_matrix(

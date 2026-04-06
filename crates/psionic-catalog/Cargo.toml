@@ -15,6 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 hex = { workspace = true }
+libc = "0.2"
 memmap2 = "0.9"
 reqwest = { workspace = true, features = ["blocking"] }
 serde = { workspace = true }

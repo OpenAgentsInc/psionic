@@ -474,10 +474,14 @@ One honest boundary remains:
   the host quantized projection path rather than a native Metal kernel
 - that means the lane is now honest and benchmarkable on one Mac, but it is not
   yet the performance ceiling for sparse Gemma 4 on Apple hardware
-- current local receipt on `main` for
-  `gemma-4-26B-A4B-it-Q4_K_M.gguf --mode distributed-sparse --backend metal`:
-  load `30.7068 s`, total `43.0130 s` for `16` output tokens, about
-  `0.372 tok/s` end-to-end
+- after porting explicit expert-range prefaulting and parallel selected-expert
+  accumulation into the sparse host path, current local receipt on `main` for
+  `gemma-4-26B-A4B-it-Q4_K_M.gguf --mode distributed-sparse --backend metal`
+  is now: load `30.7238 s`, total `12.4447 s` for `16` output tokens, about
+  `1.286 tok/s` end-to-end
+- the retained earlier local Metal sparse receipt on this same lane was
+  `43.0130 s` for `16` output tokens, about `0.372 tok/s`, so the current path
+  is about `3.46x` faster end-to-end on the same admitted benchmark shape
 
 Those runs are the current publication bar. They prove:
 

@@ -193,9 +193,7 @@ pub enum BlobError {
         actual: String,
     },
     /// The requested byte range is outside the blob bounds.
-    #[error(
-        "blob range [{offset}, {end}) is out of bounds for `{path}` with length {byte_length}"
-    )]
+    #[error("blob range [{offset}, {end}) is out of bounds for `{path}` with length {byte_length}")]
     RangeOutOfBounds {
         /// Blob path.
         path: String,
@@ -478,6 +476,45 @@ impl PagedBlobRange {
         }
         self.blob.read_range(self.offset + offset, len)
     }
+
+    /// Prefaults a validated range so host-side row walkers do not discover the
+    /// bytes one page fault at a time.
+    pub fn prefetch_range(&self, offset: usize, len: usize) -> Result<(), BlobError> {
+        let bytes = self.read_range(offset, len)?;
+        prefetch_bytes(bytes, self.page_size(), self.blob.metadata().read_path);
+        Ok(())
+    }
+}
+
+fn prefetch_bytes(bytes: &[u8], page_size: usize, read_path: BlobReadPath) {
+    if bytes.is_empty() {
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    if matches!(read_path, BlobReadPath::MemoryMapped) {
+        macos_prefetch_bytes(bytes, page_size.max(1));
+    }
+    touch_pages(bytes, page_size.max(1));
+}
+
+#[cfg(target_os = "macos")]
+fn macos_prefetch_bytes(bytes: &[u8], page_size: usize) {
+    let base = bytes.as_ptr() as usize;
+    let aligned_base = base.saturating_sub(base % page_size);
+    let delta = base.saturating_sub(aligned_base);
+    let advised_len = bytes.len().saturating_add(delta);
+    let ptr = aligned_base as *mut libc::c_void;
+    // Ignore failures here. The follow-up touch still brings the range resident.
+    let _ = unsafe { libc::madvise(ptr, advised_len, libc::MADV_WILLNEED) };
+}
+
+fn touch_pages(bytes: &[u8], page_size: usize) {
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        std::hint::black_box(bytes[offset]);
+        offset = offset.saturating_add(page_size);
+    }
+    std::hint::black_box(bytes[bytes.len().saturating_sub(1)]);
 }
 
 /// Resolves an Ollama blob file path from a models root and digest.
@@ -581,8 +618,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        ollama_blob_path, BlobError, BlobIntegrityPolicy, BlobReadPath, BlobReadPreference,
-        LocalBlob, LocalBlobKind, LocalBlobOpenOptions,
+        BlobError, BlobIntegrityPolicy, BlobReadPath, BlobReadPreference, LocalBlob, LocalBlobKind,
+        LocalBlobOpenOptions, ollama_blob_path,
     };
 
     fn write_blob(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
@@ -651,8 +688,8 @@ mod tests {
     }
 
     #[test]
-    fn paged_blob_range_supports_partial_and_repeated_reads(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn paged_blob_range_supports_partial_and_repeated_reads()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("paged.gguf");
         let bytes = (0_u8..48).collect::<Vec<_>>();
@@ -695,8 +732,8 @@ mod tests {
     }
 
     #[test]
-    fn local_blob_can_skip_full_sha256_for_unverified_local_paths(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn local_blob_can_skip_full_sha256_for_unverified_local_paths()
+    -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempdir()?;
         let path = temp.path().join("fast-local.gguf");
         write_blob(&path, b"psionic")?;
