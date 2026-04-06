@@ -207,12 +207,16 @@ into one generic engine claim.
   support claim for Psionic.
 - `qwen35` is `implemented_early` through a native Psionic CUDA text-generation
   runtime with prompt-projected image and video inputs at the HTTP layer.
-- Current `main` also admits native local CPU execution for the real Hugging
-  Face `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy. That path
-  now accepts the scalar `qwen35.attention.head_count_kv` form, the
-  `blk.N.ssm_dt.bias` tensor naming used by the public 27B artifact, and the
-  missing `qwen35.ssm.v_head_reordered` family fact by defaulting it to
-  `false`.
+- Current `main` also admits native local execution for the real Hugging Face
+  `Qwen3.5-27B-Q4_K_M.gguf` artifact without a llama.cpp proxy on both CPU and
+  Metal. That path now accepts the scalar `qwen35.attention.head_count_kv`
+  form, the `blk.N.ssm_dt.bias` tensor naming used by the public 27B artifact,
+  the official `qwen35` tokenizer pre, GGUF MRoPE metadata, and the missing
+  `qwen35.ssm.v_head_reordered` family fact by defaulting it to `true`.
+- The current native Metal `qwen35` lane is coherent and materially faster than
+  the first bring-up, but it is still host-stepped and not yet in the same
+  performance class as the local Ollama / llama.cpp reference. The current gap
+  is execution shape, not GGUF admission.
 - The `qwen35` lane must publish:
   - `backend = cuda`
   - `execution_mode = native`

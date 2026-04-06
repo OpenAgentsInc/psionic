@@ -1,13 +1,13 @@
-use std::{
-    env, fs,
-    path::PathBuf,
-    process::ExitCode,
-};
+use std::{env, fs, path::PathBuf, process::ExitCode};
 
-use psionic_models::{GgufDecoderAdapterLoader, PromptMessage, PromptMessageRole};
+use psionic_models::{
+    GgufDecoderAdapterLoader, GgufRuntimeTokenizer, PromptMessage, PromptMessageRole,
+    TokenizerBoundary,
+};
 use psionic_serve::{
     CpuGgufTextGenerationService, CudaGgufQwen35TextGenerationService, GenerationOptions,
-    GenerationRequest, GenerationResponse, TerminationReason, TextGenerationExecutor,
+    GenerationRequest, GenerationResponse, MetalGgufQwen35TextGenerationService, TerminationReason,
+    TextGenerationExecutor,
 };
 use serde::Serialize;
 
@@ -58,6 +58,7 @@ fn run() -> Result<(), String> {
 enum BenchBackend {
     Cpu,
     Cuda,
+    Metal,
 }
 
 impl BenchBackend {
@@ -65,8 +66,9 @@ impl BenchBackend {
         match value {
             "cpu" => Ok(Self::Cpu),
             "cuda" => Ok(Self::Cuda),
+            "metal" => Ok(Self::Metal),
             other => Err(format!(
-                "unsupported qwen35 backend `{other}`; expected one of: cpu, cuda"
+                "unsupported qwen35 backend `{other}`; expected one of: cpu, cuda, metal"
             )),
         }
     }
@@ -75,8 +77,16 @@ impl BenchBackend {
         match self {
             Self::Cpu => "cpu",
             Self::Cuda => "cuda",
+            Self::Metal => "metal",
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum BenchPromptMode {
+    ChatTemplate,
+    RawText,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +94,7 @@ struct BenchConfig {
     model_path: PathBuf,
     backend: BenchBackend,
     prompt: String,
+    prompt_mode: BenchPromptMode,
     max_output_tokens: usize,
     repeats: usize,
     json_stdout: bool,
@@ -98,6 +109,7 @@ impl BenchConfig {
         let mut model_path = None::<PathBuf>;
         let mut backend = BenchBackend::Cpu;
         let mut prompt = String::from("Write one short sentence about open source AI.");
+        let mut prompt_mode = BenchPromptMode::ChatTemplate;
         let mut max_output_tokens = 64usize;
         let mut repeats = 1usize;
         let mut json_stdout = false;
@@ -123,6 +135,9 @@ impl BenchConfig {
                     prompt = args
                         .next()
                         .ok_or_else(|| String::from("missing value for --prompt"))?;
+                }
+                "--raw-prompt" => {
+                    prompt_mode = BenchPromptMode::RawText;
                 }
                 "--max-output-tokens" => {
                     let value = args
@@ -168,6 +183,7 @@ impl BenchConfig {
             model_path,
             backend,
             prompt,
+            prompt_mode,
             max_output_tokens,
             repeats,
             json_stdout,
@@ -184,6 +200,8 @@ struct BenchReport {
     model_id: String,
     model_path: String,
     prompt: String,
+    prompt_mode: BenchPromptMode,
+    prompt_token_ids: Vec<u32>,
     max_output_tokens: usize,
     repeats: usize,
     load_s: f64,
@@ -198,6 +216,7 @@ struct BenchReport {
 struct BenchRunReport {
     run_index: usize,
     output_tokens: usize,
+    output_token_ids: Vec<u32>,
     total_s: f64,
     prompt_s: Option<f64>,
     decode_s: Option<f64>,
@@ -210,6 +229,7 @@ struct BenchRunReport {
 enum BenchRuntime {
     Cpu(CpuGgufTextGenerationService),
     Cuda(CudaGgufQwen35TextGenerationService),
+    Metal(MetalGgufQwen35TextGenerationService),
 }
 
 impl BenchRuntime {
@@ -217,6 +237,7 @@ impl BenchRuntime {
         match self {
             Self::Cpu(service) => service.model_descriptor().clone(),
             Self::Cuda(service) => service.model_descriptor().clone(),
+            Self::Metal(service) => service.model_descriptor().clone(),
         }
     }
 
@@ -224,6 +245,7 @@ impl BenchRuntime {
         match self {
             Self::Cpu(service) => service.model_descriptor().model.model_id.as_str(),
             Self::Cuda(service) => service.model_descriptor().model.model_id.as_str(),
+            Self::Metal(service) => service.model_descriptor().model.model_id.as_str(),
         }
     }
 
@@ -231,6 +253,7 @@ impl BenchRuntime {
         match self {
             Self::Cpu(service) => service.generate(request).map_err(|error| error.to_string()),
             Self::Cuda(service) => service.generate(request).map_err(|error| error.to_string()),
+            Self::Metal(service) => service.generate(request).map_err(|error| error.to_string()),
         }
     }
 }
@@ -244,37 +267,54 @@ fn run_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
                 config.model_path.display()
             )
         })?;
-    let rendered = adapter
-        .render_prompt(
-            None,
-            &[PromptMessage::new(
-                PromptMessageRole::User,
-                config.prompt.clone(),
-            )],
-            true,
-        )
-        .map_err(|error| format!("failed to render Qwen prompt: {error}"))?;
-    let prompt_tokens = adapter
-        .prompt_renderer()
-        .tokenize_rendered_prompt(rendered.text.as_str())
-        .map_err(|error| format!("failed to tokenize rendered prompt: {error}"))?;
+    let prompt_tokens = match config.prompt_mode {
+        BenchPromptMode::ChatTemplate => {
+            let rendered = adapter
+                .render_prompt(
+                    None,
+                    &[PromptMessage::new(
+                        PromptMessageRole::User,
+                        config.prompt.clone(),
+                    )],
+                    true,
+                )
+                .map_err(|error| format!("failed to render Qwen prompt: {error}"))?;
+            adapter
+                .prompt_renderer()
+                .tokenize_rendered_prompt(rendered.text.as_str())
+                .map_err(|error| format!("failed to tokenize rendered prompt: {error}"))?
+        }
+        BenchPromptMode::RawText => GgufRuntimeTokenizer::from_gguf(adapter.tokenizer())
+            .map_err(|error| format!("failed to build Qwen runtime tokenizer: {error}"))?
+            .encode(config.prompt.as_str()),
+    };
 
     let load_started = std::time::Instant::now();
     let mut runtime = match config.backend {
         BenchBackend::Cpu => BenchRuntime::Cpu(
-            CpuGgufTextGenerationService::from_gguf_path(config.model_path.as_path())
-                .map_err(|error| {
+            CpuGgufTextGenerationService::from_gguf_path(config.model_path.as_path()).map_err(
+                |error| {
                     format!(
                         "failed to load qwen35 cpu service from {}: {error}",
                         config.model_path.display()
                     )
-                })?,
+                },
+            )?,
         ),
         BenchBackend::Cuda => BenchRuntime::Cuda(
             CudaGgufQwen35TextGenerationService::from_gguf_path(config.model_path.as_path())
                 .map_err(|error| {
                     format!(
                         "failed to load qwen35 cuda service from {}: {error}",
+                        config.model_path.display()
+                    )
+                })?,
+        ),
+        BenchBackend::Metal => BenchRuntime::Metal(
+            MetalGgufQwen35TextGenerationService::from_gguf_path(config.model_path.as_path())
+                .map_err(|error| {
+                    format!(
+                        "failed to load qwen35 metal service from {}: {error}",
                         config.model_path.display()
                     )
                 })?,
@@ -299,6 +339,11 @@ fn run_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
     Ok(finish_report(
         runtime.model_id().to_string(),
         config,
+        prompt_tokens
+            .as_slice()
+            .iter()
+            .map(|token: &psionic_models::TokenId| token.as_u32())
+            .collect(),
         load_s,
         runs,
     ))
@@ -317,6 +362,13 @@ fn run_report_from_generation(
     BenchRunReport {
         run_index,
         output_tokens,
+        output_token_ids: response
+            .output
+            .tokens
+            .as_slice()
+            .iter()
+            .map(|token: &psionic_models::TokenId| token.as_u32())
+            .collect(),
         total_s,
         prompt_s: metrics.prompt_eval_duration_ns.map(nanos_to_seconds),
         decode_s,
@@ -332,6 +384,7 @@ fn run_report_from_generation(
 fn finish_report(
     model_id: String,
     config: &BenchConfig,
+    prompt_token_ids: Vec<u32>,
     load_s: f64,
     runs: Vec<BenchRunReport>,
 ) -> BenchReport {
@@ -366,6 +419,8 @@ fn finish_report(
         model_id,
         model_path: config.model_path.display().to_string(),
         prompt: config.prompt.clone(),
+        prompt_mode: config.prompt_mode,
+        prompt_token_ids,
         max_output_tokens: config.max_output_tokens,
         repeats: config.repeats,
         load_s,
@@ -384,6 +439,7 @@ fn render_human_report(report: &BenchReport) -> String {
     out.push_str(&format!("path: {}\n", report.model_path));
     out.push_str(&format!("load: {:.3} s\n", report.load_s));
     out.push_str(&format!("prompt: {}\n", report.prompt));
+    out.push_str(&format!("prompt_mode: {:?}\n", report.prompt_mode));
     out.push_str(&format!(
         "mean: output_tokens={:.2} total={:.3} s ttft={} tok/s={}\n",
         report.mean_output_tokens,
@@ -447,6 +503,6 @@ fn format_optional_rate(value: Option<f64>) -> String {
 
 fn usage() -> &'static str {
     "Usage: cargo run -p psionic-serve --example qwen35_bench -- \\
-  --model-path <path> [--backend cpu|cuda] [--prompt <text>] \\
-  [--max-output-tokens <n>] [--repeats <n>] [--json] [--json-out <path>]"
+  --model-path <path> [--backend cpu|cuda|metal] [--prompt <text>] \\
+  [--raw-prompt] [--max-output-tokens <n>] [--repeats <n>] [--json] [--json-out <path>]"
 }

@@ -641,20 +641,22 @@ impl TokenizerBoundary for ByteLevelBpeRuntimeTokenizer {
     }
 
     fn decode(&self, tokens: &[TokenId]) -> String {
-        self.bpe.decode_utf8(tokens).unwrap_or_else(|| {
-            tokens
-                .iter()
-                .filter(|token| {
-                    !is_runtime_special_token(
-                        &self.vocabulary,
-                        self.eos_token_ids.as_slice(),
-                        **token,
-                    )
-                })
-                .filter_map(|token| self.vocabulary.token(*token))
-                .collect::<Vec<_>>()
-                .join("")
-        })
+        let filtered = tokens
+            .iter()
+            .copied()
+            .filter(|token| {
+                !is_runtime_special_token(&self.vocabulary, self.eos_token_ids.as_slice(), *token)
+            })
+            .collect::<Vec<_>>();
+        self.bpe
+            .decode_utf8(filtered.as_slice())
+            .unwrap_or_else(|| {
+                filtered
+                    .iter()
+                    .filter_map(|token| self.vocabulary.token(*token))
+                    .collect::<Vec<_>>()
+                    .join("")
+            })
     }
 
     fn append_decoded_token(&self, text: &mut String, token: TokenId) {
@@ -1287,6 +1289,38 @@ mod tests {
         assert!(!encoded.as_slice().is_empty());
         assert_eq!(tokenizer.decode(&[TokenId(2)]), "\n");
         assert_eq!(tokenizer.decode(&[TokenId(3)]), "\n");
+    }
+
+    #[test]
+    fn byte_level_runtime_decode_ignores_runtime_special_tokens() {
+        let tokenizer = GgufRuntimeTokenizer::from_gguf(&GgufTokenizerMetadata {
+            model: GgufTokenizerModel::Gpt2Bpe,
+            vocabulary: crate::GgufTokenizerVocabulary {
+                tokens: vec![
+                    String::from("<bos>"),
+                    String::from("<eos>"),
+                    String::from("Ġhello"),
+                    String::from("Ġworld"),
+                ],
+                bos_token_id: Some(TokenId(0)),
+                eos_token_ids: vec![TokenId(1)],
+                pad_token_id: None,
+                unknown_token_id: None,
+            },
+            scores: Vec::new(),
+            token_types: vec![3, 3, 1, 1],
+            merges: Vec::new(),
+            add_bos: false,
+            add_eos: false,
+            pretokenizer: Some(crate::GgufTokenizerPretokenizer::Qwen35),
+            token_type_count: None,
+            digest: String::from("qwen35-byte-level-special-decode-test"),
+        })
+        .expect("qwen35 runtime tokenizer");
+        assert_eq!(
+            tokenizer.decode(&[TokenId(2), TokenId(1), TokenId(3)]),
+            " hello world"
+        );
     }
 
     #[test]

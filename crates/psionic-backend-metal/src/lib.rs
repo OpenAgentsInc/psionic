@@ -906,14 +906,13 @@ impl MetalSubmission {
                 source.byte_len, destination.byte_len
             )));
         }
-        self.platform
-            .copy_buffer(
-                &source.platform,
-                source.byte_offset,
-                &destination.platform,
-                destination.byte_offset,
-                source.byte_len,
-            )?;
+        self.platform.copy_buffer(
+            &source.platform,
+            source.byte_offset,
+            &destination.platform,
+            destination.byte_offset,
+            source.byte_len,
+        )?;
         self.encoded_operations += 1;
         Ok(())
     }
@@ -2046,8 +2045,7 @@ impl MetalBackend {
     /// directly on Metal for the provided head width.
     #[must_use]
     pub fn supports_dense_decode_attention(&self, head_dim: usize) -> bool {
-        matches!(head_dim, 64 | 96 | 128 | 256)
-            && self.selected_device().is_some()
+        matches!(head_dim, 64 | 96 | 128 | 256) && self.selected_device().is_some()
     }
 
     /// Encodes one quantized row-wise matrix-vector product into an existing submission.
@@ -6201,12 +6199,19 @@ fn dense_decode_attention_head_into(
     let mut max_logit = f32::NEG_INFINITY;
     let mut denom = 0.0f32;
     for token_index in 0..token_count {
-        let row_start = token_index.saturating_mul(row_width) + kv_head_index.saturating_mul(head_dim);
+        let row_start =
+            token_index.saturating_mul(row_width) + kv_head_index.saturating_mul(head_dim);
         let row_end = row_start + head_dim;
         let key = &key_rows[row_start..row_end];
         let value = &value_rows[row_start..row_end];
         let logit = dense_row_dot(query, key)? * scale;
-        accumulate_dense_online_softmax_value(output_slice, value, logit, &mut max_logit, &mut denom)?;
+        accumulate_dense_online_softmax_value(
+            output_slice,
+            value,
+            logit,
+            &mut max_logit,
+            &mut denom,
+        )?;
     }
     let normalizer = 1.0 / denom.max(f32::EPSILON);
     for value in output_slice.iter_mut() {
@@ -6952,9 +6957,9 @@ mod platform {
 
     use metal::{
         Buffer, CommandBuffer, CommandQueue, CompileOptions, ComputeCommandEncoder,
-        ComputePipelineState,
-        Device as MetalDevice, DeviceRef as MetalDeviceRef, MTLCommandBufferStatus,
-        MTLDeviceLocation, MTLGPUFamily, MTLResourceOptions, MTLSize, NSRange,
+        ComputePipelineState, Device as MetalDevice, DeviceRef as MetalDeviceRef,
+        MTLCommandBufferStatus, MTLDeviceLocation, MTLGPUFamily, MTLResourceOptions, MTLSize,
+        NSRange,
     };
     use psionic_core::{DType, Device, DeviceKind, QuantizationMode};
     use psionic_runtime::{
@@ -6992,10 +6997,12 @@ mod platform {
         argmax_f32: ComputePipelineState,
         argmax_candidates_u32: ComputePipelineState,
         quantized_matvec_argmax_q4_k: ComputePipelineState,
+        quantized_matvec_argmax_q5_k: ComputePipelineState,
         quantized_matvec_argmax_q6_k: ComputePipelineState,
         quantized_matvec_argmax_q8_0: ComputePipelineState,
         quantized_matvec_argmax_mxfp4: ComputePipelineState,
         quantized_matvec_q4_k: ComputePipelineState,
+        quantized_matvec_q5_k: ComputePipelineState,
         quantized_matvec_q6_k: ComputePipelineState,
         quantized_matvec_q8_0: ComputePipelineState,
         quantized_matvec_mxfp4: ComputePipelineState,
@@ -7566,9 +7573,8 @@ mod platform {
             let head_count = u32::try_from(head_count).map_err(|_| {
                 RuntimeError::Backend(String::from("metal rope head count overflow"))
             })?;
-            let head_dim = u32::try_from(head_dim).map_err(|_| {
-                RuntimeError::Backend(String::from("metal rope head dim overflow"))
-            })?;
+            let head_dim = u32::try_from(head_dim)
+                .map_err(|_| RuntimeError::Backend(String::from("metal rope head dim overflow")))?;
             let half_dim = head_dim / 2;
             encoder.set_bytes(3, 4, (&head_count as *const u32).cast());
             encoder.set_bytes(4, 4, (&head_dim as *const u32).cast());
@@ -7614,16 +7620,14 @@ mod platform {
             let head_count = u32::try_from(head_count).map_err(|_| {
                 RuntimeError::Backend(String::from("metal rope head count overflow"))
             })?;
-            let head_dim = u32::try_from(head_dim).map_err(|_| {
-                RuntimeError::Backend(String::from("metal rope head dim overflow"))
-            })?;
+            let head_dim = u32::try_from(head_dim)
+                .map_err(|_| RuntimeError::Backend(String::from("metal rope head dim overflow")))?;
             let half_dim = head_dim / 2;
             let rotary_half = u32::try_from(rotary_half).map_err(|_| {
                 RuntimeError::Backend(String::from("metal rope rotary-half overflow"))
             })?;
-            let position = u32::try_from(position).map_err(|_| {
-                RuntimeError::Backend(String::from("metal rope position overflow"))
-            })?;
+            let position = u32::try_from(position)
+                .map_err(|_| RuntimeError::Backend(String::from("metal rope position overflow")))?;
             encoder.set_bytes(2, 4, (&head_count as *const u32).cast());
             encoder.set_bytes(3, 4, (&head_dim as *const u32).cast());
             encoder.set_bytes(4, 4, (&half_dim as *const u32).cast());
@@ -7669,7 +7673,11 @@ mod platform {
             let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
             encoder.set_buffer(0, Some(&query.raw), to_metal_size(query_byte_offset)?);
-            encoder.set_buffer(1, Some(&key_cache.raw), to_metal_size(key_cache_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&key_cache.raw),
+                to_metal_size(key_cache_byte_offset)?,
+            );
             encoder.set_buffer(
                 2,
                 Some(&value_cache.raw),
@@ -7688,9 +7696,7 @@ mod platform {
                 ))
             })?;
             let token_count = u32::try_from(token_count).map_err(|_| {
-                RuntimeError::Backend(String::from(
-                    "metal decode attention token count overflow",
-                ))
+                RuntimeError::Backend(String::from("metal decode attention token count overflow"))
             })?;
             let head_dim = u32::try_from(head_dim).map_err(|_| {
                 RuntimeError::Backend(String::from("metal decode attention head dim overflow"))
@@ -7849,11 +7855,15 @@ mod platform {
             let candidate_count = crate::quantized_argmax_candidate_count(rows as usize);
             let threadgroup_size = MTLSize::new(u64::from(active_threads), 1, 1);
             encoder.dispatch_thread_groups(
-                MTLSize::new(u64::try_from(candidate_count).map_err(|_| {
-                    RuntimeError::Backend(String::from(
-                        "metal quantized argmax candidate count overflow",
-                    ))
-                })?, 1, 1),
+                MTLSize::new(
+                    u64::try_from(candidate_count).map_err(|_| {
+                        RuntimeError::Backend(String::from(
+                            "metal quantized argmax candidate count overflow",
+                        ))
+                    })?,
+                    1,
+                    1,
+                ),
                 threadgroup_size,
             );
             Ok(())
@@ -8465,6 +8475,7 @@ mod platform {
             let pipelines = self.pipelines()?;
             let pipeline = match mode {
                 QuantizationMode::GgmlQ4K => &pipelines.quantized_matvec_q4_k,
+                QuantizationMode::GgmlQ5K => &pipelines.quantized_matvec_q5_k,
                 QuantizationMode::GgmlQ6K => &pipelines.quantized_matvec_q6_k,
                 QuantizationMode::GgmlQ8_0 => &pipelines.quantized_matvec_q8_0,
                 QuantizationMode::GgmlMxfp4 => &pipelines.quantized_matvec_mxfp4,
@@ -8505,6 +8516,7 @@ mod platform {
             let pipelines = self.pipelines()?;
             let pipeline = match mode {
                 QuantizationMode::GgmlQ4K => &pipelines.quantized_matvec_argmax_q4_k,
+                QuantizationMode::GgmlQ5K => &pipelines.quantized_matvec_argmax_q5_k,
                 QuantizationMode::GgmlQ6K => &pipelines.quantized_matvec_argmax_q6_k,
                 QuantizationMode::GgmlQ8_0 => &pipelines.quantized_matvec_argmax_q8_0,
                 QuantizationMode::GgmlMxfp4 => &pipelines.quantized_matvec_argmax_mxfp4,
@@ -8886,7 +8898,9 @@ mod platform {
         let copy_f32_with_offset = library
             .get_function("psionic_copy_f32_with_offset", None)
             .map_err(|error| {
-                RuntimeError::Backend(format!("missing Metal copy_f32_with_offset kernel: {error}"))
+                RuntimeError::Backend(format!(
+                    "missing Metal copy_f32_with_offset kernel: {error}"
+                ))
             })?;
         let gelu_glu_f32 = library
             .get_function("psionic_gelu_glu_f32", None)
@@ -8930,9 +8944,7 @@ mod platform {
         let rope_neox_position_f32 = library
             .get_function("psionic_rope_neox_position_f32", None)
             .map_err(|error| {
-                RuntimeError::Backend(format!(
-                    "missing Metal rope_neox_position kernel: {error}"
-                ))
+                RuntimeError::Backend(format!("missing Metal rope_neox_position kernel: {error}"))
             })?;
         let decode_attention_dense_f32 = library
             .get_function("psionic_decode_attention_dense_f32", None)
@@ -8949,9 +8961,7 @@ mod platform {
         let argmax_candidates_u32 = library
             .get_function("psionic_argmax_candidates_u32", None)
             .map_err(|error| {
-                RuntimeError::Backend(format!(
-                    "missing Metal argmax candidates kernel: {error}"
-                ))
+                RuntimeError::Backend(format!("missing Metal argmax candidates kernel: {error}"))
             })?;
         let quantized_matvec_argmax_q8_0 = library
             .get_function("psionic_quantized_matvec_argmax_q8_0", None)
@@ -8965,6 +8975,13 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!(
                     "missing Metal q4_k quantized argmax kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_argmax_q5_k = library
+            .get_function("psionic_quantized_matvec_argmax_q5_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q5_k quantized argmax kernel: {error}"
                 ))
             })?;
         let quantized_matvec_argmax_q6_k = library
@@ -8993,6 +9010,13 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!(
                     "missing Metal q4_k quantized matvec kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_q5_k = library
+            .get_function("psionic_quantized_matvec_q5_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q5_k quantized matvec kernel: {error}"
                 ))
             })?;
         let quantized_matvec_q6_k = library
@@ -9104,9 +9128,7 @@ mod platform {
             rope_neox_f32: device
                 .new_compute_pipeline_state_with_function(&rope_neox_f32)
                 .map_err(|error| {
-                    RuntimeError::Backend(format!(
-                        "metal rope_neox pipeline build failed: {error}"
-                    ))
+                    RuntimeError::Backend(format!("metal rope_neox pipeline build failed: {error}"))
                 })?,
             rope_neox_position_f32: device
                 .new_compute_pipeline_state_with_function(&rope_neox_position_f32)
@@ -9141,6 +9163,13 @@ mod platform {
                         "metal q4_k quantized argmax pipeline build failed: {error}"
                     ))
                 })?,
+            quantized_matvec_argmax_q5_k: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_q5_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q5_k quantized argmax pipeline build failed: {error}"
+                    ))
+                })?,
             quantized_matvec_argmax_q6_k: device
                 .new_compute_pipeline_state_with_function(&quantized_matvec_argmax_q6_k)
                 .map_err(|error| {
@@ -9167,6 +9196,13 @@ mod platform {
                 .map_err(|error| {
                     RuntimeError::Backend(format!(
                         "metal q4_k quantized matvec pipeline build failed: {error}"
+                    ))
+                })?,
+            quantized_matvec_q5_k: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_q5_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q5_k quantized matvec pipeline build failed: {error}"
                     ))
                 })?,
             quantized_matvec_q6_k: device
@@ -9237,7 +9273,10 @@ mod platform {
         mode: QuantizationMode,
         columns: usize,
     ) -> Result<u32, RuntimeError> {
-        if matches!(mode, QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ6K) {
+        if matches!(
+            mode,
+            QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ5K | QuantizationMode::GgmlQ6K
+        ) {
             return Ok(32);
         }
         let Some((elements_per_block, _)) = mode.ggml_block_spec() else {
@@ -10053,6 +10092,66 @@ inline float psionic_q4_k_block_dot(
     return sum;
 }
 
+inline float psionic_q5_k_block_dot(
+    const device uchar* block,
+    const device float* input
+) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    ushort min_bits = ushort(block[2]) | (ushort(block[3]) << 8);
+    float minimum = float(as_type<half>(min_bits));
+    const device uchar* scales = block + 4;
+    const device uchar* high_bits = block + 16;
+    const device uchar* quants = block + 48;
+    float sum = 0.0f;
+    uint input_offset = 0;
+    uint scale_index = 0;
+    uchar low_mask = 1u;
+    uchar high_mask = 2u;
+
+    for (uint chunk = 0; chunk < 4; ++chunk) {
+        const device uchar* quant_chunk = quants + (chunk * 32);
+
+        uchar2 low = psionic_q4_k_scale_min(scale_index, scales);
+        float low_scale = scale * float(low.x);
+        float low_min = minimum * float(low.y);
+        float low_input_sum = 0.0f;
+        float low_quant_sum = 0.0f;
+        for (uint index = 0; index < 32; ++index) {
+            float input_value = input[input_offset + index];
+            uchar quant = quant_chunk[index];
+            uchar lifted = (high_bits[index] & low_mask) != 0u ? 16u : 0u;
+            float quant_low = float((quant & 0x0f) + lifted);
+            low_input_sum += input_value;
+            low_quant_sum += input_value * quant_low;
+        }
+        sum += (low_quant_sum * low_scale) - (low_input_sum * low_min);
+        input_offset += 32;
+        scale_index += 1;
+
+        uchar2 high = psionic_q4_k_scale_min(scale_index, scales);
+        float high_scale = scale * float(high.x);
+        float high_min = minimum * float(high.y);
+        float high_input_sum = 0.0f;
+        float high_quant_sum = 0.0f;
+        for (uint index = 0; index < 32; ++index) {
+            float input_value = input[input_offset + index];
+            uchar quant = quant_chunk[index];
+            uchar lifted = (high_bits[index] & high_mask) != 0u ? 16u : 0u;
+            float quant_high = float(((quant >> 4) & 0x0f) + lifted);
+            high_input_sum += input_value;
+            high_quant_sum += input_value * quant_high;
+        }
+        sum += (high_quant_sum * high_scale) - (high_input_sum * high_min);
+        input_offset += 32;
+        scale_index += 1;
+        low_mask <<= 2;
+        high_mask <<= 2;
+    }
+
+    return sum;
+}
+
 inline float psionic_q6_k_block_dot(
     const device uchar* block,
     const device float* input
@@ -10251,6 +10350,98 @@ kernel void psionic_quantized_matvec_argmax_q4_k(
         for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
             const device uchar* block = row_weights + (block_index * 144);
             sum += psionic_q4_k_block_dot(block, input + block_index * 256);
+        }
+        partial[tid] = sum;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                partial[tid] += partial[tid + stride];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid == 0) {
+            uint candidate_key = psionic_ordered_float_key(partial[0]);
+            if (psionic_argmax_candidate_better(candidate_key, row, best_key, best_row)) {
+                best_key = candidate_key;
+                best_row = row;
+            }
+        }
+    }
+    if (tid == 0) {
+        uint base = candidate_index * 2;
+        output[base] = best_key;
+        output[base + 1] = best_row;
+    }
+}
+
+kernel void psionic_quantized_matvec_q5_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row = tgpig.x;
+    if (row >= rows) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
+    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+    uint block_count = columns / 256;
+    float sum = 0.0f;
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+        const device uchar* block = row_weights + (block_index * 176);
+        sum += psionic_q5_k_block_dot(block, input + block_index * 256);
+    }
+    partial[tid] = sum;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            partial[tid] += partial[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        output[row] = partial[0];
+    }
+}
+
+kernel void psionic_quantized_matvec_argmax_q5_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device uint* output [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    constant uint& active_threads [[buffer(7)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint candidate_index = tgpig.x;
+    uint base_row = candidate_index * PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP;
+    if (base_row >= rows) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
+    uint best_key = 0u;
+    uint best_row = 0xffffffffu;
+    uint block_count = columns / 256;
+    for (uint local_row = 0; local_row < PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP; ++local_row) {
+        uint row = base_row + local_row;
+        if (row >= rows) {
+            break;
+        }
+        const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
+        float sum = 0.0f;
+        for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+            const device uchar* block = row_weights + (block_index * 176);
+            sum += psionic_q5_k_block_dot(block, input + block_index * 256);
         }
         partial[tid] = sum;
         threadgroup_barrier(mem_flags::mem_threadgroup);
@@ -11540,6 +11731,28 @@ mod tests {
         for index in 0..128_u8 {
             let low = index & 0x0f;
             let high = (15_u8).wrapping_sub(index & 0x0f) & 0x0f;
+            bytes.push(low | (high << 4));
+        }
+        bytes
+    }
+
+    fn sample_q5_k_row(scale: f32, minimum: f32, offset: u8) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(176);
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        bytes.extend_from_slice(&f32_to_f16_bits(minimum).to_le_bytes());
+        for index in 0..12_u8 {
+            bytes.push(offset.wrapping_add(index.wrapping_mul(5)));
+        }
+        for index in 0..32_u8 {
+            let b0 = (index & 0x03) << 0;
+            let b1 = ((index.wrapping_add(1)) & 0x03) << 2;
+            let b2 = ((index.wrapping_add(2)) & 0x03) << 4;
+            let b3 = ((index.wrapping_add(3)) & 0x03) << 6;
+            bytes.push(b0 | b1 | b2 | b3);
+        }
+        for index in 0..128_u8 {
+            let low = index & 0x0f;
+            let high = (index.wrapping_mul(3)) & 0x0f;
             bytes.push(low | (high << 4));
         }
         bytes
@@ -12855,6 +13068,35 @@ mod tests {
         )?;
         let values =
             backend.quantized_matvec(&weights, QuantizationMode::GgmlQ6K, 2, 256, &reference)?;
+        assert_close(values.as_slice(), &[expected_a, expected_b], 1.0e-4);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_executes_q5_k_quantized_matvec_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let row_a = sample_q5_k_row(0.375, 0.0625, 3);
+        let row_b = sample_q5_k_row(0.625, 0.125, 7);
+        let reference = sample_reference_vector_256();
+        let expected_a =
+            psionic_backend_cpu::quantized_row_dot(&reference, QuantizationMode::GgmlQ5K, &row_a)?;
+        let expected_b =
+            psionic_backend_cpu::quantized_row_dot(&reference, QuantizationMode::GgmlQ5K, &row_b)?;
+
+        let weights = backend.quantized_buffer(
+            Shape::new(vec![2, 256]),
+            QuantizationMode::GgmlQ5K,
+            [row_a, row_b].concat(),
+        )?;
+        let values =
+            backend.quantized_matvec(&weights, QuantizationMode::GgmlQ5K, 2, 256, &reference)?;
         assert_close(values.as_slice(), &[expected_a, expected_b], 1.0e-4);
         Ok(())
     }

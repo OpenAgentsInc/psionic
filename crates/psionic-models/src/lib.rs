@@ -6223,10 +6223,7 @@ fn build_gguf_decoder_tensor_layout(
 
                 let ssm_dt = required_tensor_info_any(
                     content,
-                    &[
-                        format!("{prefix}.ssm_dt"),
-                        format!("{prefix}.ssm_dt.bias"),
-                    ],
+                    &[format!("{prefix}.ssm_dt"), format!("{prefix}.ssm_dt.bias")],
                 )?;
                 let ssm_dt_width = tensor_vector_shape(ssm_dt)?;
                 if ssm_dt_width != ssm_time_step_rank {
@@ -8535,6 +8532,7 @@ fn collect_decoder_family_facts(
         ],
         GgufDecoderFamily::Qwen35 => vec![
             format!("{architecture}.attention.head_count_kv"),
+            format!("{architecture}.attention.scale"),
             format!("{architecture}.full_attention_interval"),
             format!("{architecture}.mrope_sections"),
             format!("{architecture}.rope.dimension_sections"),
@@ -9143,7 +9141,11 @@ fn decode_q5_k_blocks(
             let high_scale = scale * f32::from(high_scale_value);
             let high_min = minimum * f32::from(high_min_value);
             for (index, quant) in quant_chunk.iter().enumerate() {
-                let lifted = if (high_bits[index] & low_mask) != 0 { 16 } else { 0 };
+                let lifted = if (high_bits[index] & low_mask) != 0 {
+                    16
+                } else {
+                    0
+                };
                 output.push(low_scale * f32::from((quant & 0x0f) + lifted) - low_min);
             }
             for (index, quant) in quant_chunk.iter().enumerate() {
@@ -9432,9 +9434,7 @@ mod tests {
             .filter(|value| !value.is_empty())
             .or_else(|| {
                 let default = "/Users/christopherdavid/models/qwen3.5/Qwen3.5-27B-Q4_K_M.gguf";
-                Path::new(default)
-                    .exists()
-                    .then(|| String::from(default))
+                Path::new(default).exists().then(|| String::from(default))
             })
     }
 
@@ -10856,8 +10856,10 @@ mod tests {
         };
 
         let content = GgufContent::read_path(Path::new(path.as_str()))?;
-        let renderer =
-            GgufPromptTemplateRenderer::new(content.load_tokenizer()?, content.load_chat_templates()?);
+        let renderer = GgufPromptTemplateRenderer::new(
+            content.load_tokenizer()?,
+            content.load_chat_templates()?,
+        );
         let rendered = renderer.render(
             None,
             &[PromptMessage::new(PromptMessageRole::User, "hello")],
@@ -11772,6 +11774,14 @@ mod tests {
         assert_eq!(adapter.descriptor().tokenizer_family, "gpt2_bpe:qwen35");
         assert_eq!(adapter.family_metadata().family, GgufDecoderFamily::Qwen35);
         assert_eq!(adapter.family_metadata().architecture, "qwen35");
+        assert_eq!(
+            adapter
+                .family_metadata()
+                .family_facts
+                .get("qwen35.attention.scale")
+                .and_then(GgufMetadataValue::as_f32),
+            Some(0.5)
+        );
         assert_eq!(
             adapter
                 .family_metadata()
@@ -12729,6 +12739,10 @@ mod tests {
             (
                 String::from("qwen35.attention.layer_norm_rms_epsilon"),
                 GgufMetadataValue::F32(1e-6),
+            ),
+            (
+                String::from("qwen35.attention.scale"),
+                GgufMetadataValue::F32(0.5),
             ),
             (
                 String::from("qwen35.rope.dimension_count"),

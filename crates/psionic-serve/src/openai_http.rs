@@ -15,8 +15,8 @@ use std::{
 };
 
 use axum::{
-    body::Bytes,
     Json, Router,
+    body::Bytes,
     extract::{Query, State},
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
     response::{
@@ -30,11 +30,11 @@ use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_cluster::{
     ClusterReplicaDemandRebalanceDecision, ClusterReplicaDemandRebalanceReason,
     ClusterReplicaDemandSnapshot, ClusterReplicaLaneExpertTopologyRequirement,
-    ClusterReplicaLifecyclePolicy, ClusterState,
-    Gemma4MoeDistributedLaneRequest, SparseExpertClusterSchedule, SparseShardArtifactCache,
+    ClusterReplicaLifecyclePolicy, ClusterState, Gemma4MoeDistributedLaneRequest,
+    SparseExpertClusterSchedule, SparseExpertExecutionRequest, SparseShardArtifactCache,
     SparseShardArtifactStatus, SparseShardHealth, SparseShardLifecycleState,
-    SparseExpertExecutionRequest, gemma4_26b_distributed_lane_policy,
-    realize_sparse_expert_cluster_execution, schedule_sparse_expert_execution,
+    gemma4_26b_distributed_lane_policy, realize_sparse_expert_cluster_execution,
+    schedule_sparse_expert_execution,
 };
 use psionic_models::{
     GgufBlobArtifact, GgufDecoderArtifactInspection, GgufDecoderExpertRuntimeContract,
@@ -87,12 +87,13 @@ use crate::{
     EmbeddingProvenance, EmbeddingRequest, EmbeddingResponse, EmbeddingsExecutor,
     GenerationMetrics, GenerationOptions, GenerationRequest, GgufDecoderAdapterLoader,
     GptOssPerformanceMetrics, MetalGemma4TextGenerationService,
-    MetalGgufGptOssTextGenerationService, MetalGptOssTextGenerationError, ModelEmbeddingsError,
-    PromptRenderError, ReferenceTextGenerationError, TEXT_GENERATION_PRODUCT_ID, TerminationReason,
+    MetalGgufGptOssTextGenerationService, MetalGgufQwen35TextGenerationService,
+    MetalGptOssTextGenerationError, ModelEmbeddingsError, PromptRenderError,
+    ReferenceTextGenerationError, TEXT_GENERATION_PRODUCT_ID, TerminationReason,
     TextGenerationExecutor, TokenSequence, continuous_batch_text_generation_execution_profile,
-    default_embeddings_execution_profile, default_generation_scheduler_policy,
-    default_text_generation_execution_profile, encode_distributed_gemma4_remote_step_response,
-    decode_distributed_gemma4_remote_step_request,
+    decode_distributed_gemma4_remote_step_request, default_embeddings_execution_profile,
+    default_generation_scheduler_policy, default_text_generation_execution_profile,
+    encode_distributed_gemma4_remote_step_response,
     tokio_runtime_telemetry_axum::serve_with_runtime_telemetry,
 };
 
@@ -1015,15 +1016,17 @@ impl OpenAiCompatConfig {
         let topology_requirement = inspected_gemma4_sparse_topology_requirement(
             self.model_paths.as_slice(),
             self.backend,
-            request.expert_host_inventory.served_artifact_digest.as_str(),
+            request
+                .expert_host_inventory
+                .served_artifact_digest
+                .as_str(),
         )?;
         let mut sparse_request = SparseExpertExecutionRequest::new(
             request.scheduler_node_id.clone(),
             topology_requirement,
             request.expert_host_inventory.clone(),
         );
-        if let Some(minimum_free_memory_bytes_per_host) =
-            request.minimum_free_memory_bytes_per_host
+        if let Some(minimum_free_memory_bytes_per_host) = request.minimum_free_memory_bytes_per_host
         {
             sparse_request = sparse_request
                 .with_minimum_free_memory_bytes_per_host(minimum_free_memory_bytes_per_host);
@@ -1991,6 +1994,7 @@ enum OpenAiCompatRuntimeKind {
     GgufDecoderMetalGemma4,
     GgufDecoderMetalGemma4DistributedFront,
     GgufDecoderMetalGemma4SparseDistributed,
+    GgufDecoderMetalQwen35,
     SafetensorsEmbeddings,
 }
 
@@ -2613,7 +2617,10 @@ fn maybe_apply_admitted_sparse_schedule(
             model_key
         )));
     };
-    if !matches!(backend, OpenAiCompatBackend::Cuda | OpenAiCompatBackend::Metal) {
+    if !matches!(
+        backend,
+        OpenAiCompatBackend::Cuda | OpenAiCompatBackend::Metal
+    ) {
         return Err(OpenAiCompatServerError::Config(format!(
             "sparse distributed schedule for `{}` requires the generic CUDA or Metal backend",
             model_key
@@ -2648,7 +2655,9 @@ fn maybe_apply_admitted_sparse_schedule(
 
     decoder.execution_refusal_reason = None;
     load_plan.runtime_kind = match backend {
-        OpenAiCompatBackend::Cuda => OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4SparseDistributed,
+        OpenAiCompatBackend::Cuda => {
+            OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4SparseDistributed
+        }
         OpenAiCompatBackend::Metal => {
             OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4SparseDistributed
         }
@@ -3187,6 +3196,7 @@ enum OpenAiCompatGenerationService {
     Gemma4DistributedFront(DistributedGemma4TextGenerationService),
     Gemma4SparseDistributed(Gemma4SparseDistributedTextGenerationService),
     Qwen35Cuda(CudaGgufQwen35TextGenerationService),
+    Qwen35Metal(MetalGgufQwen35TextGenerationService),
 }
 
 enum Gemma4SparseDistributedLocalRuntime {
@@ -3274,8 +3284,8 @@ impl Gemma4SparseDistributedTextGenerationService {
                 ));
             }
         };
-        let generic_lane_match =
-            schedule.lane.model_id == "gemma4:26b" && schedule.lane.product_id == TEXT_GENERATION_PRODUCT_ID;
+        let generic_lane_match = schedule.lane.model_id == "gemma4:26b"
+            && schedule.lane.product_id == TEXT_GENERATION_PRODUCT_ID;
         if inner.model_id() != schedule.lane.model_id && !generic_lane_match {
             return Err(ReferenceTextGenerationError::Runtime(
                 psionic_runtime::RuntimeError::Backend(format!(
@@ -3963,6 +3973,24 @@ impl OpenAiCompatWorker {
                                 }
                             }
                         }
+                        OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35 => {
+                            match MetalGgufQwen35TextGenerationService::from_gguf_path(
+                                &load_plan.path,
+                            ) {
+                                Ok(service) => {
+                                    let model_key =
+                                        service.model_descriptor().model.model_id.clone();
+                                    generation_services.insert(
+                                        model_key,
+                                        OpenAiCompatGenerationService::Qwen35Metal(service),
+                                    );
+                                }
+                                Err(error) => {
+                                    let _ = ready_tx.send(Err::<(), String>(error.to_string()));
+                                    return;
+                                }
+                            }
+                        }
                         OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal => {}
                         OpenAiCompatRuntimeKind::SafetensorsEmbeddings => {
                             match CpuModelEmbeddingsService::from_safetensors_artifact(
@@ -4138,6 +4166,9 @@ impl OpenAiCompatWorker {
                             service.generate_continuous_batch(requests)
                         }
                         OpenAiCompatGenerationService::Qwen35Cuda(service) => {
+                            service.generate_continuous_batch(requests)
+                        }
+                        OpenAiCompatGenerationService::Qwen35Metal(service) => {
                             service.generate_continuous_batch(requests)
                         }
                     };
@@ -7999,9 +8030,10 @@ async fn handle_generic_internal_gemma4_pipeline_step(
     body: Bytes,
 ) -> Result<Response, OpenAiCompatHttpError> {
     require_distributed_gemma4_internal_access(headers)?;
-    let request = decode_distributed_gemma4_remote_step_request(body.as_ref()).map_err(|error| {
-        OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
-    })?;
+    let request =
+        decode_distributed_gemma4_remote_step_request(body.as_ref()).map_err(|error| {
+            OpenAiCompatHttpError::from(GptOssOpenAiCompatGenerationError::Generation(error))
+        })?;
     let response = local_worker_for_internal_route(state.as_ref())?
         .gemma4_pipeline_step(request.model_id.clone(), request)
         .await
@@ -10246,9 +10278,12 @@ fn load_generic_decoder_model(
                 OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4
             }
         }
+        (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35, false) => {
+            OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35
+        }
         (OpenAiCompatBackend::Metal, _, _) => {
             return Err(format!(
-                "generic OpenAI metal backend currently supports only the gemma4 metal lane contract; `{}` resolved to `{}`",
+                "generic OpenAI metal backend currently supports only gemma4 and qwen35 GGUF decoders; `{}` resolved to `{}`",
                 model_path.display(),
                 decoder_family_label(family),
             ));
@@ -10385,6 +10420,7 @@ fn generic_decoder_serving_truth(
     } else if matches!(
         (backend, family),
         (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
+            | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35)
     ) {
         OpenAiCompatServingTruth::metal_native()
     } else {
@@ -10396,7 +10432,10 @@ fn generic_decoder_execution_profile(
     family: GgufDecoderFamily,
     backend: OpenAiCompatBackend,
 ) -> ExecutionCapabilityProfile {
-    if matches!((backend, family), (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen35)) {
+    if matches!(
+        (backend, family),
+        (OpenAiCompatBackend::Cpu, GgufDecoderFamily::Qwen35)
+    ) {
         return default_text_generation_execution_profile();
     }
     if matches!(
@@ -10404,6 +10443,7 @@ fn generic_decoder_execution_profile(
         (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Gemma4)
             | (OpenAiCompatBackend::Cuda, GgufDecoderFamily::Qwen35)
             | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Gemma4)
+            | (OpenAiCompatBackend::Metal, GgufDecoderFamily::Qwen35)
     ) {
         default_text_generation_execution_profile()
     } else {
@@ -13863,6 +13903,36 @@ mod tests {
     }
 
     #[test]
+    fn generic_metal_qwen35_load_plan_publishes_native_execution_contract()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35-metal.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny qwen35 metal").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+
+        let (loaded_model, accepted_names, load_plan) =
+            load_generic_decoder_model(&qwen35_path, 0, OpenAiCompatBackend::Metal)?;
+
+        assert_eq!(
+            load_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderMetalQwen35
+        );
+        assert_eq!(loaded_model.backend_label(), "metal");
+        assert_eq!(loaded_model.execution_mode_label(), "native");
+        assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(loaded_model.execution_refusal_reason(), None);
+        assert_eq!(
+            model_endpoint_paths(&loaded_model),
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        assert!(accepted_names.contains("tiny-qwen35-metal.gguf"));
+        Ok(())
+    }
+
+    #[test]
     fn generic_cuda_gemma4_26b_load_plan_publishes_sparse_topology_refusal_contract()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
@@ -15636,12 +15706,18 @@ mod tests {
         assert_eq!(model.psionic_served_backend, Some("cpu"));
         assert_eq!(model.psionic_execution_mode, Some("native"));
         assert_eq!(model.psionic_execution_engine, Some("psionic"));
-        assert_eq!(model.psionic_residency_mode, Some(CPU_SERVER_RESIDENCY_MODE));
+        assert_eq!(
+            model.psionic_residency_mode,
+            Some(CPU_SERVER_RESIDENCY_MODE)
+        );
         assert_eq!(
             model.psionic_hybrid_offload,
             Some(CPU_SERVER_HYBRID_OFFLOAD_MODE)
         );
-        assert_eq!(model.psionic_fallback_policy, Some(CPU_SERVER_FALLBACK_POLICY));
+        assert_eq!(
+            model.psionic_fallback_policy,
+            Some(CPU_SERVER_FALLBACK_POLICY)
+        );
         assert_eq!(
             model.psionic_structured_outputs.as_deref(),
             Some(
@@ -15756,13 +15832,105 @@ mod tests {
             header_value(response.headers(), "x-psionic-batch-posture"),
             Some(String::from("single_request_only"))
         );
-        assert_eq!(header_value(response.headers(), "x-psionic-scheduling-class"), None);
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-scheduling-class"),
+            None
+        );
         let payload = runtime.block_on(response_json(response))?;
         assert_eq!(
             payload["choices"][0]["message"]["content"],
             serde_json::json!("world")
         );
         assert_eq!(payload["usage"]["completion_tokens"], serde_json::json!(1));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_qwen35_native_metal_publication_and_generation_are_honest_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
+        let runtime = tokio::runtime::Runtime::new()?;
+        let temp = tempfile::tempdir()?;
+        let qwen35_path = temp.path().join("tiny-qwen35-metal-server.gguf");
+        write_test_gguf(
+            &qwen35_path,
+            qwen35_decoder_metadata("tiny native qwen35 metal").as_slice(),
+            qwen35_decoder_tensors().as_slice(),
+        )?;
+        let mut config = OpenAiCompatConfig::new(&qwen35_path);
+        config.backend = OpenAiCompatBackend::Metal;
+        let server = OpenAiCompatServer::from_config(&config)?;
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.backend, "metal");
+        assert_eq!(health.0.execution_mode, "native");
+        assert_eq!(health.0.execution_engine, "psionic");
+        assert_eq!(health.0.residency_mode, "metal_accelerated");
+        assert_eq!(health.0.fallback_policy, "refuse");
+        assert_eq!(
+            health.0.execution_profile.batch_posture,
+            BatchExecutionPosture::SingleRequestOnly
+        );
+        assert!(health.0.scheduler_policy.is_none());
+
+        let models = runtime.block_on(generic_list_models(State(std::sync::Arc::clone(
+            &server.state,
+        ))));
+        let model = models
+            .0
+            .data
+            .iter()
+            .find(|model| model.id == "tiny-qwen35-metal-server.gguf")
+            .expect("qwen35 metal model should be listed");
+        assert_eq!(model.psionic_served_backend, Some("metal"));
+        assert_eq!(model.psionic_execution_mode, Some("native"));
+        assert_eq!(model.psionic_execution_engine, Some("psionic"));
+        assert_eq!(model.psionic_residency_mode, Some("metal_accelerated"));
+        assert_eq!(model.psionic_fallback_policy, Some("refuse"));
+        assert!(model.psionic_scheduler_policy.is_none());
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-qwen35-metal-server")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(2),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-served-backend"),
+            Some(String::from("metal"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-mode"),
+            Some(String::from("native"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-execution-engine"),
+            Some(String::from("psionic"))
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        assert!(payload["choices"][0]["message"]["content"].is_string());
+        assert!(
+            payload["usage"]["completion_tokens"]
+                .as_u64()
+                .is_some_and(|count| count >= 1)
+        );
         Ok(())
     }
 
@@ -15923,7 +16091,10 @@ mod tests {
             header_value(response.headers(), "x-psionic-batch-posture"),
             Some(String::from("single_request_only"))
         );
-        assert_eq!(header_value(response.headers(), "x-psionic-scheduling-class"), None);
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-scheduling-class"),
+            None
+        );
         let payload = runtime.block_on(response_json(response))?;
         assert_eq!(
             payload["choices"][0]["message"]["content"],
@@ -17106,9 +17277,7 @@ mod tests {
                         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
                     ),
                     ChatCompletionContentPart::text(" compare "),
-                    ChatCompletionContentPart::video_url(
-                        "https://example.invalid/pilot.mp4",
-                    ),
+                    ChatCompletionContentPart::video_url("https://example.invalid/pilot.mp4"),
                 ],
             )],
             temperature: Some(0.0),
@@ -20328,7 +20497,9 @@ mod tests {
                         .to_string()
                 })
             })
-            .ok_or_else(|| std::io::Error::other("loaded model was missing a served artifact digest"))?;
+            .ok_or_else(|| {
+                std::io::Error::other("loaded model was missing a served artifact digest")
+            })?;
         Ok(digest)
     }
 

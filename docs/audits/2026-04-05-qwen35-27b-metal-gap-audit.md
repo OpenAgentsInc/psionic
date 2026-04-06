@@ -1,210 +1,162 @@
 # Qwen3.5 27B Metal Gap Audit
 
-> Status: audit, 2026-04-05
->
-> Scope: explain why the real Hugging Face `Qwen3.5-27B-Q4_K_M.gguf` artifact
-> is still slow on Psionic local Mac execution, compare the current Psionic
-> shape against `llama.cpp` and Ollama, and define the next architecture work
-> required to close the gap.
->
-> This is an audit doc. It is not the canonical inference spec. The canonical
-> owner docs remain `docs/INFERENCE_ENGINE.md`.
+`Qwen3.5-27B-Q4_K_M.gguf` now runs natively in Psionic on local Metal. The hard
+parsing and family-admission gaps are closed. The model now produces the same
+early decode shape as the local Ollama lane on the raw prompt `who are you`:
+`?\n\n<think>\nOkay, the user is asking "who are you?" I`.
 
-## Current State
+The problem is no longer "Psionic cannot run the public 27B artifact." The
+problem is that Psionic still runs it with the wrong execution shape on Apple
+Silicon.
 
-Current `main` admits the real Hugging Face `Qwen3.5-27B-Q4_K_M.gguf` artifact
-on Psionic without a `llama.cpp` proxy runtime.
+## Current Receipts
 
-That closed parser and family-admission work. It did not close performance.
+The most useful comparison is the exact same raw prompt on the exact same
+artifact, before and after the latest Psionic Metal runtime fixes, against the
+local Ollama reference lane.
 
-The current measured local receipt on this Mac from the native Psionic harness
-was:
-
-| Artifact | Backend | Load | Prompt | Decode | Total | TTFT | End-to-end throughput |
+| Runtime | Artifact | Load | Prompt | Decode | Total | TTFT | Decode tok/s |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `Qwen3.5-27B-Q4_K_M.gguf` | `cpu` | `30.646 s` | `303.782 s` | `220.120 s` | `523.902 s` | `0.000195 s` | `0.0305 tok/s` |
+| Psionic Metal, before output-selection fix | `Qwen3.5-27B-Q4_K_M.gguf` | `1.916 s` | `0.748 s` | `2.689 s` | `3.436 s` | `0.193 ms` | `5.95` |
+| Psionic Metal, current | `Qwen3.5-27B-Q4_K_M.gguf` | `1.833 s` | `0.539 s` | `2.305 s` | `2.844 s` | `0.050 ms` | `6.94` |
+| Ollama local | `qwen35-27b-local:latest` | `3.234 s` | `0.333 s` | `0.785 s` | `4.384 s` | not published separately | `20.38` |
 
-That number is not a small-kernel tuning problem. It is a runtime-shape problem.
+The current Psionic pass is materially better than the earlier one. Decode
+throughput is up from `5.95 tok/s` to `6.94 tok/s`, about a `16.7%` gain on the
+same prompt and host. That is real improvement. It is also still roughly `3x`
+slower than the local Ollama lane on decode.
 
-## What The Reference Systems Are Doing That We Are Not
+That remaining gap is large enough that it cannot be explained by one bad
+constant, one wrong tensor fact, or one missing tokenizer rule. It is a runtime
+shape gap.
 
-### `llama.cpp`
+## What We Fixed Already
 
-`llama.cpp` treats `qwen35` as a first-class hybrid linear-attention family.
+The first class of bugs was correctness. Psionic now handles the public 27B
+artifact much more honestly than the first bring-up did.
 
-The checked-in local reference code does all of these things explicitly:
+The native runtime now accepts the real artifact metadata that mattered for this
+family: the scalar `qwen35.attention.head_count_kv` form, `blk.N.ssm_dt.bias`,
+the official `qwen35` tokenizer pre, and the missing
+`qwen35.ssm.v_head_reordered` family fact by defaulting it to `true`, which is
+what the local Ollama reference expects for this family. The runtime also now
+uses the GGUF MRoPE metadata instead of silently treating the path as generic
+RoPE.
 
-- loads dedicated `qwen35` and `qwen35moe` model builders
-- admits the gated-delta layout directly instead of pretending it is generic
-  dense attention
-- carries model-specific `gla` and recurrent memory handling in the runtime
-- builds backend-owned compute graphs and cache structures around that shape
+The second class of bugs was math. Two of them mattered directly. The hybrid
+recurrent path was doing extra fake q/k normalization before the real
+`delta_net_autoregressive_step_in_place` normalization, and the host hybrid path
+was exponentiating the decay twice. Removing those mistakes moved the model from
+prompt-suffix echo and garbage to coherent early decode.
 
-Relevant local reference files:
+The third class of bugs was serving architecture. Before this pass, the Metal
+service still computed output projection for every prompt token and materialized
+full-vocabulary logits even for greedy decode. The current Metal lane now skips
+prompt-prefix output work entirely and keeps greedy decode on an argmax-only
+path instead of reading back raw logits every step.
+
+That is why the current lane is faster even though the core layer loop is still
+the same shape.
+
+## What Ollama And `llama.cpp` Are Doing Differently
+
+The local references are not faster because they happen to parse one tensor
+better. They are faster because `qwen35` is treated as a first-class hybrid
+family in the runtime.
+
+`llama.cpp` has dedicated `qwen35` and `qwen35moe` model builders, recurrent
+memory ownership, and explicit fused gated-delta-net chunked paths. The
+important local files are:
 
 - `competition/repos/llama.cpp/src/models/qwen35.cpp`
 - `competition/repos/llama.cpp/src/models/qwen35moe.cpp`
-- `competition/repos/llama.cpp/ggml/src/ggml-cuda/gla.cu`
+- `competition/repos/llama.cpp/src/llama-memory-recurrent.h`
+- `competition/repos/llama.cpp/src/llama-memory-hybrid-iswa.cpp`
 
-### Ollama
-
-Ollama also treats the family as first-class.
-
-The local checked-in Qwen3-next implementation:
-
-- owns the full hybrid operator
-- owns the recurrent cache shape
-- owns the split `ssm_beta` and `ssm_alpha` path used by `qwen35`
-- owns the `ssm_dt.bias` alternate tensor naming
-- validates the recurrent/full-attention mixed layout before execution
-
-Relevant local reference files:
+Ollama inherits that runtime shape in its vendored `llama.cpp` layer and also
+owns the Qwen3-next conversion and model metadata path directly. The important
+local files are:
 
 - `competition/repos/ollama/model/models/qwen3next/model.go`
 - `competition/repos/ollama/model/models/qwen3next/deltanet.go`
+- `competition/repos/ollama/llama/llama.cpp/src/models/qwen35.cpp`
 
-### MLX
+The local `mlx` checkout in this workspace does not currently expose a checked-in
+`qwen35` implementation to compare line by line. MLX is still useful as the
+Apple reference for the right execution philosophy: device-owned arrays,
+backend-owned state, and unified-memory execution that does not bounce every
+major activation back through host `Vec<f32>` control flow.
 
-The local `mlx` checkout in this workspace does not currently expose a checked
-in `qwen35` implementation to compare directly. It is still useful as a
-reference for Apple unified-memory execution and device-owned array semantics.
+That is the real architectural line here. The reference systems keep Qwen35
+inside a backend-owned execution path. Psionic still leaves too much of the
+Metal Qwen35 path in host-owned Rust vectors and host-managed recurrent state.
 
-That matters because Psionic is failing before the Qwen35-specific recurrent
-math even becomes the dominant problem. The Mac lane is still spending the
-majority of its time in a host-owned decode loop.
+## Where Psionic Still Loses Time
 
-## Where Psionic Is Slow
+The current Metal lane is only partially accelerated.
 
-The current real Mac `Qwen3.5-27B-Q4_K_M.gguf` lane is slow for three direct
-reasons.
+Large quantized projections are already admitted natively on Metal. `Q4_K`,
+`Q5_K`, `Q6_K`, `Q8_0`, and `MXFP4` are all admitted for the Qwen35 projection
+path now. That part is no longer the blocker.
 
-### 1. The admitted local lane is still CPU
+The blocker is that the service still steps the model on the host between those
+projections. `MetalGgufQwen35TextGenerationService` still calls a
+host-oriented `MetalQwen35Model::forward_token` that decodes token embedding to
+a host vector, threads `Vec<f32>` hidden state through every layer, and reuses
+CPU-shaped recurrent and attention state containers for the hybrid path. The
+projection kernels are native. The execution ownership is not.
 
-The benchmark harness in `crates/psionic-serve/examples/qwen35_bench.rs` only
-admits `cpu` and `cuda`.
+In practical terms, the current lane still pays for:
 
-The OpenAI server in `crates/psionic-serve/src/openai_http.rs` only admits:
+- host-visible hidden-state materialization between major substeps
+- host-managed recurrent update flow instead of backend-owned recurrent state
+- host-managed full-attention bookkeeping instead of a backend-native cache path
+- one-token-at-a-time prompt replay instead of chunked recurrent prefill
 
-- `cuda` for `qwen35`
-- `cpu` for everything else on the fallback path
-- no native Metal runtime for `qwen35`
+That is why fixing output selection helps, but does not close the gap. We made
+the last stage cheaper. The middle of the pipeline is still shaped wrong.
 
-So Apple Silicon is not reaching a device-native `qwen35` runtime at all.
+## What Has To Change Next
 
-### 2. The real 27B artifact depends on `Q5_K`
+The next step is not "distribute it first." Distributing a host-stepped local
+lane just spreads a slow execution shape across more machines.
 
-The public Hugging Face `Qwen3.5-27B-Q4_K_M.gguf` artifact is not a pure
-`Q4_K` artifact internally. It carries `Q5_K` tensors.
+The next step is to make Qwen35 on Metal a real backend-owned path.
 
-Psionic currently has:
+That means four concrete changes.
 
-- CPU decode and dot support for `Q5_K` in `psionic-backend-cpu`
-- no `Q5_K` decode in `psionic-nn`
-- no `Q5_K` Metal quantized matvec support in `psionic-backend-metal`
+First, the Metal Qwen35 lane needs a real step plan, the same way the CUDA lane
+already has one. Hidden state, projection scratch, recurrent scratch, and output
+selection buffers need to stay in backend-owned buffers instead of returning to
+host `Vec<f32>` after every major operation.
 
-The current Metal backend only admits native quantized projection kernels for:
+Second, the hybrid recurrent state must stop aliasing CPU state types. The
+current code literally reuses CPU hybrid and full-attention state containers in
+the Metal lane. That is acceptable for bring-up and unacceptable for performance.
 
-- `Q4_K`
-- `Q6_K`
-- `Q8_0`
-- `MXFP4`
+Third, prompt replay has to become chunked recurrent prefill instead of scalar
+token stepping. `llama.cpp` is explicit about this in its hybrid memory and
+chunked gated-delta-net path. Psionic needs the same class of shape on Metal if
+it wants to be in the same performance conversation.
 
-That means the public 27B artifact falls off the Metal fast path before the
-family-specific recurrent operator even matters.
+Fourth, once the local single-node Metal lane is backend-owned, then clustered
+or split execution becomes meaningful. If we later decide to distribute Qwen35
+for larger home-network or cross-site runs, the split should happen above a
+device-owned local stage, not above the current host-driven layer loop.
 
-### 3. The current native Psionic `qwen35` implementation is model-specific on CUDA only
+## Bottom Line
 
-`crates/psionic-serve/src/qwen35.rs` already contains a large amount of
-Qwen35-specific accelerated logic.
+Psionic no longer has a Qwen35 admission problem on Metal. It has a runtime
+shape problem.
 
-That logic currently exists for CUDA:
+The current work closed the parser and math mistakes, made the model coherent,
+and removed an obvious serving inefficiency by skipping pointless prompt logits
+and keeping greedy decode on a device argmax path. That raised the native Metal
+lane from `5.95 tok/s` to `6.94 tok/s` on the benchmark that matters here.
 
-- native quantized projection upload
-- native Qwen35 hybrid-layer step planning
-- native full-attention path
-- native recurrent state handling
-- native decode output selection and profiling
+The remaining gap to Ollama is still large because Ollama and `llama.cpp` keep
+Qwen35 inside a first-class backend-owned hybrid runtime, while Psionic still
+hands too much of the Metal lane back to the host between steps.
 
-There is no equivalent Metal service. The Mac lane therefore bypasses the only
-family-specific accelerated implementation Psionic currently owns.
-
-## Direct Comparison Against Current Psionic Shape
-
-Today Psionic has:
-
-- a real native CUDA `qwen35` runtime
-- a real native CPU `qwen35` runtime
-- no native Metal `qwen35` runtime
-- no Metal `Q5_K` matvec support
-
-That is the whole gap in one sentence.
-
-The reference systems do not route Apple execution for this family into a
-generic CPU fallback. They route it into model-aware accelerated code.
-
-## What Has To Change
-
-The next architecture step is not ambiguous.
-
-### First required change: admit `Q5_K` on Metal
-
-Without native `Q5_K` quantized matvec on Metal, the public 27B artifact cannot
-become a serious Apple lane.
-
-This requires:
-
-- native `Q5_K` Metal quantized matvec
-- native `Q5_K` Metal logits-selection path
-- truthful Metal backend admission for the mode
-
-### Second required change: add a native Metal `qwen35` runtime
-
-This does not need to start as a full Metal recurrent-kernel stack on day one.
-
-The first bounded honest version can:
-
-- move all large projection work to Metal
-- keep the smaller recurrent and attention glue on host where needed
-- keep refusal posture explicit for unsupported execution regions
-
-That is still materially better than the current all-CPU lane because the
-largest per-token costs are the repeated large quantized projections.
-
-### Third required change: expose the real lane through the public runtime selectors
-
-After the service exists, Psionic needs to admit it in:
-
-- `qwen35_bench`
-- `openai_http.rs`
-- runtime-support publication
-- `docs/INFERENCE_ENGINE.md`
-
-If the code exists but the selectors keep routing Apple devices to CPU, the
-architecture is still wrong.
-
-## What This Audit Does Not Claim
-
-This audit does not claim that a first Metal `qwen35` runtime will instantly
-match the best `llama.cpp` or Ollama numbers.
-
-It claims something narrower and concrete:
-
-- the current local Mac number is dominated by the absence of a real Metal
-  runtime
-- the public 27B artifact is blocked specifically by missing `Q5_K` Metal
-  support
-- Psionic already has enough family-specific structure to justify a dedicated
-  Metal lane now instead of treating Qwen35 as CPU-only on Apple
-
-## Immediate Follow-On Work
-
-The required follow-on sequence is:
-
-1. land native `Q5_K` Metal quantized matvec support
-2. land `MetalGgufQwen35TextGenerationService`
-3. admit `metal` in `qwen35_bench`
-4. admit `qwen35` on Metal in the generic OpenAI server
-5. record new receipts for the real Hugging Face 27B artifact on current `main`
-
-That is the shortest honest path from the current `0.0305 tok/s` CPU lane to a
-real Apple execution lane.
+The right next architecture change is therefore clear: make Qwen35 on Metal a
+real backend-owned execution path first, then talk about distribution.
