@@ -17,7 +17,7 @@ use psionic_models::{
     GgufDecoderAdapterLoader, GgufDecoderFamily, PromptMessage, PromptMessageRole,
 };
 use psionic_serve::{
-    CudaGemma4TextGenerationService, DistributedGemma4PeerConfig,
+    CpuGgufTextGenerationService, CudaGemma4TextGenerationService, DistributedGemma4PeerConfig,
     DistributedGemma4TextGenerationService, GenerationMetrics, GenerationOptions,
     GenerationRequest, GenerationResponse, MetalGemma4TextGenerationService, OpenAiCompatBackend,
     OpenAiCompatConfig, OpenAiCompatServer, TerminationReason, TextGenerationExecutor,
@@ -117,8 +117,34 @@ impl BenchMode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PromptMode {
+    RenderedTokens,
+    Text,
+}
+
+impl PromptMode {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "rendered-tokens" => Ok(Self::RenderedTokens),
+            "text" => Ok(Self::Text),
+            other => Err(format!(
+                "unsupported Gemma prompt mode `{other}`; expected one of: rendered-tokens, text"
+            )),
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::RenderedTokens => "rendered_tokens",
+            Self::Text => "text",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DenseBenchBackend {
     Auto,
+    Cpu,
     Metal,
     Cuda,
     Distributed,
@@ -128,10 +154,11 @@ impl DenseBenchBackend {
     fn parse(value: &str) -> Result<Self, String> {
         match value {
             "auto" => Ok(Self::Auto),
+            "cpu" => Ok(Self::Cpu),
             "metal" => Ok(Self::Metal),
             "cuda" => Ok(Self::Cuda),
             other => Err(format!(
-                "unsupported Gemma backend `{other}`; expected one of: auto, metal, cuda"
+                "unsupported Gemma backend `{other}`; expected one of: auto, cpu, metal, cuda"
             )),
         }
     }
@@ -147,6 +174,7 @@ impl DenseBenchBackend {
             }
             Self::Metal => "metal",
             Self::Cuda => "cuda",
+            Self::Cpu => "cpu",
             Self::Distributed => "metal+cuda",
         }
     }
@@ -171,6 +199,9 @@ impl DenseBenchBackend {
             Self::Distributed => Err(String::from(
                 "distributed-sparse benchmarks require a local backend; use auto, metal, or cuda",
             )),
+            Self::Cpu => Err(String::from(
+                "distributed-sparse benchmarks do not support the cpu backend; use auto, metal, or cuda",
+            )),
         }
     }
 
@@ -178,7 +209,9 @@ impl DenseBenchBackend {
         match self.resolve_single() {
             Self::Cuda => OpenAiCompatBackend::Cuda,
             Self::Metal => OpenAiCompatBackend::Metal,
-            Self::Auto | Self::Distributed => unreachable!("backend should be resolved before use"),
+            Self::Auto | Self::Cpu | Self::Distributed => {
+                unreachable!("backend should be resolved before use")
+            }
         }
     }
 }
@@ -188,6 +221,7 @@ struct BenchConfig {
     model_path: PathBuf,
     mode: BenchMode,
     backend: DenseBenchBackend,
+    prompt_mode: PromptMode,
     prompt: String,
     max_output_tokens: usize,
     repeats: usize,
@@ -205,6 +239,7 @@ impl BenchConfig {
         let mut model_path = None::<PathBuf>;
         let mut mode = BenchMode::Single;
         let mut backend = DenseBenchBackend::Auto;
+        let mut prompt_mode = PromptMode::RenderedTokens;
         let mut prompt =
             String::from("Write one short sentence about decentralized Gemma inference.");
         let mut max_output_tokens = 96usize;
@@ -234,6 +269,13 @@ impl BenchConfig {
                     backend = DenseBenchBackend::parse(
                         args.next()
                             .ok_or_else(|| String::from("missing value for --backend"))?
+                            .as_str(),
+                    )?;
+                }
+                "--prompt-mode" => {
+                    prompt_mode = PromptMode::parse(
+                        args.next()
+                            .ok_or_else(|| String::from("missing value for --prompt-mode"))?
                             .as_str(),
                     )?;
                 }
@@ -306,6 +348,7 @@ impl BenchConfig {
             model_path,
             mode,
             backend,
+            prompt_mode,
             prompt,
             max_output_tokens,
             repeats,
@@ -329,6 +372,7 @@ struct BenchReport {
     peer_base_url: Option<String>,
     split_layer: Option<usize>,
     prompt: String,
+    prompt_mode: String,
     max_output_tokens: usize,
     repeats: usize,
     load_s: f64,
@@ -344,6 +388,7 @@ struct BenchReport {
 struct BenchRunReport {
     run_index: usize,
     output_tokens: usize,
+    output_token_ids: Vec<u32>,
     total_s: f64,
     prompt_s: Option<f64>,
     decode_s: Option<f64>,
@@ -354,6 +399,7 @@ struct BenchRunReport {
 }
 
 enum DenseRuntime {
+    Cpu(CpuGgufTextGenerationService),
     Metal(MetalGemma4TextGenerationService),
     Cuda(CudaGemma4TextGenerationService),
     Distributed(DistributedGemma4TextGenerationService),
@@ -362,6 +408,7 @@ enum DenseRuntime {
 impl DenseRuntime {
     fn model_id(&self) -> &str {
         match self {
+            Self::Cpu(service) => service.model_descriptor().model.model_id.as_str(),
             Self::Metal(service) => service.model_descriptor().model.model_id.as_str(),
             Self::Cuda(service) => service.model_descriptor().model.model_id.as_str(),
             Self::Distributed(service) => service.model_descriptor().model.model_id.as_str(),
@@ -370,6 +417,7 @@ impl DenseRuntime {
 
     fn model_descriptor(&self) -> psionic_models::DecoderModelDescriptor {
         match self {
+            Self::Cpu(service) => service.model_descriptor().clone(),
             Self::Metal(service) => service.model_descriptor().clone(),
             Self::Cuda(service) => service.model_descriptor().clone(),
             Self::Distributed(service) => service.model_descriptor().clone(),
@@ -378,6 +426,7 @@ impl DenseRuntime {
 
     fn generate(&mut self, request: &GenerationRequest) -> Result<GenerationResponse, String> {
         match self {
+            Self::Cpu(service) => service.generate(request).map_err(|error| error.to_string()),
             Self::Metal(service) => service.generate(request).map_err(|error| error.to_string()),
             Self::Cuda(service) => service.generate(request).map_err(|error| error.to_string()),
             Self::Distributed(service) => {
@@ -426,29 +475,40 @@ fn run_dense_benchmark(
 
     let load_started = Instant::now();
     let mut runtime = match backend {
-        DenseBenchBackend::Auto | DenseBenchBackend::Metal | DenseBenchBackend::Cuda => {
-            match backend.resolve_single() {
-                DenseBenchBackend::Metal => DenseRuntime::Metal(
-                    MetalGemma4TextGenerationService::from_gguf_path(config.model_path.as_path())
-                        .map_err(|error| {
+        DenseBenchBackend::Auto
+        | DenseBenchBackend::Cpu
+        | DenseBenchBackend::Metal
+        | DenseBenchBackend::Cuda => match backend.resolve_single() {
+            DenseBenchBackend::Cpu => DenseRuntime::Cpu(
+                CpuGgufTextGenerationService::from_gguf_path(config.model_path.as_path()).map_err(
+                    |error| {
+                        format!(
+                            "failed to load CPU Gemma runtime from {}: {error}",
+                            config.model_path.display()
+                        )
+                    },
+                )?,
+            ),
+            DenseBenchBackend::Metal => DenseRuntime::Metal(
+                MetalGemma4TextGenerationService::from_gguf_path(config.model_path.as_path())
+                    .map_err(|error| {
                         format!(
                             "failed to load Metal Gemma 4 runtime from {}: {error}",
                             config.model_path.display()
                         )
                     })?,
-                ),
-                DenseBenchBackend::Cuda => DenseRuntime::Cuda(
-                    CudaGemma4TextGenerationService::from_gguf_path(config.model_path.as_path())
-                        .map_err(|error| {
-                            format!(
-                                "failed to load CUDA Gemma 4 runtime from {}: {error}",
-                                config.model_path.display()
-                            )
-                        })?,
-                ),
-                _ => unreachable!(),
-            }
-        }
+            ),
+            DenseBenchBackend::Cuda => DenseRuntime::Cuda(
+                CudaGemma4TextGenerationService::from_gguf_path(config.model_path.as_path())
+                    .map_err(|error| {
+                        format!(
+                            "failed to load CUDA Gemma 4 runtime from {}: {error}",
+                            config.model_path.display()
+                        )
+                    })?,
+            ),
+            DenseBenchBackend::Auto | DenseBenchBackend::Distributed => unreachable!(),
+        },
         DenseBenchBackend::Distributed => DenseRuntime::Distributed(
             DistributedGemma4TextGenerationService::from_gguf_path(
                 config.model_path.as_path(),
@@ -475,13 +535,22 @@ fn run_dense_benchmark(
     for run_index in 0..config.repeats {
         let mut options = GenerationOptions::greedy(config.max_output_tokens);
         options.stop_sequences = rendered.stop_sequences.clone();
-        let request = GenerationRequest::new_tokens(
-            format!("gemma4-bench-{}", run_index + 1),
-            model_descriptor.clone(),
-            None,
-            prompt_tokens.clone(),
-            options,
-        );
+        let request = match config.prompt_mode {
+            PromptMode::RenderedTokens => GenerationRequest::new_tokens(
+                format!("gemma4-bench-{}", run_index + 1),
+                model_descriptor.clone(),
+                None,
+                prompt_tokens.clone(),
+                options,
+            ),
+            PromptMode::Text => GenerationRequest::new_text(
+                format!("gemma4-bench-{}", run_index + 1),
+                model_descriptor.clone(),
+                None,
+                config.prompt.clone(),
+                options,
+            ),
+        };
         let started = Instant::now();
         let response = runtime.generate(&request)?;
         let total_s = started.elapsed().as_secs_f64();
@@ -545,10 +614,7 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
     server_config.backend = backend.openai_backend();
     server_config
         .admit_gemma4_26b_sparse_distributed_lane(
-            &sample_sparse_cluster_state(
-                backend.runtime_label(),
-                served_artifact_digest.as_str(),
-            ),
+            &sample_sparse_cluster_state(backend.runtime_label(), served_artifact_digest.as_str()),
             &Gemma4MoeDistributedLaneRequest::new(
                 NodeId::new("scheduler"),
                 sample_gemma4_26b_sparse_inventory(
@@ -638,6 +704,7 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
         runs.push(BenchRunReport {
             run_index: run_index + 1,
             output_tokens,
+            output_token_ids: Vec::new(),
             total_s,
             prompt_s: metrics
                 .as_ref()
@@ -702,6 +769,7 @@ fn finish_report(
         peer_base_url: config.peer_base_url.clone(),
         split_layer,
         prompt: config.prompt.clone(),
+        prompt_mode: config.prompt_mode.label().to_string(),
         max_output_tokens: config.max_output_tokens,
         repeats: config.repeats,
         load_s,
@@ -722,6 +790,13 @@ fn run_report_from_generation(
     BenchRunReport {
         run_index: run_index + 1,
         output_tokens: response.usage.output_tokens,
+        output_token_ids: response
+            .output
+            .tokens
+            .as_slice()
+            .iter()
+            .map(|token| token.as_u32())
+            .collect(),
         total_s,
         prompt_s: response.metrics.prompt_eval_duration_ns.map(ns_to_s),
         decode_s: response.metrics.eval_duration_ns.map(ns_to_s),
@@ -951,11 +1026,12 @@ fn usage() -> &'static str {
     "Gemma 4 benchmark harness.\n\
 Usage: cargo run -p psionic-serve --example gemma4_bench -- \\\n\
   --model-path <gguf> [--mode single|distributed-dense|distributed-sparse] \\\n\
-  [--backend auto|metal|cuda] [--peer-base-url <url>] [--split-layer <n>] \\\n\
-  [--prompt <text>] [--max-output-tokens <n>] [--repeats <n>] [--json] [--json-out <path>]\n\
+  [--backend auto|cpu|metal|cuda] [--peer-base-url <url>] [--split-layer <n>] \\\n\
+  [--prompt-mode rendered-tokens|text] [--prompt <text>] [--max-output-tokens <n>] \\\n\
+  [--repeats <n>] [--json] [--json-out <path>]\n\
 \n\
 Notes:\n\
-  - single runs dense Gemma 4 on one local backend.\n\
+  - single runs dense Gemma 4 on one local backend, including the CPU reference path.\n\
   - distributed-dense runs the Metal+CUDA split-execution lane and requires --peer-base-url.\n\
   - distributed-sparse runs the admitted Gemma 4 26B sparse lane through the generic server on the selected local backend.\n"
 }

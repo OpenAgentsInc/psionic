@@ -1480,44 +1480,76 @@ impl CpuDenseGgufGenerationModel {
                 .unwrap_or(0);
             let is_swa =
                 gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
-            let has_kv = gemma4_layer_has_kv(adapter.family_metadata(), layout);
-            let (cache_read_offset, cache_write_offset, reuse_layer_index) = if has_kv {
-                (cache_offset, Some(cache_offset), None)
-            } else if is_swa {
-                (
-                    last_swa_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
-                        format: String::from("gguf"),
-                        message: format!(
-                            "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
-                        ),
-                    })?,
-                    None,
-                    Some(last_swa_kv_layer_index.ok_or_else(|| ModelLoadError::ArtifactFormat {
-                        format: String::from("gguf"),
-                        message: format!(
-                            "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
-                        ),
-                    })?),
-                )
-            } else {
-                (
-                    last_full_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
-                        format: String::from("gguf"),
-                        message: format!(
-                            "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
-                        ),
-                    })?,
-                    None,
-                    Some(
-                        last_full_kv_layer_index.ok_or_else(|| ModelLoadError::ArtifactFormat {
+            let has_kv =
+                gemma4_layer_has_kv(&descriptor, adapter.family_metadata(), layer_index, layout);
+            let (cache_read_offset, cache_write_offset, reuse_layer_index) =
+                if gemma4_declared_shared_kv_layers(adapter.family_metadata()).is_some() {
+                    let cache_write_offset = has_kv.then_some(cache_offset);
+                    let cache_read_offset = if has_kv {
+                        cache_offset
+                    } else if is_swa {
+                        last_swa_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
                             format: String::from("gguf"),
                             message: format!(
-                                "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                                "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                            ),
+                        })?
+                    } else {
+                        last_full_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                            format: String::from("gguf"),
+                            message: format!(
+                                "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                            ),
+                        })?
+                    };
+                    let reuse_layer_index = if has_kv {
+                        None
+                    } else {
+                        Some(gemma4_reused_kv_layer_index_from_metadata(
+                            &descriptor,
+                            adapter.family_metadata(),
+                            layer_index,
+                            is_swa,
+                        )?)
+                    };
+                    (cache_read_offset, cache_write_offset, reuse_layer_index)
+                } else if has_kv {
+                    (cache_offset, Some(cache_offset), None)
+                } else if is_swa {
+                    (
+                        last_swa_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                            format: String::from("gguf"),
+                            message: format!(
+                                "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
                             ),
                         })?,
-                    ),
-                )
-            };
+                        None,
+                        Some(last_swa_kv_layer_index.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                            format: String::from("gguf"),
+                            message: format!(
+                                "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
+                            ),
+                        })?),
+                    )
+                } else {
+                    (
+                        last_full_cache_offset.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                            format: String::from("gguf"),
+                            message: format!(
+                                "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                            ),
+                        })?,
+                        None,
+                        Some(
+                            last_full_kv_layer_index.ok_or_else(|| ModelLoadError::ArtifactFormat {
+                                format: String::from("gguf"),
+                                message: format!(
+                                    "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                                ),
+                            })?,
+                        ),
+                    )
+                };
             let layer = DenseGgufLayer::load(
                 &artifact,
                 layout,
@@ -1712,6 +1744,9 @@ struct DenseGgufModelInner {
 
 impl DenseGgufModelInner {
     fn rope_freq_factors_for_layer(&self, layer_index: usize, head_dim: usize) -> Option<&[f32]> {
+        if gemma4_disable_rope_freq_factors() {
+            return None;
+        }
         (self.family_metadata.family == GgufDecoderFamily::Gemma4
             && !gemma4_layer_is_swa(&self.family_metadata, layer_index, head_dim))
         .then_some(self.rope_freq_factors.as_deref())
@@ -2235,6 +2270,9 @@ struct DenseGemma4PerLayerInputs {
 
 impl DenseGemma4PerLayerInputs {
     fn load(artifact: &GgufBlobArtifact) -> Result<Option<Self>, ModelLoadError> {
+        if gemma4_disable_per_layer_inputs() {
+            return Ok(None);
+        }
         let token_embedding =
             load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?;
         let model_proj =
@@ -3109,6 +3147,7 @@ fn run_metal_gemma4_generation_request(
                 None,
                 None,
                 None,
+                false,
                 produce_prompt_logits,
                 prompt_logits_output_mode,
             )?;
@@ -3148,6 +3187,7 @@ fn run_metal_gemma4_generation_request(
         let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
         let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
             .then(|| cache.clone());
+        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
         let mut generated_tokens = Vec::new();
@@ -3199,6 +3239,7 @@ fn run_metal_gemma4_generation_request(
                 None,
                 None,
                 None,
+                false,
                 true,
                 logits_output_mode,
             )?;
@@ -3241,7 +3282,6 @@ fn run_metal_gemma4_generation_request(
             }
         }
 
-        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let generated = TokenSequence::new(generated_tokens);
         if let Some(session_id) = &request.session_id {
             if cache.len() > materialized_host_tokens {
@@ -3436,46 +3476,83 @@ impl MetalGemma4GenerationModel {
                 .unwrap_or(0);
             let is_swa =
                 gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
-            let has_kv = gemma4_layer_has_kv(adapter.family_metadata(), layout);
-            let (cache_read_offset, cache_write_offset, reuse_layer_index) = if has_kv {
-                (cache_offset, Some(cache_offset), None)
-            } else if is_swa {
-                (
-                    last_swa_cache_offset.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
-                            ),
-                        ))
-                    })?,
-                    None,
-                    Some(last_swa_kv_layer_index.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
-                            ),
-                        ))
-                    })?),
-                )
-            } else {
-                (
-                    last_full_cache_offset.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
-                            ),
-                        ))
-                    })?,
-                    None,
-                    Some(last_full_kv_layer_index.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
-                            ),
-                        ))
-                    })?),
-                )
-            };
+            let has_kv =
+                gemma4_layer_has_kv(&descriptor, adapter.family_metadata(), layer_index, layout);
+            let (cache_read_offset, cache_write_offset, reuse_layer_index) =
+                if gemma4_declared_shared_kv_layers(adapter.family_metadata()).is_some() {
+                    let cache_write_offset = has_kv.then_some(cache_offset);
+                    let cache_read_offset = if has_kv {
+                        cache_offset
+                    } else if is_swa {
+                        last_swa_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                                ),
+                            ))
+                        })?
+                    } else {
+                        last_full_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                                ),
+                            ))
+                        })?
+                    };
+                    let reuse_layer_index = if has_kv {
+                        None
+                    } else {
+                        Some(
+                            gemma4_reused_kv_layer_index_from_metadata(
+                                &descriptor,
+                                adapter.family_metadata(),
+                                layer_index,
+                                is_swa,
+                            )
+                            .map_err(model_load_runtime_error)?,
+                        )
+                    };
+                    (cache_read_offset, cache_write_offset, reuse_layer_index)
+                } else if has_kv {
+                    (cache_offset, Some(cache_offset), None)
+                } else if is_swa {
+                    (
+                        last_swa_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                                ),
+                            ))
+                        })?,
+                        None,
+                        Some(last_swa_kv_layer_index.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
+                                ),
+                            ))
+                        })?),
+                    )
+                } else {
+                    (
+                        last_full_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                                ),
+                            ))
+                        })?,
+                        None,
+                        Some(last_full_kv_layer_index.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                                ),
+                            ))
+                        })?),
+                    )
+                };
             let layer = MetalGemma4Layer::load(
                 backend,
                 &artifact,
@@ -3520,6 +3597,73 @@ impl MetalGemma4GenerationModel {
                 .try_into()
                 .unwrap_or(u64::MAX),
         };
+        if std::env::var_os("PSIONIC_GEMMA4_METAL_DEBUG_LOAD").is_some() {
+            let fused_qkv_layers = inner
+                .layers
+                .iter()
+                .filter(|layer| layer.attention_qkv_weight.is_some())
+                .count();
+            let fused_gate_up_layers = inner
+                .layers
+                .iter()
+                .filter(|layer| layer.feed_forward_gate_up_weight.is_some())
+                .count();
+            let native_attention_layers = inner
+                .layers
+                .iter()
+                .filter(|layer| {
+                    layer.attention_query_weight.is_native()
+                        && layer.attention_key_weight.is_native()
+                        && layer.attention_value_weight.is_native()
+                        && layer.attention_output_weight.is_native()
+                })
+                .count();
+            let native_ffn_layers = inner
+                .layers
+                .iter()
+                .filter(|layer| {
+                    layer
+                        .feed_forward_gate_weight
+                        .as_ref()
+                        .map(MetalQuantizedProjectionMatrix::is_native)
+                        .unwrap_or(true)
+                        && layer
+                            .feed_forward_up_weight
+                            .as_ref()
+                            .map(MetalQuantizedProjectionMatrix::is_native)
+                            .unwrap_or(true)
+                        && layer
+                            .feed_forward_down_weight
+                            .as_ref()
+                            .map(MetalQuantizedProjectionMatrix::is_native)
+                            .unwrap_or(true)
+                })
+                .count();
+            let per_layer_model_proj = match inner.gemma4_per_layer_inputs.as_ref() {
+                None => String::from("absent"),
+                Some(inputs) => match &inputs.model_proj {
+                    MetalGemma4PerLayerProjectionMatrix::Host(_) => String::from("host_dense"),
+                    MetalGemma4PerLayerProjectionMatrix::Quantized(matrix)
+                        if matrix.is_native() =>
+                    {
+                        format!("native_{:?}", matrix.mode)
+                    }
+                    MetalGemma4PerLayerProjectionMatrix::Quantized(matrix) => {
+                        format!("host_quantized_{:?}", matrix.mode)
+                    }
+                },
+            };
+            eprintln!(
+                "psionic.gemma4.metal.load model={} layers={} fused_qkv_layers={} fused_gate_up_layers={} native_attention_layers={} native_ffn_layers={} per_layer_model_proj={}",
+                descriptor.model.model_id,
+                inner.layers.len(),
+                fused_qkv_layers,
+                fused_gate_up_layers,
+                native_attention_layers,
+                native_ffn_layers,
+                per_layer_model_proj,
+            );
+        }
         Ok(Self {
             inner: Arc::new(inner),
         })
@@ -3677,6 +3821,9 @@ struct MetalGemma4ModelInner {
 
 impl MetalGemma4ModelInner {
     fn rope_freq_factors_for_layer(&self, layer_index: usize, head_dim: usize) -> Option<&[f32]> {
+        if gemma4_disable_rope_freq_factors() {
+            return None;
+        }
         (!gemma4_layer_is_swa(&self.family_metadata, layer_index, head_dim))
             .then_some(self.rope_freq_factors.as_deref())
             .flatten()
@@ -4050,21 +4197,31 @@ impl MetalGemma4ModelInner {
             .write_f32(hidden.as_slice())
             .map_err(ReferenceTextGenerationError::Runtime)?;
 
-        let mut cache_key = forwarded_key
-            .map(|values| values.to_vec())
-            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
-        let mut cache_value = forwarded_value
-            .map(|values| values.to_vec())
-            .unwrap_or_else(|| vec![0.0; self.cache_width()]);
-        if cache_key.len() != self.cache_width() || cache_value.len() != self.cache_width() {
-            return Err(ReferenceTextGenerationError::Runtime(
-                crate::RuntimeError::Backend(format!(
-                    "gemma4 metal forwarded kv width mismatch: expected {}, actual key={} value={}",
-                    self.cache_width(),
-                    cache_key.len(),
-                    cache_value.len()
-                )),
-            ));
+        let need_host_cache_buffers = start_layer > 0
+            || materialize_stage_outputs
+            || forwarded_key.is_some()
+            || forwarded_value.is_some();
+        let mut cache_key = need_host_cache_buffers.then(|| {
+            forwarded_key
+                .map(|values| values.to_vec())
+                .unwrap_or_else(|| vec![0.0; self.cache_width()])
+        });
+        let mut cache_value = need_host_cache_buffers.then(|| {
+            forwarded_value
+                .map(|values| values.to_vec())
+                .unwrap_or_else(|| vec![0.0; self.cache_width()])
+        });
+        if let (Some(cache_key), Some(cache_value)) = (cache_key.as_ref(), cache_value.as_ref()) {
+            if cache_key.len() != self.cache_width() || cache_value.len() != self.cache_width() {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "gemma4 metal forwarded kv width mismatch: expected {}, actual key={} value={}",
+                        self.cache_width(),
+                        cache_key.len(),
+                        cache_value.len()
+                    )),
+                ));
+            }
         }
         if start_layer > 0
             && materialize_stage_outputs
@@ -4077,6 +4234,16 @@ impl MetalGemma4ModelInner {
             ));
         }
         if start_layer > 0 {
+            let cache_key = cache_key.as_ref().ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "gemma4 metal staged execution expected forwarded key cache values",
+                )))
+            })?;
+            let cache_value = cache_value.as_ref().ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "gemma4 metal staged execution expected forwarded value cache values",
+                )))
+            })?;
             for (layer_index, layer) in self.layers.iter().enumerate().take(start_layer) {
                 let Some(cache_offset) = layer.attention_geometry.cache_write_offset else {
                     continue;
@@ -4932,6 +5099,16 @@ impl MetalGemma4ModelInner {
             }
         }
         if materialize_stage_outputs {
+            let cache_key = cache_key.as_mut().ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "gemma4 metal staged execution expected host key materialization buffers",
+                )))
+            })?;
+            let cache_value = cache_value.as_mut().ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "gemma4 metal staged execution expected host value materialization buffers",
+                )))
+            })?;
             for (layer_index, layer) in self
                 .layers
                 .iter()
@@ -4964,8 +5141,8 @@ impl MetalGemma4ModelInner {
         }
 
         Ok(MetalGemma4StageStep {
-            key: cache_key,
-            value: cache_value,
+            key: cache_key.unwrap_or_default(),
+            value: cache_value.unwrap_or_default(),
             logits,
             selected_token,
             hidden,
@@ -4989,6 +5166,7 @@ impl MetalGemma4ModelInner {
         input_hidden: Option<&[f32]>,
         forwarded_key: Option<&[f32]>,
         forwarded_value: Option<&[f32]>,
+        materialize_stage_outputs: bool,
         produce_logits: bool,
         logits_output_mode: MetalLogitsOutputMode,
     ) -> Result<MetalGemma4StageStep, ReferenceTextGenerationError> {
@@ -5082,7 +5260,7 @@ impl MetalGemma4ModelInner {
                 input_hidden,
                 forwarded_key,
                 forwarded_value,
-                true,
+                materialize_stage_outputs,
                 produce_logits,
                 logits_output_mode,
             );
@@ -6834,6 +7012,9 @@ impl MetalGemma4PerLayerInputs {
         backend: &mut MetalBackend,
         artifact: &GgufBlobArtifact,
     ) -> Result<Option<Self>, ReferenceTextGenerationError> {
+        if gemma4_disable_per_layer_inputs() {
+            return Ok(None);
+        }
         let token_embedding =
             load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?;
         let model_proj = load_named_optional_metal_gemma4_projection_matrix(
@@ -7386,9 +7567,13 @@ impl MetalQuantizedProjectionMatrix {
 }
 
 fn supports_native_metal_quantized_projection(mode: QuantizationMode) -> bool {
+    if env::var_os("PSIONIC_GEMMA4_METAL_FORCE_HOST_PROJECTIONS").is_some() {
+        return false;
+    }
     matches!(
         mode,
         QuantizationMode::GgmlQ4K
+            | QuantizationMode::GgmlQ5K
             | QuantizationMode::GgmlQ6K
             | QuantizationMode::GgmlQ8_0
             | QuantizationMode::GgmlMxfp4
@@ -9098,6 +9283,7 @@ fn run_distributed_gemma4_generation_request(
                 None,
                 None,
                 None,
+                true,
                 false,
                 MetalLogitsOutputMode::RawLogits,
             )?;
@@ -9124,6 +9310,7 @@ fn run_distributed_gemma4_generation_request(
         let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
         let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
             .then(|| cache.clone());
+        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
         let mut generated_tokens = Vec::new();
@@ -9165,6 +9352,7 @@ fn run_distributed_gemma4_generation_request(
                 None,
                 None,
                 None,
+                true,
                 false,
                 MetalLogitsOutputMode::RawLogits,
             )?;
@@ -9216,7 +9404,6 @@ fn run_distributed_gemma4_generation_request(
             }
         }
 
-        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let generated = TokenSequence::new(generated_tokens);
         if let Some(session_id) = &request.session_id {
             session_tokens.extend_from_slice(prompt_tokens.as_slice());
@@ -9596,6 +9783,7 @@ fn run_cuda_gemma4_generation_request(
         let prefill_handoff_state = gemma4_cuda_layer_cache_state(layer_caches.as_slice());
         let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
             .then(|| cache.clone());
+        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
         let mut generated_tokens = Vec::new();
@@ -9688,7 +9876,6 @@ fn run_cuda_gemma4_generation_request(
             }
         }
 
-        let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let generated = TokenSequence::new(generated_tokens);
         if let Some(session_id) = &request.session_id {
             session_tokens.extend_from_slice(prompt_tokens.as_slice());
@@ -10302,46 +10489,83 @@ impl CudaGemma4GenerationModel {
                 .unwrap_or(0);
             let is_swa =
                 gemma4_layer_is_swa(adapter.family_metadata(), layer_index, layer_head_dim);
-            let has_kv = gemma4_layer_has_kv(adapter.family_metadata(), layout);
-            let (cache_read_offset, cache_write_offset, reuse_layer_index) = if has_kv {
-                (cache_offset, Some(cache_offset), None)
-            } else if is_swa {
-                (
-                    last_swa_cache_offset.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
-                            ),
-                        ))
-                    })?,
-                    None,
-                    Some(last_swa_kv_layer_index.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
-                            ),
-                        ))
-                    })?),
-                )
-            } else {
-                (
-                    last_full_cache_offset.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
-                            ),
-                        ))
-                    })?,
-                    None,
-                    Some(last_full_kv_layer_index.ok_or_else(|| {
-                        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
-                            format!(
-                                "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
-                            ),
-                        ))
-                    })?),
-                )
-            };
+            let has_kv =
+                gemma4_layer_has_kv(&descriptor, adapter.family_metadata(), layer_index, layout);
+            let (cache_read_offset, cache_write_offset, reuse_layer_index) =
+                if gemma4_declared_shared_kv_layers(adapter.family_metadata()).is_some() {
+                    let cache_write_offset = has_kv.then_some(cache_offset);
+                    let cache_read_offset = if has_kv {
+                        cache_offset
+                    } else if is_swa {
+                        last_swa_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                                ),
+                            ))
+                        })?
+                    } else {
+                        last_full_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                                ),
+                            ))
+                        })?
+                    };
+                    let reuse_layer_index = if has_kv {
+                        None
+                    } else {
+                        Some(
+                            gemma4_reused_kv_layer_index_from_metadata(
+                                &descriptor,
+                                adapter.family_metadata(),
+                                layer_index,
+                                is_swa,
+                            )
+                            .map_err(model_load_runtime_error)?,
+                        )
+                    };
+                    (cache_read_offset, cache_write_offset, reuse_layer_index)
+                } else if has_kv {
+                    (cache_offset, Some(cache_offset), None)
+                } else if is_swa {
+                    (
+                        last_swa_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 swa layer {layer_index} reuses kv before any swa kv source was loaded"
+                                ),
+                            ))
+                        })?,
+                        None,
+                        Some(last_swa_kv_layer_index.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 swa layer {layer_index} is missing a reused kv source layer index"
+                                ),
+                            ))
+                        })?),
+                    )
+                } else {
+                    (
+                        last_full_cache_offset.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 full-attention layer {layer_index} reuses kv before any full-attention kv source was loaded"
+                                ),
+                            ))
+                        })?,
+                        None,
+                        Some(last_full_kv_layer_index.ok_or_else(|| {
+                            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                                format!(
+                                    "gemma4 full-attention layer {layer_index} is missing a reused kv source layer index"
+                                ),
+                            ))
+                        })?),
+                    )
+                };
             let layer = CudaGemma4Layer::load(
                 backend,
                 &artifact,
@@ -10545,6 +10769,9 @@ struct CudaGemma4ModelInner {
 
 impl CudaGemma4ModelInner {
     fn rope_freq_factors_for_layer(&self, layer_index: usize, head_dim: usize) -> Option<&[f32]> {
+        if gemma4_disable_rope_freq_factors() {
+            return None;
+        }
         (!gemma4_layer_is_swa(&self.family_metadata, layer_index, head_dim))
             .then_some(self.rope_freq_factors.as_deref())
             .flatten()
@@ -12150,6 +12377,9 @@ impl CudaGemma4PerLayerInputs {
         backend: &mut CudaBackend,
         artifact: &GgufBlobArtifact,
     ) -> Result<Option<Self>, ReferenceTextGenerationError> {
+        if gemma4_disable_per_layer_inputs() {
+            return Ok(None);
+        }
         let token_embedding =
             load_named_optional_projection_matrix(artifact, "per_layer_token_embd.weight")?;
         let model_proj = load_named_optional_cuda_gemma4_projection_matrix(
@@ -13779,7 +14009,13 @@ fn input_embedding_scale(family_metadata: &GgufDecoderFamilyMetadata, hidden_siz
 
 fn attention_scale(family_metadata: &GgufDecoderFamilyMetadata, head_dim: usize) -> f32 {
     match family_metadata.family {
-        GgufDecoderFamily::Gemma4 => 1.0,
+        GgufDecoderFamily::Gemma4 => {
+            if std::env::var_os("PSIONIC_GEMMA4_FORCE_SQRT_ATTENTION_SCALE").is_some() {
+                1.0 / (head_dim as f32).sqrt()
+            } else {
+                1.0
+            }
+        }
         _ => 1.0 / (head_dim as f32).sqrt(),
     }
 }
@@ -14153,14 +14389,65 @@ fn gemma4_layer_is_swa(
         .is_some_and(|full_head_dim| head_dim < full_head_dim)
 }
 
+fn gemma4_declared_shared_kv_layers(family_metadata: &GgufDecoderFamilyMetadata) -> Option<usize> {
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return None;
+    }
+    family_fact_usize(
+        family_metadata,
+        format!(
+            "{}.attention.shared_kv_layers",
+            family_metadata.architecture
+        )
+        .as_str(),
+    )
+    .filter(|value| *value > 0)
+}
+
 fn gemma4_layer_has_kv(
+    descriptor: &DecoderModelDescriptor,
     family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
     layout: &GgufDecoderLayerTensorLayout,
 ) -> bool {
     if family_metadata.family != GgufDecoderFamily::Gemma4 {
         return true;
     }
+    if let Some(shared_kv_layers) = gemma4_declared_shared_kv_layers(family_metadata) {
+        let kv_layers = descriptor
+            .config
+            .layer_count
+            .saturating_sub(shared_kv_layers);
+        return layer_index < kv_layers;
+    }
     layout.attention_key_weight.is_some()
+}
+
+fn gemma4_reused_kv_layer_index_from_metadata(
+    descriptor: &DecoderModelDescriptor,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    layer_index: usize,
+    is_swa: bool,
+) -> Result<usize, ModelLoadError> {
+    if family_metadata.family != GgufDecoderFamily::Gemma4 {
+        return Ok(layer_index);
+    }
+    let shared_kv_layers = gemma4_declared_shared_kv_layers(family_metadata).unwrap_or(0);
+    let kv_layers = descriptor
+        .config
+        .layer_count
+        .saturating_sub(shared_kv_layers);
+    if layer_index < kv_layers {
+        return Ok(layer_index);
+    }
+    kv_layers
+        .checked_sub(if is_swa { 2 } else { 1 })
+        .ok_or_else(|| ModelLoadError::ArtifactFormat {
+            format: String::from("gguf"),
+            message: format!(
+                "gemma4 layer {layer_index} cannot map reused kv source with kv_layers={kv_layers}"
+            ),
+        })
 }
 
 fn gemma4_layer_kv_head_count(
@@ -14310,6 +14597,14 @@ fn apply_rope_neox(
             head[pair + rotary_half] = x0 * sin_theta + x1 * cos_theta;
         }
     }
+}
+
+fn gemma4_disable_per_layer_inputs() -> bool {
+    std::env::var_os("PSIONIC_GEMMA4_DISABLE_PER_LAYER_INPUTS").is_some()
+}
+
+fn gemma4_disable_rope_freq_factors() -> bool {
+    std::env::var_os("PSIONIC_GEMMA4_DISABLE_ROPE_FREQ_FACTORS").is_some()
 }
 
 fn metal_gemma4_rope_cos_sin_values(
@@ -14527,8 +14822,8 @@ mod tests {
     use psionic_core::{DType, Device, QuantizationMode, Shape, TensorSpec};
     use psionic_data::{TokenizerDigest, TokenizerFamily};
     use psionic_models::{
-        DecoderModelDescriptor, GgufDecoderFamily, GgufMetadataValue, GgufTensorType, TokenId,
-        TokenSequence,
+        DecoderModelDescriptor, GgufDecoderAdapterLoader, GgufDecoderFamily, GgufMetadataValue,
+        GgufTensorType, TokenId, TokenSequence,
     };
     use psionic_runtime::LocalServingIsolationPolicy;
     use psionic_train::{
@@ -14937,6 +15232,61 @@ mod tests {
             GenerationOptions::greedy(1),
         ))?;
         assert_eq!(response.output.text, "world");
+        Ok(())
+    }
+
+    #[test]
+    fn gemma4_shared_kv_metadata_overrides_tensor_presence_for_tail_layers()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempdir()?;
+        let path = temp.path().join("gemma4_shared_kv_tail.gguf");
+        let mut metadata =
+            dense_gemma4_metadata_with_block_count("tiny psionic gemma4 shared kv", 4);
+        metadata.push((
+            String::from("gemma4.attention.shared_kv_layers"),
+            GgufMetadataValue::U32(2),
+        ));
+        write_test_gguf(
+            &path,
+            metadata.as_slice(),
+            dense_decoder_tensors_with_layers(false, 3, 4, 4).as_slice(),
+        )?;
+
+        let adapter = GgufDecoderAdapterLoader.load_path(&path)?;
+        let layers = &adapter.tensor_layout().layers;
+
+        assert!(layers[2].attention_key_weight.is_some());
+        assert!(layers[3].attention_key_weight.is_some());
+        assert!(!super::gemma4_layer_has_kv(
+            adapter.descriptor(),
+            adapter.family_metadata(),
+            2,
+            &layers[2],
+        ));
+        assert!(!super::gemma4_layer_has_kv(
+            adapter.descriptor(),
+            adapter.family_metadata(),
+            3,
+            &layers[3],
+        ));
+        assert_eq!(
+            super::gemma4_reused_kv_layer_index_from_metadata(
+                adapter.descriptor(),
+                adapter.family_metadata(),
+                2,
+                false,
+            )?,
+            1
+        );
+        assert_eq!(
+            super::gemma4_reused_kv_layer_index_from_metadata(
+                adapter.descriptor(),
+                adapter.family_metadata(),
+                3,
+                false,
+            )?,
+            1
+        );
         Ok(())
     }
 

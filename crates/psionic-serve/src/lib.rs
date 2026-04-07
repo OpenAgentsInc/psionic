@@ -3654,7 +3654,18 @@ impl InMemoryKvCache {
 
     /// Appends a token placeholder when the runtime will materialize KV rows later.
     pub(crate) fn append_token_without_kv(&mut self, token: TokenId) -> Result<(), KvCacheError> {
-        self.append(token, vec![0.0; self.width], vec![0.0; self.width])
+        self.ensure_capacity_for_append()?;
+        self.allocate_tail_page_if_needed()?;
+        self.entries.push(KvCacheEntry {
+            position: self.entries.len(),
+            token,
+            key: Vec::new(),
+            value: Vec::new(),
+        });
+        if let Some(page) = self.pages.last_mut() {
+            page.token_count = page.token_count.saturating_add(1);
+        }
+        Ok(())
     }
 
     /// Replaces one existing KV entry in place.
