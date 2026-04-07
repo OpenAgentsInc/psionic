@@ -168,6 +168,12 @@ Default to:
   --format=csv,noheader,nounits`.
 - Do not benchmark on a GPU with resident compute processes unless the user
   explicitly instructs you to override that rule.
+- Before any full-model Apple Metal benchmark on an interactive macOS host,
+  verify there is no competing local model workload and do not launch multiple
+  benchmark variants in parallel.
+- Do not use `multi_tool_use.parallel` for full-model local Metal benchmark
+  sweeps on the active desktop. Run variants serially or move the sweep to a
+  remote Tailnet machine.
 
 ## Push Gate
 

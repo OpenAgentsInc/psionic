@@ -1,5 +1,7 @@
 use std::{
-    env, fs,
+    env,
+    fs::{self, OpenOptions},
+    io::{ErrorKind, Write},
     path::PathBuf,
     process::ExitCode,
     time::{Duration, Instant},
@@ -26,6 +28,9 @@ use serde::Serialize;
 use serde_json::json;
 use tokio::{net::TcpListener, sync::oneshot};
 
+const LOCAL_METAL_BENCH_OVERRIDE_ENV: &str = "PSIONIC_ALLOW_PARALLEL_METAL_BENCH";
+const LOCAL_METAL_BENCH_LOCK_NAME: &str = "gemma4-metal-bench.lock";
+
 fn main() -> ExitCode {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -48,6 +53,7 @@ fn main() -> ExitCode {
 
 async fn async_main() -> Result<(), String> {
     let config = BenchConfig::parse(env::args().skip(1))?;
+    let _local_metal_guard = LocalMetalBenchGuard::acquire(&config)?;
     let report = match config.mode {
         BenchMode::Single => run_dense_benchmark(&config, config.backend)?,
         BenchMode::DistributedDense => run_dense_benchmark(&config, DenseBenchBackend::Distributed)
@@ -216,6 +222,65 @@ impl DenseBenchBackend {
     }
 }
 
+#[derive(Debug)]
+struct LocalMetalBenchGuard {
+    lock_path: PathBuf,
+}
+
+impl LocalMetalBenchGuard {
+    fn acquire(config: &BenchConfig) -> Result<Option<Self>, String> {
+        if !config.requires_interactive_metal_guard()
+            || env::var_os(LOCAL_METAL_BENCH_OVERRIDE_ENV).is_some()
+        {
+            return Ok(None);
+        }
+        let lock_dir = env::temp_dir().join("psionic-bench-locks");
+        fs::create_dir_all(&lock_dir).map_err(|error| {
+            format!(
+                "failed to create local Metal benchmark lock directory {}: {error}",
+                lock_dir.display()
+            )
+        })?;
+        let lock_path = lock_dir.join(LOCAL_METAL_BENCH_LOCK_NAME);
+        Self::acquire_at_path(lock_path).map(Some)
+    }
+
+    fn acquire_at_path(lock_path: PathBuf) -> Result<Self, String> {
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+        {
+            Ok(mut lock_file) => {
+                let _ = writeln!(lock_file, "pid={}", std::process::id());
+                let _ = writeln!(
+                    lock_file,
+                    "cwd={}",
+                    env::current_dir()
+                        .unwrap_or_else(|_| PathBuf::from("."))
+                        .display()
+                );
+                Ok(Self { lock_path })
+            }
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => Err(format!(
+                "refusing to start a second local Metal Gemma benchmark on the interactive host because {} already exists. Wait for the current run to finish, remove the stale lock if an earlier run crashed, or set {}=1 to override.",
+                lock_path.display(),
+                LOCAL_METAL_BENCH_OVERRIDE_ENV,
+            )),
+            Err(error) => Err(format!(
+                "failed to create local Metal benchmark lock {}: {error}",
+                lock_path.display()
+            )),
+        }
+    }
+}
+
+impl Drop for LocalMetalBenchGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.lock_path);
+    }
+}
+
 #[derive(Clone, Debug)]
 struct BenchConfig {
     model_path: PathBuf,
@@ -357,6 +422,17 @@ impl BenchConfig {
             json_stdout,
             json_out,
         })
+    }
+
+    fn requires_interactive_metal_guard(&self) -> bool {
+        match self.mode {
+            BenchMode::Single => matches!(self.backend.resolve_single(), DenseBenchBackend::Metal),
+            BenchMode::DistributedDense => cfg!(target_os = "macos"),
+            BenchMode::DistributedSparse => self
+                .backend
+                .resolve_sparse()
+                .is_ok_and(|backend| matches!(backend, DenseBenchBackend::Metal)),
+        }
     }
 }
 
@@ -1033,5 +1109,30 @@ Usage: cargo run -p psionic-serve --example gemma4_bench -- \\\n\
 Notes:\n\
   - single runs dense Gemma 4 on one local backend, including the CPU reference path.\n\
   - distributed-dense runs the Metal+CUDA split-execution lane and requires --peer-base-url.\n\
-  - distributed-sparse runs the admitted Gemma 4 26B sparse lane through the generic server on the selected local backend.\n"
+  - distributed-sparse runs the admitted Gemma 4 26B sparse lane through the generic server on the selected local backend.\n\
+  - local Metal runs refuse parallel launch on an interactive Mac by default; set PSIONIC_ALLOW_PARALLEL_METAL_BENCH=1 only when you intentionally want to override that lock.\n"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LocalMetalBenchGuard;
+
+    #[test]
+    fn local_metal_bench_guard_releases_lock_on_drop() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let lock_path = tempdir.path().join("gemma4-metal-bench.lock");
+        let guard = LocalMetalBenchGuard::acquire_at_path(lock_path.clone()).expect("first guard");
+        drop(guard);
+        LocalMetalBenchGuard::acquire_at_path(lock_path).expect("lock should be reusable");
+    }
+
+    #[test]
+    fn local_metal_bench_guard_rejects_parallel_holder() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let lock_path = tempdir.path().join("gemma4-metal-bench.lock");
+        let _guard = LocalMetalBenchGuard::acquire_at_path(lock_path.clone()).expect("first guard");
+        let error =
+            LocalMetalBenchGuard::acquire_at_path(lock_path).expect_err("second guard rejects");
+        assert!(error.contains("refusing to start a second local Metal Gemma benchmark"));
+    }
 }
