@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "report_kind": "qwen35_ollama_raw_benchmark",
+  "backend": "ollama",
+  "model": "qwen35-27b-local:latest",
+  "model_path": "/Users/christopherdavid/models/qwen3.5/Qwen3.5-27B-Q4_K_M.gguf",
+  "prompt": "who are you",
+  "prompt_mode": "raw_text",
+  "max_output_tokens": 16,
+  "repeats": 1,
+  "load_s": 0.114602958,
+  "prompt_tokens": 3,
+  "prompt_s": 0.274257167,
+  "output_tokens": 16,
+  "decode_s": 0.752130751,
+  "total_s": 1.147588833,
+  "decode_tok_s": 21.272897004579463,
+  "termination": "length",
+  "output_text": "?\n\n<think>\nOkay, the user is asking \"who are you?\" I"
+}

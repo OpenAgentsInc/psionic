@@ -18,13 +18,20 @@ local Ollama reference lane.
 | Runtime | Artifact | Load | Prompt | Decode | Total | TTFT | Decode tok/s |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Psionic Metal, before output-selection fix | `Qwen3.5-27B-Q4_K_M.gguf` | `1.916 s` | `0.748 s` | `2.689 s` | `3.436 s` | `0.193 ms` | `5.95` |
-| Psionic Metal, current | `Qwen3.5-27B-Q4_K_M.gguf` | `1.833 s` | `0.539 s` | `2.305 s` | `2.844 s` | `0.050 ms` | `6.94` |
-| Ollama local | `qwen35-27b-local:latest` | `3.234 s` | `0.333 s` | `0.785 s` | `4.384 s` | not published separately | `20.38` |
+| Psionic Metal, current | `Qwen3.5-27B-Q4_K_M.gguf` | `1.689 s` | `0.487 s` | `1.747 s` | `2.234 s` | `0.069 ms` | `9.16` |
+| Ollama local, raw prompt | `qwen35-27b-local:latest` | `0.115 s` | `0.274 s` | `0.752 s` | `1.148 s` | not published separately | `21.27` |
 
 The current Psionic pass is materially better than the earlier one. Decode
-throughput is up from `5.95 tok/s` to `6.94 tok/s`, about a `16.7%` gain on the
-same prompt and host. That is real improvement. It is also still roughly `3x`
-slower than the local Ollama lane on decode.
+throughput is up from `5.95 tok/s` to `9.16 tok/s`, about a `54.0%` gain on the
+same prompt and host. That is real improvement. It is also still a little more
+than `2.3x` slower than the local Ollama lane on decode, which means Psionic is
+currently at about `43%` of the local reference throughput on this exact raw
+prompt contract.
+
+Fresh April 7 receipts are committed at:
+
+- `fixtures/qwen35/benchmarks/qwen35_27b_psionic_metal_20260407_macbookpro_m5.json`
+- `fixtures/qwen35/benchmarks/qwen35_27b_ollama_raw_20260407_macbookpro_m5.json`
 
 That remaining gap is large enough that it cannot be explained by one bad
 constant, one wrong tensor fact, or one missing tokenizer rule. It is a runtime
@@ -152,7 +159,7 @@ shape problem.
 The current work closed the parser and math mistakes, made the model coherent,
 and removed an obvious serving inefficiency by skipping pointless prompt logits
 and keeping greedy decode on a device argmax path. That raised the native Metal
-lane from `5.95 tok/s` to `6.94 tok/s` on the benchmark that matters here.
+lane from `5.95 tok/s` to `9.16 tok/s` on the benchmark that matters here.
 
 The remaining gap to Ollama is still large because Ollama and `llama.cpp` keep
 Qwen35 inside a first-class backend-owned hybrid runtime, while Psionic still

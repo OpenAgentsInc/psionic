@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "report_kind": "psionic_qwen35_benchmark",
+  "backend": "metal",
+  "model_id": "qwen3-5-27b@local-unverified:c5297668e33409ca1f60e97e8a78d2b0d3504bc5ee530bfce1844a7e3e6eb62e",
+  "model_path": "/Users/christopherdavid/models/qwen3.5/Qwen3.5-27B-Q4_K_M.gguf",
+  "prompt": "who are you",
+  "prompt_mode": "raw_text",
+  "prompt_token_ids": [
+    14202,
+    513,
+    488
+  ],
+  "max_output_tokens": 16,
+  "repeats": 1,
+  "load_s": 1.6887539999999999,
+  "runs": [
+    {
+      "run_index": 0,
+      "output_tokens": 16,
+      "output_token_ids": [
+        30,
+        271,
+        248068,
+        198,
+        31248,
+        11,
+        279,
+        1156,
+        369,
+        9859,
+        328,
+        14202,
+        513,
+        488,
+        7285,
+        353
+      ],
+      "total_s": 2.234384291,
+      "prompt_s": 0.487091583,
+      "decode_s": 1.747176125,
+      "ttft_s": 0.00006925,
+      "decode_tok_s": 9.157634294024021,
+      "termination": "max_output_tokens",
+      "output_text": "?\n\n<think>\nOkay, the user is asking \"who are you?\" I"
+    }
+  ],
+  "mean_output_tokens": 16.0,
+  "mean_total_s": 2.234384291,
+  "mean_ttft_s": 0.00006925,
+  "mean_decode_tok_s": 9.157634294024021
+}
