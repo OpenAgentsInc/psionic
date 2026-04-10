@@ -7,21 +7,24 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use sha2::Digest;
+
 use psionic_train::{
-    admitted_environment_ref_for_lane, admitted_release_id_for_lane,
-    build_psionic_train_checkpoint_handoff_receipt, inspect_psionic_train_checkpoint_surface,
-    materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
-    retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
-    execute_psionic_train_validator_replay,
-    PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
-    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
-    PsionicTrainCheckpointSurface, PsionicTrainInvocationManifest,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCurrentRunStatus,
+    PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
+    PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
+    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
     PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
     PsionicTrainValidatorArtifactOutputs, PsionicTrainValidatorReplayError,
     PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
-    PsionicTrainWindowStatusPacket,
+    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
+    admitted_release_id_for_lane, build_psionic_train_checkpoint_handoff_receipt,
+    execute_psionic_train_validator_replay, inspect_psionic_train_checkpoint_surface,
+    materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
+    retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
 };
 
 #[allow(dead_code)]
@@ -153,6 +156,14 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                 );
             }
         }
+    }
+    if manifest.lane_id == PSION_APPLE_WINDOWED_TRAINING_LANE_ID {
+        return run_apple_windowed_manifest(
+            &manifest,
+            &manifest_path,
+            &runtime_identity,
+            run_root.as_deref(),
+        );
     }
 
     let operator_args = match operator_args_from_manifest(&manifest) {
@@ -536,12 +547,116 @@ fn run_validator_replay_manifest(
     ExitCode::SUCCESS
 }
 
+fn run_apple_windowed_manifest(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: &Path,
+    runtime_identity: &MachineRuntimeIdentity,
+    run_root: Option<&Path>,
+) -> ExitCode {
+    let Some(run_root) = run_root else {
+        let packet = PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BadConfig,
+            Some(manifest_path.display().to_string()),
+            Some(runtime_identity.attestation.clone()),
+            Some(runtime_identity.capability_projection.clone()),
+            manifest.run_id.clone(),
+            None,
+            None,
+            None,
+            "apple machine lane requires one resolved run root",
+        );
+        emit_refusal_packet(packet.clone());
+        return ExitCode::from(packet.exit_code);
+    };
+
+    if manifest.operation == PsionicTrainOperation::RecordCheckpoint {
+        if let Err(error) = write_generic_machine_checkpoint_artifacts(manifest, run_root) {
+            let packet = PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::InternalError,
+                Some(manifest_path.display().to_string()),
+                Some(runtime_identity.attestation.clone()),
+                Some(runtime_identity.capability_projection.clone()),
+                manifest.run_id.clone(),
+                Some(run_root.display().to_string()),
+                None,
+                None,
+                error,
+            );
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    }
+
+    let detail = apple_machine_success_detail(manifest);
+    let status_paths = match write_status_surfaces(
+        manifest,
+        manifest_path.display().to_string(),
+        Some(run_root),
+        None,
+        None,
+        PsionicTrainOutcomeKind::Succeeded,
+        0,
+        false,
+        psionic_train::PsionicTrainAuthorityOwner::Pylon,
+        None,
+        detail.as_str(),
+        runtime_identity,
+    ) {
+        Ok(paths) => paths,
+        Err(error) => {
+            let packet = PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::InternalError,
+                Some(manifest_path.display().to_string()),
+                Some(runtime_identity.attestation.clone()),
+                Some(runtime_identity.capability_projection.clone()),
+                manifest.run_id.clone(),
+                Some(run_root.display().to_string()),
+                None,
+                None,
+                format!("failed to persist machine status packets: {error}"),
+            );
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    };
+    let checkpoint_pointer_path =
+        run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
+    let packet = PsionicTrainStatusPacket::success(
+        manifest,
+        Some(manifest_path.display().to_string()),
+        runtime_identity.attestation.clone(),
+        runtime_identity.capability_projection.clone(),
+        manifest.run_id.clone().or_else(|| {
+            run_root
+                .file_name()
+                .map(|value| value.to_string_lossy().to_string())
+        }),
+        Some(run_root.display().to_string()),
+        status_paths.run_status_packet_path,
+        status_paths.window_status_packet_path,
+        None,
+        None,
+        checkpoint_pointer_path
+            .is_file()
+            .then(|| checkpoint_pointer_path.display().to_string()),
+        None,
+        detail,
+    );
+    emit_success_packet(&packet);
+    ExitCode::SUCCESS
+}
+
 fn refusal_for_validator_replay_error(
     error: &PsionicTrainValidatorReplayError,
 ) -> PsionicTrainRefusalClass {
     match error {
         PsionicTrainValidatorReplayError::Read { .. }
-        | PsionicTrainValidatorReplayError::Write { .. } => PsionicTrainRefusalClass::ArtifactIncomplete,
+        | PsionicTrainValidatorReplayError::Write { .. } => {
+            PsionicTrainRefusalClass::ArtifactIncomplete
+        }
         PsionicTrainValidatorReplayError::Parse { .. }
         | PsionicTrainValidatorReplayError::ArtifactDigestMismatch { .. } => {
             PsionicTrainRefusalClass::ArtifactDigestMismatch
@@ -555,7 +670,9 @@ fn refusal_for_validator_replay_error(
     }
 }
 
-fn validator_disposition_label(disposition: psionic_train::TrainingExecutionValidatorDisposition) -> &'static str {
+fn validator_disposition_label(
+    disposition: psionic_train::TrainingExecutionValidatorDisposition,
+) -> &'static str {
     match disposition {
         psionic_train::TrainingExecutionValidatorDisposition::Accepted => "accepted",
         psionic_train::TrainingExecutionValidatorDisposition::Quarantined => "quarantined",
@@ -1548,6 +1665,163 @@ fn emit_refusal_packet(packet: PsionicTrainStatusPacket) {
         "{}",
         serde_json::to_string_pretty(&packet).expect("status packet should serialize")
     );
+}
+
+fn write_generic_machine_checkpoint_artifacts(
+    manifest: &PsionicTrainInvocationManifest,
+    run_root: &Path,
+) -> Result<(), String> {
+    let checkpoint_label = manifest
+        .checkpoint_label
+        .as_deref()
+        .ok_or_else(|| String::from("record-checkpoint requires checkpoint_label"))?;
+    let optimizer_step = manifest
+        .optimizer_step
+        .ok_or_else(|| String::from("record-checkpoint requires optimizer_step"))?;
+    let checkpoint_ref = manifest
+        .checkpoint_ref
+        .as_deref()
+        .ok_or_else(|| String::from("record-checkpoint requires checkpoint_ref"))?;
+    let run_id = manifest
+        .run_id
+        .clone()
+        .or_else(|| {
+            run_root
+                .file_name()
+                .map(|value| value.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| String::from("unknown_run"));
+    let checkpoints_dir = run_root.join("checkpoints");
+    let manifests_dir = checkpoints_dir.join("manifests");
+    fs::create_dir_all(&manifests_dir).map_err(|error| {
+        format!(
+            "failed to create generic checkpoint manifest directory `{}`: {error}",
+            manifests_dir.display()
+        )
+    })?;
+
+    let relative_manifest_path =
+        format!("checkpoints/manifests/checkpoint_manifest_step-{optimizer_step:06}.json");
+    let checkpoint_object_digest = manifest
+        .checkpoint_object_digest
+        .clone()
+        .unwrap_or_else(|| stable_generic_checkpoint_object_digest(manifest, run_id.as_str()));
+    let checkpoint_total_bytes = manifest.checkpoint_total_bytes.unwrap_or(65_536);
+    let mut checkpoint_manifest = PsionicTrainCheckpointManifest {
+        schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION),
+        lane_id: manifest.lane_id.clone(),
+        run_id: run_id.clone(),
+        checkpoint_label: String::from(checkpoint_label),
+        optimizer_step,
+        checkpoint_ref: String::from(checkpoint_ref),
+        relative_manifest_path: relative_manifest_path.clone(),
+        checkpoint_object_digest,
+        checkpoint_total_bytes,
+        manifest_digest: String::new(),
+    };
+    checkpoint_manifest.manifest_digest = checkpoint_manifest.stable_manifest_digest();
+
+    let checkpoint_pointer = PsionicTrainCheckpointPointer {
+        schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION),
+        lane_id: manifest.lane_id.clone(),
+        run_id,
+        pointer_state: String::from("accepted"),
+        checkpoint_label: String::from(checkpoint_label),
+        optimizer_step,
+        checkpoint_ref: String::from(checkpoint_ref),
+        checkpoint_manifest_relative_path: relative_manifest_path,
+        detail: String::from(
+            "Bounded Apple machine lane retained one accepted checkpoint pointer under the shared machine checkpoint contract.",
+        ),
+    };
+
+    let pointer_path = checkpoints_dir.join("latest_accepted_checkpoint_pointer.json");
+    let manifest_path = run_root.join(&checkpoint_manifest.relative_manifest_path);
+    fs::write(
+        &pointer_path,
+        serde_json::to_vec_pretty(&checkpoint_pointer)
+            .map_err(|error| format!("failed to serialize generic checkpoint pointer: {error}"))?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write generic checkpoint pointer `{}`: {error}",
+            pointer_path.display()
+        )
+    })?;
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&checkpoint_manifest)
+            .map_err(|error| format!("failed to serialize generic checkpoint manifest: {error}"))?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write generic checkpoint manifest `{}`: {error}",
+            manifest_path.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn stable_generic_checkpoint_object_digest(
+    manifest: &PsionicTrainInvocationManifest,
+    run_id: &str,
+) -> String {
+    let mut digest = sha2::Sha256::new();
+    digest.update(b"psionic_train_generic_checkpoint_object|");
+    digest.update(manifest.lane_id.as_bytes());
+    digest.update(b"|");
+    digest.update(run_id.as_bytes());
+    digest.update(b"|");
+    digest.update(
+        manifest
+            .checkpoint_label
+            .as_deref()
+            .unwrap_or("unknown_checkpoint")
+            .as_bytes(),
+    );
+    digest.update(b"|");
+    digest.update(
+        manifest
+            .checkpoint_ref
+            .as_deref()
+            .unwrap_or("checkpoint://unknown")
+            .as_bytes(),
+    );
+    format!("{:x}", digest.finalize())
+}
+
+fn apple_machine_success_detail(manifest: &PsionicTrainInvocationManifest) -> String {
+    match manifest.operation {
+        PsionicTrainOperation::Start => format!(
+            "psionic-train admitted one Apple-homogeneous worker window under lane `{}` using the shared machine manifest and status contract",
+            manifest.lane_id
+        ),
+        PsionicTrainOperation::Resume => format!(
+            "psionic-train resumed one Apple-homogeneous worker window under lane `{}` using the shared machine recovery contract",
+            manifest.lane_id
+        ),
+        PsionicTrainOperation::RecordCheckpoint => format!(
+            "psionic-train retained one Apple-homogeneous checkpoint pointer and manifest under lane `{}` using the shared machine checkpoint contract",
+            manifest.lane_id
+        ),
+        PsionicTrainOperation::Backup => format!(
+            "psionic-train acknowledged bounded Apple backup posture for lane `{}` without widening beyond the shared machine contract",
+            manifest.lane_id
+        ),
+        PsionicTrainOperation::DecideContinueRestart => format!(
+            "psionic-train retained bounded Apple continue-restart posture for lane `{}` under the shared machine recovery contract",
+            manifest.lane_id
+        ),
+        PsionicTrainOperation::RehearseBaseLane => format!(
+            "psionic-train rehearsed the bounded Apple machine lane `{}` under the shared manifest contract",
+            manifest.lane_id
+        ),
+        other => format!(
+            "psionic-train completed Apple machine operation `{}` for lane `{}`",
+            other.cli_subcommand(),
+            manifest.lane_id
+        ),
+    }
 }
 
 fn write_membership_revision_receipt(

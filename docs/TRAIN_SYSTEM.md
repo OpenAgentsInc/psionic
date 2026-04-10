@@ -397,8 +397,9 @@ surface above that same actual-lane operator logic. The typed contract lives in
 `crates/psionic-train/src/main.rs`, the local membership contract lives in
 `crates/psionic-train/src/train_membership.rs`, and the actual-lane shell
 wrapper now dispatches through that binary instead of `cargo run --example ...`.
-The first machine runtime surface intentionally stays narrow: it admits the
-`psion_actual_pretraining_v1` lane only, consumes one explicit
+The first machine runtime surface intentionally stays narrow: it now admits the
+actual CUDA lane `psion_actual_pretraining_v1` plus one bounded Apple lane
+`psion_apple_windowed_training_v1`, consumes one explicit
 `psionic.train.invocation_manifest.v1` JSON manifest with deterministic run id,
 run root or output root, git ref, role, operation, one shared coordination
 envelope, one required admitted `node_pubkey`, and one admitted
@@ -452,6 +453,27 @@ surface is
 the first honest answer to “how does `Pylon` invoke `psionic-train` without
 going through a human shell wrapper?” and “what deterministic contribution
 artifact set did this local assignment materialize?”
+
+The Apple lane stays intentionally narrower than the actual-pretraining lane.
+It does not route through the CUDA actual-pretraining operator. Instead, the
+manifest runtime retains one backend-homogeneous Apple / Metal execution class
+directly inside `crates/psionic-train/src/main.rs` and
+`crates/psionic-train/src/train_runtime.rs`. It still emits the same admitted
+runtime attestation, capability projection, status packets, membership
+receipts, window artifacts, validator replay outputs, and peer checkpoint
+handoff receipts, but its checkpoint lineage is recorded through one generic
+machine pointer and manifest family:
+
+- `psionic.train.checkpoint_pointer.v1`
+- `psionic.train.checkpoint_manifest.v1`
+
+Those generic checkpoint artifacts live at
+`checkpoints/latest_accepted_checkpoint_pointer.json` plus
+`checkpoints/manifests/checkpoint_manifest_step-<optimizer_step>.json`. The
+shared checkpoint-surface and handoff code now reads either the actual-lane
+checkpoint family or that generic family, which is what lets Apple runs use the
+same `serve-checkpoint`, `resume`, and `validate-contribution` entrypoints
+without pretending mixed CUDA/Metal windows are already admitted.
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,

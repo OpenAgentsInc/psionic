@@ -4,6 +4,9 @@ use thiserror::Error;
 
 use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
 
+/// Stable admitted lane id for the first Apple-homogeneous machine training lane.
+pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
+
 /// Stable schema version for the machine-consumable `psionic-train` invocation manifest.
 pub const PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION: &str =
     "psionic.train.invocation_manifest.v1";
@@ -34,12 +37,27 @@ pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID: &str =
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF: &str =
     "psionic.environment.psion_actual_pretraining.cuda_h100.operator@v1";
 
+/// Stable admitted release id for the first Apple machine lane on the runtime surface.
+pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID: &str =
+    "psionic-train.psion_apple_windowed_training.release.v1";
+
+/// Stable admitted environment ref for the first Apple machine lane on the runtime surface.
+pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF: &str =
+    "psionic.environment.psion_apple_windowed_training.metal_mlx.operator@v1";
+
 /// Stable backend family projected by the first admitted actual-lane runtime.
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY: &str = "cuda";
 
 /// Stable topology class projected by the first admitted actual-lane runtime.
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS: &str =
     "homogeneous_four_node_h100_tensor_parallel";
+
+/// Stable backend family projected by the first admitted Apple machine runtime.
+pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY: &str = "metal";
+
+/// Stable topology class projected by the first admitted Apple machine runtime.
+pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS: &str =
+    "homogeneous_apple_silicon_data_parallel";
 
 /// One stable machine role consumed by `psionic-train`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -461,7 +479,7 @@ impl PsionicTrainInvocationManifest {
             });
         }
         require_nonempty(self.lane_id.as_str(), "invocation_manifest.lane_id")?;
-        if self.lane_id != PSION_ACTUAL_PRETRAINING_LANE_ID {
+        if !is_machine_admitted_lane(self.lane_id.as_str()) {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
                 field: String::from("invocation_manifest.lane_id"),
                 detail: format!(
@@ -505,7 +523,8 @@ impl PsionicTrainInvocationManifest {
             "validator_target_contribution_receipt_path",
         )?;
         validate_optional_field(
-            self.validator_target_contribution_artifact_manifest_path.as_deref(),
+            self.validator_target_contribution_artifact_manifest_path
+                .as_deref(),
             "invocation_manifest",
             "validator_target_contribution_artifact_manifest_path",
         )?;
@@ -645,7 +664,8 @@ impl PsionicTrainInvocationManifest {
                 "invocation_manifest.validator_target_contribution_receipt_path",
             )?;
             require_nonempty_option(
-                self.validator_target_contribution_artifact_manifest_path.as_deref(),
+                self.validator_target_contribution_artifact_manifest_path
+                    .as_deref(),
                 "invocation_manifest.validator_target_contribution_artifact_manifest_path",
             )?;
         } else if self.validator_target_contribution_receipt_path.is_some()
@@ -654,7 +674,9 @@ impl PsionicTrainInvocationManifest {
                 .is_some()
         {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                field: String::from("invocation_manifest.validator_target_contribution_receipt_path"),
+                field: String::from(
+                    "invocation_manifest.validator_target_contribution_receipt_path",
+                ),
                 detail: String::from(
                     "validator target contribution inputs are only admitted for validate_contribution on the machine runtime surface",
                 ),
@@ -829,6 +851,13 @@ impl PsionicTrainCapabilityProjection {
                 topology_class: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS),
                 environment_ref: environment_ref.into(),
             }),
+            PSION_APPLE_WINDOWED_TRAINING_LANE_ID => Ok(Self {
+                lane_id: String::from(lane_id),
+                role,
+                backend_family: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY),
+                topology_class: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS),
+                environment_ref: environment_ref.into(),
+            }),
             other => Err(PsionicTrainRuntimeContractError::InvalidValue {
                 field: String::from("invocation_manifest.lane_id"),
                 detail: format!("lane `{other}` has no admitted machine capability projection"),
@@ -843,6 +872,9 @@ pub fn admitted_release_id_for_lane(
 ) -> Result<&'static str, PsionicTrainRuntimeContractError> {
     match lane_id {
         PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID => {
+            Ok(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID)
+        }
         other => Err(PsionicTrainRuntimeContractError::InvalidValue {
             field: String::from("invocation_manifest.lane_id"),
             detail: format!("lane `{other}` has no admitted release id on the machine runtime"),
@@ -856,6 +888,9 @@ pub fn admitted_environment_ref_for_lane(
 ) -> Result<&'static str, PsionicTrainRuntimeContractError> {
     match lane_id {
         PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID => {
+            Ok(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF)
+        }
         other => Err(PsionicTrainRuntimeContractError::InvalidValue {
             field: String::from("invocation_manifest.lane_id"),
             detail: format!(
@@ -863,6 +898,14 @@ pub fn admitted_environment_ref_for_lane(
             ),
         }),
     }
+}
+
+/// Whether the lane is admitted by the machine runtime surface.
+pub fn is_machine_admitted_lane(lane_id: &str) -> bool {
+    matches!(
+        lane_id,
+        PSION_ACTUAL_PRETRAINING_LANE_ID | PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    )
 }
 
 /// Computes the stable runtime build digest from the resolved executable posture.
@@ -1117,7 +1160,9 @@ mod tests {
         assert_eq!(
             error,
             PsionicTrainRuntimeContractError::MissingField {
-                field: String::from("invocation_manifest.validator_target_contribution_receipt_path"),
+                field: String::from(
+                    "invocation_manifest.validator_target_contribution_receipt_path"
+                ),
             }
         );
     }
@@ -1162,6 +1207,34 @@ mod tests {
         assert_eq!(
             digest,
             "2ed54b617f887b00bcb7f65caecf75a40058e5cea8c7b12631948f199c8281b7"
+        );
+    }
+
+    #[test]
+    fn apple_lane_is_admitted_by_machine_contract() {
+        let mut manifest = base_manifest();
+        manifest.lane_id = String::from(PSION_APPLE_WINDOWED_TRAINING_LANE_ID);
+        manifest.admission_identity = PsionicTrainAdmissionIdentity {
+            release_id: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID),
+            build_digest: String::from("sha256:apple-build"),
+            environment_ref: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF),
+        };
+        manifest
+            .validate_machine_contract()
+            .expect("apple machine manifests should validate");
+        let projection = PsionicTrainCapabilityProjection::for_lane(
+            PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+            PsionicTrainRole::Worker,
+            PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+        )
+        .expect("apple capability projection should exist");
+        assert_eq!(
+            projection.backend_family,
+            PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY
+        );
+        assert_eq!(
+            projection.topology_class,
+            PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS
         );
     }
 }

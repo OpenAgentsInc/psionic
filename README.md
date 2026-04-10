@@ -148,6 +148,19 @@ attestation and the retained absolute paths for
 `status/psionic_train_window_status_packet.json`. When a run root exists, the
 runtime also persists one `psionic.train.membership_revision_receipt.v1`
 receipt at `status/membership_revision_receipt.json` and appends revision
+history under `status/membership_revisions/`. That same machine contract now
+admits one second bounded lane, `psion_apple_windowed_training_v1`, for
+homogeneous Apple Silicon / Metal windowed training. The Apple lane uses the
+same invocation manifest, status packets, membership receipt, contribution
+artifacts, validator replay entrypoint, and peer handoff flow, but it retains
+generic checkpoint artifacts under
+`checkpoints/latest_accepted_checkpoint_pointer.json` plus
+`checkpoints/manifests/checkpoint_manifest_step-<optimizer_step>.json` using
+`psionic.train.checkpoint_pointer.v1` and
+`psionic.train.checkpoint_manifest.v1`. That is intentionally narrower than the
+actual pretraining lane: it is one admitted machine lane for backend-homogeneous
+Apple windows, not a claim that the broader CUDA actual-pretraining operator
+contract is now portable across backend families.
 history under `status/membership_revisions/` so the local worker heartbeat,
 drain, rejoin, replace, and failed-session posture remain machine-visible.
 The same machine runtime now also persists one

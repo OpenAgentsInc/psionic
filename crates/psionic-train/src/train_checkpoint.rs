@@ -1,18 +1,75 @@
 use std::{fs, path::Path};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PsionActualPretrainingAutoResumeReceipt, PsionActualPretrainingCheckpointBackupReceipt,
-    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
-    PsionActualPretrainingCurrentRunStatus, PsionicTrainCheckpointHandoffReceipt,
-    PsionicTrainOperation, PsionicTrainRole, PSION_ACTUAL_PRETRAINING_LANE_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PsionActualPretrainingAutoResumeReceipt,
+    PsionActualPretrainingCheckpointBackupReceipt, PsionActualPretrainingCheckpointManifest,
+    PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCurrentRunStatus,
+    PsionicTrainCheckpointHandoffReceipt, PsionicTrainOperation, PsionicTrainRole,
 };
 
 /// Stable schema version for the retained machine-readable checkpoint surface.
 pub const PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION: &str =
     "psionic.train.checkpoint_surface.v1";
+
+/// Stable schema version for the retained generic machine checkpoint pointer.
+pub const PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION: &str =
+    "psionic.train.checkpoint_pointer.v1";
+
+/// Stable schema version for the retained generic machine checkpoint manifest.
+pub const PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION: &str =
+    "psionic.train.checkpoint_manifest.v1";
+
+/// Generic machine checkpoint pointer shared by bounded non-actual-pretraining lanes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainCheckpointPointer {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable lane identifier.
+    pub lane_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Pointer state for the latest checkpoint.
+    pub pointer_state: String,
+    /// Latest checkpoint label.
+    pub checkpoint_label: String,
+    /// Latest accepted optimizer step.
+    pub optimizer_step: u64,
+    /// Latest checkpoint ref.
+    pub checkpoint_ref: String,
+    /// Relative path to the retained checkpoint manifest.
+    pub checkpoint_manifest_relative_path: String,
+    /// Short detail.
+    pub detail: String,
+}
+
+/// Generic machine checkpoint manifest shared by bounded non-actual-pretraining lanes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainCheckpointManifest {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable lane identifier.
+    pub lane_id: String,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Latest checkpoint label.
+    pub checkpoint_label: String,
+    /// Latest accepted optimizer step.
+    pub optimizer_step: u64,
+    /// Latest checkpoint ref.
+    pub checkpoint_ref: String,
+    /// Relative path where this manifest is retained.
+    pub relative_manifest_path: String,
+    /// Stable checkpoint-object digest.
+    pub checkpoint_object_digest: String,
+    /// Stable checkpoint byte count.
+    pub checkpoint_total_bytes: u64,
+    /// Stable canonical manifest digest.
+    pub manifest_digest: String,
+}
 
 /// Shared retained artifact paths for the latest local checkpoint state.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -82,6 +139,131 @@ pub struct PsionicTrainCheckpointSurface {
     pub artifacts: PsionicTrainCheckpointArtifactPaths,
 }
 
+impl PsionicTrainCheckpointPointer {
+    /// Validates the retained generic machine checkpoint pointer.
+    pub fn validate(&self) -> Result<(), PsionicTrainCheckpointSurfaceError> {
+        require_nonempty(
+            self.schema_version.as_str(),
+            "checkpoint_pointer.schema_version",
+        )?;
+        if self.schema_version != PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION {
+            return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from("checkpoint_pointer"),
+                detail: format!(
+                    "checkpoint pointer schema version `{}` is not admitted",
+                    self.schema_version
+                ),
+            });
+        }
+        require_nonempty(self.lane_id.as_str(), "checkpoint_pointer.lane_id")?;
+        require_nonempty(self.run_id.as_str(), "checkpoint_pointer.run_id")?;
+        match self.pointer_state.as_str() {
+            "accepted" | "accepted_primary" => {}
+            other => {
+                return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                    path: String::from("checkpoint_pointer"),
+                    detail: format!(
+                        "checkpoint pointer state `{other}` is not admitted for the generic machine surface"
+                    ),
+                });
+            }
+        }
+        require_nonempty(
+            self.checkpoint_label.as_str(),
+            "checkpoint_pointer.checkpoint_label",
+        )?;
+        if self.optimizer_step == 0 {
+            return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from("checkpoint_pointer"),
+                detail: String::from("checkpoint pointer optimizer_step must be non-zero"),
+            });
+        }
+        require_nonempty(
+            self.checkpoint_ref.as_str(),
+            "checkpoint_pointer.checkpoint_ref",
+        )?;
+        require_nonempty(
+            self.checkpoint_manifest_relative_path.as_str(),
+            "checkpoint_pointer.checkpoint_manifest_relative_path",
+        )?;
+        require_nonempty(self.detail.as_str(), "checkpoint_pointer.detail")?;
+        Ok(())
+    }
+}
+
+impl PsionicTrainCheckpointManifest {
+    /// Computes the stable canonical digest for the manifest.
+    pub fn stable_manifest_digest(&self) -> String {
+        let mut copy = self.clone();
+        copy.manifest_digest.clear();
+        let encoded =
+            serde_json::to_vec(&copy).expect("generic checkpoint manifest should serialize");
+        let mut digest = Sha256::new();
+        digest.update(b"psionic_train_checkpoint_manifest|");
+        digest.update(&encoded);
+        format!("{:x}", digest.finalize())
+    }
+
+    /// Validates the retained generic machine checkpoint manifest.
+    pub fn validate(&self) -> Result<(), PsionicTrainCheckpointSurfaceError> {
+        require_nonempty(
+            self.schema_version.as_str(),
+            "checkpoint_manifest.schema_version",
+        )?;
+        if self.schema_version != PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION {
+            return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from("checkpoint_manifest"),
+                detail: format!(
+                    "checkpoint manifest schema version `{}` is not admitted",
+                    self.schema_version
+                ),
+            });
+        }
+        require_nonempty(self.lane_id.as_str(), "checkpoint_manifest.lane_id")?;
+        require_nonempty(self.run_id.as_str(), "checkpoint_manifest.run_id")?;
+        require_nonempty(
+            self.checkpoint_label.as_str(),
+            "checkpoint_manifest.checkpoint_label",
+        )?;
+        if self.optimizer_step == 0 {
+            return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from("checkpoint_manifest"),
+                detail: String::from("checkpoint manifest optimizer_step must be non-zero"),
+            });
+        }
+        require_nonempty(
+            self.checkpoint_ref.as_str(),
+            "checkpoint_manifest.checkpoint_ref",
+        )?;
+        require_nonempty(
+            self.relative_manifest_path.as_str(),
+            "checkpoint_manifest.relative_manifest_path",
+        )?;
+        require_nonempty(
+            self.checkpoint_object_digest.as_str(),
+            "checkpoint_manifest.checkpoint_object_digest",
+        )?;
+        if self.checkpoint_total_bytes == 0 {
+            return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from("checkpoint_manifest"),
+                detail: String::from("checkpoint manifest checkpoint_total_bytes must be non-zero"),
+            });
+        }
+        require_nonempty(
+            self.manifest_digest.as_str(),
+            "checkpoint_manifest.manifest_digest",
+        )?;
+        let expected_digest = self.stable_manifest_digest();
+        if self.manifest_digest != expected_digest {
+            return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from("checkpoint_manifest"),
+                detail: String::from("checkpoint manifest digest drifted from canonical form"),
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Errors while deriving the retained checkpoint surface from a run root.
 #[derive(Debug, Error)]
 pub enum PsionicTrainCheckpointSurfaceError {
@@ -99,6 +281,10 @@ pub fn inspect_psionic_train_checkpoint_surface(
     role: PsionicTrainRole,
     operation: PsionicTrainOperation,
 ) -> Result<Option<PsionicTrainCheckpointSurface>, PsionicTrainCheckpointSurfaceError> {
+    let retained_surface_path = run_root.join("status/checkpoint_surface.json");
+    let retained_surface: Option<PsionicTrainCheckpointSurface> =
+        load_optional_json(retained_surface_path.as_path())?;
+
     let current_status_path = run_root.join("status/current_run_status.json");
     let checkpoint_pointer_path =
         run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
@@ -107,6 +293,22 @@ pub fn inspect_psionic_train_checkpoint_surface(
     let auto_resume_receipt_path = run_root.join("checkpoints/auto_resume_receipt.json");
     let peer_checkpoint_handoff_receipt_path =
         run_root.join("status/peer_checkpoint_handoff_receipt.json");
+
+    if checkpoint_pointer_path.is_file()
+        && checkpoint_schema_version(checkpoint_pointer_path.as_path())?
+            == Some(String::from(
+                PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
+            ))
+    {
+        return load_generic_checkpoint_surface(
+            run_root,
+            role,
+            operation,
+            checkpoint_pointer_path.as_path(),
+            peer_checkpoint_handoff_receipt_path.as_path(),
+        )
+        .map(Some);
+    }
 
     let current_status: Option<PsionActualPretrainingCurrentRunStatus> =
         load_optional_json(current_status_path.as_path())?;
@@ -210,7 +412,7 @@ pub fn inspect_psionic_train_checkpoint_surface(
         && auto_resume_receipt.is_none()
         && peer_checkpoint_handoff_receipt.is_none()
     {
-        return Ok(None);
+        return Ok(retained_surface);
     }
 
     let run_id = current_status
@@ -359,6 +561,87 @@ pub fn inspect_psionic_train_checkpoint_surface(
     }))
 }
 
+fn load_generic_checkpoint_surface(
+    run_root: &Path,
+    role: PsionicTrainRole,
+    operation: PsionicTrainOperation,
+    checkpoint_pointer_path: &Path,
+    peer_checkpoint_handoff_receipt_path: &Path,
+) -> Result<PsionicTrainCheckpointSurface, PsionicTrainCheckpointSurfaceError> {
+    let checkpoint_pointer: PsionicTrainCheckpointPointer = load_json(checkpoint_pointer_path)?;
+    checkpoint_pointer.validate()?;
+
+    let checkpoint_manifest_path = run_root.join(
+        checkpoint_pointer
+            .checkpoint_manifest_relative_path
+            .as_str(),
+    );
+    let checkpoint_manifest: PsionicTrainCheckpointManifest =
+        load_json(checkpoint_manifest_path.as_path())?;
+    checkpoint_manifest.validate()?;
+    if checkpoint_manifest.lane_id != checkpoint_pointer.lane_id
+        || checkpoint_manifest.run_id != checkpoint_pointer.run_id
+        || checkpoint_manifest.checkpoint_label != checkpoint_pointer.checkpoint_label
+        || checkpoint_manifest.optimizer_step != checkpoint_pointer.optimizer_step
+        || checkpoint_manifest.checkpoint_ref != checkpoint_pointer.checkpoint_ref
+        || checkpoint_manifest.relative_manifest_path
+            != checkpoint_pointer.checkpoint_manifest_relative_path
+    {
+        return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+            path: checkpoint_manifest_path.display().to_string(),
+            detail: String::from(
+                "generic checkpoint manifest drifted from the retained generic checkpoint pointer",
+            ),
+        });
+    }
+
+    let peer_checkpoint_handoff_receipt: Option<PsionicTrainCheckpointHandoffReceipt> =
+        load_optional_json(peer_checkpoint_handoff_receipt_path)?;
+    if let Some(peer_checkpoint_handoff_receipt) = &peer_checkpoint_handoff_receipt {
+        peer_checkpoint_handoff_receipt
+            .validate()
+            .map_err(|error| PsionicTrainCheckpointSurfaceError::Invalid {
+                path: peer_checkpoint_handoff_receipt_path.display().to_string(),
+                detail: error.to_string(),
+            })?;
+    }
+
+    Ok(PsionicTrainCheckpointSurface {
+        schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION),
+        lane_id: checkpoint_pointer.lane_id,
+        role,
+        operation,
+        run_id: checkpoint_pointer.run_id,
+        run_root: run_root.display().to_string(),
+        current_phase: None,
+        pointer_state: Some(checkpoint_pointer.pointer_state),
+        checkpoint_label: Some(checkpoint_pointer.checkpoint_label),
+        optimizer_step: Some(checkpoint_pointer.optimizer_step),
+        checkpoint_ref: Some(checkpoint_pointer.checkpoint_ref),
+        checkpoint_manifest_digest: Some(checkpoint_manifest.manifest_digest),
+        checkpoint_object_digest: Some(checkpoint_manifest.checkpoint_object_digest),
+        checkpoint_total_bytes: Some(checkpoint_manifest.checkpoint_total_bytes),
+        backup_state: None,
+        upload_outcome: Some(String::from("succeeded")),
+        upload_failure_reason: None,
+        recovery_resolution_state: None,
+        recovery_source_kind: None,
+        restored_primary_pointer: Some(false),
+        artifacts: PsionicTrainCheckpointArtifactPaths {
+            checkpoint_pointer_path: Some(checkpoint_pointer_path.display().to_string()),
+            checkpoint_manifest_path: Some(checkpoint_manifest_path.display().to_string()),
+            checkpoint_backup_receipt_path: None,
+            checkpoint_backup_pointer_path: None,
+            checkpoint_backup_manifest_path: None,
+            auto_resume_receipt_path: None,
+            peer_checkpoint_handoff_receipt_path: peer_checkpoint_handoff_receipt
+                .map(|_| peer_checkpoint_handoff_receipt_path.display().to_string()),
+            checkpoint_failure_drill_path: checkpoint_failure_drill_path(run_root, operation)
+                .map(|path| path.display().to_string()),
+        },
+    })
+}
+
 fn checkpoint_failure_drill_path(
     run_root: &Path,
     operation: PsionicTrainOperation,
@@ -404,4 +687,36 @@ fn load_optional_json<T: DeserializeOwned>(
         return Ok(None);
     }
     load_json(path).map(Some)
+}
+
+fn checkpoint_schema_version(
+    path: &Path,
+) -> Result<Option<String>, PsionicTrainCheckpointSurfaceError> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).map_err(|error| PsionicTrainCheckpointSurfaceError::Read {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
+        PsionicTrainCheckpointSurfaceError::Parse {
+            path: path.display().to_string(),
+            detail: error.to_string(),
+        }
+    })?;
+    Ok(value
+        .get("schema_version")
+        .and_then(|value| value.as_str())
+        .map(String::from))
+}
+
+fn require_nonempty(value: &str, field: &str) -> Result<(), PsionicTrainCheckpointSurfaceError> {
+    if value.trim().is_empty() {
+        return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+            path: String::from(field),
+            detail: String::from("value must not be empty"),
+        });
+    }
+    Ok(())
 }

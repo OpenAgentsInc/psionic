@@ -1,13 +1,15 @@
 use std::{fs, path::Path};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    inspect_psionic_train_checkpoint_surface, PsionActualPretrainingCheckpointManifest,
-    PsionActualPretrainingCheckpointPointer, PsionicTrainOperation, PsionicTrainRole,
-    PSION_ACTUAL_PRETRAINING_LANE_ID,
+    PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCheckpointManifest,
+    PsionActualPretrainingCheckpointPointer, PsionicTrainCheckpointManifest,
+    PsionicTrainCheckpointPointer, PsionicTrainOperation, PsionicTrainRole,
+    inspect_psionic_train_checkpoint_surface,
 };
 
 /// Stable schema version for the machine-readable peer checkpoint handoff receipt.
@@ -113,14 +115,7 @@ impl PsionicTrainCheckpointHandoffReceipt {
                 ),
             });
         }
-        if self.lane_id != PSION_ACTUAL_PRETRAINING_LANE_ID {
-            return Err(PsionicTrainCheckpointHandoffError::Invalid {
-                detail: format!(
-                    "checkpoint handoff lane must stay `{}` but was `{}`",
-                    PSION_ACTUAL_PRETRAINING_LANE_ID, self.lane_id
-                ),
-            });
-        }
+        require_nonempty(self.lane_id.as_str(), "checkpoint handoff lane_id")?;
         require_nonempty(
             self.serving_node_pubkey.as_str(),
             "checkpoint handoff serving_node_pubkey",
@@ -251,67 +246,67 @@ pub fn build_psionic_train_checkpoint_handoff_receipt(
         restored_from_backup,
     ) = if checkpoint_surface.pointer_state.as_deref() == Some("accepted") {
         (
-                PsionicTrainCheckpointHandoffSourceKind::LivePrimaryPointer,
-                checkpoint_surface
-                    .artifacts
-                    .checkpoint_pointer_path
-                    .clone()
-                    .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
-                        detail: String::from(
-                            "checkpoint handoff requires the live primary pointer path",
-                        ),
-                    })?,
-                checkpoint_surface
-                    .artifacts
-                    .checkpoint_manifest_path
-                    .clone()
-                    .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
-                        detail: String::from(
-                            "checkpoint handoff requires the live checkpoint manifest path",
-                        ),
-                    })?,
-                String::from(
-                    "Recovery-source handoff points the joiner at the live accepted checkpoint pointer and manifest from the serving run root.",
-                ),
-                false,
-            )
+            PsionicTrainCheckpointHandoffSourceKind::LivePrimaryPointer,
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .clone()
+                .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
+                    detail: String::from(
+                        "checkpoint handoff requires the live primary pointer path",
+                    ),
+                })?,
+            checkpoint_surface
+                .artifacts
+                .checkpoint_manifest_path
+                .clone()
+                .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
+                    detail: String::from(
+                        "checkpoint handoff requires the live checkpoint manifest path",
+                    ),
+                })?,
+            String::from(
+                "Recovery-source handoff points the joiner at the live accepted checkpoint pointer and manifest from the serving run root.",
+            ),
+            false,
+        )
     } else if checkpoint_surface.backup_state.as_deref() == Some("backed_up") {
         (
-                PsionicTrainCheckpointHandoffSourceKind::DurableBackupCopy,
-                checkpoint_surface
-                    .artifacts
-                    .checkpoint_backup_pointer_path
-                    .clone()
-                    .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
-                        detail: String::from(
-                            "checkpoint handoff requires the durable backup pointer path",
-                        ),
-                    })?,
-                checkpoint_surface
-                    .artifacts
-                    .checkpoint_backup_manifest_path
-                    .clone()
-                    .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
-                        detail: String::from(
-                            "checkpoint handoff requires the durable backup manifest path",
-                        ),
-                    })?,
-                String::from(
-                    "Recovery-source handoff falls back to the durable backup checkpoint copy because the live primary pointer is not presently usable.",
-                ),
-                true,
-            )
+            PsionicTrainCheckpointHandoffSourceKind::DurableBackupCopy,
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_pointer_path
+                .clone()
+                .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
+                    detail: String::from(
+                        "checkpoint handoff requires the durable backup pointer path",
+                    ),
+                })?,
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_manifest_path
+                .clone()
+                .ok_or_else(|| PsionicTrainCheckpointHandoffError::MissingCheckpoint {
+                    detail: String::from(
+                        "checkpoint handoff requires the durable backup manifest path",
+                    ),
+                })?,
+            String::from(
+                "Recovery-source handoff falls back to the durable backup checkpoint copy because the live primary pointer is not presently usable.",
+            ),
+            true,
+        )
     } else {
         return Err(PsionicTrainCheckpointHandoffError::MissingCheckpoint {
-                detail: String::from(
-                    "checkpoint handoff requires an accepted primary checkpoint or a durable backup copy",
-                ),
-            });
+            detail: String::from(
+                "checkpoint handoff requires an accepted primary checkpoint or a durable backup copy",
+            ),
+        });
     };
 
     let mut receipt = PsionicTrainCheckpointHandoffReceipt {
         schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_HANDOFF_RECEIPT_SCHEMA_VERSION),
-        lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+        lane_id: checkpoint_surface.lane_id,
         serving_node_pubkey: String::from(serving_node_pubkey),
         peer_node_pubkey: String::from(peer_node_pubkey),
         source_run_id: checkpoint_surface.run_id,
@@ -350,49 +345,14 @@ pub fn materialize_psionic_train_checkpoint_handoff(
         });
     }
 
-    let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
-        load_json(Path::new(receipt.source_checkpoint_pointer_path.as_str()))?;
-    checkpoint_pointer
-        .validate()
-        .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
-            detail: format!("source checkpoint pointer is invalid: {error}"),
-        })?;
-    let checkpoint_manifest: PsionActualPretrainingCheckpointManifest =
-        load_json(Path::new(receipt.source_checkpoint_manifest_path.as_str()))?;
-    checkpoint_manifest.validate().map_err(|error| {
-        PsionicTrainCheckpointHandoffError::Invalid {
-            detail: format!("source checkpoint manifest is invalid: {error}"),
+    match checkpoint_schema_version(Path::new(receipt.source_checkpoint_pointer_path.as_str()))? {
+        Some(schema_version)
+            if schema_version == PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION =>
+        {
+            materialize_generic_checkpoint_handoff(joiner_run_root, &receipt)
         }
-    })?;
-
-    if checkpoint_pointer.run_id != receipt.source_run_id
-        || checkpoint_manifest.run_id != receipt.source_run_id
-        || checkpoint_pointer
-            .checkpoint_manifest_relative_path
-            .as_deref()
-            != Some(checkpoint_manifest.relative_manifest_path.as_str())
-        || checkpoint_manifest.manifest_digest != receipt.checkpoint_manifest_digest
-        || checkpoint_manifest.checkpoint_object_digest != receipt.checkpoint_object_digest
-        || checkpoint_manifest.checkpoint_total_bytes != receipt.checkpoint_total_bytes
-    {
-        return Err(PsionicTrainCheckpointHandoffError::Invalid {
-            detail: String::from("checkpoint handoff receipt drifted from the source checkpoint"),
-        });
+        _ => materialize_actual_pretraining_checkpoint_handoff(joiner_run_root, &receipt),
     }
-
-    let local_pointer_path =
-        joiner_run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
-    let local_manifest_path = joiner_run_root.join(&checkpoint_manifest.relative_manifest_path);
-    let retention = retain_psionic_train_checkpoint_handoff_receipt(joiner_run_root, &receipt)?;
-
-    write_json(local_pointer_path.as_path(), &checkpoint_pointer)?;
-    write_json(local_manifest_path.as_path(), &checkpoint_manifest)?;
-
-    Ok(PsionicTrainCheckpointHandoffMaterialization {
-        local_receipt_path: retention.current_receipt_path,
-        local_checkpoint_pointer_path: local_pointer_path.display().to_string(),
-        local_checkpoint_manifest_path: local_manifest_path.display().to_string(),
-    })
 }
 
 pub fn retain_psionic_train_checkpoint_handoff_receipt(
@@ -466,6 +426,133 @@ fn load_json<T: DeserializeOwned>(path: &Path) -> Result<T, PsionicTrainCheckpoi
         path: path.display().to_string(),
         detail: error.to_string(),
     })
+}
+
+fn materialize_generic_checkpoint_handoff(
+    joiner_run_root: &Path,
+    receipt: &PsionicTrainCheckpointHandoffReceipt,
+) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
+    let checkpoint_pointer: PsionicTrainCheckpointPointer =
+        load_json(Path::new(receipt.source_checkpoint_pointer_path.as_str()))?;
+    checkpoint_pointer
+        .validate()
+        .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
+            detail: error.to_string(),
+        })?;
+    let checkpoint_manifest: PsionicTrainCheckpointManifest =
+        load_json(Path::new(receipt.source_checkpoint_manifest_path.as_str()))?;
+    checkpoint_manifest.validate().map_err(|error| {
+        PsionicTrainCheckpointHandoffError::Invalid {
+            detail: error.to_string(),
+        }
+    })?;
+
+    if checkpoint_pointer.lane_id != receipt.lane_id
+        || checkpoint_manifest.lane_id != receipt.lane_id
+        || checkpoint_pointer.run_id != receipt.source_run_id
+        || checkpoint_manifest.run_id != receipt.source_run_id
+        || checkpoint_pointer.checkpoint_manifest_relative_path
+            != checkpoint_manifest.relative_manifest_path
+        || checkpoint_manifest.manifest_digest != receipt.checkpoint_manifest_digest
+        || checkpoint_manifest.checkpoint_object_digest != receipt.checkpoint_object_digest
+        || checkpoint_manifest.checkpoint_total_bytes != receipt.checkpoint_total_bytes
+    {
+        return Err(PsionicTrainCheckpointHandoffError::Invalid {
+            detail: String::from("checkpoint handoff receipt drifted from the source checkpoint"),
+        });
+    }
+
+    let local_pointer_path =
+        joiner_run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
+    let local_manifest_path = joiner_run_root.join(&checkpoint_manifest.relative_manifest_path);
+    let retention = retain_psionic_train_checkpoint_handoff_receipt(joiner_run_root, receipt)?;
+
+    write_json(local_pointer_path.as_path(), &checkpoint_pointer)?;
+    write_json(local_manifest_path.as_path(), &checkpoint_manifest)?;
+
+    Ok(PsionicTrainCheckpointHandoffMaterialization {
+        local_receipt_path: retention.current_receipt_path,
+        local_checkpoint_pointer_path: local_pointer_path.display().to_string(),
+        local_checkpoint_manifest_path: local_manifest_path.display().to_string(),
+    })
+}
+
+fn materialize_actual_pretraining_checkpoint_handoff(
+    joiner_run_root: &Path,
+    receipt: &PsionicTrainCheckpointHandoffReceipt,
+) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
+    let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
+        load_json(Path::new(receipt.source_checkpoint_pointer_path.as_str()))?;
+    checkpoint_pointer
+        .validate()
+        .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
+            detail: format!("source checkpoint pointer is invalid: {error}"),
+        })?;
+    let checkpoint_manifest: PsionActualPretrainingCheckpointManifest =
+        load_json(Path::new(receipt.source_checkpoint_manifest_path.as_str()))?;
+    checkpoint_manifest.validate().map_err(|error| {
+        PsionicTrainCheckpointHandoffError::Invalid {
+            detail: format!("source checkpoint manifest is invalid: {error}"),
+        }
+    })?;
+
+    if checkpoint_pointer.run_id != receipt.source_run_id
+        || checkpoint_manifest.run_id != receipt.source_run_id
+        || checkpoint_pointer
+            .checkpoint_manifest_relative_path
+            .as_deref()
+            != Some(checkpoint_manifest.relative_manifest_path.as_str())
+        || checkpoint_manifest.manifest_digest != receipt.checkpoint_manifest_digest
+        || checkpoint_manifest.checkpoint_object_digest != receipt.checkpoint_object_digest
+        || checkpoint_manifest.checkpoint_total_bytes != receipt.checkpoint_total_bytes
+    {
+        return Err(PsionicTrainCheckpointHandoffError::Invalid {
+            detail: String::from("checkpoint handoff receipt drifted from the source checkpoint"),
+        });
+    }
+
+    let local_pointer_path =
+        joiner_run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
+    let local_manifest_path = joiner_run_root.join(&checkpoint_manifest.relative_manifest_path);
+    let retention = retain_psionic_train_checkpoint_handoff_receipt(joiner_run_root, receipt)?;
+
+    write_json(local_pointer_path.as_path(), &checkpoint_pointer)?;
+    write_json(local_manifest_path.as_path(), &checkpoint_manifest)?;
+
+    Ok(PsionicTrainCheckpointHandoffMaterialization {
+        local_receipt_path: retention.current_receipt_path,
+        local_checkpoint_pointer_path: local_pointer_path.display().to_string(),
+        local_checkpoint_manifest_path: local_manifest_path.display().to_string(),
+    })
+}
+
+fn checkpoint_schema_version(
+    path: &Path,
+) -> Result<Option<String>, PsionicTrainCheckpointHandoffError> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).map_err(|error| PsionicTrainCheckpointHandoffError::Read {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|error| {
+        PsionicTrainCheckpointHandoffError::Parse {
+            path: path.display().to_string(),
+            detail: error.to_string(),
+        }
+    })?;
+    let schema_version = value
+        .get("schema_version")
+        .and_then(|value| value.as_str())
+        .map(String::from);
+    if matches!(
+        schema_version.as_deref(),
+        Some(PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION)
+    ) {
+        return Ok(None);
+    }
+    Ok(schema_version)
 }
 
 fn write_json<T: Serialize>(

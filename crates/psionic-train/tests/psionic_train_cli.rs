@@ -5,19 +5,21 @@ use std::{
 };
 
 use psionic_train::{
-    runtime_build_digest, PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
-    PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointSurface,
-    PsionicTrainContributionArtifactManifest, PsionicTrainCoordinationContext,
-    PsionicTrainInvocationManifest,
-    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
-    PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
-    PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
-    PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
-    PsionicTrainWindowExecution,
-    PsionicTrainWindowStatusPacket,
-    TrainingExecutionValidatorDisposition,
-    PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+    PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
     PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+    PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
+    PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointManifest,
+    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PsionicTrainContributionArtifactManifest, PsionicTrainCoordinationContext,
+    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
+    PsionicTrainRunStatusPacket, PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
+    PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
+    PsionicTrainWindowExecution, PsionicTrainWindowStatusPacket,
+    TrainingExecutionValidatorDisposition, runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -80,29 +82,43 @@ fn dirty_tree_build_inputs() -> (String, Option<String>) {
     )
 }
 
-fn admitted_identity(git_commit_sha: &str) -> PsionicTrainAdmissionIdentity {
+fn admitted_identity_for_lane(
+    git_commit_sha: &str,
+    lane_id: &str,
+) -> PsionicTrainAdmissionIdentity {
     let (dirty_tree_admission, workspace_status_sha256) = dirty_tree_build_inputs();
-    PsionicTrainAdmissionIdentity {
-        release_id: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
-        build_digest: runtime_build_digest(
+    let (release_id, environment_ref) = match lane_id {
+        psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID => (
             PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+            PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+        ),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID => (
+            PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
+            PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+        ),
+        other => panic!("unexpected lane for admitted identity: {other}"),
+    };
+    PsionicTrainAdmissionIdentity {
+        release_id: String::from(release_id),
+        build_digest: runtime_build_digest(
+            release_id,
             PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-            psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID,
+            lane_id,
             git_commit_sha,
             dirty_tree_admission.as_str(),
             workspace_status_sha256.as_deref(),
-            PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+            environment_ref,
         ),
-        environment_ref: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+        environment_ref: String::from(environment_ref),
     }
 }
 
-fn base_manifest() -> PsionicTrainInvocationManifest {
+fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
     let git_commit_sha = git_head();
     PsionicTrainInvocationManifest {
         schema_version: String::from(PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION),
         runtime_surface_id: String::from(PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
-        lane_id: String::from(psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID),
+        lane_id: String::from(lane_id),
         role: PsionicTrainRole::Worker,
         operation: PsionicTrainOperation::Start,
         coordination: PsionicTrainCoordinationContext {
@@ -113,7 +129,7 @@ fn base_manifest() -> PsionicTrainInvocationManifest {
             node_pubkey: Some(String::from("npub1-psionic-cli-test")),
             membership_revision: None,
         },
-        admission_identity: admitted_identity(git_commit_sha.as_str()),
+        admission_identity: admitted_identity_for_lane(git_commit_sha.as_str(), lane_id),
         run_id: Some(String::from("psion-train-cli-test")),
         output_root: None,
         run_root: None,
@@ -135,6 +151,10 @@ fn base_manifest() -> PsionicTrainInvocationManifest {
         inject_eval_worker_unavailable: false,
         manifest_digest: None,
     }
+}
+
+fn base_manifest() -> PsionicTrainInvocationManifest {
+    base_manifest_for_lane(psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID)
 }
 
 fn add_admitted_observations(manifest: &mut PsionicTrainInvocationManifest) {
@@ -178,12 +198,19 @@ fn build_launch_manifest(run_root: &Path) -> PsionicTrainInvocationManifest {
     manifest
 }
 
+fn build_apple_launch_manifest(run_root: &Path) -> PsionicTrainInvocationManifest {
+    let mut manifest = base_manifest_for_lane(PSION_APPLE_WINDOWED_TRAINING_LANE_ID);
+    manifest.output_root = Some(run_root.display().to_string());
+    manifest.allow_dirty_tree = true;
+    manifest
+}
+
 fn build_retained_operation_manifest(
     run_root: &Path,
     role: PsionicTrainRole,
     operation: PsionicTrainOperation,
 ) -> PsionicTrainInvocationManifest {
-    let mut manifest = base_manifest();
+    let mut manifest = base_manifest_for_lane(psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID);
     manifest.role = role;
     manifest.operation = operation;
     manifest.run_id = None;
@@ -193,6 +220,27 @@ fn build_retained_operation_manifest(
     manifest.peer_checkpoint_handoff_receipt_path = None;
     manifest.allow_dirty_tree = true;
     add_admitted_observations(&mut manifest);
+    manifest
+}
+
+fn build_retained_operation_manifest_for_lane(
+    lane_id: &str,
+    run_root: &Path,
+    role: PsionicTrainRole,
+    operation: PsionicTrainOperation,
+) -> PsionicTrainInvocationManifest {
+    let mut manifest = base_manifest_for_lane(lane_id);
+    manifest.role = role;
+    manifest.operation = operation;
+    manifest.run_id = None;
+    manifest.output_root = None;
+    manifest.run_root = Some(run_root.display().to_string());
+    manifest.peer_node_pubkey = None;
+    manifest.peer_checkpoint_handoff_receipt_path = None;
+    manifest.allow_dirty_tree = true;
+    if lane_id == psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID {
+        add_admitted_observations(&mut manifest);
+    }
     manifest
 }
 
@@ -228,6 +276,24 @@ fn build_validator_manifest(
         Some(contribution_receipt_path.display().to_string());
     manifest.validator_target_contribution_artifact_manifest_path =
         Some(contribution_artifact_manifest_path.display().to_string());
+    manifest
+}
+
+fn build_apple_record_checkpoint_manifest(
+    run_root: &Path,
+    checkpoint_label: &str,
+    optimizer_step: u64,
+    checkpoint_ref: &str,
+) -> PsionicTrainInvocationManifest {
+    let mut manifest = build_retained_operation_manifest_for_lane(
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+        run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    manifest.checkpoint_label = Some(String::from(checkpoint_label));
+    manifest.optimizer_step = Some(optimizer_step);
+    manifest.checkpoint_ref = Some(String::from(checkpoint_ref));
     manifest
 }
 
@@ -399,38 +465,205 @@ fn machine_manifest_record_checkpoint_persists_checkpoint_surface() {
         checkpoint_surface.upload_outcome.as_deref(),
         Some("succeeded")
     );
-    assert!(Path::new(
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_manifest_path
+                .as_deref()
+                .expect("checkpoint manifest path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_receipt_path
+                .as_deref()
+                .expect("checkpoint backup receipt path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_pointer_path
+                .as_deref()
+                .expect("checkpoint backup pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_manifest_path
+                .as_deref()
+                .expect("checkpoint backup manifest path should exist"),
+        )
+        .is_file()
+    );
+}
+
+#[test]
+fn apple_manifest_start_emits_metal_capability_projection() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("apple-run");
+    let manifest_path = tempdir.path().join("apple-start.json");
+    let mut manifest = build_apple_launch_manifest(&run_root);
+    bind_window_context(
+        &mut manifest,
+        "apple-window-0001",
+        "apple-assignment-0001",
+        1,
+    );
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("apple status packet should parse");
+    assert_eq!(packet.outcome, PsionicTrainOutcomeKind::Succeeded);
+    let capability_projection = packet
+        .capability_projection
+        .as_ref()
+        .expect("apple capability projection should exist");
+    assert_eq!(capability_projection.backend_family.as_str(), "metal");
+    assert_eq!(
+        capability_projection.topology_class.as_str(),
+        "homogeneous_apple_silicon_data_parallel"
+    );
+    assert_eq!(
+        packet.lane_id.as_str(),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    );
+
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("apple run status path should exist"),
+    );
+    assert_eq!(
+        run_status.lane_id.as_str(),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    );
+    assert_eq!(
+        run_status.capability_projection.backend_family.as_str(),
+        "metal"
+    );
+    assert!(run_status.current_status_path.is_none());
+    assert!(run_status.retained_summary_path.is_none());
+}
+
+#[test]
+fn apple_manifest_record_checkpoint_persists_generic_checkpoint_artifacts() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("apple-run");
+    let launch_manifest_path = tempdir.path().join("apple-start.json");
+    let mut launch_manifest = build_apple_launch_manifest(&run_root);
+    bind_window_context(
+        &mut launch_manifest,
+        "apple-window-0002",
+        "apple-assignment-0002",
+        2,
+    );
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&launch_output.stdout),
+        String::from_utf8_lossy(&launch_output.stderr)
+    );
+
+    let checkpoint_manifest_path = tempdir.path().join("apple-record-checkpoint.json");
+    let mut checkpoint_manifest = build_apple_record_checkpoint_manifest(
+        &run_root,
+        "apple-window-final",
+        2_048,
+        "checkpoint://psion/apple/window/final",
+    );
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "apple-window-0002",
+        "apple-assignment-0002",
+        2,
+    );
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+
+    let output = run_machine_manifest(&checkpoint_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("apple checkpoint packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("apple run status path should exist"),
+    );
+    let checkpoint_surface_path = run_status
+        .artifacts
+        .checkpoint_surface_path
+        .as_ref()
+        .expect("apple checkpoint surface path should exist");
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(checkpoint_surface_path);
+    assert_eq!(
+        checkpoint_surface.lane_id.as_str(),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    );
+    assert_eq!(
+        checkpoint_surface.pointer_state.as_deref(),
+        Some("accepted")
+    );
+    assert_eq!(checkpoint_surface.optimizer_step, Some(2_048));
+    assert_eq!(
+        checkpoint_surface.checkpoint_ref.as_deref(),
+        Some("checkpoint://psion/apple/window/final")
+    );
+
+    let checkpoint_pointer: PsionicTrainCheckpointPointer = parse_json(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_ref()
+            .expect("apple checkpoint pointer path should exist"),
+    );
+    assert_eq!(
+        checkpoint_pointer.lane_id.as_str(),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    );
+    assert_eq!(checkpoint_pointer.optimizer_step, 2_048);
+
+    let checkpoint_manifest: PsionicTrainCheckpointManifest = parse_json(
         checkpoint_surface
             .artifacts
             .checkpoint_manifest_path
-            .as_deref()
-            .expect("checkpoint manifest path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_backup_receipt_path
-            .as_deref()
-            .expect("checkpoint backup receipt path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_backup_pointer_path
-            .as_deref()
-            .expect("checkpoint backup pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_backup_manifest_path
-            .as_deref()
-            .expect("checkpoint backup manifest path should exist"),
-    )
-    .is_file());
+            .as_ref()
+            .expect("apple checkpoint manifest path should exist"),
+    );
+    assert_eq!(
+        checkpoint_manifest.lane_id.as_str(),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    );
+    assert_eq!(
+        checkpoint_manifest.manifest_digest,
+        checkpoint_manifest.stable_manifest_digest()
+    );
 }
 
 #[test]
@@ -509,22 +742,26 @@ fn machine_manifest_resume_recovers_primary_pointer_from_backup() {
         Some("backup_receipt")
     );
     assert_eq!(checkpoint_surface.restored_primary_pointer, Some(true));
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_pointer_path
-            .as_deref()
-            .expect("checkpoint pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .auto_resume_receipt_path
-            .as_deref()
-            .expect("auto-resume receipt path should exist"),
-    )
-    .is_file());
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .as_deref()
+                .expect("checkpoint pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .auto_resume_receipt_path
+                .as_deref()
+                .expect("auto-resume receipt path should exist"),
+        )
+        .is_file()
+    );
 }
 
 #[test]
@@ -606,7 +843,12 @@ fn machine_manifest_window_context_emits_window_and_contribution_artifacts() {
     );
     assert!(run_status.artifacts.window_execution_path.is_some());
     assert!(run_status.artifacts.contribution_receipt_path.is_some());
-    assert!(run_status.artifacts.contribution_artifact_manifest_path.is_some());
+    assert!(
+        run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .is_some()
+    );
     assert!(run_status.artifacts.sealed_window_bundle_path.is_some());
 
     let window_execution: PsionicTrainWindowExecution = parse_json(
@@ -653,7 +895,12 @@ fn machine_manifest_second_assignment_updates_sealed_window_rollup() {
         PsionicTrainRole::Worker,
         PsionicTrainOperation::RecordCheckpoint,
     );
-    bind_window_context(&mut checkpoint_manifest, "window-0001", "assignment-0002", 2);
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "window-0001",
+        "assignment-0002",
+        2,
+    );
     checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
     checkpoint_manifest.optimizer_step = Some(16_384);
     checkpoint_manifest.checkpoint_ref =
@@ -869,30 +1116,36 @@ fn machine_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         checkpoint_surface.recovery_resolution_state.as_deref(),
         Some("accepted_primary_pointer")
     );
-    assert!(Path::new(
-        run_status
-            .artifacts
-            .checkpoint_handoff_receipt_path
-            .as_deref()
-            .expect("joiner checkpoint handoff receipt path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_pointer_path
-            .as_deref()
-            .expect("checkpoint pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_manifest_path
-            .as_deref()
-            .expect("checkpoint manifest path should exist"),
-    )
-    .is_file());
+    assert!(
+        Path::new(
+            run_status
+                .artifacts
+                .checkpoint_handoff_receipt_path
+                .as_deref()
+                .expect("joiner checkpoint handoff receipt path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .as_deref()
+                .expect("checkpoint pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_manifest_path
+                .as_deref()
+                .expect("checkpoint manifest path should exist"),
+        )
+        .is_file()
+    );
 }
 
 #[test]
@@ -970,10 +1223,18 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
     let worker_run_root = tempdir.path().join("worker-run");
     let worker_launch_manifest_path = tempdir.path().join("worker-windowed-launch.json");
     let mut worker_launch_manifest = build_launch_manifest(&worker_run_root);
-    bind_window_context(&mut worker_launch_manifest, "window-0001", "assignment-0001", 1);
+    bind_window_context(
+        &mut worker_launch_manifest,
+        "window-0001",
+        "assignment-0001",
+        1,
+    );
     write_manifest(&worker_launch_manifest_path, &mut worker_launch_manifest);
     let worker_launch_output = run_machine_manifest(&worker_launch_manifest_path);
-    assert!(worker_launch_output.status.success(), "worker launch should succeed");
+    assert!(
+        worker_launch_output.status.success(),
+        "worker launch should succeed"
+    );
 
     let worker_checkpoint_manifest_path = tempdir.path().join("worker-record-checkpoint.json");
     let mut worker_checkpoint_manifest = build_retained_operation_manifest(
@@ -996,7 +1257,10 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
         &mut worker_checkpoint_manifest,
     );
     let worker_output = run_machine_manifest(&worker_checkpoint_manifest_path);
-    assert!(worker_output.status.success(), "worker checkpoint should succeed");
+    assert!(
+        worker_output.status.success(),
+        "worker checkpoint should succeed"
+    );
 
     let worker_packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
@@ -1066,10 +1330,7 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
         score_artifact.disposition,
         TrainingExecutionValidatorDisposition::Accepted
     );
-    assert_eq!(
-        score_artifact.challenge_id.as_str(),
-        "challenge-0001"
-    );
+    assert_eq!(score_artifact.challenge_id.as_str(), "challenge-0001");
 }
 
 #[test]
@@ -1082,7 +1343,10 @@ fn validator_manifest_emits_rejected_score_receipt_for_refused_contribution() {
     worker_manifest.admission_identity.build_digest = String::from("sha256:not-the-real-build");
     write_manifest(&worker_manifest_path, &mut worker_manifest);
     let worker_output = run_machine_manifest(&worker_manifest_path);
-    assert!(!worker_output.status.success(), "worker launch should be refused");
+    assert!(
+        !worker_output.status.success(),
+        "worker launch should be refused"
+    );
 
     let worker_packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&worker_output.stderr).expect("worker refusal packet should parse");
@@ -1156,7 +1420,10 @@ fn validator_manifest_refuses_stale_assignment_targets() {
     bind_window_context(&mut worker_manifest, "window-0001", "assignment-0001", 1);
     write_manifest(&worker_manifest_path, &mut worker_manifest);
     let worker_output = run_machine_manifest(&worker_manifest_path);
-    assert!(worker_output.status.success(), "worker launch should succeed");
+    assert!(
+        worker_output.status.success(),
+        "worker launch should succeed"
+    );
 
     let worker_packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
@@ -1193,7 +1460,10 @@ fn validator_manifest_refuses_stale_assignment_targets() {
 
     let output = run_machine_manifest(&manifest_path);
 
-    assert!(!output.status.success(), "stale validator target should be refused");
+    assert!(
+        !output.status.success(),
+        "stale validator target should be refused"
+    );
     let packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
     assert_eq!(
@@ -1224,7 +1494,10 @@ fn validator_manifest_refuses_missing_replay_inputs() {
 
     let output = run_machine_manifest(&manifest_path);
 
-    assert!(!output.status.success(), "missing validator inputs should be refused");
+    assert!(
+        !output.status.success(),
+        "missing validator inputs should be refused"
+    );
     let packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
     assert_eq!(
@@ -1242,7 +1515,10 @@ fn validator_manifest_refuses_artifact_manifest_digest_drift() {
     bind_window_context(&mut worker_manifest, "window-0001", "assignment-0001", 1);
     write_manifest(&worker_manifest_path, &mut worker_manifest);
     let worker_output = run_machine_manifest(&worker_manifest_path);
-    assert!(worker_output.status.success(), "worker launch should succeed");
+    assert!(
+        worker_output.status.success(),
+        "worker launch should succeed"
+    );
 
     let worker_packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
@@ -1288,7 +1564,10 @@ fn validator_manifest_refuses_artifact_manifest_digest_drift() {
 
     let output = run_machine_manifest(&manifest_path);
 
-    assert!(!output.status.success(), "drifted validator input should be refused");
+    assert!(
+        !output.status.success(),
+        "drifted validator input should be refused"
+    );
     let packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
     assert_eq!(
