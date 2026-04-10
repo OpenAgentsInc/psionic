@@ -441,3 +441,157 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     );
     format!("{:x}", hasher.finalize())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        classify_validator_result, PsionicTrainValidatorReplayReasonCode,
+        TrainingExecutionValidatorDisposition,
+    };
+    use crate::{
+        PsionicTrainAuthorityOwner, PsionicTrainCheckpointArtifactPaths,
+        PsionicTrainCheckpointSurface, PsionicTrainContributionReceipt, PsionicTrainOutcomeKind,
+        PsionicTrainRole, PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
+    };
+
+    fn succeeded_contribution() -> PsionicTrainContributionReceipt {
+        let mut receipt = PsionicTrainContributionReceipt {
+            schema_version: String::from(PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            run_id: String::from("worker-run"),
+            window_id: String::from("window-0001"),
+            window_execution_id: String::from("window-execution-1"),
+            assignment_id: String::from("assignment-0001"),
+            contribution_id: String::from("contribution-0001"),
+            node_pubkey: String::from("npub1-worker"),
+            role: PsionicTrainRole::Worker,
+            operation: String::from("record-checkpoint"),
+            outcome: PsionicTrainOutcomeKind::Succeeded,
+            exit_code: 0,
+            retryable: false,
+            authority_owner: PsionicTrainAuthorityOwner::Pylon,
+            refusal_class: None,
+            artifact_manifest_path: String::from("/tmp/artifact_manifest.json"),
+            artifact_manifest_digest: String::from("artifact-digest-1"),
+            artifact_count: 4,
+            contribution_digest: String::new(),
+            detail: String::from("successful contribution"),
+        };
+        receipt.contribution_digest = receipt.stable_contribution_digest();
+        receipt
+    }
+
+    fn refused_contribution() -> PsionicTrainContributionReceipt {
+        let mut receipt = succeeded_contribution();
+        receipt.outcome = PsionicTrainOutcomeKind::Refused;
+        receipt.detail = String::from("refused contribution");
+        receipt.contribution_digest = receipt.stable_contribution_digest();
+        receipt
+    }
+
+    fn checkpoint_surface(
+        pointer_state: Option<&str>,
+        upload_outcome: Option<&str>,
+        recovery_source_kind: Option<&str>,
+        restored_primary_pointer: Option<bool>,
+        recovery_resolution_state: Option<&str>,
+    ) -> PsionicTrainCheckpointSurface {
+        PsionicTrainCheckpointSurface {
+            schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            role: PsionicTrainRole::Worker,
+            operation: crate::PsionicTrainOperation::RecordCheckpoint,
+            run_id: String::from("worker-run"),
+            run_root: String::from("/tmp/worker-run"),
+            current_phase: Some(String::from("checkpoint_evaluated")),
+            pointer_state: pointer_state.map(String::from),
+            checkpoint_label: Some(String::from("accepted")),
+            optimizer_step: Some(4_096),
+            checkpoint_ref: Some(String::from("checkpoint://psion/test")),
+            checkpoint_manifest_digest: Some(String::from("manifest-digest")),
+            checkpoint_object_digest: Some(String::from("object-digest")),
+            checkpoint_total_bytes: Some(2_048),
+            backup_state: Some(String::from("backed_up")),
+            upload_outcome: upload_outcome.map(String::from),
+            upload_failure_reason: None,
+            recovery_resolution_state: recovery_resolution_state.map(String::from),
+            recovery_source_kind: recovery_source_kind.map(String::from),
+            restored_primary_pointer,
+            artifacts: PsionicTrainCheckpointArtifactPaths::default(),
+        }
+    }
+
+    #[test]
+    fn clean_accepted_checkpoint_is_accepted() {
+        let receipt = succeeded_contribution();
+        let surface = checkpoint_surface(
+            Some("accepted"),
+            Some("succeeded"),
+            None,
+            Some(false),
+            None,
+        );
+        let (disposition, reason_codes, score_bps, _, _) =
+            classify_validator_result(&receipt, Some(&surface)).expect("classification should work");
+        assert_eq!(disposition, TrainingExecutionValidatorDisposition::Accepted);
+        assert_eq!(
+            reason_codes,
+            vec![PsionicTrainValidatorReplayReasonCode::PrimaryCheckpointAccepted]
+        );
+        assert_eq!(score_bps, 10_000);
+    }
+
+    #[test]
+    fn refused_upload_requires_replay() {
+        let receipt = succeeded_contribution();
+        let surface = checkpoint_surface(
+            Some("accepted"),
+            Some("refused"),
+            None,
+            Some(false),
+            None,
+        );
+        let (disposition, reason_codes, score_bps, _, _) =
+            classify_validator_result(&receipt, Some(&surface)).expect("classification should work");
+        assert_eq!(disposition, TrainingExecutionValidatorDisposition::ReplayRequired);
+        assert_eq!(
+            reason_codes,
+            vec![PsionicTrainValidatorReplayReasonCode::CheckpointReplayRequired]
+        );
+        assert_eq!(score_bps, 5_000);
+    }
+
+    #[test]
+    fn recovered_checkpoint_is_quarantined() {
+        let receipt = succeeded_contribution();
+        let surface = checkpoint_surface(
+            Some("accepted"),
+            Some("succeeded"),
+            Some("backup_receipt"),
+            Some(true),
+            Some("restored"),
+        );
+        let (disposition, reason_codes, score_bps, _, _) =
+            classify_validator_result(&receipt, Some(&surface)).expect("classification should work");
+        assert_eq!(disposition, TrainingExecutionValidatorDisposition::Quarantined);
+        assert_eq!(
+            reason_codes,
+            vec![PsionicTrainValidatorReplayReasonCode::CheckpointRecovered]
+        );
+        assert_eq!(score_bps, 7_500);
+    }
+
+    #[test]
+    fn refused_worker_contribution_is_rejected_without_checkpoint() {
+        let receipt = refused_contribution();
+        let (disposition, reason_codes, score_bps, _, _) =
+            classify_validator_result(&receipt, None).expect("classification should work");
+        assert_eq!(disposition, TrainingExecutionValidatorDisposition::Rejected);
+        assert_eq!(
+            reason_codes,
+            vec![PsionicTrainValidatorReplayReasonCode::ContributionOutcomeRefused]
+        );
+        assert_eq!(score_bps, 0);
+    }
+}

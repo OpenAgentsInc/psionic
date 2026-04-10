@@ -161,6 +161,9 @@ peer handoff receipt, auto-resume receipt, and validator score receipt when
 those artifacts exist. Validator replay retains the score surfaces under
 `windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
 and `validator_score_receipt.json`.
+The machine validator contract is now also covered by focused unit tests over
+disposition classification and subprocess CLI tests over stale assignment,
+missing replay inputs, and artifact-digest drift refusals.
 When the admitted coordination envelope also carries `window_id` and
 `assignment_id`, the same machine runtime now materializes one deterministic
 window artifact family under `windows/<window_id>/`: one retained

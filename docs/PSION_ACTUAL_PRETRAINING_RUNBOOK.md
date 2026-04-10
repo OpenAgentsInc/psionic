@@ -129,6 +129,9 @@ validator disposition. Missing checkpoint state, stale assignment binding, or
 artifact drift stay refusal-class failures at the machine process boundary. The
 run/window status packets now repeat the retained `validator_score_receipt_path`
 when validator replay completes successfully.
+That machine contract is now locked by focused validator-classification unit
+tests plus subprocess CLI coverage for stale assignment, missing replay-input,
+and artifact-digest drift refusal paths.
 
 The machine path now also covers late-join and recovery-source handoff
 explicitly. One recovery-source manifest with `operation = serve_checkpoint`

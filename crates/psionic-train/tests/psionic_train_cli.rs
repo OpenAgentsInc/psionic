@@ -7,7 +7,8 @@ use std::{
 use psionic_train::{
     runtime_build_digest, PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
     PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointSurface,
-    PsionicTrainCoordinationContext, PsionicTrainInvocationManifest,
+    PsionicTrainContributionArtifactManifest, PsionicTrainCoordinationContext,
+    PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
     PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
@@ -1203,6 +1204,96 @@ fn validator_manifest_refuses_stale_assignment_targets() {
     assert_eq!(
         output.status.code(),
         Some(PsionicTrainRefusalClass::StaleAssignment.exit_code() as i32)
+    );
+}
+
+#[test]
+fn validator_manifest_refuses_missing_replay_inputs() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("validator-run");
+    let manifest_path = tempdir.path().join("validator-missing-inputs.json");
+    let mut manifest = build_validator_manifest(
+        &run_root,
+        &tempdir.path().join("missing-contribution-receipt.json"),
+        &tempdir.path().join("missing-artifact-manifest.json"),
+        "window-0001",
+        "assignment-0001",
+        "challenge-0004",
+    );
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(!output.status.success(), "missing validator inputs should be refused");
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
+    assert_eq!(
+        packet.refusal_class,
+        Some(PsionicTrainRefusalClass::ArtifactIncomplete)
+    );
+}
+
+#[test]
+fn validator_manifest_refuses_artifact_manifest_digest_drift() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("worker-run");
+    let worker_manifest_path = tempdir.path().join("worker-windowed-launch.json");
+    let mut worker_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(&mut worker_manifest, "window-0001", "assignment-0001", 1);
+    write_manifest(&worker_manifest_path, &mut worker_manifest);
+    let worker_output = run_machine_manifest(&worker_manifest_path);
+    assert!(worker_output.status.success(), "worker launch should succeed");
+
+    let worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("worker run status path should exist"),
+    );
+    let artifact_manifest_path = PathBuf::from(
+        worker_run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .as_deref()
+            .expect("worker contribution artifact manifest path should exist"),
+    );
+    let mut artifact_manifest: PsionicTrainContributionArtifactManifest =
+        parse_json(&artifact_manifest_path);
+    artifact_manifest.artifact_manifest_digest = String::from("drifted-artifact-manifest-digest");
+    fs::write(
+        &artifact_manifest_path,
+        serde_json::to_vec_pretty(&artifact_manifest).expect("artifact manifest should serialize"),
+    )
+    .expect("artifact manifest should rewrite");
+
+    let validator_run_root = tempdir.path().join("validator-run");
+    let manifest_path = tempdir.path().join("validator-drifted-manifest.json");
+    let mut manifest = build_validator_manifest(
+        &validator_run_root,
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("worker contribution receipt path should exist"),
+        ),
+        &artifact_manifest_path,
+        "window-0001",
+        "assignment-0001",
+        "challenge-0005",
+    );
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(!output.status.success(), "drifted validator input should be refused");
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
+    assert_eq!(
+        packet.refusal_class,
+        Some(PsionicTrainRefusalClass::ArtifactDigestMismatch)
     );
 }
 
