@@ -160,7 +160,10 @@ generic checkpoint artifacts under
 `psionic.train.checkpoint_manifest.v1`. That is intentionally narrower than the
 actual pretraining lane: it is one admitted machine lane for backend-homogeneous
 Apple windows, not a claim that the broader CUDA actual-pretraining operator
-contract is now portable across backend families.
+contract is now portable across backend families. Apple validator replay now
+uses that same retained checkpoint surface, and Apple `resume` now fails closed
+unless one admitted checkpoint was already retained locally or materialized from
+one peer handoff receipt first.
 history under `status/membership_revisions/` so the local worker heartbeat,
 drain, rejoin, replace, and failed-session posture remain machine-visible.
 The same machine runtime now also persists one

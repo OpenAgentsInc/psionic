@@ -10,21 +10,20 @@ use std::{
 use sha2::Digest;
 
 use psionic_train::{
-    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCurrentRunStatus,
-    PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
-    PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface, PsionicTrainInvocationManifest,
-    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
-    PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
-    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    admitted_environment_ref_for_lane, admitted_release_id_for_lane,
+    build_psionic_train_checkpoint_handoff_receipt, execute_psionic_train_validator_replay,
+    inspect_psionic_train_checkpoint_surface, materialize_psionic_train_checkpoint_handoff,
+    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
+    runtime_build_digest, PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
+    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
+    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRunStatusPacket,
+    PsionicTrainRuntimeAttestation, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
     PsionicTrainValidatorArtifactOutputs, PsionicTrainValidatorReplayError,
     PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
-    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
-    admitted_release_id_for_lane, build_psionic_train_checkpoint_handoff_receipt,
-    execute_psionic_train_validator_replay, inspect_psionic_train_checkpoint_surface,
-    materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
-    retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
+    PsionicTrainWindowStatusPacket, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
 };
 
 #[allow(dead_code)]
@@ -584,6 +583,93 @@ fn run_apple_windowed_manifest(
                 None,
                 error,
             );
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    }
+
+    if manifest.operation == PsionicTrainOperation::Resume {
+        let has_checkpoint_surface = match inspect_psionic_train_checkpoint_surface(
+            run_root,
+            manifest.role,
+            manifest.operation,
+        ) {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(error) => {
+                let mut packet = PsionicTrainStatusPacket::refusal(
+                    Some(manifest),
+                    PsionicTrainRefusalClass::CheckpointDigestMismatch,
+                    Some(manifest_path.display().to_string()),
+                    Some(runtime_identity.attestation.clone()),
+                    Some(runtime_identity.capability_projection.clone()),
+                    manifest.run_id.clone().or_else(|| {
+                        run_root
+                            .file_name()
+                            .map(|value| value.to_string_lossy().to_string())
+                    }),
+                    Some(run_root.display().to_string()),
+                    None,
+                    None,
+                    format!("failed to inspect retained Apple checkpoint state: {error}"),
+                );
+                let status_paths = write_status_surfaces(
+                    manifest,
+                    manifest_path.display().to_string(),
+                    Some(run_root),
+                    None,
+                    None,
+                    packet.outcome,
+                    packet.exit_code,
+                    packet.retryable,
+                    packet.authority_owner,
+                    packet.refusal_class,
+                    packet.detail.as_str(),
+                    runtime_identity,
+                )
+                .unwrap_or_default();
+                packet.run_status_packet_path = status_paths.run_status_packet_path;
+                packet.window_status_packet_path = status_paths.window_status_packet_path;
+                emit_refusal_packet(packet.clone());
+                return ExitCode::from(packet.exit_code);
+            }
+        };
+        if !has_checkpoint_surface {
+            let mut packet = PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::CheckpointMissing,
+                Some(manifest_path.display().to_string()),
+                Some(runtime_identity.attestation.clone()),
+                Some(runtime_identity.capability_projection.clone()),
+                manifest.run_id.clone().or_else(|| {
+                    run_root
+                        .file_name()
+                        .map(|value| value.to_string_lossy().to_string())
+                }),
+                Some(run_root.display().to_string()),
+                None,
+                None,
+                String::from(
+                    "apple machine lane resume requires one retained admitted checkpoint before rejoin",
+                ),
+            );
+            let status_paths = write_status_surfaces(
+                manifest,
+                manifest_path.display().to_string(),
+                Some(run_root),
+                None,
+                None,
+                packet.outcome,
+                packet.exit_code,
+                packet.retryable,
+                packet.authority_owner,
+                packet.refusal_class,
+                packet.detail.as_str(),
+                runtime_identity,
+            )
+            .unwrap_or_default();
+            packet.run_status_packet_path = status_paths.run_status_packet_path;
+            packet.window_status_packet_path = status_paths.window_status_packet_path;
             emit_refusal_packet(packet.clone());
             return ExitCode::from(packet.exit_code);
         }

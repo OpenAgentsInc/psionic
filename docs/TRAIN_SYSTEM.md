@@ -473,7 +473,11 @@ Those generic checkpoint artifacts live at
 shared checkpoint-surface and handoff code now reads either the actual-lane
 checkpoint family or that generic family, which is what lets Apple runs use the
 same `serve-checkpoint`, `resume`, and `validate-contribution` entrypoints
-without pretending mixed CUDA/Metal windows are already admitted.
+without pretending mixed CUDA/Metal windows are already admitted. Apple
+validator replay now accepts the same retained contribution-plus-checkpoint
+surface shape as the CUDA lane, and Apple `resume` now refuses when no admitted
+checkpoint exists rather than silently claiming a rejoin path that the retained
+checkpoint lineage does not support.
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,
