@@ -78,6 +78,35 @@ digest, byte count, backup state, upload outcome, and auto-resume recovery
 result so supervisors can read the latest checkpoint posture without reopening
 the full retained artifact family themselves.
 
+When the coordination envelope declares `window_id`, `assignment_id`, and the
+admitted `node_pubkey`, the machine path also retains one window contribution
+artifact family under `windows/<window_id>/`. That family now includes:
+
+- `window_execution.json`
+- `contributions/<contribution_id>/artifact_manifest.json`
+- `contributions/<contribution_id>/contribution_receipt.json`
+- `sealed_window_bundle.json`
+
+`window_execution.json` binds the deterministic window execution id, current
+assignment materialization, admitted role, runtime build digest, and capability
+projection for that local runtime turn. The contribution artifact manifest then
+hashes the concrete retained inputs that formed the local contribution surface:
+the invocation manifest, launch manifest when it exists, membership receipt,
+checkpoint surface and pointers, backup or peer handoff receipts, recovery
+receipt, current status, retained summary, launcher log, and closeout bundle
+when present. The contribution receipt binds that artifact-manifest digest to
+the local outcome, refusal class when applicable, authority owner, retryability
+bit, and stable contribution id.
+
+`sealed_window_bundle.json` is the first local sealed-window rollup contract in
+the machine runtime. It scans the retained contribution receipts already stored
+for the same `window_id`, orders them deterministically by assignment and
+contribution id, and emits one count-and-digest summary over the current local
+receipt set. The machine-readable run/window status packets now repeat the
+absolute paths for `window_execution_path`, `contribution_receipt_path`,
+`contribution_artifact_manifest_path`, and `sealed_window_bundle_path` whenever
+those retained window artifacts exist.
+
 The machine path now also covers late-join and recovery-source handoff
 explicitly. One recovery-source manifest with `operation = serve_checkpoint`
 and a target `peer_node_pubkey` can retain

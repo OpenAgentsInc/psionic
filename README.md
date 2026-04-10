@@ -154,6 +154,15 @@ outcome, and auto-resume recovery result without reopening the full retained
 actual-lane tree. The run/window status packets repeat the absolute paths for
 that surface plus the latest checkpoint manifest, backup receipt, pointer,
 peer handoff receipt, and auto-resume receipt when those artifacts exist.
+When the admitted coordination envelope also carries `window_id` and
+`assignment_id`, the same machine runtime now materializes one deterministic
+window artifact family under `windows/<window_id>/`: one retained
+`window_execution.json`, one per-contribution `artifact_manifest.json`, one
+per-contribution `contribution_receipt.json`, and one rollup
+`sealed_window_bundle.json`. The run/window status packets repeat the absolute
+paths for those retained window surfaces too, so supervisors can follow one
+declared assignment through the local retained bundle set without re-scanning
+the whole run root.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

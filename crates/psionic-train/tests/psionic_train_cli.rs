@@ -10,7 +10,8 @@ use psionic_train::{
     PsionicTrainCoordinationContext, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
-    PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
+    PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket, PsionicTrainWindowExecution,
+    PsionicTrainWindowStatusPacket,
     PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
     PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
 };
@@ -187,6 +188,17 @@ fn build_retained_operation_manifest(
     manifest.allow_dirty_tree = true;
     add_admitted_observations(&mut manifest);
     manifest
+}
+
+fn bind_window_context(
+    manifest: &mut PsionicTrainInvocationManifest,
+    window_id: &str,
+    assignment_id: &str,
+    membership_revision: u64,
+) {
+    manifest.coordination.window_id = Some(String::from(window_id));
+    manifest.coordination.assignment_id = Some(String::from(assignment_id));
+    manifest.coordination.membership_revision = Some(membership_revision);
 }
 
 #[test]
@@ -535,6 +547,123 @@ fn machine_manifest_resume_refuses_without_any_admitted_checkpoint() {
         Some("none")
     );
     assert_eq!(checkpoint_surface.restored_primary_pointer, Some(false));
+}
+
+#[test]
+fn machine_manifest_window_context_emits_window_and_contribution_artifacts() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("windowed-run");
+    let manifest_path = tempdir.path().join("windowed-launch.json");
+    let mut manifest = build_launch_manifest(&run_root);
+    bind_window_context(&mut manifest, "window-0001", "assignment-0001", 1);
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    assert!(run_status.artifacts.window_execution_path.is_some());
+    assert!(run_status.artifacts.contribution_receipt_path.is_some());
+    assert!(run_status.artifacts.contribution_artifact_manifest_path.is_some());
+    assert!(run_status.artifacts.sealed_window_bundle_path.is_some());
+
+    let window_execution: PsionicTrainWindowExecution = parse_json(
+        run_status
+            .artifacts
+            .window_execution_path
+            .as_ref()
+            .expect("window execution path should exist"),
+    );
+    assert_eq!(window_execution.window_id.as_str(), "window-0001");
+    assert_eq!(
+        window_execution.current_assignment.assignment_id.as_str(),
+        "assignment-0001"
+    );
+
+    let sealed_window: PsionicTrainSealedWindowBundle = parse_json(
+        run_status
+            .artifacts
+            .sealed_window_bundle_path
+            .as_ref()
+            .expect("sealed window bundle path should exist"),
+    );
+    assert_eq!(sealed_window.window_id.as_str(), "window-0001");
+    assert_eq!(sealed_window.contribution_count, 1);
+    assert_eq!(sealed_window.artifact_manifest_count, 1);
+    assert_eq!(sealed_window.contributions.len(), 1);
+}
+
+#[test]
+fn machine_manifest_second_assignment_updates_sealed_window_rollup() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("windowed-run");
+
+    let launch_manifest_path = tempdir.path().join("windowed-launch.json");
+    let mut launch_manifest = build_launch_manifest(&run_root);
+    bind_window_context(&mut launch_manifest, "window-0001", "assignment-0001", 1);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(launch_output.status.success(), "launch should succeed");
+
+    let checkpoint_manifest_path = tempdir.path().join("windowed-record-checkpoint.json");
+    let mut checkpoint_manifest = build_retained_operation_manifest(
+        &run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    bind_window_context(&mut checkpoint_manifest, "window-0001", "assignment-0002", 2);
+    checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
+    checkpoint_manifest.optimizer_step = Some(16_384);
+    checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/broad/pretrain/final"));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let output = run_machine_manifest(&checkpoint_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let sealed_window: PsionicTrainSealedWindowBundle = parse_json(
+        run_status
+            .artifacts
+            .sealed_window_bundle_path
+            .as_ref()
+            .expect("sealed window bundle path should exist"),
+    );
+    assert_eq!(sealed_window.window_id.as_str(), "window-0001");
+    assert_eq!(sealed_window.contribution_count, 2);
+    assert_eq!(sealed_window.artifact_manifest_count, 2);
+    assert_eq!(sealed_window.contributions.len(), 2);
+    assert_eq!(
+        sealed_window.contributions[0].assignment_id.as_str(),
+        "assignment-0001"
+    );
+    assert_eq!(
+        sealed_window.contributions[1].assignment_id.as_str(),
+        "assignment-0002"
+    );
 }
 
 #[test]

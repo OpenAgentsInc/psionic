@@ -429,8 +429,20 @@ pointer state, checkpoint label and step, checkpoint ref, manifest digest,
 object digest, byte count, backup state, upload outcome, auto-resume recovery
 state, and the absolute paths to the latest checkpoint manifest, backup
 receipt, backup copies, peer handoff receipt, and recovery receipt when those
-artifacts exist. That surface is the first honest answer to “how does `Pylon` invoke
-`psionic-train` without going through a human shell wrapper?”
+artifacts exist. When the admitted coordination envelope also carries
+`window_id`, `assignment_id`, and `node_pubkey`, the same machine runtime now
+also persists one deterministic local window artifact family under
+`windows/<window_id>/`: `window_execution.json`,
+`contributions/<contribution_id>/artifact_manifest.json`,
+`contributions/<contribution_id>/contribution_receipt.json`, and one
+`sealed_window_bundle.json` rollup over the retained contribution receipts for
+that window. The run/window status packets repeat the absolute paths for those
+window artifacts through `window_execution_path`,
+`contribution_receipt_path`, `contribution_artifact_manifest_path`, and
+`sealed_window_bundle_path`. That combined checkpoint-plus-window surface is
+the first honest answer to “how does `Pylon` invoke `psionic-train` without
+going through a human shell wrapper?” and “what deterministic contribution
+artifact set did this local assignment materialize?”
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,

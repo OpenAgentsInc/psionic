@@ -10,13 +10,16 @@ use std::{
 use psionic_train::{
     admitted_environment_ref_for_lane, admitted_release_id_for_lane,
     build_psionic_train_checkpoint_handoff_receipt, inspect_psionic_train_checkpoint_surface,
-    materialize_psionic_train_checkpoint_handoff, retain_psionic_train_checkpoint_handoff_receipt,
-    runtime_build_digest, PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
+    materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
+    retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
+    PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
     PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
     PsionicTrainCheckpointSurface, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
-    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
+    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
+    PsionicTrainWindowStatusPacket,
 };
 
 #[allow(dead_code)]
@@ -1170,10 +1173,32 @@ fn write_status_surfaces(
         outcome,
     )?;
     let checkpoint_surface = write_checkpoint_surface(run_root, manifest)?;
+    let window_artifact_inputs = build_window_artifact_inputs(
+        summary,
+        manifest_path.as_str(),
+        membership_revision_path.clone(),
+        checkpoint_surface.as_ref(),
+    );
+    let window_artifacts = persist_psionic_train_window_artifacts(
+        manifest,
+        &runtime_identity.attestation,
+        &runtime_identity.capability_projection,
+        resolved_run_id.as_str(),
+        run_root,
+        &window_artifact_inputs,
+        outcome,
+        exit_code,
+        retryable,
+        authority_owner,
+        refusal_class,
+        detail,
+    )
+    .map_err(|error| format!("failed to persist window contribution artifacts: {error}"))?;
     let artifacts = build_artifact_surface_refs(
         summary,
         membership_revision_path.clone(),
         checkpoint_surface.as_ref(),
+        window_artifacts.as_ref(),
     );
     let run_packet = PsionicTrainRunStatusPacket {
         schema_version: String::from(psionic_train::PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION),
@@ -1265,8 +1290,54 @@ fn build_artifact_surface_refs(
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
     membership_revision_path: Option<String>,
     checkpoint_surface: Option<&RetainedCheckpointSurface>,
+    window_artifacts: Option<&PsionicTrainWindowArtifactOutputs>,
 ) -> PsionicTrainArtifactSurfaceRefs {
     PsionicTrainArtifactSurfaceRefs {
+        launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
+        membership_revision_path,
+        window_execution_path: window_artifacts.map(|value| value.window_execution_path.clone()),
+        contribution_receipt_path: window_artifacts
+            .map(|value| value.contribution_receipt_path.clone()),
+        contribution_artifact_manifest_path: window_artifacts
+            .map(|value| value.contribution_artifact_manifest_path.clone()),
+        checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
+        checkpoint_pointer_path: checkpoint_surface
+            .and_then(|value| value.surface.artifacts.checkpoint_pointer_path.clone())
+            .or_else(|| summary.and_then(|value| value.latest_checkpoint_pointer_path.clone())),
+        checkpoint_manifest_path: checkpoint_surface
+            .and_then(|value| value.surface.artifacts.checkpoint_manifest_path.clone()),
+        checkpoint_backup_receipt_path: checkpoint_surface.and_then(|value| {
+            value
+                .surface
+                .artifacts
+                .checkpoint_backup_receipt_path
+                .clone()
+        }),
+        checkpoint_handoff_receipt_path: checkpoint_surface.and_then(|value| {
+            value
+                .surface
+                .artifacts
+                .peer_checkpoint_handoff_receipt_path
+                .clone()
+        }),
+        recovery_receipt_path: checkpoint_surface
+            .and_then(|value| value.surface.artifacts.auto_resume_receipt_path.clone())
+            .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
+        validator_score_receipt_path: None,
+        sealed_window_bundle_path: window_artifacts
+            .map(|value| value.sealed_window_bundle_path.clone()),
+        final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),
+    }
+}
+
+fn build_window_artifact_inputs(
+    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    manifest_path: &str,
+    membership_revision_path: Option<String>,
+    checkpoint_surface: Option<&RetainedCheckpointSurface>,
+) -> PsionicTrainWindowArtifactInputRefs {
+    PsionicTrainWindowArtifactInputRefs {
+        invocation_manifest_path: String::from(manifest_path),
         launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
         membership_revision_path,
         checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
@@ -1292,8 +1363,9 @@ fn build_artifact_surface_refs(
         recovery_receipt_path: checkpoint_surface
             .and_then(|value| value.surface.artifacts.auto_resume_receipt_path.clone())
             .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
-        validator_score_receipt_path: None,
-        sealed_window_bundle_path: None,
+        current_status_path: summary.and_then(|value| value.current_status_path.clone()),
+        retained_summary_path: summary.and_then(|value| value.retained_summary_path.clone()),
+        launcher_log_path: summary.and_then(|value| value.launcher_log_path.clone()),
         final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),
     }
 }

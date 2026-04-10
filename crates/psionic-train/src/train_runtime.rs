@@ -167,6 +167,12 @@ pub struct PsionicTrainArtifactSurfaceRefs {
     pub launch_manifest_path: Option<String>,
     /// Optional retained membership-revision receipt path.
     pub membership_revision_path: Option<String>,
+    /// Optional retained runtime-window execution path.
+    pub window_execution_path: Option<String>,
+    /// Optional retained contribution receipt path.
+    pub contribution_receipt_path: Option<String>,
+    /// Optional retained contribution artifact-manifest path.
+    pub contribution_artifact_manifest_path: Option<String>,
     /// Optional retained checkpoint-surface path.
     pub checkpoint_surface_path: Option<String>,
     /// Optional retained checkpoint-pointer path.
