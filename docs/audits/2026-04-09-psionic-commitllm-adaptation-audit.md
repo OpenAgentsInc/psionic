@@ -3,6 +3,53 @@
 Status: repo analysis  
 Scope date: 2026-04-09
 
+Open-weight inference has an execution-integrity problem that is already large
+enough to matter for product design. A buyer, validator, or downstream system
+can often see the returned text, the provider identity, and some serving
+metadata. That is not enough to establish which model actually ran, which
+quantization or adapter state was active, which decode policy produced the
+answer, whether the route or cluster placement matched the claim, or whether
+the provider rewrote the answer after decode. Those gaps matter in normal
+commercial settings and matter even more in decentralized or semi-trusted
+compute markets.
+
+`Psionic` already has stronger execution truth surfaces than most inference
+systems. It owns the runtime, scheduler, route, and clustered execution path in
+one codebase. It already publishes provenance and delivery-proof material
+through `GenerationProvenance`, `ExecutionDeliveryProof`,
+`SettlementLinkageInput`, `ClusterEvidenceBundlePayload`, `x-psionic-*`
+headers, and `psionic_cluster_execution` payloads. That means this repo is not
+starting from a blank "add some receipts" position. It already has a concrete
+language for execution truth. The open problem is how far those surfaces can be
+upgraded from useful accountability metadata into auditable execution claims.
+
+The newly synced `CommitLLM` reference is relevant because it is a serious
+attempt to close that gap without requiring a heavy proof object for every
+response. It uses a commit-and-audit design: the provider stays on a normal GPU
+serving path, emits a compact receipt, and later answers verifier challenges by
+opening selected trace regions. The verifier checks those openings on CPU
+against committed model identity, deployment semantics, decode policy, and
+delivered output behavior. That puts `CommitLLM` in the practical middle ground
+between weak fingerprinting and expensive proof systems.
+
+`Psionic` is not in the same implementation position as `CommitLLM`. That
+project has to retrofit verification discipline onto an existing serving stack.
+`Psionic` owns its own runtime in Rust. It can define auditable execution
+classes, trace boundaries, route and cluster receipts, and verifier-facing data
+structures inside the engine rather than layering them on from the outside.
+That ownership creates real opportunities, but it does not remove the hard
+parts. GPU attention exactness, prefix reuse, speculative decode, sparse or
+MoE routing, audit freshness, and hostile-network economics still need explicit
+protocol design.
+
+This audit exists to answer one concrete repo question: which parts of
+`CommitLLM` should `Psionic` adapt, which parts should it avoid copying
+directly, and which opportunities become available specifically because
+`Psionic` owns the runtime, scheduler, and cluster path itself. The goal is not
+to produce a generic survey of verifiable inference. The goal is to identify a
+credible `Psionic` adaptation path that fits the repo's actual architecture and
+claim surfaces.
+
 ## Scope
 
 This note follows the broader 2026-04-09 inference-verifiability work and
