@@ -44,7 +44,7 @@ includes:
 
 - one shared coordination envelope for `network_id`, `window_id`,
   `assignment_id`, `challenge_id`, `node_pubkey`, and `membership_revision`
-  when those ids already exist
+- one required admitted `node_pubkey` for the local membership contract
 - one admitted `release_id`
 - one admitted `build_digest`
 - one admitted `environment_ref`
@@ -55,6 +55,16 @@ run root exists, it also persists:
 
 - `status/psionic_train_run_status_packet.json`
 - `status/psionic_train_window_status_packet.json`
+- `status/membership_revision_receipt.json`
+
+The retained membership receipt now freezes the first local cluster-session
+contract too. It binds the admitted `node_pubkey`, release id, build digest,
+environment ref, backend family, topology class, local membership revision,
+heartbeat timestamps, stale and expiry thresholds, lease timers, and drain
+deadline. It appends revision history under `status/membership_revisions/` and
+automatically records same-node rejoin, different-node replacement, and failed
+session posture from retained state instead of relying on manual metadata
+fixups.
 
 `./TRAIN` remains the operator convenience path above the same actual lane
 logic.

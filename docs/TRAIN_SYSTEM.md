@@ -394,23 +394,33 @@ That surface gives the repo one real operator path for:
 The repo now also has one stable machine-consumable `psionic-train` runtime
 surface above that same actual-lane operator logic. The typed contract lives in
 `crates/psionic-train/src/train_runtime.rs`, the binary entrypoint lives in
-`crates/psionic-train/src/main.rs`, and the actual-lane shell wrapper now
-dispatches through that binary instead of `cargo run --example ...`. The first
-machine runtime surface intentionally stays narrow: it admits the
+`crates/psionic-train/src/main.rs`, the local membership contract lives in
+`crates/psionic-train/src/train_membership.rs`, and the actual-lane shell
+wrapper now dispatches through that binary instead of `cargo run --example ...`.
+The first machine runtime surface intentionally stays narrow: it admits the
 `psion_actual_pretraining_v1` lane only, consumes one explicit
 `psionic.train.invocation_manifest.v1` JSON manifest with deterministic run id,
 run root or output root, git ref, role, operation, one shared coordination
-envelope, and one admitted release/build/environment identity. It now emits one
-final `psionic.train.status_packet.v1` packet with a stable exit code,
-retryability bit, authority owner, optional refusal class, shared coordination
-fields, resolved runtime attestation, capability projection, and retained
-artifact paths. It also persists one
+envelope, one required admitted `node_pubkey`, and one admitted
+release/build/environment identity. It now emits one final
+`psionic.train.status_packet.v1` packet with a stable exit code, retryability
+bit, authority owner, optional refusal class, shared coordination fields,
+resolved runtime attestation, capability projection, and retained artifact
+paths. It also persists one
 `psionic.train.run_status_packet.v1` packet for `Pylon` and one
 `psionic.train.window_status_packet.v1` packet for `Nexus` under
 `status/psionic_train_run_status_packet.json` and
-`status/psionic_train_window_status_packet.json` in the run root. That surface
-is the first honest answer to “how does `Pylon` invoke `psionic-train` without
-going through a human shell wrapper?”
+`status/psionic_train_window_status_packet.json` in the run root. When the run
+root exists, it also persists one
+`psionic.train.membership_revision_receipt.v1` packet at
+`status/membership_revision_receipt.json` and appends every local revision into
+`status/membership_revisions/`. That membership receipt freezes the first local
+cluster session contract: heartbeat cadence, stale and expiry thresholds, lease
+timers, drain grace, node-pubkey binding, build digest binding, current worker
+state, previous worker state, and automatic same-node rejoin or different-node
+replacement from retained state. That surface is the first honest answer to
+“how does `Pylon` invoke `psionic-train` without going through a human shell
+wrapper?”
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,
@@ -421,7 +431,8 @@ to parse ad hoc shell text.
 
 The minimum observability envelope is now frozen at the machine boundary too.
 Whenever they exist, the final process packet and the retained run/window
-packets preserve the exact field names:
+packets, plus the retained membership revision receipt, preserve the exact
+field names:
 
 - `network_id`
 - `run_id`
@@ -434,6 +445,20 @@ packets preserve the exact field names:
 
 The first admitted lane still leaves unavailable objects empty instead of
 synthesizing placeholder ids.
+
+The first admitted machine membership contract is also now frozen at the local
+worker boundary. The current policy values are:
+
+- heartbeat interval: `5000ms`
+- heartbeat stale threshold: `15000ms`
+- heartbeat expiry threshold: `30000ms`
+- lease duration: `60000ms`
+- lease-renewal threshold: `15000ms`
+- drain grace period: `15000ms`
+
+Those values now live in code rather than operator folklore, and the retained
+membership receipt carries them explicitly so `Pylon` and `Nexus` do not need
+to guess the runtime’s liveness budget.
 
 It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty

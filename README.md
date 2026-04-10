@@ -132,12 +132,17 @@ wrapper:
 cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
 ```
 
-That manifest now carries one frozen coordination envelope when those ids
-already exist, plus one admitted release/build/environment identity that the
-runtime checks before launch. The emitted `psionic.train.status_packet.v1`
-packet now also carries the resolved runtime attestation and the retained
-absolute paths for `status/psionic_train_run_status_packet.json` and
-`status/psionic_train_window_status_packet.json`.
+That manifest now carries one frozen coordination envelope, including the
+admitted `node_pubkey`, plus one admitted release/build/environment identity
+that the runtime checks before launch. The emitted
+`psionic.train.status_packet.v1` packet now also carries the resolved runtime
+attestation and the retained absolute paths for
+`status/psionic_train_run_status_packet.json` and
+`status/psionic_train_window_status_packet.json`. When a run root exists, the
+runtime also persists one `psionic.train.membership_revision_receipt.v1`
+receipt at `status/membership_revision_receipt.json` and appends revision
+history under `status/membership_revisions/` so the local worker heartbeat,
+drain, rejoin, replace, and failed-session posture remain machine-visible.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

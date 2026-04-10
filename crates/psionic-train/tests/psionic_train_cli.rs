@@ -1,12 +1,12 @@
 use std::{fs, path::PathBuf, process::Command};
 
 use psionic_train::{
-    runtime_build_digest, PsionicTrainAdmissionIdentity, PsionicTrainCoordinationContext,
-    PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainOutcomeKind,
-    PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
-    PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
     PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
     PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+    PsionicTrainAdmissionIdentity, PsionicTrainCoordinationContext, PsionicTrainInvocationManifest,
+    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
+    PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
+    PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket, runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -94,7 +94,14 @@ fn base_manifest() -> PsionicTrainInvocationManifest {
         lane_id: String::from(psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID),
         role: PsionicTrainRole::Worker,
         operation: PsionicTrainOperation::Start,
-        coordination: PsionicTrainCoordinationContext::default(),
+        coordination: PsionicTrainCoordinationContext {
+            network_id: Some(String::from("network.psionic.cli-test")),
+            window_id: None,
+            assignment_id: None,
+            challenge_id: None,
+            node_pubkey: Some(String::from("npub1-psionic-cli-test")),
+            membership_revision: None,
+        },
         admission_identity: admitted_identity(git_commit_sha.as_str()),
         run_id: Some(String::from("psion-train-cli-test")),
         output_root: None,
@@ -175,6 +182,21 @@ fn machine_manifest_dry_run_emits_success_status_packet() {
     )
     .expect("run status packet should parse");
     assert_eq!(run_status.run_id.as_deref(), Some("psion-train-cli-test"));
+    let membership_revision_path = run_status
+        .artifacts
+        .membership_revision_path
+        .as_ref()
+        .expect("membership revision path should exist");
+    let membership_receipt: PsionicTrainMembershipRevisionReceipt = serde_json::from_slice(
+        &fs::read(membership_revision_path)
+            .expect("membership revision receipt should be readable"),
+    )
+    .expect("membership revision receipt should parse");
+    assert_eq!(
+        membership_receipt.node_pubkey.as_str(),
+        "npub1-psionic-cli-test"
+    );
+    assert_eq!(membership_receipt.run_id.as_str(), "psion-train-cli-test");
     let window_status: PsionicTrainWindowStatusPacket = serde_json::from_slice(
         &fs::read(
             packet

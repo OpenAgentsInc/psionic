@@ -461,6 +461,10 @@ impl PsionicTrainInvocationManifest {
             .validate("invocation_manifest.coordination")?;
         self.admission_identity
             .validate("invocation_manifest.admission_identity")?;
+        require_nonempty_option(
+            self.coordination.node_pubkey.as_deref(),
+            "invocation_manifest.coordination.node_pubkey",
+        )?;
 
         if self.selected_git_ref.is_none() {
             return Err(PsionicTrainRuntimeContractError::MissingField {
@@ -905,7 +909,14 @@ mod tests {
             lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
             role: PsionicTrainRole::Worker,
             operation: PsionicTrainOperation::Start,
-            coordination: PsionicTrainCoordinationContext::default(),
+            coordination: PsionicTrainCoordinationContext {
+                network_id: Some(String::from("network.psionic.contract-test")),
+                window_id: None,
+                assignment_id: None,
+                challenge_id: None,
+                node_pubkey: Some(String::from("npub1-psionic-contract-test")),
+                membership_revision: None,
+            },
             admission_identity: PsionicTrainAdmissionIdentity {
                 release_id: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
                 build_digest: String::from("sha256:test-build"),
@@ -983,6 +994,21 @@ mod tests {
             PsionicTrainAuthorityOwner::Nexus
         );
         assert!(!PsionicTrainRefusalClass::BuildRevoked.retryable());
+    }
+
+    #[test]
+    fn worker_manifest_requires_node_pubkey() {
+        let mut manifest = base_manifest();
+        manifest.coordination.node_pubkey = None;
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("worker manifest should require node_pubkey");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::MissingField {
+                field: String::from("invocation_manifest.coordination.node_pubkey"),
+            }
+        );
     }
 
     #[test]

@@ -4,15 +4,16 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::ExitCode,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use psionic_train::{
-    admitted_environment_ref_for_lane, admitted_release_id_for_lane, runtime_build_digest,
     PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
-    PsionicTrainCapabilityProjection, PsionicTrainInvocationManifest, PsionicTrainOperation,
-    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRunStatusPacket,
-    PsionicTrainRuntimeAttestation, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
-    PsionicTrainWindowStatusPacket,
+    PsionicTrainCapabilityProjection, PsionicTrainInvocationManifest,
+    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
+    PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
+    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
+    admitted_environment_ref_for_lane, admitted_release_id_for_lane, runtime_build_digest,
 };
 
 #[allow(dead_code)]
@@ -902,7 +903,23 @@ fn write_status_surfaces(
     })?;
     let run_status_path = status_dir.join("psionic_train_run_status_packet.json");
     let window_status_path = status_dir.join("psionic_train_window_status_packet.json");
-    let artifacts = build_artifact_surface_refs(summary);
+    let resolved_run_id = summary
+        .and_then(|value| value.run_id.clone())
+        .or_else(|| manifest.run_id.clone())
+        .or_else(|| {
+            run_root
+                .file_name()
+                .map(|value| value.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| String::from("unknown_run"));
+    let membership_revision_path = write_membership_revision_receipt(
+        manifest,
+        run_root,
+        runtime_identity,
+        resolved_run_id.as_str(),
+        outcome,
+    )?;
+    let artifacts = build_artifact_surface_refs(summary, membership_revision_path.clone());
     let run_packet = PsionicTrainRunStatusPacket {
         schema_version: String::from(psionic_train::PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION),
         runtime_surface_id: String::from(psionic_train::PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
@@ -917,9 +934,7 @@ fn write_status_surfaces(
         coordination: manifest.coordination.clone(),
         manifest_path: Some(manifest_path.clone()),
         manifest_digest: manifest.manifest_digest.clone(),
-        run_id: summary
-            .and_then(|value| value.run_id.clone())
-            .or_else(|| manifest.run_id.clone()),
+        run_id: Some(resolved_run_id.clone()),
         run_root: Some(run_root.display().to_string()),
         phase: summary.and_then(|value| value.phase.clone()),
         runtime_attestation: runtime_identity.attestation.clone(),
@@ -945,9 +960,7 @@ fn write_status_surfaces(
         refusal_class,
         coordination: manifest.coordination.clone(),
         manifest_digest: manifest.manifest_digest.clone(),
-        run_id: summary
-            .and_then(|value| value.run_id.clone())
-            .or_else(|| manifest.run_id.clone()),
+        run_id: Some(resolved_run_id),
         run_root: Some(run_root.display().to_string()),
         window_state: manifest.coordination.window_id.as_ref().map(|_| {
             summary
@@ -995,10 +1008,11 @@ fn write_status_surfaces(
 
 fn build_artifact_surface_refs(
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    membership_revision_path: Option<String>,
 ) -> PsionicTrainArtifactSurfaceRefs {
     PsionicTrainArtifactSurfaceRefs {
         launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
-        membership_revision_path: None,
+        membership_revision_path,
         checkpoint_pointer_path: summary
             .and_then(|value| value.latest_checkpoint_pointer_path.clone()),
         recovery_receipt_path: summary.and_then(|value| value.auto_resume_receipt_path.clone()),
@@ -1020,6 +1034,90 @@ fn emit_refusal_packet(packet: PsionicTrainStatusPacket) {
         "{}",
         serde_json::to_string_pretty(&packet).expect("status packet should serialize")
     );
+}
+
+fn write_membership_revision_receipt(
+    manifest: &PsionicTrainInvocationManifest,
+    run_root: &Path,
+    runtime_identity: &MachineRuntimeIdentity,
+    resolved_run_id: &str,
+    outcome: PsionicTrainOutcomeKind,
+) -> Result<Option<String>, String> {
+    let Some(_) = manifest.coordination.node_pubkey.as_ref() else {
+        return Ok(None);
+    };
+    let status_dir = run_root.join("status");
+    let current_path = status_dir.join("membership_revision_receipt.json");
+    let history_dir = status_dir.join("membership_revisions");
+    let previous = if current_path.is_file() {
+        Some(load_membership_revision_receipt(current_path.as_path())?)
+    } else {
+        None
+    };
+    if previous.is_none() && outcome == PsionicTrainOutcomeKind::Refused {
+        return Ok(None);
+    }
+    fs::create_dir_all(&history_dir).map_err(|error| {
+        format!(
+            "failed to create membership history directory `{}`: {error}",
+            history_dir.display()
+        )
+    })?;
+    let observed_at_ms = current_time_ms()?;
+    let receipt = PsionicTrainMembershipRevisionReceipt::next_for_manifest(
+        manifest,
+        &runtime_identity.attestation,
+        &runtime_identity.capability_projection,
+        resolved_run_id,
+        observed_at_ms,
+        outcome,
+        previous.as_ref(),
+    )?;
+    let history_path = history_dir.join(format!(
+        "revision-{:06}.json",
+        receipt.local_membership_revision
+    ));
+    let encoded = serde_json::to_vec_pretty(&receipt)
+        .map_err(|error| format!("failed to serialize membership receipt: {error}"))?;
+    fs::write(&history_path, &encoded).map_err(|error| {
+        format!(
+            "failed to write membership revision receipt `{}`: {error}",
+            history_path.display()
+        )
+    })?;
+    fs::write(&current_path, encoded).map_err(|error| {
+        format!(
+            "failed to write current membership revision receipt `{}`: {error}",
+            current_path.display()
+        )
+    })?;
+    Ok(Some(current_path.display().to_string()))
+}
+
+fn load_membership_revision_receipt(
+    path: &Path,
+) -> Result<PsionicTrainMembershipRevisionReceipt, String> {
+    let bytes = fs::read(path).map_err(|error| {
+        format!(
+            "failed to read membership revision receipt `{}`: {error}",
+            path.display()
+        )
+    })?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        format!(
+            "failed to parse membership revision receipt `{}`: {error}",
+            path.display()
+        )
+    })
+}
+
+fn current_time_ms() -> Result<u64, String> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("system clock is before UNIX_EPOCH: {error}"))?;
+    let millis = duration.as_millis();
+    u64::try_from(millis)
+        .map_err(|error| format!("current time exceeded u64 milliseconds: {error}"))
 }
 
 fn print_usage() {
