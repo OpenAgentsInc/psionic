@@ -402,7 +402,10 @@ The first machine runtime surface intentionally stays narrow: it admits the
 `psionic.train.invocation_manifest.v1` JSON manifest with deterministic run id,
 run root or output root, git ref, role, operation, one shared coordination
 envelope, one required admitted `node_pubkey`, and one admitted
-release/build/environment identity. It now emits one final
+release/build/environment identity. Recovery-source manifests can now also
+carry one target `peer_node_pubkey` for `serve_checkpoint` and one
+`peer_checkpoint_handoff_receipt_path` for joiner-side `resume`. It now emits
+one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
 bit, authority owner, optional refusal class, shared coordination fields,
 resolved runtime attestation, capability projection, and retained artifact
@@ -425,8 +428,8 @@ the first machine-readable checkpoint summary contract: latest checkpoint
 pointer state, checkpoint label and step, checkpoint ref, manifest digest,
 object digest, byte count, backup state, upload outcome, auto-resume recovery
 state, and the absolute paths to the latest checkpoint manifest, backup
-receipt, backup copies, and recovery receipt when those artifacts exist. That
-surface is the first honest answer to “how does `Pylon` invoke
+receipt, backup copies, peer handoff receipt, and recovery receipt when those
+artifacts exist. That surface is the first honest answer to “how does `Pylon` invoke
 `psionic-train` without going through a human shell wrapper?”
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
@@ -493,8 +496,11 @@ launch/start materializes the pending pointer, `record_checkpoint` materializes
 the accepted checkpoint manifest plus backup lineage, `backup` replays durable
 upload state into the retained receipt family, `resume` can fetch, verify, and
 restore from the retained backup family when the primary pointer is missing,
-and resume refusal still emits one retained recovery surface instead of leaving
-the run root ambiguous.
+`serve_checkpoint` can retain one peer-readable handoff receipt from the live
+primary pointer or from the durable backup family when the primary pointer is
+missing, joiner-side `resume` can seed a clean run root from that retained
+handoff before the ordinary auto-resume flow runs, and resume refusal still
+emits one retained recovery surface instead of leaving the run root ambiguous.
 
 The repo now also owns one explicit default Tassadar train contract in
 `crates/psionic-train/src/tassadar_default_train_lane.rs`, the fixture

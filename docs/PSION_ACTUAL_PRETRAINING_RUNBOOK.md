@@ -48,6 +48,8 @@ includes:
 - one admitted `release_id`
 - one admitted `build_digest`
 - one admitted `environment_ref`
+- one optional `peer_node_pubkey` for recovery-source `serve-checkpoint`
+- one optional `peer_checkpoint_handoff_receipt_path` for joiner `resume`
 
 The runtime refuses before launch when the executing release id, build digest,
 or environment ref do not match the admitted identity in that manifest. When a
@@ -69,12 +71,23 @@ fixups.
 
 The retained checkpoint surface is the machine-readable checkpoint summary for
 that same run root. It points at the latest accepted checkpoint pointer,
-checkpoint manifest, backup receipt, backup copies, and auto-resume receipt
-when present. It also records the current checkpoint phase, pointer state,
-checkpoint label and step, manifest digest, object digest, byte count, backup
-state, upload outcome, and auto-resume recovery result so supervisors can read
-the latest checkpoint posture without reopening the full retained artifact
-family themselves.
+checkpoint manifest, backup receipt, backup copies, peer handoff receipt, and
+auto-resume receipt when present. It also records the current checkpoint
+phase, pointer state, checkpoint label and step, manifest digest, object
+digest, byte count, backup state, upload outcome, and auto-resume recovery
+result so supervisors can read the latest checkpoint posture without reopening
+the full retained artifact family themselves.
+
+The machine path now also covers late-join and recovery-source handoff
+explicitly. One recovery-source manifest with `operation = serve_checkpoint`
+and a target `peer_node_pubkey` can retain
+`status/peer_checkpoint_handoff_receipt.json` from the latest accepted primary
+checkpoint or from the durable backup family when the primary pointer is
+missing. A joiner `resume` manifest can then point
+`peer_checkpoint_handoff_receipt_path` at that retained receipt, which copies
+the served checkpoint pointer and manifest into the local run root before the
+normal resume flow validates preflight and emits the ordinary
+`auto_resume_receipt.json`.
 
 `./TRAIN` remains the operator convenience path above the same actual lane
 logic.

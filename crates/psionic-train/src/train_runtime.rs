@@ -56,6 +56,7 @@ pub enum PsionicTrainRole {
 pub enum PsionicTrainOperation {
     Start,
     Resume,
+    ServeCheckpoint,
     RecordCheckpoint,
     Backup,
     DecideContinueRestart,
@@ -174,6 +175,8 @@ pub struct PsionicTrainArtifactSurfaceRefs {
     pub checkpoint_manifest_path: Option<String>,
     /// Optional retained checkpoint-backup receipt path.
     pub checkpoint_backup_receipt_path: Option<String>,
+    /// Optional retained peer checkpoint-handoff receipt path.
+    pub checkpoint_handoff_receipt_path: Option<String>,
     /// Optional retained recovery receipt path.
     pub recovery_receipt_path: Option<String>,
     /// Optional retained validator score receipt path.
@@ -208,6 +211,10 @@ pub struct PsionicTrainInvocationManifest {
     pub output_root: Option<String>,
     /// Explicit run root for commands that operate on retained state.
     pub run_root: Option<String>,
+    /// Optional admitted peer node pubkey for recovery-source checkpoint serving.
+    pub peer_node_pubkey: Option<String>,
+    /// Optional retained peer checkpoint-handoff receipt path consumed before resume.
+    pub peer_checkpoint_handoff_receipt_path: Option<String>,
     /// Explicit git ref selection. Defaults are not allowed for machine mode.
     pub selected_git_ref: Option<String>,
     /// Optional retained hardware observation path.
@@ -471,6 +478,16 @@ impl PsionicTrainInvocationManifest {
             self.coordination.node_pubkey.as_deref(),
             "invocation_manifest.coordination.node_pubkey",
         )?;
+        validate_optional_field(
+            self.peer_node_pubkey.as_deref(),
+            "invocation_manifest",
+            "peer_node_pubkey",
+        )?;
+        validate_optional_field(
+            self.peer_checkpoint_handoff_receipt_path.as_deref(),
+            "invocation_manifest",
+            "peer_checkpoint_handoff_receipt_path",
+        )?;
 
         if self.selected_git_ref.is_none() {
             return Err(PsionicTrainRuntimeContractError::MissingField {
@@ -488,7 +505,9 @@ impl PsionicTrainInvocationManifest {
                 | PsionicTrainOperation::RecordCheckpoint
                 | PsionicTrainOperation::Backup
                 | PsionicTrainOperation::RehearseBaseLane => {}
-                PsionicTrainOperation::Resume | PsionicTrainOperation::DecideContinueRestart => {
+                PsionicTrainOperation::Resume
+                | PsionicTrainOperation::ServeCheckpoint
+                | PsionicTrainOperation::DecideContinueRestart => {
                     return Err(PsionicTrainRuntimeContractError::InvalidValue {
                         field: String::from("invocation_manifest.role"),
                         detail: String::from(
@@ -498,12 +517,14 @@ impl PsionicTrainInvocationManifest {
                 }
             },
             PsionicTrainRole::RecoverySource => match self.operation {
-                PsionicTrainOperation::Resume | PsionicTrainOperation::DecideContinueRestart => {}
+                PsionicTrainOperation::Resume
+                | PsionicTrainOperation::ServeCheckpoint
+                | PsionicTrainOperation::DecideContinueRestart => {}
                 _ => {
                     return Err(PsionicTrainRuntimeContractError::InvalidValue {
                         field: String::from("invocation_manifest.role"),
                         detail: String::from(
-                            "recovery_source role is limited to resume and decide_continue_restart on the machine runtime surface",
+                            "recovery_source role is limited to resume, serve_checkpoint, and decide_continue_restart on the machine runtime surface",
                         ),
                     });
                 }
@@ -535,6 +556,7 @@ impl PsionicTrainInvocationManifest {
                 }
             }
             PsionicTrainOperation::Resume
+            | PsionicTrainOperation::ServeCheckpoint
             | PsionicTrainOperation::Backup
             | PsionicTrainOperation::DecideContinueRestart => {
                 require_nonempty_option(self.run_root.as_deref(), "invocation_manifest.run_root")?;
@@ -555,6 +577,29 @@ impl PsionicTrainInvocationManifest {
                     "invocation_manifest.checkpoint_ref",
                 )?;
             }
+        }
+        if self.operation == PsionicTrainOperation::ServeCheckpoint {
+            require_nonempty_option(
+                self.peer_node_pubkey.as_deref(),
+                "invocation_manifest.peer_node_pubkey",
+            )?;
+        } else if self.peer_node_pubkey.is_some() {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.peer_node_pubkey"),
+                detail: String::from(
+                    "peer_node_pubkey is only admitted for serve_checkpoint on the machine runtime surface",
+                ),
+            });
+        }
+        if self.operation != PsionicTrainOperation::Resume
+            && self.peer_checkpoint_handoff_receipt_path.is_some()
+        {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.peer_checkpoint_handoff_receipt_path"),
+                detail: String::from(
+                    "peer_checkpoint_handoff_receipt_path is only admitted for resume on the machine runtime surface",
+                ),
+            });
         }
 
         Ok(())
@@ -795,6 +840,7 @@ impl PsionicTrainOperation {
         match self {
             Self::Start => "start",
             Self::Resume => "resume",
+            Self::ServeCheckpoint => "serve-checkpoint",
             Self::RecordCheckpoint => "record-checkpoint",
             Self::Backup => "backup",
             Self::DecideContinueRestart => "decide-continue-restart",
@@ -931,6 +977,8 @@ mod tests {
             run_id: Some(String::from("psion-train-contract-test")),
             output_root: Some(String::from("/tmp/psion-train-contract-test")),
             run_root: None,
+            peer_node_pubkey: None,
+            peer_checkpoint_handoff_receipt_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,

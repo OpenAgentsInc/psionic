@@ -8,13 +8,15 @@ use std::{
 };
 
 use psionic_train::{
-    PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
-    PsionicTrainCapabilityProjection, PsionicTrainCheckpointSurface,
-    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
-    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRunStatusPacket,
-    PsionicTrainRuntimeAttestation, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
-    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
-    admitted_release_id_for_lane, inspect_psionic_train_checkpoint_surface, runtime_build_digest,
+    admitted_environment_ref_for_lane, admitted_release_id_for_lane,
+    build_psionic_train_checkpoint_handoff_receipt, inspect_psionic_train_checkpoint_surface,
+    materialize_psionic_train_checkpoint_handoff, retain_psionic_train_checkpoint_handoff_receipt,
+    runtime_build_digest, PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
+    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
+    PsionicTrainCheckpointSurface, PsionicTrainInvocationManifest,
+    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
+    PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
+    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
 };
 
 #[allow(dead_code)]
@@ -105,14 +107,48 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
         }
     };
 
+    let run_root = manifest_run_root(&manifest);
+    if manifest.operation == PsionicTrainOperation::ServeCheckpoint {
+        return run_checkpoint_handoff_manifest(
+            &manifest,
+            &manifest_path,
+            &runtime_identity,
+            run_root.as_deref(),
+        );
+    }
+    if manifest.operation == PsionicTrainOperation::Resume {
+        if let (Some(run_root), Some(peer_receipt_path)) = (
+            run_root.as_deref(),
+            manifest.peer_checkpoint_handoff_receipt_path.as_deref(),
+        ) {
+            if let Err(error) = materialize_psionic_train_checkpoint_handoff(
+                run_root,
+                Path::new(peer_receipt_path),
+                manifest
+                    .coordination
+                    .node_pubkey
+                    .as_deref()
+                    .expect("validated manifests always carry coordination.node_pubkey"),
+            ) {
+                return emit_checkpoint_handoff_refusal(
+                    &manifest,
+                    &manifest_path,
+                    run_root,
+                    &runtime_identity,
+                    &error,
+                    format!("failed to materialize peer checkpoint handoff `{peer_receipt_path}`"),
+                );
+            }
+        }
+    }
+
     let operator_args = match operator_args_from_manifest(&manifest) {
         Ok(args) => args,
         Err(mut packet) => {
-            let resolved_run_root = manifest_run_root(&manifest);
             let status_paths = write_status_surfaces_for_packet(
                 &manifest,
                 manifest_path.display().to_string(),
-                resolved_run_root.as_deref(),
+                run_root.as_deref(),
                 None,
                 &packet,
             )
@@ -124,7 +160,6 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
         }
     };
 
-    let run_root = manifest_run_root(&manifest);
     let manifest_path_text = Some(manifest_path.display().to_string());
     let initial_summary = run_root
         .as_deref()
@@ -240,6 +275,133 @@ fn run_actual_pretraining_passthrough(args: &[String]) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+fn run_checkpoint_handoff_manifest(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: &Path,
+    runtime_identity: &MachineRuntimeIdentity,
+    run_root: Option<&Path>,
+) -> ExitCode {
+    let Some(run_root) = run_root else {
+        let packet = PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BadConfig,
+            Some(manifest_path.display().to_string()),
+            Some(runtime_identity.attestation.clone()),
+            Some(runtime_identity.capability_projection.clone()),
+            manifest.run_id.clone(),
+            None,
+            None,
+            None,
+            "serve-checkpoint requires one retained run_root",
+        );
+        emit_refusal_packet(packet.clone());
+        return ExitCode::from(packet.exit_code);
+    };
+    let peer_node_pubkey = manifest
+        .peer_node_pubkey
+        .as_deref()
+        .expect("validated serve-checkpoint manifests always carry peer_node_pubkey");
+    let receipt = match build_psionic_train_checkpoint_handoff_receipt(
+        run_root,
+        manifest
+            .coordination
+            .node_pubkey
+            .as_deref()
+            .expect("validated manifests always carry coordination.node_pubkey"),
+        peer_node_pubkey,
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            return emit_checkpoint_handoff_refusal(
+                manifest,
+                manifest_path,
+                run_root,
+                runtime_identity,
+                &error,
+                format!("failed to build peer checkpoint handoff for peer `{peer_node_pubkey}`"),
+            );
+        }
+    };
+    if let Err(error) = retain_psionic_train_checkpoint_handoff_receipt(run_root, &receipt) {
+        return emit_checkpoint_handoff_refusal(
+            manifest,
+            manifest_path,
+            run_root,
+            runtime_identity,
+            &error,
+            String::from("failed to retain peer checkpoint handoff receipt"),
+        );
+    }
+
+    let summary = actual_pretraining_run_surface_summary(run_root);
+    let detail = format!(
+        "psionic-train completed serve-checkpoint for lane `{}` targeting peer `{peer_node_pubkey}`",
+        manifest.lane_id
+    );
+    let status_paths = match write_status_surfaces(
+        manifest,
+        manifest_path.display().to_string(),
+        Some(run_root),
+        summary.as_ref(),
+        PsionicTrainOutcomeKind::Succeeded,
+        0,
+        false,
+        psionic_train::PsionicTrainAuthorityOwner::Pylon,
+        None,
+        detail.as_str(),
+        runtime_identity,
+    ) {
+        Ok(paths) => paths,
+        Err(error) => {
+            let packet = PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::InternalError,
+                Some(manifest_path.display().to_string()),
+                Some(runtime_identity.attestation.clone()),
+                Some(runtime_identity.capability_projection.clone()),
+                summary
+                    .as_ref()
+                    .and_then(|value| value.run_id.clone())
+                    .or_else(|| manifest.run_id.clone()),
+                Some(run_root.display().to_string()),
+                None,
+                None,
+                format!("failed to persist machine status packets: {error}"),
+            );
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    };
+    let packet = PsionicTrainStatusPacket::success(
+        manifest,
+        Some(manifest_path.display().to_string()),
+        runtime_identity.attestation.clone(),
+        runtime_identity.capability_projection.clone(),
+        summary
+            .as_ref()
+            .and_then(|value| value.run_id.clone())
+            .or_else(|| manifest.run_id.clone()),
+        Some(run_root.display().to_string()),
+        status_paths.run_status_packet_path,
+        status_paths.window_status_packet_path,
+        summary
+            .as_ref()
+            .and_then(|value| value.current_status_path.clone()),
+        summary
+            .as_ref()
+            .and_then(|value| value.retained_summary_path.clone()),
+        summary
+            .as_ref()
+            .and_then(|value| value.latest_checkpoint_pointer_path.clone()),
+        summary
+            .as_ref()
+            .and_then(|value| value.launcher_log_path.clone()),
+        detail,
+    );
+    emit_success_packet(&packet);
+    ExitCode::SUCCESS
 }
 
 fn machine_repo_root() -> Result<PathBuf, String> {
@@ -573,6 +735,20 @@ fn load_manifest(path: &Path) -> Result<PsionicTrainInvocationManifest, PsionicT
 fn operator_args_from_manifest(
     manifest: &PsionicTrainInvocationManifest,
 ) -> Result<Vec<String>, PsionicTrainStatusPacket> {
+    if manifest.operation == PsionicTrainOperation::ServeCheckpoint {
+        return Err(PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::InternalError,
+            None,
+            None,
+            None,
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            "serve-checkpoint is handled directly by manifest mode and must not be forwarded to the actual-lane operator CLI",
+        ));
+    }
     let mut args = vec![String::from(manifest.operation.cli_subcommand())];
     match manifest.operation {
         PsionicTrainOperation::Start | PsionicTrainOperation::RehearseBaseLane => {
@@ -691,7 +867,13 @@ fn manifest_run_root(manifest: &PsionicTrainInvocationManifest) -> Option<PathBu
         PsionicTrainOperation::Start | PsionicTrainOperation::RehearseBaseLane => {
             manifest.output_root.as_ref().map(PathBuf::from)
         }
-        _ => manifest.run_root.as_ref().map(PathBuf::from),
+        PsionicTrainOperation::Resume
+        | PsionicTrainOperation::ServeCheckpoint
+        | PsionicTrainOperation::RecordCheckpoint
+        | PsionicTrainOperation::Backup
+        | PsionicTrainOperation::DecideContinueRestart => {
+            manifest.run_root.as_ref().map(PathBuf::from)
+        }
     }
 }
 
@@ -787,6 +969,65 @@ fn refusal_for_contract_error(
         }
         _ => PsionicTrainRefusalClass::BadConfig,
     }
+}
+
+fn refusal_for_checkpoint_handoff_error(
+    error: &PsionicTrainCheckpointHandoffError,
+) -> PsionicTrainRefusalClass {
+    match error {
+        PsionicTrainCheckpointHandoffError::MissingCheckpoint { .. } => {
+            PsionicTrainRefusalClass::CheckpointMissing
+        }
+        PsionicTrainCheckpointHandoffError::Parse { .. }
+        | PsionicTrainCheckpointHandoffError::Invalid { .. } => {
+            PsionicTrainRefusalClass::CheckpointDigestMismatch
+        }
+        PsionicTrainCheckpointHandoffError::Read { .. } => {
+            PsionicTrainRefusalClass::CheckpointMissing
+        }
+        PsionicTrainCheckpointHandoffError::Write { .. } => {
+            PsionicTrainRefusalClass::ArtifactIncomplete
+        }
+    }
+}
+
+fn emit_checkpoint_handoff_refusal(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: &Path,
+    run_root: &Path,
+    runtime_identity: &MachineRuntimeIdentity,
+    error: &PsionicTrainCheckpointHandoffError,
+    detail_prefix: String,
+) -> ExitCode {
+    let summary = actual_pretraining_run_surface_summary(run_root);
+    let mut packet = PsionicTrainStatusPacket::refusal(
+        Some(manifest),
+        refusal_for_checkpoint_handoff_error(error),
+        Some(manifest_path.display().to_string()),
+        Some(runtime_identity.attestation.clone()),
+        Some(runtime_identity.capability_projection.clone()),
+        summary
+            .as_ref()
+            .and_then(|value| value.run_id.clone())
+            .or_else(|| manifest.run_id.clone()),
+        Some(run_root.display().to_string()),
+        None,
+        None,
+        format!("{detail_prefix}: {error}"),
+    );
+    let status_paths = write_status_surfaces_for_packet(
+        manifest,
+        manifest_path.display().to_string(),
+        Some(run_root),
+        summary.as_ref(),
+        &packet,
+    )
+    .unwrap_or_default();
+    packet.run_status_packet_path = status_paths.run_status_packet_path;
+    packet.window_status_packet_path = status_paths.window_status_packet_path;
+    let code = packet.exit_code;
+    emit_refusal_packet(packet);
+    ExitCode::from(code)
 }
 
 #[derive(Clone, Debug)]
@@ -1039,6 +1280,13 @@ fn build_artifact_surface_refs(
                 .surface
                 .artifacts
                 .checkpoint_backup_receipt_path
+                .clone()
+        }),
+        checkpoint_handoff_receipt_path: checkpoint_surface.and_then(|value| {
+            value
+                .surface
+                .artifacts
+                .peer_checkpoint_handoff_receipt_path
                 .clone()
         }),
         recovery_receipt_path: checkpoint_surface

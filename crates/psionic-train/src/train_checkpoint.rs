@@ -1,13 +1,13 @@
 use std::{fs, path::Path};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PsionActualPretrainingAutoResumeReceipt,
-    PsionActualPretrainingCheckpointBackupReceipt, PsionActualPretrainingCheckpointManifest,
-    PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCurrentRunStatus,
-    PsionicTrainOperation, PsionicTrainRole,
+    PsionActualPretrainingAutoResumeReceipt, PsionActualPretrainingCheckpointBackupReceipt,
+    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
+    PsionActualPretrainingCurrentRunStatus, PsionicTrainCheckpointHandoffReceipt,
+    PsionicTrainOperation, PsionicTrainRole, PSION_ACTUAL_PRETRAINING_LANE_ID,
 };
 
 /// Stable schema version for the retained machine-readable checkpoint surface.
@@ -29,6 +29,8 @@ pub struct PsionicTrainCheckpointArtifactPaths {
     pub checkpoint_backup_manifest_path: Option<String>,
     /// Absolute path to the latest auto-resume receipt when present.
     pub auto_resume_receipt_path: Option<String>,
+    /// Absolute path to the latest peer checkpoint-handoff receipt when present.
+    pub peer_checkpoint_handoff_receipt_path: Option<String>,
     /// Absolute path to the latest retained checkpoint failure drill when present.
     pub checkpoint_failure_drill_path: Option<String>,
 }
@@ -103,6 +105,8 @@ pub fn inspect_psionic_train_checkpoint_surface(
     let checkpoint_backup_receipt_path =
         run_root.join("checkpoints/latest_accepted_checkpoint_backup_receipt.json");
     let auto_resume_receipt_path = run_root.join("checkpoints/auto_resume_receipt.json");
+    let peer_checkpoint_handoff_receipt_path =
+        run_root.join("status/peer_checkpoint_handoff_receipt.json");
 
     let current_status: Option<PsionActualPretrainingCurrentRunStatus> =
         load_optional_json(current_status_path.as_path())?;
@@ -162,6 +166,20 @@ pub fn inspect_psionic_train_checkpoint_surface(
     let checkpoint_backup_manifest_path = checkpoint_backup_receipt
         .as_ref()
         .map(|receipt| run_root.join(receipt.backup_checkpoint_manifest.path.as_str()));
+    let checkpoint_backup_manifest: Option<PsionActualPretrainingCheckpointManifest> =
+        match checkpoint_backup_manifest_path.as_ref() {
+            Some(path) if path.is_file() => {
+                let manifest: PsionActualPretrainingCheckpointManifest = load_json(path.as_path())?;
+                manifest.validate().map_err(|error| {
+                    PsionicTrainCheckpointSurfaceError::Invalid {
+                        path: path.display().to_string(),
+                        detail: error.to_string(),
+                    }
+                })?;
+                Some(manifest)
+            }
+            _ => None,
+        };
 
     let auto_resume_receipt: Option<PsionActualPretrainingAutoResumeReceipt> =
         load_optional_json(auto_resume_receipt_path.as_path())?;
@@ -173,6 +191,16 @@ pub fn inspect_psionic_train_checkpoint_surface(
             }
         })?;
     }
+    let peer_checkpoint_handoff_receipt: Option<PsionicTrainCheckpointHandoffReceipt> =
+        load_optional_json(peer_checkpoint_handoff_receipt_path.as_path())?;
+    if let Some(peer_checkpoint_handoff_receipt) = &peer_checkpoint_handoff_receipt {
+        peer_checkpoint_handoff_receipt
+            .validate()
+            .map_err(|error| PsionicTrainCheckpointSurfaceError::Invalid {
+                path: peer_checkpoint_handoff_receipt_path.display().to_string(),
+                detail: error.to_string(),
+            })?;
+    }
 
     let checkpoint_failure_drill_path = checkpoint_failure_drill_path(run_root, operation);
 
@@ -180,6 +208,7 @@ pub fn inspect_psionic_train_checkpoint_surface(
         && checkpoint_pointer.is_none()
         && checkpoint_backup_receipt.is_none()
         && auto_resume_receipt.is_none()
+        && peer_checkpoint_handoff_receipt.is_none()
     {
         return Ok(None);
     }
@@ -263,12 +292,15 @@ pub fn inspect_psionic_train_checkpoint_surface(
         checkpoint_ref,
         checkpoint_manifest_digest: checkpoint_manifest
             .as_ref()
+            .or(checkpoint_backup_manifest.as_ref())
             .map(|value| value.manifest_digest.clone()),
         checkpoint_object_digest: checkpoint_manifest
             .as_ref()
+            .or(checkpoint_backup_manifest.as_ref())
             .map(|value| value.checkpoint_object_digest.clone()),
         checkpoint_total_bytes: checkpoint_manifest
             .as_ref()
+            .or(checkpoint_backup_manifest.as_ref())
             .map(|value| value.checkpoint_total_bytes),
         backup_state: checkpoint_backup_receipt
             .as_ref()
@@ -295,7 +327,13 @@ pub fn inspect_psionic_train_checkpoint_surface(
             checkpoint_manifest_path: checkpoint_manifest_path
                 .as_ref()
                 .filter(|value| value.is_file())
-                .map(|value| value.display().to_string()),
+                .map(|value| value.display().to_string())
+                .or_else(|| {
+                    checkpoint_backup_manifest_path
+                        .as_ref()
+                        .filter(|value| value.is_file())
+                        .map(|value| value.display().to_string())
+                }),
             checkpoint_backup_receipt_path: checkpoint_backup_receipt_path
                 .is_file()
                 .then(|| checkpoint_backup_receipt_path.display().to_string()),
@@ -310,6 +348,9 @@ pub fn inspect_psionic_train_checkpoint_surface(
             auto_resume_receipt_path: auto_resume_receipt_path
                 .is_file()
                 .then(|| auto_resume_receipt_path.display().to_string()),
+            peer_checkpoint_handoff_receipt_path: peer_checkpoint_handoff_receipt_path
+                .is_file()
+                .then(|| peer_checkpoint_handoff_receipt_path.display().to_string()),
             checkpoint_failure_drill_path: checkpoint_failure_drill_path
                 .as_ref()
                 .filter(|value| value.is_file())

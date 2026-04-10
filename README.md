@@ -134,7 +134,10 @@ cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invo
 
 That manifest now carries one frozen coordination envelope, including the
 admitted `node_pubkey`, plus one admitted release/build/environment identity
-that the runtime checks before launch. The emitted
+that the runtime checks before launch. Recovery-source manifests can now also
+carry one `peer_node_pubkey` for the machine-only `serve-checkpoint` operation
+and one `peer_checkpoint_handoff_receipt_path` that seeds a joiner’s local
+checkpoint tree before `resume` runs. The emitted
 `psionic.train.status_packet.v1` packet now also carries the resolved runtime
 attestation and the retained absolute paths for
 `status/psionic_train_run_status_packet.json` and
@@ -149,8 +152,8 @@ The same machine runtime now also persists one
 pointer state, checkpoint-manifest digest, backup receipt posture, upload
 outcome, and auto-resume recovery result without reopening the full retained
 actual-lane tree. The run/window status packets repeat the absolute paths for
-that surface plus the latest checkpoint manifest, backup receipt, pointer, and
-auto-resume receipt when those artifacts exist.
+that surface plus the latest checkpoint manifest, backup receipt, pointer,
+peer handoff receipt, and auto-resume receipt when those artifacts exist.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

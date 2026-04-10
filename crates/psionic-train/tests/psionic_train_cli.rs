@@ -5,13 +5,14 @@ use std::{
 };
 
 use psionic_train::{
+    runtime_build_digest, PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
+    PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointSurface,
+    PsionicTrainCoordinationContext, PsionicTrainInvocationManifest,
+    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
+    PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
+    PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
     PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
     PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-    PsionicTrainAdmissionIdentity, PsionicTrainCheckpointSurface, PsionicTrainCoordinationContext,
-    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
-    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
-    PsionicTrainRunStatusPacket, PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
-    runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -111,6 +112,8 @@ fn base_manifest() -> PsionicTrainInvocationManifest {
         run_id: Some(String::from("psion-train-cli-test")),
         output_root: None,
         run_root: None,
+        peer_node_pubkey: None,
+        peer_checkpoint_handoff_receipt_path: None,
         selected_git_ref: Some(String::from("HEAD")),
         hardware_observation_path: None,
         run_shape_observation_path: None,
@@ -179,6 +182,8 @@ fn build_retained_operation_manifest(
     manifest.run_id = None;
     manifest.output_root = None;
     manifest.run_root = Some(run_root.display().to_string());
+    manifest.peer_node_pubkey = None;
+    manifest.peer_checkpoint_handoff_receipt_path = None;
     manifest.allow_dirty_tree = true;
     add_admitted_observations(&mut manifest);
     manifest
@@ -352,46 +357,38 @@ fn machine_manifest_record_checkpoint_persists_checkpoint_surface() {
         checkpoint_surface.upload_outcome.as_deref(),
         Some("succeeded")
     );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_manifest_path
-                .as_deref()
-                .expect("checkpoint manifest path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_backup_receipt_path
-                .as_deref()
-                .expect("checkpoint backup receipt path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_backup_pointer_path
-                .as_deref()
-                .expect("checkpoint backup pointer path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_backup_manifest_path
-                .as_deref()
-                .expect("checkpoint backup manifest path should exist"),
-        )
-        .is_file()
-    );
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_manifest_path
+            .as_deref()
+            .expect("checkpoint manifest path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_backup_receipt_path
+            .as_deref()
+            .expect("checkpoint backup receipt path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_backup_pointer_path
+            .as_deref()
+            .expect("checkpoint backup pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_backup_manifest_path
+            .as_deref()
+            .expect("checkpoint backup manifest path should exist"),
+    )
+    .is_file());
 }
 
 #[test]
@@ -470,26 +467,22 @@ fn machine_manifest_resume_recovers_primary_pointer_from_backup() {
         Some("backup_receipt")
     );
     assert_eq!(checkpoint_surface.restored_primary_pointer, Some(true));
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_pointer_path
-                .as_deref()
-                .expect("checkpoint pointer path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .auto_resume_receipt_path
-                .as_deref()
-                .expect("auto-resume receipt path should exist"),
-        )
-        .is_file()
-    );
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_deref()
+            .expect("checkpoint pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .auto_resume_receipt_path
+            .as_deref()
+            .expect("auto-resume receipt path should exist"),
+    )
+    .is_file());
 }
 
 #[test]
@@ -542,6 +535,274 @@ fn machine_manifest_resume_refuses_without_any_admitted_checkpoint() {
         Some("none")
     );
     assert_eq!(checkpoint_surface.restored_primary_pointer, Some(false));
+}
+
+#[test]
+fn machine_manifest_serve_checkpoint_retains_primary_handoff_receipt() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let source_run_root = tempdir.path().join("source-run");
+
+    let launch_manifest_path = tempdir.path().join("launch.json");
+    let mut launch_manifest = build_launch_manifest(&source_run_root);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(launch_output.status.success(), "launch should succeed");
+
+    let checkpoint_manifest_path = tempdir.path().join("record-checkpoint.json");
+    let mut checkpoint_manifest = build_retained_operation_manifest(
+        &source_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
+    checkpoint_manifest.optimizer_step = Some(16_384);
+    checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/broad/pretrain/final"));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "record-checkpoint should succeed"
+    );
+
+    let serve_manifest_path = tempdir.path().join("serve-checkpoint.json");
+    let mut serve_manifest = build_retained_operation_manifest(
+        &source_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::ServeCheckpoint,
+    );
+    serve_manifest.peer_node_pubkey = Some(String::from("npub1-late-joiner"));
+    write_manifest(&serve_manifest_path, &mut serve_manifest);
+    let output = run_machine_manifest(&serve_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let handoff_receipt: PsionicTrainCheckpointHandoffReceipt = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_handoff_receipt_path
+            .as_ref()
+            .expect("checkpoint handoff receipt path should exist"),
+    );
+    assert_eq!(
+        handoff_receipt.source_kind,
+        PsionicTrainCheckpointHandoffSourceKind::LivePrimaryPointer
+    );
+    assert_eq!(
+        handoff_receipt.peer_node_pubkey.as_str(),
+        "npub1-late-joiner"
+    );
+    assert_eq!(
+        handoff_receipt.serving_node_pubkey.as_str(),
+        "npub1-psionic-cli-test"
+    );
+    assert_eq!(handoff_receipt.optimizer_step, 16_384);
+}
+
+#[test]
+fn machine_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let source_run_root = tempdir.path().join("source-run");
+
+    let launch_manifest_path = tempdir.path().join("launch.json");
+    let mut launch_manifest = build_launch_manifest(&source_run_root);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(launch_output.status.success(), "launch should succeed");
+
+    let checkpoint_manifest_path = tempdir.path().join("record-checkpoint.json");
+    let mut checkpoint_manifest = build_retained_operation_manifest(
+        &source_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
+    checkpoint_manifest.optimizer_step = Some(16_384);
+    checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/broad/pretrain/final"));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "record-checkpoint should succeed"
+    );
+
+    let serve_manifest_path = tempdir.path().join("serve-checkpoint.json");
+    let mut serve_manifest = build_retained_operation_manifest(
+        &source_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::ServeCheckpoint,
+    );
+    serve_manifest.peer_node_pubkey = Some(String::from("npub1-late-joiner"));
+    write_manifest(&serve_manifest_path, &mut serve_manifest);
+    let serve_output = run_machine_manifest(&serve_manifest_path);
+    assert!(
+        serve_output.status.success(),
+        "serve-checkpoint should succeed"
+    );
+    let serve_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&serve_output.stdout).expect("status packet should parse");
+    let serve_run_status: PsionicTrainRunStatusPacket = parse_json(
+        serve_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let handoff_receipt_path = serve_run_status
+        .artifacts
+        .checkpoint_handoff_receipt_path
+        .as_ref()
+        .expect("checkpoint handoff receipt path should exist")
+        .clone();
+
+    let joiner_run_root = tempdir.path().join("joiner-run");
+    let resume_manifest_path = tempdir.path().join("resume-from-peer.json");
+    let mut resume_manifest = build_retained_operation_manifest(
+        &joiner_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::Resume,
+    );
+    resume_manifest.coordination.node_pubkey = Some(String::from("npub1-late-joiner"));
+    resume_manifest.peer_checkpoint_handoff_receipt_path = Some(handoff_receipt_path);
+    resume_manifest.dry_run = true;
+    write_manifest(&resume_manifest_path, &mut resume_manifest);
+    let output = run_machine_manifest(&resume_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    assert_eq!(run_status.run_id.as_deref(), Some("psion-train-cli-test"));
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_ref()
+            .expect("checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.pointer_state.as_deref(),
+        Some("accepted")
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_resolution_state.as_deref(),
+        Some("accepted_primary_pointer")
+    );
+    assert!(Path::new(
+        run_status
+            .artifacts
+            .checkpoint_handoff_receipt_path
+            .as_deref()
+            .expect("joiner checkpoint handoff receipt path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_deref()
+            .expect("checkpoint pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_manifest_path
+            .as_deref()
+            .expect("checkpoint manifest path should exist"),
+    )
+    .is_file());
+}
+
+#[test]
+fn machine_manifest_serve_checkpoint_falls_back_to_backup_when_primary_is_missing() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let source_run_root = tempdir.path().join("source-run");
+
+    let launch_manifest_path = tempdir.path().join("launch.json");
+    let mut launch_manifest = build_launch_manifest(&source_run_root);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(launch_output.status.success(), "launch should succeed");
+
+    let checkpoint_manifest_path = tempdir.path().join("record-checkpoint.json");
+    let mut checkpoint_manifest = build_retained_operation_manifest(
+        &source_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
+    checkpoint_manifest.optimizer_step = Some(16_384);
+    checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/broad/pretrain/final"));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "record-checkpoint should succeed"
+    );
+
+    fs::remove_file(source_run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json"))
+        .expect("primary pointer should be removable");
+
+    let serve_manifest_path = tempdir.path().join("serve-checkpoint.json");
+    let mut serve_manifest = build_retained_operation_manifest(
+        &source_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::ServeCheckpoint,
+    );
+    serve_manifest.peer_node_pubkey = Some(String::from("npub1-late-joiner"));
+    write_manifest(&serve_manifest_path, &mut serve_manifest);
+    let output = run_machine_manifest(&serve_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let handoff_receipt: PsionicTrainCheckpointHandoffReceipt = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_handoff_receipt_path
+            .as_ref()
+            .expect("checkpoint handoff receipt path should exist"),
+    );
+    assert_eq!(
+        handoff_receipt.source_kind,
+        PsionicTrainCheckpointHandoffSourceKind::DurableBackupCopy
+    );
+    assert!(handoff_receipt.restored_from_backup);
 }
 
 #[test]
