@@ -9,11 +9,12 @@ use std::{
 
 use psionic_train::{
     PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
-    PsionicTrainCapabilityProjection, PsionicTrainInvocationManifest,
-    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
-    PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
-    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
-    admitted_environment_ref_for_lane, admitted_release_id_for_lane, runtime_build_digest,
+    PsionicTrainCapabilityProjection, PsionicTrainCheckpointSurface,
+    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRunStatusPacket,
+    PsionicTrainRuntimeAttestation, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
+    admitted_release_id_for_lane, inspect_psionic_train_checkpoint_surface, runtime_build_digest,
 };
 
 #[allow(dead_code)]
@@ -30,6 +31,12 @@ struct MachineRuntimeIdentity {
 struct MachineStatusSurfacePaths {
     run_status_packet_path: Option<String>,
     window_status_packet_path: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct RetainedCheckpointSurface {
+    path: String,
+    surface: PsionicTrainCheckpointSurface,
 }
 
 fn main() -> ExitCode {
@@ -748,6 +755,8 @@ fn classify_operator_error(detail: &str) -> PsionicTrainRefusalClass {
         || lower.contains("checkpoint manifest path")
         || lower.contains("no admitted backup receipt was available")
         || lower.contains("latest checkpoint backup receipt is not durable enough")
+        || lower.contains("could not resolve an admitted checkpoint pointer")
+        || lower.contains("primary pointer could not be resumed")
     {
         PsionicTrainRefusalClass::CheckpointMissing
     } else if lower.contains("drifted from the accepted checkpoint pointer")
@@ -919,7 +928,12 @@ fn write_status_surfaces(
         resolved_run_id.as_str(),
         outcome,
     )?;
-    let artifacts = build_artifact_surface_refs(summary, membership_revision_path.clone());
+    let checkpoint_surface = write_checkpoint_surface(run_root, manifest)?;
+    let artifacts = build_artifact_surface_refs(
+        summary,
+        membership_revision_path.clone(),
+        checkpoint_surface.as_ref(),
+    );
     let run_packet = PsionicTrainRunStatusPacket {
         schema_version: String::from(psionic_train::PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION),
         runtime_surface_id: String::from(psionic_train::PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
@@ -1009,13 +1023,27 @@ fn write_status_surfaces(
 fn build_artifact_surface_refs(
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
     membership_revision_path: Option<String>,
+    checkpoint_surface: Option<&RetainedCheckpointSurface>,
 ) -> PsionicTrainArtifactSurfaceRefs {
     PsionicTrainArtifactSurfaceRefs {
         launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
         membership_revision_path,
-        checkpoint_pointer_path: summary
-            .and_then(|value| value.latest_checkpoint_pointer_path.clone()),
-        recovery_receipt_path: summary.and_then(|value| value.auto_resume_receipt_path.clone()),
+        checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
+        checkpoint_pointer_path: checkpoint_surface
+            .and_then(|value| value.surface.artifacts.checkpoint_pointer_path.clone())
+            .or_else(|| summary.and_then(|value| value.latest_checkpoint_pointer_path.clone())),
+        checkpoint_manifest_path: checkpoint_surface
+            .and_then(|value| value.surface.artifacts.checkpoint_manifest_path.clone()),
+        checkpoint_backup_receipt_path: checkpoint_surface.and_then(|value| {
+            value
+                .surface
+                .artifacts
+                .checkpoint_backup_receipt_path
+                .clone()
+        }),
+        recovery_receipt_path: checkpoint_surface
+            .and_then(|value| value.surface.artifacts.auto_resume_receipt_path.clone())
+            .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
         validator_score_receipt_path: None,
         sealed_window_bundle_path: None,
         final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),
@@ -1092,6 +1120,34 @@ fn write_membership_revision_receipt(
         )
     })?;
     Ok(Some(current_path.display().to_string()))
+}
+
+fn write_checkpoint_surface(
+    run_root: &Path,
+    manifest: &PsionicTrainInvocationManifest,
+) -> Result<Option<RetainedCheckpointSurface>, String> {
+    let Some(surface) =
+        inspect_psionic_train_checkpoint_surface(run_root, manifest.role, manifest.operation)
+            .map_err(|error| format!("failed to inspect checkpoint surface: {error}"))?
+    else {
+        return Ok(None);
+    };
+    let path = run_root.join("status/checkpoint_surface.json");
+    fs::write(
+        &path,
+        serde_json::to_vec_pretty(&surface)
+            .map_err(|error| format!("failed to serialize checkpoint surface: {error}"))?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write checkpoint surface `{}`: {error}",
+            path.display()
+        )
+    })?;
+    Ok(Some(RetainedCheckpointSurface {
+        path: path.display().to_string(),
+        surface,
+    }))
 }
 
 fn load_membership_revision_receipt(

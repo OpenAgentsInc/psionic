@@ -414,13 +414,20 @@ paths. It also persists one
 root exists, it also persists one
 `psionic.train.membership_revision_receipt.v1` packet at
 `status/membership_revision_receipt.json` and appends every local revision into
-`status/membership_revisions/`. That membership receipt freezes the first local
-cluster session contract: heartbeat cadence, stale and expiry thresholds, lease
-timers, drain grace, node-pubkey binding, build digest binding, current worker
-state, previous worker state, and automatic same-node rejoin or different-node
-replacement from retained state. That surface is the first honest answer to
-“how does `Pylon` invoke `psionic-train` without going through a human shell
-wrapper?”
+`status/membership_revisions/`. It now also persists one
+`psionic.train.checkpoint_surface.v1` packet at
+`status/checkpoint_surface.json`. That membership receipt freezes the first
+local cluster session contract: heartbeat cadence, stale and expiry thresholds,
+lease timers, drain grace, node-pubkey binding, build digest binding, current
+worker state, previous worker state, and automatic same-node rejoin or
+different-node replacement from retained state. The checkpoint surface freezes
+the first machine-readable checkpoint summary contract: latest checkpoint
+pointer state, checkpoint label and step, checkpoint ref, manifest digest,
+object digest, byte count, backup state, upload outcome, auto-resume recovery
+state, and the absolute paths to the latest checkpoint manifest, backup
+receipt, backup copies, and recovery receipt when those artifacts exist. That
+surface is the first honest answer to “how does `Pylon` invoke
+`psionic-train` without going through a human shell wrapper?”
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,
@@ -479,6 +486,15 @@ artifacts. The `rehearse-base-lane` path now closes the base lane itself by
 upgrading `closeout/closeout_bundle.json` into a retained proof packet with
 explicit evidence refs, closeout gates, failure-drill recovery evidence, and
 claim-boundary sections.
+
+The machine runtime coverage now also proves the checkpoint lifecycle directly
+through the typed manifest path instead of only through the human shell path:
+launch/start materializes the pending pointer, `record_checkpoint` materializes
+the accepted checkpoint manifest plus backup lineage, `backup` replays durable
+upload state into the retained receipt family, `resume` can fetch, verify, and
+restore from the retained backup family when the primary pointer is missing,
+and resume refusal still emits one retained recovery surface instead of leaving
+the run root ambiguous.
 
 The repo now also owns one explicit default Tassadar train contract in
 `crates/psionic-train/src/tassadar_default_train_lane.rs`, the fixture

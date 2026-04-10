@@ -143,6 +143,14 @@ runtime also persists one `psionic.train.membership_revision_receipt.v1`
 receipt at `status/membership_revision_receipt.json` and appends revision
 history under `status/membership_revisions/` so the local worker heartbeat,
 drain, rejoin, replace, and failed-session posture remain machine-visible.
+The same machine runtime now also persists one
+`psionic.train.checkpoint_surface.v1` snapshot at
+`status/checkpoint_surface.json` so supervisors can read the latest checkpoint
+pointer state, checkpoint-manifest digest, backup receipt posture, upload
+outcome, and auto-resume recovery result without reopening the full retained
+actual-lane tree. The run/window status packets repeat the absolute paths for
+that surface plus the latest checkpoint manifest, backup receipt, pointer, and
+auto-resume receipt when those artifacts exist.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

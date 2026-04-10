@@ -1,12 +1,17 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::{Command, Output},
+};
 
 use psionic_train::{
     PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
     PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-    PsionicTrainAdmissionIdentity, PsionicTrainCoordinationContext, PsionicTrainInvocationManifest,
-    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
-    PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
-    PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket, runtime_build_digest,
+    PsionicTrainAdmissionIdentity, PsionicTrainCheckpointSurface, PsionicTrainCoordinationContext,
+    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
+    PsionicTrainRunStatusPacket, PsionicTrainStatusPacket, PsionicTrainWindowStatusPacket,
+    runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -122,34 +127,72 @@ fn base_manifest() -> PsionicTrainInvocationManifest {
     }
 }
 
-#[test]
-fn machine_manifest_dry_run_emits_success_status_packet() {
-    let tempdir = tempdir().expect("tempdir should exist");
-    let run_root = tempdir.path().join("run");
-    let manifest_path = tempdir.path().join("invocation.json");
-    let mut manifest = base_manifest();
-    manifest.output_root = Some(run_root.display().to_string());
-    manifest.allow_dirty_tree = true;
+fn add_admitted_observations(manifest: &mut PsionicTrainInvocationManifest) {
     manifest.hardware_observation_path = Some(String::from(
         "fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json",
     ));
     manifest.run_shape_observation_path = Some(String::from(
         "fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json",
     ));
+}
+
+fn write_manifest(path: &Path, manifest: &mut PsionicTrainInvocationManifest) {
     manifest
         .populate_manifest_digest()
-        .expect("digest should populate");
+        .expect("manifest digest should populate");
     fs::write(
-        &manifest_path,
-        serde_json::to_string_pretty(&manifest).expect("manifest should serialize"),
+        path,
+        serde_json::to_string_pretty(manifest).expect("manifest should serialize"),
     )
     .expect("manifest should write");
+}
 
-    let output = Command::new(binary_path())
+fn run_machine_manifest(manifest_path: &Path) -> Output {
+    Command::new(binary_path())
         .args(["manifest", "--manifest"])
-        .arg(&manifest_path)
+        .arg(manifest_path)
         .output()
-        .expect("psionic-train should run");
+        .expect("psionic-train should run")
+}
+
+fn parse_json<T: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> T {
+    serde_json::from_slice(&fs::read(path.as_ref()).expect("retained artifact should be readable"))
+        .expect("retained artifact should parse")
+}
+
+fn build_launch_manifest(run_root: &Path) -> PsionicTrainInvocationManifest {
+    let mut manifest = base_manifest();
+    manifest.output_root = Some(run_root.display().to_string());
+    manifest.allow_dirty_tree = true;
+    add_admitted_observations(&mut manifest);
+    manifest
+}
+
+fn build_retained_operation_manifest(
+    run_root: &Path,
+    role: PsionicTrainRole,
+    operation: PsionicTrainOperation,
+) -> PsionicTrainInvocationManifest {
+    let mut manifest = base_manifest();
+    manifest.role = role;
+    manifest.operation = operation;
+    manifest.run_id = None;
+    manifest.output_root = None;
+    manifest.run_root = Some(run_root.display().to_string());
+    manifest.allow_dirty_tree = true;
+    add_admitted_observations(&mut manifest);
+    manifest
+}
+
+#[test]
+fn machine_manifest_dry_run_emits_success_status_packet() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("run");
+    let manifest_path = tempdir.path().join("invocation.json");
+    let mut manifest = build_launch_manifest(&run_root);
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
 
     assert!(
         output.status.success(),
@@ -182,6 +225,21 @@ fn machine_manifest_dry_run_emits_success_status_packet() {
     )
     .expect("run status packet should parse");
     assert_eq!(run_status.run_id.as_deref(), Some("psion-train-cli-test"));
+    let checkpoint_surface_path = run_status
+        .artifacts
+        .checkpoint_surface_path
+        .as_ref()
+        .expect("checkpoint surface path should exist");
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(checkpoint_surface_path);
+    assert_eq!(
+        checkpoint_surface.pointer_state.as_deref(),
+        Some("pending_first_checkpoint")
+    );
+    assert_eq!(
+        checkpoint_surface.checkpoint_label.as_deref(),
+        Some("pending_first_checkpoint")
+    );
+    assert_eq!(checkpoint_surface.optimizer_step, None);
     let membership_revision_path = run_status
         .artifacts
         .membership_revision_path
@@ -214,26 +272,288 @@ fn machine_manifest_dry_run_emits_success_status_packet() {
 }
 
 #[test]
+fn machine_manifest_record_checkpoint_persists_checkpoint_surface() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("run");
+
+    let launch_manifest_path = tempdir.path().join("launch.json");
+    let mut launch_manifest = build_launch_manifest(&run_root);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&launch_output.stdout),
+        String::from_utf8_lossy(&launch_output.stderr)
+    );
+
+    let checkpoint_manifest_path = tempdir.path().join("record-checkpoint.json");
+    let mut checkpoint_manifest = build_retained_operation_manifest(
+        &run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
+    checkpoint_manifest.optimizer_step = Some(16_384);
+    checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/broad/pretrain/final"));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let output = run_machine_manifest(&checkpoint_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    assert_eq!(packet.outcome, PsionicTrainOutcomeKind::Succeeded);
+
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_ref()
+            .expect("checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.current_phase.as_deref(),
+        Some("checkpoint_evaluated")
+    );
+    assert_eq!(
+        checkpoint_surface.pointer_state.as_deref(),
+        Some("accepted")
+    );
+    assert_eq!(
+        checkpoint_surface.checkpoint_label.as_deref(),
+        Some("broader-pretrain-final")
+    );
+    assert_eq!(checkpoint_surface.optimizer_step, Some(16_384));
+    assert_eq!(
+        checkpoint_surface.checkpoint_ref.as_deref(),
+        Some("checkpoint://psion/broad/pretrain/final")
+    );
+    assert!(checkpoint_surface.checkpoint_manifest_digest.is_some());
+    assert!(checkpoint_surface.checkpoint_object_digest.is_some());
+    assert!(checkpoint_surface.checkpoint_total_bytes.is_some());
+    assert_eq!(
+        checkpoint_surface.backup_state.as_deref(),
+        Some("backed_up")
+    );
+    assert_eq!(
+        checkpoint_surface.upload_outcome.as_deref(),
+        Some("succeeded")
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_manifest_path
+                .as_deref()
+                .expect("checkpoint manifest path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_receipt_path
+                .as_deref()
+                .expect("checkpoint backup receipt path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_pointer_path
+                .as_deref()
+                .expect("checkpoint backup pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_manifest_path
+                .as_deref()
+                .expect("checkpoint backup manifest path should exist"),
+        )
+        .is_file()
+    );
+}
+
+#[test]
+fn machine_manifest_resume_recovers_primary_pointer_from_backup() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("run");
+
+    let launch_manifest_path = tempdir.path().join("launch.json");
+    let mut launch_manifest = build_launch_manifest(&run_root);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(launch_output.status.success(), "launch should succeed");
+
+    let checkpoint_manifest_path = tempdir.path().join("record-checkpoint.json");
+    let mut checkpoint_manifest = build_retained_operation_manifest(
+        &run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    checkpoint_manifest.checkpoint_label = Some(String::from("broader-pretrain-final"));
+    checkpoint_manifest.optimizer_step = Some(16_384);
+    checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/broad/pretrain/final"));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "record-checkpoint should succeed"
+    );
+
+    let primary_pointer_path = run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
+    fs::remove_file(&primary_pointer_path).expect("primary pointer should be removable");
+    assert!(
+        !primary_pointer_path.is_file(),
+        "primary pointer should be gone"
+    );
+
+    let resume_manifest_path = tempdir.path().join("resume.json");
+    let mut resume_manifest = build_retained_operation_manifest(
+        &run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::Resume,
+    );
+    resume_manifest.dry_run = true;
+    write_manifest(&resume_manifest_path, &mut resume_manifest);
+    let output = run_machine_manifest(&resume_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_ref()
+            .expect("checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_resolution_state.as_deref(),
+        Some("recovered_from_backup")
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_source_kind.as_deref(),
+        Some("backup_receipt")
+    );
+    assert_eq!(checkpoint_surface.restored_primary_pointer, Some(true));
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .as_deref()
+                .expect("checkpoint pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .auto_resume_receipt_path
+                .as_deref()
+                .expect("auto-resume receipt path should exist"),
+        )
+        .is_file()
+    );
+}
+
+#[test]
+fn machine_manifest_resume_refuses_without_any_admitted_checkpoint() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("run");
+
+    let launch_manifest_path = tempdir.path().join("launch.json");
+    let mut launch_manifest = build_launch_manifest(&run_root);
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(launch_output.status.success(), "launch should succeed");
+
+    let resume_manifest_path = tempdir.path().join("resume.json");
+    let mut resume_manifest = build_retained_operation_manifest(
+        &run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::Resume,
+    );
+    resume_manifest.dry_run = true;
+    write_manifest(&resume_manifest_path, &mut resume_manifest);
+    let output = run_machine_manifest(&resume_manifest_path);
+
+    assert!(!output.status.success(), "resume should be refused");
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
+    assert_eq!(
+        packet.refusal_class,
+        Some(PsionicTrainRefusalClass::CheckpointMissing)
+    );
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("run status packet path should exist"),
+    );
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_ref()
+            .expect("checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_resolution_state.as_deref(),
+        Some("refused")
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_source_kind.as_deref(),
+        Some("none")
+    );
+    assert_eq!(checkpoint_surface.restored_primary_pointer, Some(false));
+}
+
+#[test]
 fn validator_role_is_reported_as_machine_refusal() {
     let tempdir = tempdir().expect("tempdir should exist");
     let manifest_path = tempdir.path().join("validator-invocation.json");
     let mut manifest = base_manifest();
     manifest.role = PsionicTrainRole::Validator;
     manifest.output_root = Some(tempdir.path().join("validator-run").display().to_string());
-    manifest
-        .populate_manifest_digest()
-        .expect("digest should populate");
-    fs::write(
-        &manifest_path,
-        serde_json::to_string_pretty(&manifest).expect("manifest should serialize"),
-    )
-    .expect("manifest should write");
+    write_manifest(&manifest_path, &mut manifest);
 
-    let output = Command::new(binary_path())
-        .args(["manifest", "--manifest"])
-        .arg(&manifest_path)
-        .output()
-        .expect("psionic-train should run");
+    let output = run_machine_manifest(&manifest_path);
 
     assert!(!output.status.success(), "validator role should be refused");
     let packet: PsionicTrainStatusPacket =
@@ -263,20 +583,9 @@ fn build_identity_mismatch_is_refused_before_launch() {
     );
     manifest.allow_dirty_tree = true;
     manifest.admission_identity.build_digest = String::from("sha256:not-the-real-build");
-    manifest
-        .populate_manifest_digest()
-        .expect("digest should populate");
-    fs::write(
-        &manifest_path,
-        serde_json::to_string_pretty(&manifest).expect("manifest should serialize"),
-    )
-    .expect("manifest should write");
+    write_manifest(&manifest_path, &mut manifest);
 
-    let output = Command::new(binary_path())
-        .args(["manifest", "--manifest"])
-        .arg(&manifest_path)
-        .output()
-        .expect("psionic-train should run");
+    let output = run_machine_manifest(&manifest_path);
 
     assert!(
         !output.status.success(),

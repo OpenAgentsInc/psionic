@@ -56,6 +56,7 @@ run root exists, it also persists:
 - `status/psionic_train_run_status_packet.json`
 - `status/psionic_train_window_status_packet.json`
 - `status/membership_revision_receipt.json`
+- `status/checkpoint_surface.json`
 
 The retained membership receipt now freezes the first local cluster-session
 contract too. It binds the admitted `node_pubkey`, release id, build digest,
@@ -65,6 +66,15 @@ deadline. It appends revision history under `status/membership_revisions/` and
 automatically records same-node rejoin, different-node replacement, and failed
 session posture from retained state instead of relying on manual metadata
 fixups.
+
+The retained checkpoint surface is the machine-readable checkpoint summary for
+that same run root. It points at the latest accepted checkpoint pointer,
+checkpoint manifest, backup receipt, backup copies, and auto-resume receipt
+when present. It also records the current checkpoint phase, pointer state,
+checkpoint label and step, manifest digest, object digest, byte count, backup
+state, upload outcome, and auto-resume recovery result so supervisors can read
+the latest checkpoint posture without reopening the full retained artifact
+family themselves.
 
 `./TRAIN` remains the operator convenience path above the same actual lane
 logic.
