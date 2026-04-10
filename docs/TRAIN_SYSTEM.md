@@ -391,6 +391,27 @@ That surface gives the repo one real operator path for:
 - `./TRAIN --lane actual_pretraining status --run-root <path>`
 - `./TRAIN --lane actual_pretraining dashboard --run-root <path>`
 
+The repo now also has one stable machine-consumable `psionic-train` runtime
+surface above that same actual-lane operator logic. The typed contract lives in
+`crates/psionic-train/src/train_runtime.rs`, the binary entrypoint lives in
+`crates/psionic-train/src/main.rs`, and the actual-lane shell wrapper now
+dispatches through that binary instead of `cargo run --example ...`. The first
+machine runtime surface intentionally stays narrow: it admits the
+`psion_actual_pretraining_v1` lane only, consumes one explicit
+`psionic.train.invocation_manifest.v1` JSON manifest with deterministic run id,
+run root or output root, git ref, role, and operation, and emits one final
+`psionic.train.status_packet.v1` packet with a stable exit code, retryability
+bit, authority owner, optional refusal class, and retained artifact paths. That
+surface is the first honest answer to “how does `Pylon` invoke `psionic-train`
+without going through a human shell wrapper?”
+
+The refusal surface is also now frozen at the `psionic-train` process boundary.
+The first machine runtime lane maps bad configuration, unsupported topology,
+checkpoint/artifact drift or absence, environment mismatch, build revocation,
+validator timeout or disagreement, lease or assignment staleness, and internal
+runtime failure to stable numeric exit codes instead of leaving supervisor logic
+to parse ad hoc shell text.
+
 It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty
 working trees by default; retains the selected ref plus exact commit SHA; and

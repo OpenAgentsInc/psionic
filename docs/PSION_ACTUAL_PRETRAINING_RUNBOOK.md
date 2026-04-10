@@ -28,6 +28,19 @@ The older reference pilot is still available explicitly:
 ./TRAIN --lane reference_pilot [reference-lane options]
 ```
 
+For machine supervision, the stable process boundary is now the repo-local
+`psionic-train` binary rather than the shell wrapper:
+
+```bash
+cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
+```
+
+That machine path consumes one explicit JSON manifest and emits one final
+`psionic.train.status_packet.v1` packet with a stable exit code, retryability
+bit, authority owner, refusal class when applicable, and retained artifact
+paths. `./TRAIN` remains the operator convenience path above the same actual
+lane logic.
+
 ## Current Claim Boundary
 
 The actual-lane command now does these things for real:

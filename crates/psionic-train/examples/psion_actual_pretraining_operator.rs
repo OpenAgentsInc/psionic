@@ -4,6 +4,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use psionic_eval::{
@@ -31,31 +32,30 @@ use psionic_train::{
     PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingAlertFeed,
     PsionActualPretrainingArtifactRef, PsionActualPretrainingAutoResumeReceipt,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointBackupReceipt,
-    PsionActualPretrainingCheckpointComparison,
-    PsionActualPretrainingCheckpointEvalDecision, PsionActualPretrainingCheckpointEvalFailure,
-    PsionActualPretrainingCheckpointFailureDrill, PsionActualPretrainingCheckpointManifest,
-    PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCloseoutBundle,
-    PsionActualPretrainingCloseoutArtifact, PsionActualPretrainingCloseoutFailureDrill,
-    PsionActualPretrainingCloseoutGate,
-    PsionActualPretrainingContinueRestartDecision,
-    PsionActualPretrainingContinuationHandoff, PsionActualPretrainingCredentialBinding,
-    PsionActualPretrainingCurrentRunStatus, PsionActualPretrainingDashboardPacket,
-    PsionActualPretrainingDataBundle, PsionActualPretrainingDataloaderProbe,
-    PsionActualPretrainingEvidenceContract, PsionActualPretrainingEvidenceContractError,
-    PsionActualPretrainingHardwareObservation, PsionActualPretrainingHardwareQualification,
-    PsionActualPretrainingLaneSpec, PsionActualPretrainingLaunchManifest,
-    PsionActualPretrainingLauncherContractRefs, PsionActualPretrainingLauncherSurfaces,
-    PsionActualPretrainingObservedCredentialSource, PsionActualPretrainingObservedWorker,
-    PsionActualPretrainingPreflightRef, PsionActualPretrainingRecipeBundle,
-    PsionActualPretrainingRedactedAlert, PsionActualPretrainingResumeManifest,
-    PsionActualPretrainingRetainedPathSet, PsionActualPretrainingRetainedSummary,
-    PsionActualPretrainingRunRoots, PsionActualPretrainingRunShapeObservation,
-    PsionActualPretrainingRunShapeQualification, PsionActualPretrainingScalingBundle,
-    PsionActualPretrainingStorageProbe, PsionActualPretrainingSystemsBundle,
-    PsionActualPretrainingThroughputProbe, PsionActualPretrainingTopologyStorageBundle,
-    PsionPluginConditionedSftStageManifest, build_psion_actual_pretraining_dashboard_packet,
-    checkpoint_comparison_relative_path, checkpoint_eval_decision_relative_path,
-    checkpoint_eval_failure_relative_path, continue_restart_decision_relative_path,
+    PsionActualPretrainingCheckpointComparison, PsionActualPretrainingCheckpointEvalDecision,
+    PsionActualPretrainingCheckpointEvalFailure, PsionActualPretrainingCheckpointFailureDrill,
+    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
+    PsionActualPretrainingCloseoutArtifact, PsionActualPretrainingCloseoutBundle,
+    PsionActualPretrainingCloseoutFailureDrill, PsionActualPretrainingCloseoutGate,
+    PsionActualPretrainingContinuationHandoff, PsionActualPretrainingContinueRestartDecision,
+    PsionActualPretrainingCredentialBinding, PsionActualPretrainingCurrentRunStatus,
+    PsionActualPretrainingDashboardPacket, PsionActualPretrainingDataBundle,
+    PsionActualPretrainingDataloaderProbe, PsionActualPretrainingEvidenceContract,
+    PsionActualPretrainingEvidenceContractError, PsionActualPretrainingHardwareObservation,
+    PsionActualPretrainingHardwareQualification, PsionActualPretrainingLaneSpec,
+    PsionActualPretrainingLaunchManifest, PsionActualPretrainingLauncherContractRefs,
+    PsionActualPretrainingLauncherSurfaces, PsionActualPretrainingObservedCredentialSource,
+    PsionActualPretrainingObservedWorker, PsionActualPretrainingPreflightRef,
+    PsionActualPretrainingRecipeBundle, PsionActualPretrainingRedactedAlert,
+    PsionActualPretrainingResumeManifest, PsionActualPretrainingRetainedPathSet,
+    PsionActualPretrainingRetainedSummary, PsionActualPretrainingRunRoots,
+    PsionActualPretrainingRunShapeObservation, PsionActualPretrainingRunShapeQualification,
+    PsionActualPretrainingScalingBundle, PsionActualPretrainingStorageProbe,
+    PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
+    PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
+    build_psion_actual_pretraining_dashboard_packet, checkpoint_comparison_relative_path,
+    checkpoint_eval_decision_relative_path, checkpoint_eval_failure_relative_path,
+    continue_restart_decision_relative_path,
     derive_psion_actual_pretraining_hardware_qualification,
     derive_psion_actual_pretraining_run_shape_qualification,
     record_psion_actual_pretraining_auto_resume_receipt,
@@ -71,6 +71,16 @@ use psionic_train::{
 };
 use sha2::{Digest, Sha256};
 use std::time::Instant;
+
+static OPERATOR_HUMAN_OUTPUT_ENABLED: AtomicBool = AtomicBool::new(true);
+
+macro_rules! println {
+    ($($arg:tt)*) => {{
+        if OPERATOR_HUMAN_OUTPUT_ENABLED.load(Ordering::Relaxed) {
+            ::std::println!($($arg)*);
+        }
+    }};
+}
 
 enum Cli {
     Start {
@@ -147,8 +157,16 @@ struct ResolvedResumeTarget {
     failure_drill: Option<PsionActualPretrainingCheckpointFailureDrill>,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let cli = parse_cli()?;
+pub fn set_human_output_enabled(enabled: bool) {
+    OPERATOR_HUMAN_OUTPUT_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+pub fn run_with_args<I, S>(args: I) -> Result<(), Box<dyn Error>>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    let cli = parse_cli_from_args(args)?;
     let root = workspace_root()?;
     let repo_root = root.as_path();
     let contracts = load_frozen_contracts(repo_root)?;
@@ -1863,18 +1881,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "continue_restart_decision={}",
                 continue_restart_decision.decision_state
             );
-            println!(
-                "failure_drill={}",
-                failed_upload_drill_path.display()
-            );
+            println!("failure_drill={}", failed_upload_drill_path.display());
         }
     }
 
     Ok(())
 }
 
-fn parse_cli() -> Result<Cli, Box<dyn Error>> {
-    let mut args = env::args().skip(1);
+pub fn run_from_env() -> Result<(), Box<dyn Error>> {
+    run_with_args(env::args().skip(1))
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    run_from_env()
+}
+
+fn parse_cli_from_args<I, S>(args: I) -> Result<Cli, Box<dyn Error>>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<String>,
+{
+    let mut args = args.into_iter().map(Into::into);
     let Some(command) = args.next() else {
         usage();
         return Err(std::io::Error::other("missing subcommand").into());
@@ -3097,8 +3124,12 @@ fn build_base_lane_rehearsal_closeout_bundle(
         still_out_of_scope: vec![
             String::from("External alert delivery or paging for actual-lane failures."),
             String::from("Streaming or cluster-connected dashboard publication."),
-            String::from("Completed distributed broader-pretraining execution on the trusted cluster."),
-            String::from("Plugin-conditioned continuation execution beyond the declared handoff artifact."),
+            String::from(
+                "Completed distributed broader-pretraining execution on the trusted cluster.",
+            ),
+            String::from(
+                "Plugin-conditioned continuation execution beyond the declared handoff artifact.",
+            ),
         ],
         claim_boundary: String::from(
             "This closeout bundle proves one retained base-lane rehearsal for the actual pretraining operator path, including launch, accepted checkpoint retention, backup recovery drill, automatic checkpoint eval, continue-vs-restart decision, and resume. It does not claim external alert delivery, streaming dashboard publication, distributed broader-pretraining execution, or plugin-conditioned continuation execution.",

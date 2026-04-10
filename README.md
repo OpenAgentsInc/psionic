@@ -125,6 +125,13 @@ Use:
 
 for plan inspection and operator follow-up on the actual lane.
 
+For machine supervision, use the typed runtime surface instead of the shell
+wrapper:
+
+```bash
+cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
+```
+
 The older bounded reference pilot still exists as the smoke/reference lane:
 
 ```bash
