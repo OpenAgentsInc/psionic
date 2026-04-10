@@ -50,6 +50,10 @@ includes:
 - one admitted `environment_ref`
 - one optional `peer_node_pubkey` for recovery-source `serve-checkpoint`
 - one optional `peer_checkpoint_handoff_receipt_path` for joiner `resume`
+- one optional `validator_target_contribution_receipt_path` for validator
+  `validate-contribution`
+- one optional `validator_target_contribution_artifact_manifest_path` for
+  validator `validate-contribution`
 
 The runtime refuses before launch when the executing release id, build digest,
 or environment ref do not match the admitted identity in that manifest. When a
@@ -106,6 +110,25 @@ receipt set. The machine-readable run/window status packets now repeat the
 absolute paths for `window_execution_path`, `contribution_receipt_path`,
 `contribution_artifact_manifest_path`, and `sealed_window_bundle_path` whenever
 those retained window artifacts exist.
+
+Validator replay is now admitted on that same machine surface too. One
+validator manifest with `role = validator` and
+`operation = validate_contribution` consumes one retained contribution receipt
+plus one retained contribution artifact manifest, binds them to the declared
+`window_id`, `assignment_id`, and `challenge_id`, and emits:
+
+- `windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
+- `windows/<window_id>/validators/<challenge_id>/validator_score_receipt.json`
+
+The current validator replay is still deliberately bounded. It does not claim a
+full independent model rerun. It replays the retained contribution artifact
+family, rechecks canonical contribution and artifact-manifest digests, loads
+the retained checkpoint surface when the challenged contribution succeeded, and
+then emits a typed `accepted`, `quarantined`, `rejected`, or `replay_required`
+validator disposition. Missing checkpoint state, stale assignment binding, or
+artifact drift stay refusal-class failures at the machine process boundary. The
+run/window status packets now repeat the retained `validator_score_receipt_path`
+when validator replay completes successfully.
 
 The machine path now also covers late-join and recovery-source handoff
 explicitly. One recovery-source manifest with `operation = serve_checkpoint`

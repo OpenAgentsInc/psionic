@@ -10,8 +10,11 @@ use psionic_train::{
     PsionicTrainCoordinationContext, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
-    PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket, PsionicTrainWindowExecution,
+    PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
+    PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
+    PsionicTrainWindowExecution,
     PsionicTrainWindowStatusPacket,
+    TrainingExecutionValidatorDisposition,
     PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
     PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
 };
@@ -115,6 +118,8 @@ fn base_manifest() -> PsionicTrainInvocationManifest {
         run_root: None,
         peer_node_pubkey: None,
         peer_checkpoint_handoff_receipt_path: None,
+        validator_target_contribution_receipt_path: None,
+        validator_target_contribution_artifact_manifest_path: None,
         selected_git_ref: Some(String::from("HEAD")),
         hardware_observation_path: None,
         run_shape_observation_path: None,
@@ -199,6 +204,30 @@ fn bind_window_context(
     manifest.coordination.window_id = Some(String::from(window_id));
     manifest.coordination.assignment_id = Some(String::from(assignment_id));
     manifest.coordination.membership_revision = Some(membership_revision);
+}
+
+fn build_validator_manifest(
+    run_root: &Path,
+    contribution_receipt_path: &Path,
+    contribution_artifact_manifest_path: &Path,
+    window_id: &str,
+    assignment_id: &str,
+    challenge_id: &str,
+) -> PsionicTrainInvocationManifest {
+    let mut manifest = build_retained_operation_manifest(
+        run_root,
+        PsionicTrainRole::Validator,
+        PsionicTrainOperation::ValidateContribution,
+    );
+    manifest.coordination.window_id = Some(String::from(window_id));
+    manifest.coordination.assignment_id = Some(String::from(assignment_id));
+    manifest.coordination.challenge_id = Some(String::from(challenge_id));
+    manifest.coordination.node_pubkey = Some(String::from("npub1-psionic-validator-cli-test"));
+    manifest.validator_target_contribution_receipt_path =
+        Some(contribution_receipt_path.display().to_string());
+    manifest.validator_target_contribution_artifact_manifest_path =
+        Some(contribution_artifact_manifest_path.display().to_string());
+    manifest
 }
 
 #[test]
@@ -935,27 +964,245 @@ fn machine_manifest_serve_checkpoint_falls_back_to_backup_when_primary_is_missin
 }
 
 #[test]
-fn validator_role_is_reported_as_machine_refusal() {
+fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
     let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("worker-run");
+    let worker_launch_manifest_path = tempdir.path().join("worker-windowed-launch.json");
+    let mut worker_launch_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(&mut worker_launch_manifest, "window-0001", "assignment-0001", 1);
+    write_manifest(&worker_launch_manifest_path, &mut worker_launch_manifest);
+    let worker_launch_output = run_machine_manifest(&worker_launch_manifest_path);
+    assert!(worker_launch_output.status.success(), "worker launch should succeed");
+
+    let worker_checkpoint_manifest_path = tempdir.path().join("worker-record-checkpoint.json");
+    let mut worker_checkpoint_manifest = build_retained_operation_manifest(
+        &worker_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    bind_window_context(
+        &mut worker_checkpoint_manifest,
+        "window-0001",
+        "assignment-0001",
+        2,
+    );
+    worker_checkpoint_manifest.checkpoint_label = Some(String::from("validator-target"));
+    worker_checkpoint_manifest.optimizer_step = Some(4_096);
+    worker_checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/validator/target"));
+    write_manifest(
+        &worker_checkpoint_manifest_path,
+        &mut worker_checkpoint_manifest,
+    );
+    let worker_output = run_machine_manifest(&worker_checkpoint_manifest_path);
+    assert!(worker_output.status.success(), "worker checkpoint should succeed");
+
+    let worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("worker run status path should exist"),
+    );
+
+    let validator_run_root = tempdir.path().join("validator-run");
     let manifest_path = tempdir.path().join("validator-invocation.json");
-    let mut manifest = base_manifest();
-    manifest.role = PsionicTrainRole::Validator;
-    manifest.output_root = Some(tempdir.path().join("validator-run").display().to_string());
+    let mut manifest = build_validator_manifest(
+        &validator_run_root,
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("worker contribution receipt path should exist"),
+        ),
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("worker contribution artifact manifest path should exist"),
+        ),
+        "window-0001",
+        "assignment-0001",
+        "challenge-0001",
+    );
     write_manifest(&manifest_path, &mut manifest);
 
     let output = run_machine_manifest(&manifest_path);
 
-    assert!(!output.status.success(), "validator role should be refused");
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("validator packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("validator run status path should exist"),
+    );
+    let score_receipt: PsionicTrainValidatorScoreReceipt = parse_json(
+        run_status
+            .artifacts
+            .validator_score_receipt_path
+            .as_ref()
+            .expect("validator score receipt path should exist"),
+    );
+    assert_eq!(
+        score_receipt.disposition,
+        TrainingExecutionValidatorDisposition::Accepted
+    );
+    assert_eq!(score_receipt.score_bps, 10_000);
+
+    let score_artifact: PsionicTrainValidatorScoreArtifact =
+        parse_json(&score_receipt.score_artifact_path);
+    assert_eq!(
+        score_artifact.disposition,
+        TrainingExecutionValidatorDisposition::Accepted
+    );
+    assert_eq!(
+        score_artifact.challenge_id.as_str(),
+        "challenge-0001"
+    );
+}
+
+#[test]
+fn validator_manifest_emits_rejected_score_receipt_for_refused_contribution() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("worker-run");
+    let worker_manifest_path = tempdir.path().join("worker-refused-launch.json");
+    let mut worker_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(&mut worker_manifest, "window-0001", "assignment-0001", 1);
+    worker_manifest.admission_identity.build_digest = String::from("sha256:not-the-real-build");
+    write_manifest(&worker_manifest_path, &mut worker_manifest);
+    let worker_output = run_machine_manifest(&worker_manifest_path);
+    assert!(!worker_output.status.success(), "worker launch should be refused");
+
+    let worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&worker_output.stderr).expect("worker refusal packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("worker run status path should exist"),
+    );
+
+    let validator_run_root = tempdir.path().join("validator-run");
+    let validator_manifest_path = tempdir.path().join("validator-rejected.json");
+    let mut validator_manifest = build_validator_manifest(
+        &validator_run_root,
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("worker contribution receipt path should exist"),
+        ),
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("worker contribution artifact manifest path should exist"),
+        ),
+        "window-0001",
+        "assignment-0001",
+        "challenge-0002",
+    );
+    write_manifest(&validator_manifest_path, &mut validator_manifest);
+
+    let output = run_machine_manifest(&validator_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("validator packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("validator run status path should exist"),
+    );
+    let score_receipt: PsionicTrainValidatorScoreReceipt = parse_json(
+        run_status
+            .artifacts
+            .validator_score_receipt_path
+            .as_ref()
+            .expect("validator score receipt path should exist"),
+    );
+    assert_eq!(
+        score_receipt.disposition,
+        TrainingExecutionValidatorDisposition::Rejected
+    );
+    assert_eq!(score_receipt.score_bps, 0);
+}
+
+#[test]
+fn validator_manifest_refuses_stale_assignment_targets() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("worker-run");
+    let worker_manifest_path = tempdir.path().join("worker-windowed-launch.json");
+    let mut worker_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(&mut worker_manifest, "window-0001", "assignment-0001", 1);
+    write_manifest(&worker_manifest_path, &mut worker_manifest);
+    let worker_output = run_machine_manifest(&worker_manifest_path);
+    assert!(worker_output.status.success(), "worker launch should succeed");
+
+    let worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("worker run status path should exist"),
+    );
+
+    let validator_run_root = tempdir.path().join("validator-run");
+    let manifest_path = tempdir.path().join("validator-stale-assignment.json");
+    let mut manifest = build_validator_manifest(
+        &validator_run_root,
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("worker contribution receipt path should exist"),
+        ),
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("worker contribution artifact manifest path should exist"),
+        ),
+        "window-0001",
+        "assignment-stale",
+        "challenge-0003",
+    );
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(!output.status.success(), "stale validator target should be refused");
     let packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
     assert_eq!(
         packet.refusal_class,
-        Some(PsionicTrainRefusalClass::BadConfig)
+        Some(PsionicTrainRefusalClass::StaleAssignment)
     );
     assert_eq!(packet.outcome, PsionicTrainOutcomeKind::Refused);
     assert_eq!(
         output.status.code(),
-        Some(PsionicTrainRefusalClass::BadConfig.exit_code() as i32)
+        Some(PsionicTrainRefusalClass::StaleAssignment.exit_code() as i32)
     );
 }
 

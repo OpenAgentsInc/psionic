@@ -157,6 +157,27 @@ pub enum PsionicTrainWindowArtifactError {
     Parse { path: String, detail: String },
 }
 
+impl PsionicTrainContributionArtifactManifest {
+    #[must_use]
+    pub fn stable_artifact_manifest_digest(&self) -> String {
+        let mut digest_basis = self.clone();
+        digest_basis.artifact_manifest_digest.clear();
+        stable_digest(
+            b"psionic_train_contribution_artifact_manifest|",
+            &digest_basis,
+        )
+    }
+}
+
+impl PsionicTrainContributionReceipt {
+    #[must_use]
+    pub fn stable_contribution_digest(&self) -> String {
+        let mut digest_basis = self.clone();
+        digest_basis.contribution_digest.clear();
+        stable_digest(b"psionic_train_contribution_receipt|", &digest_basis)
+    }
+}
+
 pub fn persist_psionic_train_window_artifacts(
     manifest: &PsionicTrainInvocationManifest,
     runtime_attestation: &PsionicTrainRuntimeAttestation,
@@ -171,6 +192,9 @@ pub fn persist_psionic_train_window_artifacts(
     refusal_class: Option<PsionicTrainRefusalClass>,
     detail: &str,
 ) -> Result<Option<PsionicTrainWindowArtifactOutputs>, PsionicTrainWindowArtifactError> {
+    if manifest.role == PsionicTrainRole::Validator {
+        return Ok(None);
+    }
     let Some(window_id) = manifest.coordination.window_id.as_ref() else {
         return Ok(None);
     };

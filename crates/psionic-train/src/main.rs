@@ -12,12 +12,14 @@ use psionic_train::{
     build_psionic_train_checkpoint_handoff_receipt, inspect_psionic_train_checkpoint_surface,
     materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
     retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
+    execute_psionic_train_validator_replay,
     PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
     PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
     PsionicTrainCheckpointSurface, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
     PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    PsionicTrainValidatorArtifactOutputs, PsionicTrainValidatorReplayError,
     PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
     PsionicTrainWindowStatusPacket,
 };
@@ -119,6 +121,14 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
             run_root.as_deref(),
         );
     }
+    if manifest.operation == PsionicTrainOperation::ValidateContribution {
+        return run_validator_replay_manifest(
+            &manifest,
+            &manifest_path,
+            &runtime_identity,
+            run_root.as_deref(),
+        );
+    }
     if manifest.operation == PsionicTrainOperation::Resume {
         if let (Some(run_root), Some(peer_receipt_path)) = (
             run_root.as_deref(),
@@ -184,6 +194,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                 manifest_path.display().to_string(),
                 run_root.as_deref(),
                 summary.as_ref(),
+                None,
                 PsionicTrainOutcomeKind::Succeeded,
                 0,
                 false,
@@ -348,6 +359,7 @@ fn run_checkpoint_handoff_manifest(
         manifest_path.display().to_string(),
         Some(run_root),
         summary.as_ref(),
+        None,
         PsionicTrainOutcomeKind::Succeeded,
         0,
         false,
@@ -405,6 +417,151 @@ fn run_checkpoint_handoff_manifest(
     );
     emit_success_packet(&packet);
     ExitCode::SUCCESS
+}
+
+fn run_validator_replay_manifest(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: &Path,
+    runtime_identity: &MachineRuntimeIdentity,
+    run_root: Option<&Path>,
+) -> ExitCode {
+    let Some(run_root) = run_root else {
+        let packet = PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BadConfig,
+            Some(manifest_path.display().to_string()),
+            Some(runtime_identity.attestation.clone()),
+            Some(runtime_identity.capability_projection.clone()),
+            manifest.run_id.clone(),
+            None,
+            None,
+            None,
+            "validate-contribution requires one retained run_root",
+        );
+        emit_refusal_packet(packet.clone());
+        return ExitCode::from(packet.exit_code);
+    };
+
+    let execution = match execute_psionic_train_validator_replay(manifest, run_root) {
+        Ok(execution) => execution,
+        Err(error) => {
+            let refusal_class = refusal_for_validator_replay_error(&error);
+            let mut packet = PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                refusal_class,
+                Some(manifest_path.display().to_string()),
+                Some(runtime_identity.attestation.clone()),
+                Some(runtime_identity.capability_projection.clone()),
+                manifest.run_id.clone(),
+                Some(run_root.display().to_string()),
+                None,
+                None,
+                error.to_string(),
+            );
+            let status_paths = write_status_surfaces(
+                manifest,
+                manifest_path.display().to_string(),
+                Some(run_root),
+                None,
+                None,
+                packet.outcome,
+                packet.exit_code,
+                packet.retryable,
+                packet.authority_owner,
+                packet.refusal_class,
+                packet.detail.as_str(),
+                runtime_identity,
+            )
+            .unwrap_or_default();
+            packet.run_status_packet_path = status_paths.run_status_packet_path;
+            packet.window_status_packet_path = status_paths.window_status_packet_path;
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    };
+
+    let status_paths = match write_status_surfaces(
+        manifest,
+        manifest_path.display().to_string(),
+        Some(run_root),
+        None,
+        Some(&execution.artifacts),
+        PsionicTrainOutcomeKind::Succeeded,
+        0,
+        false,
+        psionic_train::PsionicTrainAuthorityOwner::Pylon,
+        None,
+        execution.detail.as_str(),
+        runtime_identity,
+    ) {
+        Ok(paths) => paths,
+        Err(error) => {
+            let packet = PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::InternalError,
+                Some(manifest_path.display().to_string()),
+                Some(runtime_identity.attestation.clone()),
+                Some(runtime_identity.capability_projection.clone()),
+                manifest.run_id.clone(),
+                Some(run_root.display().to_string()),
+                None,
+                None,
+                format!("failed to persist machine status packets: {error}"),
+            );
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    };
+    let packet = PsionicTrainStatusPacket::success(
+        manifest,
+        Some(manifest_path.display().to_string()),
+        runtime_identity.attestation.clone(),
+        runtime_identity.capability_projection.clone(),
+        manifest.run_id.clone(),
+        Some(run_root.display().to_string()),
+        status_paths.run_status_packet_path,
+        status_paths.window_status_packet_path,
+        None,
+        None,
+        None,
+        None,
+        format!(
+            "{}; validator verdict `{}` at score {} bps",
+            execution.detail,
+            validator_disposition_label(execution.score_receipt.disposition),
+            execution.score_receipt.score_bps
+        ),
+    );
+    emit_success_packet(&packet);
+    ExitCode::SUCCESS
+}
+
+fn refusal_for_validator_replay_error(
+    error: &PsionicTrainValidatorReplayError,
+) -> PsionicTrainRefusalClass {
+    match error {
+        PsionicTrainValidatorReplayError::Read { .. }
+        | PsionicTrainValidatorReplayError::Write { .. } => PsionicTrainRefusalClass::ArtifactIncomplete,
+        PsionicTrainValidatorReplayError::Parse { .. }
+        | PsionicTrainValidatorReplayError::ArtifactDigestMismatch { .. } => {
+            PsionicTrainRefusalClass::ArtifactDigestMismatch
+        }
+        PsionicTrainValidatorReplayError::StaleAssignment { .. } => {
+            PsionicTrainRefusalClass::StaleAssignment
+        }
+        PsionicTrainValidatorReplayError::CheckpointMissing { .. } => {
+            PsionicTrainRefusalClass::CheckpointMissing
+        }
+    }
+}
+
+fn validator_disposition_label(disposition: psionic_train::TrainingExecutionValidatorDisposition) -> &'static str {
+    match disposition {
+        psionic_train::TrainingExecutionValidatorDisposition::Accepted => "accepted",
+        psionic_train::TrainingExecutionValidatorDisposition::Quarantined => "quarantined",
+        psionic_train::TrainingExecutionValidatorDisposition::Rejected => "rejected",
+        psionic_train::TrainingExecutionValidatorDisposition::ReplayRequired => "replay_required",
+    }
 }
 
 fn machine_repo_root() -> Result<PathBuf, String> {
@@ -738,7 +895,10 @@ fn load_manifest(path: &Path) -> Result<PsionicTrainInvocationManifest, PsionicT
 fn operator_args_from_manifest(
     manifest: &PsionicTrainInvocationManifest,
 ) -> Result<Vec<String>, PsionicTrainStatusPacket> {
-    if manifest.operation == PsionicTrainOperation::ServeCheckpoint {
+    if matches!(
+        manifest.operation,
+        PsionicTrainOperation::ServeCheckpoint | PsionicTrainOperation::ValidateContribution
+    ) {
         return Err(PsionicTrainStatusPacket::refusal(
             Some(manifest),
             PsionicTrainRefusalClass::InternalError,
@@ -749,7 +909,7 @@ fn operator_args_from_manifest(
             manifest_run_root(manifest).map(|value| value.display().to_string()),
             None,
             None,
-            "serve-checkpoint is handled directly by manifest mode and must not be forwarded to the actual-lane operator CLI",
+            "serve-checkpoint and validate-contribution are handled directly by manifest mode and must not be forwarded to the actual-lane operator CLI",
         ));
     }
     let mut args = vec![String::from(manifest.operation.cli_subcommand())];
@@ -872,6 +1032,7 @@ fn manifest_run_root(manifest: &PsionicTrainInvocationManifest) -> Option<PathBu
         }
         PsionicTrainOperation::Resume
         | PsionicTrainOperation::ServeCheckpoint
+        | PsionicTrainOperation::ValidateContribution
         | PsionicTrainOperation::RecordCheckpoint
         | PsionicTrainOperation::Backup
         | PsionicTrainOperation::DecideContinueRestart => {
@@ -1117,6 +1278,7 @@ fn write_status_surfaces_for_packet(
         manifest_path,
         run_root,
         summary,
+        None,
         packet.outcome,
         packet.exit_code,
         packet.retryable,
@@ -1136,6 +1298,7 @@ fn write_status_surfaces(
     manifest_path: String,
     run_root: Option<&Path>,
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    validator_artifacts: Option<&PsionicTrainValidatorArtifactOutputs>,
     outcome: PsionicTrainOutcomeKind,
     exit_code: u8,
     retryable: bool,
@@ -1198,6 +1361,7 @@ fn write_status_surfaces(
         summary,
         membership_revision_path.clone(),
         checkpoint_surface.as_ref(),
+        validator_artifacts,
         window_artifacts.as_ref(),
     );
     let run_packet = PsionicTrainRunStatusPacket {
@@ -1290,6 +1454,7 @@ fn build_artifact_surface_refs(
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
     membership_revision_path: Option<String>,
     checkpoint_surface: Option<&RetainedCheckpointSurface>,
+    validator_artifacts: Option<&PsionicTrainValidatorArtifactOutputs>,
     window_artifacts: Option<&PsionicTrainWindowArtifactOutputs>,
 ) -> PsionicTrainArtifactSurfaceRefs {
     PsionicTrainArtifactSurfaceRefs {
@@ -1323,7 +1488,8 @@ fn build_artifact_surface_refs(
         recovery_receipt_path: checkpoint_surface
             .and_then(|value| value.surface.artifacts.auto_resume_receipt_path.clone())
             .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
-        validator_score_receipt_path: None,
+        validator_score_receipt_path: validator_artifacts
+            .map(|value| value.validator_score_receipt_path.clone()),
         sealed_window_bundle_path: window_artifacts
             .map(|value| value.sealed_window_bundle_path.clone()),
         final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),

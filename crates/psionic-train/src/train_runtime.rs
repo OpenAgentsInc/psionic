@@ -57,6 +57,7 @@ pub enum PsionicTrainOperation {
     Start,
     Resume,
     ServeCheckpoint,
+    ValidateContribution,
     RecordCheckpoint,
     Backup,
     DecideContinueRestart,
@@ -221,6 +222,10 @@ pub struct PsionicTrainInvocationManifest {
     pub peer_node_pubkey: Option<String>,
     /// Optional retained peer checkpoint-handoff receipt path consumed before resume.
     pub peer_checkpoint_handoff_receipt_path: Option<String>,
+    /// Optional challenged contribution receipt path consumed by validator replay.
+    pub validator_target_contribution_receipt_path: Option<String>,
+    /// Optional challenged contribution artifact-manifest path consumed by validator replay.
+    pub validator_target_contribution_artifact_manifest_path: Option<String>,
     /// Explicit git ref selection. Defaults are not allowed for machine mode.
     pub selected_git_ref: Option<String>,
     /// Optional retained hardware observation path.
@@ -494,6 +499,16 @@ impl PsionicTrainInvocationManifest {
             "invocation_manifest",
             "peer_checkpoint_handoff_receipt_path",
         )?;
+        validate_optional_field(
+            self.validator_target_contribution_receipt_path.as_deref(),
+            "invocation_manifest",
+            "validator_target_contribution_receipt_path",
+        )?;
+        validate_optional_field(
+            self.validator_target_contribution_artifact_manifest_path.as_deref(),
+            "invocation_manifest",
+            "validator_target_contribution_artifact_manifest_path",
+        )?;
 
         if self.selected_git_ref.is_none() {
             return Err(PsionicTrainRuntimeContractError::MissingField {
@@ -513,6 +528,7 @@ impl PsionicTrainInvocationManifest {
                 | PsionicTrainOperation::RehearseBaseLane => {}
                 PsionicTrainOperation::Resume
                 | PsionicTrainOperation::ServeCheckpoint
+                | PsionicTrainOperation::ValidateContribution
                 | PsionicTrainOperation::DecideContinueRestart => {
                     return Err(PsionicTrainRuntimeContractError::InvalidValue {
                         field: String::from("invocation_manifest.role"),
@@ -535,14 +551,17 @@ impl PsionicTrainInvocationManifest {
                     });
                 }
             },
-            PsionicTrainRole::Validator => {
-                return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                    field: String::from("invocation_manifest.role"),
-                    detail: String::from(
-                        "validator role is not yet admitted by the first machine runtime surface",
-                    ),
-                });
-            }
+            PsionicTrainRole::Validator => match self.operation {
+                PsionicTrainOperation::ValidateContribution => {}
+                _ => {
+                    return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                        field: String::from("invocation_manifest.role"),
+                        detail: String::from(
+                            "validator role is limited to validate_contribution on the machine runtime surface",
+                        ),
+                    });
+                }
+            },
         }
 
         match self.operation {
@@ -563,6 +582,7 @@ impl PsionicTrainInvocationManifest {
             }
             PsionicTrainOperation::Resume
             | PsionicTrainOperation::ServeCheckpoint
+            | PsionicTrainOperation::ValidateContribution
             | PsionicTrainOperation::Backup
             | PsionicTrainOperation::DecideContinueRestart => {
                 require_nonempty_option(self.run_root.as_deref(), "invocation_manifest.run_root")?;
@@ -604,6 +624,39 @@ impl PsionicTrainInvocationManifest {
                 field: String::from("invocation_manifest.peer_checkpoint_handoff_receipt_path"),
                 detail: String::from(
                     "peer_checkpoint_handoff_receipt_path is only admitted for resume on the machine runtime surface",
+                ),
+            });
+        }
+        if self.operation == PsionicTrainOperation::ValidateContribution {
+            require_nonempty_option(
+                self.coordination.window_id.as_deref(),
+                "invocation_manifest.coordination.window_id",
+            )?;
+            require_nonempty_option(
+                self.coordination.assignment_id.as_deref(),
+                "invocation_manifest.coordination.assignment_id",
+            )?;
+            require_nonempty_option(
+                self.coordination.challenge_id.as_deref(),
+                "invocation_manifest.coordination.challenge_id",
+            )?;
+            require_nonempty_option(
+                self.validator_target_contribution_receipt_path.as_deref(),
+                "invocation_manifest.validator_target_contribution_receipt_path",
+            )?;
+            require_nonempty_option(
+                self.validator_target_contribution_artifact_manifest_path.as_deref(),
+                "invocation_manifest.validator_target_contribution_artifact_manifest_path",
+            )?;
+        } else if self.validator_target_contribution_receipt_path.is_some()
+            || self
+                .validator_target_contribution_artifact_manifest_path
+                .is_some()
+        {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.validator_target_contribution_receipt_path"),
+                detail: String::from(
+                    "validator target contribution inputs are only admitted for validate_contribution on the machine runtime surface",
                 ),
             });
         }
@@ -847,6 +900,7 @@ impl PsionicTrainOperation {
             Self::Start => "start",
             Self::Resume => "resume",
             Self::ServeCheckpoint => "serve-checkpoint",
+            Self::ValidateContribution => "validate-contribution",
             Self::RecordCheckpoint => "record-checkpoint",
             Self::Backup => "backup",
             Self::DecideContinueRestart => "decide-continue-restart",
@@ -985,6 +1039,8 @@ mod tests {
             run_root: None,
             peer_node_pubkey: None,
             peer_checkpoint_handoff_receipt_path: None,
+            validator_target_contribution_receipt_path: None,
+            validator_target_contribution_artifact_manifest_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -1028,19 +1084,40 @@ mod tests {
     }
 
     #[test]
-    fn validator_role_is_not_yet_admitted() {
+    fn validator_role_requires_validate_contribution_operation() {
         let mut manifest = base_manifest();
         manifest.role = PsionicTrainRole::Validator;
         let error = manifest
             .validate_machine_contract()
-            .expect_err("validator role should be refused");
+            .expect_err("validator role should reject worker operations");
         assert_eq!(
             error,
             PsionicTrainRuntimeContractError::InvalidValue {
                 field: String::from("invocation_manifest.role"),
                 detail: String::from(
-                    "validator role is not yet admitted by the first machine runtime surface",
+                    "validator role is limited to validate_contribution on the machine runtime surface",
                 ),
+            }
+        );
+    }
+
+    #[test]
+    fn validator_manifest_requires_replay_target_paths() {
+        let mut manifest = base_manifest();
+        manifest.role = PsionicTrainRole::Validator;
+        manifest.operation = PsionicTrainOperation::ValidateContribution;
+        manifest.output_root = None;
+        manifest.run_root = Some(String::from("/tmp/validator-run"));
+        manifest.coordination.window_id = Some(String::from("window-0001"));
+        manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.coordination.challenge_id = Some(String::from("challenge-0001"));
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("validator replay should require target contribution paths");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::MissingField {
+                field: String::from("invocation_manifest.validator_target_contribution_receipt_path"),
             }
         );
     }

@@ -404,7 +404,11 @@ run root or output root, git ref, role, operation, one shared coordination
 envelope, one required admitted `node_pubkey`, and one admitted
 release/build/environment identity. Recovery-source manifests can now also
 carry one target `peer_node_pubkey` for `serve_checkpoint` and one
-`peer_checkpoint_handoff_receipt_path` for joiner-side `resume`. It now emits
+`peer_checkpoint_handoff_receipt_path` for joiner-side `resume`. Validator
+manifests can now also carry one
+`validator_target_contribution_receipt_path` plus one
+`validator_target_contribution_artifact_manifest_path` for
+`validate_contribution`. It now emits
 one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
 bit, authority owner, optional refusal class, shared coordination fields,
@@ -439,7 +443,12 @@ also persists one deterministic local window artifact family under
 that window. The run/window status packets repeat the absolute paths for those
 window artifacts through `window_execution_path`,
 `contribution_receipt_path`, `contribution_artifact_manifest_path`, and
-`sealed_window_bundle_path`. That combined checkpoint-plus-window surface is
+`sealed_window_bundle_path`. Validator replay now also writes
+`windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
+plus `validator_score_receipt.json` for one bounded retained contribution
+replay and surfaces that receipt through `validator_score_receipt_path` in the
+run/window status packets. That combined checkpoint-plus-window-and-validator
+surface is
 the first honest answer to “how does `Pylon` invoke `psionic-train` without
 going through a human shell wrapper?” and “what deterministic contribution
 artifact set did this local assignment materialize?”

@@ -137,7 +137,11 @@ admitted `node_pubkey`, plus one admitted release/build/environment identity
 that the runtime checks before launch. Recovery-source manifests can now also
 carry one `peer_node_pubkey` for the machine-only `serve-checkpoint` operation
 and one `peer_checkpoint_handoff_receipt_path` that seeds a joiner’s local
-checkpoint tree before `resume` runs. The emitted
+checkpoint tree before `resume` runs. Validator manifests are now admitted for
+one machine-only `validate-contribution` operation as well, using one
+`validator_target_contribution_receipt_path` plus one
+`validator_target_contribution_artifact_manifest_path` to replay one retained
+worker contribution artifact set into one local validator score receipt. The emitted
 `psionic.train.status_packet.v1` packet now also carries the resolved runtime
 attestation and the retained absolute paths for
 `status/psionic_train_run_status_packet.json` and
@@ -153,7 +157,10 @@ pointer state, checkpoint-manifest digest, backup receipt posture, upload
 outcome, and auto-resume recovery result without reopening the full retained
 actual-lane tree. The run/window status packets repeat the absolute paths for
 that surface plus the latest checkpoint manifest, backup receipt, pointer,
-peer handoff receipt, and auto-resume receipt when those artifacts exist.
+peer handoff receipt, auto-resume receipt, and validator score receipt when
+those artifacts exist. Validator replay retains the score surfaces under
+`windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
+and `validator_score_receipt.json`.
 When the admitted coordination envelope also carries `window_id` and
 `assignment_id`, the same machine runtime now materializes one deterministic
 window artifact family under `windows/<window_id>/`: one retained
