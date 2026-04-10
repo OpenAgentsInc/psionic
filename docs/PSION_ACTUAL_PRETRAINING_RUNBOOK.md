@@ -37,9 +37,27 @@ cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invo
 
 That machine path consumes one explicit JSON manifest and emits one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
-bit, authority owner, refusal class when applicable, and retained artifact
-paths. `./TRAIN` remains the operator convenience path above the same actual
-lane logic.
+bit, authority owner, refusal class when applicable, retained artifact paths,
+the resolved runtime attestation, and the retained absolute paths for the
+machine-readable run/window status packets. The invocation manifest now also
+includes:
+
+- one shared coordination envelope for `network_id`, `window_id`,
+  `assignment_id`, `challenge_id`, `node_pubkey`, and `membership_revision`
+  when those ids already exist
+- one admitted `release_id`
+- one admitted `build_digest`
+- one admitted `environment_ref`
+
+The runtime refuses before launch when the executing release id, build digest,
+or environment ref do not match the admitted identity in that manifest. When a
+run root exists, it also persists:
+
+- `status/psionic_train_run_status_packet.json`
+- `status/psionic_train_window_status_packet.json`
+
+`./TRAIN` remains the operator convenience path above the same actual lane
+logic.
 
 ## Current Claim Boundary
 

@@ -399,11 +399,18 @@ dispatches through that binary instead of `cargo run --example ...`. The first
 machine runtime surface intentionally stays narrow: it admits the
 `psion_actual_pretraining_v1` lane only, consumes one explicit
 `psionic.train.invocation_manifest.v1` JSON manifest with deterministic run id,
-run root or output root, git ref, role, and operation, and emits one final
-`psionic.train.status_packet.v1` packet with a stable exit code, retryability
-bit, authority owner, optional refusal class, and retained artifact paths. That
-surface is the first honest answer to “how does `Pylon` invoke `psionic-train`
-without going through a human shell wrapper?”
+run root or output root, git ref, role, operation, one shared coordination
+envelope, and one admitted release/build/environment identity. It now emits one
+final `psionic.train.status_packet.v1` packet with a stable exit code,
+retryability bit, authority owner, optional refusal class, shared coordination
+fields, resolved runtime attestation, capability projection, and retained
+artifact paths. It also persists one
+`psionic.train.run_status_packet.v1` packet for `Pylon` and one
+`psionic.train.window_status_packet.v1` packet for `Nexus` under
+`status/psionic_train_run_status_packet.json` and
+`status/psionic_train_window_status_packet.json` in the run root. That surface
+is the first honest answer to “how does `Pylon` invoke `psionic-train` without
+going through a human shell wrapper?”
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,
@@ -412,10 +419,31 @@ validator timeout or disagreement, lease or assignment staleness, and internal
 runtime failure to stable numeric exit codes instead of leaving supervisor logic
 to parse ad hoc shell text.
 
+The minimum observability envelope is now frozen at the machine boundary too.
+Whenever they exist, the final process packet and the retained run/window
+packets preserve the exact field names:
+
+- `network_id`
+- `run_id`
+- `window_id`
+- `assignment_id`
+- `challenge_id`
+- `node_pubkey`
+- `membership_revision`
+- `manifest_digest`
+
+The first admitted lane still leaves unavailable objects empty instead of
+synthesizing placeholder ids.
+
 It consumes the frozen lane, recipe, baseline-tools, scaling, data, systems,
 topology/storage, evidence, and status contracts directly; refuses dirty
-working trees by default; retains the selected ref plus exact commit SHA; and
-repeats that provenance in the closeout bundle. It now also
+working trees by default; retains the selected ref plus exact commit SHA;
+derives one stable runtime build digest from the release id, runtime surface,
+lane id, resolved commit SHA, dirty-tree posture, optional workspace-status
+digest, and admitted environment ref; refuses launch before operator execution
+when the admitted release, build digest, or environment ref do not match that
+resolved runtime identity; and repeats that provenance in the closeout bundle.
+It now also
 records accepted checkpoint manifests, durable backup receipts, auto-resume
 receipts, automatic checkpoint-eval decisions, retry-required eval failures,
 retained checkpoint-comparison and continue-restart decision receipts, the

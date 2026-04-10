@@ -132,6 +132,13 @@ wrapper:
 cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
 ```
 
+That manifest now carries one frozen coordination envelope when those ids
+already exist, plus one admitted release/build/environment identity that the
+runtime checks before launch. The emitted `psionic.train.status_packet.v1`
+packet now also carries the resolved runtime attestation and the retained
+absolute paths for `status/psionic_train_run_status_packet.json` and
+`status/psionic_train_window_status_packet.json`.
+
 The older bounded reference pilot still exists as the smoke/reference lane:
 
 ```bash

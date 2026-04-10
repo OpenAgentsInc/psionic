@@ -7,13 +7,29 @@ use std::{
 };
 
 use psionic_train::{
-    PsionActualPretrainingCurrentRunStatus, PsionicTrainInvocationManifest, PsionicTrainOperation,
-    PsionicTrainRefusalClass, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    admitted_environment_ref_for_lane, admitted_release_id_for_lane, runtime_build_digest,
+    PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
+    PsionicTrainCapabilityProjection, PsionicTrainInvocationManifest, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRunStatusPacket,
+    PsionicTrainRuntimeAttestation, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    PsionicTrainWindowStatusPacket,
 };
 
 #[allow(dead_code)]
 #[path = "../examples/psion_actual_pretraining_operator.rs"]
 mod psion_actual_pretraining_operator;
+
+#[derive(Clone, Debug)]
+struct MachineRuntimeIdentity {
+    attestation: PsionicTrainRuntimeAttestation,
+    capability_projection: PsionicTrainCapabilityProjection,
+}
+
+#[derive(Clone, Debug, Default)]
+struct MachineStatusSurfacePaths {
+    run_status_packet_path: Option<String>,
+    window_status_packet_path: Option<String>,
+}
 
 fn main() -> ExitCode {
     let args = env::args().skip(1).collect::<Vec<_>>();
@@ -44,6 +60,10 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                 None,
                 None,
                 None,
+                None,
+                None,
+                None,
+                None,
                 error,
             ));
             return ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code());
@@ -58,9 +78,39 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
         }
     };
 
+    let runtime_identity = match resolve_runtime_identity(&manifest, &manifest_path) {
+        Ok(identity) => identity,
+        Err(mut packet) => {
+            let resolved_run_root = manifest_run_root(&manifest);
+            let status_paths = write_status_surfaces_for_packet(
+                &manifest,
+                manifest_path.display().to_string(),
+                resolved_run_root.as_deref(),
+                None,
+                &packet,
+            )
+            .unwrap_or_default();
+            packet.run_status_packet_path = status_paths.run_status_packet_path;
+            packet.window_status_packet_path = status_paths.window_status_packet_path;
+            emit_refusal_packet(packet.clone());
+            return ExitCode::from(packet.exit_code);
+        }
+    };
+
     let operator_args = match operator_args_from_manifest(&manifest) {
         Ok(args) => args,
-        Err(packet) => {
+        Err(mut packet) => {
+            let resolved_run_root = manifest_run_root(&manifest);
+            let status_paths = write_status_surfaces_for_packet(
+                &manifest,
+                manifest_path.display().to_string(),
+                resolved_run_root.as_deref(),
+                None,
+                &packet,
+            )
+            .unwrap_or_default();
+            packet.run_status_packet_path = status_paths.run_status_packet_path;
+            packet.window_status_packet_path = status_paths.window_status_packet_path;
             emit_refusal_packet(packet.clone());
             return ExitCode::from(packet.exit_code);
         }
@@ -82,14 +132,53 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                 .as_deref()
                 .and_then(actual_pretraining_run_surface_summary)
                 .or(initial_summary);
+            let detail = success_detail(&manifest, summary.as_ref());
+            let status_paths = match write_status_surfaces(
+                &manifest,
+                manifest_path.display().to_string(),
+                run_root.as_deref(),
+                summary.as_ref(),
+                PsionicTrainOutcomeKind::Succeeded,
+                0,
+                false,
+                psionic_train::PsionicTrainAuthorityOwner::Pylon,
+                None,
+                detail.as_str(),
+                &runtime_identity,
+            ) {
+                Ok(paths) => paths,
+                Err(error) => {
+                    let packet = PsionicTrainStatusPacket::refusal(
+                        Some(&manifest),
+                        PsionicTrainRefusalClass::InternalError,
+                        Some(manifest_path.display().to_string()),
+                        Some(runtime_identity.attestation.clone()),
+                        Some(runtime_identity.capability_projection.clone()),
+                        summary
+                            .as_ref()
+                            .and_then(|value| value.run_id.clone())
+                            .or_else(|| manifest.run_id.clone()),
+                        run_root.as_ref().map(|value| value.display().to_string()),
+                        None,
+                        None,
+                        format!("failed to persist machine status packets: {error}"),
+                    );
+                    emit_refusal_packet(packet.clone());
+                    return ExitCode::from(packet.exit_code);
+                }
+            };
             let packet = PsionicTrainStatusPacket::success(
                 &manifest,
                 manifest_path_text,
+                runtime_identity.attestation.clone(),
+                runtime_identity.capability_projection.clone(),
                 summary
                     .as_ref()
                     .and_then(|value| value.run_id.clone())
                     .or_else(|| manifest.run_id.clone()),
                 run_root.as_ref().map(|value| value.display().to_string()),
+                status_paths.run_status_packet_path,
+                status_paths.window_status_packet_path,
                 summary
                     .as_ref()
                     .and_then(|value| value.current_status_path.clone()),
@@ -102,18 +191,32 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                 summary
                     .as_ref()
                     .and_then(|value| value.launcher_log_path.clone()),
-                success_detail(&manifest, summary.as_ref()),
+                detail,
             );
             emit_success_packet(&packet);
             ExitCode::SUCCESS
         }
         Err(error) => {
-            let packet = refusal_packet_for_error(
+            let refusal_summary = run_root
+                .as_deref()
+                .and_then(actual_pretraining_run_surface_summary);
+            let mut packet = refusal_packet_for_error(
                 Some(&manifest),
                 manifest_path.display().to_string(),
                 run_root.as_deref(),
+                Some(&runtime_identity),
                 error.as_ref(),
             );
+            let status_paths = write_status_surfaces_for_packet(
+                &manifest,
+                manifest_path.display().to_string(),
+                run_root.as_deref(),
+                refusal_summary.as_ref(),
+                &packet,
+            )
+            .unwrap_or_default();
+            packet.run_status_packet_path = status_paths.run_status_packet_path;
+            packet.window_status_packet_path = status_paths.window_status_packet_path;
             let code = packet.exit_code;
             emit_refusal_packet(packet);
             ExitCode::from(code)
@@ -129,6 +232,253 @@ fn run_actual_pretraining_passthrough(args: &[String]) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+fn machine_repo_root() -> Result<PathBuf, String> {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .map_err(|error| format!("failed to resolve psionic repo root: {error}"))
+}
+
+fn git_output(repo_root: &Path, args: &[&str]) -> Result<String, String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .args(args)
+        .output()
+        .map_err(|error| {
+            format!(
+                "failed to execute git -C {} {}: {error}",
+                repo_root.display(),
+                args.join(" ")
+            )
+        })?;
+    if !output.status.success() {
+        return Err(format!(
+            "git command failed: git -C {} {}",
+            repo_root.display(),
+            args.join(" ")
+        ));
+    }
+    String::from_utf8(output.stdout)
+        .map(|value| value.trim().to_string())
+        .map_err(|error| format!("git output was not valid UTF-8: {error}"))
+}
+
+fn dirty_tree_posture(
+    repo_root: &Path,
+    allow_dirty_tree: bool,
+) -> Result<(String, Option<String>), String> {
+    let porcelain = git_output(repo_root, &["status", "--porcelain"])?;
+    if porcelain.is_empty() {
+        return Ok((String::from("refuse_by_default"), None));
+    }
+    if !allow_dirty_tree {
+        return Err(String::from(
+            "dirty working trees are refused by default; rerun with --allow-dirty-tree to override",
+        ));
+    }
+    let status_snapshot = git_output(repo_root, &["status", "--short", "--branch"])?;
+    Ok((
+        String::from("allowed_by_operator_override"),
+        Some(sha256_hex(status_snapshot.as_bytes())),
+    ))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut digest = Sha256::new();
+    digest.update(bytes);
+    format!("{:x}", digest.finalize())
+}
+
+fn resolve_runtime_identity(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: &Path,
+) -> Result<MachineRuntimeIdentity, PsionicTrainStatusPacket> {
+    let repo_root = machine_repo_root().map_err(|detail| {
+        PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::InternalError,
+            Some(manifest_path.display().to_string()),
+            None,
+            None,
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            format!("failed to resolve machine runtime identity: {detail}"),
+        )
+    })?;
+    let selected_git_ref = manifest.selected_git_ref.as_deref().ok_or_else(|| {
+        PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BadConfig,
+            Some(manifest_path.display().to_string()),
+            None,
+            None,
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            "machine runtime manifest is missing selected_git_ref",
+        )
+    })?;
+    let git_commit_sha =
+        git_output(&repo_root, &["rev-parse", selected_git_ref]).map_err(|detail| {
+            PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::BadConfig,
+                Some(manifest_path.display().to_string()),
+                None,
+                None,
+                manifest.run_id.clone(),
+                manifest_run_root(manifest).map(|value| value.display().to_string()),
+                None,
+                None,
+                detail,
+            )
+        })?;
+    let (dirty_tree_admission, workspace_status_sha256) =
+        dirty_tree_posture(&repo_root, manifest.allow_dirty_tree).map_err(|detail| {
+            PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::BadConfig,
+                Some(manifest_path.display().to_string()),
+                None,
+                None,
+                manifest.run_id.clone(),
+                manifest_run_root(manifest).map(|value| value.display().to_string()),
+                None,
+                None,
+                detail,
+            )
+        })?;
+    let expected_release_id =
+        admitted_release_id_for_lane(manifest.lane_id.as_str()).map_err(|error| {
+            PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::BadConfig,
+                Some(manifest_path.display().to_string()),
+                None,
+                None,
+                manifest.run_id.clone(),
+                manifest_run_root(manifest).map(|value| value.display().to_string()),
+                None,
+                None,
+                error.to_string(),
+            )
+        })?;
+    let expected_environment_ref = admitted_environment_ref_for_lane(manifest.lane_id.as_str())
+        .map_err(|error| {
+            PsionicTrainStatusPacket::refusal(
+                Some(manifest),
+                PsionicTrainRefusalClass::BadConfig,
+                Some(manifest_path.display().to_string()),
+                None,
+                None,
+                manifest.run_id.clone(),
+                manifest_run_root(manifest).map(|value| value.display().to_string()),
+                None,
+                None,
+                error.to_string(),
+            )
+        })?;
+    let resolved_build_digest = runtime_build_digest(
+        expected_release_id,
+        psionic_train::PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+        manifest.lane_id.as_str(),
+        git_commit_sha.as_str(),
+        dirty_tree_admission.as_str(),
+        workspace_status_sha256.as_deref(),
+        expected_environment_ref,
+    );
+    let attestation = PsionicTrainRuntimeAttestation::new(
+        expected_release_id,
+        resolved_build_digest.clone(),
+        git_commit_sha,
+        dirty_tree_admission,
+        workspace_status_sha256,
+        expected_environment_ref,
+    );
+    let capability_projection = PsionicTrainCapabilityProjection::for_lane(
+        manifest.lane_id.as_str(),
+        manifest.role,
+        expected_environment_ref,
+    )
+    .map_err(|error| {
+        PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BadConfig,
+            Some(manifest_path.display().to_string()),
+            Some(attestation.clone()),
+            None,
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            error.to_string(),
+        )
+    })?;
+
+    if manifest.admission_identity.release_id != expected_release_id {
+        return Err(PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BuildRevoked,
+            Some(manifest_path.display().to_string()),
+            Some(attestation.clone()),
+            Some(capability_projection.clone()),
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            format!(
+                "admitted release id `{}` does not match the executing runtime release `{expected_release_id}`",
+                manifest.admission_identity.release_id
+            ),
+        ));
+    }
+    if manifest.admission_identity.environment_ref != expected_environment_ref {
+        return Err(PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::EnvironmentMismatch,
+            Some(manifest_path.display().to_string()),
+            Some(attestation.clone()),
+            Some(capability_projection.clone()),
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            format!(
+                "admitted environment ref `{}` does not match the executing runtime environment `{expected_environment_ref}`",
+                manifest.admission_identity.environment_ref
+            ),
+        ));
+    }
+    if manifest.admission_identity.build_digest != resolved_build_digest {
+        return Err(PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BuildRevoked,
+            Some(manifest_path.display().to_string()),
+            Some(attestation.clone()),
+            Some(capability_projection.clone()),
+            manifest.run_id.clone(),
+            manifest_run_root(manifest).map(|value| value.display().to_string()),
+            None,
+            None,
+            format!(
+                "admitted build digest `{}` does not match the executing runtime build `{resolved_build_digest}`",
+                manifest.admission_identity.build_digest
+            ),
+        ));
+    }
+
+    Ok(MachineRuntimeIdentity {
+        attestation,
+        capability_projection,
+    })
 }
 
 fn parse_manifest_path(args: &[String]) -> Result<PathBuf, String> {
@@ -164,6 +514,10 @@ fn load_manifest(path: &Path) -> Result<PsionicTrainInvocationManifest, PsionicT
             Some(path.display().to_string()),
             None,
             None,
+            None,
+            None,
+            None,
+            None,
             format!(
                 "failed to read psionic-train invocation manifest `{}`: {error}",
                 path.display()
@@ -178,6 +532,10 @@ fn load_manifest(path: &Path) -> Result<PsionicTrainInvocationManifest, PsionicT
                 Some(path.display().to_string()),
                 None,
                 None,
+                None,
+                None,
+                None,
+                None,
                 format!(
                     "failed to parse psionic-train invocation manifest `{}`: {error}",
                     path.display()
@@ -189,8 +547,12 @@ fn load_manifest(path: &Path) -> Result<PsionicTrainInvocationManifest, PsionicT
             Some(&manifest),
             refusal_for_contract_error(&error),
             Some(path.display().to_string()),
+            None,
+            None,
             manifest.run_id.clone(),
             manifest_run_root(&manifest).map(|value| value.display().to_string()),
+            None,
+            None,
             format!(
                 "psionic-train invocation manifest `{}` failed validation: {error}",
                 path.display()
@@ -214,6 +576,10 @@ fn operator_args_from_manifest(
                     None,
                     None,
                     None,
+                    None,
+                    None,
+                    None,
+                    None,
                     "machine runtime manifest is missing run_id for launch-style operation",
                 )
             })?);
@@ -222,6 +588,10 @@ fn operator_args_from_manifest(
                 PsionicTrainStatusPacket::refusal(
                     Some(manifest),
                     PsionicTrainRefusalClass::BadConfig,
+                    None,
+                    None,
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -238,6 +608,10 @@ fn operator_args_from_manifest(
                     None,
                     None,
                     None,
+                    None,
+                    None,
+                    None,
+                    None,
                     "machine runtime manifest is missing run_root for retained-state operation",
                 )
             })?);
@@ -249,6 +623,10 @@ fn operator_args_from_manifest(
         PsionicTrainStatusPacket::refusal(
             Some(manifest),
             PsionicTrainRefusalClass::BadConfig,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -331,6 +709,7 @@ fn refusal_packet_for_error(
     manifest: Option<&PsionicTrainInvocationManifest>,
     manifest_path: String,
     run_root: Option<&Path>,
+    runtime_identity: Option<&MachineRuntimeIdentity>,
     error: &dyn Error,
 ) -> PsionicTrainStatusPacket {
     let detail = error.to_string();
@@ -340,11 +719,15 @@ fn refusal_packet_for_error(
         manifest,
         refusal_class,
         Some(manifest_path),
+        runtime_identity.map(|value| value.attestation.clone()),
+        runtime_identity.map(|value| value.capability_projection.clone()),
         summary
             .as_ref()
             .and_then(|value| value.run_id.clone())
             .or_else(|| manifest.and_then(|value| value.run_id.clone())),
         run_root.map(|value| value.display().to_string()),
+        None,
+        None,
         detail,
     )
 }
@@ -403,6 +786,9 @@ struct ActualPretrainingRunSurfaceSummary {
     current_status_path: Option<String>,
     retained_summary_path: Option<String>,
     latest_checkpoint_pointer_path: Option<String>,
+    auto_resume_receipt_path: Option<String>,
+    closeout_bundle_path: Option<String>,
+    launch_manifest_path: Option<String>,
     launcher_log_path: Option<String>,
 }
 
@@ -433,11 +819,193 @@ fn actual_pretraining_run_surface_summary(
             let path = run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json");
             path.is_file().then(|| path.display().to_string())
         },
+        auto_resume_receipt_path: {
+            let path = run_root.join("checkpoints/auto_resume_receipt.json");
+            path.is_file().then(|| path.display().to_string())
+        },
+        closeout_bundle_path: {
+            let path = run_root.join("closeout/closeout_bundle.json");
+            path.is_file().then(|| path.display().to_string())
+        },
+        launch_manifest_path: {
+            let start_path = run_root.join("manifests/launch_manifest.json");
+            if start_path.is_file() {
+                Some(start_path.display().to_string())
+            } else {
+                let resume_path = run_root.join("manifests/resume_manifest.json");
+                resume_path
+                    .is_file()
+                    .then(|| resume_path.display().to_string())
+            }
+        },
         launcher_log_path: {
             let path = run_root.join("logs/launcher.log");
             path.is_file().then(|| path.display().to_string())
         },
     })
+}
+
+fn write_status_surfaces_for_packet(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: String,
+    run_root: Option<&Path>,
+    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    packet: &PsionicTrainStatusPacket,
+) -> Result<MachineStatusSurfacePaths, String> {
+    let Some(attestation) = packet.runtime_attestation.clone() else {
+        return Ok(MachineStatusSurfacePaths::default());
+    };
+    let Some(capability_projection) = packet.capability_projection.clone() else {
+        return Ok(MachineStatusSurfacePaths::default());
+    };
+    write_status_surfaces(
+        manifest,
+        manifest_path,
+        run_root,
+        summary,
+        packet.outcome,
+        packet.exit_code,
+        packet.retryable,
+        packet.authority_owner,
+        packet.refusal_class,
+        packet.detail.as_str(),
+        &MachineRuntimeIdentity {
+            attestation,
+            capability_projection,
+        },
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_status_surfaces(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: String,
+    run_root: Option<&Path>,
+    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    outcome: PsionicTrainOutcomeKind,
+    exit_code: u8,
+    retryable: bool,
+    authority_owner: psionic_train::PsionicTrainAuthorityOwner,
+    refusal_class: Option<PsionicTrainRefusalClass>,
+    detail: &str,
+    runtime_identity: &MachineRuntimeIdentity,
+) -> Result<MachineStatusSurfacePaths, String> {
+    let Some(run_root) = run_root else {
+        return Ok(MachineStatusSurfacePaths::default());
+    };
+    let status_dir = run_root.join("status");
+    fs::create_dir_all(&status_dir).map_err(|error| {
+        format!(
+            "failed to create status directory `{}`: {error}",
+            status_dir.display()
+        )
+    })?;
+    let run_status_path = status_dir.join("psionic_train_run_status_packet.json");
+    let window_status_path = status_dir.join("psionic_train_window_status_packet.json");
+    let artifacts = build_artifact_surface_refs(summary);
+    let run_packet = PsionicTrainRunStatusPacket {
+        schema_version: String::from(psionic_train::PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION),
+        runtime_surface_id: String::from(psionic_train::PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+        lane_id: manifest.lane_id.clone(),
+        role: manifest.role,
+        operation: manifest.operation,
+        outcome,
+        exit_code,
+        retryable,
+        authority_owner,
+        refusal_class,
+        coordination: manifest.coordination.clone(),
+        manifest_path: Some(manifest_path.clone()),
+        manifest_digest: manifest.manifest_digest.clone(),
+        run_id: summary
+            .and_then(|value| value.run_id.clone())
+            .or_else(|| manifest.run_id.clone()),
+        run_root: Some(run_root.display().to_string()),
+        phase: summary.and_then(|value| value.phase.clone()),
+        runtime_attestation: runtime_identity.attestation.clone(),
+        capability_projection: runtime_identity.capability_projection.clone(),
+        artifacts: artifacts.clone(),
+        current_status_path: summary.and_then(|value| value.current_status_path.clone()),
+        retained_summary_path: summary.and_then(|value| value.retained_summary_path.clone()),
+        launcher_log_path: summary.and_then(|value| value.launcher_log_path.clone()),
+        detail: String::from(detail),
+    };
+    let window_packet = PsionicTrainWindowStatusPacket {
+        schema_version: String::from(
+            psionic_train::PSIONIC_TRAIN_WINDOW_STATUS_PACKET_SCHEMA_VERSION,
+        ),
+        runtime_surface_id: String::from(psionic_train::PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+        lane_id: manifest.lane_id.clone(),
+        role: manifest.role,
+        operation: manifest.operation,
+        outcome,
+        exit_code,
+        retryable,
+        authority_owner,
+        refusal_class,
+        coordination: manifest.coordination.clone(),
+        manifest_digest: manifest.manifest_digest.clone(),
+        run_id: summary
+            .and_then(|value| value.run_id.clone())
+            .or_else(|| manifest.run_id.clone()),
+        run_root: Some(run_root.display().to_string()),
+        window_state: manifest.coordination.window_id.as_ref().map(|_| {
+            summary
+                .and_then(|value| value.phase.clone())
+                .unwrap_or_else(|| String::from("window_context_declared"))
+        }),
+        runtime_attestation: runtime_identity.attestation.clone(),
+        capability_projection: runtime_identity.capability_projection.clone(),
+        artifacts,
+        detail: if manifest.coordination.window_id.is_some() {
+            String::from(detail)
+        } else {
+            format!(
+                "{detail}; this admitted lane does not yet materialize dedicated sealed-window artifacts"
+            )
+        },
+    };
+    fs::write(
+        &run_status_path,
+        serde_json::to_vec_pretty(&run_packet)
+            .map_err(|error| format!("failed to serialize run-status packet: {error}"))?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write run-status packet `{}`: {error}",
+            run_status_path.display()
+        )
+    })?;
+    fs::write(
+        &window_status_path,
+        serde_json::to_vec_pretty(&window_packet)
+            .map_err(|error| format!("failed to serialize window-status packet: {error}"))?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write window-status packet `{}`: {error}",
+            window_status_path.display()
+        )
+    })?;
+    Ok(MachineStatusSurfacePaths {
+        run_status_packet_path: Some(run_status_path.display().to_string()),
+        window_status_packet_path: Some(window_status_path.display().to_string()),
+    })
+}
+
+fn build_artifact_surface_refs(
+    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+) -> PsionicTrainArtifactSurfaceRefs {
+    PsionicTrainArtifactSurfaceRefs {
+        launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
+        membership_revision_path: None,
+        checkpoint_pointer_path: summary
+            .and_then(|value| value.latest_checkpoint_pointer_path.clone()),
+        recovery_receipt_path: summary.and_then(|value| value.auto_resume_receipt_path.clone()),
+        validator_score_receipt_path: None,
+        sealed_window_bundle_path: None,
+        final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),
+    }
 }
 
 fn emit_success_packet(packet: &PsionicTrainStatusPacket) {
