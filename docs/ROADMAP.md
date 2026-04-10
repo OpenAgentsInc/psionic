@@ -46,6 +46,201 @@
   proof/lineage surfaces, the first Phase 5 hull-cache fast path, and the
   first Phase 6 runtime capability/selection truth now landed above it.
 
+## Current System Audit
+
+This roadmap now needs an explicit audit section because the repo is no longer
+mostly aspirational. As of 2026-04-10, the checked-in tree already contains a
+real framework spine, a real system-truth layer, a real early training
+substrate, a bounded cluster substrate, and a bounded executor-class program.
+The honest question is no longer whether Psionic has any of these systems. The
+honest question is which parts are `implemented`, which parts are
+`implemented_early`, which parts are still `partial`, and which parts of full
+system completion belong outside Psionic.
+
+This section uses the repo-local status vocabulary:
+
+- `implemented`: shipped on `main` for the bounded contract Psionic currently
+  claims
+- `implemented_early`: shipped on `main` and real, but intentionally narrow and
+  not yet an honest generalized claim
+- `partial`: real substrate exists, but major contract closure is still missing
+- `partial_outside_psionic`: part of the full system story exists or must be
+  completed above Psionic in `openagents` and related control-plane repos
+
+### Framework Core And Execution Contracts
+
+Status: compact core and local execution contracts are `implemented`. Broad
+framework-semantics closure is still `partial`.
+
+Psionic already has a real tensor and execution spine. `psionic-core`,
+`psionic-ir`, `psionic-compiler`, and `psionic-runtime` are not placeholders or
+single-lane runtime glue. They give the repo a typed bottom layer for tensor
+identity, IR, lowering, scheduling, runtime execution, device inventory,
+topology planning, cache identity, artifact identity, and refusal posture. The
+project is already organized like a library that expects multiple backends,
+multiple runtimes, multiple artifact families, and multiple higher-level
+consumers above it.
+
+That matters because the repo is no longer blocked on inventing a substrate.
+The bottom layer exists and is already carrying real work. The remaining core
+problem is not "make Rust touch accelerators somehow." The remaining core
+problem is to widen semantics above this spine without corrupting it. That is
+why the roadmap keeps emphasizing the small framework core, broad semantics in
+the middle, and Psionic-native system truth above both.
+
+### Runtime Truth, Serving Surfaces, And Evidence
+
+Status: runtime identity, artifact identity, topology truth, and evidence
+surfaces are `implemented`. Generalized model-runtime and backend closure are
+still `partial`.
+
+The repo already spans a large part of layer 3. Psionic owns manifests,
+runtime identity, stable digests, artifact provenance, hardware validation,
+cache invalidation, delivery-proof substrate, provider capability surfaces, and
+machine-legible refusal reasons. That is real engine work. It means later
+operator or authority systems do not need to invent side channels just to learn
+what model, build, topology, artifact, or environment actually ran.
+
+What is not honest to claim yet is broad serving closure across every backend
+and model family. The repo has real runtime truth and evidence seams, but
+backend breadth and family-specific runtime closure are still uneven. In the
+same way, Psionic already carries lineage, replay, and proof-adjacent surfaces,
+but that should not be confused with full cryptographic verification of every
+inference path. The current system is much better described as receipt-grade
+runtime truth with explicit refusal boundaries than as finished universal
+verifiable inference.
+
+### Cluster Substrate And Distributed Execution
+
+Status: same-network cluster substrate is `implemented_early`. Generalized
+cluster execution is still `partial`.
+
+The checked-in repo is not yet a generalized cluster runtime, but it is far
+beyond design-only notes. The current `psionic-cluster` lane already includes
+trusted-LAN discovery, persistent node identity, explicit admission policy,
+machine-checkable join refusals, replayable ordered state, catchup, snapshots,
+compaction, recovery, topology and telemetry facts, artifact residency truth,
+cluster execution evidence seams, truthful remote whole-request scheduling,
+explicit queue and backpressure policy, truthful replicated serving for a
+bounded lane, and first homogeneous CUDA layer-sharded and tensor-sharded
+lanes.
+
+That is enough to say cluster work is real and already integrated into the
+typed substrate. It is not enough to claim that Psionic now has a generalized
+multi-backend or adversarial-network cluster. The honest first cluster scope
+remains a trusted same-network lane with explicit namespace, admission, and
+replay policy. There is also now an operator-managed configured-peer posture
+for wider networks, but it is still bounded, signed, and replay-protected
+rather than an internet-wide trustless compute market. Metal remains on an
+explicit refusal boundary for current GPT-OSS cluster claims until the Metal
+queue closes, so cluster work must widen only where backend truth is already
+real.
+
+### Training, Validation, Checkpointing, And Replay
+
+Status: the train substrate is `implemented_early`. A scaled, generalized, and
+fully hardened all-Rust training system is still `partial`.
+
+The train system is no longer hypothetical. The current tree already contains
+runtime training truth, train-relevant datastream movement, collective
+planning, checkpoint and recovery session state, early training-output lineage
+through adapters, reusable environment, eval, validator, and orchestrator
+crates, typed model-IO portability surfaces, deterministic replay posture,
+mixed-precision and refusal posture, artifact-storage lifecycle controls,
+scheduling and accounting, failure-injection coverage, and benchmark-acceptance
+surfaces. `psionic-train` is therefore already a real machine-consumable
+runtime, not a thin wrapper around a future Python-owned system.
+
+What remains missing is the hard center of scale and generality. The roadmap is
+still honest that Psionic stops short of fully generalized multi-device
+execution kernels at production scale, broad distributed-optimizer execution,
+full portability across the wider checkpoint and tokenizer ecosystem, stronger
+promotion and retention governance, and deeper security or authority coupling
+beyond the currently implemented Apple-centered path. The repo has crossed from
+"training plan" to "early real training system," but it has not crossed into
+"finished generalized Rust training framework."
+
+### Apple, Metal, MLX, And Executor-Class Lanes
+
+Status: the repo-owned Apple training lane is `implemented_early`. The
+executor-class `Tassadar` lane is `implemented_early`. Broad Apple and Metal
+closure remain `partial`.
+
+Psionic now has one real repo-owned Apple training lane with app-owned operator
+and accepted-outcome integration around it. That is important because it means
+the Apple path is no longer only a benchmark or local script story. It has real
+environment, checkpoint, validator, and outcome surfaces attached. The repo
+also now has a bounded executor-class lane under the `Psion` umbrella:
+`Tassadar`. That work already includes benchmark and environment packages,
+proof and lineage surfaces, checkpoint visibility, dashboard and ledger
+artifacts, bounded fast-path promotion-block rules, and runtime capability and
+selection truth. The right reading is that executor-class Psionic work now
+exists as a real reference program inside the library.
+
+The wrong reading would be that Apple is broadly closed, Metal GPT-OSS is fully
+ready, or executor-class deployment is now product-complete. None of those
+claims are honest yet. Current Apple and MLX work is still bounded by admitted
+profiles, retained packets, and explicit visibility rules. Current Metal GPT-
+OSS remains under refusal for broader execution claims until its correctness and
+architecture blockers close. `Tassadar` is intentionally library-owned and
+reference-scoped rather than permission to widen product claims in `openagents`
+ahead of the evidence.
+
+### Semantics, Compatibility, And PyTorch-Credible Breadth
+
+Status: `partial`, and still the largest single remaining gap in the roadmap.
+
+The missing center of gravity is still the middle layer: semantics and
+compatibility. The repo has a real compact core and a growing system-truth
+layer, but full operator breadth, advanced tensor and dtype semantics, storage
+and math-family closure, fake or meta execution, module and state-tree
+semantics, optimizer and scheduler breadth, data-pipeline semantics, broader
+distributed-training semantics, exportable graph artifacts, extensibility
+contracts, and broader serialization and checkpoint compatibility are not yet
+closed at the level needed for a general "use Psionic for most AI workloads"
+claim.
+
+This is why the roadmap keeps saying the next critical missing layer is
+semantics and compatibility rather than another lane-specific benchmark queue.
+Psionic can already power bounded serving, cluster, training, and
+executor-class lanes because the bottom and top layers are real enough. But the
+project still needs the middle layer to become much broader and more honest
+before it can present itself as a full replacement framework rather than a set
+of strong bounded lanes.
+
+### Cross-Repo Boundary And Full-System Completion
+
+Status: Psionic-owned execution truth is a mix of `implemented` and
+`implemented_early`. Admission, authority, settlement, reputation, and public
+coordination are `partial_outside_psionic`.
+
+The roadmap needs to stay explicit about where Psionic stops. Psionic owns
+execution truth: manifests, runtime identity, topology truth, artifact digests,
+checkpoint and replay surfaces, validator-facing evidence, refusal reasons, and
+machine-readable runtime packets. It does not own final authority over admitted
+node registries, run leases, public window closeouts, reputation labels,
+settlement policy, or public TRN publication. Those responsibilities sit above
+Psionic in `openagents` and its control-plane layers.
+
+That boundary is a strength, not a gap in discipline. The full system already
+has enough Psionic-owned substrate that higher layers can build on typed facts
+instead of on screenshots, shell output, or implicit operator trust. The
+remaining work to make the complete admitted-node training and execution system
+feel finished is therefore not "move more product or market logic into
+Psionic." It is to keep Psionic's outputs strict, typed, replayable, and
+truthful while the control-plane repos finish the authority and publication
+loops above them.
+
+### Audit Bottom Line
+
+This roadmap should now be read as a completion roadmap, not an invention
+roadmap. Psionic already contains a real framework spine, a real runtime-truth
+layer, a real early train system, a bounded but real cluster substrate, and a
+bounded but real executor-class reference lane. The unresolved work is now
+mostly about widening semantics, hardening scale, preserving explicit refusal
+boundaries, and connecting Psionic's machine-legible evidence to the repos that
+own admission, coordination, and accepted outcomes.
+
 ## Why This Doc Exists
 
 The old roadmap set drifted toward:
