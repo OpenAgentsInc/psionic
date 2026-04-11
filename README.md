@@ -194,7 +194,12 @@ present, the manifest, run/window status packets, and retained window
 artifacts all carry one explicit `replica_id`, `stage_id`, `stage_index`,
 `stage_count`, `stage_role`, and canonical assignment digest so a weak-device
 stage is not flattened into the same contributor identity as a single-node
-worker window.
+worker window. Non-ingress grouped stages now also require one admitted
+`grouped_stage_input_transport_path` that points at a validated upstream
+handoff envelope, and every stage with a downstream neighbor emits one
+deterministic `grouped_stage_output_transport.json` plus
+`grouped_stage_output_payload.json` under its retained contribution root for
+the next stage to consume.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

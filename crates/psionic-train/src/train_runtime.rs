@@ -194,6 +194,12 @@ pub struct PsionicTrainArtifactSurfaceRefs {
     pub contribution_receipt_path: Option<String>,
     /// Optional retained contribution artifact-manifest path.
     pub contribution_artifact_manifest_path: Option<String>,
+    /// Optional retained grouped-stage input transport path.
+    pub grouped_stage_input_transport_path: Option<String>,
+    /// Optional retained grouped-stage output transport path.
+    pub grouped_stage_output_transport_path: Option<String>,
+    /// Optional retained grouped-stage output payload path.
+    pub grouped_stage_output_payload_path: Option<String>,
     /// Optional retained checkpoint-surface path.
     pub checkpoint_surface_path: Option<String>,
     /// Optional retained checkpoint-pointer path.
@@ -249,6 +255,9 @@ pub struct PsionicTrainInvocationManifest {
     pub validator_target_contribution_receipt_path: Option<String>,
     /// Optional challenged contribution artifact-manifest path consumed by validator replay.
     pub validator_target_contribution_artifact_manifest_path: Option<String>,
+    /// Optional retained grouped-stage input transport envelope for non-ingress grouped replicas.
+    #[serde(default)]
+    pub grouped_stage_input_transport_path: Option<String>,
     /// Explicit git ref selection. Defaults are not allowed for machine mode.
     pub selected_git_ref: Option<String>,
     /// Optional retained hardware observation path.
@@ -530,6 +539,26 @@ impl PsionicTrainInvocationManifest {
                     ),
                 });
             }
+            if stage_assignment.upstream_stage_id.is_some() {
+                require_nonempty_option(
+                    self.grouped_stage_input_transport_path.as_deref(),
+                    "invocation_manifest.grouped_stage_input_transport_path",
+                )?;
+            } else if self.grouped_stage_input_transport_path.is_some() {
+                return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                    field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+                    detail: String::from(
+                        "ingress grouped stage must not declare grouped_stage_input_transport_path",
+                    ),
+                });
+            }
+        } else if self.grouped_stage_input_transport_path.is_some() {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+                detail: String::from(
+                    "grouped_stage_input_transport_path is only admitted with grouped_stage_assignment on the machine runtime surface",
+                ),
+            });
         }
         self.admission_identity
             .validate("invocation_manifest.admission_identity")?;
@@ -557,6 +586,11 @@ impl PsionicTrainInvocationManifest {
                 .as_deref(),
             "invocation_manifest",
             "validator_target_contribution_artifact_manifest_path",
+        )?;
+        validate_optional_field(
+            self.grouped_stage_input_transport_path.as_deref(),
+            "invocation_manifest",
+            "grouped_stage_input_transport_path",
         )?;
 
         if self.selected_git_ref.is_none() {
@@ -1122,6 +1156,7 @@ mod tests {
             peer_checkpoint_handoff_receipt_path: None,
             validator_target_contribution_receipt_path: None,
             validator_target_contribution_artifact_manifest_path: None,
+            grouped_stage_input_transport_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -1342,6 +1377,67 @@ mod tests {
                 field: String::from("invocation_manifest.grouped_stage_assignment"),
                 detail: String::from(
                     "grouped stage assignment is currently admitted only for worker role on the machine runtime surface",
+                ),
+            }
+        );
+    }
+
+    #[test]
+    fn downstream_grouped_stage_requires_input_transport_path() {
+        let mut manifest = base_manifest();
+        manifest.coordination.window_id = Some(String::from("window-0001"));
+        manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.grouped_stage_assignment = Some(
+            PsionicTrainGroupedReplicaStageAssignment::new(
+                "replica-01",
+                "stage-02",
+                1,
+                2,
+                PsionicTrainGroupedReplicaStageRole::Egress,
+                Some(String::from("stage-01")),
+                None,
+            )
+            .expect("grouped stage assignment should build"),
+        );
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("downstream grouped stage should require input transport path");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::MissingField {
+                field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+            }
+        );
+    }
+
+    #[test]
+    fn ingress_grouped_stage_rejects_input_transport_path() {
+        let mut manifest = base_manifest();
+        manifest.coordination.window_id = Some(String::from("window-0001"));
+        manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.grouped_stage_assignment = Some(
+            PsionicTrainGroupedReplicaStageAssignment::new(
+                "replica-01",
+                "stage-01",
+                0,
+                2,
+                PsionicTrainGroupedReplicaStageRole::Ingress,
+                None,
+                Some(String::from("stage-02")),
+            )
+            .expect("grouped stage assignment should build"),
+        );
+        manifest.grouped_stage_input_transport_path =
+            Some(String::from("/tmp/grouped-stage-input-transport.json"));
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("ingress grouped stage should reject input transport path");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+                detail: String::from(
+                    "ingress grouped stage must not declare grouped_stage_input_transport_path",
                 ),
             }
         );

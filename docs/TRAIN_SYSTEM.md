@@ -464,7 +464,15 @@ in the process status packet, the run/window status packets, `window_execution`,
 the per-contribution artifact manifest, the contribution receipt, and the
 sealed-window rollup. That keeps grouped-replica stage work machine-legible and
 prevents a weak-device stage from collapsing back into one flat contributor
-lane.
+lane. The same surface now also freezes the first inter-stage transport
+contract: non-ingress grouped stages must declare
+`grouped_stage_input_transport_path`, the runtime refuses stale or drifted
+handoff envelopes before local work starts, and every stage with a downstream
+neighbor emits deterministic `grouped_stage_output_transport.json` and
+`grouped_stage_output_payload.json` artifacts under the retained contribution
+root. That gives grouped replicas one explicit handoff seam with lane, run,
+window, assignment, stage, and payload integrity all bound into machine-legible
+artifacts instead of hidden process-local state.
 
 The Apple lane stays intentionally narrower than the actual-pretraining lane.
 It does not route through the CUDA actual-pretraining operator. Instead, the

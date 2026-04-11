@@ -10,20 +10,23 @@ use std::{
 use sha2::Digest;
 
 use psionic_train::{
-    admitted_environment_ref_for_lane, admitted_release_id_for_lane,
-    build_psionic_train_checkpoint_handoff_receipt, execute_psionic_train_validator_replay,
-    inspect_psionic_train_checkpoint_surface, materialize_psionic_train_checkpoint_handoff,
-    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
-    runtime_build_digest, PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
-    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
-    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
-    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
-    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRunStatusPacket,
-    PsionicTrainRuntimeAttestation, PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCurrentRunStatus,
+    PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
+    PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
+    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PsionicTrainGroupedReplicaTransportError, PsionicTrainInvocationManifest,
+    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
+    PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
+    PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
     PsionicTrainValidatorArtifactOutputs, PsionicTrainValidatorReplayError,
     PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
-    PsionicTrainWindowStatusPacket, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
+    admitted_release_id_for_lane, build_psionic_train_checkpoint_handoff_receipt,
+    execute_psionic_train_validator_replay, inspect_psionic_train_checkpoint_surface,
+    materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
+    retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
+    validate_psionic_train_grouped_stage_input_transport,
 };
 
 #[allow(dead_code)]
@@ -115,6 +118,38 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
     };
 
     let run_root = manifest_run_root(&manifest);
+    if let Err(error) = validate_psionic_train_grouped_stage_input_transport(&manifest) {
+        let summary = run_root
+            .as_deref()
+            .and_then(actual_pretraining_run_surface_summary);
+        let mut packet = PsionicTrainStatusPacket::refusal(
+            Some(&manifest),
+            refusal_for_grouped_stage_transport_error(&error),
+            Some(manifest_path.display().to_string()),
+            Some(runtime_identity.attestation.clone()),
+            Some(runtime_identity.capability_projection.clone()),
+            summary
+                .as_ref()
+                .and_then(|value| value.run_id.clone())
+                .or_else(|| manifest.run_id.clone()),
+            run_root.as_ref().map(|value| value.display().to_string()),
+            None,
+            None,
+            format!("failed to validate grouped stage input transport: {error}"),
+        );
+        let status_paths = write_status_surfaces_for_packet(
+            &manifest,
+            manifest_path.display().to_string(),
+            run_root.as_deref(),
+            summary.as_ref(),
+            &packet,
+        )
+        .unwrap_or_default();
+        packet.run_status_packet_path = status_paths.run_status_packet_path;
+        packet.window_status_packet_path = status_paths.window_status_packet_path;
+        emit_refusal_packet(packet.clone());
+        return ExitCode::from(packet.exit_code);
+    }
     if manifest.operation == PsionicTrainOperation::ServeCheckpoint {
         return run_checkpoint_handoff_manifest(
             &manifest,
@@ -1373,6 +1408,27 @@ fn refusal_for_checkpoint_handoff_error(
     }
 }
 
+fn refusal_for_grouped_stage_transport_error(
+    error: &PsionicTrainGroupedReplicaTransportError,
+) -> PsionicTrainRefusalClass {
+    match error {
+        PsionicTrainGroupedReplicaTransportError::Read { .. }
+        | PsionicTrainGroupedReplicaTransportError::Write { .. } => {
+            PsionicTrainRefusalClass::ArtifactIncomplete
+        }
+        PsionicTrainGroupedReplicaTransportError::Parse { .. }
+        | PsionicTrainGroupedReplicaTransportError::ArtifactDigestMismatch { .. } => {
+            PsionicTrainRefusalClass::ArtifactDigestMismatch
+        }
+        PsionicTrainGroupedReplicaTransportError::Invalid { .. } => {
+            PsionicTrainRefusalClass::GroupedStageAssignmentInvalid
+        }
+        PsionicTrainGroupedReplicaTransportError::StaleAssignment { .. } => {
+            PsionicTrainRefusalClass::StaleAssignment
+        }
+    }
+}
+
 fn emit_checkpoint_handoff_refusal(
     manifest: &PsionicTrainInvocationManifest,
     manifest_path: &Path,
@@ -1555,6 +1611,7 @@ fn write_status_surfaces(
     )?;
     let checkpoint_surface = write_checkpoint_surface(run_root, manifest)?;
     let window_artifact_inputs = build_window_artifact_inputs(
+        manifest,
         summary,
         manifest_path.as_str(),
         membership_revision_path.clone(),
@@ -1576,6 +1633,7 @@ fn write_status_surfaces(
     )
     .map_err(|error| format!("failed to persist window contribution artifacts: {error}"))?;
     let artifacts = build_artifact_surface_refs(
+        manifest,
         summary,
         membership_revision_path.clone(),
         checkpoint_surface.as_ref(),
@@ -1671,6 +1729,7 @@ fn write_status_surfaces(
 }
 
 fn build_artifact_surface_refs(
+    manifest: &PsionicTrainInvocationManifest,
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
     membership_revision_path: Option<String>,
     checkpoint_surface: Option<&RetainedCheckpointSurface>,
@@ -1685,6 +1744,11 @@ fn build_artifact_surface_refs(
             .map(|value| value.contribution_receipt_path.clone()),
         contribution_artifact_manifest_path: window_artifacts
             .map(|value| value.contribution_artifact_manifest_path.clone()),
+        grouped_stage_input_transport_path: manifest.grouped_stage_input_transport_path.clone(),
+        grouped_stage_output_transport_path: window_artifacts
+            .and_then(|value| value.grouped_stage_output_transport_path.clone()),
+        grouped_stage_output_payload_path: window_artifacts
+            .and_then(|value| value.grouped_stage_output_payload_path.clone()),
         checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
         checkpoint_pointer_path: checkpoint_surface
             .and_then(|value| value.surface.artifacts.checkpoint_pointer_path.clone())
@@ -1717,6 +1781,7 @@ fn build_artifact_surface_refs(
 }
 
 fn build_window_artifact_inputs(
+    manifest: &PsionicTrainInvocationManifest,
     summary: Option<&ActualPretrainingRunSurfaceSummary>,
     manifest_path: &str,
     membership_revision_path: Option<String>,
@@ -1726,6 +1791,7 @@ fn build_window_artifact_inputs(
         invocation_manifest_path: String::from(manifest_path),
         launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
         membership_revision_path,
+        grouped_stage_input_transport_path: manifest.grouped_stage_input_transport_path.clone(),
         checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
         checkpoint_pointer_path: checkpoint_surface
             .and_then(|value| value.surface.artifacts.checkpoint_pointer_path.clone())

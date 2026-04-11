@@ -9,9 +9,10 @@ use thiserror::Error;
 
 use crate::{
     PsionicTrainAuthorityOwner, PsionicTrainCapabilityProjection,
-    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainInvocationManifest,
-    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
-    PsionicTrainRuntimeAttestation,
+    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageTransportArtifacts,
+    PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainRefusalClass,
+    PsionicTrainRole, PsionicTrainRuntimeAttestation,
+    persist_psionic_train_grouped_stage_output_transport,
 };
 
 pub const PSIONIC_TRAIN_WINDOW_EXECUTION_SCHEMA_VERSION: &str = "psionic.train.window_execution.v1";
@@ -27,6 +28,7 @@ pub struct PsionicTrainWindowArtifactInputRefs {
     pub invocation_manifest_path: String,
     pub launch_manifest_path: Option<String>,
     pub membership_revision_path: Option<String>,
+    pub grouped_stage_input_transport_path: Option<String>,
     pub checkpoint_surface_path: Option<String>,
     pub checkpoint_pointer_path: Option<String>,
     pub checkpoint_manifest_path: Option<String>,
@@ -44,6 +46,8 @@ pub struct PsionicTrainWindowArtifactOutputs {
     pub window_execution_path: String,
     pub contribution_receipt_path: String,
     pub contribution_artifact_manifest_path: String,
+    pub grouped_stage_output_transport_path: Option<String>,
+    pub grouped_stage_output_payload_path: Option<String>,
     pub sealed_window_bundle_path: String,
 }
 
@@ -160,6 +164,8 @@ pub enum PsionicTrainWindowArtifactError {
     Write { path: String, detail: String },
     #[error("failed to parse `{path}`: {detail}")]
     Parse { path: String, detail: String },
+    #[error("grouped stage transport is invalid: {detail}")]
+    GroupedStageTransport { detail: String },
 }
 
 impl PsionicTrainContributionArtifactManifest {
@@ -261,6 +267,13 @@ pub fn persist_psionic_train_window_artifacts(
             detail: error.to_string(),
         }
     })?;
+    let grouped_stage_output_transport =
+        persist_psionic_train_grouped_stage_output_transport(manifest, run_id, &contribution_root)
+            .map_err(
+                |error| PsionicTrainWindowArtifactError::GroupedStageTransport {
+                    detail: error.to_string(),
+                },
+            )?;
 
     let current_assignment = PsionicTrainWindowAssignmentMaterialization {
         assignment_id: assignment_id.clone(),
@@ -310,7 +323,7 @@ pub fn persist_psionic_train_window_artifacts(
         node_pubkey: node_pubkey.clone(),
         grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
         artifact_count: 0,
-        artifacts: collect_artifacts(artifact_inputs)?,
+        artifacts: collect_artifacts(artifact_inputs, grouped_stage_output_transport.as_ref())?,
         artifact_manifest_digest: String::new(),
     };
     artifact_manifest.artifact_count = artifact_manifest.artifacts.len();
@@ -416,6 +429,12 @@ pub fn persist_psionic_train_window_artifacts(
         contribution_artifact_manifest_path: contribution_artifact_manifest_path
             .display()
             .to_string(),
+        grouped_stage_output_transport_path: grouped_stage_output_transport
+            .as_ref()
+            .map(|value| value.grouped_stage_output_transport_path.clone()),
+        grouped_stage_output_payload_path: grouped_stage_output_transport
+            .as_ref()
+            .map(|value| value.grouped_stage_output_payload_path.clone()),
         sealed_window_bundle_path: sealed_window_bundle_path.display().to_string(),
     }))
 }
@@ -434,6 +453,7 @@ struct RetainedContributionEntry {
 
 fn collect_artifacts(
     refs: &PsionicTrainWindowArtifactInputRefs,
+    grouped_stage_output_transport: Option<&PsionicTrainGroupedReplicaStageTransportArtifacts>,
 ) -> Result<Vec<PsionicTrainContributionArtifact>, PsionicTrainWindowArtifactError> {
     let candidates = [
         (
@@ -444,6 +464,10 @@ fn collect_artifacts(
         (
             "membership_revision",
             refs.membership_revision_path.as_deref(),
+        ),
+        (
+            "grouped_stage_input_transport",
+            refs.grouped_stage_input_transport_path.as_deref(),
         ),
         (
             "checkpoint_surface",
@@ -472,6 +496,16 @@ fn collect_artifacts(
         (
             "final_closeout_bundle",
             refs.final_closeout_bundle_path.as_deref(),
+        ),
+        (
+            "grouped_stage_output_transport",
+            grouped_stage_output_transport
+                .map(|value| value.grouped_stage_output_transport_path.as_str()),
+        ),
+        (
+            "grouped_stage_output_payload",
+            grouped_stage_output_transport
+                .map(|value| value.grouped_stage_output_payload_path.as_str()),
         ),
     ];
     let mut artifacts = Vec::new();
@@ -617,9 +651,9 @@ mod tests {
     };
 
     use super::{
-        PsionicTrainContributionReceipt, PsionicTrainSealedWindowBundle,
-        PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowExecution,
-        persist_psionic_train_window_artifacts,
+        PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
+        PsionicTrainSealedWindowBundle, PsionicTrainWindowArtifactInputRefs,
+        PsionicTrainWindowExecution, persist_psionic_train_window_artifacts,
     };
     use crate::{
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
@@ -675,6 +709,7 @@ mod tests {
             peer_checkpoint_handoff_receipt_path: None,
             validator_target_contribution_receipt_path: None,
             validator_target_contribution_artifact_manifest_path: None,
+            grouped_stage_input_transport_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -751,6 +786,7 @@ mod tests {
             invocation_manifest_path,
             launch_manifest_path: None,
             membership_revision_path: None,
+            grouped_stage_input_transport_path: None,
             checkpoint_surface_path: None,
             checkpoint_pointer_path: None,
             checkpoint_manifest_path: None,
@@ -820,6 +856,35 @@ mod tests {
                 .stage_id,
             "stage-01"
         );
+        let artifact_manifest: PsionicTrainContributionArtifactManifest = serde_json::from_slice(
+            &fs::read(&outputs.contribution_artifact_manifest_path)
+                .expect("artifact manifest should read"),
+        )
+        .expect("artifact manifest should parse");
+        assert!(
+            artifact_manifest
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.artifact_kind == "grouped_stage_output_transport")
+        );
+        assert!(
+            artifact_manifest
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.artifact_kind == "grouped_stage_output_payload")
+        );
+        let expected_transport_path = run_root
+            .join("windows")
+            .join("window-0001")
+            .join("contributions")
+            .join(window_execution.current_assignment.contribution_id.as_str())
+            .join("grouped_stage_output_transport.json")
+            .display()
+            .to_string();
+        assert_eq!(
+            outputs.grouped_stage_output_transport_path.as_deref(),
+            Some(expected_transport_path.as_str())
+        );
     }
 
     #[test]
@@ -845,6 +910,7 @@ mod tests {
             invocation_manifest_path: write_invocation_manifest(&run_root, &manifest_a),
             launch_manifest_path: None,
             membership_revision_path: None,
+            grouped_stage_input_transport_path: None,
             checkpoint_surface_path: None,
             checkpoint_pointer_path: None,
             checkpoint_manifest_path: None,
@@ -893,6 +959,7 @@ mod tests {
             invocation_manifest_path: write_invocation_manifest(&run_root, &manifest_b),
             launch_manifest_path: None,
             membership_revision_path: None,
+            grouped_stage_input_transport_path: None,
             checkpoint_surface_path: None,
             checkpoint_pointer_path: None,
             checkpoint_manifest_path: None,
