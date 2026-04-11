@@ -3,6 +3,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
+use crate::PsionicTrainGroupedReplicaStageAssignment;
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -98,6 +99,7 @@ pub enum PsionicTrainRefusalClass {
     StaleAssignment,
     LeaseExpired,
     UnsupportedTopology,
+    GroupedStageAssignmentInvalid,
     CheckpointMissing,
     CheckpointDigestMismatch,
     ArtifactIncomplete,
@@ -228,6 +230,9 @@ pub struct PsionicTrainInvocationManifest {
     /// Shared coordination envelope for the run when the caller already knows those ids.
     #[serde(default)]
     pub coordination: PsionicTrainCoordinationContext,
+    /// Optional grouped-replica stage assignment when one worker participates in a staged replica.
+    #[serde(default)]
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Admitted release, build, and environment identity expected before launch.
     pub admission_identity: PsionicTrainAdmissionIdentity,
     /// Stable run identifier when the machine caller wants deterministic run roots.
@@ -301,6 +306,8 @@ pub struct PsionicTrainStatusPacket {
     pub manifest_digest: Option<String>,
     /// Shared coordination envelope.
     pub coordination: PsionicTrainCoordinationContext,
+    /// Optional grouped-replica stage assignment projected by the admitted manifest.
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Runtime attestation resolved by the local machine before or during execution.
     pub runtime_attestation: Option<PsionicTrainRuntimeAttestation>,
     /// Minimal runtime capability projection.
@@ -350,6 +357,8 @@ pub struct PsionicTrainRunStatusPacket {
     pub refusal_class: Option<PsionicTrainRefusalClass>,
     /// Shared coordination envelope.
     pub coordination: PsionicTrainCoordinationContext,
+    /// Optional grouped-replica stage assignment projected by the admitted manifest.
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Optional invocation manifest path.
     pub manifest_path: Option<String>,
     /// Optional invocation manifest digest.
@@ -401,6 +410,8 @@ pub struct PsionicTrainWindowStatusPacket {
     pub refusal_class: Option<PsionicTrainRefusalClass>,
     /// Shared coordination envelope.
     pub coordination: PsionicTrainCoordinationContext,
+    /// Optional grouped-replica stage assignment projected by the admitted manifest.
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Optional invocation manifest digest.
     pub manifest_digest: Option<String>,
     /// Optional run identifier.
@@ -501,6 +512,25 @@ impl PsionicTrainInvocationManifest {
         }
         self.coordination
             .validate("invocation_manifest.coordination")?;
+        if let Some(stage_assignment) = &self.grouped_stage_assignment {
+            stage_assignment.validate("invocation_manifest.grouped_stage_assignment")?;
+            require_nonempty_option(
+                self.coordination.window_id.as_deref(),
+                "invocation_manifest.coordination.window_id",
+            )?;
+            require_nonempty_option(
+                self.coordination.assignment_id.as_deref(),
+                "invocation_manifest.coordination.assignment_id",
+            )?;
+            if self.role != PsionicTrainRole::Worker {
+                return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                    field: String::from("invocation_manifest.grouped_stage_assignment"),
+                    detail: String::from(
+                        "grouped stage assignment is currently admitted only for worker role on the machine runtime surface",
+                    ),
+                });
+            }
+        }
         self.admission_identity
             .validate("invocation_manifest.admission_identity")?;
         require_nonempty_option(
@@ -719,6 +749,7 @@ impl PsionicTrainStatusPacket {
             manifest_path,
             manifest_digest: manifest.manifest_digest.clone(),
             coordination: manifest.coordination.clone(),
+            grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
             runtime_attestation: Some(runtime_attestation),
             capability_projection: Some(capability_projection),
             run_id,
@@ -768,6 +799,8 @@ impl PsionicTrainStatusPacket {
             coordination: manifest
                 .map(|value| value.coordination.clone())
                 .unwrap_or_default(),
+            grouped_stage_assignment: manifest
+                .and_then(|value| value.grouped_stage_assignment.clone()),
             runtime_attestation,
             capability_projection,
             run_id,
@@ -960,14 +993,15 @@ impl PsionicTrainRefusalClass {
             Self::StaleAssignment => 11,
             Self::LeaseExpired => 12,
             Self::UnsupportedTopology => 13,
-            Self::CheckpointMissing => 14,
-            Self::CheckpointDigestMismatch => 15,
-            Self::ArtifactIncomplete => 16,
-            Self::ArtifactDigestMismatch => 17,
-            Self::ValidatorTimeout => 18,
-            Self::ValidatorDisagreement => 19,
-            Self::EnvironmentMismatch => 20,
-            Self::BuildRevoked => 21,
+            Self::GroupedStageAssignmentInvalid => 14,
+            Self::CheckpointMissing => 15,
+            Self::CheckpointDigestMismatch => 16,
+            Self::ArtifactIncomplete => 17,
+            Self::ArtifactDigestMismatch => 18,
+            Self::ValidatorTimeout => 19,
+            Self::ValidatorDisagreement => 20,
+            Self::EnvironmentMismatch => 21,
+            Self::BuildRevoked => 22,
             Self::InternalError => 70,
         }
     }
@@ -979,6 +1013,7 @@ impl PsionicTrainRefusalClass {
             Self::StaleAssignment => true,
             Self::LeaseExpired => true,
             Self::UnsupportedTopology => false,
+            Self::GroupedStageAssignmentInvalid => false,
             Self::CheckpointMissing => true,
             Self::CheckpointDigestMismatch => false,
             Self::ArtifactIncomplete => true,
@@ -1000,6 +1035,7 @@ impl PsionicTrainRefusalClass {
             | Self::ValidatorDisagreement => PsionicTrainAuthorityOwner::Nexus,
             Self::BadConfig
             | Self::UnsupportedTopology
+            | Self::GroupedStageAssignmentInvalid
             | Self::CheckpointMissing
             | Self::CheckpointDigestMismatch
             | Self::ArtifactIncomplete
@@ -1056,6 +1092,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PsionicTrainGroupedReplicaStageRole;
 
     fn base_manifest() -> PsionicTrainInvocationManifest {
         PsionicTrainInvocationManifest {
@@ -1072,6 +1109,7 @@ mod tests {
                 node_pubkey: Some(String::from("npub1-psionic-contract-test")),
                 membership_revision: None,
             },
+            grouped_stage_assignment: None,
             admission_identity: PsionicTrainAdmissionIdentity {
                 release_id: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
                 build_digest: String::from("sha256:test-build"),
@@ -1172,6 +1210,10 @@ mod tests {
         assert_eq!(PsionicTrainRefusalClass::BadConfig.exit_code(), 10);
         assert_eq!(PsionicTrainRefusalClass::LeaseExpired.exit_code(), 12);
         assert_eq!(
+            PsionicTrainRefusalClass::GroupedStageAssignmentInvalid.exit_code(),
+            14
+        );
+        assert_eq!(
             PsionicTrainRefusalClass::ValidatorTimeout.authority_owner(),
             PsionicTrainAuthorityOwner::Nexus
         );
@@ -1235,6 +1277,73 @@ mod tests {
         assert_eq!(
             projection.topology_class,
             PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS
+        );
+    }
+
+    #[test]
+    fn grouped_stage_assignment_requires_window_and_assignment_context() {
+        let mut manifest = base_manifest();
+        manifest.coordination.window_id = None;
+        manifest.grouped_stage_assignment = Some(
+            PsionicTrainGroupedReplicaStageAssignment::new(
+                "replica-01",
+                "stage-01",
+                0,
+                2,
+                PsionicTrainGroupedReplicaStageRole::Ingress,
+                None,
+                Some(String::from("stage-02")),
+            )
+            .expect("grouped stage assignment should build"),
+        );
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("grouped stage assignment should require window context");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::MissingField {
+                field: String::from("invocation_manifest.coordination.window_id"),
+            }
+        );
+    }
+
+    #[test]
+    fn validator_manifest_rejects_grouped_stage_assignment() {
+        let mut manifest = base_manifest();
+        manifest.role = PsionicTrainRole::Validator;
+        manifest.operation = PsionicTrainOperation::ValidateContribution;
+        manifest.output_root = None;
+        manifest.run_root = Some(String::from("/tmp/validator-run"));
+        manifest.coordination.window_id = Some(String::from("window-0001"));
+        manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.coordination.challenge_id = Some(String::from("challenge-0001"));
+        manifest.validator_target_contribution_receipt_path =
+            Some(String::from("/tmp/contribution_receipt.json"));
+        manifest.validator_target_contribution_artifact_manifest_path =
+            Some(String::from("/tmp/artifact_manifest.json"));
+        manifest.grouped_stage_assignment = Some(
+            PsionicTrainGroupedReplicaStageAssignment::new(
+                "replica-01",
+                "stage-01",
+                0,
+                2,
+                PsionicTrainGroupedReplicaStageRole::Ingress,
+                None,
+                Some(String::from("stage-02")),
+            )
+            .expect("grouped stage assignment should build"),
+        );
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("validator should reject grouped-stage worker assignment");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.grouped_stage_assignment"),
+                detail: String::from(
+                    "grouped stage assignment is currently admitted only for worker role on the machine runtime surface",
+                ),
+            }
         );
     }
 }

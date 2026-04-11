@@ -454,6 +454,18 @@ the first honest answer to “how does `Pylon` invoke `psionic-train` without
 going through a human shell wrapper?” and “what deterministic contribution
 artifact set did this local assignment materialize?”
 
+That same machine surface now also freezes the first grouped-replica
+stage-assignment contract. When the invocation manifest carries
+`grouped_stage_assignment`, the runtime validates one explicit `replica_id`,
+`stage_id`, `stage_index`, `stage_count`, `stage_role`,
+`upstream_stage_id`/`downstream_stage_id` posture, and a canonical stage
+assignment digest before launch. The resolved stage assignment is then repeated
+in the process status packet, the run/window status packets, `window_execution`,
+the per-contribution artifact manifest, the contribution receipt, and the
+sealed-window rollup. That keeps grouped-replica stage work machine-legible and
+prevents a weak-device stage from collapsing back into one flat contributor
+lane.
+
 The Apple lane stays intentionally narrower than the actual-pretraining lane.
 It does not route through the CUDA actual-pretraining operator. Instead, the
 manifest runtime retains one backend-homogeneous Apple / Metal execution class

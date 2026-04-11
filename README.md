@@ -188,7 +188,13 @@ per-contribution `contribution_receipt.json`, and one rollup
 `sealed_window_bundle.json`. The run/window status packets repeat the absolute
 paths for those retained window surfaces too, so supervisors can follow one
 declared assignment through the local retained bundle set without re-scanning
-the whole run root.
+the whole run root. The same machine contract now also admits one optional
+`grouped_stage_assignment` payload for grouped replicas. When that payload is
+present, the manifest, run/window status packets, and retained window
+artifacts all carry one explicit `replica_id`, `stage_id`, `stage_index`,
+`stage_count`, `stage_role`, and canonical assignment digest so a weak-device
+stage is not flattened into the same contributor identity as a single-node
+worker window.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

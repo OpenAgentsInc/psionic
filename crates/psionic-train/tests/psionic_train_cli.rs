@@ -5,7 +5,12 @@ use std::{
 };
 
 use psionic_train::{
-    runtime_build_digest, PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+    PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
+    PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+    PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
     PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainContributionArtifactManifest, PsionicTrainCoordinationContext,
@@ -14,12 +19,7 @@ use psionic_train::{
     PsionicTrainRunStatusPacket, PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
     PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
     PsionicTrainWindowExecution, PsionicTrainWindowStatusPacket,
-    TrainingExecutionValidatorDisposition, PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
-    PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
-    PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-    PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+    TrainingExecutionValidatorDisposition, runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -129,6 +129,7 @@ fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
             node_pubkey: Some(String::from("npub1-psionic-cli-test")),
             membership_revision: None,
         },
+        grouped_stage_assignment: None,
         admission_identity: admitted_identity_for_lane(git_commit_sha.as_str(), lane_id),
         run_id: Some(String::from("psion-train-cli-test")),
         output_root: None,
@@ -486,38 +487,46 @@ fn machine_manifest_record_checkpoint_persists_checkpoint_surface() {
         checkpoint_surface.upload_outcome.as_deref(),
         Some("succeeded")
     );
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_manifest_path
-            .as_deref()
-            .expect("checkpoint manifest path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_backup_receipt_path
-            .as_deref()
-            .expect("checkpoint backup receipt path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_backup_pointer_path
-            .as_deref()
-            .expect("checkpoint backup pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_backup_manifest_path
-            .as_deref()
-            .expect("checkpoint backup manifest path should exist"),
-    )
-    .is_file());
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_manifest_path
+                .as_deref()
+                .expect("checkpoint manifest path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_receipt_path
+                .as_deref()
+                .expect("checkpoint backup receipt path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_pointer_path
+                .as_deref()
+                .expect("checkpoint backup pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_backup_manifest_path
+                .as_deref()
+                .expect("checkpoint backup manifest path should exist"),
+        )
+        .is_file()
+    );
 }
 
 #[test]
@@ -917,22 +926,26 @@ fn apple_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         Some("apple-resume-final")
     );
     assert_eq!(checkpoint_surface.optimizer_step, Some(4_096));
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_pointer_path
-            .as_deref()
-            .expect("apple checkpoint pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .peer_checkpoint_handoff_receipt_path
-            .as_deref()
-            .expect("apple handoff receipt path should exist"),
-    )
-    .is_file());
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .as_deref()
+                .expect("apple checkpoint pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .peer_checkpoint_handoff_receipt_path
+                .as_deref()
+                .expect("apple handoff receipt path should exist"),
+        )
+        .is_file()
+    );
 }
 
 #[test]
@@ -1011,22 +1024,26 @@ fn machine_manifest_resume_recovers_primary_pointer_from_backup() {
         Some("backup_receipt")
     );
     assert_eq!(checkpoint_surface.restored_primary_pointer, Some(true));
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_pointer_path
-            .as_deref()
-            .expect("checkpoint pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .auto_resume_receipt_path
-            .as_deref()
-            .expect("auto-resume receipt path should exist"),
-    )
-    .is_file());
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .as_deref()
+                .expect("checkpoint pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .auto_resume_receipt_path
+                .as_deref()
+                .expect("auto-resume receipt path should exist"),
+        )
+        .is_file()
+    );
 }
 
 #[test]
@@ -1108,10 +1125,12 @@ fn machine_manifest_window_context_emits_window_and_contribution_artifacts() {
     );
     assert!(run_status.artifacts.window_execution_path.is_some());
     assert!(run_status.artifacts.contribution_receipt_path.is_some());
-    assert!(run_status
-        .artifacts
-        .contribution_artifact_manifest_path
-        .is_some());
+    assert!(
+        run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .is_some()
+    );
     assert!(run_status.artifacts.sealed_window_bundle_path.is_some());
 
     let window_execution: PsionicTrainWindowExecution = parse_json(
@@ -1379,30 +1398,36 @@ fn machine_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         checkpoint_surface.recovery_resolution_state.as_deref(),
         Some("accepted_primary_pointer")
     );
-    assert!(Path::new(
-        run_status
-            .artifacts
-            .checkpoint_handoff_receipt_path
-            .as_deref()
-            .expect("joiner checkpoint handoff receipt path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_pointer_path
-            .as_deref()
-            .expect("checkpoint pointer path should exist"),
-    )
-    .is_file());
-    assert!(Path::new(
-        checkpoint_surface
-            .artifacts
-            .checkpoint_manifest_path
-            .as_deref()
-            .expect("checkpoint manifest path should exist"),
-    )
-    .is_file());
+    assert!(
+        Path::new(
+            run_status
+                .artifacts
+                .checkpoint_handoff_receipt_path
+                .as_deref()
+                .expect("joiner checkpoint handoff receipt path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_pointer_path
+                .as_deref()
+                .expect("checkpoint pointer path should exist"),
+        )
+        .is_file()
+    );
+    assert!(
+        Path::new(
+            checkpoint_surface
+                .artifacts
+                .checkpoint_manifest_path
+                .as_deref()
+                .expect("checkpoint manifest path should exist"),
+        )
+        .is_file()
+    );
 }
 
 #[test]

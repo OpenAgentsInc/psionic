@@ -1329,6 +1329,21 @@ fn refusal_for_contract_error(
         {
             PsionicTrainRefusalClass::UnsupportedTopology
         }
+        PsionicTrainRuntimeContractError::InvalidValue { field, .. }
+            if field.starts_with("invocation_manifest.grouped_stage_assignment") =>
+        {
+            PsionicTrainRefusalClass::GroupedStageAssignmentInvalid
+        }
+        PsionicTrainRuntimeContractError::FieldMismatch { field, .. }
+            if field.starts_with("invocation_manifest.grouped_stage_assignment") =>
+        {
+            PsionicTrainRefusalClass::GroupedStageAssignmentInvalid
+        }
+        PsionicTrainRuntimeContractError::MissingField { field }
+            if field.starts_with("invocation_manifest.grouped_stage_assignment") =>
+        {
+            PsionicTrainRefusalClass::GroupedStageAssignmentInvalid
+        }
         PsionicTrainRuntimeContractError::FieldMismatch { field, .. }
             if field == "invocation_manifest.manifest_digest" =>
         {
@@ -1579,6 +1594,7 @@ fn write_status_surfaces(
         authority_owner,
         refusal_class,
         coordination: manifest.coordination.clone(),
+        grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
         manifest_path: Some(manifest_path.clone()),
         manifest_digest: manifest.manifest_digest.clone(),
         run_id: Some(resolved_run_id.clone()),
@@ -1606,6 +1622,7 @@ fn write_status_surfaces(
         authority_owner,
         refusal_class,
         coordination: manifest.coordination.clone(),
+        grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
         manifest_digest: manifest.manifest_digest.clone(),
         run_id: Some(resolved_run_id),
         run_root: Some(run_root.display().to_string()),

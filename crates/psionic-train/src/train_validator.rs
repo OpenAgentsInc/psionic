@@ -1,9 +1,6 @@
-use std::{
-    fs,
-    path::Path,
-};
+use std::{fs, path::Path};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -115,7 +112,8 @@ pub fn execute_psionic_train_validator_replay(
             .as_deref()
             .expect("validated validator manifests always carry target contribution receipt path"),
     );
-    let contribution_receipt: PsionicTrainContributionReceipt = read_json(contribution_receipt_path)?;
+    let contribution_receipt: PsionicTrainContributionReceipt =
+        read_json(contribution_receipt_path)?;
     if contribution_receipt.contribution_digest != contribution_receipt.stable_contribution_digest()
     {
         return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
@@ -228,9 +226,11 @@ pub fn execute_psionic_train_validator_replay(
         .join(contribution_receipt.window_id.as_str())
         .join("validators")
         .join(challenge_id);
-    fs::create_dir_all(&validator_root).map_err(|error| PsionicTrainValidatorReplayError::Write {
-        path: validator_root.display().to_string(),
-        detail: error.to_string(),
+    fs::create_dir_all(&validator_root).map_err(|error| {
+        PsionicTrainValidatorReplayError::Write {
+            path: validator_root.display().to_string(),
+            detail: error.to_string(),
+        }
     })?;
     let score_artifact_path = validator_root.join("validator_score_artifact.json");
     let mut score_artifact = PsionicTrainValidatorScoreArtifact {
@@ -246,7 +246,9 @@ pub fn execute_psionic_train_validator_replay(
         challenged_node_pubkey: contribution_receipt.node_pubkey.clone(),
         contribution_id: contribution_receipt.contribution_id.clone(),
         contribution_digest: contribution_receipt.contribution_digest.clone(),
-        artifact_manifest_digest: contribution_artifact_manifest.artifact_manifest_digest.clone(),
+        artifact_manifest_digest: contribution_artifact_manifest
+            .artifact_manifest_digest
+            .clone(),
         artifact_count: contribution_artifact_manifest.artifact_count,
         checkpoint_pointer_state,
         checkpoint_manifest_digest: checkpoint_surface
@@ -279,7 +281,9 @@ pub fn execute_psionic_train_validator_replay(
         challenged_node_pubkey: contribution_receipt.node_pubkey.clone(),
         contribution_id: contribution_receipt.contribution_id.clone(),
         contribution_digest: contribution_receipt.contribution_digest.clone(),
-        artifact_manifest_digest: contribution_artifact_manifest.artifact_manifest_digest.clone(),
+        artifact_manifest_digest: contribution_artifact_manifest
+            .artifact_manifest_digest
+            .clone(),
         disposition,
         reason_codes,
         score_bps,
@@ -445,14 +449,14 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_validator_result, PsionicTrainValidatorReplayReasonCode,
-        TrainingExecutionValidatorDisposition,
+        PsionicTrainValidatorReplayReasonCode, TrainingExecutionValidatorDisposition,
+        classify_validator_result,
     };
     use crate::{
-        PsionicTrainAuthorityOwner, PsionicTrainCheckpointArtifactPaths,
-        PsionicTrainCheckpointSurface, PsionicTrainContributionReceipt, PsionicTrainOutcomeKind,
-        PsionicTrainRole, PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
-        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION, PsionicTrainAuthorityOwner,
+        PsionicTrainCheckpointArtifactPaths, PsionicTrainCheckpointSurface,
+        PsionicTrainContributionReceipt, PsionicTrainOutcomeKind, PsionicTrainRole,
     };
 
     fn succeeded_contribution() -> PsionicTrainContributionReceipt {
@@ -465,6 +469,7 @@ mod tests {
             assignment_id: String::from("assignment-0001"),
             contribution_id: String::from("contribution-0001"),
             node_pubkey: String::from("npub1-worker"),
+            grouped_stage_assignment: None,
             role: PsionicTrainRole::Worker,
             operation: String::from("record-checkpoint"),
             outcome: PsionicTrainOutcomeKind::Succeeded,
@@ -525,15 +530,11 @@ mod tests {
     #[test]
     fn clean_accepted_checkpoint_is_accepted() {
         let receipt = succeeded_contribution();
-        let surface = checkpoint_surface(
-            Some("accepted"),
-            Some("succeeded"),
-            None,
-            Some(false),
-            None,
-        );
+        let surface =
+            checkpoint_surface(Some("accepted"), Some("succeeded"), None, Some(false), None);
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, Some(&surface)).expect("classification should work");
+            classify_validator_result(&receipt, Some(&surface))
+                .expect("classification should work");
         assert_eq!(disposition, TrainingExecutionValidatorDisposition::Accepted);
         assert_eq!(
             reason_codes,
@@ -545,16 +546,15 @@ mod tests {
     #[test]
     fn refused_upload_requires_replay() {
         let receipt = succeeded_contribution();
-        let surface = checkpoint_surface(
-            Some("accepted"),
-            Some("refused"),
-            None,
-            Some(false),
-            None,
-        );
+        let surface =
+            checkpoint_surface(Some("accepted"), Some("refused"), None, Some(false), None);
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, Some(&surface)).expect("classification should work");
-        assert_eq!(disposition, TrainingExecutionValidatorDisposition::ReplayRequired);
+            classify_validator_result(&receipt, Some(&surface))
+                .expect("classification should work");
+        assert_eq!(
+            disposition,
+            TrainingExecutionValidatorDisposition::ReplayRequired
+        );
         assert_eq!(
             reason_codes,
             vec![PsionicTrainValidatorReplayReasonCode::CheckpointReplayRequired]
@@ -573,8 +573,12 @@ mod tests {
             Some("restored"),
         );
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, Some(&surface)).expect("classification should work");
-        assert_eq!(disposition, TrainingExecutionValidatorDisposition::Quarantined);
+            classify_validator_result(&receipt, Some(&surface))
+                .expect("classification should work");
+        assert_eq!(
+            disposition,
+            TrainingExecutionValidatorDisposition::Quarantined
+        );
         assert_eq!(
             reason_codes,
             vec![PsionicTrainValidatorReplayReasonCode::CheckpointRecovered]
