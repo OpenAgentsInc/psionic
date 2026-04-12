@@ -472,7 +472,14 @@ neighbor emits deterministic `grouped_stage_output_transport.json` and
 `grouped_stage_output_payload.json` artifacts under the retained contribution
 root. That gives grouped replicas one explicit handoff seam with lane, run,
 window, assignment, stage, and payload integrity all bound into machine-legible
-artifacts instead of hidden process-local state.
+artifacts instead of hidden process-local state. The retained contribution root
+now also carries one deterministic `grouped_stage_execution_summary.json` that
+binds the grouped stage assignment, accepted input/output transport digests,
+and local execution outcome into one replay-safe artifact. Validator replay
+uses that retained summary to emit one paired
+`grouped_stage_replay_evidence.json` under the validator artifact root, so the
+challenge path can prove that grouped stage identity, transport lineage, and
+receipt-level acceptance stayed aligned.
 
 The Apple lane stays intentionally narrower than the actual-pretraining lane.
 It does not route through the CUDA actual-pretraining operator. Instead, the

@@ -5,9 +5,13 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PsionicTrainCheckpointSurface, PsionicTrainContributionArtifactManifest,
-    PsionicTrainContributionReceipt, PsionicTrainInvocationManifest, PsionicTrainOutcomeKind,
-    TrainingExecutionValidatorDisposition,
+    PsionicTrainCheckpointSurface, PsionicTrainContributionArtifact,
+    PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
+    PsionicTrainGroupedReplicaEvidenceError, PsionicTrainGroupedReplicaStageExecutionSummary,
+    PsionicTrainGroupedReplicaStageReplayEvidence, PsionicTrainInvocationManifest,
+    PsionicTrainOutcomeKind, TrainingExecutionValidatorDisposition,
+    load_psionic_train_grouped_stage_execution_summary, load_psionic_train_grouped_stage_transport,
+    persist_psionic_train_grouped_stage_replay_evidence,
 };
 
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
@@ -15,13 +19,14 @@ pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.train.validator_score_receipt.v1";
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PsionicTrainValidatorReplayReasonCode {
     ContributionOutcomeRefused,
     PrimaryCheckpointAccepted,
     CheckpointRecovered,
     CheckpointReplayRequired,
+    GroupedStageEvidenceVerified,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,6 +45,10 @@ pub struct PsionicTrainValidatorScoreArtifact {
     pub contribution_digest: String,
     pub artifact_manifest_digest: String,
     pub artifact_count: usize,
+    pub grouped_stage_execution_summary_path: Option<String>,
+    pub grouped_stage_execution_summary_digest: Option<String>,
+    pub grouped_stage_replay_evidence_path: Option<String>,
+    pub grouped_stage_replay_evidence_digest: Option<String>,
     pub checkpoint_pointer_state: Option<String>,
     pub checkpoint_manifest_digest: Option<String>,
     pub checkpoint_object_digest: Option<String>,
@@ -65,6 +74,10 @@ pub struct PsionicTrainValidatorScoreReceipt {
     pub contribution_id: String,
     pub contribution_digest: String,
     pub artifact_manifest_digest: String,
+    pub grouped_stage_execution_summary_path: Option<String>,
+    pub grouped_stage_execution_summary_digest: Option<String>,
+    pub grouped_stage_replay_evidence_path: Option<String>,
+    pub grouped_stage_replay_evidence_digest: Option<String>,
     pub disposition: TrainingExecutionValidatorDisposition,
     pub reason_codes: Vec<PsionicTrainValidatorReplayReasonCode>,
     pub score_bps: u16,
@@ -77,6 +90,7 @@ pub struct PsionicTrainValidatorScoreReceipt {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainValidatorArtifactOutputs {
     pub validator_score_receipt_path: String,
+    pub grouped_stage_replay_evidence_path: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -197,10 +211,29 @@ pub fn execute_psionic_train_validator_replay(
             ),
         });
     }
+    let grouped_stage_execution_summary = load_grouped_stage_execution_summary(
+        manifest,
+        &contribution_receipt,
+        &contribution_artifact_manifest,
+    )?;
+    let grouped_stage_execution_summary_path = grouped_stage_execution_summary
+        .as_ref()
+        .map(|_| {
+            require_artifact(
+                &contribution_artifact_manifest,
+                "grouped_stage_execution_summary",
+            )
+            .map(|artifact| artifact.artifact_path.clone())
+        })
+        .transpose()?;
 
     let checkpoint_surface = load_checkpoint_surface(&contribution_artifact_manifest)?;
     let (disposition, reason_codes, score_bps, detail, checkpoint_pointer_state) =
-        classify_validator_result(&contribution_receipt, checkpoint_surface.as_ref())?;
+        classify_validator_result(
+            &contribution_receipt,
+            checkpoint_surface.as_ref(),
+            grouped_stage_execution_summary.is_some(),
+        )?;
 
     let challenge_id = manifest
         .coordination
@@ -232,6 +265,25 @@ pub fn execute_psionic_train_validator_replay(
             detail: error.to_string(),
         }
     })?;
+    let grouped_stage_replay_evidence = grouped_stage_execution_summary
+        .as_ref()
+        .map(|execution_summary| {
+            persist_grouped_stage_replay_evidence(
+                manifest,
+                &contribution_receipt,
+                &contribution_artifact_manifest,
+                execution_summary,
+                &validator_root,
+                challenge_id,
+                validator_node_pubkey,
+                validator_run_id.as_str(),
+                disposition,
+                &reason_codes,
+                score_bps,
+                detail.as_str(),
+            )
+        })
+        .transpose()?;
     let score_artifact_path = validator_root.join("validator_score_artifact.json");
     let mut score_artifact = PsionicTrainValidatorScoreArtifact {
         schema_version: String::from(PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION),
@@ -250,6 +302,16 @@ pub fn execute_psionic_train_validator_replay(
             .artifact_manifest_digest
             .clone(),
         artifact_count: contribution_artifact_manifest.artifact_count,
+        grouped_stage_execution_summary_path: grouped_stage_execution_summary_path.clone(),
+        grouped_stage_execution_summary_digest: grouped_stage_execution_summary
+            .as_ref()
+            .map(|value| value.execution_summary_digest.clone()),
+        grouped_stage_replay_evidence_path: grouped_stage_replay_evidence
+            .as_ref()
+            .map(|value| value.grouped_stage_replay_evidence_path.clone()),
+        grouped_stage_replay_evidence_digest: grouped_stage_replay_evidence
+            .as_ref()
+            .map(|value| value.grouped_stage_replay_evidence_digest.clone()),
         checkpoint_pointer_state,
         checkpoint_manifest_digest: checkpoint_surface
             .as_ref()
@@ -284,6 +346,16 @@ pub fn execute_psionic_train_validator_replay(
         artifact_manifest_digest: contribution_artifact_manifest
             .artifact_manifest_digest
             .clone(),
+        grouped_stage_execution_summary_path: grouped_stage_execution_summary_path,
+        grouped_stage_execution_summary_digest: grouped_stage_execution_summary
+            .as_ref()
+            .map(|value| value.execution_summary_digest.clone()),
+        grouped_stage_replay_evidence_path: grouped_stage_replay_evidence
+            .as_ref()
+            .map(|value| value.grouped_stage_replay_evidence_path.clone()),
+        grouped_stage_replay_evidence_digest: grouped_stage_replay_evidence
+            .as_ref()
+            .map(|value| value.grouped_stage_replay_evidence_digest.clone()),
         disposition,
         reason_codes,
         score_bps,
@@ -299,6 +371,8 @@ pub fn execute_psionic_train_validator_replay(
     Ok(PsionicTrainValidatorReplayExecution {
         artifacts: PsionicTrainValidatorArtifactOutputs {
             validator_score_receipt_path: score_receipt_path.display().to_string(),
+            grouped_stage_replay_evidence_path: grouped_stage_replay_evidence
+                .map(|value| value.grouped_stage_replay_evidence_path),
         },
         score_receipt,
         detail,
@@ -321,9 +395,276 @@ fn load_checkpoint_surface(
     .map(Some)
 }
 
+fn load_grouped_stage_execution_summary(
+    manifest: &PsionicTrainInvocationManifest,
+    contribution_receipt: &PsionicTrainContributionReceipt,
+    contribution_artifact_manifest: &PsionicTrainContributionArtifactManifest,
+) -> Result<Option<PsionicTrainGroupedReplicaStageExecutionSummary>, PsionicTrainValidatorReplayError>
+{
+    let Some(grouped_stage_assignment) = contribution_receipt.grouped_stage_assignment.as_ref()
+    else {
+        return Ok(None);
+    };
+    let execution_summary_artifact = require_artifact(
+        contribution_artifact_manifest,
+        "grouped_stage_execution_summary",
+    )?;
+    let execution_summary = load_psionic_train_grouped_stage_execution_summary(Path::new(
+        execution_summary_artifact.artifact_path.as_str(),
+    ))
+    .map_err(map_grouped_stage_evidence_error)?;
+    if execution_summary.lane_id != manifest.lane_id
+        || execution_summary.run_id != contribution_receipt.run_id
+        || execution_summary.window_id != contribution_receipt.window_id
+        || execution_summary.assignment_id != contribution_receipt.assignment_id
+        || execution_summary.contribution_id != contribution_receipt.contribution_id
+        || execution_summary.node_pubkey != contribution_receipt.node_pubkey
+        || execution_summary.grouped_stage_assignment != *grouped_stage_assignment
+    {
+        return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+            detail: String::from(
+                "grouped stage execution summary drifted from the challenged contribution receipt",
+            ),
+        });
+    }
+    validate_grouped_stage_execution_summary_artifacts(
+        contribution_artifact_manifest,
+        &execution_summary,
+    )?;
+    Ok(Some(execution_summary))
+}
+
+fn validate_grouped_stage_execution_summary_artifacts(
+    contribution_artifact_manifest: &PsionicTrainContributionArtifactManifest,
+    execution_summary: &PsionicTrainGroupedReplicaStageExecutionSummary,
+) -> Result<(), PsionicTrainValidatorReplayError> {
+    if let Some(path) = execution_summary.input_transport_path.as_deref() {
+        let input_transport_artifact = require_artifact(
+            contribution_artifact_manifest,
+            "grouped_stage_input_transport",
+        )?;
+        if input_transport_artifact.artifact_path != path {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary input transport path drifted from the artifact manifest",
+                ),
+            });
+        }
+        let loaded_transport = load_psionic_train_grouped_stage_transport(Path::new(path))
+            .map_err(map_grouped_stage_transport_error)?;
+        if execution_summary.input_transport_digest.as_deref()
+            != Some(loaded_transport.envelope.transport_digest.as_str())
+            || execution_summary.input_payload_digest.as_deref()
+                != Some(loaded_transport.payload.payload_digest.as_str())
+        {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary input transport digests drifted from the retained transport envelope",
+                ),
+            });
+        }
+    }
+    if let Some(path) = execution_summary.output_transport_path.as_deref() {
+        let output_transport_artifact = require_artifact(
+            contribution_artifact_manifest,
+            "grouped_stage_output_transport",
+        )?;
+        if output_transport_artifact.artifact_path != path {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary output transport path drifted from the artifact manifest",
+                ),
+            });
+        }
+        let output_payload_path = execution_summary.output_payload_path.as_deref().ok_or_else(|| {
+            PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary declared one output transport without one output payload path",
+                ),
+            }
+        })?;
+        let output_payload_artifact = require_artifact(
+            contribution_artifact_manifest,
+            "grouped_stage_output_payload",
+        )?;
+        if output_payload_artifact.artifact_path != output_payload_path {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary output payload path drifted from the artifact manifest",
+                ),
+            });
+        }
+        let loaded_transport = load_psionic_train_grouped_stage_transport(Path::new(path))
+            .map_err(map_grouped_stage_transport_error)?;
+        if execution_summary.output_transport_digest.as_deref()
+            != Some(loaded_transport.envelope.transport_digest.as_str())
+            || execution_summary.output_payload_digest.as_deref()
+                != Some(loaded_transport.payload.payload_digest.as_str())
+        {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary output transport digests drifted from the retained transport envelope",
+                ),
+            });
+        }
+        if loaded_transport.envelope.payload_path != output_payload_path {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: String::from(
+                    "grouped stage execution summary output payload path drifted from the retained transport envelope",
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn persist_grouped_stage_replay_evidence(
+    manifest: &PsionicTrainInvocationManifest,
+    contribution_receipt: &PsionicTrainContributionReceipt,
+    contribution_artifact_manifest: &PsionicTrainContributionArtifactManifest,
+    execution_summary: &PsionicTrainGroupedReplicaStageExecutionSummary,
+    validator_root: &Path,
+    challenge_id: &str,
+    validator_node_pubkey: &str,
+    validator_run_id: &str,
+    disposition: TrainingExecutionValidatorDisposition,
+    reason_codes: &[PsionicTrainValidatorReplayReasonCode],
+    score_bps: u16,
+    detail: &str,
+) -> Result<
+    crate::PsionicTrainGroupedReplicaStageReplayEvidenceArtifacts,
+    PsionicTrainValidatorReplayError,
+> {
+    let path = validator_root.join("grouped_stage_replay_evidence.json");
+    persist_psionic_train_grouped_stage_replay_evidence(
+        path.as_path(),
+        PsionicTrainGroupedReplicaStageReplayEvidence {
+            schema_version: String::from(
+                crate::PSIONIC_TRAIN_GROUPED_STAGE_REPLAY_EVIDENCE_SCHEMA_VERSION,
+            ),
+            lane_id: manifest.lane_id.clone(),
+            network_id: manifest.coordination.network_id.clone(),
+            validator_run_id: String::from(validator_run_id),
+            challenged_run_id: contribution_receipt.run_id.clone(),
+            window_id: contribution_receipt.window_id.clone(),
+            assignment_id: contribution_receipt.assignment_id.clone(),
+            challenge_id: String::from(challenge_id),
+            validator_node_pubkey: String::from(validator_node_pubkey),
+            challenged_node_pubkey: contribution_receipt.node_pubkey.clone(),
+            contribution_id: contribution_receipt.contribution_id.clone(),
+            contribution_digest: contribution_receipt.contribution_digest.clone(),
+            artifact_manifest_digest: contribution_artifact_manifest
+                .artifact_manifest_digest
+                .clone(),
+            grouped_stage_assignment: execution_summary.grouped_stage_assignment.clone(),
+            execution_summary_path: require_artifact(
+                contribution_artifact_manifest,
+                "grouped_stage_execution_summary",
+            )?
+            .artifact_path
+            .clone(),
+            execution_summary_digest: execution_summary.execution_summary_digest.clone(),
+            input_transport_digest: execution_summary.input_transport_digest.clone(),
+            output_transport_digest: execution_summary.output_transport_digest.clone(),
+            disposition,
+            reason_codes: reason_codes
+                .iter()
+                .map(|reason_code| validator_reason_code_label(*reason_code).to_string())
+                .collect(),
+            score_bps,
+            detail: detail.to_string(),
+            replay_evidence_digest: String::new(),
+        },
+    )
+    .map_err(map_grouped_stage_evidence_error)
+}
+
+fn require_artifact<'a>(
+    contribution_artifact_manifest: &'a PsionicTrainContributionArtifactManifest,
+    artifact_kind: &str,
+) -> Result<&'a PsionicTrainContributionArtifact, PsionicTrainValidatorReplayError> {
+    contribution_artifact_manifest
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.artifact_kind == artifact_kind)
+        .ok_or_else(|| PsionicTrainValidatorReplayError::Read {
+            path: contribution_artifact_manifest
+                .artifacts
+                .first()
+                .map(|artifact| artifact.artifact_path.clone())
+                .unwrap_or_else(|| String::from("contribution_artifact_manifest")),
+            detail: format!("missing required artifact kind `{artifact_kind}`"),
+        })
+}
+
+fn map_grouped_stage_evidence_error(
+    error: PsionicTrainGroupedReplicaEvidenceError,
+) -> PsionicTrainValidatorReplayError {
+    match error {
+        PsionicTrainGroupedReplicaEvidenceError::Read { path, detail } => {
+            PsionicTrainValidatorReplayError::Read { path, detail }
+        }
+        PsionicTrainGroupedReplicaEvidenceError::Write { path, detail } => {
+            PsionicTrainValidatorReplayError::Write { path, detail }
+        }
+        PsionicTrainGroupedReplicaEvidenceError::Parse { path, detail } => {
+            PsionicTrainValidatorReplayError::Parse { path, detail }
+        }
+        PsionicTrainGroupedReplicaEvidenceError::Invalid { detail }
+        | PsionicTrainGroupedReplicaEvidenceError::ArtifactDigestMismatch { detail } => {
+            PsionicTrainValidatorReplayError::ArtifactDigestMismatch { detail }
+        }
+        PsionicTrainGroupedReplicaEvidenceError::StaleAssignment { detail } => {
+            PsionicTrainValidatorReplayError::StaleAssignment { detail }
+        }
+    }
+}
+
+fn map_grouped_stage_transport_error(
+    error: crate::PsionicTrainGroupedReplicaTransportError,
+) -> PsionicTrainValidatorReplayError {
+    match error {
+        crate::PsionicTrainGroupedReplicaTransportError::Read { path, detail } => {
+            PsionicTrainValidatorReplayError::Read { path, detail }
+        }
+        crate::PsionicTrainGroupedReplicaTransportError::Write { path, detail } => {
+            PsionicTrainValidatorReplayError::Write { path, detail }
+        }
+        crate::PsionicTrainGroupedReplicaTransportError::Parse { path, detail } => {
+            PsionicTrainValidatorReplayError::Parse { path, detail }
+        }
+        crate::PsionicTrainGroupedReplicaTransportError::Invalid { detail }
+        | crate::PsionicTrainGroupedReplicaTransportError::ArtifactDigestMismatch { detail } => {
+            PsionicTrainValidatorReplayError::ArtifactDigestMismatch { detail }
+        }
+        crate::PsionicTrainGroupedReplicaTransportError::StaleAssignment { detail } => {
+            PsionicTrainValidatorReplayError::StaleAssignment { detail }
+        }
+    }
+}
+
+fn validator_reason_code_label(reason_code: PsionicTrainValidatorReplayReasonCode) -> &'static str {
+    match reason_code {
+        PsionicTrainValidatorReplayReasonCode::ContributionOutcomeRefused => {
+            "contribution_outcome_refused"
+        }
+        PsionicTrainValidatorReplayReasonCode::PrimaryCheckpointAccepted => {
+            "primary_checkpoint_accepted"
+        }
+        PsionicTrainValidatorReplayReasonCode::CheckpointRecovered => "checkpoint_recovered",
+        PsionicTrainValidatorReplayReasonCode::CheckpointReplayRequired => {
+            "checkpoint_replay_required"
+        }
+        PsionicTrainValidatorReplayReasonCode::GroupedStageEvidenceVerified => {
+            "grouped_stage_evidence_verified"
+        }
+    }
+}
+
 fn classify_validator_result(
     contribution_receipt: &PsionicTrainContributionReceipt,
     checkpoint_surface: Option<&PsionicTrainCheckpointSurface>,
+    grouped_stage_evidence_verified: bool,
 ) -> Result<
     (
         TrainingExecutionValidatorDisposition,
@@ -366,9 +707,14 @@ fn classify_validator_result(
     if checkpoint_surface.upload_outcome.as_deref() == Some("refused")
         || checkpoint_surface.recovery_resolution_state.as_deref() == Some("refused")
     {
+        let mut reason_codes =
+            vec![PsionicTrainValidatorReplayReasonCode::CheckpointReplayRequired];
+        if grouped_stage_evidence_verified {
+            reason_codes.push(PsionicTrainValidatorReplayReasonCode::GroupedStageEvidenceVerified);
+        }
         return Ok((
             TrainingExecutionValidatorDisposition::ReplayRequired,
-            vec![PsionicTrainValidatorReplayReasonCode::CheckpointReplayRequired],
+            reason_codes,
             5_000,
             String::from(
                 "validator replay kept the challenged contribution in replay-required posture because the retained checkpoint surface still records a refused upload or refused recovery path",
@@ -381,9 +727,13 @@ fn classify_validator_result(
         || !clean_recovery_posture
         || !accepted_pointer_state
     {
+        let mut reason_codes = vec![PsionicTrainValidatorReplayReasonCode::CheckpointRecovered];
+        if grouped_stage_evidence_verified {
+            reason_codes.push(PsionicTrainValidatorReplayReasonCode::GroupedStageEvidenceVerified);
+        }
         return Ok((
             TrainingExecutionValidatorDisposition::Quarantined,
-            vec![PsionicTrainValidatorReplayReasonCode::CheckpointRecovered],
+            reason_codes,
             7_500,
             String::from(
                 "validator replay quarantined the challenged contribution because it depends on recovered or non-primary checkpoint posture rather than a clean accepted-primary pointer",
@@ -392,9 +742,13 @@ fn classify_validator_result(
         ));
     }
 
+    let mut reason_codes = vec![PsionicTrainValidatorReplayReasonCode::PrimaryCheckpointAccepted];
+    if grouped_stage_evidence_verified {
+        reason_codes.push(PsionicTrainValidatorReplayReasonCode::GroupedStageEvidenceVerified);
+    }
     Ok((
         TrainingExecutionValidatorDisposition::Accepted,
-        vec![PsionicTrainValidatorReplayReasonCode::PrimaryCheckpointAccepted],
+        reason_codes,
         10_000,
         String::from(
             "validator replay accepted the challenged contribution because the retained artifact manifest, contribution receipt, and accepted-primary checkpoint surface all match the declared replay target",
@@ -448,16 +802,182 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use super::{
         PsionicTrainValidatorReplayReasonCode, TrainingExecutionValidatorDisposition,
-        classify_validator_result,
+        classify_validator_result, execute_psionic_train_validator_replay,
     };
     use crate::{
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
         PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
-        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION, PsionicTrainAuthorityOwner,
-        PsionicTrainCheckpointArtifactPaths, PsionicTrainCheckpointSurface,
-        PsionicTrainContributionReceipt, PsionicTrainOutcomeKind, PsionicTrainRole,
+        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
+        PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+        PsionicTrainAdmissionIdentity, PsionicTrainAuthorityOwner,
+        PsionicTrainCapabilityProjection, PsionicTrainCheckpointArtifactPaths,
+        PsionicTrainCheckpointSurface, PsionicTrainContributionReceipt,
+        PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaStageAssignment,
+        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
+        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
+        PsionicTrainWindowArtifactInputRefs, load_psionic_train_grouped_stage_replay_evidence,
+        persist_psionic_train_window_artifacts,
     };
+
+    fn temp_root(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should move forward")
+            .as_nanos();
+        let path = env::temp_dir().join(format!("psionic-validator-{label}-{unique}"));
+        if path.exists() {
+            fs::remove_dir_all(&path).expect("temp dir should clear");
+        }
+        fs::create_dir_all(&path).expect("temp dir should create");
+        path
+    }
+
+    fn write_json<T: serde::Serialize>(path: &Path, value: &T) {
+        fs::create_dir_all(path.parent().expect("parent should exist"))
+            .expect("parent dir should create");
+        fs::write(
+            path,
+            serde_json::to_vec_pretty(value).expect("json should serialize"),
+        )
+        .expect("json should write");
+    }
+
+    fn runtime_attestation() -> PsionicTrainRuntimeAttestation {
+        PsionicTrainRuntimeAttestation::new(
+            PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+            "sha256:test-build",
+            "1111222233334444555566667777888899990000",
+            "clean",
+            None,
+            PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+        )
+    }
+
+    fn capability_projection() -> PsionicTrainCapabilityProjection {
+        PsionicTrainCapabilityProjection {
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            role: PsionicTrainRole::Worker,
+            backend_family: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY),
+            topology_class: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS),
+            environment_ref: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+        }
+    }
+
+    fn grouped_worker_manifest(run_root: &Path) -> PsionicTrainInvocationManifest {
+        PsionicTrainInvocationManifest {
+            schema_version: String::from(PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION),
+            runtime_surface_id: String::from(PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            role: PsionicTrainRole::Worker,
+            operation: PsionicTrainOperation::Start,
+            coordination: PsionicTrainCoordinationContext {
+                network_id: Some(String::from("network.psionic.validator-test")),
+                window_id: Some(String::from("window-0001")),
+                assignment_id: Some(String::from("assignment-0001")),
+                challenge_id: None,
+                node_pubkey: Some(String::from("npub1-grouped-worker")),
+                membership_revision: Some(7),
+            },
+            grouped_stage_assignment: Some(
+                PsionicTrainGroupedReplicaStageAssignment::new(
+                    "replica-01",
+                    "stage-01",
+                    0,
+                    2,
+                    PsionicTrainGroupedReplicaStageRole::Ingress,
+                    None,
+                    Some(String::from("stage-02")),
+                )
+                .expect("grouped stage assignment should build"),
+            ),
+            admission_identity: PsionicTrainAdmissionIdentity {
+                release_id: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
+                build_digest: String::from("sha256:test-build"),
+                environment_ref: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+            },
+            run_id: Some(String::from("worker-run")),
+            output_root: Some(run_root.display().to_string()),
+            run_root: None,
+            peer_node_pubkey: None,
+            peer_checkpoint_handoff_receipt_path: None,
+            validator_target_contribution_receipt_path: None,
+            validator_target_contribution_artifact_manifest_path: None,
+            grouped_stage_input_transport_path: None,
+            selected_git_ref: Some(String::from("HEAD")),
+            hardware_observation_path: None,
+            run_shape_observation_path: None,
+            allow_dirty_tree: false,
+            dry_run: true,
+            checkpoint_label: None,
+            optimizer_step: None,
+            checkpoint_ref: None,
+            checkpoint_object_digest: None,
+            checkpoint_total_bytes: None,
+            inject_failed_upload: false,
+            inject_eval_worker_unavailable: false,
+            manifest_digest: None,
+        }
+    }
+
+    fn validator_manifest(
+        run_root: &Path,
+        contribution_receipt_path: String,
+        artifact_manifest_path: String,
+    ) -> PsionicTrainInvocationManifest {
+        PsionicTrainInvocationManifest {
+            schema_version: String::from(PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION),
+            runtime_surface_id: String::from(PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            role: PsionicTrainRole::Validator,
+            operation: PsionicTrainOperation::ValidateContribution,
+            coordination: PsionicTrainCoordinationContext {
+                network_id: Some(String::from("network.psionic.validator-test")),
+                window_id: Some(String::from("window-0001")),
+                assignment_id: Some(String::from("assignment-0001")),
+                challenge_id: Some(String::from("challenge-0001")),
+                node_pubkey: Some(String::from("npub1-validator")),
+                membership_revision: Some(9),
+            },
+            grouped_stage_assignment: None,
+            admission_identity: PsionicTrainAdmissionIdentity {
+                release_id: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
+                build_digest: String::from("sha256:test-build"),
+                environment_ref: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+            },
+            run_id: Some(String::from("validator-run")),
+            output_root: None,
+            run_root: Some(run_root.display().to_string()),
+            peer_node_pubkey: None,
+            peer_checkpoint_handoff_receipt_path: None,
+            validator_target_contribution_receipt_path: Some(contribution_receipt_path),
+            validator_target_contribution_artifact_manifest_path: Some(artifact_manifest_path),
+            grouped_stage_input_transport_path: None,
+            selected_git_ref: Some(String::from("HEAD")),
+            hardware_observation_path: None,
+            run_shape_observation_path: None,
+            allow_dirty_tree: false,
+            dry_run: true,
+            checkpoint_label: None,
+            optimizer_step: None,
+            checkpoint_ref: None,
+            checkpoint_object_digest: None,
+            checkpoint_total_bytes: None,
+            inject_failed_upload: false,
+            inject_eval_worker_unavailable: false,
+            manifest_digest: None,
+        }
+    }
 
     fn succeeded_contribution() -> PsionicTrainContributionReceipt {
         let mut receipt = PsionicTrainContributionReceipt {
@@ -533,7 +1053,7 @@ mod tests {
         let surface =
             checkpoint_surface(Some("accepted"), Some("succeeded"), None, Some(false), None);
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, Some(&surface))
+            classify_validator_result(&receipt, Some(&surface), false)
                 .expect("classification should work");
         assert_eq!(disposition, TrainingExecutionValidatorDisposition::Accepted);
         assert_eq!(
@@ -549,7 +1069,7 @@ mod tests {
         let surface =
             checkpoint_surface(Some("accepted"), Some("refused"), None, Some(false), None);
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, Some(&surface))
+            classify_validator_result(&receipt, Some(&surface), false)
                 .expect("classification should work");
         assert_eq!(
             disposition,
@@ -573,7 +1093,7 @@ mod tests {
             Some("restored"),
         );
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, Some(&surface))
+            classify_validator_result(&receipt, Some(&surface), false)
                 .expect("classification should work");
         assert_eq!(
             disposition,
@@ -590,12 +1110,111 @@ mod tests {
     fn refused_worker_contribution_is_rejected_without_checkpoint() {
         let receipt = refused_contribution();
         let (disposition, reason_codes, score_bps, _, _) =
-            classify_validator_result(&receipt, None).expect("classification should work");
+            classify_validator_result(&receipt, None, false).expect("classification should work");
         assert_eq!(disposition, TrainingExecutionValidatorDisposition::Rejected);
         assert_eq!(
             reason_codes,
             vec![PsionicTrainValidatorReplayReasonCode::ContributionOutcomeRefused]
         );
         assert_eq!(score_bps, 0);
+    }
+
+    #[test]
+    fn grouped_stage_validator_replay_emits_replay_evidence() {
+        let run_root = temp_root("grouped-stage-replay");
+        let mut worker_manifest = grouped_worker_manifest(&run_root);
+        worker_manifest
+            .populate_manifest_digest()
+            .expect("worker manifest digest should populate");
+        let invocation_manifest_path = run_root.join("manifest/worker_invocation_manifest.json");
+        write_json(invocation_manifest_path.as_path(), &worker_manifest);
+
+        let checkpoint_surface_path = run_root.join("status/checkpoint_surface.json");
+        write_json(
+            checkpoint_surface_path.as_path(),
+            &checkpoint_surface(Some("accepted"), Some("succeeded"), None, Some(false), None),
+        );
+
+        let window_artifacts = persist_psionic_train_window_artifacts(
+            &worker_manifest,
+            &runtime_attestation(),
+            &capability_projection(),
+            "worker-run",
+            &run_root,
+            &PsionicTrainWindowArtifactInputRefs {
+                invocation_manifest_path: invocation_manifest_path.display().to_string(),
+                launch_manifest_path: None,
+                membership_revision_path: None,
+                grouped_stage_input_transport_path: None,
+                checkpoint_surface_path: Some(checkpoint_surface_path.display().to_string()),
+                checkpoint_pointer_path: None,
+                checkpoint_manifest_path: None,
+                checkpoint_backup_receipt_path: None,
+                checkpoint_handoff_receipt_path: None,
+                recovery_receipt_path: None,
+                current_status_path: None,
+                retained_summary_path: None,
+                launcher_log_path: None,
+                final_closeout_bundle_path: None,
+            },
+            PsionicTrainOutcomeKind::Succeeded,
+            0,
+            false,
+            PsionicTrainAuthorityOwner::Pylon,
+            None,
+            "grouped stage worker contribution completed",
+        )
+        .expect("worker window artifacts should persist")
+        .expect("worker should emit window artifacts");
+        let validator_manifest = validator_manifest(
+            &run_root,
+            window_artifacts.contribution_receipt_path.clone(),
+            window_artifacts.contribution_artifact_manifest_path.clone(),
+        );
+        let execution = execute_psionic_train_validator_replay(&validator_manifest, &run_root)
+            .expect("validator replay should succeed");
+        let contribution_receipt: PsionicTrainContributionReceipt = serde_json::from_slice(
+            &fs::read(&window_artifacts.contribution_receipt_path)
+                .expect("contribution receipt should read"),
+        )
+        .expect("contribution receipt should parse");
+        let replay_evidence_path = execution
+            .artifacts
+            .grouped_stage_replay_evidence_path
+            .as_deref()
+            .expect("grouped stage replay evidence should be emitted");
+        let replay_evidence =
+            load_psionic_train_grouped_stage_replay_evidence(Path::new(replay_evidence_path))
+                .expect("grouped stage replay evidence should parse");
+        assert_eq!(
+            replay_evidence.contribution_id,
+            contribution_receipt.contribution_id
+        );
+        assert_eq!(
+            replay_evidence.grouped_stage_assignment.stage_id,
+            "stage-01"
+        );
+        assert!(
+            replay_evidence
+                .reason_codes
+                .iter()
+                .any(|reason_code| reason_code == "grouped_stage_evidence_verified")
+        );
+        assert_eq!(
+            execution
+                .score_receipt
+                .grouped_stage_execution_summary_path
+                .as_deref(),
+            window_artifacts
+                .grouped_stage_execution_summary_path
+                .as_deref()
+        );
+        assert_eq!(
+            execution
+                .score_receipt
+                .grouped_stage_replay_evidence_path
+                .as_deref(),
+            Some(replay_evidence_path)
+        );
     }
 }

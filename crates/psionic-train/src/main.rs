@@ -1749,6 +1749,10 @@ fn build_artifact_surface_refs(
             .and_then(|value| value.grouped_stage_output_transport_path.clone()),
         grouped_stage_output_payload_path: window_artifacts
             .and_then(|value| value.grouped_stage_output_payload_path.clone()),
+        grouped_stage_execution_summary_path: window_artifacts
+            .and_then(|value| value.grouped_stage_execution_summary_path.clone()),
+        grouped_stage_replay_evidence_path: validator_artifacts
+            .and_then(|value| value.grouped_stage_replay_evidence_path.clone()),
         checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
         checkpoint_pointer_path: checkpoint_surface
             .and_then(|value| value.surface.artifacts.checkpoint_pointer_path.clone())

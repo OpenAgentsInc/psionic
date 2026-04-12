@@ -200,6 +200,10 @@ pub struct PsionicTrainArtifactSurfaceRefs {
     pub grouped_stage_output_transport_path: Option<String>,
     /// Optional retained grouped-stage output payload path.
     pub grouped_stage_output_payload_path: Option<String>,
+    /// Optional retained grouped-stage execution summary path.
+    pub grouped_stage_execution_summary_path: Option<String>,
+    /// Optional retained grouped-stage replay evidence path.
+    pub grouped_stage_replay_evidence_path: Option<String>,
     /// Optional retained checkpoint-surface path.
     pub checkpoint_surface_path: Option<String>,
     /// Optional retained checkpoint-pointer path.

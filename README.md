@@ -199,7 +199,12 @@ worker window. Non-ingress grouped stages now also require one admitted
 handoff envelope, and every stage with a downstream neighbor emits one
 deterministic `grouped_stage_output_transport.json` plus
 `grouped_stage_output_payload.json` under its retained contribution root for
-the next stage to consume.
+the next stage to consume. The retained contribution root now also carries one
+deterministic `grouped_stage_execution_summary.json` that binds the grouped
+assignment, accepted input/output transport digests, and local outcome into one
+machine-legible artifact, and validator replay now emits one paired
+`grouped_stage_replay_evidence.json` when it verifies that grouped stage
+surface against the challenged receipt and artifact manifest.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

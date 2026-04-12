@@ -50,7 +50,15 @@ pub struct PsionicTrainGroupedReplicaStageTransportEnvelope {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PsionicTrainGroupedReplicaStageTransportArtifacts {
     pub grouped_stage_output_transport_path: String,
+    pub grouped_stage_output_transport_digest: String,
     pub grouped_stage_output_payload_path: String,
+    pub grouped_stage_output_payload_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PsionicTrainGroupedReplicaStageLoadedTransport {
+    pub envelope: PsionicTrainGroupedReplicaStageTransportEnvelope,
+    pub payload: PsionicTrainGroupedReplicaStageTransportPayload,
 }
 
 #[derive(Debug, Error)]
@@ -173,9 +181,8 @@ pub fn validate_psionic_train_grouped_stage_input_transport(
             ),
         }
     })?;
-    let envelope: PsionicTrainGroupedReplicaStageTransportEnvelope =
-        load_json(Path::new(transport_path))?;
-    envelope.validate()?;
+    let loaded_transport = load_psionic_train_grouped_stage_transport(Path::new(transport_path))?;
+    let envelope = loaded_transport.envelope;
     if envelope.lane_id != manifest.lane_id {
         return Err(
             PsionicTrainGroupedReplicaTransportError::ArtifactDigestMismatch {
@@ -247,8 +254,17 @@ pub fn validate_psionic_train_grouped_stage_input_transport(
             ),
         });
     }
-    validate_transport_payload(Path::new(transport_path), &envelope)?;
     Ok(Some(envelope))
+}
+
+pub fn load_psionic_train_grouped_stage_transport(
+    transport_path: &Path,
+) -> Result<PsionicTrainGroupedReplicaStageLoadedTransport, PsionicTrainGroupedReplicaTransportError>
+{
+    let envelope: PsionicTrainGroupedReplicaStageTransportEnvelope = load_json(transport_path)?;
+    envelope.validate()?;
+    let payload = validate_transport_payload(transport_path, &envelope)?;
+    Ok(PsionicTrainGroupedReplicaStageLoadedTransport { envelope, payload })
 }
 
 pub fn persist_psionic_train_grouped_stage_output_transport(
@@ -331,17 +347,21 @@ pub fn persist_psionic_train_grouped_stage_output_transport(
     envelope.transport_digest = envelope.stable_transport_digest();
     envelope.validate()?;
     write_json(transport_path.as_path(), &envelope)?;
+    let loaded_transport = load_psionic_train_grouped_stage_transport(transport_path.as_path())?;
 
     Ok(Some(PsionicTrainGroupedReplicaStageTransportArtifacts {
         grouped_stage_output_transport_path: transport_path.display().to_string(),
+        grouped_stage_output_transport_digest: loaded_transport.envelope.transport_digest,
         grouped_stage_output_payload_path: payload_path.display().to_string(),
+        grouped_stage_output_payload_digest: loaded_transport.payload.payload_digest,
     }))
 }
 
 fn validate_transport_payload(
     transport_path: &Path,
     envelope: &PsionicTrainGroupedReplicaStageTransportEnvelope,
-) -> Result<(), PsionicTrainGroupedReplicaTransportError> {
+) -> Result<PsionicTrainGroupedReplicaStageTransportPayload, PsionicTrainGroupedReplicaTransportError>
+{
     let payload_path = Path::new(envelope.payload_path.as_str());
     let bytes =
         fs::read(payload_path).map_err(|error| PsionicTrainGroupedReplicaTransportError::Read {
@@ -403,7 +423,7 @@ fn validate_transport_payload(
             },
         );
     }
-    Ok(())
+    Ok(payload)
 }
 
 fn require_nonempty(

@@ -9,9 +9,11 @@ use thiserror::Error;
 
 use crate::{
     PsionicTrainAuthorityOwner, PsionicTrainCapabilityProjection,
-    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageTransportArtifacts,
-    PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainRefusalClass,
-    PsionicTrainRole, PsionicTrainRuntimeAttestation,
+    PsionicTrainGroupedReplicaStageAssignment,
+    PsionicTrainGroupedReplicaStageExecutionSummaryArtifacts,
+    PsionicTrainGroupedReplicaStageTransportArtifacts, PsionicTrainInvocationManifest,
+    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
+    PsionicTrainRuntimeAttestation, persist_psionic_train_grouped_stage_execution_summary,
     persist_psionic_train_grouped_stage_output_transport,
 };
 
@@ -48,6 +50,7 @@ pub struct PsionicTrainWindowArtifactOutputs {
     pub contribution_artifact_manifest_path: String,
     pub grouped_stage_output_transport_path: Option<String>,
     pub grouped_stage_output_payload_path: Option<String>,
+    pub grouped_stage_execution_summary_path: Option<String>,
     pub sealed_window_bundle_path: String,
 }
 
@@ -166,6 +169,8 @@ pub enum PsionicTrainWindowArtifactError {
     Parse { path: String, detail: String },
     #[error("grouped stage transport is invalid: {detail}")]
     GroupedStageTransport { detail: String },
+    #[error("grouped stage evidence is invalid: {detail}")]
+    GroupedStageEvidence { detail: String },
 }
 
 impl PsionicTrainContributionArtifactManifest {
@@ -274,6 +279,20 @@ pub fn persist_psionic_train_window_artifacts(
                     detail: error.to_string(),
                 },
             )?;
+    let grouped_stage_execution_summary = persist_psionic_train_grouped_stage_execution_summary(
+        manifest,
+        run_id,
+        contribution_id.as_str(),
+        &contribution_root,
+        outcome,
+        detail,
+        grouped_stage_output_transport.as_ref(),
+    )
+    .map_err(
+        |error| PsionicTrainWindowArtifactError::GroupedStageEvidence {
+            detail: error.to_string(),
+        },
+    )?;
 
     let current_assignment = PsionicTrainWindowAssignmentMaterialization {
         assignment_id: assignment_id.clone(),
@@ -323,7 +342,11 @@ pub fn persist_psionic_train_window_artifacts(
         node_pubkey: node_pubkey.clone(),
         grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
         artifact_count: 0,
-        artifacts: collect_artifacts(artifact_inputs, grouped_stage_output_transport.as_ref())?,
+        artifacts: collect_artifacts(
+            artifact_inputs,
+            grouped_stage_output_transport.as_ref(),
+            grouped_stage_execution_summary.as_ref(),
+        )?,
         artifact_manifest_digest: String::new(),
     };
     artifact_manifest.artifact_count = artifact_manifest.artifacts.len();
@@ -435,6 +458,9 @@ pub fn persist_psionic_train_window_artifacts(
         grouped_stage_output_payload_path: grouped_stage_output_transport
             .as_ref()
             .map(|value| value.grouped_stage_output_payload_path.clone()),
+        grouped_stage_execution_summary_path: grouped_stage_execution_summary
+            .as_ref()
+            .map(|value| value.grouped_stage_execution_summary_path.clone()),
         sealed_window_bundle_path: sealed_window_bundle_path.display().to_string(),
     }))
 }
@@ -454,6 +480,9 @@ struct RetainedContributionEntry {
 fn collect_artifacts(
     refs: &PsionicTrainWindowArtifactInputRefs,
     grouped_stage_output_transport: Option<&PsionicTrainGroupedReplicaStageTransportArtifacts>,
+    grouped_stage_execution_summary: Option<
+        &PsionicTrainGroupedReplicaStageExecutionSummaryArtifacts,
+    >,
 ) -> Result<Vec<PsionicTrainContributionArtifact>, PsionicTrainWindowArtifactError> {
     let candidates = [
         (
@@ -506,6 +535,11 @@ fn collect_artifacts(
             "grouped_stage_output_payload",
             grouped_stage_output_transport
                 .map(|value| value.grouped_stage_output_payload_path.as_str()),
+        ),
+        (
+            "grouped_stage_execution_summary",
+            grouped_stage_execution_summary
+                .map(|value| value.grouped_stage_execution_summary_path.as_str()),
         ),
     ];
     let mut artifacts = Vec::new();
@@ -663,9 +697,9 @@ mod tests {
         PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
         PsionicTrainAdmissionIdentity, PsionicTrainAuthorityOwner,
         PsionicTrainCapabilityProjection, PsionicTrainCoordinationContext,
-        PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageRole,
-        PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainOutcomeKind,
-        PsionicTrainRole, PsionicTrainRuntimeAttestation,
+        PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageExecutionSummary,
+        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
+        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -873,6 +907,12 @@ mod tests {
                 .iter()
                 .any(|artifact| artifact.artifact_kind == "grouped_stage_output_payload")
         );
+        assert!(
+            artifact_manifest
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.artifact_kind == "grouped_stage_execution_summary")
+        );
         let expected_transport_path = run_root
             .join("windows")
             .join("window-0001")
@@ -884,6 +924,29 @@ mod tests {
         assert_eq!(
             outputs.grouped_stage_output_transport_path.as_deref(),
             Some(expected_transport_path.as_str())
+        );
+        let grouped_stage_execution_summary: PsionicTrainGroupedReplicaStageExecutionSummary =
+            serde_json::from_slice(
+                &fs::read(
+                    outputs
+                        .grouped_stage_execution_summary_path
+                        .as_deref()
+                        .expect("grouped stage execution summary path should exist"),
+                )
+                .expect("grouped stage execution summary should read"),
+            )
+            .expect("grouped stage execution summary should parse");
+        assert_eq!(
+            grouped_stage_execution_summary
+                .grouped_stage_assignment
+                .stage_id,
+            "stage-01"
+        );
+        assert_eq!(
+            grouped_stage_execution_summary
+                .output_transport_path
+                .as_deref(),
+            outputs.grouped_stage_output_transport_path.as_deref()
         );
     }
 
@@ -955,11 +1018,15 @@ mod tests {
         manifest_b
             .populate_manifest_digest()
             .expect("manifest digest should populate");
+        manifest_b.grouped_stage_input_transport_path =
+            outputs_a.grouped_stage_output_transport_path.clone();
         let inputs_b = PsionicTrainWindowArtifactInputRefs {
             invocation_manifest_path: write_invocation_manifest(&run_root, &manifest_b),
             launch_manifest_path: None,
             membership_revision_path: None,
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport_path: manifest_b
+                .grouped_stage_input_transport_path
+                .clone(),
             checkpoint_surface_path: None,
             checkpoint_pointer_path: None,
             checkpoint_manifest_path: None,
