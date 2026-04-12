@@ -11470,6 +11470,20 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_copy_f32_slice(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _source: &MetalBuffer,
+            _destination: &MetalBuffer,
+            _element_count: usize,
+            _source_offset_elements: usize,
+            _destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_decode_attention_dense(
             &mut self,
             _submission: &mut PlatformSubmission,
@@ -11497,6 +11511,22 @@ mod platform {
             _columns: usize,
             _input: &MetalBuffer,
             _output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_quantized_matvec_argmax(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _weights: &MetalBuffer,
+            _byte_offset: usize,
+            _mode: QuantizationMode,
+            _rows: usize,
+            _columns: usize,
+            _input: &MetalBuffer,
+            _selected: &MetalBuffer,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
