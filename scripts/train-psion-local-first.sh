@@ -680,6 +680,14 @@ log_note() {
   printf '[%s] %s\n' "$(now_utc)" "$*" >>"${local_log_path}"
 }
 
+run_with_reference_pilot_env() {
+  if (( ${#reference_pilot_env[@]} )); then
+    env "${reference_pilot_env[@]}" "$@"
+  else
+    env "$@"
+  fi
+}
+
 reference_pilot_env=()
 if [[ -n "${max_steps}" ]]; then
   reference_pilot_env+=("PSION_REFERENCE_PILOT_MAX_STEPS=${max_steps}")
@@ -744,7 +752,7 @@ trap 'on_exit $?' EXIT
 
 if [[ "${selected_mode}" == "local_reference" ]]; then
   log_note "launching local_reference control_plane_host=${control_plane_host}"
-  env "${reference_pilot_env[@]}" cargo run -q -p psionic-train --example psion_reference_pilot -- "${local_artifact_dir}" \
+  run_with_reference_pilot_env cargo run -q -p psionic-train --example psion_reference_pilot -- "${local_artifact_dir}" \
     >>"${local_log_path}" 2>&1
   write_summary "${selected_mode}" "completed" "${output_root}" "${local_log_path}" "${local_artifact_dir}"
   echo "status=completed"
@@ -790,8 +798,7 @@ else
   rm -rf "${local_artifact_dir}"
   mkdir -p "${local_artifact_dir}"
   log_note "launching distributed_reference control_plane_host=${control_plane_host} remote_worker_host=${remote_host}"
-  env \
-    "${reference_pilot_env[@]}" \
+  run_with_reference_pilot_env \
     "PSION_REFERENCE_PILOT_REMOTE_SSH_TARGET=${remote_ssh_target}" \
     "PSION_REFERENCE_PILOT_REMOTE_WORKTREE_DIR=${remote_worktree_dir}" \
     "PSION_REFERENCE_PILOT_REMOTE_OUTPUT_DIR=${remote_output_dir}" \
