@@ -603,6 +603,10 @@ stage_remote_repo() {
   log_note "staging_strategy=archive_tarball git_ref=${git_ref} local_stage_archive=${local_stage_archive}"
   git -C "${repo_root}" archive --format=tar -o "${local_stage_archive}" "${git_ref}" \
     >>"${local_log_path}" 2>&1
+  ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
+    set -euo pipefail
+    mkdir -p \"\$(dirname \"${remote_worktree_dir}\")\"
+  " >>"${local_log_path}" 2>&1
   scp "${scp_opts[@]}" "${local_stage_archive}" "${remote_ssh_target}:${remote_stage_archive}" \
     >>"${local_log_path}" 2>&1
   ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
@@ -642,7 +646,7 @@ fi
 log_note "launching accelerated_reference control_plane_host=${control_plane_host} worker_host=${worker_host} worker_count=${worker_count}"
 stage_remote_repo
 
-remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
+remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; export RUST_MIN_STACK=16777216; mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
 ssh "${ssh_opts[@]}" "${remote_ssh_target}" "${remote_command}" >>"${local_log_path}" 2>&1
 
 rm -rf "${local_artifact_dir}"
@@ -660,11 +664,23 @@ if [[ "${cleanup_remote}" == "1" ]]; then
       set -euo pipefail
       git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${remote_worktree_dir}\"
       rm -rf \"${remote_output_dir}\"
+      worktree_parent=\"\$(dirname \"${remote_worktree_dir}\")\"
+      output_parent=\"\$(dirname \"${remote_output_dir}\")\"
+      rmdir \"\${worktree_parent}\" 2>/dev/null || true
+      if [[ \"\${output_parent}\" != \"\${worktree_parent}\" ]]; then
+        rmdir \"\${output_parent}\" 2>/dev/null || true
+      fi
     " >>"${local_log_path}" 2>&1
   else
     ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
       set -euo pipefail
       rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
+      worktree_parent=\"\$(dirname \"${remote_worktree_dir}\")\"
+      output_parent=\"\$(dirname \"${remote_output_dir}\")\"
+      rmdir \"\${worktree_parent}\" 2>/dev/null || true
+      if [[ \"\${output_parent}\" != \"\${worktree_parent}\" ]]; then
+        rmdir \"\${output_parent}\" 2>/dev/null || true
+      fi
     " >>"${local_log_path}" 2>&1
   fi
 fi

@@ -9,9 +9,9 @@ use psionic_backend_cuda::CudaBackend;
 use psionic_cluster::NodeId;
 use psionic_core::{DType, Device, Shape, TensorData, TensorId, TensorSpec};
 use psionic_data::{
-    DatasetSplitKind, PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
-    PsionArtifactLineageManifest, PsionReferenceCorpusBundle, PsionReferenceCorpusError,
-    PsionReferenceEncodedSequence, build_psion_reference_corpus,
+    build_psion_reference_corpus, DatasetSplitKind, PsionArtifactLineageManifest,
+    PsionReferenceCorpusBundle, PsionReferenceCorpusError, PsionReferenceEncodedSequence,
+    PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
 };
 use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
@@ -28,20 +28,24 @@ use psionic_runtime::{
     DeliveredExecutionContext, DeviceDescriptor, DeviceInventoryQualifiers, DeviceMemoryClass,
     DevicePerformanceClass, RuntimeError, TrainingCheckpointReference,
 };
-use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ArtifactArchiveClass, ArtifactColdRestoreReceipt, ArtifactRetentionProfile,
-    ArtifactStorageSweepReceipt, CheckpointDurabilityPosture, CheckpointManifest,
-    CheckpointPointer, CheckpointRecoveryError, CheckpointScopeBinding, CheckpointScopeKind,
-    CheckpointShardManifest, CheckpointStoreReadOptions, FixedBudgetTrainingRun,
-    InMemoryCheckpointStore, PsionAcceptanceMatrix, PsionAcceptanceMatrixError,
-    PsionBenchmarkCatalog, PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily,
-    PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkTaskContract,
-    PsionCapabilityMatrixView, PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
+    record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
+    record_psion_pilot_route_probe, record_psion_pretrain_run_observability,
+    record_psion_refusal_calibration_receipt, record_psion_route_class_evaluation_receipt,
+    run_psion_pretrain_stage, run_psion_pretrain_stage_with_execution, ArtifactArchiveClass,
+    ArtifactColdRestoreReceipt, ArtifactRetentionProfile, ArtifactStorageSweepReceipt,
+    CheckpointDurabilityPosture, CheckpointManifest, CheckpointPointer, CheckpointRecoveryError,
+    CheckpointScopeBinding, CheckpointScopeKind, CheckpointShardManifest,
+    CheckpointStoreReadOptions, FixedBudgetTrainingRun, InMemoryCheckpointStore,
+    PsionAcceptanceMatrix, PsionAcceptanceMatrixError, PsionBenchmarkCatalog,
+    PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionBenchmarkPackageContract,
+    PsionBenchmarkPackageError, PsionBenchmarkTaskContract, PsionCapabilityMatrixView,
+    PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
     PsionContaminationReviewReceipt, PsionGoogleSingleNodeLiveVisualizationWriter,
     PsionGoogleSingleNodeStepTelemetry, PsionGoogleSingleNodeVisualizationError, PsionMetricKind,
     PsionObservedMetric, PsionPhaseGate, PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow,
@@ -63,13 +67,8 @@ use crate::{
     PsionSourceContributionCap, PsionSourceFamilySamplingWeight, TrainArtifactClass,
     TrainArtifactStorageController, TrainArtifactStorageError, TrainingCoreError,
     TrainingLoopBudget, TrainingOptimizerConfig, TrainingOptimizerResidencyPolicy,
-    TrainingParameterClass, TrainingParameterGroupState, TrainingRecoveryMode,
-    TrainingRunSummary, TrainingSessionState, TrainingStepInput, TrainingStepReceipt,
-    TrainingTensorBuffer, record_psion_pilot_held_out_loss,
-    record_psion_pilot_pretraining_run, record_psion_pilot_route_probe,
-    record_psion_pretrain_run_observability, record_psion_refusal_calibration_receipt,
-    record_psion_route_class_evaluation_receipt, run_psion_pretrain_stage,
-    run_psion_pretrain_stage_with_execution,
+    TrainingParameterClass, TrainingParameterGroupState, TrainingRecoveryMode, TrainingRunSummary,
+    TrainingSessionState, TrainingStepInput, TrainingStepReceipt, TrainingTensorBuffer,
 };
 
 const TOKEN_EMBEDDING_GROUP_ID: &str = "decoder.embed_tokens.weight";
@@ -960,10 +959,12 @@ pub fn probe_psion_reference_pilot_resume(
         TrainingRecoveryMode::ResumeFromLastStableCheckpoint,
     )?;
 
-    let resume_model = materialize_model_from_parameter_groups(
-        &model_descriptor,
+    let resume_parameter_groups = rebind_parameter_groups_to_device(
         optimizer_state_artifact.parameter_groups.as_slice(),
-    )?;
+        &Device::cpu(),
+    );
+    let resume_model =
+        materialize_model_from_parameter_groups(&model_descriptor, &resume_parameter_groups)?;
     let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
     let mut session = TrainingSessionState::new(
         "psion-google-single-node",
@@ -974,7 +975,7 @@ pub fn probe_psion_reference_pilot_resume(
     let mut resumed_run = session.restore_fixed_budget_run(
         format!("{}-resume", stage_receipt.run_id),
         TrainingLoopBudget::new(1, 1, 1)?,
-        optimizer_state_artifact.parameter_groups.clone(),
+        resume_parameter_groups,
     )?;
     let started_at_ms = promoted_checkpoint
         .durable_at_ms
@@ -3625,6 +3626,24 @@ fn materialize_model_from_parameter_groups(
     })
 }
 
+fn rebind_parameter_groups_to_device(
+    groups: &[TrainingParameterGroupState],
+    device: &Device,
+) -> Vec<TrainingParameterGroupState> {
+    groups
+        .iter()
+        .cloned()
+        .map(|mut group| {
+            group.parameter.spec = TensorSpec::from_layout(
+                group.parameter.spec.layout().clone(),
+                group.parameter.spec.dtype(),
+                device.clone(),
+            );
+            group
+        })
+        .collect()
+}
+
 fn parameter_state_digest_from_groups(
     groups: &[TrainingParameterGroupState],
 ) -> Result<String, PsionReferencePilotError> {
@@ -3996,8 +4015,56 @@ mod tests {
     }
 
     #[test]
-    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn reference_pilot_resume_probe_rebinds_accelerated_parameter_groups_to_cpu() {
+        let config = PsionReferencePilotConfig::reference().expect("config");
+        let run =
+            run_psion_reference_pilot(repo_root().as_path(), &config).expect("pilot should run");
+        let output_dir = std::env::temp_dir().join(format!(
+            "psion-reference-pilot-cuda-resume-probe-{}",
+            std::process::id()
+        ));
+        if output_dir.exists() {
+            fs::remove_dir_all(&output_dir).expect("stale temp output should be removable");
+        }
+        fs::create_dir_all(&output_dir).expect("temp output should be creatable");
+        run.write_to_dir(output_dir.as_path())
+            .expect("run artifacts should write");
+
+        let optimizer_state_path = output_dir.join("psion_reference_pilot_optimizer_state.json");
+        let mut optimizer_state: PsionReferencePilotOptimizerStateArtifact =
+            read_json_artifact(optimizer_state_path.as_path())
+                .expect("optimizer artifact should load");
+        for group in &mut optimizer_state.parameter_groups {
+            group.parameter.spec = TensorSpec::from_layout(
+                group.parameter.spec.layout().clone(),
+                group.parameter.spec.dtype(),
+                Device::new(
+                    psionic_core::DeviceKind::Cuda,
+                    0,
+                    Some(String::from("cuda:0")),
+                ),
+            );
+        }
+        write_json(optimizer_state_path.as_path(), &optimizer_state)
+            .expect("mutated optimizer artifact should write");
+
+        let probe = probe_psion_reference_pilot_resume(repo_root().as_path(), output_dir.as_path())
+            .expect("resume probe should succeed");
+        assert_eq!(
+            probe.recovery_mode,
+            TrainingRecoveryMode::ResumeFromLastStableCheckpoint
+        );
+        assert!(
+            probe.resumed_step_receipt.restore_source.is_some(),
+            "resumed step should carry restore lineage after CPU rebinding"
+        );
+
+        fs::remove_dir_all(&output_dir).expect("temp output should be removable");
+    }
+
+    #[test]
+    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let config = PsionReferencePilotConfig::reference()?;
         let bundle = run_psion_reference_pilot_evidence_bundle(repo_root().as_path(), &config)?;
         let acceptance_matrix: PsionAcceptanceMatrix = load_json_fixture(
