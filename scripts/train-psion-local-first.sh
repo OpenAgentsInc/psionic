@@ -45,11 +45,11 @@ Default behavior:
   - launches the bounded Psion reference-pilot lane, not the actual broader-pretraining lane
   - prefers the accelerator-backed bounded reference pilot
   - stages the current committed git ref to the admitted Tailnet CUDA host
-  - runs the accelerated reference pilot there
+  - runs the accelerated reference pilot there, or the distributed dual-host reference pilot when explicitly requested
   - copies the retained reference-pilot artifacts back to the local machine
 
 Options:
-  --mode <auto|accelerated_reference|local_reference>
+  --mode <auto|accelerated_reference|local_reference|distributed_reference>
                                  Training mode. Default: auto
   --remote-host <host>           Tailnet SSH target for accelerated runs. Default: archlinux
   --run-id <id>                  Stable run identifier.
@@ -155,7 +155,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${mode}" in
-  auto|accelerated_reference|local_reference) ;;
+  auto|accelerated_reference|local_reference|distributed_reference) ;;
   *)
     echo "error: unsupported mode ${mode}" >&2
     usage
@@ -291,7 +291,7 @@ remote_accelerated_preflight() {
 detect_remote_stage_strategy() {
   remote_stage_strategy="archive_tarball"
   remote_stage_reason="remote_seed_repo_missing_git_ref"
-  if [[ "${selected_mode}" != "accelerated_reference" ]]; then
+  if [[ "${selected_mode}" != "accelerated_reference" && "${selected_mode}" != "distributed_reference" ]]; then
     remote_stage_strategy="not_applicable"
     remote_stage_reason="local_reference_mode"
     return 0
@@ -330,7 +330,7 @@ if [[ "${selected_mode}" == "auto" ]]; then
   fi
 fi
 
-if [[ "${selected_mode}" == "accelerated_reference" ]]; then
+if [[ "${selected_mode}" == "accelerated_reference" || "${selected_mode}" == "distributed_reference" ]]; then
   if ! remote_accelerated_preflight; then
     echo "error: accelerated Psion lane unavailable: ${remote_preflight_reason}" >&2
     exit 1
@@ -340,7 +340,7 @@ fi
 if [[ -z "${local_tailnet_ip}" ]]; then
   local_tailnet_ip="$(detect_local_tailnet_ip || true)"
 fi
-if [[ "${selected_mode}" == "accelerated_reference" ]] && [[ -z "${remote_tailnet_ip}" ]]; then
+if [[ "${selected_mode}" == "accelerated_reference" || "${selected_mode}" == "distributed_reference" ]] && [[ -z "${remote_tailnet_ip}" ]]; then
   remote_tailnet_ip="$(detect_remote_tailnet_ip || true)"
 fi
 
@@ -355,6 +355,12 @@ if [[ "${selected_mode}" == "accelerated_reference" ]]; then
   worker_count="1"
   execution_location="remote"
   execution_topology_classification="local_control_plane_single_remote_worker"
+elif [[ "${selected_mode}" == "distributed_reference" ]]; then
+  worker_host="${remote_host}"
+  worker_tailnet_ip="${remote_tailnet_ip}"
+  worker_count="2"
+  execution_location="hybrid_cluster"
+  execution_topology_classification="dual_host_joint_gradient_average"
 else
   worker_host="${control_plane_host}"
   worker_tailnet_ip="${local_tailnet_ip}"
@@ -429,6 +435,11 @@ doc = {
     "worker_host": worker_host or None,
     "worker_tailnet_ip": worker_tailnet_ip or None,
     "worker_count": int(worker_count),
+    "worker_hosts": (
+        [value for value in [control_plane_host or None, worker_host or None] if value is not None]
+        if execution_topology_classification == "dual_host_joint_gradient_average"
+        else [value for value in [worker_host or None] if value is not None]
+    ),
     "execution_location": execution_location,
     "execution_topology_classification": execution_topology_classification,
     "remote_host": remote_host,
@@ -445,7 +456,7 @@ doc = {
         "windows_per_cadence": int(windows_per_cadence) if windows_per_cadence else None,
         "step_duration_ms": int(step_duration_ms) if step_duration_ms else None,
     },
-    "claim_boundary": "This manifest records one bounded Psion reference-pilot operator run. It does not claim the actual broader-pretraining lane. The accelerator-backed mode targets the admitted accelerated reference pilot on the Tailnet CUDA host. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
+    "claim_boundary": "This manifest records one bounded Psion reference-pilot operator run. It does not claim the actual broader-pretraining lane. The accelerator-backed mode targets the admitted accelerated reference pilot on the Tailnet CUDA host. The distributed_reference mode targets the bounded dual-host reference lane where the local Apple-silicon host and the admitted Tailnet CUDA host both contribute optimizer-bearing work. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
 }
 
 with open(path, "w", encoding="utf-8") as handle:
@@ -468,11 +479,14 @@ if [[ "${dry_run}" == "1" ]]; then
   echo "windows_per_cadence=${windows_per_cadence:-default}"
   echo "step_duration_ms=${step_duration_ms:-default}"
   echo "reference_pilot_operator_manifest=${operator_manifest_path}"
-  if [[ "${selected_mode}" == "accelerated_reference" ]]; then
+  if [[ "${selected_mode}" == "accelerated_reference" || "${selected_mode}" == "distributed_reference" ]]; then
     echo "remote_host=${remote_host}"
     echo "remote_tailnet_ip=${remote_tailnet_ip}"
     echo "remote_gpu_name=${remote_gpu_name}"
     echo "remote_stage_strategy=${remote_stage_strategy}"
+    if [[ "${selected_mode}" == "distributed_reference" ]]; then
+      echo "distributed_topology=dual_host_joint_gradient_average"
+    fi
   fi
   exit 0
 fi
@@ -577,6 +591,50 @@ if mode == "accelerated_reference" and status == "completed":
             checkpoint = json.load(handle)
         summary["checkpoint_ref"] = checkpoint.get("checkpoint_ref")
         summary["checkpoint_parameter_state_digest"] = checkpoint.get("parameter_state_digest")
+elif mode == "distributed_reference" and status == "completed":
+    stage_path = os.path.join(artifact_dir, "psion_reference_pilot_stage_receipt.json")
+    observability_path = os.path.join(artifact_dir, "psion_reference_pilot_observability_receipt.json")
+    checkpoint_path = os.path.join(artifact_dir, "psion_reference_pilot_checkpoint_manifest.json")
+    topology_path = os.path.join(artifact_dir, "psion_reference_pilot_dual_host_topology_receipt.json")
+    step_path = os.path.join(artifact_dir, "psion_reference_pilot_dual_host_step_receipts.json")
+    for key, path in [
+        ("stage_receipt_path", stage_path),
+        ("observability_receipt_path", observability_path),
+        ("checkpoint_manifest_path", checkpoint_path),
+        ("dual_host_topology_receipt_path", topology_path),
+        ("dual_host_step_receipts_path", step_path),
+    ]:
+        summary[key] = os.path.abspath(path)
+        if os.path.exists(path):
+            summary[f"{key}_sha256"] = sha256_file(path)
+    if os.path.exists(stage_path):
+        with open(stage_path, "r", encoding="utf-8") as handle:
+            stage = json.load(handle)
+        delivered = stage.get("delivered_execution") or {}
+        summary["delivered_backend"] = delivered.get("runtime_backend")
+        summary["delivered_devices"] = delivered.get("selected_devices")
+        summary["stage_receipt_digest"] = stage.get("receipt_digest")
+    if os.path.exists(observability_path):
+        with open(observability_path, "r", encoding="utf-8") as handle:
+            observability = json.load(handle)
+        cost = observability.get("cost") or {}
+        hardware = observability.get("hardware_topology") or {}
+        summary["observability_receipt_digest"] = observability.get("observability_digest")
+        summary["cost"] = cost
+        summary["total_cost_microusd"] = cost.get("total_cost_microusd")
+        summary["observed_worker_count"] = hardware.get("observed_worker_count")
+    if os.path.exists(checkpoint_path):
+        with open(checkpoint_path, "r", encoding="utf-8") as handle:
+            checkpoint = json.load(handle)
+        summary["checkpoint_ref"] = checkpoint.get("checkpoint_ref")
+        summary["checkpoint_parameter_state_digest"] = checkpoint.get("parameter_state_digest")
+    if os.path.exists(topology_path):
+        with open(topology_path, "r", encoding="utf-8") as handle:
+            topology = json.load(handle)
+        summary["execution_topology_classification"] = topology.get("execution_topology_classification")
+        summary["local_runtime_backend"] = topology.get("local_runtime_backend")
+        summary["remote_runtime_backend"] = topology.get("remote_runtime_backend")
+        summary["remote_worker_host"] = topology.get("remote_worker_host")
 elif mode == "local_reference" and status == "completed":
     stage_path = os.path.join(artifact_dir, "psion_reference_pilot_stage_receipt.json")
     observability_path = os.path.join(artifact_dir, "psion_reference_pilot_observability_receipt.json")
@@ -700,7 +758,7 @@ if [[ "${selected_mode}" == "local_reference" ]]; then
   exit 0
 fi
 
-log_note "launching accelerated_reference control_plane_host=${control_plane_host} worker_host=${worker_host} worker_count=${worker_count}"
+log_note "launching ${selected_mode} control_plane_host=${control_plane_host} worker_host=${worker_host} worker_count=${worker_count}"
 stage_remote_repo
 
 remote_reference_pilot_exports=""
@@ -717,16 +775,36 @@ if [[ -n "${step_duration_ms}" ]]; then
   remote_reference_pilot_exports="${remote_reference_pilot_exports} export PSION_REFERENCE_PILOT_STEP_DURATION_MS=${step_duration_ms};"
 fi
 
-remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; export RUST_MIN_STACK=16777216;${remote_reference_pilot_exports} mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
-ssh "${ssh_opts[@]}" "${remote_ssh_target}" "${remote_command}" >>"${local_log_path}" 2>&1
+if [[ "${selected_mode}" == "accelerated_reference" ]]; then
+  remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; export RUST_MIN_STACK=16777216;${remote_reference_pilot_exports} mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
+  ssh "${ssh_opts[@]}" "${remote_ssh_target}" "${remote_command}" >>"${local_log_path}" 2>&1
 
-rm -rf "${local_artifact_dir}"
-mkdir -p "${local_artifact_dir}"
-log_note "copying_retained_artifacts remote_output_dir=${remote_output_dir}"
-ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
-  set -euo pipefail
-  tar -cf - -C \"${remote_output_dir}\" .
-" 2>>"${local_log_path}" | tar -xf - -C "${local_artifact_dir}" >>"${local_log_path}" 2>&1
+  rm -rf "${local_artifact_dir}"
+  mkdir -p "${local_artifact_dir}"
+  log_note "copying_retained_artifacts remote_output_dir=${remote_output_dir}"
+  ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
+    set -euo pipefail
+    tar -cf - -C \"${remote_output_dir}\" .
+  " 2>>"${local_log_path}" | tar -xf - -C "${local_artifact_dir}" >>"${local_log_path}" 2>&1
+else
+  rm -rf "${local_artifact_dir}"
+  mkdir -p "${local_artifact_dir}"
+  log_note "launching distributed_reference control_plane_host=${control_plane_host} remote_worker_host=${remote_host}"
+  env \
+    "${reference_pilot_env[@]}" \
+    "PSION_REFERENCE_PILOT_REMOTE_SSH_TARGET=${remote_ssh_target}" \
+    "PSION_REFERENCE_PILOT_REMOTE_WORKTREE_DIR=${remote_worktree_dir}" \
+    "PSION_REFERENCE_PILOT_REMOTE_OUTPUT_DIR=${remote_output_dir}" \
+    "PSION_REFERENCE_PILOT_REMOTE_TARGET_DIR=${remote_target_dir}" \
+    "PSION_REFERENCE_PILOT_REMOTE_TMP_DIR=${remote_tmp_dir}" \
+    "PSION_REFERENCE_PILOT_CONTROL_PLANE_HOST=${control_plane_host}" \
+    "PSION_REFERENCE_PILOT_CONTROL_PLANE_TAILNET_IP=${local_tailnet_ip}" \
+    "PSION_REFERENCE_PILOT_REMOTE_HOST=${remote_host}" \
+    "PSION_REFERENCE_PILOT_REMOTE_TAILNET_IP=${remote_tailnet_ip}" \
+    "PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND=cuda" \
+    cargo run -q -p psionic-train --example psion_distributed_reference_pilot -- "${local_artifact_dir}" \
+    >>"${local_log_path}" 2>&1
+fi
 
 if [[ "${cleanup_remote}" == "1" ]]; then
   log_note "cleanup_remote=1 remote_stage_strategy=${remote_stage_strategy}"
