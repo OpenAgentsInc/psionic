@@ -1,11 +1,14 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::PsionicTrainGroupedReplicaStageAssignment;
 use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
+use crate::PsionicTrainGroupedReplicaStageAssignment;
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -31,6 +34,9 @@ pub const PSIONIC_TRAIN_WINDOW_STATUS_PACKET_SCHEMA_VERSION: &str =
 
 /// Stable runtime surface identifier for the first machine-consumable `psionic-train` CLI.
 pub const PSIONIC_TRAIN_RUNTIME_SURFACE_ID: &str = "psionic-train.runtime.v1";
+
+/// Canonical local cache directory where resolver-backed artifacts are materialized for runtime use.
+pub const PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR: &str = "artifacts/resolved";
 
 /// Stable admitted release id for the actual pretraining lane on the first machine runtime.
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID: &str =
@@ -709,7 +715,9 @@ impl PsionicTrainInvocationManifest {
                         )?;
                     } else if self.grouped_stage_input_transport.is_some() {
                         return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                            field: String::from("invocation_manifest.grouped_stage_input_transport"),
+                            field: String::from(
+                                "invocation_manifest.grouped_stage_input_transport",
+                            ),
                             detail: String::from(
                                 "ingress grouped stage must not declare grouped_stage_input_transport",
                             ),
@@ -727,7 +735,9 @@ impl PsionicTrainInvocationManifest {
                     }
                     if self.grouped_stage_input_transport.is_some() {
                         return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                            field: String::from("invocation_manifest.grouped_stage_input_transport"),
+                            field: String::from(
+                                "invocation_manifest.grouped_stage_input_transport",
+                            ),
                             detail: String::from(
                                 "grouped_stage_input_transport is not admitted on grouped stage resume manifests",
                             ),
@@ -1396,6 +1406,42 @@ pub fn psionic_train_local_artifact_id(artifact_role: &str, artifact_digest: &st
     format!("psionic.train.artifact.{sanitized_role}.{artifact_digest}")
 }
 
+#[must_use]
+pub fn psionic_train_resolved_artifact_cache_key(artifact_id: &str) -> String {
+    let mut sanitized = artifact_id
+        .chars()
+        .map(|value| {
+            if value.is_ascii_alphanumeric() {
+                value.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    while sanitized.contains("__") {
+        sanitized = sanitized.replace("__", "_");
+    }
+    let sanitized = sanitized.trim_matches('_');
+    if sanitized.is_empty() {
+        String::from("artifact")
+    } else {
+        sanitized.to_string()
+    }
+}
+
+#[must_use]
+pub fn psionic_train_resolved_artifact_cache_candidates(
+    run_root: &Path,
+    artifact_id: &str,
+) -> Vec<PathBuf> {
+    let cache_root = run_root.join(PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR);
+    let cache_key = psionic_train_resolved_artifact_cache_key(artifact_id);
+    vec![
+        cache_root.join(format!("{cache_key}.json")),
+        cache_root.join(cache_key),
+    ]
+}
+
 pub fn build_psionic_train_artifact_binding_from_path(
     artifact_role: &str,
     path: &Path,
@@ -1435,6 +1481,25 @@ mod tests {
             },
             materialized_path: Some(String::from(path)),
         }
+    }
+
+    #[test]
+    fn resolved_artifact_cache_candidates_are_stable() {
+        let candidates = psionic_train_resolved_artifact_cache_candidates(
+            Path::new("/tmp/psionic-train-run"),
+            "artifact://checkpoint/pointer@v1",
+        );
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(
+            candidates[0],
+            Path::new(
+                "/tmp/psionic-train-run/artifacts/resolved/artifact_checkpoint_pointer_v1.json"
+            )
+        );
+        assert_eq!(
+            candidates[1],
+            Path::new("/tmp/psionic-train-run/artifacts/resolved/artifact_checkpoint_pointer_v1")
+        );
     }
 
     fn base_manifest() -> PsionicTrainInvocationManifest {

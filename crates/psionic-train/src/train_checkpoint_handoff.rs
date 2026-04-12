@@ -1,16 +1,20 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    build_psionic_train_artifact_binding_from_path, inspect_psionic_train_checkpoint_surface,
-    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
-    PsionicTrainArtifactBinding, PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer,
-    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainOperation, PsionicTrainRole,
     PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCheckpointManifest,
+    PsionActualPretrainingCheckpointPointer, PsionicTrainArtifactBinding,
+    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer,
+    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainOperation, PsionicTrainRole,
+    build_psionic_train_artifact_binding_from_path, inspect_psionic_train_checkpoint_surface,
+    psionic_train_resolved_artifact_cache_candidates, psionic_train_resolved_artifact_cache_key,
 };
 
 /// Stable schema version for the machine-readable peer checkpoint handoff receipt.
@@ -367,10 +371,18 @@ pub fn build_psionic_train_checkpoint_handoff_receipt(
 
 pub fn materialize_psionic_train_checkpoint_handoff(
     joiner_run_root: &Path,
-    handoff_receipt_path: &Path,
+    handoff_receipt_binding: &PsionicTrainArtifactBinding,
     joiner_node_pubkey: &str,
 ) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
-    let receipt: PsionicTrainCheckpointHandoffReceipt = load_json(handoff_receipt_path)?;
+    let handoff_receipt_path = resolve_artifact_binding_path(
+        joiner_run_root,
+        None,
+        handoff_receipt_binding,
+        "checkpoint_handoff.receipt",
+    )?;
+    let handoff_receipt_path = PathBuf::from(handoff_receipt_path);
+    let mut receipt: PsionicTrainCheckpointHandoffReceipt =
+        load_json(handoff_receipt_path.as_path())?;
     receipt.validate()?;
     if receipt.peer_node_pubkey != joiner_node_pubkey {
         return Err(PsionicTrainCheckpointHandoffError::Invalid {
@@ -381,17 +393,39 @@ pub fn materialize_psionic_train_checkpoint_handoff(
         });
     }
 
-    let source_checkpoint_pointer_path = materialized_binding_path(
+    let source_checkpoint_pointer_path = resolve_artifact_binding_path(
+        joiner_run_root,
+        Some(handoff_receipt_path.as_path()),
         &receipt.source_checkpoint_pointer,
         "checkpoint_handoff.source_checkpoint_pointer",
     )?;
+    let source_checkpoint_manifest_path = resolve_artifact_binding_path(
+        joiner_run_root,
+        Some(handoff_receipt_path.as_path()),
+        &receipt.source_checkpoint_manifest,
+        "checkpoint_handoff.source_checkpoint_manifest",
+    )?;
+    receipt.source_checkpoint_pointer.materialized_path =
+        Some(source_checkpoint_pointer_path.clone());
+    receipt.source_checkpoint_manifest.materialized_path =
+        Some(source_checkpoint_manifest_path.clone());
     match checkpoint_schema_version(Path::new(source_checkpoint_pointer_path.as_str()))? {
         Some(schema_version)
             if schema_version == PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION =>
         {
-            materialize_generic_checkpoint_handoff(joiner_run_root, &receipt)
+            materialize_generic_checkpoint_handoff(
+                joiner_run_root,
+                &receipt,
+                Path::new(source_checkpoint_pointer_path.as_str()),
+                Path::new(source_checkpoint_manifest_path.as_str()),
+            )
         }
-        _ => materialize_actual_pretraining_checkpoint_handoff(joiner_run_root, &receipt),
+        _ => materialize_actual_pretraining_checkpoint_handoff(
+            joiner_run_root,
+            &receipt,
+            Path::new(source_checkpoint_pointer_path.as_str()),
+            Path::new(source_checkpoint_manifest_path.as_str()),
+        ),
     }
 }
 
@@ -477,9 +511,7 @@ fn validate_grouped_stage_scope(
 }
 
 fn short_digest(value: &str) -> String {
-    let mut digest = Sha256::new();
-    digest.update(value.as_bytes());
-    let hex = format!("{:x}", digest.finalize());
+    let hex = sha256_hex(value.as_bytes());
     hex[..12].to_string()
 }
 
@@ -489,6 +521,12 @@ fn stable_digest(receipt: &PsionicTrainCheckpointHandoffReceipt) -> String {
     let mut digest = Sha256::new();
     digest.update(b"psionic_train_checkpoint_handoff|");
     digest.update(&encoded);
+    format!("{:x}", digest.finalize())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(bytes);
     format!("{:x}", digest.finalize())
 }
 
@@ -503,37 +541,85 @@ fn load_json<T: DeserializeOwned>(path: &Path) -> Result<T, PsionicTrainCheckpoi
     })
 }
 
-fn materialized_binding_path(
+fn resolve_artifact_binding_path(
+    joiner_run_root: &Path,
+    handoff_receipt_path: Option<&Path>,
     binding: &PsionicTrainArtifactBinding,
     field: &str,
 ) -> Result<String, PsionicTrainCheckpointHandoffError> {
-    binding
-        .require_materialized_path(field)
-        .map(String::from)
-        .map_err(|detail| PsionicTrainCheckpointHandoffError::MissingCheckpoint { detail })
+    let mut candidates = Vec::new();
+    if let Some(materialized_path) = binding.materialized_path.as_deref() {
+        push_candidate_path(&mut candidates, PathBuf::from(materialized_path));
+        let materialized_path = Path::new(materialized_path);
+        if materialized_path.is_relative() {
+            if let Some(receipt_parent) = handoff_receipt_path.and_then(Path::parent) {
+                push_candidate_path(&mut candidates, receipt_parent.join(materialized_path));
+            }
+            push_candidate_path(&mut candidates, joiner_run_root.join(materialized_path));
+        }
+    }
+    if let Some(receipt_parent) = handoff_receipt_path.and_then(Path::parent) {
+        let cache_key =
+            psionic_train_resolved_artifact_cache_key(binding.artifact_ref.artifact_id.as_str());
+        push_candidate_path(
+            &mut candidates,
+            receipt_parent.join(format!("{cache_key}.json")),
+        );
+        push_candidate_path(&mut candidates, receipt_parent.join(cache_key));
+    }
+    for candidate in psionic_train_resolved_artifact_cache_candidates(
+        joiner_run_root,
+        binding.artifact_ref.artifact_id.as_str(),
+    ) {
+        push_candidate_path(&mut candidates, candidate);
+    }
+
+    let mut first_invalid = None;
+    let mut attempted_paths = Vec::new();
+    for candidate in candidates {
+        attempted_paths.push(candidate.display().to_string());
+        if !candidate.is_file() {
+            continue;
+        }
+        match validate_artifact_binding_candidate(binding, candidate.as_path(), field) {
+            Ok(()) => return Ok(candidate.display().to_string()),
+            Err(error @ PsionicTrainCheckpointHandoffError::Invalid { .. }) => {
+                if first_invalid.is_none() {
+                    first_invalid = Some(error);
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    if let Some(error) = first_invalid {
+        return Err(error);
+    }
+
+    Err(PsionicTrainCheckpointHandoffError::MissingCheckpoint {
+        detail: format!(
+            "{field} requires one local copy of artifact `{}`; checked {}",
+            binding.artifact_ref.artifact_id,
+            attempted_paths.join(", ")
+        ),
+    })
 }
 
 fn materialize_generic_checkpoint_handoff(
     joiner_run_root: &Path,
     receipt: &PsionicTrainCheckpointHandoffReceipt,
+    source_checkpoint_pointer_path: &Path,
+    source_checkpoint_manifest_path: &Path,
 ) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
-    let source_checkpoint_pointer_path = materialized_binding_path(
-        &receipt.source_checkpoint_pointer,
-        "checkpoint_handoff.source_checkpoint_pointer",
-    )?;
-    let source_checkpoint_manifest_path = materialized_binding_path(
-        &receipt.source_checkpoint_manifest,
-        "checkpoint_handoff.source_checkpoint_manifest",
-    )?;
     let checkpoint_pointer: PsionicTrainCheckpointPointer =
-        load_json(Path::new(source_checkpoint_pointer_path.as_str()))?;
+        load_json(source_checkpoint_pointer_path)?;
     checkpoint_pointer
         .validate()
         .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
             detail: error.to_string(),
         })?;
     let checkpoint_manifest: PsionicTrainCheckpointManifest =
-        load_json(Path::new(source_checkpoint_manifest_path.as_str()))?;
+        load_json(source_checkpoint_manifest_path)?;
     checkpoint_manifest.validate().map_err(|error| {
         PsionicTrainCheckpointHandoffError::Invalid {
             detail: error.to_string(),
@@ -579,24 +665,18 @@ fn materialize_generic_checkpoint_handoff(
 fn materialize_actual_pretraining_checkpoint_handoff(
     joiner_run_root: &Path,
     receipt: &PsionicTrainCheckpointHandoffReceipt,
+    source_checkpoint_pointer_path: &Path,
+    source_checkpoint_manifest_path: &Path,
 ) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
-    let source_checkpoint_pointer_path = materialized_binding_path(
-        &receipt.source_checkpoint_pointer,
-        "checkpoint_handoff.source_checkpoint_pointer",
-    )?;
-    let source_checkpoint_manifest_path = materialized_binding_path(
-        &receipt.source_checkpoint_manifest,
-        "checkpoint_handoff.source_checkpoint_manifest",
-    )?;
     let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
-        load_json(Path::new(source_checkpoint_pointer_path.as_str()))?;
+        load_json(source_checkpoint_pointer_path)?;
     checkpoint_pointer
         .validate()
         .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
             detail: format!("source checkpoint pointer is invalid: {error}"),
         })?;
     let checkpoint_manifest: PsionActualPretrainingCheckpointManifest =
-        load_json(Path::new(source_checkpoint_manifest_path.as_str()))?;
+        load_json(source_checkpoint_manifest_path)?;
     checkpoint_manifest.validate().map_err(|error| {
         PsionicTrainCheckpointHandoffError::Invalid {
             detail: format!("source checkpoint manifest is invalid: {error}"),
@@ -631,6 +711,62 @@ fn materialize_actual_pretraining_checkpoint_handoff(
         local_checkpoint_pointer_path: local_pointer_path.display().to_string(),
         local_checkpoint_manifest_path: local_manifest_path.display().to_string(),
     })
+}
+
+fn push_candidate_path(candidates: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if !candidates.iter().any(|existing| existing == &candidate) {
+        candidates.push(candidate);
+    }
+}
+
+fn validate_artifact_binding_candidate(
+    binding: &PsionicTrainArtifactBinding,
+    path: &Path,
+    field: &str,
+) -> Result<(), PsionicTrainCheckpointHandoffError> {
+    let bytes = fs::read(path).map_err(|error| PsionicTrainCheckpointHandoffError::Read {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    if let Some(expected_bytes) = binding.artifact_ref.artifact_bytes {
+        let actual_bytes = u64::try_from(bytes.len()).map_err(|error| {
+            PsionicTrainCheckpointHandoffError::Read {
+                path: path.display().to_string(),
+                detail: error.to_string(),
+            }
+        })?;
+        if actual_bytes != expected_bytes {
+            return Err(PsionicTrainCheckpointHandoffError::Invalid {
+                detail: format!(
+                    "{field} byte count mismatch for `{}`: expected {} but found {}",
+                    path.display(),
+                    expected_bytes,
+                    actual_bytes
+                ),
+            });
+        }
+    }
+    if let Some(expected_digest) = binding.artifact_ref.artifact_digest.as_deref() {
+        let actual_digest = sha256_hex(bytes.as_slice());
+        if normalize_sha256_digest(expected_digest) != actual_digest {
+            return Err(PsionicTrainCheckpointHandoffError::Invalid {
+                detail: format!(
+                    "{field} digest mismatch for `{}`: expected `{}` but found `sha256:{}`",
+                    path.display(),
+                    expected_digest,
+                    actual_digest
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn normalize_sha256_digest(value: &str) -> String {
+    value
+        .strip_prefix("sha256:")
+        .unwrap_or(value)
+        .to_ascii_lowercase()
 }
 
 fn checkpoint_schema_version(

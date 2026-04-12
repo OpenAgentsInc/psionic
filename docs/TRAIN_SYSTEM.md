@@ -415,7 +415,10 @@ logical `artifact_ref` (`artifact_id`, optional digest, optional byte count)
 plus one optional local `materialized_path`. Stable manifest, contribution,
 and handoff digests now canonicalize away the local path so cross-machine
 resume and replay can preserve logical identity even when the receiving node
-stages the bytes somewhere else. It now emits
+stages the bytes somewhere else. Resume can now also resolve the outer
+checkpoint handoff receipt plus its nested checkpoint pointer and manifest from
+the canonical local cache under `artifacts/resolved/` when only logical
+artifact ids are available. It now emits
 one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
 bit, authority owner, optional refusal class, shared coordination fields,

@@ -76,6 +76,15 @@ and restores the primary pointer from:
 - `checkpoints/backups/latest_accepted_checkpoint_pointer.backup.json`
 - `checkpoints/backups/step-<optimizer_step>/checkpoint_manifest.backup.json`
 
+Joiner-side resume now also accepts resolver-backed checkpoint handoff
+receipts whose nested pointer and manifest bindings retain only logical
+artifact ids plus digests. When `Pylon` or another caller has already
+downloaded those artifacts into the canonical local cache under
+`artifacts/resolved/<sanitized-artifact-id>[.json]`, the joiner can
+re-materialize the checkpoint pointer and manifest without SCP or manual file
+placement. The local `materialized_path` fields remain execution hints, not
+part of the stable signed digest.
+
 Every resume attempt now writes:
 
 - `checkpoints/auto_resume_receipt.json`

@@ -10,15 +10,11 @@ use std::{
 use sha2::Digest;
 
 use psionic_train::{
-    admitted_environment_ref_for_lane, admitted_release_id_for_lane,
-    build_psionic_train_checkpoint_handoff_receipt, execute_psionic_train_validator_replay,
-    inspect_psionic_train_checkpoint_surface, materialize_psionic_train_checkpoint_handoff,
-    persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
-    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
-    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
-    PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
-    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
-    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCurrentRunStatus,
+    PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
+    PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
+    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainGroupedReplicaCheckpointError, PsionicTrainGroupedReplicaRecoverySourceKind,
     PsionicTrainGroupedReplicaTransportError, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
@@ -26,8 +22,13 @@ use psionic_train::{
     PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
     PsionicTrainValidatorArtifactOutputs, PsionicTrainValidatorReplayError,
     PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
-    PsionicTrainWindowStatusPacket, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
+    admitted_release_id_for_lane, build_psionic_train_checkpoint_handoff_receipt,
+    execute_psionic_train_validator_replay, inspect_psionic_train_checkpoint_surface,
+    materialize_psionic_train_checkpoint_handoff,
+    persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
+    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
+    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
 };
 
 #[allow(dead_code)]
@@ -168,16 +169,13 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
         );
     }
     if manifest.operation == PsionicTrainOperation::Resume {
-        if let (Some(run_root), Some(peer_receipt_path)) = (
+        if let (Some(run_root), Some(peer_receipt_binding)) = (
             run_root.as_deref(),
-            manifest
-                .peer_checkpoint_handoff_receipt
-                .as_ref()
-                .and_then(|value| value.materialized_path.as_deref()),
+            manifest.peer_checkpoint_handoff_receipt.as_ref(),
         ) {
             if let Err(error) = materialize_psionic_train_checkpoint_handoff(
                 run_root,
-                Path::new(peer_receipt_path),
+                peer_receipt_binding,
                 manifest
                     .coordination
                     .node_pubkey
@@ -190,7 +188,10 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                     run_root,
                     &runtime_identity,
                     &error,
-                    format!("failed to materialize peer checkpoint handoff `{peer_receipt_path}`"),
+                    format!(
+                        "failed to materialize peer checkpoint handoff `{}`",
+                        peer_receipt_binding.artifact_ref.artifact_id
+                    ),
                 );
             }
         }
@@ -1503,18 +1504,21 @@ fn persist_grouped_stage_resume_recovery(
     if manifest.grouped_stage_assignment.is_none() {
         return Ok(());
     }
-    let checkpoint_surface =
-        inspect_psionic_train_checkpoint_surface(run_root, manifest.role, manifest.operation)
-            .map_err(|error| PsionicTrainGroupedReplicaCheckpointError::Invalid {
-                detail: error.to_string(),
-            })?
-            .ok_or_else(|| {
-                PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint {
+    let checkpoint_surface = inspect_psionic_train_checkpoint_surface(
+        run_root,
+        manifest.role,
+        manifest.operation,
+    )
+    .map_err(|error| PsionicTrainGroupedReplicaCheckpointError::Invalid {
+        detail: error.to_string(),
+    })?
+    .ok_or_else(
+        || PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint {
             detail: String::from(
                 "grouped stage resume requires one retained checkpoint surface under the run root",
             ),
-        }
-            })?;
+        },
+    )?;
     persist_psionic_train_grouped_stage_recovery_receipt_from_surface(
         run_root,
         manifest,
