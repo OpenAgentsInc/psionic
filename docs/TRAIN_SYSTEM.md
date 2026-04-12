@@ -559,7 +559,19 @@ receipts now persist both the validator work class and the challenged work
 class plus that verified-hook set, and grouped-stage validator replay refuses
 as `ArtifactIncomplete` when the retained
 `grouped_stage_execution_summary.json` evidence surface is absent. Validator
-replay now also retains one deterministic
+target bindings now only require one logical artifact binding, not one
+machine-local `materialized_path`. Replay checks the retained local path when
+present and otherwise falls back to the canonical resolver cache under
+`<run-root>/artifacts/resolved/<sanitized-artifact-id>[.json]`. When that cache
+contains the challenged contribution receipt, contribution artifact manifest,
+or nested checkpoint and grouped-stage evidence family, the validator
+re-materializes those artifacts into the local run root before bounded replay
+continues. That keeps weak-device accepted-outcome proofs and retained
+contribution-family path expectations intact while removing the old SCP/manual
+replay staging requirement. Missing cache entries stay explicit
+`ArtifactIncomplete` or `CheckpointMissing` refusals with resolver-cache
+guidance instead of ambiguous local-path failures. Validator replay now also
+retains one deterministic
 `validator_quality_drift_signal.json` plus one paired
 `validator_rollback_signal.json` under each validator root. Those signal
 artifacts carry one monotonic `validation_index`, the previous retained

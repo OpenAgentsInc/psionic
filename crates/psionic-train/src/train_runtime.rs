@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
 use crate::PsionicTrainGroupedReplicaStageAssignment;
+use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -938,11 +938,11 @@ impl PsionicTrainInvocationManifest {
                 self.coordination.challenge_id.as_deref(),
                 "invocation_manifest.coordination.challenge_id",
             )?;
-            require_artifact_binding_with_materialized_path(
+            require_artifact_binding(
                 self.validator_target_contribution_receipt.as_ref(),
                 "invocation_manifest.validator_target_contribution_receipt",
             )?;
-            require_artifact_binding_with_materialized_path(
+            require_artifact_binding(
                 self.validator_target_contribution_artifact_manifest
                     .as_ref(),
                 "invocation_manifest.validator_target_contribution_artifact_manifest",
@@ -1388,6 +1388,22 @@ fn require_artifact_binding_with_materialized_path(
             detail,
         }
     })?;
+    Ok(())
+}
+
+fn require_artifact_binding(
+    value: Option<&PsionicTrainArtifactBinding>,
+    field: &'static str,
+) -> Result<(), PsionicTrainRuntimeContractError> {
+    let value = value.ok_or_else(|| PsionicTrainRuntimeContractError::MissingField {
+        field: String::from(field),
+    })?;
+    value
+        .validate(field)
+        .map_err(|detail| PsionicTrainRuntimeContractError::InvalidValue {
+            field: String::from(field),
+            detail,
+        })?;
     Ok(())
 }
 

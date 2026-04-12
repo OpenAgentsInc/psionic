@@ -68,8 +68,10 @@ re-materialize the outer handoff receipt plus its nested checkpoint pointer and
 checkpoint manifest from the canonical local cache under
 `<run-root>/artifacts/resolved/<sanitized-artifact-id>[.json]` when the caller
 has already fetched those resolver-backed artifacts. Resume therefore no longer
-requires SCP or hand placement of those inputs. Validator replay and grouped
-stage transport still follow their own rematerialization issues.
+requires SCP or hand placement of those inputs. Validator replay now follows
+that same resolver-backed posture for the challenged contribution receipt,
+contribution artifact manifest, and their nested replay inputs, so launch-path
+replay no longer depends on manual artifact placement either.
 
 The runtime refuses before launch when the executing release id, build digest,
 or environment ref do not match the admitted identity in that manifest. When a
@@ -139,6 +141,17 @@ plus one retained contribution artifact manifest, binds them to the declared
 - `windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
 - `windows/<window_id>/validators/<challenge_id>/validator_score_receipt.json`
 
+Those validator-target bindings may now carry logical artifact references
+without one pre-staged `materialized_path`. Replay first checks any declared
+local path, then falls back to the canonical resolver cache under
+`<run-root>/artifacts/resolved/<sanitized-artifact-id>[.json]`. When the cache
+contains the challenged receipt, artifact manifest, or nested checkpoint and
+evidence artifacts, the validator rematerializes the retained contribution
+family back into the local run root before bounded replay continues. That keeps
+weak-device proof continuity and contributor-family path expectations intact
+without reintroducing SCP or operator handoff steps. Missing cache entries stay
+machine-boundary refusals and now report the expected resolver-cache location.
+
 The current validator replay is still deliberately bounded. It does not claim a
 full independent model rerun. It replays the retained contribution artifact
 family, rechecks canonical contribution and artifact-manifest digests against
@@ -150,8 +163,9 @@ refusal-class failures at the machine process boundary. The run/window status
 packets now repeat the retained `validator_score_receipt_path` when validator
 replay completes successfully.
 That machine contract is now locked by focused validator-classification unit
-tests plus subprocess CLI coverage for stale assignment, missing replay-input,
-and artifact-digest drift refusal paths.
+tests plus subprocess CLI coverage for stale assignment, resolver-backed
+replay-input rematerialization, missing replay-input, and artifact-digest
+drift refusal paths.
 
 The machine path now also covers late-join and recovery-source handoff
 explicitly. One recovery-source manifest with `operation = serve_checkpoint`

@@ -63,6 +63,66 @@ fn artifact_binding(path: &Path) -> psionic_train::PsionicTrainArtifactBinding {
         .expect("artifact binding should build from path")
 }
 
+fn cache_artifact_binding(
+    run_root: &Path,
+    binding: &psionic_train::PsionicTrainArtifactBinding,
+) -> PathBuf {
+    let source_path = Path::new(
+        binding
+            .materialized_path
+            .as_deref()
+            .expect("artifact binding should carry a source path for cache staging"),
+    );
+    let cache_path = psionic_train_resolved_artifact_cache_candidates(
+        run_root,
+        binding.artifact_ref.artifact_id.as_str(),
+    )
+    .remove(0);
+    if let Some(parent) = cache_path.parent() {
+        fs::create_dir_all(parent).expect("resolver cache parent should exist");
+    }
+    fs::copy(source_path, &cache_path).expect("artifact should copy into the resolver cache");
+    cache_path
+}
+
+fn cache_contribution_family(
+    run_root: &Path,
+    contribution_receipt_path: &Path,
+    contribution_artifact_manifest_path: &Path,
+) -> PsionicTrainContributionArtifactManifest {
+    cache_artifact_binding(run_root, &artifact_binding(contribution_receipt_path));
+    cache_artifact_binding(
+        run_root,
+        &artifact_binding(contribution_artifact_manifest_path),
+    );
+    let contribution_artifact_manifest: PsionicTrainContributionArtifactManifest =
+        parse_json(contribution_artifact_manifest_path);
+    for artifact in &contribution_artifact_manifest.artifacts {
+        cache_artifact_binding(run_root, &artifact.binding);
+    }
+    contribution_artifact_manifest
+}
+
+fn remove_path_if_present(path: &Path) {
+    if path.is_file() {
+        fs::remove_file(path).expect("artifact file should remove");
+    }
+}
+
+fn remove_contribution_family(
+    contribution_receipt_path: &Path,
+    contribution_artifact_manifest_path: &Path,
+    contribution_artifact_manifest: &PsionicTrainContributionArtifactManifest,
+) {
+    remove_path_if_present(contribution_receipt_path);
+    remove_path_if_present(contribution_artifact_manifest_path);
+    for artifact in &contribution_artifact_manifest.artifacts {
+        if let Some(path) = artifact.binding.materialized_path.as_deref() {
+            remove_path_if_present(Path::new(path));
+        }
+    }
+}
+
 fn dirty_tree_build_inputs() -> (String, Option<String>) {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let porcelain = Command::new("git")
@@ -2372,6 +2432,160 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
 }
 
 #[test]
+fn validator_manifest_can_replay_from_resolver_backed_artifact_ids() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("resolver-worker-run");
+    let worker_launch_manifest_path = tempdir.path().join("resolver-worker-windowed-launch.json");
+    let mut worker_launch_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(
+        &mut worker_launch_manifest,
+        "window-0005",
+        "assignment-0005",
+        1,
+    );
+    write_manifest(&worker_launch_manifest_path, &mut worker_launch_manifest);
+    let worker_launch_output = run_machine_manifest(&worker_launch_manifest_path);
+    assert!(
+        worker_launch_output.status.success(),
+        "worker launch should succeed"
+    );
+
+    let worker_checkpoint_manifest_path = tempdir.path().join("resolver-worker-record-checkpoint.json");
+    let mut worker_checkpoint_manifest = build_retained_operation_manifest(
+        &worker_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    bind_window_context(
+        &mut worker_checkpoint_manifest,
+        "window-0005",
+        "assignment-0005",
+        2,
+    );
+    worker_checkpoint_manifest.checkpoint_label = Some(String::from("resolver-validator-target"));
+    worker_checkpoint_manifest.optimizer_step = Some(8_192);
+    worker_checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/resolver/validator/target"));
+    write_manifest(
+        &worker_checkpoint_manifest_path,
+        &mut worker_checkpoint_manifest,
+    );
+    let worker_output = run_machine_manifest(&worker_checkpoint_manifest_path);
+    assert!(
+        worker_output.status.success(),
+        "worker checkpoint should succeed"
+    );
+
+    let worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&worker_output.stdout).expect("worker packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("worker run status path should exist"),
+    );
+    let contribution_receipt_path = PathBuf::from(
+        worker_run_status
+            .artifacts
+            .contribution_receipt_path
+            .as_deref()
+            .expect("worker contribution receipt path should exist"),
+    );
+    let contribution_artifact_manifest_path = PathBuf::from(
+        worker_run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .as_deref()
+            .expect("worker contribution artifact manifest path should exist"),
+    );
+
+    let validator_run_root = tempdir.path().join("resolver-validator-run");
+    let manifest_path = tempdir.path().join("resolver-validator-invocation.json");
+    let mut manifest = build_validator_manifest(
+        &validator_run_root,
+        contribution_receipt_path.as_path(),
+        contribution_artifact_manifest_path.as_path(),
+        "window-0005",
+        "assignment-0005",
+        "challenge-0005",
+    );
+    manifest
+        .validator_target_contribution_receipt
+        .as_mut()
+        .expect("validator receipt binding should exist")
+        .materialized_path = None;
+    manifest
+        .validator_target_contribution_artifact_manifest
+        .as_mut()
+        .expect("validator artifact manifest binding should exist")
+        .materialized_path = None;
+    let cached_artifact_manifest = cache_contribution_family(
+        &validator_run_root,
+        contribution_receipt_path.as_path(),
+        contribution_artifact_manifest_path.as_path(),
+    );
+    remove_contribution_family(
+        contribution_receipt_path.as_path(),
+        contribution_artifact_manifest_path.as_path(),
+        &cached_artifact_manifest,
+    );
+    assert!(
+        !contribution_receipt_path.is_file(),
+        "source contribution receipt should be removed to force cache-backed replay"
+    );
+    let checkpoint_surface_path = PathBuf::from(
+        cached_artifact_manifest
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.artifact_kind == "checkpoint_surface")
+            .and_then(|artifact| artifact.binding.materialized_path.as_ref())
+            .expect("checkpoint surface path should exist"),
+    );
+    assert!(
+        !checkpoint_surface_path.is_file(),
+        "checkpoint surface should be removed to force nested artifact rematerialization"
+    );
+
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("validator packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("validator run status path should exist"),
+    );
+    let score_receipt: PsionicTrainValidatorScoreReceipt = parse_json(
+        run_status
+            .artifacts
+            .validator_score_receipt_path
+            .as_ref()
+            .expect("validator score receipt path should exist"),
+    );
+    assert_eq!(
+        score_receipt.disposition,
+        TrainingExecutionValidatorDisposition::Accepted
+    );
+    assert_eq!(
+        score_receipt.challenged_work_class,
+        PsionicTrainWorkClass::FullIslandLocalUpdateTraining
+    );
+    assert!(
+        checkpoint_surface_path.is_file(),
+        "validator replay should restore nested checkpoint evidence from the resolver cache"
+    );
+}
+
+#[test]
 fn apple_validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
     let tempdir = tempdir().expect("tempdir should exist");
     let worker_run_root = tempdir.path().join("apple-worker-run");
@@ -2964,14 +3178,39 @@ fn validator_manifest_refuses_missing_replay_inputs() {
     let tempdir = tempdir().expect("tempdir should exist");
     let run_root = tempdir.path().join("validator-run");
     let manifest_path = tempdir.path().join("validator-missing-inputs.json");
-    let mut manifest = build_validator_manifest(
+    let mut manifest = build_retained_operation_manifest(
         &run_root,
-        &tempdir.path().join("missing-contribution-receipt.json"),
-        &tempdir.path().join("missing-artifact-manifest.json"),
-        "window-0001",
-        "assignment-0001",
-        "challenge-0004",
+        PsionicTrainRole::Validator,
+        PsionicTrainOperation::ValidateContribution,
     );
+    manifest.work_class = PsionicTrainWorkClass::ValidationReplay;
+    manifest.coordination.window_id = Some(String::from("window-0001"));
+    manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+    manifest.coordination.challenge_id = Some(String::from("challenge-0004"));
+    manifest.coordination.node_pubkey = Some(String::from("npub1-psionic-validator-cli-test"));
+    manifest.validator_target_contribution_receipt =
+        Some(psionic_train::PsionicTrainArtifactBinding {
+            artifact_ref: psionic_train::PsionicTrainArtifactRef {
+                artifact_id: String::from(
+                    "psionic.train.artifact.contribution_receipt.missing",
+                ),
+                artifact_digest: None,
+                artifact_bytes: None,
+            },
+            materialized_path: None,
+        });
+    manifest.validator_target_contribution_artifact_manifest =
+        Some(psionic_train::PsionicTrainArtifactBinding {
+            artifact_ref: psionic_train::PsionicTrainArtifactRef {
+                artifact_id: String::from(
+                    "psionic.train.artifact.contribution_artifact_manifest.missing",
+                ),
+                artifact_digest: None,
+                artifact_bytes: None,
+            },
+            materialized_path: None,
+        });
+    manifest.validator_target_work_class = Some(PsionicTrainWorkClass::FullIslandLocalUpdateTraining);
     write_manifest(&manifest_path, &mut manifest);
 
     let output = run_machine_manifest(&manifest_path);
@@ -2985,6 +3224,12 @@ fn validator_manifest_refuses_missing_replay_inputs() {
     assert_eq!(
         packet.refusal_class,
         Some(PsionicTrainRefusalClass::ArtifactIncomplete)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("artifacts/resolved"),
+        "refusal should point at the canonical resolver cache path:\n{}",
+        stderr
     );
 }
 
@@ -3284,29 +3529,49 @@ fn apple_grouped_stage_records_weak_device_accepted_outcome_proof() {
     let validator_run_root = tempdir
         .path()
         .join("apple-grouped-weak-device-validator-run");
+    let contribution_receipt_path = PathBuf::from(
+        worker_run_status
+            .artifacts
+            .contribution_receipt_path
+            .as_deref()
+            .expect("worker contribution receipt path should exist"),
+    );
+    let contribution_artifact_manifest_path = PathBuf::from(
+        worker_run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .as_deref()
+            .expect("worker contribution artifact manifest path should exist"),
+    );
+    let cached_artifact_manifest = cache_contribution_family(
+        &validator_run_root,
+        contribution_receipt_path.as_path(),
+        contribution_artifact_manifest_path.as_path(),
+    );
     let validator_manifest_path = tempdir
         .path()
         .join("apple-grouped-weak-device-validator.json");
     let mut validator_manifest = build_validator_manifest_for_lane(
         PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
         &validator_run_root,
-        Path::new(
-            worker_run_status
-                .artifacts
-                .contribution_receipt_path
-                .as_deref()
-                .expect("worker contribution receipt path should exist"),
-        ),
-        Path::new(
-            worker_run_status
-                .artifacts
-                .contribution_artifact_manifest_path
-                .as_deref()
-                .expect("worker contribution artifact manifest path should exist"),
-        ),
+        contribution_receipt_path.as_path(),
+        contribution_artifact_manifest_path.as_path(),
         "apple-grouped-weak-device-window-0001",
         "apple-grouped-weak-device-assignment-0001",
         "apple-grouped-weak-device-challenge-0001",
+    );
+    remove_contribution_family(
+        contribution_receipt_path.as_path(),
+        contribution_artifact_manifest_path.as_path(),
+        &cached_artifact_manifest,
+    );
+    assert!(
+        !contribution_receipt_path.is_file(),
+        "worker contribution receipt should be removed before replay rematerialization"
+    );
+    assert!(
+        !contribution_artifact_manifest_path.is_file(),
+        "worker contribution artifact manifest should be removed before replay rematerialization"
     );
     write_manifest(&validator_manifest_path, &mut validator_manifest);
     let validator_output = run_machine_manifest(&validator_manifest_path);
@@ -3315,6 +3580,14 @@ fn apple_grouped_stage_records_weak_device_accepted_outcome_proof() {
         "grouped weak-device validator should succeed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&validator_output.stdout),
         String::from_utf8_lossy(&validator_output.stderr)
+    );
+    assert!(
+        contribution_receipt_path.is_file(),
+        "validator replay should restore the worker contribution receipt path"
+    );
+    assert!(
+        contribution_artifact_manifest_path.is_file(),
+        "validator replay should restore the worker contribution artifact manifest path"
     );
 
     let validator_packet: PsionicTrainStatusPacket =

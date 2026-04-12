@@ -1,4 +1,7 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -6,12 +9,13 @@ use thiserror::Error;
 
 use crate::{
     load_psionic_train_grouped_stage_execution_summary, load_psionic_train_grouped_stage_transport,
-    persist_psionic_train_grouped_stage_replay_evidence, PsionicTrainCheckpointSurface,
+    persist_psionic_train_grouped_stage_replay_evidence,
+    psionic_train_resolved_artifact_cache_candidates, PsionicTrainCheckpointSurface,
     PsionicTrainContributionArtifact, PsionicTrainContributionArtifactManifest,
     PsionicTrainContributionReceipt, PsionicTrainGroupedReplicaEvidenceError,
     PsionicTrainGroupedReplicaStageExecutionSummary, PsionicTrainGroupedReplicaStageReplayEvidence,
     PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainWorkClass,
-    TrainingExecutionValidatorDisposition,
+    TrainingExecutionValidatorDisposition, PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR,
 };
 
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
@@ -229,15 +233,13 @@ pub fn execute_psionic_train_validator_replay(
         .validator_target_contribution_receipt
         .as_ref()
         .expect("validated validator manifests always carry target contribution receipt binding");
-    let contribution_receipt_path = Path::new(
-        contribution_receipt_binding
-            .require_materialized_path("invocation_manifest.validator_target_contribution_receipt")
-            .expect(
-                "validated validator manifests always carry a materialized contribution receipt",
-            ),
-    );
+    let contribution_receipt_path = materialize_validator_artifact_binding(
+        contribution_receipt_binding,
+        run_root,
+        "invocation_manifest.validator_target_contribution_receipt",
+    )?;
     let contribution_receipt: PsionicTrainContributionReceipt =
-        read_json(contribution_receipt_path)?;
+        read_json(contribution_receipt_path.as_path())?;
     if contribution_receipt.contribution_digest != contribution_receipt.stable_contribution_digest()
     {
         return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
@@ -252,17 +254,13 @@ pub fn execute_psionic_train_validator_replay(
         .validator_target_contribution_artifact_manifest
         .as_ref()
         .expect("validated validator manifests always carry target contribution artifact manifest binding");
-    let contribution_artifact_manifest_path = Path::new(
-        contribution_artifact_manifest_binding
-            .require_materialized_path(
-                "invocation_manifest.validator_target_contribution_artifact_manifest",
-            )
-            .expect(
-                "validated validator manifests always carry a materialized contribution artifact manifest",
-            ),
-    );
+    let contribution_artifact_manifest_path = materialize_validator_artifact_binding(
+        contribution_artifact_manifest_binding,
+        run_root,
+        "invocation_manifest.validator_target_contribution_artifact_manifest",
+    )?;
     let contribution_artifact_manifest: PsionicTrainContributionArtifactManifest =
-        read_json(contribution_artifact_manifest_path)?;
+        read_json(contribution_artifact_manifest_path.as_path())?;
     if contribution_artifact_manifest.artifact_manifest_digest
         != contribution_artifact_manifest.stable_artifact_manifest_digest()
     {
@@ -273,6 +271,8 @@ pub fn execute_psionic_train_validator_replay(
             ),
         });
     }
+    let contribution_artifact_manifest =
+        materialize_contribution_artifact_manifest(&contribution_artifact_manifest, run_root)?;
     if contribution_receipt
         .artifact_manifest
         .artifact_ref
@@ -1162,6 +1162,180 @@ fn materialized_artifact_path(
         .map_err(|detail| PsionicTrainValidatorReplayError::ArtifactIncomplete { detail })
 }
 
+fn materialize_contribution_artifact_manifest(
+    contribution_artifact_manifest: &PsionicTrainContributionArtifactManifest,
+    run_root: &Path,
+) -> Result<PsionicTrainContributionArtifactManifest, PsionicTrainValidatorReplayError> {
+    let mut localized = contribution_artifact_manifest.clone();
+    for artifact in &mut localized.artifacts {
+        let field = format!(
+            "contribution_artifact_manifest.artifacts[{}]",
+            artifact.artifact_kind
+        );
+        let materialized_path =
+            materialize_validator_artifact_binding(&artifact.binding, run_root, field.as_str())?;
+        artifact.binding.materialized_path = Some(materialized_path.display().to_string());
+    }
+    Ok(localized)
+}
+
+fn materialize_validator_artifact_binding(
+    binding: &crate::PsionicTrainArtifactBinding,
+    run_root: &Path,
+    field: &str,
+) -> Result<PathBuf, PsionicTrainValidatorReplayError> {
+    let mut attempted_paths = Vec::new();
+    let desired_path = binding.materialized_path.as_deref().map(|value| {
+        let candidate = PathBuf::from(value);
+        if candidate.is_absolute() {
+            candidate
+        } else {
+            run_root.join(candidate)
+        }
+    });
+    let mut last_validation_error = None;
+
+    if let Some(desired_path) = desired_path.as_ref() {
+        attempted_paths.push(desired_path.display().to_string());
+        if desired_path.is_file() {
+            match validate_artifact_binding_candidate(binding, desired_path.as_path(), field) {
+                Ok(()) => return Ok(desired_path.clone()),
+                Err(error) => last_validation_error = Some(error),
+            }
+        }
+    }
+
+    let mut valid_cache_candidate = None;
+    for candidate in psionic_train_resolved_artifact_cache_candidates(
+        run_root,
+        binding.artifact_ref.artifact_id.as_str(),
+    ) {
+        let candidate_display = candidate.display().to_string();
+        if !attempted_paths.contains(&candidate_display) {
+            attempted_paths.push(candidate_display);
+        }
+        if !candidate.is_file() {
+            continue;
+        }
+        match validate_artifact_binding_candidate(binding, candidate.as_path(), field) {
+            Ok(()) => {
+                valid_cache_candidate = Some(candidate);
+                break;
+            }
+            Err(error) => last_validation_error = Some(error),
+        }
+    }
+
+    if let Some(desired_path) = desired_path {
+        if let Some(cache_candidate) = valid_cache_candidate {
+            if cache_candidate != desired_path {
+                copy_validator_artifact(cache_candidate.as_path(), desired_path.as_path())?;
+                validate_artifact_binding_candidate(binding, desired_path.as_path(), field)?;
+            }
+            return Ok(desired_path);
+        }
+    } else if let Some(cache_candidate) = valid_cache_candidate {
+        return Ok(cache_candidate);
+    }
+
+    if let Some(error) = last_validation_error {
+        return Err(error);
+    }
+    Err(missing_validator_artifact_error(
+        binding,
+        run_root,
+        field,
+        attempted_paths,
+    ))
+}
+
+fn validate_artifact_binding_candidate(
+    binding: &crate::PsionicTrainArtifactBinding,
+    candidate: &Path,
+    field: &str,
+) -> Result<(), PsionicTrainValidatorReplayError> {
+    let bytes = fs::read(candidate).map_err(|error| PsionicTrainValidatorReplayError::Read {
+        path: candidate.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    if let Some(expected_bytes) = binding.artifact_ref.artifact_bytes {
+        let actual_bytes = u64::try_from(bytes.len()).map_err(|error| {
+            PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: format!(
+                    "{field} artifact `{}` could not measure candidate `{}`: {error}",
+                    binding.artifact_ref.artifact_id,
+                    candidate.display(),
+                ),
+            }
+        })?;
+        if actual_bytes != expected_bytes {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: format!(
+                    "{field} artifact `{}` expected {expected_bytes} bytes but `{}` had {actual_bytes}",
+                    binding.artifact_ref.artifact_id,
+                    candidate.display(),
+                ),
+            });
+        }
+    }
+    if let Some(expected_digest) = binding.artifact_ref.artifact_digest.as_deref() {
+        let actual_digest = sha256_hex(bytes.as_slice());
+        if actual_digest != expected_digest {
+            return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: format!(
+                    "{field} artifact `{}` expected digest `{expected_digest}` but `{}` had `{actual_digest}`",
+                    binding.artifact_ref.artifact_id,
+                    candidate.display(),
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn copy_validator_artifact(
+    source_path: &Path,
+    target_path: &Path,
+) -> Result<(), PsionicTrainValidatorReplayError> {
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| PsionicTrainValidatorReplayError::Write {
+            path: parent.display().to_string(),
+            detail: error.to_string(),
+        })?;
+    }
+    fs::copy(source_path, target_path).map_err(|error| {
+        PsionicTrainValidatorReplayError::Write {
+            path: target_path.display().to_string(),
+            detail: format!(
+                "failed to copy `{}` into the validator replay materialization target: {error}",
+                source_path.display()
+            ),
+        }
+    })?;
+    Ok(())
+}
+
+fn missing_validator_artifact_error(
+    binding: &crate::PsionicTrainArtifactBinding,
+    run_root: &Path,
+    field: &str,
+    attempted_paths: Vec<String>,
+) -> PsionicTrainValidatorReplayError {
+    let detail = format!(
+        "{field} requires one local copy of artifact `{}`; automatic replay expects resolver-backed materialization under `{}`; checked {}",
+        binding.artifact_ref.artifact_id,
+        run_root
+            .join(PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR)
+            .display(),
+        attempted_paths.join(", "),
+    );
+    if field.contains("checkpoint") || binding.artifact_ref.artifact_id.contains("checkpoint") {
+        PsionicTrainValidatorReplayError::CheckpointMissing { detail }
+    } else {
+        PsionicTrainValidatorReplayError::ArtifactIncomplete { detail }
+    }
+}
+
 fn validator_hooks_for_target_work_class(
     work_class: PsionicTrainWorkClass,
 ) -> Vec<PsionicTrainValidatorHook> {
@@ -1389,6 +1563,12 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
             .expect("validator replay score surfaces must serialize for stable digest"),
     );
     format!("{:x}", hasher.finalize())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(bytes);
+    format!("{:x}", digest.finalize())
 }
 
 #[cfg(test)]
