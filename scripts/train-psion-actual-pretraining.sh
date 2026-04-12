@@ -31,6 +31,9 @@ Options for `start`:
 
 Options for `resume`:
   --run-root <path>        Existing actual-lane run root containing checkpoints/latest_accepted_checkpoint_pointer.json
+                           For launch-path peer handoff, the same run root is also the canonical
+                           resolver cache root under artifacts/resolved/; no SCP or manual file
+                           placement is required when the caller stages resolver-backed artifacts there.
   --git-ref <ref>          Git ref to resolve for the resumed run. Default: current symbolic ref or HEAD
   --hardware-observation <path>
                            Optional retained hardware observation snapshot to consume instead of probing the local host.

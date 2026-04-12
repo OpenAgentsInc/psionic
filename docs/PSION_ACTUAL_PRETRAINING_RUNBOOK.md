@@ -63,10 +63,13 @@ Each artifact binding now carries one stable `artifact_ref` tuple
 `materialized_path`. The logical artifact reference is the signed identity used
 in invocation-manifest, contribution-receipt, and checkpoint-handoff digests.
 The `materialized_path` is only one local execution binding for the current
-machine. Current launch code still requires that local path to exist before the
-runtime can open a handoff receipt, validator target, or grouped-stage
-transport. The next rematerialization issues remove that last manual fetch
-assumption.
+machine. For resume handoff on the launch path, the runtime can now
+re-materialize the outer handoff receipt plus its nested checkpoint pointer and
+checkpoint manifest from the canonical local cache under
+`<run-root>/artifacts/resolved/<sanitized-artifact-id>[.json]` when the caller
+has already fetched those resolver-backed artifacts. Resume therefore no longer
+requires SCP or hand placement of those inputs. Validator replay and grouped
+stage transport still follow their own rematerialization issues.
 
 The runtime refuses before launch when the executing release id, build digest,
 or environment ref do not match the admitted identity in that manifest. When a
@@ -159,9 +162,11 @@ missing. A joiner `resume` manifest can then point
 `peer_checkpoint_handoff_receipt` at that retained receipt through one artifact
 binding. The retained handoff receipt now carries logical artifact references
 for the served checkpoint pointer and checkpoint manifest, while its local
-source path remains only an operator diagnostic. The resume path copies the
-materialized checkpoint pointer and manifest into the local run root before the
-normal preflight validation emits the ordinary `auto_resume_receipt.json`.
+source path remains only an operator diagnostic. When the caller stages the
+resolver-backed handoff family into `<run-root>/artifacts/resolved/`, the
+resume path copies the checkpoint pointer and manifest into the local run root
+before the normal preflight validation emits the ordinary
+`auto_resume_receipt.json`.
 
 `./TRAIN` remains the operator convenience path above the same actual lane
 logic.
@@ -387,6 +392,12 @@ Canonical resume:
 ```bash
 ./TRAIN resume --run-root <path>
 ```
+
+For the launch path, that run root is also the canonical local staging root for
+resolver-backed peer handoff artifacts:
+
+- `<run-root>/artifacts/resolved/<sanitized-artifact-id>.json`
+- `<run-root>/artifacts/resolved/<sanitized-artifact-id>`
 
 Resume first reads:
 

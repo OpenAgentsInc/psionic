@@ -3,18 +3,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCheckpointManifest,
-    PsionActualPretrainingCheckpointPointer, PsionicTrainArtifactBinding,
-    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer,
-    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainOperation, PsionicTrainRole,
     build_psionic_train_artifact_binding_from_path, inspect_psionic_train_checkpoint_surface,
     psionic_train_resolved_artifact_cache_candidates, psionic_train_resolved_artifact_cache_key,
+    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
+    PsionicTrainArtifactBinding, PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer,
+    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainOperation, PsionicTrainRole,
+    PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR,
 };
 
 /// Stable schema version for the machine-readable peer checkpoint handoff receipt.
@@ -598,8 +599,11 @@ fn resolve_artifact_binding_path(
 
     Err(PsionicTrainCheckpointHandoffError::MissingCheckpoint {
         detail: format!(
-            "{field} requires one local copy of artifact `{}`; checked {}",
+            "{field} requires one local copy of artifact `{}`; automatic launch expects resolver-backed materialization under `{}`; checked {}",
             binding.artifact_ref.artifact_id,
+            joiner_run_root
+                .join(PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR)
+                .display(),
             attempted_paths.join(", ")
         ),
     })

@@ -2130,6 +2130,46 @@ fn machine_manifest_resume_can_seed_from_resolver_backed_peer_checkpoint_handoff
 }
 
 #[test]
+fn machine_manifest_resume_refuses_with_cache_guidance_when_resolver_artifact_is_missing() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let joiner_run_root = tempdir.path().join("joiner-run");
+    let resume_manifest_path = tempdir.path().join("resume-missing-resolver-artifact.json");
+    let mut resume_manifest = build_retained_operation_manifest(
+        &joiner_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::Resume,
+    );
+    resume_manifest.coordination.node_pubkey = Some(String::from("npub1-late-joiner"));
+    resume_manifest.peer_checkpoint_handoff_receipt =
+        Some(psionic_train::PsionicTrainArtifactBinding {
+            artifact_ref: psionic_train::PsionicTrainArtifactRef {
+                artifact_id: String::from(
+                    "psionic.train.artifact.checkpoint_handoff_receipt.missing",
+                ),
+                artifact_digest: None,
+                artifact_bytes: None,
+            },
+            materialized_path: None,
+        });
+    resume_manifest.dry_run = true;
+    write_manifest(&resume_manifest_path, &mut resume_manifest);
+    let output = run_machine_manifest(&resume_manifest_path);
+
+    assert!(!output.status.success(), "resume should be refused");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("artifacts/resolved"),
+        "stderr should point at the canonical resolver cache path:\n{}",
+        stderr
+    );
+    assert!(
+        stderr.contains("checkpoint_missing"),
+        "stderr should preserve the checkpoint_missing refusal class:\n{}",
+        stderr
+    );
+}
+
+#[test]
 fn machine_manifest_serve_checkpoint_falls_back_to_backup_when_primary_is_missing() {
     let tempdir = tempdir().expect("tempdir should exist");
     let source_run_root = tempdir.path().join("source-run");
