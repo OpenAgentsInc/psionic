@@ -136,6 +136,21 @@ training.
 This still prefers the accelerated lane. It only falls back to the CPU
 reference lane when the remote accelerated lane is unavailable.
 
+### Longer bounded runs
+
+```bash
+./TRAIN --lane reference_pilot \
+  --mode accelerated_reference \
+  --max-steps 16 \
+  --steps-per-window 4 \
+  --windows-per-cadence 2
+```
+
+The reference lane now accepts bounded budget overrides through the existing
+operator script. Those overrides stay within the same shipped lane and are
+recorded in `reference_pilot_operator_manifest.json` as
+`requested_budget_override`.
+
 ## Output Layout
 
 Every bounded reference-pilot run writes:

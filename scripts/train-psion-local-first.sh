@@ -30,6 +30,10 @@ execution_location=""
 execution_topology_classification=""
 remote_stage_strategy="not_applicable"
 remote_stage_reason=""
+max_steps=""
+steps_per_window=""
+windows_per_cadence=""
+step_duration_ms=""
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=5)
 scp_opts=(-O -o BatchMode=yes -o ConnectTimeout=5)
 
@@ -58,6 +62,10 @@ Options:
                                  In auto mode, fall back to the bounded CPU reference lane if the remote accelerated lane is unavailable.
   --local-tailnet-ip <ip>        Override local Tailnet IPv4 in the operator manifest.
   --remote-tailnet-ip <ip>       Override remote Tailnet IPv4 in the operator manifest.
+  --max-steps <count>            Override the bounded reference-pilot max step count.
+  --steps-per-window <count>     Override the bounded reference-pilot steps per logical window.
+  --windows-per-cadence <count>  Override the bounded reference-pilot windows per outer cadence.
+  --step-duration-ms <ms>        Override the bounded reference-pilot synthetic step duration.
   --cleanup-remote               Remove the staged remote worktree and output after copying artifacts back.
   --dry-run                      Print the bounded reference-pilot plan and write the operator manifest without launching training.
   --help|-h                      Show this help text.
@@ -108,6 +116,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --remote-tailnet-ip)
       remote_tailnet_ip="$2"
+      shift 2
+      ;;
+    --max-steps)
+      max_steps="$2"
+      shift 2
+      ;;
+    --steps-per-window)
+      steps_per_window="$2"
+      shift 2
+      ;;
+    --windows-per-cadence)
+      windows_per_cadence="$2"
+      shift 2
+      ;;
+    --step-duration-ms)
+      step_duration_ms="$2"
       shift 2
       ;;
     --cleanup-remote)
@@ -353,7 +377,8 @@ python3 - <<'PY' \
   "${remote_gpu_name}" "${remote_preflight_reason}" "${control_plane_host}" \
   "${worker_host}" "${worker_tailnet_ip}" "${worker_count}" \
   "${execution_location}" "${execution_topology_classification}" \
-  "${remote_stage_strategy}" "${remote_stage_reason}"
+  "${remote_stage_strategy}" "${remote_stage_reason}" \
+  "${max_steps}" "${steps_per_window}" "${windows_per_cadence}" "${step_duration_ms}"
 import json
 import sys
 from datetime import datetime
@@ -381,6 +406,10 @@ from datetime import datetime
     execution_topology_classification,
     remote_stage_strategy,
     remote_stage_reason,
+    max_steps,
+    steps_per_window,
+    windows_per_cadence,
+    step_duration_ms,
 ) = sys.argv[1:]
 
 doc = {
@@ -410,6 +439,12 @@ doc = {
     "remote_stage_reason": remote_stage_reason or None,
     "remote_worktree_dir": remote_worktree_dir,
     "remote_output_dir": remote_output_dir,
+    "requested_budget_override": {
+        "max_steps": int(max_steps) if max_steps else None,
+        "steps_per_window": int(steps_per_window) if steps_per_window else None,
+        "windows_per_cadence": int(windows_per_cadence) if windows_per_cadence else None,
+        "step_duration_ms": int(step_duration_ms) if step_duration_ms else None,
+    },
     "claim_boundary": "This manifest records one bounded Psion reference-pilot operator run. It does not claim the actual broader-pretraining lane. The accelerator-backed mode targets the admitted accelerated reference pilot on the Tailnet CUDA host. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
 }
 
@@ -428,6 +463,10 @@ if [[ "${dry_run}" == "1" ]]; then
   echo "worker_host=${worker_host}"
   echo "worker_count=${worker_count}"
   echo "execution_location=${execution_location}"
+  echo "max_steps=${max_steps:-default}"
+  echo "steps_per_window=${steps_per_window:-default}"
+  echo "windows_per_cadence=${windows_per_cadence:-default}"
+  echo "step_duration_ms=${step_duration_ms:-default}"
   echo "reference_pilot_operator_manifest=${operator_manifest_path}"
   if [[ "${selected_mode}" == "accelerated_reference" ]]; then
     echo "remote_host=${remote_host}"
@@ -502,6 +541,10 @@ for key in [
 ]:
     if key in manifest:
         summary[key] = manifest[key]
+
+budget_override = manifest.get("requested_budget_override")
+if budget_override:
+    summary["requested_budget_override"] = budget_override
 
 if mode == "accelerated_reference" and status == "completed":
     stage_path = os.path.join(artifact_dir, "psion_accelerated_reference_pilot_stage_receipt.json")
@@ -579,6 +622,20 @@ log_note() {
   printf '[%s] %s\n' "$(now_utc)" "$*" >>"${local_log_path}"
 }
 
+reference_pilot_env=()
+if [[ -n "${max_steps}" ]]; then
+  reference_pilot_env+=("PSION_REFERENCE_PILOT_MAX_STEPS=${max_steps}")
+fi
+if [[ -n "${steps_per_window}" ]]; then
+  reference_pilot_env+=("PSION_REFERENCE_PILOT_STEPS_PER_WINDOW=${steps_per_window}")
+fi
+if [[ -n "${windows_per_cadence}" ]]; then
+  reference_pilot_env+=("PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=${windows_per_cadence}")
+fi
+if [[ -n "${step_duration_ms}" ]]; then
+  reference_pilot_env+=("PSION_REFERENCE_PILOT_STEP_DURATION_MS=${step_duration_ms}")
+fi
+
 stage_remote_repo() {
   if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
     log_note "staging_strategy=remote_git_worktree git_ref=${git_ref} remote_seed_repo_dir=${remote_seed_repo_dir}"
@@ -629,7 +686,7 @@ trap 'on_exit $?' EXIT
 
 if [[ "${selected_mode}" == "local_reference" ]]; then
   log_note "launching local_reference control_plane_host=${control_plane_host}"
-  cargo run -q -p psionic-train --example psion_reference_pilot -- "${local_artifact_dir}" \
+  env "${reference_pilot_env[@]}" cargo run -q -p psionic-train --example psion_reference_pilot -- "${local_artifact_dir}" \
     >>"${local_log_path}" 2>&1
   write_summary "${selected_mode}" "completed" "${output_root}" "${local_log_path}" "${local_artifact_dir}"
   echo "status=completed"
@@ -646,7 +703,21 @@ fi
 log_note "launching accelerated_reference control_plane_host=${control_plane_host} worker_host=${worker_host} worker_count=${worker_count}"
 stage_remote_repo
 
-remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; export RUST_MIN_STACK=16777216; mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
+remote_reference_pilot_exports=""
+if [[ -n "${max_steps}" ]]; then
+  remote_reference_pilot_exports="${remote_reference_pilot_exports} export PSION_REFERENCE_PILOT_MAX_STEPS=${max_steps};"
+fi
+if [[ -n "${steps_per_window}" ]]; then
+  remote_reference_pilot_exports="${remote_reference_pilot_exports} export PSION_REFERENCE_PILOT_STEPS_PER_WINDOW=${steps_per_window};"
+fi
+if [[ -n "${windows_per_cadence}" ]]; then
+  remote_reference_pilot_exports="${remote_reference_pilot_exports} export PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=${windows_per_cadence};"
+fi
+if [[ -n "${step_duration_ms}" ]]; then
+  remote_reference_pilot_exports="${remote_reference_pilot_exports} export PSION_REFERENCE_PILOT_STEP_DURATION_MS=${step_duration_ms};"
+fi
+
+remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; export RUST_MIN_STACK=16777216;${remote_reference_pilot_exports} mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
 ssh "${ssh_opts[@]}" "${remote_ssh_target}" "${remote_command}" >>"${local_log_path}" 2>&1
 
 rm -rf "${local_artifact_dir}"
