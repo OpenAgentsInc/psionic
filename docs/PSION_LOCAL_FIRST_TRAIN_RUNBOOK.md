@@ -19,6 +19,7 @@ The command is:
 From the Psionic repo root, that now means:
 
 - prefer the canonical accelerator-backed bounded reference pilot
+- support the bounded dual-host joint-gradient reference mode explicitly
 - stage the current committed git revision to the admitted Tailnet CUDA host
 - run `psion_accelerated_reference_pilot` there
 - copy the retained artifacts back locally
@@ -104,6 +105,18 @@ The accelerated claim is still narrow:
 That means a successful accelerated run is a real remote single-worker CUDA
 pilot, not mixed-device Mac + CUDA training and not a broader cluster proof.
 
+The bounded distributed claim is different:
+
+- control plane: the local host that launched `./TRAIN --lane reference_pilot`
+- worker count: `2`
+- worker hosts: the local Apple-silicon host and the admitted remote CUDA host
+- execution classification:
+  `dual_host_joint_gradient_average`
+
+That means a successful distributed run is one real bounded joint optimizer
+path where the Mac and the remote CUDA worker both stay in the model-progress
+path for the full retained run.
+
 ## Useful Options
 
 ### Dry run
@@ -126,6 +139,15 @@ training.
 ```bash
 ./TRAIN --lane reference_pilot --mode local_reference
 ```
+
+### Explicit dual-host joint-gradient run
+
+```bash
+./TRAIN --lane reference_pilot --mode distributed_reference --cleanup-remote
+```
+
+Use `--cleanup-remote` on the live Tailnet lane unless you are actively
+debugging the staged remote worktree.
 
 ### Auto mode with explicit fallback
 
@@ -150,6 +172,17 @@ The reference lane now accepts bounded budget overrides through the existing
 operator script. Those overrides stay within the same shipped lane and are
 recorded in `reference_pilot_operator_manifest.json` as
 `requested_budget_override`.
+
+The same override surface works for the dual-host lane:
+
+```bash
+./TRAIN --lane reference_pilot \
+  --mode distributed_reference \
+  --cleanup-remote \
+  --max-steps 8 \
+  --steps-per-window 4 \
+  --windows-per-cadence 2
+```
 
 ## Output Layout
 
@@ -184,12 +217,27 @@ For accelerated runs, `reference_pilot_artifacts/` should contain:
 - `psion_accelerated_reference_pilot_checkpoint_manifest.json`
 - the related checkpoint and visualization artifacts emitted by the example
 
+For distributed dual-host runs, `reference_pilot_artifacts/` should contain:
+
+- `psion_reference_pilot_stage_receipt.json`
+- `psion_reference_pilot_observability_receipt.json`
+- `psion_reference_pilot_checkpoint_manifest.json`
+- `psion_reference_pilot_dual_host_topology_receipt.json`
+- `psion_reference_pilot_dual_host_step_receipts.json`
+- `psion_reference_pilot_dual_host_exchange/`
+
 For local reference runs, `reference_pilot_artifacts/` should contain:
 
 - `psion_reference_pilot_stage_receipt.json`
 - `psion_reference_pilot_observability_receipt.json`
 - `psion_reference_pilot_checkpoint_manifest.json`
 - the related checkpoint artifacts emitted by the example
+
+The dual-host topology receipt is the canonical retained proof that both the
+local host and the remote CUDA worker remained in the optimizer path. The
+step-receipts file is the canonical per-step proof that each optimizer step
+merged one local contribution and one remote contribution before the shared
+checkpoint advanced.
 
 ## Checkpoint Restore Verification
 
@@ -230,6 +278,12 @@ bounded reference pilot were the actual broader-pretraining lane.
 If staging or launch fails, `train.log` is also the canonical failure trace. It
 records the selected staging strategy and the last completed launcher step so a
 wrapper failure can be retained honestly instead of reconstructed from memory.
+
+The first successful dual-host run on a freshly rebooted or freshly staged
+remote worker may spend most of its wall-clock time in the remote initial
+`cargo run` build. That is normal for the first step because the remote target
+directory is cold. Once the remote build cache is warm, the per-step exchange is
+much faster.
 
 ## Staging Behavior
 
