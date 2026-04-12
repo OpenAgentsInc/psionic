@@ -11501,6 +11501,31 @@ mod platform {
             )))
         }
 
+        pub(super) fn encode_argmax_f32(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _input: &MetalBuffer,
+            _output: &MetalBuffer,
+            _row_count: usize,
+            _column_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_argmax_candidates(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _input: &MetalBuffer,
+            _output: &MetalBuffer,
+            _candidate_count: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_quantized_matvec(
             &mut self,
             _submission: &mut PlatformSubmission,
