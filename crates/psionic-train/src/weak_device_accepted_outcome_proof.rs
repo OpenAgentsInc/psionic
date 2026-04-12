@@ -4,26 +4,29 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    inspect_psionic_train_checkpoint_surface, load_psionic_train_grouped_stage_execution_summary,
-    load_psionic_train_grouped_stage_replay_evidence, PsionicTrainCheckpointManifest,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainContributionArtifactManifest,
     PsionicTrainContributionReceipt, PsionicTrainGroupedReplicaStageAssignment,
-    PsionicTrainOutcomeKind, PsionicTrainRunStatusPacket, PsionicTrainSealedWindowBundle,
-    PsionicTrainValidatorHook, PsionicTrainValidatorQualityDriftSignal,
-    PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorRollbackPosture,
-    PsionicTrainValidatorRollbackSignal, PsionicTrainValidatorScoreArtifact,
-    PsionicTrainValidatorScoreReceipt, PsionicTrainWindowExecution, PsionicTrainWorkClass,
-    TrainingExecutionValidatorDisposition, PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS,
+    PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainRunStatusPacket,
+    PsionicTrainSealedWindowBundle, PsionicTrainValidatorHook,
+    PsionicTrainValidatorQualityDriftSignal, PsionicTrainValidatorQualityDriftState,
+    PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorRollbackSignal,
+    PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
+    PsionicTrainWindowExecution, PsionicTrainWorkClass, TrainingExecutionValidatorDisposition,
+    inspect_psionic_train_checkpoint_surface, load_psionic_train_grouped_stage_execution_summary,
+    load_psionic_train_grouped_stage_replay_evidence,
 };
 
 pub const PSIONIC_TRAIN_WEAK_DEVICE_ACCEPTED_OUTCOME_PROOF_SCHEMA_VERSION: &str =
     "psionic.train.weak_device_accepted_outcome_proof.v1";
+pub const PSIONIC_TRAIN_WEAK_DEVICE_VALIDATION_REPLAY_PROOF_SCHEMA_VERSION: &str =
+    "psionic.train.weak_device_validation_replay_proof.v1";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainWeakDeviceAcceptedOutcomeArtifactRef {
@@ -31,6 +34,44 @@ pub struct PsionicTrainWeakDeviceAcceptedOutcomeArtifactRef {
     pub artifact_path: String,
     pub artifact_digest: String,
     pub detail: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionicTrainWeakDevicePublicCountClass {
+    ValidatorRecognizedParticipation,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainWeakDeviceValidationReplayProof {
+    pub schema_version: String,
+    pub proof_id: String,
+    pub lane_id: String,
+    pub network_id: Option<String>,
+    pub validator_run_id: String,
+    pub validator_node_pubkey: String,
+    pub backend_family: String,
+    pub topology_class: String,
+    pub weak_device_bearing: bool,
+    pub challenged_run_id: String,
+    pub challenged_node_pubkey: String,
+    pub challenged_work_class: PsionicTrainWorkClass,
+    pub window_id: String,
+    pub assignment_id: String,
+    pub challenge_id: String,
+    pub contribution_id: String,
+    pub contribution_digest: String,
+    pub artifact_manifest_digest: String,
+    pub public_count_class: PsionicTrainWeakDevicePublicCountClass,
+    pub validator_disposition: TrainingExecutionValidatorDisposition,
+    pub validator_score_bps: u16,
+    pub verified_hooks: Vec<PsionicTrainValidatorHook>,
+    pub quality_drift_state: PsionicTrainValidatorQualityDriftState,
+    pub rollback_posture: PsionicTrainValidatorRollbackPosture,
+    pub cited_artifacts: Vec<PsionicTrainWeakDeviceAcceptedOutcomeArtifactRef>,
+    pub claim_boundary: String,
+    pub detail: String,
+    pub bundle_digest: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -348,6 +389,421 @@ impl PsionicTrainWeakDeviceAcceptedOutcomeProof {
         }
         Ok(())
     }
+}
+
+impl PsionicTrainWeakDeviceValidationReplayProof {
+    #[must_use]
+    pub fn stable_bundle_digest(&self) -> String {
+        let mut digest_basis = self.clone();
+        digest_basis.bundle_digest.clear();
+        stable_digest(
+            b"psionic_train_weak_device_validation_replay_proof|",
+            &digest_basis,
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), PsionicTrainWeakDeviceAcceptedOutcomeProofError> {
+        require_nonempty(self.schema_version.as_str(), "proof.schema_version")?;
+        if self.schema_version != PSIONIC_TRAIN_WEAK_DEVICE_VALIDATION_REPLAY_PROOF_SCHEMA_VERSION {
+            return Err(invalid(format!(
+                "proof schema version must stay `{}` but was `{}`",
+                PSIONIC_TRAIN_WEAK_DEVICE_VALIDATION_REPLAY_PROOF_SCHEMA_VERSION,
+                self.schema_version
+            )));
+        }
+        require_nonempty(self.proof_id.as_str(), "proof.proof_id")?;
+        require_nonempty(self.lane_id.as_str(), "proof.lane_id")?;
+        require_nonempty(self.validator_run_id.as_str(), "proof.validator_run_id")?;
+        require_nonempty(
+            self.validator_node_pubkey.as_str(),
+            "proof.validator_node_pubkey",
+        )?;
+        require_nonempty(self.backend_family.as_str(), "proof.backend_family")?;
+        require_nonempty(self.topology_class.as_str(), "proof.topology_class")?;
+        require_nonempty(self.challenged_run_id.as_str(), "proof.challenged_run_id")?;
+        require_nonempty(
+            self.challenged_node_pubkey.as_str(),
+            "proof.challenged_node_pubkey",
+        )?;
+        require_nonempty(self.window_id.as_str(), "proof.window_id")?;
+        require_nonempty(self.assignment_id.as_str(), "proof.assignment_id")?;
+        require_nonempty(self.challenge_id.as_str(), "proof.challenge_id")?;
+        require_nonempty(self.contribution_id.as_str(), "proof.contribution_id")?;
+        require_nonempty(
+            self.contribution_digest.as_str(),
+            "proof.contribution_digest",
+        )?;
+        require_nonempty(
+            self.artifact_manifest_digest.as_str(),
+            "proof.artifact_manifest_digest",
+        )?;
+        if !self.weak_device_bearing {
+            return Err(invalid(String::from(
+                "validation replay proof must stay explicitly marked as weak-device-bearing",
+            )));
+        }
+        if self.backend_family != PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY
+            || self.topology_class != PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS
+        {
+            return Err(invalid(format!(
+                "validation replay proof capability projection `{}` / `{}` is not the admitted Apple weak-device surface",
+                self.backend_family, self.topology_class
+            )));
+        }
+        if !self.challenged_work_class.is_validator_target_admitted() {
+            return Err(invalid(format!(
+                "validation replay proof challenged work class `{}` is not admitted for validator replay",
+                self.challenged_work_class.label()
+            )));
+        }
+        if self.validator_disposition != TrainingExecutionValidatorDisposition::Accepted {
+            return Err(invalid(String::from(
+                "validation replay proof requires one accepted validator disposition",
+            )));
+        }
+        if self.validator_score_bps != 10_000 {
+            return Err(invalid(String::from(
+                "validation replay proof requires the accepted 10000 bps score ceiling",
+            )));
+        }
+        if self.verified_hooks.is_empty() {
+            return Err(invalid(String::from(
+                "validation replay proof requires one non-empty verified hook set",
+            )));
+        }
+        if self.quality_drift_state == PsionicTrainValidatorQualityDriftState::Regressed {
+            return Err(invalid(String::from(
+                "validation replay proof does not admit regressed quality drift state",
+            )));
+        }
+        if self.rollback_posture != PsionicTrainValidatorRollbackPosture::Hold {
+            return Err(invalid(String::from(
+                "validation replay proof requires rollback posture `hold`",
+            )));
+        }
+        if self.cited_artifacts.is_empty() {
+            return Err(invalid(String::from(
+                "validation replay proof cited_artifacts must not be empty",
+            )));
+        }
+        let mut artifact_roles = BTreeSet::new();
+        for artifact in &self.cited_artifacts {
+            require_nonempty(
+                artifact.artifact_role.as_str(),
+                "proof.cited_artifacts[].artifact_role",
+            )?;
+            require_nonempty(
+                artifact.artifact_path.as_str(),
+                "proof.cited_artifacts[].artifact_path",
+            )?;
+            require_nonempty(
+                artifact.artifact_digest.as_str(),
+                "proof.cited_artifacts[].artifact_digest",
+            )?;
+            require_nonempty(artifact.detail.as_str(), "proof.cited_artifacts[].detail")?;
+            artifact_roles.insert(artifact.artifact_role.as_str());
+        }
+        for required_role in [
+            "contribution_receipt",
+            "contribution_artifact_manifest",
+            "validator_score_artifact",
+            "validator_score_receipt",
+            "validator_quality_drift_signal",
+            "validator_rollback_signal",
+        ] {
+            if !artifact_roles.contains(required_role) {
+                return Err(invalid(format!(
+                    "validation replay proof cited_artifacts is missing required role `{required_role}`",
+                )));
+            }
+        }
+        require_nonempty(self.claim_boundary.as_str(), "proof.claim_boundary")?;
+        require_nonempty(self.detail.as_str(), "proof.detail")?;
+        require_nonempty(self.bundle_digest.as_str(), "proof.bundle_digest")?;
+        if self.bundle_digest != self.stable_bundle_digest() {
+            return Err(invalid(String::from(
+                "validation replay proof bundle_digest drifted from canonical contents",
+            )));
+        }
+        Ok(())
+    }
+}
+
+pub fn maybe_record_psionic_train_weak_device_validation_replay_proof(
+    output_path: &Path,
+    manifest: &PsionicTrainInvocationManifest,
+    contribution_receipt_path: &Path,
+    contribution_receipt: &PsionicTrainContributionReceipt,
+    contribution_artifact_manifest_path: &Path,
+    contribution_artifact_manifest: &PsionicTrainContributionArtifactManifest,
+    score_artifact_path: &Path,
+    score_artifact: &PsionicTrainValidatorScoreArtifact,
+    score_receipt_path: &Path,
+    score_receipt: &PsionicTrainValidatorScoreReceipt,
+    quality_drift_signal_path: &Path,
+    quality_drift_signal: &PsionicTrainValidatorQualityDriftSignal,
+    rollback_signal_path: &Path,
+    rollback_signal: &PsionicTrainValidatorRollbackSignal,
+) -> Result<
+    Option<PsionicTrainWeakDeviceValidationReplayProof>,
+    PsionicTrainWeakDeviceAcceptedOutcomeProofError,
+> {
+    if manifest.lane_id != PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+        || manifest.work_class != PsionicTrainWorkClass::ValidationReplay
+    {
+        return Ok(None);
+    }
+
+    if score_receipt.disposition != TrainingExecutionValidatorDisposition::Accepted
+        || score_artifact.disposition != TrainingExecutionValidatorDisposition::Accepted
+        || score_receipt.score_bps != 10_000
+        || score_artifact.score_bps != 10_000
+        || rollback_signal.rollback_posture != PsionicTrainValidatorRollbackPosture::Hold
+        || quality_drift_signal.drift_state == PsionicTrainValidatorQualityDriftState::Regressed
+    {
+        return Ok(None);
+    }
+
+    let validator_run_id = manifest.run_id.as_deref().ok_or_else(|| {
+        invalid(String::from(
+            "weak-device validator manifest is missing run_id",
+        ))
+    })?;
+    let validator_node_pubkey = manifest
+        .coordination
+        .node_pubkey
+        .as_deref()
+        .ok_or_else(|| {
+            invalid(String::from(
+                "weak-device validator manifest is missing coordination.node_pubkey",
+            ))
+        })?;
+    require_eq(
+        validator_run_id,
+        score_receipt.validator_run_id.as_str(),
+        "validation replay proof validator_run_id",
+    )?;
+    require_eq(
+        validator_node_pubkey,
+        score_receipt.validator_node_pubkey.as_str(),
+        "validation replay proof validator_node_pubkey",
+    )?;
+    require_eq(
+        contribution_receipt.run_id.as_str(),
+        score_receipt.challenged_run_id.as_str(),
+        "validation replay proof challenged_run_id",
+    )?;
+    require_eq(
+        contribution_receipt.node_pubkey.as_str(),
+        score_receipt.challenged_node_pubkey.as_str(),
+        "validation replay proof challenged_node_pubkey",
+    )?;
+    require_eq(
+        contribution_receipt.window_id.as_str(),
+        score_receipt.window_id.as_str(),
+        "validation replay proof window_id",
+    )?;
+    require_eq(
+        contribution_receipt.assignment_id.as_str(),
+        score_receipt.assignment_id.as_str(),
+        "validation replay proof assignment_id",
+    )?;
+    require_eq(
+        contribution_receipt.contribution_id.as_str(),
+        score_receipt.contribution_id.as_str(),
+        "validation replay proof contribution_id",
+    )?;
+    require_eq(
+        contribution_receipt.contribution_digest.as_str(),
+        score_receipt.contribution_digest.as_str(),
+        "validation replay proof contribution_digest",
+    )?;
+    require_eq(
+        contribution_artifact_manifest
+            .artifact_manifest_digest
+            .as_str(),
+        score_receipt.artifact_manifest_digest.as_str(),
+        "validation replay proof artifact_manifest_digest",
+    )?;
+    require_eq(
+        contribution_receipt.window_id.as_str(),
+        quality_drift_signal.current_window_id.as_str(),
+        "validation replay proof quality_drift_signal.window_id",
+    )?;
+    require_eq(
+        contribution_receipt.assignment_id.as_str(),
+        quality_drift_signal.current_assignment_id.as_str(),
+        "validation replay proof quality_drift_signal.assignment_id",
+    )?;
+    require_eq(
+        score_receipt.challenge_id.as_str(),
+        quality_drift_signal.current_challenge_id.as_str(),
+        "validation replay proof quality_drift_signal.challenge_id",
+    )?;
+    require_eq(
+        score_receipt.challenge_id.as_str(),
+        rollback_signal.current_challenge_id.as_str(),
+        "validation replay proof rollback_signal.challenge_id",
+    )?;
+    require_eq(
+        score_receipt.score_receipt_digest.as_str(),
+        quality_drift_signal.validator_score_receipt_digest.as_str(),
+        "validation replay proof quality_drift_signal.validator_score_receipt_digest",
+    )?;
+    require_eq(
+        score_receipt.score_receipt_digest.as_str(),
+        rollback_signal.validator_score_receipt_digest.as_str(),
+        "validation replay proof rollback_signal.validator_score_receipt_digest",
+    )?;
+    if score_receipt.challenged_work_class != contribution_receipt.work_class
+        || score_receipt.challenged_work_class != contribution_artifact_manifest.work_class
+    {
+        return Err(invalid(String::from(
+            "validation replay proof challenged work class drifted across retained replay artifacts",
+        )));
+    }
+
+    let mut cited_artifacts = vec![
+        artifact_ref(
+            "contribution_receipt",
+            contribution_receipt_path.display().to_string().as_str(),
+            contribution_receipt.contribution_digest.as_str(),
+            "Accepted challenged contribution receipt cited by the weak-device validator replay proof.",
+        )?,
+        artifact_ref(
+            "contribution_artifact_manifest",
+            contribution_artifact_manifest_path
+                .display()
+                .to_string()
+                .as_str(),
+            contribution_artifact_manifest
+                .artifact_manifest_digest
+                .as_str(),
+            "Accepted challenged contribution artifact manifest cited by the weak-device validator replay proof.",
+        )?,
+        artifact_ref(
+            "validator_score_artifact",
+            score_artifact_path.display().to_string().as_str(),
+            score_artifact.score_digest.as_str(),
+            "Accepted validator score artifact that records the bounded replay hooks for the weak-device lane.",
+        )?,
+        artifact_ref(
+            "validator_score_receipt",
+            score_receipt_path.display().to_string().as_str(),
+            score_receipt.score_receipt_digest.as_str(),
+            "Accepted validator score receipt retained for the weak-device validation_replay assignment.",
+        )?,
+        artifact_ref(
+            "validator_quality_drift_signal",
+            quality_drift_signal_path.display().to_string().as_str(),
+            quality_drift_signal.drift_signal_digest.as_str(),
+            "Quality-drift signal proving the accepted weak-device validator replay did not regress below the retained validator baseline.",
+        )?,
+        artifact_ref(
+            "validator_rollback_signal",
+            rollback_signal_path.display().to_string().as_str(),
+            rollback_signal.rollback_signal_digest.as_str(),
+            "Rollback signal proving the accepted weak-device validator replay remains in hold posture.",
+        )?,
+    ];
+    if let (Some(path), Some(digest)) = (
+        score_receipt.grouped_stage_replay_evidence_path.as_deref(),
+        score_receipt
+            .grouped_stage_replay_evidence_digest
+            .as_deref(),
+    ) {
+        cited_artifacts.push(artifact_ref(
+            "grouped_stage_replay_evidence",
+            path,
+            digest,
+            "Grouped-stage replay evidence carried through the weak-device validator proof because the challenged contribution used grouped stage execution.",
+        )?);
+    }
+    if let (Some(path), Some(digest)) = (
+        score_receipt
+            .grouped_stage_execution_summary_path
+            .as_deref(),
+        score_receipt
+            .grouped_stage_execution_summary_digest
+            .as_deref(),
+    ) {
+        cited_artifacts.push(artifact_ref(
+            "grouped_stage_execution_summary",
+            path,
+            digest,
+            "Grouped-stage execution summary cited when the weak-device validator replay challenged a grouped-stage contribution.",
+        )?);
+    }
+
+    let mut proof = PsionicTrainWeakDeviceValidationReplayProof {
+        schema_version: String::from(
+            PSIONIC_TRAIN_WEAK_DEVICE_VALIDATION_REPLAY_PROOF_SCHEMA_VERSION,
+        ),
+        proof_id: format!(
+            "weak-device-validation-replay:{}:{}:{}",
+            manifest.lane_id, score_receipt.window_id, score_receipt.challenge_id
+        ),
+        lane_id: manifest.lane_id.clone(),
+        network_id: manifest.coordination.network_id.clone(),
+        validator_run_id: String::from(validator_run_id),
+        validator_node_pubkey: String::from(validator_node_pubkey),
+        backend_family: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY),
+        topology_class: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS),
+        weak_device_bearing: true,
+        challenged_run_id: contribution_receipt.run_id.clone(),
+        challenged_node_pubkey: contribution_receipt.node_pubkey.clone(),
+        challenged_work_class: contribution_receipt.work_class,
+        window_id: contribution_receipt.window_id.clone(),
+        assignment_id: contribution_receipt.assignment_id.clone(),
+        challenge_id: score_receipt.challenge_id.clone(),
+        contribution_id: contribution_receipt.contribution_id.clone(),
+        contribution_digest: contribution_receipt.contribution_digest.clone(),
+        artifact_manifest_digest: contribution_artifact_manifest
+            .artifact_manifest_digest
+            .clone(),
+        public_count_class:
+            PsionicTrainWeakDevicePublicCountClass::ValidatorRecognizedParticipation,
+        validator_disposition: score_receipt.disposition,
+        validator_score_bps: score_receipt.score_bps,
+        verified_hooks: score_receipt.verified_hooks.clone(),
+        quality_drift_state: quality_drift_signal.drift_state,
+        rollback_posture: rollback_signal.rollback_posture,
+        cited_artifacts,
+        claim_boundary: String::from(
+            "This proof bundle cites one accepted weak-device validation_replay assignment. It counts as validator-recognized participation on the public weak-device lane. It does not claim direct model-progress credit, checkpoint promotion authority, payout closeout, or network-wide finality beyond the retained Psionic validator surfaces cited here.",
+        ),
+        detail: String::from(
+            "Weak-device validation replay proof keeps the launch claim narrow and machine-readable: one weaker Apple/Metal node completed one accepted validation_replay assignment, the bounded replay hooks stayed explicit, quality did not regress, and rollback posture remained hold.",
+        ),
+        bundle_digest: String::new(),
+    };
+    proof.bundle_digest = proof.stable_bundle_digest();
+    proof.validate()?;
+
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            PsionicTrainWeakDeviceAcceptedOutcomeProofError::Write {
+                path: parent.display().to_string(),
+                detail: error.to_string(),
+            }
+        })?;
+    }
+    fs::write(
+        output_path,
+        serde_json::to_vec_pretty(&proof).map_err(|error| {
+            PsionicTrainWeakDeviceAcceptedOutcomeProofError::Write {
+                path: output_path.display().to_string(),
+                detail: error.to_string(),
+            }
+        })?,
+    )
+    .map_err(
+        |error| PsionicTrainWeakDeviceAcceptedOutcomeProofError::Write {
+            path: output_path.display().to_string(),
+            detail: error.to_string(),
+        },
+    )?;
+    Ok(Some(proof))
 }
 
 pub fn record_psionic_train_weak_device_accepted_outcome_proof(
@@ -1234,9 +1690,11 @@ pub fn record_psionic_train_weak_device_accepted_outcome_proof(
                     .artifact_ref
                     .artifact_digest
                     .as_deref()
-                    .ok_or_else(|| invalid(String::from(
-                        "checkpoint surface artifact binding is missing one digest",
-                    )))?,
+                    .ok_or_else(|| {
+                        invalid(String::from(
+                            "checkpoint surface artifact binding is missing one digest",
+                        ))
+                    })?,
                 "Checkpoint surface cited by the contribution manifest and inspected from the retained run root.",
             )?,
             artifact_ref_with_digest(
@@ -1247,9 +1705,11 @@ pub fn record_psionic_train_weak_device_accepted_outcome_proof(
                     .artifact_ref
                     .artifact_digest
                     .as_deref()
-                    .ok_or_else(|| invalid(String::from(
-                        "checkpoint pointer artifact binding is missing one digest",
-                    )))?,
+                    .ok_or_else(|| {
+                        invalid(String::from(
+                            "checkpoint pointer artifact binding is missing one digest",
+                        ))
+                    })?,
                 "Accepted grouped-stage checkpoint pointer retained under the run root.",
             )?,
             artifact_ref(
@@ -1688,6 +2148,90 @@ mod tests {
         proof
     }
 
+    fn sample_validation_replay_proof() -> PsionicTrainWeakDeviceValidationReplayProof {
+        let mut proof = PsionicTrainWeakDeviceValidationReplayProof {
+            schema_version: String::from(
+                PSIONIC_TRAIN_WEAK_DEVICE_VALIDATION_REPLAY_PROOF_SCHEMA_VERSION,
+            ),
+            proof_id: String::from("weak-device-validation-replay:lane:window:challenge"),
+            lane_id: String::from(PSION_APPLE_WINDOWED_TRAINING_LANE_ID),
+            network_id: Some(String::from("network.psionic.test")),
+            validator_run_id: String::from("validator-run-0001"),
+            validator_node_pubkey: String::from("npub1-validator"),
+            backend_family: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY),
+            topology_class: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS),
+            weak_device_bearing: true,
+            challenged_run_id: String::from("worker-run-0001"),
+            challenged_node_pubkey: String::from("npub1-worker"),
+            challenged_work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            window_id: String::from("window-0001"),
+            assignment_id: String::from("assignment-0001"),
+            challenge_id: String::from("challenge-0001"),
+            contribution_id: String::from("contribution-0001"),
+            contribution_digest: String::from("sha256:contribution"),
+            artifact_manifest_digest: String::from("sha256:artifact-manifest"),
+            public_count_class:
+                PsionicTrainWeakDevicePublicCountClass::ValidatorRecognizedParticipation,
+            validator_disposition: TrainingExecutionValidatorDisposition::Accepted,
+            validator_score_bps: 10_000,
+            verified_hooks: vec![
+                PsionicTrainValidatorHook::AssignmentCorrectness,
+                PsionicTrainValidatorHook::CheckpointLineage,
+            ],
+            quality_drift_state: PsionicTrainValidatorQualityDriftState::Baseline,
+            rollback_posture: PsionicTrainValidatorRollbackPosture::Hold,
+            cited_artifacts: vec![
+                artifact_ref(
+                    "contribution_receipt",
+                    "/tmp/contribution_receipt.json",
+                    "sha256:1",
+                    "sample",
+                )
+                .expect("artifact ref should build"),
+                artifact_ref(
+                    "contribution_artifact_manifest",
+                    "/tmp/artifact_manifest.json",
+                    "sha256:2",
+                    "sample",
+                )
+                .expect("artifact ref should build"),
+                artifact_ref(
+                    "validator_score_artifact",
+                    "/tmp/validator_score_artifact.json",
+                    "sha256:3",
+                    "sample",
+                )
+                .expect("artifact ref should build"),
+                artifact_ref(
+                    "validator_score_receipt",
+                    "/tmp/validator_score_receipt.json",
+                    "sha256:4",
+                    "sample",
+                )
+                .expect("artifact ref should build"),
+                artifact_ref(
+                    "validator_quality_drift_signal",
+                    "/tmp/validator_quality_drift_signal.json",
+                    "sha256:5",
+                    "sample",
+                )
+                .expect("artifact ref should build"),
+                artifact_ref(
+                    "validator_rollback_signal",
+                    "/tmp/validator_rollback_signal.json",
+                    "sha256:6",
+                    "sample",
+                )
+                .expect("artifact ref should build"),
+            ],
+            claim_boundary: String::from("sample"),
+            detail: String::from("sample"),
+            bundle_digest: String::new(),
+        };
+        proof.bundle_digest = proof.stable_bundle_digest();
+        proof
+    }
+
     #[test]
     fn weak_device_accepted_outcome_proof_validates() {
         sample_proof()
@@ -1705,5 +2249,23 @@ mod tests {
             .validate()
             .expect_err("non-accepted proof should fail");
         assert!(error.to_string().contains("validator disposition"));
+    }
+
+    #[test]
+    fn weak_device_validation_replay_proof_validates() {
+        sample_validation_replay_proof()
+            .validate()
+            .expect("sample validation replay proof should validate");
+    }
+
+    #[test]
+    fn weak_device_validation_replay_proof_rejects_non_accepted_disposition() {
+        let mut proof = sample_validation_replay_proof();
+        proof.validator_disposition = TrainingExecutionValidatorDisposition::ReplayRequired;
+        proof.bundle_digest = proof.stable_bundle_digest();
+        let error = proof
+            .validate()
+            .expect_err("non-accepted validation replay proof should fail");
+        assert!(error.to_string().contains("accepted validator disposition"));
     }
 }

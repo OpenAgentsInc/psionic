@@ -458,9 +458,15 @@ absolute paths for those window artifacts through `window_execution_path`,
 `sealed_window_bundle_path`. Validator replay now also writes
 `windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
 plus `validator_score_receipt.json` for one bounded retained contribution
-replay and surfaces that receipt through `validator_score_receipt_path` in the
-run/window status packets. That combined checkpoint-plus-window-and-validator
-surface is
+replay, then adds one paired `validator_quality_drift_signal.json` plus
+`validator_rollback_signal.json` under the same validator root. Accepted
+Apple / Metal weak-device validation replay can now also emit one
+`weak_device_validation_replay_proof.json` artifact from that retained
+validator surface. The run/window status packets still surface the score
+receipt through `validator_score_receipt_path`, and the validator artifact
+surface now also carries `weak_device_validation_replay_proof_path` when that
+narrow proof exists. That combined checkpoint-plus-window-and-validator surface
+is
 the first honest answer to “how does `Pylon` invoke `psionic-train` without
 going through a human shell wrapper?” and “what deterministic contribution
 artifact set did this local assignment materialize?”
@@ -530,8 +536,23 @@ checkpoint artifacts, then emits one
 device, validator acceptance, rollback-hold, and checkpoint-lineage facts. The
 claim boundary on that proof stays narrow on purpose: it proves Psionic-side
 accepted progress for one consumer-device-bearing grouped stage, not payout
-closeout or network-wide finality.
-same `serve-checkpoint`, `resume`, and `validate-contribution` entrypoints
+closeout or network-wide finality. The same Apple / Metal lane now also emits
+one distinct validator-lane proof when the challenged work class is the current
+weak-device `validation_replay` lane. In that case
+`maybe_record_psionic_train_weak_device_validation_replay_proof()` reads the
+retained contribution receipt and artifact manifest, validator score artifact
+and receipt, quality-drift signal, rollback signal, and cited artifact digests
+to emit one `psionic.train.weak_device_validation_replay_proof.v1` bundle at
+`windows/<window_id>/validators/<challenge_id>/weak_device_validation_replay_proof.json`.
+That proof only materializes when the replay stayed on the Apple / Metal weak
+device envelope, the validator disposition was `accepted`, the validator score
+stayed at `10_000` basis points, quality drift stayed non-regressed, and the
+rollback posture stayed `hold`. Its claim boundary is narrower than the
+grouped-stage accepted-outcome proof: it counts validator-recognized
+participation for one admitted weak-device validation replay contribution, not
+direct model progress, checkpoint promotion, payout closeout, or network-wide
+finality. That keeps the Apple lane on the same
+`serve-checkpoint`, `resume`, and `validate-contribution` entrypoints
 without pretending mixed CUDA/Metal windows are already admitted. Apple
 validator replay now accepts the same retained contribution-plus-checkpoint
 surface shape as the CUDA lane, and Apple `resume` now refuses when no admitted
@@ -580,7 +601,9 @@ count, and the latest accepted baseline window when one exists. The rollback
 signal is only a posture artifact: it emits `hold` or `candidate` so later
 closeout, scheduler, or checkpoint-authority code can consume the signal
 without pretending the machine runtime already owns promotion or rollback
-policy.
+policy. The weak-device validation replay proof depends on those retained
+signals, but it does not replace later scheduler, payout, or checkpoint
+authority decisions.
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,

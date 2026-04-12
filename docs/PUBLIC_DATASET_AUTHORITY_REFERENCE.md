@@ -84,3 +84,19 @@ This issue intentionally does not claim:
 
 This issue freezes public data truth first: tokenizer binding, packing binding,
 page proofs, and duplicate-work refusal.
+
+## Relation To Weak-Device Validation Replay
+
+The newer weak-device validation replay proof surface in
+`crates/psionic-train/src/weak_device_accepted_outcome_proof.rs` builds on this
+dataset-authority contract; it does not replace it.
+
+When Apple / Metal validator replay emits
+`weak_device_validation_replay_proof.json`, that proof cites one accepted weak-
+device replay outcome plus the validator score, quality-drift, rollback, and
+artifact-lineage evidence that bounded replay consumed. The proof is only
+honest because the public dataset authority already froze tokenizer, packing,
+page-slice, and duplicate-work truth for the cited public replay inputs. The
+new proof therefore packages one accepted validator-side replay outcome above
+the retained dataset/page authority surface; it does not independently prove
+dataset provenance, public-run policy, payout closeout, or checkpoint finality.

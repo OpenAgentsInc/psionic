@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::PsionicTrainGroupedReplicaStageAssignment;
 use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
+use crate::PsionicTrainGroupedReplicaStageAssignment;
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -342,6 +342,8 @@ pub struct PsionicTrainArtifactSurfaceRefs {
     pub validator_quality_drift_signal_path: Option<String>,
     /// Optional retained validator rollback-signal path.
     pub validator_rollback_signal_path: Option<String>,
+    /// Optional retained weak-device validation-replay proof path.
+    pub weak_device_validation_replay_proof_path: Option<String>,
     /// Optional retained sealed-window bundle path.
     pub sealed_window_bundle_path: Option<String>,
     /// Optional retained final closeout bundle path.

@@ -3,19 +3,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    load_psionic_train_grouped_stage_execution_summary, load_psionic_train_grouped_stage_transport,
-    persist_psionic_train_grouped_stage_replay_evidence,
-    psionic_train_resolved_artifact_cache_candidates, PsionicTrainCheckpointSurface,
+    PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR, PsionicTrainCheckpointSurface,
     PsionicTrainContributionArtifact, PsionicTrainContributionArtifactManifest,
     PsionicTrainContributionReceipt, PsionicTrainGroupedReplicaEvidenceError,
     PsionicTrainGroupedReplicaStageExecutionSummary, PsionicTrainGroupedReplicaStageReplayEvidence,
     PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainWorkClass,
-    TrainingExecutionValidatorDisposition, PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR,
+    TrainingExecutionValidatorDisposition, load_psionic_train_grouped_stage_execution_summary,
+    load_psionic_train_grouped_stage_transport,
+    maybe_record_psionic_train_weak_device_validation_replay_proof,
+    persist_psionic_train_grouped_stage_replay_evidence,
+    psionic_train_resolved_artifact_cache_candidates,
 };
 
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
@@ -195,6 +197,7 @@ pub struct PsionicTrainValidatorArtifactOutputs {
     pub grouped_stage_replay_evidence_path: Option<String>,
     pub validator_quality_drift_signal_path: String,
     pub validator_rollback_signal_path: String,
+    pub weak_device_validation_replay_proof_path: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -573,6 +576,31 @@ pub fn execute_psionic_train_validator_replay(
     );
     write_json(rollback_signal_path.as_path(), &rollback_signal)?;
 
+    let weak_device_validation_replay_proof_path =
+        validator_root.join("weak_device_validation_replay_proof.json");
+    let weak_device_validation_replay_proof =
+        maybe_record_psionic_train_weak_device_validation_replay_proof(
+            weak_device_validation_replay_proof_path.as_path(),
+            manifest,
+            contribution_receipt_path.as_path(),
+            &contribution_receipt,
+            contribution_artifact_manifest_path.as_path(),
+            &contribution_artifact_manifest,
+            score_artifact_path.as_path(),
+            &score_artifact,
+            score_receipt_path.as_path(),
+            &score_receipt,
+            quality_drift_signal_path.as_path(),
+            &quality_drift_signal,
+            rollback_signal_path.as_path(),
+            &rollback_signal,
+        )
+        .map_err(
+            |error| PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+                detail: error.to_string(),
+            },
+        )?;
+
     Ok(PsionicTrainValidatorReplayExecution {
         artifacts: PsionicTrainValidatorArtifactOutputs {
             validator_score_receipt_path: score_receipt_path.display().to_string(),
@@ -580,6 +608,13 @@ pub fn execute_psionic_train_validator_replay(
                 .map(|value| value.grouped_stage_replay_evidence_path),
             validator_quality_drift_signal_path: quality_drift_signal_path.display().to_string(),
             validator_rollback_signal_path: rollback_signal_path.display().to_string(),
+            weak_device_validation_replay_proof_path: weak_device_validation_replay_proof.map(
+                |_| {
+                    weak_device_validation_replay_proof_path
+                        .display()
+                        .to_string()
+                },
+            ),
         },
         score_receipt,
         detail,
@@ -1580,30 +1615,35 @@ mod tests {
     };
 
     use super::{
-        build_validator_quality_drift_signal, build_validator_rollback_signal,
-        classify_validator_result, execute_psionic_train_validator_replay, stable_digest,
-        PsionicTrainValidatorHook, PsionicTrainValidatorQualityDriftState,
-        PsionicTrainValidatorReplayReasonCode, PsionicTrainValidatorRollbackPosture,
-        PsionicTrainValidatorScoreReceipt, TrainingExecutionValidatorDisposition,
-        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION,
+        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION, PsionicTrainValidatorHook,
+        PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorReplayReasonCode,
+        PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorScoreReceipt,
+        TrainingExecutionValidatorDisposition, build_validator_quality_drift_signal,
+        build_validator_rollback_signal, classify_validator_result,
+        execute_psionic_train_validator_replay, stable_digest,
     };
     use crate::{
-        build_psionic_train_artifact_binding_from_path,
-        load_psionic_train_grouped_stage_replay_evidence, persist_psionic_train_window_artifacts,
-        PsionicTrainAdmissionIdentity, PsionicTrainArtifactBinding, PsionicTrainAuthorityOwner,
-        PsionicTrainCapabilityProjection, PsionicTrainCheckpointArtifactPaths,
-        PsionicTrainCheckpointSurface, PsionicTrainContributionReceipt,
-        PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaStageAssignment,
-        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
-        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
-        PsionicTrainWindowArtifactInputRefs, PsionicTrainWorkClass,
-        PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
+        PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+        PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
         PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION,
         PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
         PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+        PsionicTrainAdmissionIdentity, PsionicTrainArtifactBinding, PsionicTrainAuthorityOwner,
+        PsionicTrainCapabilityProjection, PsionicTrainCheckpointArtifactPaths,
+        PsionicTrainCheckpointSurface, PsionicTrainContributionArtifact,
+        PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
+        PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaStageAssignment,
+        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
+        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
+        PsionicTrainWeakDevicePublicCountClass, PsionicTrainWeakDeviceValidationReplayProof,
+        PsionicTrainWindowArtifactInputRefs, PsionicTrainWorkClass,
+        build_psionic_train_artifact_binding_from_path,
+        load_psionic_train_grouped_stage_replay_evidence, persist_psionic_train_window_artifacts,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -1772,6 +1812,26 @@ mod tests {
             inject_eval_worker_unavailable: false,
             manifest_digest: None,
         }
+    }
+
+    fn apple_validator_manifest(
+        run_root: &Path,
+        contribution_receipt_path: String,
+        artifact_manifest_path: String,
+        challenged_work_class: PsionicTrainWorkClass,
+    ) -> PsionicTrainInvocationManifest {
+        let mut manifest =
+            validator_manifest(run_root, contribution_receipt_path, artifact_manifest_path);
+        manifest.lane_id = String::from(PSION_APPLE_WINDOWED_TRAINING_LANE_ID);
+        manifest.run_id = Some(String::from("apple-validator-run"));
+        manifest.coordination.node_pubkey = Some(String::from("npub1-apple-validator"));
+        manifest.admission_identity = PsionicTrainAdmissionIdentity {
+            release_id: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID),
+            build_digest: String::from("sha256:apple-test-build"),
+            environment_ref: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF),
+        };
+        manifest.validator_target_work_class = Some(challenged_work_class);
+        manifest
     }
 
     fn base_validator_manifest(
@@ -2130,10 +2190,12 @@ mod tests {
             execution.score_receipt.challenged_work_class,
             PsionicTrainWorkClass::GroupedReplicaStageExecution
         );
-        assert!(execution
-            .score_receipt
-            .verified_hooks
-            .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity));
+        assert!(
+            execution
+                .score_receipt
+                .verified_hooks
+                .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity)
+        );
         let contribution_receipt: PsionicTrainContributionReceipt = serde_json::from_slice(
             &fs::read(&window_artifacts.contribution_receipt_path)
                 .expect("contribution receipt should read"),
@@ -2155,10 +2217,12 @@ mod tests {
             replay_evidence.grouped_stage_assignment.stage_id,
             "stage-01"
         );
-        assert!(replay_evidence
-            .reason_codes
-            .iter()
-            .any(|reason_code| reason_code == "grouped_stage_evidence_verified"));
+        assert!(
+            replay_evidence
+                .reason_codes
+                .iter()
+                .any(|reason_code| reason_code == "grouped_stage_evidence_verified")
+        );
         assert_eq!(
             execution
                 .score_receipt
@@ -2174,6 +2238,113 @@ mod tests {
                 .grouped_stage_replay_evidence_path
                 .as_deref(),
             Some(replay_evidence_path)
+        );
+        assert!(
+            execution
+                .artifacts
+                .weak_device_validation_replay_proof_path
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn apple_validation_replay_emits_weak_device_proof() {
+        let run_root = temp_root("apple-weak-device-validation");
+        let checkpoint_surface_path = run_root.join("status/checkpoint_surface.json");
+        write_json(
+            checkpoint_surface_path.as_path(),
+            &checkpoint_surface(Some("accepted"), Some("succeeded"), None, Some(false), None),
+        );
+
+        let contribution_root = run_root.join("challenged");
+        let artifact_manifest_path = contribution_root.join("artifact_manifest.json");
+        let contribution_receipt_path = contribution_root.join("contribution_receipt.json");
+        let mut artifact_manifest = PsionicTrainContributionArtifactManifest {
+            schema_version: String::from(
+                PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+            ),
+            lane_id: String::from(PSION_APPLE_WINDOWED_TRAINING_LANE_ID),
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            run_id: String::from("worker-run"),
+            window_id: String::from("window-0001"),
+            assignment_id: String::from("assignment-0001"),
+            contribution_id: String::from("contribution-0001"),
+            node_pubkey: String::from("npub1-worker"),
+            grouped_stage_assignment: None,
+            artifact_count: 1,
+            artifacts: vec![PsionicTrainContributionArtifact {
+                artifact_kind: String::from("checkpoint_surface"),
+                binding: build_psionic_train_artifact_binding_from_path(
+                    "checkpoint_surface",
+                    checkpoint_surface_path.as_path(),
+                )
+                .expect("checkpoint surface binding should build"),
+            }],
+            artifact_manifest_digest: String::new(),
+        };
+        artifact_manifest.artifact_manifest_digest =
+            artifact_manifest.stable_artifact_manifest_digest();
+        write_json(artifact_manifest_path.as_path(), &artifact_manifest);
+
+        let mut contribution_receipt = PsionicTrainContributionReceipt {
+            schema_version: String::from(PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION),
+            lane_id: String::from(PSION_APPLE_WINDOWED_TRAINING_LANE_ID),
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            run_id: String::from("worker-run"),
+            window_id: String::from("window-0001"),
+            window_execution_id: String::from("window-execution-1"),
+            assignment_id: String::from("assignment-0001"),
+            contribution_id: String::from("contribution-0001"),
+            node_pubkey: String::from("npub1-worker"),
+            grouped_stage_assignment: None,
+            role: PsionicTrainRole::Worker,
+            operation: String::from("record-checkpoint"),
+            outcome: PsionicTrainOutcomeKind::Succeeded,
+            exit_code: 0,
+            retryable: false,
+            authority_owner: PsionicTrainAuthorityOwner::Pylon,
+            refusal_class: None,
+            artifact_manifest: artifact_binding(
+                artifact_manifest_path.display().to_string().as_str(),
+            ),
+            artifact_manifest_digest: artifact_manifest.artifact_manifest_digest.clone(),
+            artifact_count: artifact_manifest.artifact_count,
+            contribution_digest: String::new(),
+            detail: String::from("successful contribution"),
+        };
+        contribution_receipt.contribution_digest =
+            contribution_receipt.stable_contribution_digest();
+        write_json(contribution_receipt_path.as_path(), &contribution_receipt);
+
+        let manifest = apple_validator_manifest(
+            &run_root,
+            contribution_receipt_path.display().to_string(),
+            artifact_manifest_path.display().to_string(),
+            PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+        );
+        let execution = execute_psionic_train_validator_replay(&manifest, &run_root)
+            .expect("apple validator replay should succeed");
+        let proof_path = execution
+            .artifacts
+            .weak_device_validation_replay_proof_path
+            .as_deref()
+            .expect("apple validator replay should emit weak-device proof");
+        let proof: PsionicTrainWeakDeviceValidationReplayProof =
+            serde_json::from_slice(&fs::read(proof_path).expect("proof bytes should read"))
+                .expect("proof json should parse");
+        proof.validate().expect("proof should validate");
+        assert_eq!(
+            proof.public_count_class,
+            PsionicTrainWeakDevicePublicCountClass::ValidatorRecognizedParticipation
+        );
+        assert_eq!(
+            proof.challenged_work_class,
+            PsionicTrainWorkClass::FullIslandLocalUpdateTraining
+        );
+        assert_eq!(proof.validator_node_pubkey, "npub1-apple-validator");
+        assert_eq!(
+            proof.validator_disposition,
+            TrainingExecutionValidatorDisposition::Accepted
         );
     }
 }

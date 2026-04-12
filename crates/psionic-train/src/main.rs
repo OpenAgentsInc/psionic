@@ -1895,6 +1895,8 @@ fn build_artifact_surface_refs(
             .map(|value| value.validator_quality_drift_signal_path.clone()),
         validator_rollback_signal_path: validator_artifacts
             .map(|value| value.validator_rollback_signal_path.clone()),
+        weak_device_validation_replay_proof_path: validator_artifacts
+            .and_then(|value| value.weak_device_validation_replay_proof_path.clone()),
         sealed_window_bundle_path: window_artifacts
             .map(|value| value.sealed_window_bundle_path.clone()),
         final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),

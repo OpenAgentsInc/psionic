@@ -140,6 +140,12 @@ plus one retained contribution artifact manifest, binds them to the declared
 
 - `windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
 - `windows/<window_id>/validators/<challenge_id>/validator_score_receipt.json`
+- `windows/<window_id>/validators/<challenge_id>/validator_quality_drift_signal.json`
+- `windows/<window_id>/validators/<challenge_id>/validator_rollback_signal.json`
+- `windows/<window_id>/validators/<challenge_id>/weak_device_validation_replay_proof.json`
+  when an Apple / Metal weak-device `validation_replay` challenge returns an
+  accepted `10_000` bps result with non-regressed quality drift and rollback
+  posture `hold`
 
 Those validator-target bindings may now carry logical artifact references
 without one pre-staged `materialized_path`. Replay first checks any declared
@@ -161,7 +167,11 @@ the challenged contribution succeeded, and then emits a typed `accepted`,
 checkpoint state, stale assignment binding, or artifact drift stay
 refusal-class failures at the machine process boundary. The run/window status
 packets now repeat the retained `validator_score_receipt_path` when validator
-replay completes successfully.
+replay completes successfully, and the validator artifact surface carries
+`weak_device_validation_replay_proof_path` whenever that narrow accepted weak-
+device replay proof is materialized. That proof only counts
+validator-recognized weak-device participation. It does not by itself claim
+checkpoint promotion, payout closeout, or network-wide finality.
 That machine contract is now locked by focused validator-classification unit
 tests plus subprocess CLI coverage for stale assignment, resolver-backed
 replay-input rematerialization, missing replay-input, and artifact-digest
