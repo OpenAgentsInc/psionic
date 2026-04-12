@@ -8,25 +8,23 @@ use std::{
 };
 
 use psionic_eval::{
-    build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
     PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
+    build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
 };
 use psionic_train::{
-    build_psion_actual_pretraining_dashboard_packet, checkpoint_comparison_relative_path,
-    checkpoint_eval_decision_relative_path, checkpoint_eval_failure_relative_path,
-    continue_restart_decision_relative_path,
-    derive_psion_actual_pretraining_hardware_qualification,
-    derive_psion_actual_pretraining_run_shape_qualification,
-    psion_actual_pretraining_retained_paths, record_psion_actual_pretraining_auto_resume_receipt,
-    record_psion_actual_pretraining_checkpoint_backup_receipt,
-    record_psion_actual_pretraining_checkpoint_comparison,
-    record_psion_actual_pretraining_checkpoint_eval_decision,
-    record_psion_actual_pretraining_checkpoint_eval_failure,
-    record_psion_actual_pretraining_checkpoint_failure_drill,
-    record_psion_actual_pretraining_checkpoint_manifest,
-    record_psion_actual_pretraining_continuation_handoff,
-    record_psion_actual_pretraining_continue_restart_decision,
-    record_psion_actual_pretraining_redacted_alert, PsionActualPretrainingAlertFeed,
+    PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingAlertFeed,
     PsionActualPretrainingArtifactRef, PsionActualPretrainingAutoResumeReceipt,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointBackupReceipt,
     PsionActualPretrainingCheckpointComparison, PsionActualPretrainingCheckpointEvalDecision,
@@ -51,27 +49,29 @@ use psionic_train::{
     PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
     PsionReferencePilotCheckpointManifest, PsionReferencePilotDualHostTopologyReceipt,
-    PsionReferencePilotJointContributionReceipt, PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
+    PsionReferencePilotJointContributionReceipt, build_psion_actual_pretraining_dashboard_packet,
+    checkpoint_comparison_relative_path, checkpoint_eval_decision_relative_path,
+    checkpoint_eval_failure_relative_path, continue_restart_decision_relative_path,
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    psion_actual_pretraining_retained_paths, record_psion_actual_pretraining_auto_resume_receipt,
+    record_psion_actual_pretraining_checkpoint_backup_receipt,
+    record_psion_actual_pretraining_checkpoint_comparison,
+    record_psion_actual_pretraining_checkpoint_eval_decision,
+    record_psion_actual_pretraining_checkpoint_eval_failure,
+    record_psion_actual_pretraining_checkpoint_failure_drill,
+    record_psion_actual_pretraining_checkpoint_manifest,
+    record_psion_actual_pretraining_continuation_handoff,
+    record_psion_actual_pretraining_continue_restart_decision,
+    record_psion_actual_pretraining_redacted_alert,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::Instant;
 
 static OPERATOR_HUMAN_OUTPUT_ENABLED: AtomicBool = AtomicBool::new(true);
-const PSION_ACTUAL_PRETRAINING_DISTRIBUTED_REFERENCE_REHEARSAL_SCHEMA_VERSION: &str =
-    "psion.actual_pretraining_distributed_reference_rehearsal.v1";
+const PSION_ACTUAL_PRETRAINING_DISTRIBUTED_BRINGUP_REHEARSAL_SCHEMA_VERSION: &str =
+    "psion.actual_pretraining_distributed_bringup_rehearsal.v1";
 
 macro_rules! println {
     ($($arg:tt)*) => {{
@@ -160,10 +160,10 @@ struct ResolvedResumeTarget {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct PsionActualPretrainingDistributedReferenceRehearsal {
+struct PsionActualPretrainingDistributedBringupRehearsal {
     schema_version: String,
     run_id: String,
-    reference_run_id: String,
+    bringup_run_id: String,
     rehearsal_summary_path: String,
     relative_output_root: String,
     operator_manifest_path: String,
@@ -186,19 +186,19 @@ struct PsionActualPretrainingDistributedReferenceRehearsal {
     detail: String,
 }
 
-impl PsionActualPretrainingDistributedReferenceRehearsal {
+impl PsionActualPretrainingDistributedBringupRehearsal {
     fn validate(&self) -> Result<(), Box<dyn Error>> {
         if self.schema_version
-            != PSION_ACTUAL_PRETRAINING_DISTRIBUTED_REFERENCE_REHEARSAL_SCHEMA_VERSION
+            != PSION_ACTUAL_PRETRAINING_DISTRIBUTED_BRINGUP_REHEARSAL_SCHEMA_VERSION
         {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal schema_version drifted",
+                "distributed bringup rehearsal schema_version drifted",
             )
             .into());
         }
         for value in [
             self.run_id.as_str(),
-            self.reference_run_id.as_str(),
+            self.bringup_run_id.as_str(),
             self.rehearsal_summary_path.as_str(),
             self.relative_output_root.as_str(),
             self.operator_manifest_path.as_str(),
@@ -216,44 +216,44 @@ impl PsionActualPretrainingDistributedReferenceRehearsal {
         ] {
             if value.trim().is_empty() {
                 return Err(std::io::Error::other(
-                    "distributed reference rehearsal retained one empty field",
+                    "distributed bringup rehearsal retained one empty field",
                 )
                 .into());
             }
         }
         if self.contributor_count == 0 {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal must retain at least one contributor",
+                "distributed bringup rehearsal must retain at least one contributor",
             )
             .into());
         }
         if self.worker_hosts.len() != self.contributor_count {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal worker host count drifted from contributor_count",
+                "distributed bringup rehearsal worker host count drifted from contributor_count",
             )
             .into());
         }
         if self.runtime_backends.len() != self.contributor_count {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal runtime backend count drifted from contributor_count",
+                "distributed bringup rehearsal runtime backend count drifted from contributor_count",
             )
             .into());
         }
         if self.checkpoint_total_bytes == 0 {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal checkpoint_total_bytes must be nonzero",
+                "distributed bringup rehearsal checkpoint_total_bytes must be nonzero",
             )
             .into());
         }
         if self.optimizer_steps == 0 {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal optimizer_steps must be nonzero",
+                "distributed bringup rehearsal optimizer_steps must be nonzero",
             )
             .into());
         }
         if self.contribution_receipt_count < self.contributor_count {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal contribution receipts are too small for the contributor count",
+                "distributed bringup rehearsal contribution receipts are too small for the contributor count",
             )
             .into());
         }
@@ -1778,7 +1778,7 @@ where
                 &[],
             )?;
             let distributed_rehearsal = match remote_host.as_deref() {
-                Some(remote_host) => Some(run_actual_pretraining_distributed_reference_rehearsal(
+                Some(remote_host) => Some(run_actual_pretraining_distributed_bringup_rehearsal(
                     repo_root,
                     &run_root,
                     &run_id,
@@ -1794,14 +1794,14 @@ where
                 record_checkpoint_args.extend([
                     String::from("--checkpoint-label"),
                     format!(
-                        "bounded-distributed-reference-step-{}",
+                        "bounded-actual-pretraining-bringup-step-{}",
                         rehearsal.optimizer_steps
                     ),
                     String::from("--optimizer-step"),
                     rehearsal.optimizer_steps.to_string(),
                     String::from("--checkpoint-ref"),
                     format!(
-                        "checkpoint://psion/actual-pretraining/rehearsal/{}",
+                        "checkpoint://psion/actual-pretraining/bounded-bringup/{}",
                         rehearsal.checkpoint_ref
                     ),
                     String::from("--checkpoint-object-digest"),
@@ -2044,7 +2044,7 @@ where
             println!("failure_drill={}", failed_upload_drill_path.display());
             if let Some(rehearsal) = distributed_rehearsal.as_ref() {
                 println!(
-                    "distributed_rehearsal={}",
+                    "distributed_bringup={}",
                     run_root.join(&rehearsal.rehearsal_summary_path).display()
                 );
                 println!(
@@ -3048,7 +3048,7 @@ fn write_json_pretty<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), 
     Ok(())
 }
 
-fn run_actual_pretraining_distributed_reference_rehearsal(
+fn run_actual_pretraining_distributed_bringup_rehearsal(
     repo_root: &Path,
     run_root: &Path,
     actual_run_id: &str,
@@ -3056,9 +3056,9 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
     remote_host: &str,
     secondary_remote_host: Option<&str>,
     cleanup_remote: bool,
-) -> Result<PsionActualPretrainingDistributedReferenceRehearsal, Box<dyn Error>> {
-    let reference_run_id = format!("{actual_run_id}-distributed-reference");
-    let relative_output_root = PathBuf::from("distributed_reference_rehearsal");
+) -> Result<PsionActualPretrainingDistributedBringupRehearsal, Box<dyn Error>> {
+    let bringup_run_id = format!("{actual_run_id}-distributed-actual-pretraining-bringup");
+    let relative_output_root = PathBuf::from("distributed_actual_pretraining_bringup");
     let output_root = run_root.join(&relative_output_root);
     let resolved_git_ref = git_output(repo_root, &["rev-parse", selected_git_ref])?;
     if output_root.exists() {
@@ -3066,12 +3066,14 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
     }
     let mut command = Command::new(repo_root.join("scripts/train-psion-local-first.sh"));
     command
+        .arg("--workload")
+        .arg("actual_pretraining_bringup")
         .arg("--mode")
         .arg("distributed_reference")
         .arg("--remote-host")
         .arg(remote_host)
         .arg("--run-id")
-        .arg(&reference_run_id)
+        .arg(&bringup_run_id)
         .arg("--output-root")
         .arg(&output_root)
         .arg("--git-ref")
@@ -3086,7 +3088,7 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
     }
     let output = command.output()?;
     if !output.status.success() {
-        let local_log_tail = output_root.join("reference_pilot_train.log");
+        let local_log_tail = output_root.join("actual_pretraining_bringup_train.log");
         let log_excerpt = if local_log_tail.is_file() {
             let log = fs::read_to_string(&local_log_tail)?;
             let lines: Vec<&str> = log.lines().rev().take(80).collect();
@@ -3098,7 +3100,7 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
             String::new()
         };
         return Err(std::io::Error::other(format!(
-            "actual-lane distributed reference rehearsal failed\nstdout:\n{}\nstderr:\n{}{}",
+            "actual-lane distributed bringup rehearsal failed\nstdout:\n{}\nstderr:\n{}{}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
             log_excerpt,
@@ -3106,29 +3108,32 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
         .into());
     }
 
-    let operator_manifest_path = output_root.join("reference_pilot_operator_manifest.json");
-    let operator_summary_path = output_root.join("reference_pilot_operator_summary.json");
-    let train_log_path = output_root.join("reference_pilot_train.log");
-    let artifact_dir = output_root.join("reference_pilot_artifacts");
+    let operator_manifest_path =
+        output_root.join("actual_pretraining_bringup_operator_manifest.json");
+    let operator_summary_path =
+        output_root.join("actual_pretraining_bringup_operator_summary.json");
+    let train_log_path = output_root.join("actual_pretraining_bringup_train.log");
+    let artifact_dir = output_root.join("actual_pretraining_bringup_artifacts");
     let cluster_topology_receipt_path = if artifact_dir
-        .join("psion_reference_pilot_cluster_topology_receipt.json")
+        .join("psion_actual_pretraining_bringup_cluster_topology_receipt.json")
         .is_file()
     {
-        artifact_dir.join("psion_reference_pilot_cluster_topology_receipt.json")
+        artifact_dir.join("psion_actual_pretraining_bringup_cluster_topology_receipt.json")
     } else {
-        artifact_dir.join("psion_reference_pilot_dual_host_topology_receipt.json")
+        artifact_dir.join("psion_actual_pretraining_bringup_dual_host_topology_receipt.json")
     };
     let cluster_contribution_receipts_path = if artifact_dir
-        .join("psion_reference_pilot_cluster_contribution_receipts.json")
+        .join("psion_actual_pretraining_bringup_cluster_contribution_receipts.json")
         .is_file()
     {
-        artifact_dir.join("psion_reference_pilot_cluster_contribution_receipts.json")
+        artifact_dir.join("psion_actual_pretraining_bringup_cluster_contribution_receipts.json")
     } else {
-        artifact_dir.join("psion_reference_pilot_dual_host_contribution_receipts.json")
+        artifact_dir.join("psion_actual_pretraining_bringup_dual_host_contribution_receipts.json")
     };
     let checkpoint_manifest_path =
-        artifact_dir.join("psion_reference_pilot_checkpoint_manifest.json");
-    let checkpoint_weights_path = artifact_dir.join("psion_reference_pilot_checkpoint.safetensors");
+        artifact_dir.join("psion_actual_pretraining_bringup_checkpoint_manifest.json");
+    let checkpoint_weights_path =
+        artifact_dir.join("psion_actual_pretraining_bringup_checkpoint.safetensors");
 
     let topology_receipt: PsionReferencePilotDualHostTopologyReceipt =
         load_json(&cluster_topology_receipt_path)?;
@@ -3141,14 +3146,14 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
 
     if topology_receipt.contributor_count == 0 {
         return Err(std::io::Error::other(
-            "distributed reference rehearsal retained zero contributors",
+            "distributed bringup rehearsal retained zero contributors",
         )
         .into());
     }
     if let Some(_) = secondary_remote_host {
         if topology_receipt.contributor_count < 3 {
             return Err(std::io::Error::other(
-                "distributed reference rehearsal did not retain the expected tri-host contributor count",
+                "distributed bringup rehearsal did not retain the expected tri-host contributor count",
             )
             .into());
         }
@@ -3159,19 +3164,19 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
             .saturating_mul(checkpoint_manifest.step as usize)
     {
         return Err(std::io::Error::other(
-            "distributed reference rehearsal retained fewer contribution receipts than expected from the checkpoint step count",
+            "distributed bringup rehearsal retained fewer contribution receipts than expected from the checkpoint step count",
         )
         .into());
     }
 
-    let receipt = PsionActualPretrainingDistributedReferenceRehearsal {
+    let receipt = PsionActualPretrainingDistributedBringupRehearsal {
         schema_version: String::from(
-            PSION_ACTUAL_PRETRAINING_DISTRIBUTED_REFERENCE_REHEARSAL_SCHEMA_VERSION,
+            PSION_ACTUAL_PRETRAINING_DISTRIBUTED_BRINGUP_REHEARSAL_SCHEMA_VERSION,
         ),
         run_id: String::from(actual_run_id),
-        reference_run_id,
+        bringup_run_id,
         rehearsal_summary_path: String::from(
-            "distributed_execution/distributed_reference_rehearsal.json",
+            "distributed_execution/distributed_actual_pretraining_bringup.json",
         ),
         relative_output_root: relative_output_root.to_string_lossy().replace('\\', "/"),
         operator_manifest_path: operator_manifest_path
@@ -3212,10 +3217,10 @@ fn run_actual_pretraining_distributed_reference_rehearsal(
         optimizer_steps: checkpoint_manifest.step,
         contribution_receipt_count: contribution_receipts.len(),
         claim_boundary: String::from(
-            "This retained rehearsal proves one bounded multi-host optimizer-bearing execution segment inside the actual pretraining operator path by delegating to the shipped distributed reference pilot. It does not by itself claim full broader actual-lane cluster execution.",
+            "This retained rehearsal proves one bounded multi-host optimizer-bearing execution segment inside the actual pretraining operator path using the larger actual-pretraining model and canonical actual dataset identity. It does not by itself claim full broader long-run actual-lane cluster execution.",
         ),
         detail: String::from(
-            "Distributed rehearsal binds the actual-lane run root to one retained multi-host reference-pilot proof, its checkpoint bytes, and the exact operator/log surfaces used to produce that proof.",
+            "Distributed bringup binds the actual-lane run root to one retained multi-host actual-pretraining bringup proof, its checkpoint bytes, and the exact operator/log surfaces used to produce that proof.",
         ),
     };
     receipt.validate()?;
@@ -3290,7 +3295,7 @@ fn build_base_lane_rehearsal_closeout_bundle(
     workspace_status_sha256: Option<String>,
     checkpoint_manifest_path: &Path,
     failed_upload_drill_path: &Path,
-    distributed_rehearsal: Option<&PsionActualPretrainingDistributedReferenceRehearsal>,
+    distributed_rehearsal: Option<&PsionActualPretrainingDistributedBringupRehearsal>,
 ) -> Result<PsionActualPretrainingCloseoutBundle, Box<dyn Error>> {
     let mut evidence_artifacts = vec![
         closeout_artifact(
@@ -3394,27 +3399,27 @@ fn build_base_lane_rehearsal_closeout_bundle(
         evidence_artifacts.extend([
             closeout_artifact(
                 run_root,
-                "distributed_reference_rehearsal",
+                "distributed_actual_pretraining_bringup",
                 &run_root.join(&rehearsal.rehearsal_summary_path),
-                "Distributed rehearsal summary proves the actual-lane operator delegated one bounded multi-host optimizer-bearing segment through the shipped reference-pilot path.",
+                "Distributed bringup summary proves the actual-lane operator delegated one bounded multi-host optimizer-bearing segment through the actual-pretraining bringup workload.",
             )?,
             closeout_artifact(
                 run_root,
-                "distributed_reference_topology_receipt",
+                "distributed_actual_pretraining_bringup_topology_receipt",
                 &run_root.join(&rehearsal.cluster_topology_receipt_path),
-                "Cluster topology receipt proves which hosts and runtime backends materially contributed to the bounded distributed rehearsal segment.",
+                "Cluster topology receipt proves which hosts and runtime backends materially contributed to the bounded actual-pretraining bringup segment.",
             )?,
             closeout_artifact(
                 run_root,
-                "distributed_reference_contribution_receipts",
+                "distributed_actual_pretraining_bringup_contribution_receipts",
                 &run_root.join(&rehearsal.cluster_contribution_receipts_path),
                 "Contribution receipts prove that each configured contributor participated in the distributed optimizer path.",
             )?,
             closeout_artifact(
                 run_root,
-                "distributed_reference_checkpoint_manifest",
+                "distributed_actual_pretraining_bringup_checkpoint_manifest",
                 &run_root.join(&rehearsal.checkpoint_manifest_path),
-                "Distributed rehearsal checkpoint manifest proves the exact bounded checkpoint lineage promoted into the actual-lane checkpoint family.",
+                "Distributed bringup checkpoint manifest proves the exact bounded checkpoint lineage promoted into the actual-lane checkpoint family.",
             )?,
         ]);
     }

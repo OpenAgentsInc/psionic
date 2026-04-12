@@ -141,8 +141,7 @@ const EVAL_PACK_DOCS: [ReferenceDocumentBlueprint; 1] = [ReferenceDocumentBluepr
     document_id: "spec_quiz_eval_pack_v1:records",
     relative_path: "spec_quiz_eval_pack_v1/records.txt",
     import_kind: PsionRawSourceImportKind::RecordStreamSnapshot,
-    import_reference:
-        "repo://fixtures/psion/reference_corpus/raw_sources/spec_quiz_eval_pack_v1/records.txt",
+    import_reference: "repo://fixtures/psion/reference_corpus/raw_sources/spec_quiz_eval_pack_v1/records.txt",
 }];
 
 const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
@@ -154,20 +153,17 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         author_or_origin: "M. Foster",
         publication_year_or_revision: "1985",
         language: "en",
-        canonical_reference:
-            "repo://fixtures/psion/reference_corpus/raw_sources/arch_textbook_foster_1985",
+        canonical_reference: "repo://fixtures/psion/reference_corpus/raw_sources/arch_textbook_foster_1985",
         rights_posture: PsionSourceRightsPosture::InternalTrainingOnly,
         normative_role: PsionSourceNormativeRole::Historical,
         boundary_kind: PsionSourceBoundaryKind::ChapterSectionAnchors,
         review_decision: PsionAdmissionReviewDecision::Admitted,
         reviewer: "psion-reference-review",
-        decision_summary:
-            "Historical architecture textbook retained for bottleneck and tradeoff language.",
+        decision_summary: "Historical architecture textbook retained for bottleneck and tradeoff language.",
         notes: None,
         lifecycle_state: PsionSourceLifecycleState::Admitted,
         last_transition_trigger: PsionLifecycleChangeTrigger::ReviewMisclassificationCorrected,
-        lifecycle_rationale:
-            "Admitted into the bounded reference corpus for architecture reasoning language.",
+        lifecycle_rationale: "Admitted into the bounded reference corpus for architecture reasoning language.",
         tokenizer_exposed: true,
         model_training_exposed: true,
         benchmark_exposed: false,
@@ -181,20 +177,17 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         author_or_origin: "OpenAgents Runtime Team",
         publication_year_or_revision: "2026-03",
         language: "en",
-        canonical_reference:
-            "repo://fixtures/psion/reference_corpus/raw_sources/distributed_scheduler_notes_v1",
+        canonical_reference: "repo://fixtures/psion/reference_corpus/raw_sources/distributed_scheduler_notes_v1",
         rights_posture: PsionSourceRightsPosture::InternalTrainingOnly,
         normative_role: PsionSourceNormativeRole::Explanatory,
         boundary_kind: PsionSourceBoundaryKind::ChapterSectionAnchors,
         review_decision: PsionAdmissionReviewDecision::Admitted,
         reviewer: "psion-reference-review",
-        decision_summary:
-            "Short technical runtime notes retained for scheduler and tradeoff vocabulary.",
+        decision_summary: "Short technical runtime notes retained for scheduler and tradeoff vocabulary.",
         notes: None,
         lifecycle_state: PsionSourceLifecycleState::Admitted,
         last_transition_trigger: PsionLifecycleChangeTrigger::ReviewMisclassificationCorrected,
-        lifecycle_rationale:
-            "Admitted into the bounded reference corpus for technical-doc held-out tracking.",
+        lifecycle_rationale: "Admitted into the bounded reference corpus for technical-doc held-out tracking.",
         tokenizer_exposed: true,
         model_training_exposed: true,
         benchmark_exposed: false,
@@ -208,8 +201,7 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         author_or_origin: "W3C WebAssembly Working Group",
         publication_year_or_revision: "release-2",
         language: "en",
-        canonical_reference:
-            "repo://fixtures/psion/reference_corpus/raw_sources/wasm_core_spec_release_2",
+        canonical_reference: "repo://fixtures/psion/reference_corpus/raw_sources/wasm_core_spec_release_2",
         rights_posture: PsionSourceRightsPosture::InternalTrainingAndInternalServing,
         normative_role: PsionSourceNormativeRole::Normative,
         boundary_kind: PsionSourceBoundaryKind::ChapterSectionAnchors,
@@ -219,8 +211,7 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         notes: None,
         lifecycle_state: PsionSourceLifecycleState::Admitted,
         last_transition_trigger: PsionLifecycleChangeTrigger::ReviewMisclassificationCorrected,
-        lifecycle_rationale:
-            "Admitted into the bounded reference corpus for normative-spec coverage.",
+        lifecycle_rationale: "Admitted into the bounded reference corpus for normative-spec coverage.",
         tokenizer_exposed: true,
         model_training_exposed: true,
         benchmark_exposed: false,
@@ -234,8 +225,7 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         author_or_origin: "Legacy Vendor",
         publication_year_or_revision: "scan-v1",
         language: "en",
-        canonical_reference:
-            "repo://fixtures/psion/reference_corpus/raw_sources/vendor_manual_private_scan_v1",
+        canonical_reference: "repo://fixtures/psion/reference_corpus/raw_sources/vendor_manual_private_scan_v1",
         rights_posture: PsionSourceRightsPosture::TokenizerOnly,
         normative_role: PsionSourceNormativeRole::Mixed,
         boundary_kind: PsionSourceBoundaryKind::ChapterSectionAnchors,
@@ -245,8 +235,7 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         notes: Some("Tokenizer-only source."),
         lifecycle_state: PsionSourceLifecycleState::Restricted,
         last_transition_trigger: PsionLifecycleChangeTrigger::ReclassifiedToRestrictedUse,
-        lifecycle_rationale:
-            "Restricted to tokenizer exposure because the rights posture excludes model training.",
+        lifecycle_rationale: "Restricted to tokenizer exposure because the rights posture excludes model training.",
         tokenizer_exposed: true,
         model_training_exposed: false,
         benchmark_exposed: false,
@@ -260,8 +249,7 @@ const REFERENCE_SOURCES: [ReferenceSourceBlueprint; 5] = [
         author_or_origin: "OpenAgents Eval Team",
         publication_year_or_revision: "2026-03",
         language: "en",
-        canonical_reference:
-            "repo://fixtures/psion/reference_corpus/raw_sources/spec_quiz_eval_pack_v1/records.txt",
+        canonical_reference: "repo://fixtures/psion/reference_corpus/raw_sources/spec_quiz_eval_pack_v1/records.txt",
         rights_posture: PsionSourceRightsPosture::EvaluationOnly,
         normative_role: PsionSourceNormativeRole::Explanatory,
         boundary_kind: PsionSourceBoundaryKind::RecordAnchors,
@@ -529,6 +517,71 @@ pub fn build_psion_reference_corpus(
         &exclusion_manifest,
         &tokenizer_bundle,
         &shard_artifacts,
+    )?;
+    let bundle = PsionReferenceCorpusBundle {
+        admission_manifest,
+        lifecycle_manifest,
+        exclusion_manifest,
+        raw_source_manifest,
+        tokenizer_training_manifest,
+        tokenizer_bundle,
+        tokenized_corpus_manifest,
+        vocabulary_artifact,
+        shard_artifacts,
+    };
+    bundle.validate()?;
+    Ok(bundle)
+}
+
+/// Builds one repo-owned reconstructed corpus bundle for the canonical actual
+/// pretraining lane.
+///
+/// This does not claim byte-exact recovery of the canonical datastream-backed
+/// shard payloads. It materializes a bounded local reconstruction from the
+/// frozen actual-lane admission, lifecycle, tokenizer, tokenized-corpus, and
+/// sampling manifests plus the repo-owned raw-source snapshots that remain
+/// available in-tree for bring-up and rehearsal.
+pub fn build_psion_actual_pretraining_reconstructed_corpus(
+    repo_root: &Path,
+) -> Result<PsionReferenceCorpusBundle, PsionReferenceCorpusError> {
+    let loaded_sources = load_reference_sources(repo_root)?;
+    let admission_manifest: PsionCorpusAdmissionManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/corpus_admission/psion_source_admission_manifest_v1.json",
+    )?;
+    let lifecycle_manifest: PsionSourceLifecycleManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/lifecycle/psion_source_lifecycle_manifest_v1.json",
+    )?;
+    let exclusion_manifest: PsionExclusionManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/isolation/psion_exclusion_manifest_v1.json",
+    )?;
+    let raw_source_manifest: PsionRawSourceManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/ingestion/psion_raw_source_manifest_v1.json",
+    )?;
+    let tokenizer_training_manifest: PsionTokenizerTrainingManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/tokenizer/psion_tokenizer_training_manifest_v1.json",
+    )?;
+    let tokenizer_bundle: PsionTokenizerArtifactBundle = load_json_fixture(
+        repo_root,
+        "fixtures/psion/tokenizer/psion_tokenizer_artifact_bundle_v1.json",
+    )?;
+    let tokenized_corpus_manifest: PsionTokenizedCorpusManifest = load_json_fixture(
+        repo_root,
+        "fixtures/psion/tokenized/psion_tokenized_corpus_manifest_v1.json",
+    )?;
+    let vocabulary_artifact =
+        build_vocabulary_artifact_for_tokenizer(&loaded_sources, &tokenizer_training_manifest);
+    let shard_artifacts = build_actual_pretraining_shard_artifacts(
+        &loaded_sources,
+        &raw_source_manifest,
+        &tokenizer_training_manifest,
+        &tokenized_corpus_manifest,
+        &exclusion_manifest,
+        &vocabulary_artifact,
     )?;
     let bundle = PsionReferenceCorpusBundle {
         admission_manifest,
@@ -869,6 +922,42 @@ fn build_vocabulary_artifact(loaded_sources: &[LoadedSource]) -> PsionReferenceV
     }
 }
 
+fn build_vocabulary_artifact_for_tokenizer(
+    loaded_sources: &[LoadedSource],
+    tokenizer_training_manifest: &PsionTokenizerTrainingManifest,
+) -> PsionReferenceVocabularyArtifact {
+    let admitted_source_ids = tokenizer_training_manifest
+        .admitted_sources
+        .iter()
+        .map(|source| source.source_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut counts = BTreeMap::<String, u32>::new();
+    for source in loaded_sources {
+        if !admitted_source_ids.contains(source.blueprint.source_id) {
+            continue;
+        }
+        for document in &source.documents {
+            for token in tokenize_text(&document.normalized_text) {
+                *counts.entry(token).or_insert(0) += 1;
+            }
+        }
+    }
+    let mut tokens = tokenizer_training_manifest
+        .training_config
+        .special_tokens
+        .clone();
+    let mut vocabulary_tokens = counts.into_iter().collect::<Vec<_>>();
+    vocabulary_tokens.sort_by(|left, right| right.1.cmp(&left.1).then(left.0.cmp(&right.0)));
+    tokens.extend(vocabulary_tokens.into_iter().map(|(token, _)| token));
+    PsionReferenceVocabularyArtifact {
+        schema_version: String::from("psion.reference_vocabulary.v1"),
+        tokenizer_id: tokenizer_training_manifest.tokenizer_id.clone(),
+        tokenizer_version: tokenizer_training_manifest.tokenizer_version.clone(),
+        vocabulary_digest: stable_digest(b"psion_reference_vocabulary|", &tokens),
+        tokens,
+    }
+}
+
 fn build_tokenizer_training_manifest(
     loaded_sources: &[LoadedSource],
     raw_source_manifest: &PsionRawSourceManifest,
@@ -1042,6 +1131,143 @@ fn build_shard_artifacts(
         ),
     ];
     Ok(shard_artifacts)
+}
+
+fn build_actual_pretraining_shard_artifacts(
+    loaded_sources: &[LoadedSource],
+    raw_source_manifest: &PsionRawSourceManifest,
+    tokenizer_training_manifest: &PsionTokenizerTrainingManifest,
+    tokenized_corpus_manifest: &PsionTokenizedCorpusManifest,
+    exclusion_manifest: &PsionExclusionManifest,
+    vocabulary_artifact: &PsionReferenceVocabularyArtifact,
+) -> Result<Vec<PsionReferenceShardArtifact>, PsionReferenceCorpusError> {
+    let token_map = vocabulary_artifact
+        .tokens
+        .iter()
+        .enumerate()
+        .map(|(index, token)| {
+            (
+                token.clone(),
+                u32::try_from(index).expect("token index should fit in u32"),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let max_sequence_tokens = usize::try_from(
+        tokenized_corpus_manifest.packing_policy.max_sequence_tokens,
+    )
+    .map_err(|_| PsionReferenceCorpusError::Parse {
+        detail: String::from("actual pretraining packing max_sequence_tokens did not fit in usize"),
+    })?;
+    let raw_source_map = raw_source_manifest
+        .sources
+        .iter()
+        .map(|source| (source.source_id.as_str(), source))
+        .collect::<BTreeMap<_, _>>();
+    let held_out_source_ids = exclusion_manifest
+        .held_out_source_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let training_excluded_source_ids = exclusion_manifest
+        .training_excluded_source_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let training_visible_source_ids = tokenizer_training_manifest
+        .exposure_report
+        .iter()
+        .filter(|row| row.model_training_exposed)
+        .map(|row| row.source_id.as_str())
+        .collect::<BTreeSet<_>>();
+
+    let mut train_sequences = Vec::new();
+    let mut validation_sequences = Vec::new();
+    let mut held_out_sequences = Vec::new();
+
+    for source in loaded_sources {
+        let mut source_sequences = Vec::new();
+        for document in &source.documents {
+            for section in &document.sections {
+                let mut token_ids = vec![token_id(&token_map, "<bos>")];
+                token_ids.extend(tokenize_text(&section.text).into_iter().map(|token| {
+                    token_map
+                        .get(&token)
+                        .copied()
+                        .unwrap_or(token_id(&token_map, "<unk>"))
+                }));
+                token_ids.push(token_id(&token_map, "<eos>"));
+                if token_ids.len() > max_sequence_tokens {
+                    token_ids.truncate(max_sequence_tokens);
+                    if let Some(last) = token_ids.last_mut() {
+                        *last = token_id(&token_map, "<eos>");
+                    }
+                }
+                source_sequences.push(PsionReferenceEncodedSequence {
+                    sequence_id: format!("{}:{}", source.blueprint.source_id, section.section_id),
+                    source_id: String::from(source.blueprint.source_id),
+                    source_family_id: String::from(source.blueprint.source_family_id),
+                    split_name: String::new(),
+                    split_kind: DatasetSplitKind::Custom,
+                    token_ids,
+                });
+            }
+        }
+
+        if held_out_source_ids.contains(source.blueprint.source_id) {
+            for mut sequence in source_sequences {
+                sequence.split_name = String::from("held_out");
+                sequence.split_kind = DatasetSplitKind::HeldOut;
+                held_out_sequences.push(sequence);
+            }
+            continue;
+        }
+
+        if training_excluded_source_ids.contains(source.blueprint.source_id)
+            || !training_visible_source_ids.contains(source.blueprint.source_id)
+        {
+            continue;
+        }
+
+        let validation_index = source_sequences.len().saturating_sub(1);
+        for (index, mut sequence) in source_sequences.into_iter().enumerate() {
+            if index == validation_index {
+                sequence.split_name = String::from("validation");
+                sequence.split_kind = DatasetSplitKind::Validation;
+                validation_sequences.push(sequence);
+            } else {
+                sequence.split_name = String::from("train");
+                sequence.split_kind = DatasetSplitKind::Train;
+                train_sequences.push(sequence);
+            }
+        }
+
+        let _ = raw_source_map;
+    }
+
+    train_sequences.sort_by(|left, right| left.sequence_id.cmp(&right.sequence_id));
+    validation_sequences.sort_by(|left, right| left.sequence_id.cmp(&right.sequence_id));
+    held_out_sequences.sort_by(|left, right| left.sequence_id.cmp(&right.sequence_id));
+
+    Ok(vec![
+        build_shard_artifact(
+            "psion_actual_train_shard_0001",
+            "train",
+            DatasetSplitKind::Train,
+            train_sequences,
+        ),
+        build_shard_artifact(
+            "psion_actual_validation_shard_0001",
+            "validation",
+            DatasetSplitKind::Validation,
+            validation_sequences,
+        ),
+        build_shard_artifact(
+            "psion_actual_held_out_shard_0001",
+            "held_out",
+            DatasetSplitKind::HeldOut,
+            held_out_sequences,
+        ),
+    ])
 }
 
 fn build_shard_artifact(
@@ -1250,6 +1476,14 @@ fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn load_json_fixture<T: serde::de::DeserializeOwned>(
+    repo_root: &Path,
+    relative_path: &str,
+) -> Result<T, PsionReferenceCorpusError> {
+    let payload = fs::read_to_string(repo_root.join(relative_path))?;
+    serde_json::from_str(&payload).map_err(PsionReferenceCorpusError::Serialization)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::panic_in_result_fn)]
@@ -1272,16 +1506,20 @@ mod tests {
         let bundle = build_psion_reference_corpus(repo_root().as_path())
             .expect("reference corpus should build");
         bundle.validate().expect("reference corpus should validate");
-        assert!(bundle
-            .tokenized_corpus_manifest
-            .splits
-            .iter()
-            .any(|split| split.kind == DatasetSplitKind::HeldOut));
-        assert!(bundle
-            .tokenizer_training_manifest
-            .admitted_sources
-            .iter()
-            .any(|source| source.source_id == "vendor_manual_private_scan_v1"));
+        assert!(
+            bundle
+                .tokenized_corpus_manifest
+                .splits
+                .iter()
+                .any(|split| split.kind == DatasetSplitKind::HeldOut)
+        );
+        assert!(
+            bundle
+                .tokenizer_training_manifest
+                .admitted_sources
+                .iter()
+                .any(|source| source.source_id == "vendor_manual_private_scan_v1")
+        );
     }
 
     #[test]
@@ -1298,13 +1536,45 @@ mod tests {
         bundle
             .write_to_dir(output_dir.as_path())
             .expect("writer should materialize the reference corpus");
-        assert!(output_dir
-            .join("psion_raw_source_manifest_v1.json")
-            .exists());
-        assert!(output_dir
-            .join("psion_tokenized_corpus_manifest_v1.json")
-            .exists());
+        assert!(
+            output_dir
+                .join("psion_raw_source_manifest_v1.json")
+                .exists()
+        );
+        assert!(
+            output_dir
+                .join("psion_tokenized_corpus_manifest_v1.json")
+                .exists()
+        );
         assert!(output_dir.join("tokenized/train_shard_0001.json").exists());
         fs::remove_dir_all(output_dir).expect("test output should be removable");
+    }
+
+    #[test]
+    fn actual_pretraining_reconstructed_corpus_builds_validated_inputs() {
+        let bundle = build_psion_actual_pretraining_reconstructed_corpus(repo_root().as_path())
+            .expect("actual pretraining corpus should build");
+        bundle
+            .validate()
+            .expect("actual pretraining corpus should validate");
+        assert_eq!(
+            bundle
+                .tokenized_corpus_manifest
+                .replay_contract
+                .stable_dataset_identity,
+            "psion_corpus_tokenized@v1"
+        );
+        assert_eq!(
+            bundle.tokenizer_bundle.tokenizer.tokenizer_digest,
+            "sha256:psion_sentencepiece_seed_tokenizer_digest_v1"
+        );
+        assert!(
+            bundle
+                .shard_artifacts
+                .iter()
+                .any(|artifact| artifact.split_kind == DatasetSplitKind::Train
+                    && !artifact.sequences.is_empty()),
+            "actual pretraining reconstructed corpus should retain non-empty train sequences"
+        );
     }
 }

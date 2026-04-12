@@ -11,7 +11,8 @@ use psionic_core::{DType, Device, Shape, TensorData, TensorId, TensorSpec};
 use psionic_data::{
     DatasetSplitKind, PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
     PsionArtifactLineageManifest, PsionReferenceCorpusBundle, PsionReferenceCorpusError,
-    PsionReferenceEncodedSequence, build_psion_reference_corpus,
+    PsionReferenceEncodedSequence, build_psion_actual_pretraining_reconstructed_corpus,
+    build_psion_reference_corpus,
 };
 use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
@@ -208,6 +209,19 @@ impl PsionReferencePilotConfig {
             step_duration_ms: 2_000,
             budget: TrainingLoopBudget::new(4, 2, 1)?,
             optimizer: TrainingOptimizerConfig::adamw(0.0005, 0.9, 0.99, 1e-8)
+                .with_weight_decay(0.01),
+        })
+    }
+
+    pub fn actual_pretraining_bringup() -> Result<Self, PsionReferencePilotError> {
+        Ok(Self {
+            run_id: String::from("psion-actual-pretraining-bringup-run"),
+            stage_id: String::from("psion-actual-pretraining-stage-pretrain-bringup"),
+            checkpoint_family: String::from("train.psion.actual_pretraining_bringup"),
+            started_at_ms: 1_774_320_300_000,
+            step_duration_ms: 4_000,
+            budget: TrainingLoopBudget::new(2, 1, 1)?,
+            optimizer: TrainingOptimizerConfig::adamw(0.0004, 0.9, 0.99, 1e-8)
                 .with_weight_decay(0.01),
         })
     }
@@ -476,35 +490,38 @@ pub struct PsionReferencePilotDualHostRun {
 
 impl PsionReferencePilotDualHostRun {
     pub fn write_to_dir(&self, output_dir: &Path) -> Result<(), PsionReferencePilotError> {
-        self.run.write_to_dir(output_dir)?;
-        let dual_host_topology_path =
-            output_dir.join("psion_reference_pilot_dual_host_topology_receipt.json");
-        let dual_host_step_path =
-            output_dir.join("psion_reference_pilot_dual_host_step_receipts.json");
-        let dual_host_contribution_path =
-            output_dir.join("psion_reference_pilot_dual_host_contribution_receipts.json");
-        write_json(dual_host_topology_path.as_path(), &self.topology_receipt)?;
-        write_json(dual_host_step_path.as_path(), &self.joint_step_receipts)?;
-        write_json(
-            dual_host_contribution_path.as_path(),
-            &self.contribution_receipts,
-        )?;
+        self.write_to_dir_with_prefix(output_dir, "psion_reference_pilot")
+    }
+
+    pub fn write_to_dir_with_prefix(
+        &self,
+        output_dir: &Path,
+        prefix: &str,
+    ) -> Result<(), PsionReferencePilotError> {
+        self.run.write_to_dir_with_prefix(output_dir, prefix)?;
+        let topology_path = output_dir.join(format!("{prefix}_dual_host_topology_receipt.json"));
+        let step_path = output_dir.join(format!("{prefix}_dual_host_step_receipts.json"));
+        let contribution_path =
+            output_dir.join(format!("{prefix}_dual_host_contribution_receipts.json"));
+        write_json(topology_path.as_path(), &self.topology_receipt)?;
+        write_json(step_path.as_path(), &self.joint_step_receipts)?;
+        write_json(contribution_path.as_path(), &self.contribution_receipts)?;
         if self.topology_receipt.contributor_count > 2 {
             write_json(
                 output_dir
-                    .join("psion_reference_pilot_cluster_topology_receipt.json")
+                    .join(format!("{prefix}_cluster_topology_receipt.json"))
                     .as_path(),
                 &self.topology_receipt,
             )?;
             write_json(
                 output_dir
-                    .join("psion_reference_pilot_cluster_step_receipts.json")
+                    .join(format!("{prefix}_cluster_step_receipts.json"))
                     .as_path(),
                 &self.joint_step_receipts,
             )?;
             write_json(
                 output_dir
-                    .join("psion_reference_pilot_cluster_contribution_receipts.json")
+                    .join(format!("{prefix}_cluster_contribution_receipts.json"))
                     .as_path(),
                 &self.contribution_receipts,
             )?;
@@ -1545,6 +1562,112 @@ pub fn build_psion_reference_pilot_joint_contribution(
     Ok(receipt)
 }
 
+pub fn build_psion_actual_pretraining_joint_contribution(
+    repo_root: &Path,
+    request: &PsionReferencePilotJointContributionRequest,
+) -> Result<PsionReferencePilotJointContributionReceipt, PsionReferencePilotError> {
+    let corpus_bundle = build_psion_actual_pretraining_reconstructed_corpus(repo_root)?;
+    let descriptor = build_actual_pretraining_model_descriptor(repo_root)?;
+    let base_model = PsionCompactDecoderReferencePilotModel::seeded(descriptor.clone());
+    let restored_model = base_model.with_parameter_overrides(&request.parameter_values)?;
+    let restored_digest = stable_digest(
+        b"psion_reference_pilot_parameter_state|",
+        &restored_model.parameter_values(),
+    );
+    if restored_digest != request.parameter_state_digest {
+        return Err(PsionReferencePilotError::ParameterStateDigestMismatch {
+            expected: request.parameter_state_digest.clone(),
+            actual: restored_digest,
+        });
+    }
+
+    let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
+    let selected_examples = joint_reference_examples_for_step(
+        train_examples.as_slice(),
+        request.global_step,
+        request.batch_rows,
+        request.contributor_index,
+        request.contributor_count,
+    );
+    let example_selection_digest = stable_reference_example_digest(selected_examples.as_slice());
+
+    let (gradient_batch, runtime_backend, selected_device) = match request.backend {
+        PsionReferencePilotContributionBackend::Cpu => (
+            build_gradient_batch_for_device(
+                &restored_model,
+                selected_examples.as_slice(),
+                &Device::cpu(),
+            )?,
+            String::from("cpu"),
+            cpu_delivered_device(),
+        ),
+        PsionReferencePilotContributionBackend::Cuda => {
+            let mut cuda_backend = CudaBackend::new();
+            let Some(selected_device) = cuda_backend.selected_device().cloned() else {
+                let detail = cuda_backend
+                    .discovery_report()
+                    .map(|report| report.health.message)
+                    .unwrap_or_else(|error| error.to_string());
+                return Err(PsionReferencePilotError::CudaBackendUnavailable { detail });
+            };
+            let training_device = selected_device.device.clone();
+            let program = build_accelerated_gradient_program(
+                training_device.clone(),
+                &descriptor,
+                selected_examples.len(),
+            )?;
+            let gradient_batch = build_accelerated_gradient_batch(
+                &mut cuda_backend,
+                &program,
+                &restored_model,
+                selected_examples.as_slice(),
+                &training_device,
+            )?;
+            (
+                gradient_batch,
+                String::from("cuda"),
+                selected_device.inventory_qualifiers(),
+            )
+        }
+    };
+
+    let mut gradient_batch = gradient_batch;
+    gradient_batch.batch_id = format!(
+        "{}-step-{}-{}",
+        request.run_id, request.global_step, request.contributor_id
+    );
+    let detail = format!(
+        "Contributor `{}` on host `{}` computed one bounded actual-pretraining bringup gradient contribution for global step {} over {} examples.",
+        request.contributor_id,
+        request.contributor_host,
+        request.global_step,
+        gradient_batch.sample_count
+    );
+    let mut receipt = PsionReferencePilotJointContributionReceipt {
+        schema_version: String::from("psion.reference_pilot_joint_contribution_receipt.v1"),
+        run_id: request.run_id.clone(),
+        checkpoint_family: request.checkpoint_family.clone(),
+        global_step: request.global_step,
+        contributor_id: request.contributor_id.clone(),
+        contributor_host: request.contributor_host.clone(),
+        contributor_tailnet_ip: request.contributor_tailnet_ip.clone(),
+        contributor_role: request.contributor_role,
+        contributor_index: request.contributor_index,
+        contributor_count: request.contributor_count,
+        runtime_backend,
+        selected_device,
+        batch_rows: request.batch_rows,
+        sample_count: gradient_batch.sample_count,
+        example_selection_digest,
+        parameter_state_digest: request.parameter_state_digest.clone(),
+        gradient_batch,
+        detail,
+        contribution_digest: String::new(),
+    };
+    receipt.contribution_digest = receipt.stable_digest();
+    Ok(receipt)
+}
+
 pub fn run_psion_dual_host_reference_pilot<F>(
     repo_root: &Path,
     config: &PsionReferencePilotConfig,
@@ -1917,6 +2040,378 @@ where
     })
 }
 
+pub fn run_psion_dual_host_actual_pretraining_bringup<F>(
+    repo_root: &Path,
+    config: &PsionReferencePilotConfig,
+    dual_host: &PsionReferencePilotDualHostConfig,
+    mut remote_contributor: F,
+) -> Result<PsionReferencePilotDualHostRun, PsionReferencePilotError>
+where
+    F: FnMut(
+        &PsionReferencePilotJointContributionRequest,
+    ) -> Result<PsionReferencePilotJointContributionReceipt, PsionReferencePilotError>,
+{
+    let corpus_bundle = build_psion_actual_pretraining_reconstructed_corpus(repo_root)?;
+    let sampling_policy = build_actual_pretraining_sampling_policy(repo_root)?;
+    let model_descriptor = build_actual_pretraining_model_descriptor(repo_root)?;
+    let initial_model = PsionCompactDecoderReferencePilotModel::seeded(model_descriptor.clone());
+    let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
+    let validation_examples = split_examples(&corpus_bundle, DatasetSplitKind::Validation);
+    let held_out_examples = split_examples(&corpus_bundle, DatasetSplitKind::HeldOut);
+
+    let initial_validation_summary = evaluate_examples(&initial_model, &validation_examples);
+    let initial_held_out_summary = evaluate_examples(&initial_model, &held_out_examples);
+
+    let parameter_groups = build_parameter_groups(&initial_model, config)?;
+    let mut run = FixedBudgetTrainingRun::new(
+        config.run_id.clone(),
+        config.checkpoint_family.clone(),
+        config.budget,
+        parameter_groups,
+    )?;
+
+    let mut current_model = initial_model.clone();
+    let mut step_receipts = Vec::new();
+    let mut contribution_receipts = Vec::new();
+    let mut joint_step_receipts = Vec::new();
+    let mut remote_nodes = vec![(
+        dual_host.remote_worker_host.clone(),
+        dual_host.remote_worker_tailnet_ip.clone(),
+        dual_host.remote_worker_backend,
+        dual_host.remote_worker_batch_rows.max(1),
+    )];
+    if let Some(host) = dual_host.secondary_remote_worker_host.as_ref() {
+        remote_nodes.push((
+            host.clone(),
+            dual_host.secondary_remote_worker_tailnet_ip.clone(),
+            dual_host.secondary_remote_worker_backend,
+            dual_host.secondary_remote_worker_batch_rows.max(1),
+        ));
+    }
+    let contributor_count = remote_nodes.len().saturating_add(1);
+    let execution_topology_classification = if contributor_count == 2 {
+        "dual_host_joint_gradient_average"
+    } else {
+        "multi_host_joint_gradient_average"
+    };
+    let mut remote_device_inventory = BTreeMap::new();
+    let mut remote_runtime_backends = BTreeMap::new();
+
+    for step_index in 0..config.budget.max_steps {
+        let global_step = step_index.saturating_add(1);
+        let parameter_values = current_model.parameter_values();
+        let parameter_state_digest =
+            stable_digest(b"psion_reference_pilot_parameter_state|", &parameter_values);
+        let mut step_contributions = Vec::new();
+        let local_request = PsionReferencePilotJointContributionRequest {
+            schema_version: String::from("psion.reference_pilot_joint_contribution_request.v1"),
+            run_id: config.run_id.clone(),
+            checkpoint_family: config.checkpoint_family.clone(),
+            global_step,
+            contributor_id: format!("{}-cpu", dual_host.control_plane_host),
+            contributor_host: dual_host.control_plane_host.clone(),
+            contributor_tailnet_ip: dual_host.control_plane_tailnet_ip.clone(),
+            contributor_role: PsionReferencePilotJointContributionRole::LocalAppleHost,
+            contributor_index: 0,
+            contributor_count,
+            backend: PsionReferencePilotContributionBackend::Cpu,
+            batch_rows: dual_host.control_plane_batch_rows.max(1),
+            parameter_values: parameter_values.clone(),
+            parameter_state_digest: parameter_state_digest.clone(),
+        };
+        step_contributions.push(build_psion_actual_pretraining_joint_contribution(
+            repo_root,
+            &local_request,
+        )?);
+        for (remote_index, (remote_host, remote_tailnet_ip, remote_backend, remote_batch_rows)) in
+            remote_nodes.iter().enumerate()
+        {
+            let remote_request = PsionReferencePilotJointContributionRequest {
+                schema_version: String::from("psion.reference_pilot_joint_contribution_request.v1"),
+                run_id: config.run_id.clone(),
+                checkpoint_family: config.checkpoint_family.clone(),
+                global_step,
+                contributor_id: format!("{}-{}", remote_host, remote_backend.runtime_backend()),
+                contributor_host: remote_host.clone(),
+                contributor_tailnet_ip: remote_tailnet_ip.clone(),
+                contributor_role: PsionReferencePilotJointContributionRole::RemoteTailnetWorker,
+                contributor_index: remote_index.saturating_add(1),
+                contributor_count,
+                backend: *remote_backend,
+                batch_rows: (*remote_batch_rows).max(1),
+                parameter_values: parameter_values.clone(),
+                parameter_state_digest: parameter_state_digest.clone(),
+            };
+            let remote_contribution = remote_contributor(&remote_request)?;
+            validate_joint_contribution_against_request(&remote_contribution, &remote_request)?;
+            remote_runtime_backends.insert(
+                remote_host.clone(),
+                remote_contribution.runtime_backend.clone(),
+            );
+            remote_device_inventory.insert(
+                remote_host.clone(),
+                remote_contribution.selected_device.clone(),
+            );
+            step_contributions.push(remote_contribution);
+        }
+
+        let merged_batch = merge_joint_contributions(
+            format!("{}-step-{}-merged", config.run_id, global_step),
+            step_contributions.iter().collect::<Vec<_>>().as_slice(),
+            &Device::cpu(),
+        )?;
+        let started_at_ms = config
+            .started_at_ms
+            .saturating_add(step_index.saturating_mul(config.step_duration_ms));
+        let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
+        let receipt = run.apply_step(TrainingStepInput::new(
+            merged_batch.clone(),
+            started_at_ms,
+            finished_at_ms,
+        ))?;
+        current_model = materialize_model(&model_descriptor, &run)?;
+        let contribution_hosts = step_contributions
+            .iter()
+            .map(|receipt| receipt.contributor_host.clone())
+            .collect::<Vec<_>>();
+        let contribution_runtime_backends = step_contributions
+            .iter()
+            .map(|receipt| receipt.runtime_backend.clone())
+            .collect::<Vec<_>>();
+        let contribution_digests = step_contributions
+            .iter()
+            .map(|receipt| receipt.contribution_digest.clone())
+            .collect::<Vec<_>>();
+        joint_step_receipts.push(PsionReferencePilotDualHostStepReceipt {
+            schema_version: String::from("psion.reference_pilot_dual_host_step_receipt.v1"),
+            run_id: config.run_id.clone(),
+            global_step,
+            local_contribution_digest: contribution_digests
+                .first()
+                .cloned()
+                .unwrap_or_default(),
+            remote_contribution_digest: contribution_digests
+                .get(1)
+                .cloned()
+                .unwrap_or_default(),
+            contribution_digests,
+            contributor_hosts: contribution_hosts.clone(),
+            contributor_runtime_backends: contribution_runtime_backends.clone(),
+            merged_batch_id: merged_batch.batch_id.clone(),
+            merged_sample_count: merged_batch.sample_count,
+            applied_receipt_id: receipt.receipt_id.clone(),
+            applied_receipt_digest: receipt.receipt_digest.clone(),
+            detail: format!(
+                "Global step {} merged bounded actual-pretraining bringup gradient contributions from {} before applying the optimizer step.",
+                global_step,
+                contribution_hosts
+                    .iter()
+                    .zip(contribution_runtime_backends.iter())
+                    .map(|(host, backend)| format!("`{host}` ({backend})"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        });
+        contribution_receipts.extend(step_contributions);
+        step_receipts.push(receipt);
+    }
+
+    let final_validation_summary = evaluate_examples(&current_model, &validation_examples);
+    let final_held_out_summary = evaluate_examples(&current_model, &held_out_examples);
+    let checkpoint_artifact = export_checkpoint(
+        &current_model,
+        &train_examples,
+        &validation_examples,
+        config,
+        &model_descriptor,
+        config.started_at_ms.saturating_add(
+            config
+                .budget
+                .max_steps
+                .saturating_mul(config.step_duration_ms),
+        ),
+    )?;
+    let optimizer_state_artifact =
+        build_optimizer_state_artifact(&run, &checkpoint_artifact, config)?;
+    let stage_config = PsionPretrainStageConfig::new(
+        config.run_id.clone(),
+        config.stage_id.clone(),
+        PsionPretrainObjectiveConfig {
+            objective_kind: PsionPretrainObjectiveKind::NextTokenPrediction,
+            loss_normalization: PsionPretrainLossNormalization::ByTargetToken,
+            label_smoothing_bps: 25,
+            tokenizer_binding_digest: model_descriptor.tokenizer_binding.stable_digest(),
+            dataset_identity: String::from("psion_corpus_tokenized@v1"),
+            max_context_tokens: model_descriptor.config.max_context,
+        },
+        &model_descriptor,
+        &corpus_bundle.tokenized_corpus_manifest,
+        &sampling_policy,
+    )?;
+    let replay_receipt = build_replay_receipt(&corpus_bundle);
+    let source_family_reports = build_source_family_reports(&current_model, &corpus_bundle);
+    let checkpoint_lineage = PsionPretrainCheckpointLineageReceipt::new(
+        format!("{}-checkpoint-lineage", config.run_id),
+        checkpoint_artifact.checkpoint.clone(),
+        None,
+        checkpoint_artifact.manifest.checkpoint_ref.clone(),
+        model_descriptor.model.model_id.clone(),
+        model_descriptor.stable_digest(),
+    );
+    let local_device = cpu_delivered_device();
+    let remote_worker_receipts = remote_nodes
+        .iter()
+        .map(|(host, tailnet_ip, _, _)| {
+            let runtime_backend = remote_runtime_backends.get(host).cloned().ok_or_else(|| {
+                PsionReferencePilotError::InvalidJointContribution {
+                    message: format!(
+                        "missing remote runtime backend from the actual-pretraining bringup run for `{host}`"
+                    ),
+                }
+            })?;
+            let device_inventory = remote_device_inventory.get(host).cloned().ok_or_else(|| {
+                PsionReferencePilotError::InvalidJointContribution {
+                    message: format!(
+                        "missing remote device inventory from the actual-pretraining bringup run for `{host}`"
+                    ),
+                }
+            })?;
+            Ok((
+                host.clone(),
+                tailnet_ip.clone(),
+                runtime_backend,
+                device_inventory,
+            ))
+        })
+        .collect::<Result<Vec<_>, PsionReferencePilotError>>()?;
+    let delivered_execution = dual_host_delivered_execution(
+        dual_host,
+        local_device.clone(),
+        remote_worker_receipts.as_slice(),
+        &checkpoint_artifact.checkpoint,
+    );
+    let stage_receipt = run_psion_pretrain_stage_with_execution(
+        &stage_config,
+        source_family_reports,
+        replay_receipt,
+        checkpoint_lineage,
+        Some(delivered_execution.clone()),
+        None,
+        &format!(
+            "Bounded actual-pretraining bringup completed joint optimizer steps where {} each contributed gradient-bearing work to the promoted checkpoint for `psion-compact-decoder-internal-v1` on `psion_corpus_tokenized@v1`.",
+            std::iter::once(format!("`{}` (cpu)", dual_host.control_plane_host))
+                .chain(
+                    remote_worker_receipts
+                        .iter()
+                        .map(|(host, _, runtime_backend, _)| {
+                            format!("`{host}` ({runtime_backend})")
+                        })
+                )
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        &model_descriptor,
+        &corpus_bundle.tokenized_corpus_manifest,
+        &sampling_policy,
+    )?;
+    let observability_receipt = build_dual_host_observability_receipt(
+        config,
+        dual_host,
+        &stage_receipt,
+        &checkpoint_artifact,
+        &step_receipts,
+        contribution_receipts.as_slice(),
+        train_examples.as_slice(),
+        validation_examples.as_slice(),
+        held_out_examples.as_slice(),
+        delivered_execution.clone(),
+    )?;
+
+    let mut topology_receipt = PsionReferencePilotDualHostTopologyReceipt {
+        schema_version: String::from("psion.reference_pilot_dual_host_topology_receipt.v1"),
+        run_id: config.run_id.clone(),
+        checkpoint_family: config.checkpoint_family.clone(),
+        execution_topology_classification: String::from(execution_topology_classification),
+        control_plane_host: dual_host.control_plane_host.clone(),
+        control_plane_tailnet_ip: dual_host.control_plane_tailnet_ip.clone(),
+        remote_worker_host: dual_host.remote_worker_host.clone(),
+        remote_worker_tailnet_ip: dual_host.remote_worker_tailnet_ip.clone(),
+        secondary_remote_worker_host: dual_host.secondary_remote_worker_host.clone(),
+        secondary_remote_worker_tailnet_ip: dual_host.secondary_remote_worker_tailnet_ip.clone(),
+        local_runtime_backend: String::from("cpu"),
+        remote_runtime_backend: remote_worker_receipts
+            .first()
+            .map(|(_, _, runtime_backend, _)| runtime_backend.clone())
+            .unwrap_or_else(|| String::from("unknown")),
+        worker_hosts: std::iter::once(dual_host.control_plane_host.clone())
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(host, _, _, _)| host.clone()),
+            )
+            .collect(),
+        worker_tailnet_ips: std::iter::once(dual_host.control_plane_tailnet_ip.clone())
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(_, tailnet_ip, _, _)| tailnet_ip.clone()),
+            )
+            .flatten()
+            .collect(),
+        runtime_backends: std::iter::once(String::from("cpu"))
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(_, _, runtime_backend, _)| runtime_backend.clone()),
+            )
+            .collect(),
+        contributor_count,
+        delivered_execution: delivered_execution.clone(),
+        joint_step_receipt_digests: joint_step_receipts
+            .iter()
+            .map(|receipt| stable_digest(b"psion_reference_pilot_dual_host_step_receipt|", receipt))
+            .collect(),
+        checkpoint_ref: checkpoint_artifact.manifest.checkpoint_ref.clone(),
+        detail: format!(
+            "This retained topology receipt proves one bounded actual-pretraining bringup run where {} each computed one contribution per optimizer step before the merged update advanced the shared checkpoint.",
+            std::iter::once(format!("`{}` (cpu)", dual_host.control_plane_host))
+                .chain(
+                    remote_worker_receipts
+                        .iter()
+                        .map(|(host, _, runtime_backend, _)| {
+                            format!("`{host}` ({runtime_backend})")
+                        })
+                )
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        topology_receipt_digest: String::new(),
+    };
+    topology_receipt.topology_receipt_digest = topology_receipt.stable_digest();
+
+    Ok(PsionReferencePilotDualHostRun {
+        run: PsionReferencePilotRun {
+            corpus_bundle,
+            model_descriptor,
+            sampling_policy,
+            stage_config,
+            stage_receipt,
+            observability_receipt,
+            checkpoint_artifact,
+            optimizer_state_artifact,
+            initial_validation_loss_milli_by_family: initial_validation_summary
+                .loss_by_family_milli,
+            final_validation_loss_milli_by_family: final_validation_summary.loss_by_family_milli,
+            initial_held_out_loss_milli: milli_loss(initial_held_out_summary.mean_loss),
+            final_held_out_loss_milli: milli_loss(final_held_out_summary.mean_loss),
+            step_receipts,
+        },
+        topology_receipt,
+        contribution_receipts,
+        joint_step_receipts,
+    })
+}
+
 fn build_reference_sampling_policy(
     corpus_bundle: &PsionReferenceCorpusBundle,
 ) -> Result<PsionSamplingPolicyManifest, PsionReferencePilotError> {
@@ -2102,6 +2597,30 @@ fn build_reference_model_descriptor(
                 .clone(),
         },
     )?)
+}
+
+fn build_actual_pretraining_model_descriptor(
+    repo_root: &Path,
+) -> Result<PsionCompactDecoderDescriptor, PsionReferencePilotError> {
+    load_json_fixture(
+        repo_root,
+        "fixtures/psion/models/psion_compact_decoder_internal_descriptor_v1.json",
+    )
+    .map_err(|error| PsionReferencePilotError::Serialization {
+        message: error.to_string(),
+    })
+}
+
+fn build_actual_pretraining_sampling_policy(
+    repo_root: &Path,
+) -> Result<PsionSamplingPolicyManifest, PsionReferencePilotError> {
+    load_json_fixture(
+        repo_root,
+        "fixtures/psion/sampling/psion_sampling_policy_manifest_v1.json",
+    )
+    .map_err(|error| PsionReferencePilotError::Serialization {
+        message: error.to_string(),
+    })
 }
 
 fn load_json_fixture<T: DeserializeOwned>(
@@ -5498,6 +6017,61 @@ mod tests {
             .observability_receipt
             .validate_against_stage(&run.run.stage_receipt)
             .expect("tri-host observability receipt should validate");
+    }
+
+    #[test]
+    fn actual_pretraining_bringup_runs_tri_host_cpu_merge_end_to_end() {
+        let config = PsionReferencePilotConfig::actual_pretraining_bringup().expect("config");
+        let dual_host = PsionReferencePilotDualHostConfig::new("macbook-pro-m5", "archlinux")
+            .with_control_plane_tailnet_ip("100.127.107.31")
+            .with_remote_worker_tailnet_ip("100.108.56.85")
+            .with_secondary_remote_worker_host("macbook-pro-m2")
+            .with_secondary_remote_worker_tailnet_ip("100.72.151.98")
+            .with_control_plane_batch_rows(2)
+            .with_remote_worker_batch_rows(2)
+            .with_secondary_remote_worker_batch_rows(2)
+            .with_remote_worker_backend(PsionReferencePilotContributionBackend::Cpu)
+            .with_secondary_remote_worker_backend(PsionReferencePilotContributionBackend::Cpu);
+        let run = run_psion_dual_host_actual_pretraining_bringup(
+            repo_root().as_path(),
+            &config,
+            &dual_host,
+            |request| {
+                build_psion_actual_pretraining_joint_contribution(repo_root().as_path(), request)
+            },
+        )
+        .expect("actual pretraining bringup should run");
+
+        assert_eq!(run.run.stage_receipt.stage_id, config.stage_id);
+        assert_eq!(
+            run.run.stage_receipt.model_id,
+            "psion-compact-decoder-internal-v1"
+        );
+        assert_eq!(
+            run.run.stage_receipt.dataset_identity,
+            "psion_corpus_tokenized@v1"
+        );
+        assert_eq!(
+            run.contribution_receipts.len(),
+            (config.budget.max_steps as usize) * 3,
+            "tri-host actual bringup should retain one contribution per host per step"
+        );
+        assert_eq!(run.topology_receipt.contributor_count, 3);
+        assert_eq!(
+            run.topology_receipt.execution_topology_classification,
+            "multi_host_joint_gradient_average"
+        );
+        assert!(
+            run.run.step_receipts.iter().any(|receipt| receipt
+                .group_telemetry
+                .iter()
+                .any(|group| group.update_norm_l2 > 0.0)),
+            "actual pretraining bringup should apply at least one non-zero merged update"
+        );
+        run.run
+            .observability_receipt
+            .validate_against_stage(&run.run.stage_receipt)
+            .expect("actual bringup observability receipt should validate");
     }
 
     #[test]
