@@ -14,6 +14,8 @@ use psionic_train::{
     PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainContributionArtifactManifest, PsionicTrainCoordinationContext,
+    PsionicTrainGroupedReplicaRecoverySourceKind, PsionicTrainGroupedReplicaStageAssignment,
+    PsionicTrainGroupedReplicaStageRecoveryReceipt, PsionicTrainGroupedReplicaStageRole,
     PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
     PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
     PsionicTrainRunStatusPacket, PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
@@ -255,6 +257,26 @@ fn bind_window_context(
     manifest.coordination.window_id = Some(String::from(window_id));
     manifest.coordination.assignment_id = Some(String::from(assignment_id));
     manifest.coordination.membership_revision = Some(membership_revision);
+}
+
+fn grouped_stage_assignment(
+    stage_id: &str,
+    stage_index: u32,
+    stage_count: u32,
+    stage_role: PsionicTrainGroupedReplicaStageRole,
+    upstream_stage_id: Option<&str>,
+    downstream_stage_id: Option<&str>,
+) -> PsionicTrainGroupedReplicaStageAssignment {
+    PsionicTrainGroupedReplicaStageAssignment::new(
+        "replica-apple-01",
+        stage_id,
+        stage_index,
+        stage_count,
+        stage_role,
+        upstream_stage_id.map(String::from),
+        downstream_stage_id.map(String::from),
+    )
+    .expect("grouped stage assignment should build")
 }
 
 fn build_validator_manifest(
@@ -946,6 +968,451 @@ fn apple_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
                 .expect("apple handoff receipt path should exist"),
         )
         .is_file()
+    );
+}
+
+#[test]
+fn apple_grouped_stage_record_checkpoint_persists_grouped_checkpoint_surface() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("apple-grouped-run");
+
+    let launch_manifest_path = tempdir.path().join("apple-grouped-launch.json");
+    let mut launch_manifest = build_apple_launch_manifest(&run_root);
+    bind_window_context(
+        &mut launch_manifest,
+        "apple-grouped-window-0001",
+        "apple-grouped-assignment-0001",
+        1,
+    );
+    launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "grouped apple launch should succeed"
+    );
+
+    let checkpoint_manifest_path = tempdir.path().join("apple-grouped-record-checkpoint.json");
+    let mut checkpoint_manifest = build_apple_record_checkpoint_manifest(
+        &run_root,
+        "apple-grouped-final",
+        5_120,
+        "checkpoint://psion/apple/grouped/final",
+    );
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "apple-grouped-window-0001",
+        "apple-grouped-assignment-0001",
+        2,
+    );
+    checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let output = run_machine_manifest(&checkpoint_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("grouped checkpoint packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("grouped run status path should exist"),
+    );
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_ref()
+            .expect("grouped checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.window_id.as_deref(),
+        Some("apple-grouped-window-0001")
+    );
+    assert_eq!(
+        checkpoint_surface.assignment_id.as_deref(),
+        Some("apple-grouped-assignment-0001")
+    );
+    assert_eq!(
+        checkpoint_surface
+            .grouped_stage_assignment
+            .as_ref()
+            .expect("grouped checkpoint surface should carry stage assignment")
+            .stage_id
+            .as_str(),
+        "stage-01"
+    );
+
+    let checkpoint_pointer: PsionicTrainCheckpointPointer = parse_json(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_ref()
+            .expect("grouped checkpoint pointer path should exist"),
+    );
+    assert_eq!(
+        checkpoint_pointer.window_id.as_deref(),
+        Some("apple-grouped-window-0001")
+    );
+    assert_eq!(
+        checkpoint_pointer.assignment_id.as_deref(),
+        Some("apple-grouped-assignment-0001")
+    );
+    assert_eq!(
+        checkpoint_pointer
+            .grouped_stage_assignment
+            .as_ref()
+            .expect("grouped checkpoint pointer should carry stage assignment")
+            .stage_id
+            .as_str(),
+        "stage-01"
+    );
+
+    let checkpoint_manifest: PsionicTrainCheckpointManifest = parse_json(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_manifest_path
+            .as_ref()
+            .expect("grouped checkpoint manifest path should exist"),
+    );
+    assert_eq!(
+        checkpoint_manifest.window_id.as_deref(),
+        Some("apple-grouped-window-0001")
+    );
+    assert_eq!(
+        checkpoint_manifest.assignment_id.as_deref(),
+        Some("apple-grouped-assignment-0001")
+    );
+    assert_eq!(
+        checkpoint_manifest
+            .grouped_stage_assignment
+            .as_ref()
+            .expect("grouped checkpoint manifest should carry stage assignment")
+            .stage_id
+            .as_str(),
+        "stage-01"
+    );
+
+    let contribution_artifact_manifest: PsionicTrainContributionArtifactManifest = parse_json(
+        run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .as_ref()
+            .expect("grouped contribution artifact manifest path should exist"),
+    );
+    assert!(
+        contribution_artifact_manifest
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_kind == "checkpoint_pointer")
+    );
+    assert!(
+        contribution_artifact_manifest
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_kind == "checkpoint_manifest")
+    );
+}
+
+#[test]
+fn apple_grouped_stage_resume_can_seed_from_peer_checkpoint_handoff() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let source_run_root = tempdir.path().join("apple-grouped-source-run");
+
+    let launch_manifest_path = tempdir.path().join("apple-grouped-source-launch.json");
+    let mut launch_manifest = build_apple_launch_manifest(&source_run_root);
+    bind_window_context(
+        &mut launch_manifest,
+        "apple-grouped-window-0002",
+        "apple-grouped-assignment-0002",
+        1,
+    );
+    launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "grouped source launch should succeed"
+    );
+
+    let checkpoint_manifest_path = tempdir
+        .path()
+        .join("apple-grouped-source-record-checkpoint.json");
+    let mut checkpoint_manifest = build_apple_record_checkpoint_manifest(
+        &source_run_root,
+        "apple-grouped-peer-final",
+        6_144,
+        "checkpoint://psion/apple/grouped/peer-final",
+    );
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "apple-grouped-window-0002",
+        "apple-grouped-assignment-0002",
+        2,
+    );
+    checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "grouped source record-checkpoint should succeed"
+    );
+
+    let serve_manifest_path = tempdir.path().join("apple-grouped-serve-checkpoint.json");
+    let mut serve_manifest = build_retained_operation_manifest_for_lane(
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+        &source_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::ServeCheckpoint,
+    );
+    serve_manifest.peer_node_pubkey = Some(String::from("npub1-apple-grouped-joiner"));
+    write_manifest(&serve_manifest_path, &mut serve_manifest);
+    let serve_output = run_machine_manifest(&serve_manifest_path);
+    assert!(
+        serve_output.status.success(),
+        "grouped serve-checkpoint should succeed"
+    );
+    let serve_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&serve_output.stdout).expect("grouped serve packet should parse");
+    let serve_run_status: PsionicTrainRunStatusPacket = parse_json(
+        serve_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("grouped serve run status path should exist"),
+    );
+    let handoff_receipt: PsionicTrainCheckpointHandoffReceipt = parse_json(
+        serve_run_status
+            .artifacts
+            .checkpoint_handoff_receipt_path
+            .as_ref()
+            .expect("grouped handoff receipt path should exist"),
+    );
+    assert_eq!(
+        handoff_receipt
+            .grouped_stage_assignment
+            .as_ref()
+            .expect("grouped handoff receipt should carry stage assignment")
+            .stage_id
+            .as_str(),
+        "stage-01"
+    );
+
+    let joiner_run_root = tempdir.path().join("apple-grouped-joiner-run");
+    let resume_manifest_path = tempdir.path().join("apple-grouped-resume-from-peer.json");
+    let mut resume_manifest = build_retained_operation_manifest_for_lane(
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+        &joiner_run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::Resume,
+    );
+    bind_window_context(
+        &mut resume_manifest,
+        "apple-grouped-window-0002",
+        "apple-grouped-assignment-0002",
+        2,
+    );
+    resume_manifest.coordination.node_pubkey = Some(String::from("npub1-apple-grouped-joiner"));
+    resume_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    resume_manifest.peer_checkpoint_handoff_receipt_path = serve_run_status
+        .artifacts
+        .checkpoint_handoff_receipt_path
+        .clone();
+    resume_manifest.dry_run = true;
+    write_manifest(&resume_manifest_path, &mut resume_manifest);
+    let output = run_machine_manifest(&resume_manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("grouped resume packet should parse");
+    let run_status: PsionicTrainRunStatusPacket = parse_json(
+        packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("grouped resume run status path should exist"),
+    );
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_ref()
+            .expect("grouped resume checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_resolution_state.as_deref(),
+        Some("accepted_peer_handoff_checkpoint")
+    );
+    assert_eq!(
+        checkpoint_surface.recovery_source_kind.as_deref(),
+        Some("peer_checkpoint_handoff")
+    );
+    assert_eq!(checkpoint_surface.restored_primary_pointer, Some(true));
+    assert_eq!(
+        checkpoint_surface
+            .grouped_stage_assignment
+            .as_ref()
+            .expect("grouped checkpoint surface should keep stage assignment")
+            .stage_id
+            .as_str(),
+        "stage-01"
+    );
+
+    let grouped_recovery_receipt: PsionicTrainGroupedReplicaStageRecoveryReceipt = parse_json(
+        run_status
+            .artifacts
+            .recovery_receipt_path
+            .as_ref()
+            .expect("grouped recovery receipt path should exist"),
+    );
+    assert_eq!(
+        grouped_recovery_receipt.recovery_source_kind,
+        PsionicTrainGroupedReplicaRecoverySourceKind::PeerCheckpointHandoff
+    );
+    assert_eq!(
+        grouped_recovery_receipt
+            .grouped_stage_assignment
+            .stage_id
+            .as_str(),
+        "stage-01"
+    );
+}
+
+#[test]
+fn apple_grouped_stage_resume_refuses_mismatched_stage_checkpoint() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("apple-grouped-mismatch-run");
+
+    let launch_manifest_path = tempdir.path().join("apple-grouped-mismatch-launch.json");
+    let mut launch_manifest = build_apple_launch_manifest(&run_root);
+    bind_window_context(
+        &mut launch_manifest,
+        "apple-grouped-window-0003",
+        "apple-grouped-assignment-0003",
+        1,
+    );
+    launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "grouped mismatch launch should succeed"
+    );
+
+    let checkpoint_manifest_path = tempdir
+        .path()
+        .join("apple-grouped-mismatch-record-checkpoint.json");
+    let mut checkpoint_manifest = build_apple_record_checkpoint_manifest(
+        &run_root,
+        "apple-grouped-mismatch-final",
+        7_168,
+        "checkpoint://psion/apple/grouped/mismatch-final",
+    );
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "apple-grouped-window-0003",
+        "apple-grouped-assignment-0003",
+        2,
+    );
+    checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "grouped mismatch record-checkpoint should succeed"
+    );
+
+    let resume_manifest_path = tempdir.path().join("apple-grouped-mismatch-resume.json");
+    let mut resume_manifest = build_retained_operation_manifest_for_lane(
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+        &run_root,
+        PsionicTrainRole::RecoverySource,
+        PsionicTrainOperation::Resume,
+    );
+    bind_window_context(
+        &mut resume_manifest,
+        "apple-grouped-window-0003",
+        "apple-grouped-assignment-0003",
+        2,
+    );
+    resume_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-02",
+        1,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Egress,
+        Some("stage-01"),
+        None,
+    ));
+    resume_manifest.dry_run = true;
+    write_manifest(&resume_manifest_path, &mut resume_manifest);
+    let output = run_machine_manifest(&resume_manifest_path);
+
+    assert!(
+        !output.status.success(),
+        "grouped mismatch resume should be refused"
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stderr).expect("grouped mismatch refusal should parse");
+    assert_eq!(
+        packet.refusal_class,
+        Some(PsionicTrainRefusalClass::StaleAssignment)
     );
 }
 

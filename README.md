@@ -204,7 +204,16 @@ deterministic `grouped_stage_execution_summary.json` that binds the grouped
 assignment, accepted input/output transport digests, and local outcome into one
 machine-legible artifact, and validator replay now emits one paired
 `grouped_stage_replay_evidence.json` when it verifies that grouped stage
-surface against the challenged receipt and artifact manifest.
+surface against the challenged receipt and artifact manifest. Grouped stage
+checkpointing now preserves that same scope through the generic checkpoint
+surface too: the retained checkpoint pointer and manifest carry the
+`window_id`, `assignment_id`, and full `grouped_stage_assignment`, peer
+handoff receipts repeat that grouped metadata, and grouped resume refuses to
+seed from any retained or handed-off checkpoint whose stage identity drifts
+from the requested worker window. Every grouped resume also writes one
+deterministic `checkpoints/grouped_stage_recovery_receipt.json` so supervisors
+can see whether the resumed stage came from one retained checkpoint or one
+peer checkpoint handoff without re-inferring that from process-local state.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

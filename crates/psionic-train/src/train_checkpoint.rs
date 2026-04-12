@@ -5,10 +5,12 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PsionActualPretrainingAutoResumeReceipt,
-    PsionActualPretrainingCheckpointBackupReceipt, PsionActualPretrainingCheckpointManifest,
-    PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCurrentRunStatus,
-    PsionicTrainCheckpointHandoffReceipt, PsionicTrainOperation, PsionicTrainRole,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSIONIC_TRAIN_GROUPED_STAGE_RECOVERY_RECEIPT_RELATIVE_PATH,
+    PsionActualPretrainingAutoResumeReceipt, PsionActualPretrainingCheckpointBackupReceipt,
+    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
+    PsionActualPretrainingCurrentRunStatus, PsionicTrainCheckpointHandoffReceipt,
+    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageRecoveryReceipt,
+    PsionicTrainOperation, PsionicTrainRole, load_psionic_train_grouped_stage_recovery_receipt,
 };
 
 /// Stable schema version for the retained machine-readable checkpoint surface.
@@ -32,6 +34,15 @@ pub struct PsionicTrainCheckpointPointer {
     pub lane_id: String,
     /// Stable run identifier.
     pub run_id: String,
+    /// Stable window identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_id: Option<String>,
+    /// Stable assignment identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment_id: Option<String>,
+    /// Stable grouped stage assignment when the checkpoint belongs to one grouped replica stage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Pointer state for the latest checkpoint.
     pub pointer_state: String,
     /// Latest checkpoint label.
@@ -55,6 +66,15 @@ pub struct PsionicTrainCheckpointManifest {
     pub lane_id: String,
     /// Stable run identifier.
     pub run_id: String,
+    /// Stable window identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_id: Option<String>,
+    /// Stable assignment identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment_id: Option<String>,
+    /// Stable grouped stage assignment when the checkpoint belongs to one grouped replica stage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Latest checkpoint label.
     pub checkpoint_label: String,
     /// Latest accepted optimizer step.
@@ -86,6 +106,8 @@ pub struct PsionicTrainCheckpointArtifactPaths {
     pub checkpoint_backup_manifest_path: Option<String>,
     /// Absolute path to the latest auto-resume receipt when present.
     pub auto_resume_receipt_path: Option<String>,
+    /// Absolute path to the latest grouped-stage recovery receipt when present.
+    pub grouped_stage_recovery_receipt_path: Option<String>,
     /// Absolute path to the latest peer checkpoint-handoff receipt when present.
     pub peer_checkpoint_handoff_receipt_path: Option<String>,
     /// Absolute path to the latest retained checkpoint failure drill when present.
@@ -105,6 +127,15 @@ pub struct PsionicTrainCheckpointSurface {
     pub operation: PsionicTrainOperation,
     /// Stable run identifier.
     pub run_id: String,
+    /// Stable window identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_id: Option<String>,
+    /// Stable assignment identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment_id: Option<String>,
+    /// Stable grouped stage assignment when the checkpoint belongs to one grouped replica stage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Absolute local run root.
     pub run_root: String,
     /// Latest retained actual-lane phase when present.
@@ -157,6 +188,12 @@ impl PsionicTrainCheckpointPointer {
         }
         require_nonempty(self.lane_id.as_str(), "checkpoint_pointer.lane_id")?;
         require_nonempty(self.run_id.as_str(), "checkpoint_pointer.run_id")?;
+        validate_grouped_checkpoint_scope(
+            self.window_id.as_deref(),
+            self.assignment_id.as_deref(),
+            self.grouped_stage_assignment.as_ref(),
+            "checkpoint_pointer",
+        )?;
         match self.pointer_state.as_str() {
             "accepted" | "accepted_primary" => {}
             other => {
@@ -221,6 +258,12 @@ impl PsionicTrainCheckpointManifest {
         }
         require_nonempty(self.lane_id.as_str(), "checkpoint_manifest.lane_id")?;
         require_nonempty(self.run_id.as_str(), "checkpoint_manifest.run_id")?;
+        validate_grouped_checkpoint_scope(
+            self.window_id.as_deref(),
+            self.assignment_id.as_deref(),
+            self.grouped_stage_assignment.as_ref(),
+            "checkpoint_manifest",
+        )?;
         require_nonempty(
             self.checkpoint_label.as_str(),
             "checkpoint_manifest.checkpoint_label",
@@ -291,6 +334,8 @@ pub fn inspect_psionic_train_checkpoint_surface(
     let checkpoint_backup_receipt_path =
         run_root.join("checkpoints/latest_accepted_checkpoint_backup_receipt.json");
     let auto_resume_receipt_path = run_root.join("checkpoints/auto_resume_receipt.json");
+    let grouped_stage_recovery_receipt_path =
+        run_root.join(PSIONIC_TRAIN_GROUPED_STAGE_RECOVERY_RECEIPT_RELATIVE_PATH);
     let peer_checkpoint_handoff_receipt_path =
         run_root.join("status/peer_checkpoint_handoff_receipt.json");
 
@@ -393,6 +438,20 @@ pub fn inspect_psionic_train_checkpoint_surface(
             }
         })?;
     }
+    let grouped_stage_recovery_receipt: Option<PsionicTrainGroupedReplicaStageRecoveryReceipt> =
+        if grouped_stage_recovery_receipt_path.is_file() {
+            Some(
+                load_psionic_train_grouped_stage_recovery_receipt(
+                    grouped_stage_recovery_receipt_path.as_path(),
+                )
+                .map_err(|error| PsionicTrainCheckpointSurfaceError::Invalid {
+                    path: grouped_stage_recovery_receipt_path.display().to_string(),
+                    detail: error.to_string(),
+                })?,
+            )
+        } else {
+            None
+        };
     let peer_checkpoint_handoff_receipt: Option<PsionicTrainCheckpointHandoffReceipt> =
         load_optional_json(peer_checkpoint_handoff_receipt_path.as_path())?;
     if let Some(peer_checkpoint_handoff_receipt) = &peer_checkpoint_handoff_receipt {
@@ -410,6 +469,7 @@ pub fn inspect_psionic_train_checkpoint_surface(
         && checkpoint_pointer.is_none()
         && checkpoint_backup_receipt.is_none()
         && auto_resume_receipt.is_none()
+        && grouped_stage_recovery_receipt.is_none()
         && peer_checkpoint_handoff_receipt.is_none()
     {
         return Ok(retained_surface);
@@ -434,6 +494,16 @@ pub fn inspect_psionic_train_checkpoint_surface(
                 .map(|value| value.run_id.clone())
         })
         .unwrap_or_else(|| String::from("unknown_run"));
+
+    let grouped_window_id = grouped_stage_recovery_receipt
+        .as_ref()
+        .map(|value| value.window_id.clone());
+    let grouped_assignment_id = grouped_stage_recovery_receipt
+        .as_ref()
+        .map(|value| value.assignment_id.clone());
+    let grouped_stage_assignment = grouped_stage_recovery_receipt
+        .as_ref()
+        .map(|value| value.grouped_stage_assignment.clone());
 
     let checkpoint_label = checkpoint_pointer
         .as_ref()
@@ -484,6 +554,9 @@ pub fn inspect_psionic_train_checkpoint_surface(
         role,
         operation,
         run_id,
+        window_id: grouped_window_id,
+        assignment_id: grouped_assignment_id,
+        grouped_stage_assignment,
         run_root: run_root.display().to_string(),
         current_phase: current_status.as_ref().map(|value| value.phase.clone()),
         pointer_state: checkpoint_pointer
@@ -550,6 +623,9 @@ pub fn inspect_psionic_train_checkpoint_surface(
             auto_resume_receipt_path: auto_resume_receipt_path
                 .is_file()
                 .then(|| auto_resume_receipt_path.display().to_string()),
+            grouped_stage_recovery_receipt_path: grouped_stage_recovery_receipt_path
+                .is_file()
+                .then(|| grouped_stage_recovery_receipt_path.display().to_string()),
             peer_checkpoint_handoff_receipt_path: peer_checkpoint_handoff_receipt_path
                 .is_file()
                 .then(|| peer_checkpoint_handoff_receipt_path.display().to_string()),
@@ -581,6 +657,10 @@ fn load_generic_checkpoint_surface(
     checkpoint_manifest.validate()?;
     if checkpoint_manifest.lane_id != checkpoint_pointer.lane_id
         || checkpoint_manifest.run_id != checkpoint_pointer.run_id
+        || checkpoint_manifest.window_id != checkpoint_pointer.window_id
+        || checkpoint_manifest.assignment_id != checkpoint_pointer.assignment_id
+        || checkpoint_manifest.grouped_stage_assignment
+            != checkpoint_pointer.grouped_stage_assignment
         || checkpoint_manifest.checkpoint_label != checkpoint_pointer.checkpoint_label
         || checkpoint_manifest.optimizer_step != checkpoint_pointer.optimizer_step
         || checkpoint_manifest.checkpoint_ref != checkpoint_pointer.checkpoint_ref
@@ -594,6 +674,45 @@ fn load_generic_checkpoint_surface(
             ),
         });
     }
+
+    let grouped_stage_recovery_receipt_path =
+        run_root.join(PSIONIC_TRAIN_GROUPED_STAGE_RECOVERY_RECEIPT_RELATIVE_PATH);
+    let grouped_stage_recovery_receipt: Option<PsionicTrainGroupedReplicaStageRecoveryReceipt> =
+        if grouped_stage_recovery_receipt_path.is_file() {
+            let receipt = load_psionic_train_grouped_stage_recovery_receipt(
+                grouped_stage_recovery_receipt_path.as_path(),
+            )
+            .map_err(|error| PsionicTrainCheckpointSurfaceError::Invalid {
+                path: grouped_stage_recovery_receipt_path.display().to_string(),
+                detail: error.to_string(),
+            })?;
+            if receipt.lane_id != checkpoint_pointer.lane_id
+                || receipt.run_id != checkpoint_pointer.run_id
+                || Some(receipt.window_id.as_str()) != checkpoint_pointer.window_id.as_deref()
+                || Some(receipt.assignment_id.as_str())
+                    != checkpoint_pointer.assignment_id.as_deref()
+                || receipt.grouped_stage_assignment != checkpoint_pointer.grouped_stage_assignment.clone().ok_or_else(|| PsionicTrainCheckpointSurfaceError::Invalid {
+                    path: grouped_stage_recovery_receipt_path.display().to_string(),
+                    detail: String::from(
+                        "grouped stage recovery receipt was retained without one grouped stage checkpoint pointer",
+                    ),
+                })?
+                || receipt.checkpoint_manifest_digest != checkpoint_manifest.manifest_digest
+                || receipt.checkpoint_object_digest != checkpoint_manifest.checkpoint_object_digest
+                || receipt.checkpoint_pointer_path != checkpoint_pointer_path.display().to_string()
+                || receipt.checkpoint_manifest_path != checkpoint_manifest_path.display().to_string()
+            {
+                return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+                    path: grouped_stage_recovery_receipt_path.display().to_string(),
+                    detail: String::from(
+                        "grouped stage recovery receipt drifted from the retained generic checkpoint surface",
+                    ),
+                });
+            }
+            Some(receipt)
+        } else {
+            None
+        };
 
     let peer_checkpoint_handoff_receipt: Option<PsionicTrainCheckpointHandoffReceipt> =
         load_optional_json(peer_checkpoint_handoff_receipt_path)?;
@@ -612,6 +731,9 @@ fn load_generic_checkpoint_surface(
         role,
         operation,
         run_id: checkpoint_pointer.run_id,
+        window_id: checkpoint_pointer.window_id.clone(),
+        assignment_id: checkpoint_pointer.assignment_id.clone(),
+        grouped_stage_assignment: checkpoint_pointer.grouped_stage_assignment.clone(),
         run_root: run_root.display().to_string(),
         current_phase: None,
         pointer_state: Some(checkpoint_pointer.pointer_state),
@@ -624,9 +746,25 @@ fn load_generic_checkpoint_surface(
         backup_state: None,
         upload_outcome: Some(String::from("succeeded")),
         upload_failure_reason: None,
-        recovery_resolution_state: None,
-        recovery_source_kind: None,
-        restored_primary_pointer: Some(false),
+        recovery_resolution_state: grouped_stage_recovery_receipt
+            .as_ref()
+            .map(|value| value.resolution_state.clone()),
+        recovery_source_kind: grouped_stage_recovery_receipt.as_ref().map(|value| {
+            match value.recovery_source_kind {
+                crate::PsionicTrainGroupedReplicaRecoverySourceKind::RetainedCheckpoint => {
+                    String::from("retained_grouped_stage_checkpoint")
+                }
+                crate::PsionicTrainGroupedReplicaRecoverySourceKind::PeerCheckpointHandoff => {
+                    String::from("peer_checkpoint_handoff")
+                }
+            }
+        }),
+        restored_primary_pointer: Some(
+            grouped_stage_recovery_receipt
+                .as_ref()
+                .map(|value| value.restored_primary_pointer)
+                .unwrap_or(false),
+        ),
         artifacts: PsionicTrainCheckpointArtifactPaths {
             checkpoint_pointer_path: Some(checkpoint_pointer_path.display().to_string()),
             checkpoint_manifest_path: Some(checkpoint_manifest_path.display().to_string()),
@@ -634,6 +772,8 @@ fn load_generic_checkpoint_surface(
             checkpoint_backup_pointer_path: None,
             checkpoint_backup_manifest_path: None,
             auto_resume_receipt_path: None,
+            grouped_stage_recovery_receipt_path: grouped_stage_recovery_receipt
+                .map(|_| grouped_stage_recovery_receipt_path.display().to_string()),
             peer_checkpoint_handoff_receipt_path: peer_checkpoint_handoff_receipt
                 .map(|_| peer_checkpoint_handoff_receipt_path.display().to_string()),
             checkpoint_failure_drill_path: checkpoint_failure_drill_path(run_root, operation)
@@ -669,6 +809,40 @@ fn checkpoint_failure_drill_path(
         .find(|value| value.is_file())
 }
 
+fn validate_grouped_checkpoint_scope(
+    window_id: Option<&str>,
+    assignment_id: Option<&str>,
+    grouped_stage_assignment: Option<&PsionicTrainGroupedReplicaStageAssignment>,
+    field_prefix: &str,
+) -> Result<(), PsionicTrainCheckpointSurfaceError> {
+    validate_optional_nonempty(window_id, format!("{field_prefix}.window_id").as_str())?;
+    validate_optional_nonempty(
+        assignment_id,
+        format!("{field_prefix}.assignment_id").as_str(),
+    )?;
+    if let Some(grouped_stage_assignment) = grouped_stage_assignment {
+        require_nonempty_option(window_id, format!("{field_prefix}.window_id").as_str())?;
+        require_nonempty_option(
+            assignment_id,
+            format!("{field_prefix}.assignment_id").as_str(),
+        )?;
+        grouped_stage_assignment
+            .validate(format!("{field_prefix}.grouped_stage_assignment").as_str())
+            .map_err(|error| PsionicTrainCheckpointSurfaceError::Invalid {
+                path: String::from(field_prefix),
+                detail: error.to_string(),
+            })?;
+    } else if window_id.is_some() || assignment_id.is_some() {
+        return Err(PsionicTrainCheckpointSurfaceError::Invalid {
+            path: String::from(field_prefix),
+            detail: String::from(
+                "window_id and assignment_id are only admitted on grouped stage checkpoints",
+            ),
+        });
+    }
+    Ok(())
+}
+
 fn load_json<T: DeserializeOwned>(path: &Path) -> Result<T, PsionicTrainCheckpointSurfaceError> {
     let bytes = fs::read(path).map_err(|error| PsionicTrainCheckpointSurfaceError::Read {
         path: path.display().to_string(),
@@ -678,6 +852,27 @@ fn load_json<T: DeserializeOwned>(path: &Path) -> Result<T, PsionicTrainCheckpoi
         path: path.display().to_string(),
         detail: error.to_string(),
     })
+}
+
+fn require_nonempty_option(
+    value: Option<&str>,
+    field: &str,
+) -> Result<(), PsionicTrainCheckpointSurfaceError> {
+    let value = value.ok_or_else(|| PsionicTrainCheckpointSurfaceError::Invalid {
+        path: String::from(field),
+        detail: format!("{field} must not be empty"),
+    })?;
+    require_nonempty(value, field)
+}
+
+fn validate_optional_nonempty(
+    value: Option<&str>,
+    field: &str,
+) -> Result<(), PsionicTrainCheckpointSurfaceError> {
+    if let Some(value) = value {
+        require_nonempty(value, field)?;
+    }
+    Ok(())
 }
 
 fn load_optional_json<T: DeserializeOwned>(

@@ -479,7 +479,16 @@ and local execution outcome into one replay-safe artifact. Validator replay
 uses that retained summary to emit one paired
 `grouped_stage_replay_evidence.json` under the validator artifact root, so the
 challenge path can prove that grouped stage identity, transport lineage, and
-receipt-level acceptance stayed aligned.
+receipt-level acceptance stayed aligned. The generic checkpoint surface now
+extends that same grouped lineage contract: checkpoint pointers and manifests
+retain `window_id`, `assignment_id`, and the full grouped stage assignment,
+checkpoint handoff receipts repeat the grouped metadata for peer seeding, and
+resume rejects any retained or handed-off checkpoint whose grouped stage scope
+does not match the requesting worker window. Every admitted grouped resume
+also materializes one deterministic
+`checkpoints/grouped_stage_recovery_receipt.json` that records whether the
+resumed stage came from a retained checkpoint or a peer handoff and binds that
+decision back to the accepted grouped assignment digest.
 
 The Apple lane stays intentionally narrower than the actual-pretraining lane.
 It does not route through the CUDA actual-pretraining operator. Instead, the

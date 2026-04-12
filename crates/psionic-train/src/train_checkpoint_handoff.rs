@@ -8,8 +8,8 @@ use crate::{
     PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
     PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCheckpointManifest,
     PsionActualPretrainingCheckpointPointer, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainOperation, PsionicTrainRole,
-    inspect_psionic_train_checkpoint_surface,
+    PsionicTrainCheckpointPointer, PsionicTrainGroupedReplicaStageAssignment,
+    PsionicTrainOperation, PsionicTrainRole, inspect_psionic_train_checkpoint_surface,
 };
 
 /// Stable schema version for the machine-readable peer checkpoint handoff receipt.
@@ -44,6 +44,15 @@ pub struct PsionicTrainCheckpointHandoffReceipt {
     pub peer_node_pubkey: String,
     /// Stable source run identifier.
     pub source_run_id: String,
+    /// Stable window identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_id: Option<String>,
+    /// Stable assignment identifier when the checkpoint belongs to one grouped stage window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assignment_id: Option<String>,
+    /// Stable grouped stage assignment when the checkpoint belongs to one grouped replica stage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     /// Absolute source run root.
     pub source_run_root: String,
     /// Whether the source is the live primary pointer or a durable backup copy.
@@ -127,6 +136,11 @@ impl PsionicTrainCheckpointHandoffReceipt {
         require_nonempty(
             self.source_run_id.as_str(),
             "checkpoint handoff source_run_id",
+        )?;
+        validate_grouped_stage_scope(
+            self.window_id.as_deref(),
+            self.assignment_id.as_deref(),
+            self.grouped_stage_assignment.as_ref(),
         )?;
         require_nonempty(
             self.source_run_root.as_str(),
@@ -310,6 +324,9 @@ pub fn build_psionic_train_checkpoint_handoff_receipt(
         serving_node_pubkey: String::from(serving_node_pubkey),
         peer_node_pubkey: String::from(peer_node_pubkey),
         source_run_id: checkpoint_surface.run_id,
+        window_id: checkpoint_surface.window_id.clone(),
+        assignment_id: checkpoint_surface.assignment_id.clone(),
+        grouped_stage_assignment: checkpoint_surface.grouped_stage_assignment.clone(),
         source_run_root: run_root.display().to_string(),
         source_kind,
         checkpoint_label,
@@ -401,6 +418,45 @@ fn require_nonempty(value: &str, field: &str) -> Result<(), PsionicTrainCheckpoi
     Ok(())
 }
 
+fn require_nonempty_option(
+    value: Option<&str>,
+    field: &str,
+) -> Result<(), PsionicTrainCheckpointHandoffError> {
+    let value = value.ok_or_else(|| PsionicTrainCheckpointHandoffError::Invalid {
+        detail: format!("{field} must not be empty"),
+    })?;
+    require_nonempty(value, field)
+}
+
+fn validate_grouped_stage_scope(
+    window_id: Option<&str>,
+    assignment_id: Option<&str>,
+    grouped_stage_assignment: Option<&PsionicTrainGroupedReplicaStageAssignment>,
+) -> Result<(), PsionicTrainCheckpointHandoffError> {
+    if let Some(window_id) = window_id {
+        require_nonempty(window_id, "checkpoint handoff window_id")?;
+    }
+    if let Some(assignment_id) = assignment_id {
+        require_nonempty(assignment_id, "checkpoint handoff assignment_id")?;
+    }
+    if let Some(grouped_stage_assignment) = grouped_stage_assignment {
+        require_nonempty_option(window_id, "checkpoint handoff window_id")?;
+        require_nonempty_option(assignment_id, "checkpoint handoff assignment_id")?;
+        grouped_stage_assignment
+            .validate("checkpoint_handoff.grouped_stage_assignment")
+            .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
+                detail: error.to_string(),
+            })?;
+    } else if window_id.is_some() || assignment_id.is_some() {
+        return Err(PsionicTrainCheckpointHandoffError::Invalid {
+            detail: String::from(
+                "checkpoint handoff window_id and assignment_id are only admitted on grouped stage checkpoints",
+            ),
+        });
+    }
+    Ok(())
+}
+
 fn short_digest(value: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(value.as_bytes());
@@ -450,7 +506,13 @@ fn materialize_generic_checkpoint_handoff(
     if checkpoint_pointer.lane_id != receipt.lane_id
         || checkpoint_manifest.lane_id != receipt.lane_id
         || checkpoint_pointer.run_id != receipt.source_run_id
+        || checkpoint_pointer.window_id.as_deref() != receipt.window_id.as_deref()
+        || checkpoint_pointer.assignment_id.as_deref() != receipt.assignment_id.as_deref()
+        || checkpoint_pointer.grouped_stage_assignment != receipt.grouped_stage_assignment
         || checkpoint_manifest.run_id != receipt.source_run_id
+        || checkpoint_manifest.window_id.as_deref() != receipt.window_id.as_deref()
+        || checkpoint_manifest.assignment_id.as_deref() != receipt.assignment_id.as_deref()
+        || checkpoint_manifest.grouped_stage_assignment != receipt.grouped_stage_assignment
         || checkpoint_pointer.checkpoint_manifest_relative_path
             != checkpoint_manifest.relative_manifest_path
         || checkpoint_manifest.manifest_digest != receipt.checkpoint_manifest_digest

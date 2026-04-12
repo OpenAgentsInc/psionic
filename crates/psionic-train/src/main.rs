@@ -15,6 +15,7 @@ use psionic_train::{
     PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
     PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PsionicTrainGroupedReplicaCheckpointError, PsionicTrainGroupedReplicaRecoverySourceKind,
     PsionicTrainGroupedReplicaTransportError, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRunStatusPacket, PsionicTrainRuntimeAttestation,
@@ -24,9 +25,10 @@ use psionic_train::{
     PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
     admitted_release_id_for_lane, build_psionic_train_checkpoint_handoff_receipt,
     execute_psionic_train_validator_replay, inspect_psionic_train_checkpoint_surface,
-    materialize_psionic_train_checkpoint_handoff, persist_psionic_train_window_artifacts,
-    retain_psionic_train_checkpoint_handoff_receipt, runtime_build_digest,
-    validate_psionic_train_grouped_stage_input_transport,
+    materialize_psionic_train_checkpoint_handoff,
+    persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
+    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
+    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
 };
 
 #[allow(dead_code)]
@@ -188,6 +190,46 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                     &error,
                     format!("failed to materialize peer checkpoint handoff `{peer_receipt_path}`"),
                 );
+            }
+        }
+        if let Some(run_root) = run_root.as_deref() {
+            if let Err(error) = persist_grouped_stage_resume_recovery(
+                &manifest,
+                run_root,
+                if manifest.peer_checkpoint_handoff_receipt_path.is_some() {
+                    PsionicTrainGroupedReplicaRecoverySourceKind::PeerCheckpointHandoff
+                } else {
+                    PsionicTrainGroupedReplicaRecoverySourceKind::RetainedCheckpoint
+                },
+            ) {
+                let summary = actual_pretraining_run_surface_summary(run_root);
+                let mut packet = PsionicTrainStatusPacket::refusal(
+                    Some(&manifest),
+                    refusal_for_grouped_stage_checkpoint_error(&error),
+                    Some(manifest_path.display().to_string()),
+                    Some(runtime_identity.attestation.clone()),
+                    Some(runtime_identity.capability_projection.clone()),
+                    summary
+                        .as_ref()
+                        .and_then(|value| value.run_id.clone())
+                        .or_else(|| manifest.run_id.clone()),
+                    Some(run_root.display().to_string()),
+                    None,
+                    None,
+                    format!("failed to materialize grouped stage resume recovery: {error}"),
+                );
+                let status_paths = write_status_surfaces_for_packet(
+                    &manifest,
+                    manifest_path.display().to_string(),
+                    Some(run_root),
+                    summary.as_ref(),
+                    &packet,
+                )
+                .unwrap_or_default();
+                packet.run_status_packet_path = status_paths.run_status_packet_path;
+                packet.window_status_packet_path = status_paths.window_status_packet_path;
+                emit_refusal_packet(packet.clone());
+                return ExitCode::from(packet.exit_code);
             }
         }
     }
@@ -1429,6 +1471,59 @@ fn refusal_for_grouped_stage_transport_error(
     }
 }
 
+fn refusal_for_grouped_stage_checkpoint_error(
+    error: &PsionicTrainGroupedReplicaCheckpointError,
+) -> PsionicTrainRefusalClass {
+    match error {
+        PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint { .. } => {
+            PsionicTrainRefusalClass::CheckpointMissing
+        }
+        PsionicTrainGroupedReplicaCheckpointError::StaleAssignment { .. } => {
+            PsionicTrainRefusalClass::StaleAssignment
+        }
+        PsionicTrainGroupedReplicaCheckpointError::Read { .. }
+        | PsionicTrainGroupedReplicaCheckpointError::Write { .. } => {
+            PsionicTrainRefusalClass::ArtifactIncomplete
+        }
+        PsionicTrainGroupedReplicaCheckpointError::Parse { .. }
+        | PsionicTrainGroupedReplicaCheckpointError::Invalid { .. } => {
+            PsionicTrainRefusalClass::CheckpointDigestMismatch
+        }
+    }
+}
+
+fn persist_grouped_stage_resume_recovery(
+    manifest: &PsionicTrainInvocationManifest,
+    run_root: &Path,
+    recovery_source_kind: PsionicTrainGroupedReplicaRecoverySourceKind,
+) -> Result<(), PsionicTrainGroupedReplicaCheckpointError> {
+    if manifest.grouped_stage_assignment.is_none() {
+        return Ok(());
+    }
+    let checkpoint_surface = inspect_psionic_train_checkpoint_surface(
+        run_root,
+        manifest.role,
+        manifest.operation,
+    )
+    .map_err(|error| PsionicTrainGroupedReplicaCheckpointError::Invalid {
+        detail: error.to_string(),
+    })?
+    .ok_or_else(
+        || PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint {
+            detail: String::from(
+                "grouped stage resume requires one retained checkpoint surface under the run root",
+            ),
+        },
+    )?;
+    persist_psionic_train_grouped_stage_recovery_receipt_from_surface(
+        run_root,
+        manifest,
+        &checkpoint_surface,
+        recovery_source_kind,
+    )?;
+    Ok(())
+}
+
 fn emit_checkpoint_handoff_refusal(
     manifest: &PsionicTrainInvocationManifest,
     manifest_path: &Path,
@@ -1774,7 +1869,14 @@ fn build_artifact_surface_refs(
                 .clone()
         }),
         recovery_receipt_path: checkpoint_surface
-            .and_then(|value| value.surface.artifacts.auto_resume_receipt_path.clone())
+            .and_then(|value| {
+                value
+                    .surface
+                    .artifacts
+                    .grouped_stage_recovery_receipt_path
+                    .clone()
+                    .or_else(|| value.surface.artifacts.auto_resume_receipt_path.clone())
+            })
             .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
         validator_score_receipt_path: validator_artifacts
             .map(|value| value.validator_score_receipt_path.clone()),
@@ -1817,7 +1919,14 @@ fn build_window_artifact_inputs(
                 .clone()
         }),
         recovery_receipt_path: checkpoint_surface
-            .and_then(|value| value.surface.artifacts.auto_resume_receipt_path.clone())
+            .and_then(|value| {
+                value
+                    .surface
+                    .artifacts
+                    .grouped_stage_recovery_receipt_path
+                    .clone()
+                    .or_else(|| value.surface.artifacts.auto_resume_receipt_path.clone())
+            })
             .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
         current_status_path: summary.and_then(|value| value.current_status_path.clone()),
         retained_summary_path: summary.and_then(|value| value.retained_summary_path.clone()),
@@ -1884,6 +1993,9 @@ fn write_generic_machine_checkpoint_artifacts(
         schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION),
         lane_id: manifest.lane_id.clone(),
         run_id: run_id.clone(),
+        window_id: manifest.coordination.window_id.clone(),
+        assignment_id: manifest.coordination.assignment_id.clone(),
+        grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
         checkpoint_label: String::from(checkpoint_label),
         optimizer_step,
         checkpoint_ref: String::from(checkpoint_ref),
@@ -1898,14 +2010,24 @@ fn write_generic_machine_checkpoint_artifacts(
         schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION),
         lane_id: manifest.lane_id.clone(),
         run_id,
+        window_id: manifest.coordination.window_id.clone(),
+        assignment_id: manifest.coordination.assignment_id.clone(),
+        grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
         pointer_state: String::from("accepted"),
         checkpoint_label: String::from(checkpoint_label),
         optimizer_step,
         checkpoint_ref: String::from(checkpoint_ref),
         checkpoint_manifest_relative_path: relative_manifest_path,
-        detail: String::from(
-            "Bounded Apple machine lane retained one accepted checkpoint pointer under the shared machine checkpoint contract.",
-        ),
+        detail: if let Some(stage_assignment) = manifest.grouped_stage_assignment.as_ref() {
+            format!(
+                "Grouped-replica stage `{}` retained one accepted stage checkpoint pointer under the shared machine checkpoint contract.",
+                stage_assignment.stage_id
+            )
+        } else {
+            String::from(
+                "Bounded Apple machine lane retained one accepted checkpoint pointer under the shared machine checkpoint contract.",
+            )
+        },
     };
 
     let pointer_path = checkpoints_dir.join("latest_accepted_checkpoint_pointer.json");

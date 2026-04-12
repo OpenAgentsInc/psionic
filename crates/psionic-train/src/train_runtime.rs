@@ -535,26 +535,44 @@ impl PsionicTrainInvocationManifest {
                 self.coordination.assignment_id.as_deref(),
                 "invocation_manifest.coordination.assignment_id",
             )?;
-            if self.role != PsionicTrainRole::Worker {
-                return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                    field: String::from("invocation_manifest.grouped_stage_assignment"),
-                    detail: String::from(
-                        "grouped stage assignment is currently admitted only for worker role on the machine runtime surface",
-                    ),
-                });
-            }
-            if stage_assignment.upstream_stage_id.is_some() {
-                require_nonempty_option(
-                    self.grouped_stage_input_transport_path.as_deref(),
-                    "invocation_manifest.grouped_stage_input_transport_path",
-                )?;
-            } else if self.grouped_stage_input_transport_path.is_some() {
-                return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                    field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
-                    detail: String::from(
-                        "ingress grouped stage must not declare grouped_stage_input_transport_path",
-                    ),
-                });
+            match (self.role, self.operation) {
+                (PsionicTrainRole::Worker, _) => {
+                    if stage_assignment.upstream_stage_id.is_some() {
+                        require_nonempty_option(
+                            self.grouped_stage_input_transport_path.as_deref(),
+                            "invocation_manifest.grouped_stage_input_transport_path",
+                        )?;
+                    } else if self.grouped_stage_input_transport_path.is_some() {
+                        return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                            field: String::from(
+                                "invocation_manifest.grouped_stage_input_transport_path",
+                            ),
+                            detail: String::from(
+                                "ingress grouped stage must not declare grouped_stage_input_transport_path",
+                            ),
+                        });
+                    }
+                }
+                (PsionicTrainRole::RecoverySource, PsionicTrainOperation::Resume) => {
+                    if self.grouped_stage_input_transport_path.is_some() {
+                        return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                            field: String::from(
+                                "invocation_manifest.grouped_stage_input_transport_path",
+                            ),
+                            detail: String::from(
+                                "grouped_stage_input_transport_path is not admitted on grouped stage resume manifests",
+                            ),
+                        });
+                    }
+                }
+                _ => {
+                    return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                        field: String::from("invocation_manifest.grouped_stage_assignment"),
+                        detail: String::from(
+                            "grouped stage assignment is currently admitted only for worker operations and recovery_source resume on the machine runtime surface",
+                        ),
+                    });
+                }
             }
         } else if self.grouped_stage_input_transport_path.is_some() {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
@@ -1380,7 +1398,7 @@ mod tests {
             PsionicTrainRuntimeContractError::InvalidValue {
                 field: String::from("invocation_manifest.grouped_stage_assignment"),
                 detail: String::from(
-                    "grouped stage assignment is currently admitted only for worker role on the machine runtime surface",
+                    "grouped stage assignment is currently admitted only for worker operations and recovery_source resume on the machine runtime surface",
                 ),
             }
         );
