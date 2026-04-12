@@ -851,6 +851,11 @@ pub fn run_psion_reference_pilot(
         &validation_examples,
         config,
         &model_descriptor,
+        corpus_bundle
+            .tokenized_corpus_manifest
+            .replay_contract
+            .stable_dataset_identity
+            .as_str(),
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -1095,6 +1100,11 @@ pub fn run_psion_accelerated_reference_pilot_with_live_visualization(
         &validation_examples,
         config,
         &model_descriptor,
+        corpus_bundle
+            .tokenized_corpus_manifest
+            .replay_contract
+            .stable_dataset_identity
+            .as_str(),
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -1852,6 +1862,11 @@ where
         &validation_examples,
         config,
         &model_descriptor,
+        corpus_bundle
+            .tokenized_corpus_manifest
+            .replay_contract
+            .stable_dataset_identity
+            .as_str(),
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -2224,6 +2239,11 @@ where
         &validation_examples,
         config,
         &model_descriptor,
+        corpus_bundle
+            .tokenized_corpus_manifest
+            .replay_contract
+            .stable_dataset_identity
+            .as_str(),
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -5277,6 +5297,7 @@ fn export_checkpoint(
     validation_examples: &[PsionReferenceTrainingExample],
     config: &PsionReferencePilotConfig,
     descriptor: &PsionCompactDecoderDescriptor,
+    dataset_identity: &str,
     durable_at_ms: u64,
 ) -> Result<PsionReferencePilotCheckpointArtifact, PsionReferencePilotError> {
     let parameter_values = model.parameter_values();
@@ -5319,7 +5340,7 @@ fn export_checkpoint(
         step: config.budget.max_steps,
         model_id: descriptor.model.model_id.clone(),
         model_descriptor_digest: descriptor.stable_digest(),
-        dataset_identity: String::from(PSION_REFERENCE_DATASET_IDENTITY),
+        dataset_identity: String::from(dataset_identity),
         train_example_count: train_examples.len(),
         validation_example_count: validation_examples.len(),
         parameter_ids: vec![
