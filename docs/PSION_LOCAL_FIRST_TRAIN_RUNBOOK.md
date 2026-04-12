@@ -176,6 +176,25 @@ For local reference runs, `reference_pilot_artifacts/` should contain:
 - `psion_reference_pilot_checkpoint_manifest.json`
 - the related checkpoint artifacts emitted by the example
 
+## Checkpoint Restore Verification
+
+After a bounded local reference run completes, verify that the retained
+checkpoint can be restored through the live resume-probe surface:
+
+```bash
+cargo run -q -p psionic-train --example psion_reference_pilot_resume_probe -- \
+  ~/scratch/psion_reference_pilot_runs/<run_id>/reference_pilot_artifacts \
+  /tmp/psion_reference_pilot_resume_probe_<run_id>
+```
+
+That command writes:
+
+- `/tmp/psion_reference_pilot_resume_probe_<run_id>/psion_reference_pilot_resume_probe.json`
+
+The resume-probe receipt is the retained proof that the saved checkpoint can be
+reloaded and advanced through one resumed optimizer step without inventing a
+second runtime path.
+
 ## Refusal Behavior
 
 `./TRAIN --lane reference_pilot` now refuses explicitly when:
