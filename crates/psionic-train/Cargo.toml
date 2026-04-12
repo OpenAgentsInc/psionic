@@ -6,12 +6,17 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 description = "Training checkpoint, recovery, and elastic membership substrate for Psionic"
+default-run = "psionic-train"
 
 [lints]
 workspace = true
 
 [lib]
 path = "src/lib.rs"
+
+[[bin]]
+name = "psionic-train"
+path = "src/main.rs"
 
 [features]
 legacy-apple-toolkit-oracle = []

@@ -129,7 +129,7 @@ For machine supervision, use the typed runtime surface instead of the shell
 wrapper:
 
 ```bash
-cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
+cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
 ```
 
 That manifest now carries one frozen coordination envelope, including the

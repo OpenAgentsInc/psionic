@@ -404,10 +404,7 @@ impl PsionActualPretrainingDashboardHardwareCard {
             self.required_backend.as_str(),
             "dashboard.hardware.required_backend",
         )?;
-        if self.required_worker_count == 0
-            || self.required_min_free_memory_bytes_per_worker == 0
-            || self.observed_worker_count == 0
-        {
+        if self.required_worker_count == 0 || self.required_min_free_memory_bytes_per_worker == 0 {
             return Err(PsionActualPretrainingDashboardError::InvalidValue {
                 field: String::from("dashboard.hardware.worker_counts"),
                 detail: String::from("hardware counts and memory thresholds must stay positive"),
@@ -421,6 +418,14 @@ impl PsionActualPretrainingDashboardHardwareCard {
                     detail: String::from("unsupported hardware health state"),
                 });
             }
+        }
+        if self.health_state != "refused" && self.observed_worker_count == 0 {
+            return Err(PsionActualPretrainingDashboardError::InvalidValue {
+                field: String::from("dashboard.hardware.worker_counts"),
+                detail: String::from(
+                    "non-refused hardware cards must retain at least one observed worker",
+                ),
+            });
         }
         ensure_nonempty(self.detail.as_str(), "dashboard.hardware.detail")
     }
@@ -975,5 +980,51 @@ mod tests {
         ))
         .expect("alert feed fixture should parse");
         feed.validate().expect("alert feed fixture should validate");
+    }
+
+    #[test]
+    fn refused_hardware_card_allows_zero_observed_workers() {
+        let card = PsionActualPretrainingDashboardHardwareCard {
+            required_backend: String::from("cuda"),
+            required_worker_count: 4,
+            observed_worker_count: 0,
+            required_min_free_memory_bytes_per_worker: 1,
+            min_observed_free_memory_bytes: None,
+            max_observed_temperature_celsius: None,
+            max_observed_ecc_uncorrected_error_count: None,
+            any_throttling_observed: false,
+            checkpoint_restore_ready: false,
+            health_state: String::from("refused"),
+            detail: String::from("hardware qualification refused the lane"),
+        };
+
+        card.validate()
+            .expect("refused hardware card should allow zero observed workers");
+    }
+
+    #[test]
+    fn healthy_hardware_card_requires_observed_workers() {
+        let card = PsionActualPretrainingDashboardHardwareCard {
+            required_backend: String::from("cuda"),
+            required_worker_count: 4,
+            observed_worker_count: 0,
+            required_min_free_memory_bytes_per_worker: 1,
+            min_observed_free_memory_bytes: None,
+            max_observed_temperature_celsius: None,
+            max_observed_ecc_uncorrected_error_count: None,
+            any_throttling_observed: false,
+            checkpoint_restore_ready: true,
+            health_state: String::from("healthy"),
+            detail: String::from("all workers are admitted"),
+        };
+
+        let error = card
+            .validate()
+            .expect_err("healthy hardware card should refuse zero observed workers");
+        assert!(matches!(
+            error,
+            PsionActualPretrainingDashboardError::InvalidValue { field, .. }
+                if field == "dashboard.hardware.worker_counts"
+        ));
     }
 }

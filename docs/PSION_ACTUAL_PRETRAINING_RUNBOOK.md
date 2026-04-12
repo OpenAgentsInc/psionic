@@ -32,7 +32,7 @@ For machine supervision, the stable process boundary is now the repo-local
 `psionic-train` binary rather than the shell wrapper:
 
 ```bash
-cargo run -q -p psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
+cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
 ```
 
 That machine path consumes one explicit JSON manifest and emits one final

@@ -98,7 +98,7 @@ fi
 
 case "${command}" in
   start|record-checkpoint|backup|resume|decide-continue-restart|rehearse-base-lane)
-    exec cargo run -q -p psionic-train -- actual-pretraining "${command}" "$@"
+    exec cargo run -q -p psionic-train --bin psionic-train -- actual-pretraining "${command}" "$@"
     ;;
   status)
     exec "${script_dir}/psion-actual-pretraining-status.sh" "$@"

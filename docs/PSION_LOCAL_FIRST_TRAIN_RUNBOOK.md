@@ -68,6 +68,8 @@ The default run is:
 
 - local Mac as control plane
 - `archlinux` as the admitted Tailnet CUDA training host
+- live Tailnet status as the source of truth for the remote host's current IPv4
+  instead of relying on one static SSH alias
 - staged committed git revision, not dirty working-copy state
 - copied-back retained artifacts under a local run root
 
@@ -78,6 +80,11 @@ From the Psionic repo root:
 ```bash
 ./TRAIN --lane reference_pilot
 ```
+
+The launcher now resolves logical hosts like `archlinux` through live
+`tailscale status` output before opening SSH. You can still override that
+explicitly with `--remote-host christopherdavid@<tailnet-ip>` when you want to
+pin one exact target.
 
 Reference-lane result:
 

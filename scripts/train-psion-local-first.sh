@@ -6,6 +6,8 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 
 mode="auto"
 remote_host="archlinux"
+remote_ssh_target=""
+remote_ssh_user="$(id -un)"
 run_id=""
 output_root=""
 remote_worktree_dir=""
@@ -182,15 +184,62 @@ if [[ -n "$(git -C "${repo_root}" status --porcelain)" ]]; then
 fi
 
 detect_local_tailnet_ip() {
-  tailscale ip -4 2>/dev/null | awk 'NF { print; exit }'
+  tailscale_cli ip -4 2>/dev/null | awk 'NF { print; exit }'
 }
 
 detect_local_hostname() {
   hostname -s 2>/dev/null || hostname
 }
 
+tailscale_cli() {
+  if command -v tailscale >/dev/null 2>&1; then
+    tailscale "$@"
+    return
+  fi
+  if [[ -x /opt/homebrew/bin/tailscale ]]; then
+    /opt/homebrew/bin/tailscale "$@"
+    return
+  fi
+  return 127
+}
+
+resolve_tailnet_ipv4() {
+  local logical_host="$1"
+  tailscale_cli status 2>/dev/null | awk -v host="${logical_host}" '$2 == host { print $1; exit }'
+}
+
+resolve_remote_ssh_target() {
+  if [[ "${remote_host}" == *"@"* ]]; then
+    printf '%s\n' "${remote_host}"
+    return 0
+  fi
+  if [[ "${remote_host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '%s@%s\n' "${remote_ssh_user}" "${remote_host}"
+    return 0
+  fi
+  local resolved_ip=""
+  resolved_ip="$(resolve_tailnet_ipv4 "${remote_host}" || true)"
+  if [[ -n "${resolved_ip}" ]]; then
+    printf '%s@%s\n' "${remote_ssh_user}" "${resolved_ip}"
+    return 0
+  fi
+  printf '%s\n' "${remote_host}"
+}
+
 detect_remote_tailnet_ip() {
-  ssh "${ssh_opts[@]}" "${remote_host}" "tailscale ip -4 2>/dev/null | awk 'NF { print; exit }'"
+  if [[ -n "${remote_tailnet_ip}" ]]; then
+    printf '%s\n' "${remote_tailnet_ip}"
+    return 0
+  fi
+  if [[ "${remote_host}" == *"@"* ]]; then
+    printf '%s\n' "${remote_host##*@}"
+    return 0
+  fi
+  if [[ "${remote_host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '%s\n' "${remote_host}"
+    return 0
+  fi
+  resolve_tailnet_ipv4 "${remote_host}"
 }
 
 remote_preflight_reason=""
@@ -198,16 +247,16 @@ remote_gpu_name=""
 remote_gpu_busy=""
 
 remote_accelerated_preflight() {
-  if ! ssh "${ssh_opts[@]}" "${remote_host}" "bash -ic 'command -v cargo >/dev/null && command -v nvidia-smi >/dev/null'" >/dev/null 2>&1; then
+  if ! ssh "${ssh_opts[@]}" "${remote_ssh_target}" "bash -ic 'command -v cargo >/dev/null && command -v nvidia-smi >/dev/null'" >/dev/null 2>&1; then
     remote_preflight_reason="remote_host_unreachable_or_missing_cargo_or_nvidia_smi"
     return 1
   fi
-  remote_gpu_name="$(ssh "${ssh_opts[@]}" "${remote_host}" "nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1" 2>/dev/null | head -n 1 | tr -d '\r')"
+  remote_gpu_name="$(ssh "${ssh_opts[@]}" "${remote_ssh_target}" "nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1" 2>/dev/null | head -n 1 | tr -d '\r')"
   if [[ -z "${remote_gpu_name}" ]]; then
     remote_preflight_reason="remote_gpu_name_unavailable"
     return 1
   fi
-  remote_gpu_busy="$(ssh "${ssh_opts[@]}" "${remote_host}" "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits 2>/dev/null | awk 'NF { print }'" 2>/dev/null | tr -d '\r')"
+  remote_gpu_busy="$(ssh "${ssh_opts[@]}" "${remote_ssh_target}" "nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv,noheader,nounits 2>/dev/null | awk 'NF { print }'" 2>/dev/null | tr -d '\r')"
   if [[ -n "${remote_gpu_busy}" ]]; then
     remote_preflight_reason="remote_gpu_has_resident_compute_processes"
     return 1
@@ -223,7 +272,7 @@ detect_remote_stage_strategy() {
     remote_stage_reason="local_reference_mode"
     return 0
   fi
-  if ssh "${ssh_opts[@]}" "${remote_host}" "
+  if ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
     set -euo pipefail
     if [[ ! -d \"${remote_seed_repo_dir}/.git\" ]]; then
       exit 11
@@ -235,12 +284,14 @@ detect_remote_stage_strategy() {
     remote_stage_reason="remote_seed_repo_contains_git_ref"
     return 0
   fi
-  if ssh "${ssh_opts[@]}" "${remote_host}" "test -d \"${remote_seed_repo_dir}/.git\"" >/dev/null 2>&1; then
+  if ssh "${ssh_opts[@]}" "${remote_ssh_target}" "test -d \"${remote_seed_repo_dir}/.git\"" >/dev/null 2>&1; then
     remote_stage_reason="remote_seed_repo_missing_git_ref"
   else
     remote_stage_reason="remote_seed_repo_missing"
   fi
 }
+
+remote_ssh_target="$(resolve_remote_ssh_target)"
 
 selected_mode="${mode}"
 if [[ "${selected_mode}" == "auto" ]]; then
@@ -531,7 +582,7 @@ log_note() {
 stage_remote_repo() {
   if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
     log_note "staging_strategy=remote_git_worktree git_ref=${git_ref} remote_seed_repo_dir=${remote_seed_repo_dir}"
-    ssh "${ssh_opts[@]}" "${remote_host}" "
+    ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
       set -euo pipefail
       rm -rf \"${remote_output_dir}\"
       mkdir -p \"\$(dirname \"${remote_worktree_dir}\")\" \"${remote_output_dir}\"
@@ -552,9 +603,9 @@ stage_remote_repo() {
   log_note "staging_strategy=archive_tarball git_ref=${git_ref} local_stage_archive=${local_stage_archive}"
   git -C "${repo_root}" archive --format=tar -o "${local_stage_archive}" "${git_ref}" \
     >>"${local_log_path}" 2>&1
-  scp "${scp_opts[@]}" "${local_stage_archive}" "${remote_host}:${remote_stage_archive}" \
+  scp "${scp_opts[@]}" "${local_stage_archive}" "${remote_ssh_target}:${remote_stage_archive}" \
     >>"${local_log_path}" 2>&1
-  ssh "${ssh_opts[@]}" "${remote_host}" "
+  ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
     set -euo pipefail
     rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
     mkdir -p \"${remote_worktree_dir}\" \"${remote_output_dir}\"
@@ -592,12 +643,12 @@ log_note "launching accelerated_reference control_plane_host=${control_plane_hos
 stage_remote_repo
 
 remote_command="bash -ic 'export CARGO_TARGET_DIR=${remote_target_dir}; export TMPDIR=${remote_tmp_dir}; mkdir -p \"${remote_target_dir}\" \"${remote_tmp_dir}\"; cd ${remote_worktree_dir} && cargo run -q -p psionic-train --example psion_accelerated_reference_pilot -- ${remote_output_dir}'"
-ssh "${ssh_opts[@]}" "${remote_host}" "${remote_command}" >>"${local_log_path}" 2>&1
+ssh "${ssh_opts[@]}" "${remote_ssh_target}" "${remote_command}" >>"${local_log_path}" 2>&1
 
 rm -rf "${local_artifact_dir}"
 mkdir -p "${local_artifact_dir}"
 log_note "copying_retained_artifacts remote_output_dir=${remote_output_dir}"
-ssh "${ssh_opts[@]}" "${remote_host}" "
+ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
   set -euo pipefail
   tar -cf - -C \"${remote_output_dir}\" .
 " 2>>"${local_log_path}" | tar -xf - -C "${local_artifact_dir}" >>"${local_log_path}" 2>&1
@@ -605,13 +656,13 @@ ssh "${ssh_opts[@]}" "${remote_host}" "
 if [[ "${cleanup_remote}" == "1" ]]; then
   log_note "cleanup_remote=1 remote_stage_strategy=${remote_stage_strategy}"
   if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
-    ssh "${ssh_opts[@]}" "${remote_host}" "
+    ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
       set -euo pipefail
       git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${remote_worktree_dir}\"
       rm -rf \"${remote_output_dir}\"
     " >>"${local_log_path}" 2>&1
   else
-    ssh "${ssh_opts[@]}" "${remote_host}" "
+    ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
       set -euo pipefail
       rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
     " >>"${local_log_path}" 2>&1
