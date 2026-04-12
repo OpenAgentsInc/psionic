@@ -2861,7 +2861,7 @@ fn run_rehearsal_subcommand(
     extra_args: &[&str],
 ) -> Result<(), Box<dyn Error>> {
     let mut command = Command::new(current_exe);
-    command.arg(subcommand);
+    command.args(rehearsal_command_args(current_exe, subcommand));
     match subcommand {
         "start" => {
             command.arg("--run-id").arg(run_id);
@@ -2892,6 +2892,18 @@ fn run_rehearsal_subcommand(
         String::from_utf8_lossy(&output.stderr)
     ))
     .into())
+}
+
+fn rehearsal_command_args(current_exe: &Path, subcommand: &str) -> Vec<String> {
+    let executable_stem = current_exe
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default();
+    if executable_stem == "psionic-train" {
+        vec![String::from("actual-pretraining"), String::from(subcommand)]
+    } else {
+        vec![String::from(subcommand)]
+    }
 }
 
 fn build_base_lane_rehearsal_closeout_bundle(
@@ -3104,6 +3116,27 @@ fn build_base_lane_rehearsal_closeout_bundle(
             "Base-lane closeout bundle ties the exact retained rehearsal artifacts, one injected backup failure drill, and one explicit claim boundary into a single operator-readable proof packet.",
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rehearsal_command_args;
+    use std::path::Path;
+
+    #[test]
+    fn rehearsal_uses_actual_pretraining_prefix_for_top_level_binary() {
+        let args = rehearsal_command_args(Path::new("/tmp/psionic-train"), "start");
+        assert_eq!(args, vec!["actual-pretraining", "start"]);
+    }
+
+    #[test]
+    fn rehearsal_uses_direct_subcommand_for_example_binary() {
+        let args = rehearsal_command_args(
+            Path::new("/tmp/psion_actual_pretraining_operator"),
+            "resume",
+        );
+        assert_eq!(args, vec!["resume"]);
+    }
 }
 
 fn closeout_artifact(
