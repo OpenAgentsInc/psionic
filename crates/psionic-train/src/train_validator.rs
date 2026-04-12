@@ -18,6 +18,10 @@ pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
     "psionic.train.validator_score_artifact.v1";
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION: &str =
     "psionic.train.validator_score_receipt.v1";
+pub const PSIONIC_TRAIN_VALIDATOR_QUALITY_DRIFT_SIGNAL_SCHEMA_VERSION: &str =
+    "psionic.train.validator_quality_drift_signal.v1";
+pub const PSIONIC_TRAIN_VALIDATOR_ROLLBACK_SIGNAL_SCHEMA_VERSION: &str =
+    "psionic.train.validator_rollback_signal.v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -37,6 +41,22 @@ pub enum PsionicTrainValidatorHook {
     WorkExecutionPlausibility,
     UpdateIntegrity,
     GroupedStageIntegrity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionicTrainValidatorQualityDriftState {
+    Baseline,
+    Stable,
+    Improved,
+    Regressed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionicTrainValidatorRollbackPosture {
+    Hold,
+    Candidate,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +84,7 @@ pub struct PsionicTrainValidatorScoreArtifact {
     pub checkpoint_pointer_state: Option<String>,
     pub checkpoint_manifest_digest: Option<String>,
     pub checkpoint_object_digest: Option<String>,
+    pub validation_index: u64,
     pub verified_hooks: Vec<PsionicTrainValidatorHook>,
     pub disposition: TrainingExecutionValidatorDisposition,
     pub reason_codes: Vec<PsionicTrainValidatorReplayReasonCode>,
@@ -93,6 +114,7 @@ pub struct PsionicTrainValidatorScoreReceipt {
     pub grouped_stage_execution_summary_digest: Option<String>,
     pub grouped_stage_replay_evidence_path: Option<String>,
     pub grouped_stage_replay_evidence_digest: Option<String>,
+    pub validation_index: u64,
     pub verified_hooks: Vec<PsionicTrainValidatorHook>,
     pub disposition: TrainingExecutionValidatorDisposition,
     pub reason_codes: Vec<PsionicTrainValidatorReplayReasonCode>,
@@ -104,9 +126,71 @@ pub struct PsionicTrainValidatorScoreReceipt {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainValidatorQualityDriftSignal {
+    pub schema_version: String,
+    pub lane_id: String,
+    pub network_id: Option<String>,
+    pub validator_run_id: String,
+    pub challenged_run_id: String,
+    pub challenged_work_class: PsionicTrainWorkClass,
+    pub current_window_id: String,
+    pub current_assignment_id: String,
+    pub current_challenge_id: String,
+    pub validation_index: u64,
+    pub validator_score_receipt_path: String,
+    pub validator_score_receipt_digest: String,
+    pub previous_validation_index: Option<u64>,
+    pub previous_window_id: Option<String>,
+    pub previous_assignment_id: Option<String>,
+    pub previous_challenge_id: Option<String>,
+    pub previous_score_bps: Option<u16>,
+    pub previous_disposition: Option<TrainingExecutionValidatorDisposition>,
+    pub current_score_bps: u16,
+    pub current_disposition: TrainingExecutionValidatorDisposition,
+    pub score_bps_delta: Option<i32>,
+    pub trailing_window_count: usize,
+    pub degraded_window_count: usize,
+    pub non_accepted_window_count: usize,
+    pub drift_state: PsionicTrainValidatorQualityDriftState,
+    pub detail: String,
+    pub drift_signal_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainValidatorRollbackSignal {
+    pub schema_version: String,
+    pub lane_id: String,
+    pub network_id: Option<String>,
+    pub validator_run_id: String,
+    pub challenged_run_id: String,
+    pub challenged_work_class: PsionicTrainWorkClass,
+    pub current_window_id: String,
+    pub current_assignment_id: String,
+    pub current_challenge_id: String,
+    pub validation_index: u64,
+    pub validator_score_receipt_path: String,
+    pub validator_score_receipt_digest: String,
+    pub quality_drift_signal_path: String,
+    pub quality_drift_signal_digest: String,
+    pub rollback_posture: PsionicTrainValidatorRollbackPosture,
+    pub degraded_window_count: usize,
+    pub consecutive_non_accepted_window_count: usize,
+    pub rollback_baseline_validation_index: Option<u64>,
+    pub rollback_baseline_window_id: Option<String>,
+    pub rollback_baseline_assignment_id: Option<String>,
+    pub rollback_baseline_challenge_id: Option<String>,
+    pub rollback_baseline_score_bps: Option<u16>,
+    pub rollback_baseline_disposition: Option<TrainingExecutionValidatorDisposition>,
+    pub detail: String,
+    pub rollback_signal_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainValidatorArtifactOutputs {
     pub validator_score_receipt_path: String,
     pub grouped_stage_replay_evidence_path: Option<String>,
+    pub validator_quality_drift_signal_path: String,
+    pub validator_rollback_signal_path: String,
 }
 
 #[derive(Clone, Debug)]
@@ -299,6 +383,21 @@ pub fn execute_psionic_train_validator_replay(
             detail: error.to_string(),
         }
     })?;
+    let prior_score_receipts = load_prior_validator_score_receipts(
+        run_root,
+        manifest.lane_id.as_str(),
+        contribution_receipt.run_id.as_str(),
+        challenged_work_class,
+        contribution_receipt.window_id.as_str(),
+        contribution_receipt.assignment_id.as_str(),
+        challenge_id,
+    )?;
+    let validation_index = prior_score_receipts
+        .iter()
+        .map(|receipt| receipt.validation_index)
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1);
     let grouped_stage_replay_evidence = grouped_stage_execution_summary
         .as_ref()
         .map(|execution_summary| {
@@ -355,6 +454,7 @@ pub fn execute_psionic_train_validator_replay(
         checkpoint_object_digest: checkpoint_surface
             .as_ref()
             .and_then(|value| value.checkpoint_object_digest.clone()),
+        validation_index,
         verified_hooks: verified_hooks.clone(),
         disposition,
         reason_codes: reason_codes.clone(),
@@ -395,6 +495,7 @@ pub fn execute_psionic_train_validator_replay(
         grouped_stage_replay_evidence_digest: grouped_stage_replay_evidence
             .as_ref()
             .map(|value| value.grouped_stage_replay_evidence_digest.clone()),
+        validation_index,
         verified_hooks,
         disposition,
         reason_codes,
@@ -408,15 +509,333 @@ pub fn execute_psionic_train_validator_replay(
         stable_digest(b"psionic_train_validator_score_receipt|", &score_receipt);
     write_json(score_receipt_path.as_path(), &score_receipt)?;
 
+    let quality_drift_signal_path = validator_root.join("validator_quality_drift_signal.json");
+    let mut quality_drift_signal = build_validator_quality_drift_signal(
+        manifest,
+        &score_receipt,
+        score_receipt_path.as_path(),
+        &prior_score_receipts,
+    );
+    quality_drift_signal.drift_signal_digest = stable_digest(
+        b"psionic_train_validator_quality_drift_signal|",
+        &quality_drift_signal,
+    );
+    write_json(quality_drift_signal_path.as_path(), &quality_drift_signal)?;
+
+    let rollback_signal_path = validator_root.join("validator_rollback_signal.json");
+    let mut rollback_signal = build_validator_rollback_signal(
+        manifest,
+        &score_receipt,
+        score_receipt_path.as_path(),
+        quality_drift_signal_path.as_path(),
+        &quality_drift_signal,
+        &prior_score_receipts,
+    );
+    rollback_signal.rollback_signal_digest = stable_digest(
+        b"psionic_train_validator_rollback_signal|",
+        &rollback_signal,
+    );
+    write_json(rollback_signal_path.as_path(), &rollback_signal)?;
+
     Ok(PsionicTrainValidatorReplayExecution {
         artifacts: PsionicTrainValidatorArtifactOutputs {
             validator_score_receipt_path: score_receipt_path.display().to_string(),
             grouped_stage_replay_evidence_path: grouped_stage_replay_evidence
                 .map(|value| value.grouped_stage_replay_evidence_path),
+            validator_quality_drift_signal_path: quality_drift_signal_path.display().to_string(),
+            validator_rollback_signal_path: rollback_signal_path.display().to_string(),
         },
         score_receipt,
         detail,
     })
+}
+
+fn load_prior_validator_score_receipts(
+    run_root: &Path,
+    lane_id: &str,
+    challenged_run_id: &str,
+    challenged_work_class: PsionicTrainWorkClass,
+    current_window_id: &str,
+    current_assignment_id: &str,
+    current_challenge_id: &str,
+) -> Result<Vec<PsionicTrainValidatorScoreReceipt>, PsionicTrainValidatorReplayError> {
+    let windows_root = run_root.join("windows");
+    if !windows_root.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut receipts = Vec::new();
+    for window_entry in
+        fs::read_dir(&windows_root).map_err(|error| PsionicTrainValidatorReplayError::Read {
+            path: windows_root.display().to_string(),
+            detail: error.to_string(),
+        })?
+    {
+        let window_entry =
+            window_entry.map_err(|error| PsionicTrainValidatorReplayError::Read {
+                path: windows_root.display().to_string(),
+                detail: error.to_string(),
+            })?;
+        let validators_root = window_entry.path().join("validators");
+        if !validators_root.is_dir() {
+            continue;
+        }
+        for validator_entry in fs::read_dir(&validators_root).map_err(|error| {
+            PsionicTrainValidatorReplayError::Read {
+                path: validators_root.display().to_string(),
+                detail: error.to_string(),
+            }
+        })? {
+            let validator_entry =
+                validator_entry.map_err(|error| PsionicTrainValidatorReplayError::Read {
+                    path: validators_root.display().to_string(),
+                    detail: error.to_string(),
+                })?;
+            let score_receipt_path = validator_entry.path().join("validator_score_receipt.json");
+            if !score_receipt_path.is_file() {
+                continue;
+            }
+            let receipt: PsionicTrainValidatorScoreReceipt =
+                read_json(score_receipt_path.as_path())?;
+            if receipt.lane_id != lane_id
+                || receipt.challenged_run_id != challenged_run_id
+                || receipt.challenged_work_class != challenged_work_class
+                || (receipt.window_id == current_window_id
+                    && receipt.assignment_id == current_assignment_id
+                    && receipt.challenge_id == current_challenge_id)
+            {
+                continue;
+            }
+            receipts.push(receipt);
+        }
+    }
+    receipts.sort_by_key(|receipt| receipt.validation_index);
+    Ok(receipts)
+}
+
+fn build_validator_quality_drift_signal(
+    manifest: &PsionicTrainInvocationManifest,
+    score_receipt: &PsionicTrainValidatorScoreReceipt,
+    score_receipt_path: &Path,
+    prior_score_receipts: &[PsionicTrainValidatorScoreReceipt],
+) -> PsionicTrainValidatorQualityDriftSignal {
+    let previous_receipt = prior_score_receipts.last();
+    let previous_score_bps = previous_receipt.map(|receipt| receipt.score_bps);
+    let previous_disposition = previous_receipt.map(|receipt| receipt.disposition);
+    let score_bps_delta =
+        previous_score_bps.map(|score| i32::from(score_receipt.score_bps) - i32::from(score));
+    let drift_state = previous_receipt.map_or(
+        PsionicTrainValidatorQualityDriftState::Baseline,
+        |previous_receipt| compare_validator_quality(previous_receipt, score_receipt),
+    );
+    let trailing_window_count = prior_score_receipts.len() + 1;
+    let degraded_window_count = count_degraded_windows(prior_score_receipts, score_receipt);
+    let non_accepted_window_count = prior_score_receipts
+        .iter()
+        .chain(std::iter::once(score_receipt))
+        .filter(|receipt| receipt.disposition != TrainingExecutionValidatorDisposition::Accepted)
+        .count();
+    let detail = match previous_receipt {
+        None => String::from(
+            "validator quality drift signal initialized the first retained score for this challenged run and work-class scope",
+        ),
+        Some(previous_receipt) => match drift_state {
+            PsionicTrainValidatorQualityDriftState::Baseline => String::from(
+                "validator quality drift signal initialized the first retained score for this challenged run and work-class scope",
+            ),
+            PsionicTrainValidatorQualityDriftState::Stable => format!(
+                "validator quality remained stable across windows: {} {}bps -> {} {}bps",
+                validator_disposition_label(previous_receipt.disposition),
+                previous_receipt.score_bps,
+                validator_disposition_label(score_receipt.disposition),
+                score_receipt.score_bps
+            ),
+            PsionicTrainValidatorQualityDriftState::Improved => format!(
+                "validator quality improved across windows: {} {}bps -> {} {}bps",
+                validator_disposition_label(previous_receipt.disposition),
+                previous_receipt.score_bps,
+                validator_disposition_label(score_receipt.disposition),
+                score_receipt.score_bps
+            ),
+            PsionicTrainValidatorQualityDriftState::Regressed => format!(
+                "validator quality regressed across windows: {} {}bps -> {} {}bps",
+                validator_disposition_label(previous_receipt.disposition),
+                previous_receipt.score_bps,
+                validator_disposition_label(score_receipt.disposition),
+                score_receipt.score_bps
+            ),
+        },
+    };
+    PsionicTrainValidatorQualityDriftSignal {
+        schema_version: String::from(PSIONIC_TRAIN_VALIDATOR_QUALITY_DRIFT_SIGNAL_SCHEMA_VERSION),
+        lane_id: manifest.lane_id.clone(),
+        network_id: manifest.coordination.network_id.clone(),
+        validator_run_id: score_receipt.validator_run_id.clone(),
+        challenged_run_id: score_receipt.challenged_run_id.clone(),
+        challenged_work_class: score_receipt.challenged_work_class,
+        current_window_id: score_receipt.window_id.clone(),
+        current_assignment_id: score_receipt.assignment_id.clone(),
+        current_challenge_id: score_receipt.challenge_id.clone(),
+        validation_index: score_receipt.validation_index,
+        validator_score_receipt_path: score_receipt_path.display().to_string(),
+        validator_score_receipt_digest: score_receipt.score_receipt_digest.clone(),
+        previous_validation_index: previous_receipt.map(|receipt| receipt.validation_index),
+        previous_window_id: previous_receipt.map(|receipt| receipt.window_id.clone()),
+        previous_assignment_id: previous_receipt.map(|receipt| receipt.assignment_id.clone()),
+        previous_challenge_id: previous_receipt.map(|receipt| receipt.challenge_id.clone()),
+        previous_score_bps,
+        previous_disposition,
+        current_score_bps: score_receipt.score_bps,
+        current_disposition: score_receipt.disposition,
+        score_bps_delta,
+        trailing_window_count,
+        degraded_window_count,
+        non_accepted_window_count,
+        drift_state,
+        detail,
+        drift_signal_digest: String::new(),
+    }
+}
+
+fn build_validator_rollback_signal(
+    manifest: &PsionicTrainInvocationManifest,
+    score_receipt: &PsionicTrainValidatorScoreReceipt,
+    score_receipt_path: &Path,
+    quality_drift_signal_path: &Path,
+    quality_drift_signal: &PsionicTrainValidatorQualityDriftSignal,
+    prior_score_receipts: &[PsionicTrainValidatorScoreReceipt],
+) -> PsionicTrainValidatorRollbackSignal {
+    let rollback_baseline = prior_score_receipts
+        .iter()
+        .rev()
+        .find(|receipt| receipt.disposition == TrainingExecutionValidatorDisposition::Accepted);
+    let consecutive_non_accepted_window_count = prior_score_receipts
+        .iter()
+        .rev()
+        .take_while(|receipt| {
+            receipt.disposition != TrainingExecutionValidatorDisposition::Accepted
+        })
+        .count()
+        + usize::from(score_receipt.disposition != TrainingExecutionValidatorDisposition::Accepted);
+    let rollback_posture = if rollback_baseline.is_some()
+        && quality_drift_signal.drift_state == PsionicTrainValidatorQualityDriftState::Regressed
+    {
+        PsionicTrainValidatorRollbackPosture::Candidate
+    } else {
+        PsionicTrainValidatorRollbackPosture::Hold
+    };
+    let detail = match (rollback_posture, rollback_baseline) {
+        (PsionicTrainValidatorRollbackPosture::Hold, None) => String::from(
+            "rollback posture remains hold because no prior accepted validation baseline exists for this challenged run and work-class scope",
+        ),
+        (PsionicTrainValidatorRollbackPosture::Hold, Some(_)) => String::from(
+            "rollback posture remains hold because the current window did not regress below the retained accepted baseline",
+        ),
+        (PsionicTrainValidatorRollbackPosture::Candidate, Some(baseline)) => format!(
+            "rollback candidate raised because validation window `{}` fell below accepted baseline window `{}` ({} {}bps -> {} {}bps)",
+            score_receipt.window_id,
+            baseline.window_id,
+            validator_disposition_label(baseline.disposition),
+            baseline.score_bps,
+            validator_disposition_label(score_receipt.disposition),
+            score_receipt.score_bps
+        ),
+        (PsionicTrainValidatorRollbackPosture::Candidate, None) => String::from(
+            "rollback candidate raised because the current window regressed and no explicit accepted baseline was retained",
+        ),
+    };
+    PsionicTrainValidatorRollbackSignal {
+        schema_version: String::from(PSIONIC_TRAIN_VALIDATOR_ROLLBACK_SIGNAL_SCHEMA_VERSION),
+        lane_id: manifest.lane_id.clone(),
+        network_id: manifest.coordination.network_id.clone(),
+        validator_run_id: score_receipt.validator_run_id.clone(),
+        challenged_run_id: score_receipt.challenged_run_id.clone(),
+        challenged_work_class: score_receipt.challenged_work_class,
+        current_window_id: score_receipt.window_id.clone(),
+        current_assignment_id: score_receipt.assignment_id.clone(),
+        current_challenge_id: score_receipt.challenge_id.clone(),
+        validation_index: score_receipt.validation_index,
+        validator_score_receipt_path: score_receipt_path.display().to_string(),
+        validator_score_receipt_digest: score_receipt.score_receipt_digest.clone(),
+        quality_drift_signal_path: quality_drift_signal_path.display().to_string(),
+        quality_drift_signal_digest: quality_drift_signal.drift_signal_digest.clone(),
+        rollback_posture,
+        degraded_window_count: quality_drift_signal.degraded_window_count,
+        consecutive_non_accepted_window_count,
+        rollback_baseline_validation_index: rollback_baseline
+            .map(|receipt| receipt.validation_index),
+        rollback_baseline_window_id: rollback_baseline.map(|receipt| receipt.window_id.clone()),
+        rollback_baseline_assignment_id: rollback_baseline
+            .map(|receipt| receipt.assignment_id.clone()),
+        rollback_baseline_challenge_id: rollback_baseline
+            .map(|receipt| receipt.challenge_id.clone()),
+        rollback_baseline_score_bps: rollback_baseline.map(|receipt| receipt.score_bps),
+        rollback_baseline_disposition: rollback_baseline.map(|receipt| receipt.disposition),
+        detail,
+        rollback_signal_digest: String::new(),
+    }
+}
+
+fn compare_validator_quality(
+    previous_receipt: &PsionicTrainValidatorScoreReceipt,
+    current_receipt: &PsionicTrainValidatorScoreReceipt,
+) -> PsionicTrainValidatorQualityDriftState {
+    use PsionicTrainValidatorQualityDriftState::{Improved, Regressed, Stable};
+
+    if current_receipt.score_bps > previous_receipt.score_bps {
+        return Improved;
+    }
+    if current_receipt.score_bps < previous_receipt.score_bps {
+        return Regressed;
+    }
+    let previous_severity = validator_disposition_severity(previous_receipt.disposition);
+    let current_severity = validator_disposition_severity(current_receipt.disposition);
+    if current_severity < previous_severity {
+        Improved
+    } else if current_severity > previous_severity {
+        Regressed
+    } else {
+        Stable
+    }
+}
+
+fn count_degraded_windows(
+    prior_score_receipts: &[PsionicTrainValidatorScoreReceipt],
+    current_receipt: &PsionicTrainValidatorScoreReceipt,
+) -> usize {
+    let mut degraded_window_count = 0;
+    let mut previous_receipt = None;
+    for receipt in prior_score_receipts
+        .iter()
+        .chain(std::iter::once(current_receipt))
+    {
+        if let Some(previous) = previous_receipt {
+            if compare_validator_quality(previous, receipt)
+                == PsionicTrainValidatorQualityDriftState::Regressed
+            {
+                degraded_window_count += 1;
+            }
+        }
+        previous_receipt = Some(receipt);
+    }
+    degraded_window_count
+}
+
+fn validator_disposition_severity(disposition: TrainingExecutionValidatorDisposition) -> u8 {
+    match disposition {
+        TrainingExecutionValidatorDisposition::Accepted => 0,
+        TrainingExecutionValidatorDisposition::Quarantined => 1,
+        TrainingExecutionValidatorDisposition::ReplayRequired => 2,
+        TrainingExecutionValidatorDisposition::Rejected => 3,
+    }
+}
+
+fn validator_disposition_label(disposition: TrainingExecutionValidatorDisposition) -> &'static str {
+    match disposition {
+        TrainingExecutionValidatorDisposition::Accepted => "accepted",
+        TrainingExecutionValidatorDisposition::Quarantined => "quarantined",
+        TrainingExecutionValidatorDisposition::Rejected => "rejected",
+        TrainingExecutionValidatorDisposition::ReplayRequired => "replay_required",
+    }
 }
 
 fn load_checkpoint_surface(
@@ -919,9 +1338,12 @@ mod tests {
     };
 
     use super::{
-        PsionicTrainValidatorHook, PsionicTrainValidatorReplayReasonCode,
-        TrainingExecutionValidatorDisposition, classify_validator_result,
-        execute_psionic_train_validator_replay,
+        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION, PsionicTrainValidatorHook,
+        PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorReplayReasonCode,
+        PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorScoreReceipt,
+        TrainingExecutionValidatorDisposition, build_validator_quality_drift_signal,
+        build_validator_rollback_signal, classify_validator_result,
+        execute_psionic_train_validator_replay, stable_digest,
     };
     use crate::{
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
@@ -1094,6 +1516,22 @@ mod tests {
         }
     }
 
+    fn base_validator_manifest(
+        window_id: &str,
+        assignment_id: &str,
+        challenge_id: &str,
+    ) -> PsionicTrainInvocationManifest {
+        let mut manifest = validator_manifest(
+            Path::new("/tmp/validator-run"),
+            String::from("/tmp/contribution_receipt.json"),
+            String::from("/tmp/artifact_manifest.json"),
+        );
+        manifest.coordination.window_id = Some(String::from(window_id));
+        manifest.coordination.assignment_id = Some(String::from(assignment_id));
+        manifest.coordination.challenge_id = Some(String::from(challenge_id));
+        manifest
+    }
+
     fn succeeded_contribution() -> PsionicTrainContributionReceipt {
         let mut receipt = PsionicTrainContributionReceipt {
             schema_version: String::from(PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION),
@@ -1166,6 +1604,49 @@ mod tests {
         }
     }
 
+    fn score_receipt(
+        window_id: &str,
+        assignment_id: &str,
+        challenge_id: &str,
+        validation_index: u64,
+        score_bps: u16,
+        disposition: TrainingExecutionValidatorDisposition,
+    ) -> PsionicTrainValidatorScoreReceipt {
+        let mut receipt = PsionicTrainValidatorScoreReceipt {
+            schema_version: String::from(PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            validator_work_class: PsionicTrainWorkClass::ValidationReplay,
+            challenged_work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            network_id: Some(String::from("network.psionic.test")),
+            validator_run_id: String::from("validator-run"),
+            challenged_run_id: String::from("worker-run"),
+            window_id: String::from(window_id),
+            assignment_id: String::from(assignment_id),
+            challenge_id: String::from(challenge_id),
+            validator_node_pubkey: String::from("npub1-validator"),
+            challenged_node_pubkey: String::from("npub1-worker"),
+            contribution_id: format!("contribution-{window_id}"),
+            contribution_digest: format!("digest-{window_id}"),
+            artifact_manifest_digest: format!("manifest-{window_id}"),
+            grouped_stage_execution_summary_path: None,
+            grouped_stage_execution_summary_digest: None,
+            grouped_stage_replay_evidence_path: None,
+            grouped_stage_replay_evidence_digest: None,
+            validation_index,
+            verified_hooks: vec![PsionicTrainValidatorHook::CheckpointLineage],
+            disposition,
+            reason_codes: vec![PsionicTrainValidatorReplayReasonCode::PrimaryCheckpointAccepted],
+            score_bps,
+            score_artifact_path: format!("/tmp/{window_id}/validator_score_artifact.json"),
+            score_artifact_digest: format!("score-artifact-{window_id}"),
+            detail: String::from("validator test receipt"),
+            score_receipt_digest: format!("score-receipt-{window_id}"),
+        };
+        receipt.score_receipt_digest =
+            stable_digest(b"psionic_train_validator_score_receipt|", &receipt);
+        receipt
+    }
+
     #[test]
     fn clean_accepted_checkpoint_is_accepted() {
         let receipt = succeeded_contribution();
@@ -1236,6 +1717,97 @@ mod tests {
             vec![PsionicTrainValidatorReplayReasonCode::ContributionOutcomeRefused]
         );
         assert_eq!(score_bps, 0);
+    }
+
+    #[test]
+    fn quality_drift_signal_marks_multi_window_regression() {
+        let manifest = base_validator_manifest("window-0002", "assignment-0002", "challenge-0002");
+        let previous_receipt = score_receipt(
+            "window-0001",
+            "assignment-0001",
+            "challenge-0001",
+            1,
+            10_000,
+            TrainingExecutionValidatorDisposition::Accepted,
+        );
+        let current_receipt = score_receipt(
+            "window-0002",
+            "assignment-0002",
+            "challenge-0002",
+            2,
+            5_000,
+            TrainingExecutionValidatorDisposition::ReplayRequired,
+        );
+        let signal = build_validator_quality_drift_signal(
+            &manifest,
+            &current_receipt,
+            Path::new("/tmp/window-0002/validator_score_receipt.json"),
+            &[previous_receipt],
+        );
+        assert_eq!(
+            signal.drift_state,
+            PsionicTrainValidatorQualityDriftState::Regressed
+        );
+        assert_eq!(signal.score_bps_delta, Some(-5_000));
+        assert_eq!(signal.degraded_window_count, 1);
+        assert_eq!(signal.non_accepted_window_count, 1);
+        assert_eq!(signal.previous_window_id.as_deref(), Some("window-0001"));
+    }
+
+    #[test]
+    fn rollback_signal_uses_last_accepted_baseline() {
+        let manifest = base_validator_manifest("window-0003", "assignment-0003", "challenge-0003");
+        let baseline_receipt = score_receipt(
+            "window-0001",
+            "assignment-0001",
+            "challenge-0001",
+            1,
+            10_000,
+            TrainingExecutionValidatorDisposition::Accepted,
+        );
+        let degraded_receipt = score_receipt(
+            "window-0002",
+            "assignment-0002",
+            "challenge-0002",
+            2,
+            7_500,
+            TrainingExecutionValidatorDisposition::Quarantined,
+        );
+        let current_receipt = score_receipt(
+            "window-0003",
+            "assignment-0003",
+            "challenge-0003",
+            3,
+            5_000,
+            TrainingExecutionValidatorDisposition::ReplayRequired,
+        );
+        let mut drift_signal = build_validator_quality_drift_signal(
+            &manifest,
+            &current_receipt,
+            Path::new("/tmp/window-0003/validator_score_receipt.json"),
+            &[baseline_receipt.clone(), degraded_receipt.clone()],
+        );
+        drift_signal.drift_signal_digest = stable_digest(
+            b"psionic_train_validator_quality_drift_signal|",
+            &drift_signal,
+        );
+        let rollback_signal = build_validator_rollback_signal(
+            &manifest,
+            &current_receipt,
+            Path::new("/tmp/window-0003/validator_score_receipt.json"),
+            Path::new("/tmp/window-0003/validator_quality_drift_signal.json"),
+            &drift_signal,
+            &[baseline_receipt, degraded_receipt],
+        );
+        assert_eq!(
+            rollback_signal.rollback_posture,
+            PsionicTrainValidatorRollbackPosture::Candidate
+        );
+        assert_eq!(
+            rollback_signal.rollback_baseline_window_id.as_deref(),
+            Some("window-0001")
+        );
+        assert_eq!(rollback_signal.consecutive_non_accepted_window_count, 2);
     }
 
     #[test]

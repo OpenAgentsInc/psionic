@@ -20,6 +20,8 @@ use psionic_train::{
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
     PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
     PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket, PsionicTrainValidatorHook,
+    PsionicTrainValidatorQualityDriftSignal, PsionicTrainValidatorQualityDriftState,
+    PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorRollbackSignal,
     PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
     PsionicTrainWindowExecution, PsionicTrainWindowStatusPacket, PsionicTrainWorkClass,
     TrainingExecutionValidatorDisposition, runtime_build_digest,
@@ -203,6 +205,14 @@ fn run_machine_manifest(manifest_path: &Path) -> Output {
 fn parse_json<T: serde::de::DeserializeOwned>(path: impl AsRef<Path>) -> T {
     serde_json::from_slice(&fs::read(path.as_ref()).expect("retained artifact should be readable"))
         .expect("retained artifact should parse")
+}
+
+fn write_json<T: serde::Serialize>(path: impl AsRef<Path>, value: &T) {
+    fs::write(
+        path.as_ref(),
+        serde_json::to_string_pretty(value).expect("artifact should serialize"),
+    )
+    .expect("artifact should write");
 }
 
 fn build_launch_manifest(run_root: &Path) -> PsionicTrainInvocationManifest {
@@ -2259,6 +2269,304 @@ fn apple_validator_manifest_emits_accepted_score_receipt_for_valid_contribution(
     assert_eq!(
         score_artifact.challenged_work_class,
         PsionicTrainWorkClass::SmallModelLocalTraining
+    );
+}
+
+#[test]
+fn validator_manifest_emits_multi_window_quality_drift_and_rollback_signals() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("worker-run");
+    let validator_run_root = tempdir.path().join("validator-run");
+
+    let first_launch_manifest_path = tempdir.path().join("worker-window-0001-launch.json");
+    let mut first_launch_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(
+        &mut first_launch_manifest,
+        "window-0001",
+        "assignment-0001",
+        1,
+    );
+    write_manifest(&first_launch_manifest_path, &mut first_launch_manifest);
+    let first_launch_output = run_machine_manifest(&first_launch_manifest_path);
+    assert!(
+        first_launch_output.status.success(),
+        "first worker launch should succeed"
+    );
+
+    let first_checkpoint_manifest_path = tempdir.path().join("worker-window-0001-checkpoint.json");
+    let mut first_checkpoint_manifest = build_retained_operation_manifest(
+        &worker_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    bind_window_context(
+        &mut first_checkpoint_manifest,
+        "window-0001",
+        "assignment-0001",
+        2,
+    );
+    first_checkpoint_manifest.checkpoint_label = Some(String::from("validator-target-0001"));
+    first_checkpoint_manifest.optimizer_step = Some(4_096);
+    first_checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/validator/target/0001"));
+    write_manifest(
+        &first_checkpoint_manifest_path,
+        &mut first_checkpoint_manifest,
+    );
+    let first_checkpoint_output = run_machine_manifest(&first_checkpoint_manifest_path);
+    assert!(
+        first_checkpoint_output.status.success(),
+        "first worker checkpoint should succeed"
+    );
+    let first_worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&first_checkpoint_output.stdout)
+            .expect("first worker packet should parse");
+    let first_worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        first_worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("first worker run status path should exist"),
+    );
+
+    let first_validator_manifest_path = tempdir.path().join("validator-window-0001.json");
+    let mut first_validator_manifest = build_validator_manifest(
+        &validator_run_root,
+        Path::new(
+            first_worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("first contribution receipt path should exist"),
+        ),
+        Path::new(
+            first_worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("first contribution artifact manifest path should exist"),
+        ),
+        "window-0001",
+        "assignment-0001",
+        "challenge-0001",
+    );
+    write_manifest(
+        &first_validator_manifest_path,
+        &mut first_validator_manifest,
+    );
+    let first_validator_output = run_machine_manifest(&first_validator_manifest_path);
+    assert!(
+        first_validator_output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&first_validator_output.stdout),
+        String::from_utf8_lossy(&first_validator_output.stderr)
+    );
+    let first_validator_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&first_validator_output.stdout)
+            .expect("first validator packet should parse");
+    let first_validator_run_status: PsionicTrainRunStatusPacket = parse_json(
+        first_validator_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("first validator run status path should exist"),
+    );
+    let first_score_receipt: PsionicTrainValidatorScoreReceipt = parse_json(
+        first_validator_run_status
+            .artifacts
+            .validator_score_receipt_path
+            .as_ref()
+            .expect("first validator score receipt path should exist"),
+    );
+    assert_eq!(first_score_receipt.validation_index, 1);
+    let first_quality_signal: PsionicTrainValidatorQualityDriftSignal = parse_json(
+        first_validator_run_status
+            .artifacts
+            .validator_quality_drift_signal_path
+            .as_ref()
+            .expect("first validator quality drift signal path should exist"),
+    );
+    assert_eq!(
+        first_quality_signal.drift_state,
+        PsionicTrainValidatorQualityDriftState::Baseline
+    );
+    let first_rollback_signal: PsionicTrainValidatorRollbackSignal = parse_json(
+        first_validator_run_status
+            .artifacts
+            .validator_rollback_signal_path
+            .as_ref()
+            .expect("first validator rollback signal path should exist"),
+    );
+    assert_eq!(
+        first_rollback_signal.rollback_posture,
+        PsionicTrainValidatorRollbackPosture::Hold
+    );
+
+    let second_launch_manifest_path = tempdir.path().join("worker-window-0002-launch.json");
+    let mut second_launch_manifest = build_launch_manifest(&worker_run_root);
+    bind_window_context(
+        &mut second_launch_manifest,
+        "window-0002",
+        "assignment-0002",
+        3,
+    );
+    write_manifest(&second_launch_manifest_path, &mut second_launch_manifest);
+    let second_launch_output = run_machine_manifest(&second_launch_manifest_path);
+    assert!(
+        second_launch_output.status.success(),
+        "second worker launch should succeed"
+    );
+
+    let second_checkpoint_manifest_path = tempdir.path().join("worker-window-0002-checkpoint.json");
+    let mut second_checkpoint_manifest = build_retained_operation_manifest(
+        &worker_run_root,
+        PsionicTrainRole::Worker,
+        PsionicTrainOperation::RecordCheckpoint,
+    );
+    bind_window_context(
+        &mut second_checkpoint_manifest,
+        "window-0002",
+        "assignment-0002",
+        4,
+    );
+    second_checkpoint_manifest.checkpoint_label = Some(String::from("validator-target-0002"));
+    second_checkpoint_manifest.optimizer_step = Some(8_192);
+    second_checkpoint_manifest.checkpoint_ref =
+        Some(String::from("checkpoint://psion/validator/target/0002"));
+    write_manifest(
+        &second_checkpoint_manifest_path,
+        &mut second_checkpoint_manifest,
+    );
+    let second_checkpoint_output = run_machine_manifest(&second_checkpoint_manifest_path);
+    assert!(
+        second_checkpoint_output.status.success(),
+        "second worker checkpoint should succeed"
+    );
+    let second_worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&second_checkpoint_output.stdout)
+            .expect("second worker packet should parse");
+    let second_worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        second_worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("second worker run status path should exist"),
+    );
+    let second_artifact_manifest: PsionicTrainContributionArtifactManifest = parse_json(
+        second_worker_run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .as_ref()
+            .expect("second contribution artifact manifest path should exist"),
+    );
+    let checkpoint_surface_artifact = second_artifact_manifest
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.artifact_kind == "checkpoint_surface")
+        .expect("second contribution should retain checkpoint surface");
+    let mut degraded_checkpoint_surface: PsionicTrainCheckpointSurface =
+        parse_json(&checkpoint_surface_artifact.artifact_path);
+    degraded_checkpoint_surface.upload_outcome = Some(String::from("refused"));
+    write_json(
+        &checkpoint_surface_artifact.artifact_path,
+        &degraded_checkpoint_surface,
+    );
+
+    let second_validator_manifest_path = tempdir.path().join("validator-window-0002.json");
+    let mut second_validator_manifest = build_validator_manifest(
+        &validator_run_root,
+        Path::new(
+            second_worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("second contribution receipt path should exist"),
+        ),
+        Path::new(
+            second_worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("second contribution artifact manifest path should exist"),
+        ),
+        "window-0002",
+        "assignment-0002",
+        "challenge-0002",
+    );
+    write_manifest(
+        &second_validator_manifest_path,
+        &mut second_validator_manifest,
+    );
+    let second_validator_output = run_machine_manifest(&second_validator_manifest_path);
+    assert!(
+        second_validator_output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&second_validator_output.stdout),
+        String::from_utf8_lossy(&second_validator_output.stderr)
+    );
+    let second_validator_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&second_validator_output.stdout)
+            .expect("second validator packet should parse");
+    let second_validator_run_status: PsionicTrainRunStatusPacket = parse_json(
+        second_validator_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("second validator run status path should exist"),
+    );
+    let second_score_receipt: PsionicTrainValidatorScoreReceipt = parse_json(
+        second_validator_run_status
+            .artifacts
+            .validator_score_receipt_path
+            .as_ref()
+            .expect("second validator score receipt path should exist"),
+    );
+    assert_eq!(second_score_receipt.validation_index, 2);
+    assert_eq!(
+        second_score_receipt.disposition,
+        TrainingExecutionValidatorDisposition::ReplayRequired
+    );
+    assert_eq!(second_score_receipt.score_bps, 5_000);
+
+    let second_quality_signal: PsionicTrainValidatorQualityDriftSignal = parse_json(
+        second_validator_run_status
+            .artifacts
+            .validator_quality_drift_signal_path
+            .as_ref()
+            .expect("second validator quality drift signal path should exist"),
+    );
+    assert_eq!(
+        second_quality_signal.drift_state,
+        PsionicTrainValidatorQualityDriftState::Regressed
+    );
+    assert_eq!(
+        second_quality_signal.previous_window_id.as_deref(),
+        Some("window-0001")
+    );
+    assert_eq!(
+        second_quality_signal.current_window_id.as_str(),
+        "window-0002"
+    );
+    assert_eq!(second_quality_signal.score_bps_delta, Some(-5_000));
+    assert_eq!(second_quality_signal.degraded_window_count, 1);
+    assert_eq!(second_quality_signal.non_accepted_window_count, 1);
+
+    let second_rollback_signal: PsionicTrainValidatorRollbackSignal = parse_json(
+        second_validator_run_status
+            .artifacts
+            .validator_rollback_signal_path
+            .as_ref()
+            .expect("second validator rollback signal path should exist"),
+    );
+    assert_eq!(
+        second_rollback_signal.rollback_posture,
+        PsionicTrainValidatorRollbackPosture::Candidate
+    );
+    assert_eq!(
+        second_rollback_signal
+            .rollback_baseline_window_id
+            .as_deref(),
+        Some("window-0001")
+    );
+    assert_eq!(
+        second_rollback_signal.consecutive_non_accepted_window_count,
+        1
     );
 }
 

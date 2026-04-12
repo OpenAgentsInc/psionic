@@ -1885,6 +1885,10 @@ fn build_artifact_surface_refs(
             .or_else(|| summary.and_then(|value| value.auto_resume_receipt_path.clone())),
         validator_score_receipt_path: validator_artifacts
             .map(|value| value.validator_score_receipt_path.clone()),
+        validator_quality_drift_signal_path: validator_artifacts
+            .map(|value| value.validator_quality_drift_signal_path.clone()),
+        validator_rollback_signal_path: validator_artifacts
+            .map(|value| value.validator_rollback_signal_path.clone()),
         sealed_window_bundle_path: window_artifacts
             .map(|value| value.sealed_window_bundle_path.clone()),
         final_closeout_bundle_path: summary.and_then(|value| value.closeout_bundle_path.clone()),

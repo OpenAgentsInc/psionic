@@ -231,7 +231,16 @@ one grouped replica stage. Grouped-stage validator replay also fails closed as
 `ArtifactIncomplete` whenever the retained
 `grouped_stage_execution_summary.json` surface is missing, so a replacement
 validator cannot silently score one grouped stage without the retained
-transport-and-execution evidence bundle.
+transport-and-execution evidence bundle. Validator replay now also retains one
+deterministic `validator_quality_drift_signal.json` plus one paired
+`validator_rollback_signal.json` under each validator root. Those signal
+artifacts carry one monotonic `validation_index`, the previous retained
+score/disposition, score delta, degraded-window count, non-accepted-window
+count, and the latest accepted baseline window when one exists. The rollback
+signal does not execute rollback itself; it emits one machine-readable `hold`
+or `candidate` posture that later `Nexus` or scheduler policy can consume
+without re-scanning validator history, and the run/window status packets now
+repeat both signal paths beside the validator score receipt.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

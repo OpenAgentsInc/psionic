@@ -535,7 +535,17 @@ integrity for grouped stage targets. Retained validator score artifacts and
 receipts now persist both the validator work class and the challenged work
 class plus that verified-hook set, and grouped-stage validator replay refuses
 as `ArtifactIncomplete` when the retained
-`grouped_stage_execution_summary.json` evidence surface is absent.
+`grouped_stage_execution_summary.json` evidence surface is absent. Validator
+replay now also retains one deterministic
+`validator_quality_drift_signal.json` plus one paired
+`validator_rollback_signal.json` under each validator root. Those signal
+artifacts carry one monotonic `validation_index`, the previous retained
+score/disposition, score delta, degraded-window count, non-accepted-window
+count, and the latest accepted baseline window when one exists. The rollback
+signal is only a posture artifact: it emits `hold` or `candidate` so later
+closeout, scheduler, or checkpoint-authority code can consume the signal
+without pretending the machine runtime already owns promotion or rollback
+policy.
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,

@@ -259,6 +259,10 @@ pub struct PsionicTrainArtifactSurfaceRefs {
     pub recovery_receipt_path: Option<String>,
     /// Optional retained validator score receipt path.
     pub validator_score_receipt_path: Option<String>,
+    /// Optional retained validator quality-drift signal path.
+    pub validator_quality_drift_signal_path: Option<String>,
+    /// Optional retained validator rollback-signal path.
+    pub validator_rollback_signal_path: Option<String>,
     /// Optional retained sealed-window bundle path.
     pub sealed_window_bundle_path: Option<String>,
     /// Optional retained final closeout bundle path.
