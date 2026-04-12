@@ -107,13 +107,13 @@ impl RemoteContributionInvoker {
         )?;
         let remote_command = format!(
             "export CARGO_TARGET_DIR={}; export TMPDIR={}; export RUST_MIN_STACK=16777216; mkdir -p {} {}; cd {} && cargo run -q -p psionic-train --example psion_reference_pilot_joint_contribution -- {} {}",
-            shell_quote(self.remote_target_dir.as_str()),
-            shell_quote(self.remote_tmp_dir.as_str()),
-            shell_quote(self.remote_target_dir.as_str()),
-            shell_quote(self.remote_tmp_dir.as_str()),
-            shell_quote(self.remote_worktree_dir.as_str()),
-            shell_quote(remote_request_path.as_str()),
-            shell_quote(remote_response_path.as_str()),
+            remote_shell_path(self.remote_target_dir.as_str()),
+            remote_shell_path(self.remote_tmp_dir.as_str()),
+            remote_shell_path(self.remote_target_dir.as_str()),
+            remote_shell_path(self.remote_tmp_dir.as_str()),
+            remote_shell_path(self.remote_worktree_dir.as_str()),
+            remote_shell_path(remote_request_path.as_str()),
+            remote_shell_path(remote_response_path.as_str()),
         );
         ssh_bash(self.ssh_target.as_str(), remote_command.as_str())?;
         scp_download(
@@ -268,6 +268,13 @@ fn scp_download(
 fn shell_quote(value: &str) -> String {
     let escaped = value.replace('\'', "'\"'\"'");
     format!("'{escaped}'")
+}
+
+fn remote_shell_path(value: &str) -> String {
+    if let Some(suffix) = value.strip_prefix("$HOME/") {
+        return format!("\"$HOME/{}\"", suffix.replace('"', "\\\""));
+    }
+    shell_quote(value)
 }
 
 fn io_as_remote_error(error: std::io::Error) -> psionic_train::PsionReferencePilotError {
