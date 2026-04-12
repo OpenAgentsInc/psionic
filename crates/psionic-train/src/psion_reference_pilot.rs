@@ -9,9 +9,9 @@ use psionic_backend_cuda::CudaBackend;
 use psionic_cluster::NodeId;
 use psionic_core::{DType, Device, Shape, TensorData, TensorId, TensorSpec};
 use psionic_data::{
-    build_psion_reference_corpus, DatasetSplitKind, PsionArtifactLineageManifest,
-    PsionReferenceCorpusBundle, PsionReferenceCorpusError, PsionReferenceEncodedSequence,
-    PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
+    DatasetSplitKind, PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
+    PsionArtifactLineageManifest, PsionReferenceCorpusBundle, PsionReferenceCorpusError,
+    PsionReferenceEncodedSequence, build_psion_reference_corpus,
 };
 use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
@@ -33,24 +33,20 @@ use psionic_runtime::{
     TrainingDeviceMeshAxis, TrainingDeviceMeshAxisKind, TrainingDeviceMeshContext,
     TrainingElasticMembershipContext, TrainingRecoveryContext, TrainingRecoveryPosture,
 };
-use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
-    record_psion_pilot_route_probe, record_psion_pretrain_run_observability,
-    record_psion_refusal_calibration_receipt, record_psion_route_class_evaluation_receipt,
-    run_psion_pretrain_stage, run_psion_pretrain_stage_with_execution, ArtifactArchiveClass,
-    ArtifactColdRestoreReceipt, ArtifactRetentionProfile, ArtifactStorageSweepReceipt,
-    CheckpointDurabilityPosture, CheckpointManifest, CheckpointPointer, CheckpointRecoveryError,
-    CheckpointScopeBinding, CheckpointScopeKind, CheckpointShardManifest,
-    CheckpointStoreReadOptions, FixedBudgetTrainingRun, InMemoryCheckpointStore,
-    PsionAcceptanceMatrix, PsionAcceptanceMatrixError, PsionBenchmarkCatalog,
-    PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionBenchmarkPackageContract,
-    PsionBenchmarkPackageError, PsionBenchmarkTaskContract, PsionCapabilityMatrixView,
-    PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
+    ArtifactArchiveClass, ArtifactColdRestoreReceipt, ArtifactRetentionProfile,
+    ArtifactStorageSweepReceipt, CheckpointDurabilityPosture, CheckpointManifest,
+    CheckpointPointer, CheckpointRecoveryError, CheckpointScopeBinding, CheckpointScopeKind,
+    CheckpointShardManifest, CheckpointStoreReadOptions, FixedBudgetTrainingRun,
+    InMemoryCheckpointStore, PsionAcceptanceMatrix, PsionAcceptanceMatrixError,
+    PsionBenchmarkCatalog, PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily,
+    PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkTaskContract,
+    PsionCapabilityMatrixView, PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
     PsionContaminationReviewReceipt, PsionGoogleSingleNodeLiveVisualizationWriter,
     PsionGoogleSingleNodeStepTelemetry, PsionGoogleSingleNodeVisualizationError, PsionMetricKind,
     PsionObservedMetric, PsionPhaseGate, PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow,
@@ -72,9 +68,13 @@ use crate::{
     PsionSourceContributionCap, PsionSourceFamilySamplingWeight, TrainArtifactClass,
     TrainArtifactStorageController, TrainArtifactStorageError, TrainingCoreError,
     TrainingGradientBatch, TrainingLoopBudget, TrainingOptimizerConfig,
-    TrainingOptimizerResidencyPolicy,
-    TrainingParameterClass, TrainingParameterGroupState, TrainingRecoveryMode, TrainingRunSummary,
-    TrainingSessionState, TrainingStepInput, TrainingStepReceipt, TrainingTensorBuffer,
+    TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
+    TrainingRecoveryMode, TrainingRunSummary, TrainingSessionState, TrainingStepInput,
+    TrainingStepReceipt, TrainingTensorBuffer, record_psion_pilot_held_out_loss,
+    record_psion_pilot_pretraining_run, record_psion_pilot_route_probe,
+    record_psion_pretrain_run_observability, record_psion_refusal_calibration_receipt,
+    record_psion_route_class_evaluation_receipt, run_psion_pretrain_stage,
+    run_psion_pretrain_stage_with_execution,
 };
 
 const TOKEN_EMBEDDING_GROUP_ID: &str = "decoder.embed_tokens.weight";
@@ -248,6 +248,12 @@ pub struct PsionReferencePilotDualHostConfig {
     pub remote_worker_tailnet_ip: Option<String>,
     pub remote_worker_batch_rows: usize,
     pub remote_worker_backend: PsionReferencePilotContributionBackend,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_remote_worker_host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_remote_worker_tailnet_ip: Option<String>,
+    pub secondary_remote_worker_batch_rows: usize,
+    pub secondary_remote_worker_backend: PsionReferencePilotContributionBackend,
 }
 
 impl PsionReferencePilotDualHostConfig {
@@ -264,6 +270,10 @@ impl PsionReferencePilotDualHostConfig {
             remote_worker_tailnet_ip: None,
             remote_worker_batch_rows: 256,
             remote_worker_backend: PsionReferencePilotContributionBackend::Cuda,
+            secondary_remote_worker_host: None,
+            secondary_remote_worker_tailnet_ip: None,
+            secondary_remote_worker_batch_rows: 256,
+            secondary_remote_worker_backend: PsionReferencePilotContributionBackend::Cpu,
         }
     }
 
@@ -299,6 +309,42 @@ impl PsionReferencePilotDualHostConfig {
         self.remote_worker_backend = remote_worker_backend;
         self
     }
+
+    #[must_use]
+    pub fn with_secondary_remote_worker_host(
+        mut self,
+        secondary_remote_worker_host: impl Into<String>,
+    ) -> Self {
+        self.secondary_remote_worker_host = Some(secondary_remote_worker_host.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_secondary_remote_worker_tailnet_ip(
+        mut self,
+        secondary_remote_worker_tailnet_ip: impl Into<String>,
+    ) -> Self {
+        self.secondary_remote_worker_tailnet_ip = Some(secondary_remote_worker_tailnet_ip.into());
+        self
+    }
+
+    #[must_use]
+    pub const fn with_secondary_remote_worker_batch_rows(
+        mut self,
+        secondary_remote_worker_batch_rows: usize,
+    ) -> Self {
+        self.secondary_remote_worker_batch_rows = secondary_remote_worker_batch_rows;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_secondary_remote_worker_backend(
+        mut self,
+        secondary_remote_worker_backend: PsionReferencePilotContributionBackend,
+    ) -> Self {
+        self.secondary_remote_worker_backend = secondary_remote_worker_backend;
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -312,6 +358,8 @@ pub struct PsionReferencePilotJointContributionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contributor_tailnet_ip: Option<String>,
     pub contributor_role: PsionReferencePilotJointContributionRole,
+    pub contributor_index: usize,
+    pub contributor_count: usize,
     pub backend: PsionReferencePilotContributionBackend,
     pub batch_rows: usize,
     pub parameter_values: BTreeMap<String, Vec<f32>>,
@@ -329,6 +377,8 @@ pub struct PsionReferencePilotJointContributionReceipt {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contributor_tailnet_ip: Option<String>,
     pub contributor_role: PsionReferencePilotJointContributionRole,
+    pub contributor_index: usize,
+    pub contributor_count: usize,
     pub runtime_backend: String,
     pub selected_device: DeviceInventoryQualifiers,
     pub batch_rows: usize,
@@ -359,6 +409,12 @@ pub struct PsionReferencePilotDualHostStepReceipt {
     pub global_step: u64,
     pub local_contribution_digest: String,
     pub remote_contribution_digest: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contribution_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contributor_hosts: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contributor_runtime_backends: Vec<String>,
     pub merged_batch_id: String,
     pub merged_sample_count: u32,
     pub applied_receipt_id: String,
@@ -378,8 +434,19 @@ pub struct PsionReferencePilotDualHostTopologyReceipt {
     pub remote_worker_host: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_worker_tailnet_ip: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_remote_worker_host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secondary_remote_worker_tailnet_ip: Option<String>,
     pub local_runtime_backend: String,
     pub remote_runtime_backend: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub worker_hosts: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub worker_tailnet_ips: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runtime_backends: Vec<String>,
+    pub contributor_count: usize,
     pub delivered_execution: DeliveredExecutionContext,
     pub joint_step_receipt_digests: Vec<String>,
     pub checkpoint_ref: String,
@@ -410,24 +477,38 @@ pub struct PsionReferencePilotDualHostRun {
 impl PsionReferencePilotDualHostRun {
     pub fn write_to_dir(&self, output_dir: &Path) -> Result<(), PsionReferencePilotError> {
         self.run.write_to_dir(output_dir)?;
+        let dual_host_topology_path =
+            output_dir.join("psion_reference_pilot_dual_host_topology_receipt.json");
+        let dual_host_step_path =
+            output_dir.join("psion_reference_pilot_dual_host_step_receipts.json");
+        let dual_host_contribution_path =
+            output_dir.join("psion_reference_pilot_dual_host_contribution_receipts.json");
+        write_json(dual_host_topology_path.as_path(), &self.topology_receipt)?;
+        write_json(dual_host_step_path.as_path(), &self.joint_step_receipts)?;
         write_json(
-            output_dir
-                .join("psion_reference_pilot_dual_host_topology_receipt.json")
-                .as_path(),
-            &self.topology_receipt,
-        )?;
-        write_json(
-            output_dir
-                .join("psion_reference_pilot_dual_host_step_receipts.json")
-                .as_path(),
-            &self.joint_step_receipts,
-        )?;
-        write_json(
-            output_dir
-                .join("psion_reference_pilot_dual_host_contribution_receipts.json")
-                .as_path(),
+            dual_host_contribution_path.as_path(),
             &self.contribution_receipts,
         )?;
+        if self.topology_receipt.contributor_count > 2 {
+            write_json(
+                output_dir
+                    .join("psion_reference_pilot_cluster_topology_receipt.json")
+                    .as_path(),
+                &self.topology_receipt,
+            )?;
+            write_json(
+                output_dir
+                    .join("psion_reference_pilot_cluster_step_receipts.json")
+                    .as_path(),
+                &self.joint_step_receipts,
+            )?;
+            write_json(
+                output_dir
+                    .join("psion_reference_pilot_cluster_contribution_receipts.json")
+                    .as_path(),
+                &self.contribution_receipts,
+            )?;
+        }
         Ok(())
     }
 }
@@ -1382,13 +1463,18 @@ pub fn build_psion_reference_pilot_joint_contribution(
         train_examples.as_slice(),
         request.global_step,
         request.batch_rows,
-        request.contributor_role,
+        request.contributor_index,
+        request.contributor_count,
     );
     let example_selection_digest = stable_reference_example_digest(selected_examples.as_slice());
 
     let (gradient_batch, runtime_backend, selected_device) = match request.backend {
         PsionReferencePilotContributionBackend::Cpu => (
-            build_gradient_batch_for_device(&restored_model, selected_examples.as_slice(), &Device::cpu())?,
+            build_gradient_batch_for_device(
+                &restored_model,
+                selected_examples.as_slice(),
+                &Device::cpu(),
+            )?,
             String::from("cpu"),
             cpu_delivered_device(),
         ),
@@ -1443,6 +1529,8 @@ pub fn build_psion_reference_pilot_joint_contribution(
         contributor_host: request.contributor_host.clone(),
         contributor_tailnet_ip: request.contributor_tailnet_ip.clone(),
         contributor_role: request.contributor_role,
+        contributor_index: request.contributor_index,
+        contributor_count: request.contributor_count,
         runtime_backend,
         selected_device,
         batch_rows: request.batch_rows,
@@ -1491,14 +1579,35 @@ where
     let mut step_receipts = Vec::new();
     let mut contribution_receipts = Vec::new();
     let mut joint_step_receipts = Vec::new();
-    let mut remote_device_inventory = None;
-    let mut remote_runtime_backend = String::new();
+    let mut remote_nodes = vec![(
+        dual_host.remote_worker_host.clone(),
+        dual_host.remote_worker_tailnet_ip.clone(),
+        dual_host.remote_worker_backend,
+        dual_host.remote_worker_batch_rows.max(1),
+    )];
+    if let Some(host) = dual_host.secondary_remote_worker_host.as_ref() {
+        remote_nodes.push((
+            host.clone(),
+            dual_host.secondary_remote_worker_tailnet_ip.clone(),
+            dual_host.secondary_remote_worker_backend,
+            dual_host.secondary_remote_worker_batch_rows.max(1),
+        ));
+    }
+    let contributor_count = remote_nodes.len().saturating_add(1);
+    let execution_topology_classification = if contributor_count == 2 {
+        "dual_host_joint_gradient_average"
+    } else {
+        "multi_host_joint_gradient_average"
+    };
+    let mut remote_device_inventory = BTreeMap::new();
+    let mut remote_runtime_backends = BTreeMap::new();
 
     for step_index in 0..config.budget.max_steps {
         let global_step = step_index.saturating_add(1);
         let parameter_values = current_model.parameter_values();
         let parameter_state_digest =
             stable_digest(b"psion_reference_pilot_parameter_state|", &parameter_values);
+        let mut step_contributions = Vec::new();
         let local_request = PsionReferencePilotJointContributionRequest {
             schema_version: String::from("psion.reference_pilot_joint_contribution_request.v1"),
             run_id: config.run_id.clone(),
@@ -1508,67 +1617,107 @@ where
             contributor_host: dual_host.control_plane_host.clone(),
             contributor_tailnet_ip: dual_host.control_plane_tailnet_ip.clone(),
             contributor_role: PsionReferencePilotJointContributionRole::LocalAppleHost,
+            contributor_index: 0,
+            contributor_count,
             backend: PsionReferencePilotContributionBackend::Cpu,
             batch_rows: dual_host.control_plane_batch_rows.max(1),
             parameter_values: parameter_values.clone(),
             parameter_state_digest: parameter_state_digest.clone(),
         };
-        let local_contribution =
-            build_psion_reference_pilot_joint_contribution(repo_root, &local_request)?;
-        let remote_request = PsionReferencePilotJointContributionRequest {
-            schema_version: String::from("psion.reference_pilot_joint_contribution_request.v1"),
-            run_id: config.run_id.clone(),
-            checkpoint_family: config.checkpoint_family.clone(),
-            global_step,
-            contributor_id: format!(
-                "{}-{}",
-                dual_host.remote_worker_host,
-                dual_host.remote_worker_backend.runtime_backend()
-            ),
-            contributor_host: dual_host.remote_worker_host.clone(),
-            contributor_tailnet_ip: dual_host.remote_worker_tailnet_ip.clone(),
-            contributor_role: PsionReferencePilotJointContributionRole::RemoteTailnetWorker,
-            backend: dual_host.remote_worker_backend,
-            batch_rows: dual_host.remote_worker_batch_rows.max(1),
-            parameter_values: parameter_values.clone(),
-            parameter_state_digest: parameter_state_digest.clone(),
-        };
-        let remote_contribution = remote_contributor(&remote_request)?;
-        validate_joint_contribution_against_request(&remote_contribution, &remote_request)?;
-        remote_runtime_backend = remote_contribution.runtime_backend.clone();
-        remote_device_inventory = Some(remote_contribution.selected_device.clone());
+        step_contributions.push(build_psion_reference_pilot_joint_contribution(
+            repo_root,
+            &local_request,
+        )?);
+        for (remote_index, (remote_host, remote_tailnet_ip, remote_backend, remote_batch_rows)) in
+            remote_nodes.iter().enumerate()
+        {
+            let remote_request = PsionReferencePilotJointContributionRequest {
+                schema_version: String::from("psion.reference_pilot_joint_contribution_request.v1"),
+                run_id: config.run_id.clone(),
+                checkpoint_family: config.checkpoint_family.clone(),
+                global_step,
+                contributor_id: format!("{}-{}", remote_host, remote_backend.runtime_backend()),
+                contributor_host: remote_host.clone(),
+                contributor_tailnet_ip: remote_tailnet_ip.clone(),
+                contributor_role: PsionReferencePilotJointContributionRole::RemoteTailnetWorker,
+                contributor_index: remote_index.saturating_add(1),
+                contributor_count,
+                backend: *remote_backend,
+                batch_rows: (*remote_batch_rows).max(1),
+                parameter_values: parameter_values.clone(),
+                parameter_state_digest: parameter_state_digest.clone(),
+            };
+            let remote_contribution = remote_contributor(&remote_request)?;
+            validate_joint_contribution_against_request(&remote_contribution, &remote_request)?;
+            remote_runtime_backends.insert(
+                remote_host.clone(),
+                remote_contribution.runtime_backend.clone(),
+            );
+            remote_device_inventory.insert(
+                remote_host.clone(),
+                remote_contribution.selected_device.clone(),
+            );
+            step_contributions.push(remote_contribution);
+        }
 
         let merged_batch = merge_joint_contributions(
             format!("{}-step-{}-merged", config.run_id, global_step),
-            [&local_contribution, &remote_contribution].as_slice(),
+            step_contributions.iter().collect::<Vec<_>>().as_slice(),
             &Device::cpu(),
         )?;
         let started_at_ms = config
             .started_at_ms
             .saturating_add(step_index.saturating_mul(config.step_duration_ms));
         let finished_at_ms = started_at_ms.saturating_add(config.step_duration_ms);
-        let receipt = run.apply_step(TrainingStepInput::new(merged_batch.clone(), started_at_ms, finished_at_ms))?;
+        let receipt = run.apply_step(TrainingStepInput::new(
+            merged_batch.clone(),
+            started_at_ms,
+            finished_at_ms,
+        ))?;
         current_model = materialize_model(&model_descriptor, &run)?;
+        let contribution_hosts = step_contributions
+            .iter()
+            .map(|receipt| receipt.contributor_host.clone())
+            .collect::<Vec<_>>();
+        let contribution_runtime_backends = step_contributions
+            .iter()
+            .map(|receipt| receipt.runtime_backend.clone())
+            .collect::<Vec<_>>();
+        let contribution_digests = step_contributions
+            .iter()
+            .map(|receipt| receipt.contribution_digest.clone())
+            .collect::<Vec<_>>();
         joint_step_receipts.push(PsionReferencePilotDualHostStepReceipt {
             schema_version: String::from("psion.reference_pilot_dual_host_step_receipt.v1"),
             run_id: config.run_id.clone(),
             global_step,
-            local_contribution_digest: local_contribution.contribution_digest.clone(),
-            remote_contribution_digest: remote_contribution.contribution_digest.clone(),
+            local_contribution_digest: contribution_digests
+                .first()
+                .cloned()
+                .unwrap_or_default(),
+            remote_contribution_digest: contribution_digests
+                .get(1)
+                .cloned()
+                .unwrap_or_default(),
+            contribution_digests,
+            contributor_hosts: contribution_hosts.clone(),
+            contributor_runtime_backends: contribution_runtime_backends.clone(),
             merged_batch_id: merged_batch.batch_id.clone(),
             merged_sample_count: merged_batch.sample_count,
             applied_receipt_id: receipt.receipt_id.clone(),
             applied_receipt_digest: receipt.receipt_digest.clone(),
             detail: format!(
-                "Global step {} merged one local CPU contribution from `{}` with one remote {} contribution from `{}` before applying the optimizer step.",
+                "Global step {} merged gradient contributions from {} before applying the optimizer step.",
                 global_step,
-                dual_host.control_plane_host,
-                remote_contribution.runtime_backend,
-                dual_host.remote_worker_host
+                contribution_hosts
+                    .iter()
+                    .zip(contribution_runtime_backends.iter())
+                    .map(|(host, backend)| format!("`{host}` ({backend})"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
         });
-        contribution_receipts.push(local_contribution);
-        contribution_receipts.push(remote_contribution);
+        contribution_receipts.extend(step_contributions);
         step_receipts.push(receipt);
     }
 
@@ -1615,16 +1764,35 @@ where
         model_descriptor.stable_digest(),
     );
     let local_device = cpu_delivered_device();
-    let remote_device = remote_device_inventory.ok_or_else(|| {
-        PsionReferencePilotError::InvalidJointContribution {
-            message: String::from("missing remote device inventory from the distributed run"),
-        }
-    })?;
+    let remote_worker_receipts = remote_nodes
+        .iter()
+        .map(|(host, tailnet_ip, _, _)| {
+            let runtime_backend = remote_runtime_backends.get(host).cloned().ok_or_else(|| {
+                PsionReferencePilotError::InvalidJointContribution {
+                    message: format!(
+                        "missing remote runtime backend from the distributed run for `{host}`"
+                    ),
+                }
+            })?;
+            let device_inventory = remote_device_inventory.get(host).cloned().ok_or_else(|| {
+                PsionReferencePilotError::InvalidJointContribution {
+                    message: format!(
+                        "missing remote device inventory from the distributed run for `{host}`"
+                    ),
+                }
+            })?;
+            Ok((
+                host.clone(),
+                tailnet_ip.clone(),
+                runtime_backend,
+                device_inventory,
+            ))
+        })
+        .collect::<Result<Vec<_>, PsionReferencePilotError>>()?;
     let delivered_execution = dual_host_delivered_execution(
         dual_host,
         local_device.clone(),
-        remote_device.clone(),
-        remote_runtime_backend.as_str(),
+        remote_worker_receipts.as_slice(),
         &checkpoint_artifact.checkpoint,
     );
     let stage_receipt = run_psion_pretrain_stage_with_execution(
@@ -1634,7 +1802,19 @@ where
         checkpoint_lineage,
         Some(delivered_execution.clone()),
         None,
-        "Distributed reference pilot completed joint dual-host optimizer steps where the local Apple-silicon host and the Tailnet CUDA worker both contributed gradient-bearing work to the promoted checkpoint.",
+        &format!(
+            "Distributed reference pilot completed joint optimizer steps where {} each contributed gradient-bearing work to the promoted checkpoint.",
+            std::iter::once(format!("`{}` (cpu)", dual_host.control_plane_host))
+                .chain(
+                    remote_worker_receipts
+                        .iter()
+                        .map(|(host, _, runtime_backend, _)| {
+                            format!("`{host}` ({runtime_backend})")
+                        })
+                )
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         &model_descriptor,
         &corpus_bundle.tokenized_corpus_manifest,
         &sampling_policy,
@@ -1656,26 +1836,59 @@ where
         schema_version: String::from("psion.reference_pilot_dual_host_topology_receipt.v1"),
         run_id: config.run_id.clone(),
         checkpoint_family: config.checkpoint_family.clone(),
-        execution_topology_classification: String::from("dual_host_joint_gradient_average"),
+        execution_topology_classification: String::from(execution_topology_classification),
         control_plane_host: dual_host.control_plane_host.clone(),
         control_plane_tailnet_ip: dual_host.control_plane_tailnet_ip.clone(),
         remote_worker_host: dual_host.remote_worker_host.clone(),
         remote_worker_tailnet_ip: dual_host.remote_worker_tailnet_ip.clone(),
+        secondary_remote_worker_host: dual_host.secondary_remote_worker_host.clone(),
+        secondary_remote_worker_tailnet_ip: dual_host.secondary_remote_worker_tailnet_ip.clone(),
         local_runtime_backend: String::from("cpu"),
-        remote_runtime_backend: remote_runtime_backend.clone(),
+        remote_runtime_backend: remote_worker_receipts
+            .first()
+            .map(|(_, _, runtime_backend, _)| runtime_backend.clone())
+            .unwrap_or_else(|| String::from("unknown")),
+        worker_hosts: std::iter::once(dual_host.control_plane_host.clone())
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(host, _, _, _)| host.clone()),
+            )
+            .collect(),
+        worker_tailnet_ips: std::iter::once(dual_host.control_plane_tailnet_ip.clone())
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(_, tailnet_ip, _, _)| tailnet_ip.clone()),
+            )
+            .flatten()
+            .collect(),
+        runtime_backends: std::iter::once(String::from("cpu"))
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(_, _, runtime_backend, _)| runtime_backend.clone()),
+            )
+            .collect(),
+        contributor_count,
         delivered_execution: delivered_execution.clone(),
         joint_step_receipt_digests: joint_step_receipts
             .iter()
-            .map(|receipt| {
-                stable_digest(b"psion_reference_pilot_dual_host_step_receipt|", receipt)
-            })
+            .map(|receipt| stable_digest(b"psion_reference_pilot_dual_host_step_receipt|", receipt))
             .collect(),
         checkpoint_ref: checkpoint_artifact.manifest.checkpoint_ref.clone(),
         detail: format!(
-            "This retained topology receipt proves one bounded joint reference-pilot run where `{}` computed one local CPU contribution per optimizer step and `{}` computed one remote {} contribution per optimizer step before the merged update advanced the shared checkpoint.",
-            dual_host.control_plane_host,
-            dual_host.remote_worker_host,
-            remote_runtime_backend
+            "This retained topology receipt proves one bounded joint reference-pilot run where {} each computed one contribution per optimizer step before the merged update advanced the shared checkpoint.",
+            std::iter::once(format!("`{}` (cpu)", dual_host.control_plane_host))
+                .chain(
+                    remote_worker_receipts
+                        .iter()
+                        .map(|(host, _, runtime_backend, _)| {
+                            format!("`{host}` ({runtime_backend})")
+                        })
+                )
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         topology_receipt_digest: String::new(),
     };
@@ -1691,7 +1904,8 @@ where
             observability_receipt,
             checkpoint_artifact,
             optimizer_state_artifact,
-            initial_validation_loss_milli_by_family: initial_validation_summary.loss_by_family_milli,
+            initial_validation_loss_milli_by_family: initial_validation_summary
+                .loss_by_family_milli,
             final_validation_loss_milli_by_family: final_validation_summary.loss_by_family_milli,
             initial_held_out_loss_milli: milli_loss(initial_held_out_summary.mean_loss),
             final_held_out_loss_milli: milli_loss(final_held_out_summary.mean_loss),
@@ -3694,31 +3908,37 @@ fn cpu_delivered_device() -> DeviceInventoryQualifiers {
     }
 }
 
-fn joint_runtime_backend_label(remote_runtime_backend: &str) -> String {
-    format!("mixed_cpu_{remote_runtime_backend}_cluster")
+fn joint_runtime_backend_label(runtime_backends: &[String]) -> String {
+    let mut labels = runtime_backends
+        .iter()
+        .cloned()
+        .chain(std::iter::once(String::from("cpu")))
+        .collect::<Vec<_>>();
+    labels.sort();
+    labels.dedup();
+    format!("mixed_{}_cluster", labels.join("_"))
 }
 
 fn joint_reference_examples_for_step(
     train_examples: &[PsionReferenceTrainingExample],
     global_step: u64,
     batch_rows: usize,
-    role: PsionReferencePilotJointContributionRole,
+    contributor_index: usize,
+    contributor_count: usize,
 ) -> Vec<PsionReferenceTrainingExample> {
     if train_examples.is_empty() {
         return Vec::new();
     }
     let batch_rows = batch_rows.max(1);
+    let contributor_count = contributor_count.max(1);
     let base_index = ((global_step.saturating_sub(1) as usize)
         .saturating_mul(batch_rows)
-        .saturating_mul(2))
+        .saturating_mul(contributor_count))
         % train_examples.len();
-    let start_offset = match role {
-        PsionReferencePilotJointContributionRole::LocalAppleHost => 0,
-        PsionReferencePilotJointContributionRole::RemoteTailnetWorker => 1,
-    };
     (0..batch_rows)
         .map(|offset| {
-            let index = (base_index + start_offset + (offset * 2)) % train_examples.len();
+            let index = (base_index + contributor_index + (offset * contributor_count))
+                % train_examples.len();
             train_examples[index].clone()
         })
         .collect()
@@ -3762,6 +3982,8 @@ fn validate_joint_contribution_against_request(
         || receipt.contributor_id != request.contributor_id
         || receipt.contributor_host != request.contributor_host
         || receipt.contributor_role != request.contributor_role
+        || receipt.contributor_index != request.contributor_index
+        || receipt.contributor_count != request.contributor_count
         || receipt.parameter_state_digest != request.parameter_state_digest
     {
         return Err(PsionReferencePilotError::InvalidJointContribution {
@@ -3864,54 +4086,89 @@ fn merge_joint_contributions(
 fn dual_host_delivered_execution(
     dual_host: &PsionReferencePilotDualHostConfig,
     local_device: DeviceInventoryQualifiers,
-    remote_device: DeviceInventoryQualifiers,
-    remote_runtime_backend: &str,
+    remote_worker_receipts: &[(String, Option<String>, String, DeviceInventoryQualifiers)],
     checkpoint: &TrainingCheckpointReference,
 ) -> DeliveredExecutionContext {
-    let effective_backend = joint_runtime_backend_label(remote_runtime_backend);
+    let worker_count = remote_worker_receipts.len().saturating_add(1);
+    let worker_hosts = std::iter::once(dual_host.control_plane_host.clone())
+        .chain(
+            remote_worker_receipts
+                .iter()
+                .map(|(host, _, _, _)| host.clone()),
+        )
+        .collect::<Vec<_>>();
+    let runtime_backends = std::iter::once(String::from("cpu"))
+        .chain(
+            remote_worker_receipts
+                .iter()
+                .map(|(_, _, runtime_backend, _)| runtime_backend.clone()),
+        )
+        .collect::<Vec<_>>();
+    let effective_backend = joint_runtime_backend_label(runtime_backends.as_slice());
     let execution_topology = ExecutionTopologyPlan::replicated(
         effective_backend.clone(),
-        vec![local_device.clone(), remote_device.clone()],
+        std::iter::once(local_device.clone())
+            .chain(
+                remote_worker_receipts
+                    .iter()
+                    .map(|(_, _, _, device_inventory)| device_inventory.clone()),
+            )
+            .collect(),
     );
     let elastic_membership = TrainingElasticMembershipContext::new(
         checkpoint.membership_epoch,
         checkpoint.cluster_state_digest.clone(),
         checkpoint.topology_digest.clone(),
-        vec![
-            dual_host.control_plane_host.clone(),
-            dual_host.remote_worker_host.clone(),
-        ],
+        worker_hosts.clone(),
     );
     let mesh = TrainingDeviceMeshContext::new(
-        format!("{}-dual-host-mesh", checkpoint.checkpoint_family),
+        format!("{}-joint-gradient-mesh", checkpoint.checkpoint_family),
         checkpoint.membership_epoch,
         effective_backend.clone(),
         ClusterCommunicationClass::TensorCollectiveMesh,
         elastic_membership.clone(),
-        vec![
-            dual_host.control_plane_host.clone(),
-            dual_host.remote_worker_host.clone(),
-        ],
+        worker_hosts.clone(),
     )
     .with_axes(vec![TrainingDeviceMeshAxis::new(
         "data_parallel",
         TrainingDeviceMeshAxisKind::DataParallel,
-        2,
+        worker_count,
     )
-    .with_detail(
-        "The bounded joint reference lane keeps one full-model replica on the local Apple-silicon host and one full-model replica on the remote Tailnet CUDA host.",
-    )]);
+    .with_detail(&format!(
+        "The bounded joint reference lane keeps one full-model replica on each contributor across {}.",
+        worker_hosts
+            .iter()
+            .map(|host| format!("`{host}`"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))]);
     let training_recovery = TrainingRecoveryContext::new(
         TrainingRecoveryPosture::SteadyState,
         TrainingCheckpointAvailability::Durable,
         elastic_membership,
     )
     .with_latest_checkpoint(checkpoint.clone())
-    .with_detail(
-        "The joint reference lane emits one durable checkpoint on the shared run id after merged dual-host optimizer progress.",
-    );
+    .with_detail(&format!(
+        "The joint reference lane emits one durable checkpoint on the shared run id after merged optimizer progress across {} contributors.",
+        worker_count
+    ));
+    let selected_nodes = std::iter::once(
+        ClusterSelectedNode::new(dual_host.control_plane_host.clone(), "cpu")
+            .with_role("trainer")
+            .with_device_inventory(local_device),
+    )
+    .chain(
+        remote_worker_receipts
+            .iter()
+            .map(|(host, _, runtime_backend, device_inventory)| {
+                ClusterSelectedNode::new(host.clone(), runtime_backend.clone())
+                    .with_role("trainer")
+                    .with_device_inventory(device_inventory.clone())
+            }),
+    )
+    .collect::<Vec<_>>();
     let cluster_execution = ClusterExecutionContext::new(
-        format!("{}-dual-host-cluster", checkpoint.checkpoint_family),
+        format!("{}-joint-gradient-cluster", checkpoint.checkpoint_family),
         checkpoint.cluster_state_digest.clone(),
         checkpoint.topology_digest.clone(),
         dual_host.control_plane_host.clone(),
@@ -3919,17 +4176,7 @@ fn dual_host_delivered_execution(
         ClusterExecutionDisposition::Sharded,
     )
     .with_execution_topology(execution_topology.clone())
-    .with_selected_nodes(vec![
-        ClusterSelectedNode::new(dual_host.control_plane_host.clone(), "cpu")
-            .with_role("trainer")
-            .with_device_inventory(local_device),
-        ClusterSelectedNode::new(
-            dual_host.remote_worker_host.clone(),
-            remote_runtime_backend.to_owned(),
-        )
-        .with_role("trainer")
-        .with_device_inventory(remote_device),
-    ])
+    .with_selected_nodes(selected_nodes)
     .with_training_collective(
         TrainingCollectiveContext::new(
             mesh,
@@ -3937,22 +4184,29 @@ fn dual_host_delivered_execution(
             TrainingCollectiveQuantization::None,
             0,
             0,
-            2,
+            worker_count,
         )
-        .with_detail(
-            "Each optimizer step merges one local CPU gradient contribution with one remote CUDA gradient contribution under one fp32 data-parallel reduction law.",
-        ),
+        .with_detail(&format!(
+            "Each optimizer step merges one gradient contribution from {} under one fp32 data-parallel reduction law.",
+            worker_hosts
+                .iter()
+                .zip(runtime_backends.iter())
+                .map(|(host, backend)| format!("`{host}` ({backend})"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
     )
     .with_training_recovery(training_recovery)
-    .with_placement_diagnostic(
-        "The local Apple-silicon host and the remote Tailnet CUDA worker both remained in the optimization path for the full bounded run.",
-    );
-    DeliveredExecutionContext::new(
-        effective_backend,
-        Some(execution_topology),
-        vec![],
-    )
-    .with_cluster_execution(cluster_execution)
+    .with_placement_diagnostic(&format!(
+        "The bounded reference lane kept {} in the optimization path for the full retained run.",
+        worker_hosts
+            .iter()
+            .map(|host| format!("`{host}`"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    DeliveredExecutionContext::new(effective_backend, Some(execution_topology), vec![])
+        .with_cluster_execution(cluster_execution)
 }
 
 fn build_accelerated_observability_receipt(
@@ -4087,7 +4341,7 @@ fn build_accelerated_observability_receipt(
 
 fn build_dual_host_observability_receipt(
     config: &PsionReferencePilotConfig,
-    dual_host: &PsionReferencePilotDualHostConfig,
+    _dual_host: &PsionReferencePilotDualHostConfig,
     stage_receipt: &PsionPretrainStageRunReceipt,
     checkpoint_artifact: &PsionReferencePilotCheckpointArtifact,
     step_receipts: &[TrainingStepReceipt],
@@ -4101,26 +4355,19 @@ fn build_dual_host_observability_receipt(
         .budget
         .max_steps
         .saturating_mul(config.step_duration_ms);
-    let train_tokens_processed = (1..=config.budget.max_steps)
-        .map(|global_step| {
+    let train_tokens_processed = contribution_receipts
+        .iter()
+        .map(|receipt| {
             token_count(
                 joint_reference_examples_for_step(
                     train_examples,
-                    global_step,
-                    dual_host.control_plane_batch_rows,
-                    PsionReferencePilotJointContributionRole::LocalAppleHost,
+                    receipt.global_step,
+                    receipt.batch_rows,
+                    receipt.contributor_index,
+                    receipt.contributor_count,
                 )
                 .as_slice(),
             )
-            .saturating_add(token_count(
-                joint_reference_examples_for_step(
-                    train_examples,
-                    global_step,
-                    dual_host.remote_worker_batch_rows,
-                    PsionReferencePilotJointContributionRole::RemoteTailnetWorker,
-                )
-                .as_slice(),
-            ))
         })
         .sum::<u64>();
     let validation_tokens_processed = token_count(validation_examples);
@@ -4160,14 +4407,38 @@ fn build_dual_host_observability_receipt(
             Some(ratios.iter().sum::<f32>() / ratios.len() as f32)
         }
     };
+    let host_backend_map =
+        contribution_receipts
+            .iter()
+            .fold(BTreeMap::<String, String>::new(), |mut map, receipt| {
+                map.entry(receipt.contributor_host.clone())
+                    .or_insert_with(|| receipt.runtime_backend.clone());
+                map
+            });
+    let worker_hosts = host_backend_map.keys().cloned().collect::<Vec<_>>();
+    let remote_contributor_count = worker_hosts.len().saturating_sub(1);
+    let contributor_labels = host_backend_map
+        .iter()
+        .map(|(host, backend)| format!("`{host}` ({backend})"))
+        .collect::<Vec<_>>();
+    let cuda_contributor_count = host_backend_map
+        .values()
+        .filter(|backend| backend.as_str() == "cuda")
+        .count();
+    let cpu_contributor_count = host_backend_map
+        .values()
+        .filter(|backend| backend.as_str() == "cpu")
+        .count();
     let hardware_topology = PsionPretrainHardwareTopologyReceipt::new(
-        2,
+        worker_hosts.len().try_into().unwrap_or(u16::MAX),
         delivered_execution,
         format!(
-            "Distributed reference pilot ran with one local Apple-silicon CPU contributor on `{}` and one remote Tailnet {} contributor on `{}`.",
-            dual_host.control_plane_host,
-            dual_host.remote_worker_backend.runtime_backend(),
-            dual_host.remote_worker_host
+            "Distributed reference pilot ran with contributors on {}.",
+            worker_hosts
+                .iter()
+                .map(|host| format!("`{host}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     )?;
     Ok(record_psion_pretrain_run_observability(
@@ -4176,12 +4447,20 @@ fn build_dual_host_observability_receipt(
         PsionPretrainRunCostReceipt {
             cost_basis: PsionPretrainRunCostBasis::EstimatedUsd,
             currency_code: String::from("USD"),
-            compute_cost_microusd: 9_600,
+            compute_cost_microusd: (cpu_contributor_count as u64)
+                .saturating_mul(2_400)
+                .saturating_add((cuda_contributor_count as u64).saturating_mul(7_200)),
             storage_cost_microusd: 320,
-            network_cost_microusd: 1_280,
-            total_cost_microusd: 11_200,
-            detail: String::from(
-                "Distributed reference pilot cost combines one bounded local CPU contributor, one bounded remote CUDA contributor, and per-step Tailnet request/response exchange.",
+            network_cost_microusd: (remote_contributor_count as u64).saturating_mul(640),
+            total_cost_microusd: (cpu_contributor_count as u64)
+                .saturating_mul(2_400)
+                .saturating_add((cuda_contributor_count as u64).saturating_mul(7_200))
+                .saturating_add(320)
+                .saturating_add((remote_contributor_count as u64).saturating_mul(640)),
+            detail: format!(
+                "Distributed reference pilot cost combines bounded compute from {} plus per-step Tailnet request/response exchange for {} remote contributors.",
+                contributor_labels.join(", "),
+                remote_contributor_count,
             ),
         },
         PsionPretrainRunThroughputReceipt {
@@ -4197,8 +4476,7 @@ fn build_dual_host_observability_receipt(
                     .iter()
                     .map(|receipt| receipt.sample_count)
                     .sum::<u32>(),
-            ))
-                * 1000
+            )) * 1000
                 * 1000)
                 / wall_clock_ms.max(1)) as u32,
             mean_step_latency_ms: config.step_duration_ms,
@@ -4217,8 +4495,9 @@ fn build_dual_host_observability_receipt(
                 .saturating_add(2_560)
                 .saturating_add(contribution_bytes),
             shard_count: 1,
-            detail: String::from(
-                "Distributed reference pilot exported one promoted checkpoint plus retained dual-host contribution receipts and optimizer-state artifacts.",
+            detail: format!(
+                "Distributed reference pilot exported one promoted checkpoint plus retained contribution receipts and optimizer-state artifacts for {} contributors.",
+                worker_hosts.len()
             ),
         },
         hardware_topology,
@@ -4234,9 +4513,12 @@ fn build_dual_host_observability_receipt(
         },
         None,
         format!(
-            "Distributed reference pilot processed dual-host gradient contributions from `{}` and `{}` over {} merged optimizer steps and emitted checkpoint `{}`.",
-            dual_host.control_plane_host,
-            dual_host.remote_worker_host,
+            "Distributed reference pilot processed merged gradient contributions from {} over {} optimizer steps and emitted checkpoint `{}`.",
+            worker_hosts
+                .iter()
+                .map(|host| format!("`{host}`"))
+                .collect::<Vec<_>>()
+                .join(", "),
             config.budget.max_steps,
             checkpoint_artifact.manifest.checkpoint_ref
         ),
@@ -5093,7 +5375,9 @@ mod tests {
             repo_root().as_path(),
             &config,
             &dual_host,
-            |request| build_psion_reference_pilot_joint_contribution(repo_root().as_path(), request),
+            |request| {
+                build_psion_reference_pilot_joint_contribution(repo_root().as_path(), request)
+            },
         )
         .expect("distributed reference pilot should run");
 
@@ -5131,13 +5415,10 @@ mod tests {
             "distributed run should retain both contributors in delivered execution"
         );
         assert!(
-            run.run
-                .step_receipts
+            run.run.step_receipts.iter().any(|receipt| receipt
+                .group_telemetry
                 .iter()
-                .any(|receipt| receipt
-                    .group_telemetry
-                    .iter()
-                    .any(|group| group.update_norm_l2 > 0.0)),
+                .any(|group| group.update_norm_l2 > 0.0)),
             "distributed run should apply at least one non-zero merged update"
         );
         run.run
@@ -5147,8 +5428,81 @@ mod tests {
     }
 
     #[test]
-    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn distributed_reference_pilot_runs_tri_host_cpu_merge_end_to_end() {
+        let config = PsionReferencePilotConfig::distributed_dual_host().expect("config");
+        let dual_host = PsionReferencePilotDualHostConfig::new("macbook-pro-m5", "archlinux")
+            .with_control_plane_tailnet_ip("100.127.107.31")
+            .with_remote_worker_tailnet_ip("100.108.56.85")
+            .with_secondary_remote_worker_host("macbook-pro-m2")
+            .with_secondary_remote_worker_tailnet_ip("100.72.151.98")
+            .with_control_plane_batch_rows(8)
+            .with_remote_worker_batch_rows(8)
+            .with_secondary_remote_worker_batch_rows(8)
+            .with_remote_worker_backend(PsionReferencePilotContributionBackend::Cpu)
+            .with_secondary_remote_worker_backend(PsionReferencePilotContributionBackend::Cpu);
+        let run = run_psion_dual_host_reference_pilot(
+            repo_root().as_path(),
+            &config,
+            &dual_host,
+            |request| {
+                build_psion_reference_pilot_joint_contribution(repo_root().as_path(), request)
+            },
+        )
+        .expect("distributed reference pilot should run");
+
+        assert_eq!(run.run.stage_receipt.stage_id, config.stage_id);
+        assert_eq!(
+            run.contribution_receipts.len(),
+            (config.budget.max_steps as usize) * 3,
+            "tri-host run should retain one contribution per host per step"
+        );
+        assert_eq!(
+            run.topology_receipt.contributor_count, 3,
+            "tri-host topology should record all contributors"
+        );
+        assert_eq!(
+            run.topology_receipt.execution_topology_classification,
+            "multi_host_joint_gradient_average"
+        );
+        assert_eq!(
+            run.topology_receipt.worker_hosts,
+            vec![
+                String::from("macbook-pro-m5"),
+                String::from("archlinux"),
+                String::from("macbook-pro-m2"),
+            ]
+        );
+        assert_eq!(
+            run.run
+                .stage_receipt
+                .delivered_execution
+                .as_ref()
+                .expect("tri-host run should retain delivered execution")
+                .cluster_execution
+                .as_ref()
+                .expect("tri-host run should retain cluster execution")
+                .selected_nodes
+                .len(),
+            3,
+            "tri-host run should retain all selected nodes"
+        );
+        assert!(
+            run.joint_step_receipts.iter().all(|receipt| {
+                receipt.contributor_hosts.len() == 3
+                    && receipt.contributor_runtime_backends.len() == 3
+                    && receipt.contribution_digests.len() == 3
+            }),
+            "each retained step should list all three contributions"
+        );
+        run.run
+            .observability_receipt
+            .validate_against_stage(&run.run.stage_receipt)
+            .expect("tri-host observability receipt should validate");
+    }
+
+    #[test]
+    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts()
+    -> Result<(), Box<dyn std::error::Error>> {
         let config = PsionReferencePilotConfig::reference()?;
         let bundle = run_psion_reference_pilot_evidence_bundle(repo_root().as_path(), &config)?;
         let acceptance_matrix: PsionAcceptanceMatrix = load_json_fixture(

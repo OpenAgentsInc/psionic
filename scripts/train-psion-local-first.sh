@@ -6,15 +6,21 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 
 mode="auto"
 remote_host="archlinux"
+secondary_remote_host=""
 remote_ssh_target=""
+secondary_remote_ssh_target=""
 remote_ssh_user="$(id -un)"
 run_id=""
 output_root=""
 remote_worktree_dir=""
 remote_output_dir=""
+secondary_remote_worktree_dir=""
+secondary_remote_output_dir=""
 remote_seed_repo_dir='$HOME/code/psionic'
 remote_target_dir='$HOME/.cache/psionic-target/psion-local-first'
 remote_tmp_dir='$HOME/.cache/psionic-tmp/psion-local-first'
+secondary_remote_target_dir='$HOME/.cache/psionic-target/psion-local-first'
+secondary_remote_tmp_dir='$HOME/.cache/psionic-tmp/psion-local-first'
 git_ref=""
 sync_local_main="0"
 allow_local_reference_fallback="0"
@@ -22,6 +28,7 @@ dry_run="0"
 cleanup_remote="0"
 local_tailnet_ip=""
 remote_tailnet_ip=""
+secondary_remote_tailnet_ip=""
 control_plane_host=""
 worker_host=""
 worker_tailnet_ip=""
@@ -30,6 +37,8 @@ execution_location=""
 execution_topology_classification=""
 remote_stage_strategy="not_applicable"
 remote_stage_reason=""
+secondary_remote_stage_strategy="not_applicable"
+secondary_remote_stage_reason=""
 max_steps=""
 steps_per_window=""
 windows_per_cadence=""
@@ -52,6 +61,7 @@ Options:
   --mode <auto|accelerated_reference|local_reference|distributed_reference>
                                  Training mode. Default: auto
   --remote-host <host>           Tailnet SSH target for accelerated runs. Default: archlinux
+  --secondary-remote-host <host> Optional second Tailnet SSH target for distributed_reference runs.
   --run-id <id>                  Stable run identifier.
   --output-root <path>           Local reference-pilot run root. Default: ~/scratch/psion_reference_pilot_runs/<run_id>
   --remote-worktree-dir <path>   Remote staged repo root. Default: $HOME/code/psion-reference-pilot/<run_id>/repo
@@ -62,6 +72,8 @@ Options:
                                  In auto mode, fall back to the bounded CPU reference lane if the remote accelerated lane is unavailable.
   --local-tailnet-ip <ip>        Override local Tailnet IPv4 in the operator manifest.
   --remote-tailnet-ip <ip>       Override remote Tailnet IPv4 in the operator manifest.
+  --secondary-remote-tailnet-ip <ip>
+                                 Override second remote Tailnet IPv4 in the operator manifest.
   --max-steps <count>            Override the bounded reference-pilot max step count.
   --steps-per-window <count>     Override the bounded reference-pilot steps per logical window.
   --windows-per-cadence <count>  Override the bounded reference-pilot windows per outer cadence.
@@ -80,6 +92,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --remote-host)
       remote_host="$2"
+      shift 2
+      ;;
+    --secondary-remote-host)
+      secondary_remote_host="$2"
       shift 2
       ;;
     --run-id)
@@ -116,6 +132,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --remote-tailnet-ip)
       remote_tailnet_ip="$2"
+      shift 2
+      ;;
+    --secondary-remote-tailnet-ip)
+      secondary_remote_tailnet_ip="$2"
       shift 2
       ;;
     --max-steps)
@@ -187,6 +207,12 @@ fi
 if [[ -z "${remote_output_dir}" ]]; then
   remote_output_dir="\$HOME/code/psion-reference-pilot/${run_id}/output"
 fi
+if [[ -n "${secondary_remote_host}" && -z "${secondary_remote_worktree_dir}" ]]; then
+  secondary_remote_worktree_dir="\$HOME/code/psion-reference-pilot/${run_id}/repo"
+fi
+if [[ -n "${secondary_remote_host}" && -z "${secondary_remote_output_dir}" ]]; then
+  secondary_remote_output_dir="\$HOME/code/psion-reference-pilot/${run_id}/output"
+fi
 
 if [[ "${sync_local_main}" == "1" ]]; then
   if [[ -n "$(git -C "${repo_root}" status --porcelain)" ]]; then
@@ -232,43 +258,47 @@ resolve_tailnet_ipv4() {
   tailscale_cli status 2>/dev/null | awk -v host="${logical_host}" '$2 == host { print $1; exit }'
 }
 
-resolve_remote_ssh_target() {
-  if [[ "${remote_host}" == *"@"* ]]; then
-    printf '%s\n' "${remote_host}"
+resolve_ssh_target() {
+  local logical_host="$1"
+  if [[ "${logical_host}" == *"@"* ]]; then
+    printf '%s\n' "${logical_host}"
     return 0
   fi
-  if [[ "${remote_host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    printf '%s@%s\n' "${remote_ssh_user}" "${remote_host}"
+  if [[ "${logical_host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '%s@%s\n' "${remote_ssh_user}" "${logical_host}"
     return 0
   fi
   local resolved_ip=""
-  resolved_ip="$(resolve_tailnet_ipv4 "${remote_host}" || true)"
+  resolved_ip="$(resolve_tailnet_ipv4 "${logical_host}" || true)"
   if [[ -n "${resolved_ip}" ]]; then
     printf '%s@%s\n' "${remote_ssh_user}" "${resolved_ip}"
     return 0
   fi
-  printf '%s\n' "${remote_host}"
+  printf '%s\n' "${logical_host}"
 }
 
-detect_remote_tailnet_ip() {
-  if [[ -n "${remote_tailnet_ip}" ]]; then
-    printf '%s\n' "${remote_tailnet_ip}"
+detect_host_tailnet_ip() {
+  local logical_host="$1"
+  local explicit_ip="$2"
+  if [[ -n "${explicit_ip}" ]]; then
+    printf '%s\n' "${explicit_ip}"
     return 0
   fi
-  if [[ "${remote_host}" == *"@"* ]]; then
-    printf '%s\n' "${remote_host##*@}"
+  if [[ "${logical_host}" == *"@"* ]]; then
+    printf '%s\n' "${logical_host##*@}"
     return 0
   fi
-  if [[ "${remote_host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    printf '%s\n' "${remote_host}"
+  if [[ "${logical_host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '%s\n' "${logical_host}"
     return 0
   fi
-  resolve_tailnet_ipv4 "${remote_host}"
+  resolve_tailnet_ipv4 "${logical_host}"
 }
 
 remote_preflight_reason=""
 remote_gpu_name=""
 remote_gpu_busy=""
+secondary_remote_preflight_reason=""
 
 remote_accelerated_preflight() {
   if ! ssh "${ssh_opts[@]}" "${remote_ssh_target}" "bash -ic 'command -v cargo >/dev/null && command -v nvidia-smi >/dev/null'" >/dev/null 2>&1; then
@@ -288,15 +318,25 @@ remote_accelerated_preflight() {
   return 0
 }
 
-detect_remote_stage_strategy() {
-  remote_stage_strategy="archive_tarball"
-  remote_stage_reason="remote_seed_repo_missing_git_ref"
-  if [[ "${selected_mode}" != "accelerated_reference" && "${selected_mode}" != "distributed_reference" ]]; then
-    remote_stage_strategy="not_applicable"
-    remote_stage_reason="local_reference_mode"
+secondary_remote_preflight() {
+  if [[ -z "${secondary_remote_host}" ]]; then
+    secondary_remote_preflight_reason="not_requested"
     return 0
   fi
-  if ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
+  if ! ssh "${ssh_opts[@]}" "${secondary_remote_ssh_target}" "bash -ic 'command -v cargo >/dev/null'" >/dev/null 2>&1; then
+    secondary_remote_preflight_reason="secondary_remote_unreachable_or_missing_cargo"
+    return 1
+  fi
+  return 0
+}
+
+detect_stage_strategy_for_target() {
+  local ssh_target="$1"
+  if [[ "${selected_mode}" != "accelerated_reference" && "${selected_mode}" != "distributed_reference" ]]; then
+    printf 'not_applicable|local_reference_mode\n'
+    return 0
+  fi
+  if ssh "${ssh_opts[@]}" "${ssh_target}" "
     set -euo pipefail
     if [[ ! -d \"${remote_seed_repo_dir}/.git\" ]]; then
       exit 11
@@ -304,18 +344,20 @@ detect_remote_stage_strategy() {
     git -C \"${remote_seed_repo_dir}\" fetch --quiet origin main >/dev/null 2>&1 || true
     git -C \"${remote_seed_repo_dir}\" cat-file -e \"${git_ref}^{commit}\"
   " >/dev/null 2>&1; then
-    remote_stage_strategy="remote_git_worktree"
-    remote_stage_reason="remote_seed_repo_contains_git_ref"
+    printf 'remote_git_worktree|remote_seed_repo_contains_git_ref\n'
     return 0
   fi
-  if ssh "${ssh_opts[@]}" "${remote_ssh_target}" "test -d \"${remote_seed_repo_dir}/.git\"" >/dev/null 2>&1; then
-    remote_stage_reason="remote_seed_repo_missing_git_ref"
+  if ssh "${ssh_opts[@]}" "${ssh_target}" "test -d \"${remote_seed_repo_dir}/.git\"" >/dev/null 2>&1; then
+    printf 'archive_tarball|remote_seed_repo_missing_git_ref\n'
   else
-    remote_stage_reason="remote_seed_repo_missing"
+    printf 'archive_tarball|remote_seed_repo_missing\n'
   fi
 }
 
-remote_ssh_target="$(resolve_remote_ssh_target)"
+remote_ssh_target="$(resolve_ssh_target "${remote_host}")"
+if [[ -n "${secondary_remote_host}" ]]; then
+  secondary_remote_ssh_target="$(resolve_ssh_target "${secondary_remote_host}")"
+fi
 
 selected_mode="${mode}"
 if [[ "${selected_mode}" == "auto" ]]; then
@@ -335,13 +377,22 @@ if [[ "${selected_mode}" == "accelerated_reference" || "${selected_mode}" == "di
     echo "error: accelerated Psion lane unavailable: ${remote_preflight_reason}" >&2
     exit 1
   fi
+  if [[ "${selected_mode}" == "distributed_reference" && -n "${secondary_remote_host}" ]]; then
+    if ! secondary_remote_preflight; then
+      echo "error: secondary distributed contributor unavailable: ${secondary_remote_preflight_reason}" >&2
+      exit 1
+    fi
+  fi
 fi
 
 if [[ -z "${local_tailnet_ip}" ]]; then
   local_tailnet_ip="$(detect_local_tailnet_ip || true)"
 fi
 if [[ "${selected_mode}" == "accelerated_reference" || "${selected_mode}" == "distributed_reference" ]] && [[ -z "${remote_tailnet_ip}" ]]; then
-  remote_tailnet_ip="$(detect_remote_tailnet_ip || true)"
+  remote_tailnet_ip="$(detect_host_tailnet_ip "${remote_host}" "${remote_tailnet_ip}" || true)"
+fi
+if [[ "${selected_mode}" == "distributed_reference" && -n "${secondary_remote_host}" && -z "${secondary_remote_tailnet_ip}" ]]; then
+  secondary_remote_tailnet_ip="$(detect_host_tailnet_ip "${secondary_remote_host}" "${secondary_remote_tailnet_ip}" || true)"
 fi
 
 control_plane_host="$(detect_local_hostname || true)"
@@ -358,9 +409,14 @@ if [[ "${selected_mode}" == "accelerated_reference" ]]; then
 elif [[ "${selected_mode}" == "distributed_reference" ]]; then
   worker_host="${remote_host}"
   worker_tailnet_ip="${remote_tailnet_ip}"
-  worker_count="2"
+  if [[ -n "${secondary_remote_host}" ]]; then
+    worker_count="3"
+    execution_topology_classification="multi_host_joint_gradient_average"
+  else
+    worker_count="2"
+    execution_topology_classification="dual_host_joint_gradient_average"
+  fi
   execution_location="hybrid_cluster"
-  execution_topology_classification="dual_host_joint_gradient_average"
 else
   worker_host="${control_plane_host}"
   worker_tailnet_ip="${local_tailnet_ip}"
@@ -369,7 +425,10 @@ else
   execution_topology_classification="single_local_control_plane_worker"
 fi
 
-detect_remote_stage_strategy
+IFS='|' read -r remote_stage_strategy remote_stage_reason < <(detect_stage_strategy_for_target "${remote_ssh_target}")
+if [[ -n "${secondary_remote_host}" ]]; then
+  IFS='|' read -r secondary_remote_stage_strategy secondary_remote_stage_reason < <(detect_stage_strategy_for_target "${secondary_remote_ssh_target}")
+fi
 
 operator_manifest_path="${output_root}/reference_pilot_operator_manifest.json"
 summary_path="${output_root}/reference_pilot_operator_summary.json"
@@ -379,11 +438,12 @@ local_artifact_dir="${output_root}/reference_pilot_artifacts"
 python3 - <<'PY' \
   "${operator_manifest_path}" "${run_id}" "${selected_mode}" "${git_ref}" \
   "${remote_host}" "${output_root}" "${remote_worktree_dir}" "${remote_output_dir}" \
+  "${secondary_remote_host}" "${secondary_remote_worktree_dir}" "${secondary_remote_output_dir}" \
   "${local_tailnet_ip}" "${remote_tailnet_ip}" "${local_dirty}" "${local_status_branch}" \
-  "${remote_gpu_name}" "${remote_preflight_reason}" "${control_plane_host}" \
+  "${secondary_remote_tailnet_ip}" "${remote_gpu_name}" "${remote_preflight_reason}" "${secondary_remote_preflight_reason}" "${control_plane_host}" \
   "${worker_host}" "${worker_tailnet_ip}" "${worker_count}" \
   "${execution_location}" "${execution_topology_classification}" \
-  "${remote_stage_strategy}" "${remote_stage_reason}" \
+  "${remote_stage_strategy}" "${remote_stage_reason}" "${secondary_remote_stage_strategy}" "${secondary_remote_stage_reason}" \
   "${max_steps}" "${steps_per_window}" "${windows_per_cadence}" "${step_duration_ms}"
 import json
 import sys
@@ -398,12 +458,17 @@ from datetime import datetime
     output_root,
     remote_worktree_dir,
     remote_output_dir,
+    secondary_remote_host,
+    secondary_remote_worktree_dir,
+    secondary_remote_output_dir,
     local_tailnet_ip,
     remote_tailnet_ip,
+    secondary_remote_tailnet_ip,
     local_dirty,
     local_status_branch,
     remote_gpu_name,
     remote_preflight_reason,
+    secondary_remote_preflight_reason,
     control_plane_host,
     worker_host,
     worker_tailnet_ip,
@@ -412,6 +477,8 @@ from datetime import datetime
     execution_topology_classification,
     remote_stage_strategy,
     remote_stage_reason,
+    secondary_remote_stage_strategy,
+    secondary_remote_stage_reason,
     max_steps,
     steps_per_window,
     windows_per_cadence,
@@ -435,28 +502,35 @@ doc = {
     "worker_host": worker_host or None,
     "worker_tailnet_ip": worker_tailnet_ip or None,
     "worker_count": int(worker_count),
-    "worker_hosts": (
-        [value for value in [control_plane_host or None, worker_host or None] if value is not None]
-        if execution_topology_classification == "dual_host_joint_gradient_average"
-        else [value for value in [worker_host or None] if value is not None]
-    ),
+    "worker_hosts": [
+        value
+        for value in [control_plane_host or None, remote_host or None, secondary_remote_host or None]
+        if value is not None and value != ""
+    ],
     "execution_location": execution_location,
     "execution_topology_classification": execution_topology_classification,
     "remote_host": remote_host,
     "remote_tailnet_ip": remote_tailnet_ip or None,
+    "secondary_remote_host": secondary_remote_host or None,
+    "secondary_remote_tailnet_ip": secondary_remote_tailnet_ip or None,
     "remote_gpu_name": remote_gpu_name or None,
     "remote_preflight_reason": remote_preflight_reason or None,
+    "secondary_remote_preflight_reason": secondary_remote_preflight_reason or None,
     "remote_stage_strategy": remote_stage_strategy,
     "remote_stage_reason": remote_stage_reason or None,
     "remote_worktree_dir": remote_worktree_dir,
     "remote_output_dir": remote_output_dir,
+    "secondary_remote_stage_strategy": secondary_remote_stage_strategy or None,
+    "secondary_remote_stage_reason": secondary_remote_stage_reason or None,
+    "secondary_remote_worktree_dir": secondary_remote_worktree_dir or None,
+    "secondary_remote_output_dir": secondary_remote_output_dir or None,
     "requested_budget_override": {
         "max_steps": int(max_steps) if max_steps else None,
         "steps_per_window": int(steps_per_window) if steps_per_window else None,
         "windows_per_cadence": int(windows_per_cadence) if windows_per_cadence else None,
         "step_duration_ms": int(step_duration_ms) if step_duration_ms else None,
     },
-    "claim_boundary": "This manifest records one bounded Psion reference-pilot operator run. It does not claim the actual broader-pretraining lane. The accelerator-backed mode targets the admitted accelerated reference pilot on the Tailnet CUDA host. The distributed_reference mode targets the bounded dual-host reference lane where the local Apple-silicon host and the admitted Tailnet CUDA host both contribute optimizer-bearing work. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
+    "claim_boundary": "This manifest records one bounded Psion reference-pilot operator run. It does not claim the actual broader-pretraining lane. The accelerator-backed mode targets the admitted accelerated reference pilot on the Tailnet CUDA host. The distributed_reference mode targets the bounded multi-host reference lane where the local Apple-silicon host and one or more admitted Tailnet workers contribute optimizer-bearing work. The bounded fallback mode targets the CPU reference pilot only when explicitly allowed.",
 }
 
 with open(path, "w", encoding="utf-8") as handle:
@@ -485,7 +559,12 @@ if [[ "${dry_run}" == "1" ]]; then
     echo "remote_gpu_name=${remote_gpu_name}"
     echo "remote_stage_strategy=${remote_stage_strategy}"
     if [[ "${selected_mode}" == "distributed_reference" ]]; then
-      echo "distributed_topology=dual_host_joint_gradient_average"
+      echo "distributed_topology=${execution_topology_classification}"
+      if [[ -n "${secondary_remote_host}" ]]; then
+        echo "secondary_remote_host=${secondary_remote_host}"
+        echo "secondary_remote_tailnet_ip=${secondary_remote_tailnet_ip}"
+        echo "secondary_remote_stage_strategy=${secondary_remote_stage_strategy}"
+      fi
     fi
   fi
   exit 0
@@ -545,13 +624,18 @@ for key in [
     "worker_host",
     "worker_tailnet_ip",
     "worker_count",
+    "worker_hosts",
     "execution_location",
     "execution_topology_classification",
     "remote_host",
     "remote_tailnet_ip",
+    "secondary_remote_host",
+    "secondary_remote_tailnet_ip",
     "remote_gpu_name",
     "remote_stage_strategy",
     "remote_stage_reason",
+    "secondary_remote_stage_strategy",
+    "secondary_remote_stage_reason",
 ]:
     if key in manifest:
         summary[key] = manifest[key]
@@ -595,14 +679,18 @@ elif mode == "distributed_reference" and status == "completed":
     stage_path = os.path.join(artifact_dir, "psion_reference_pilot_stage_receipt.json")
     observability_path = os.path.join(artifact_dir, "psion_reference_pilot_observability_receipt.json")
     checkpoint_path = os.path.join(artifact_dir, "psion_reference_pilot_checkpoint_manifest.json")
-    topology_path = os.path.join(artifact_dir, "psion_reference_pilot_dual_host_topology_receipt.json")
-    step_path = os.path.join(artifact_dir, "psion_reference_pilot_dual_host_step_receipts.json")
+    cluster_topology_path = os.path.join(artifact_dir, "psion_reference_pilot_cluster_topology_receipt.json")
+    cluster_step_path = os.path.join(artifact_dir, "psion_reference_pilot_cluster_step_receipts.json")
+    topology_path = cluster_topology_path if os.path.exists(cluster_topology_path) else os.path.join(artifact_dir, "psion_reference_pilot_dual_host_topology_receipt.json")
+    step_path = cluster_step_path if os.path.exists(cluster_step_path) else os.path.join(artifact_dir, "psion_reference_pilot_dual_host_step_receipts.json")
+    topology_key = "cluster_topology_receipt_path" if os.path.exists(cluster_topology_path) else "dual_host_topology_receipt_path"
+    step_key = "cluster_step_receipts_path" if os.path.exists(cluster_step_path) else "dual_host_step_receipts_path"
     for key, path in [
         ("stage_receipt_path", stage_path),
         ("observability_receipt_path", observability_path),
         ("checkpoint_manifest_path", checkpoint_path),
-        ("dual_host_topology_receipt_path", topology_path),
-        ("dual_host_step_receipts_path", step_path),
+        (topology_key, topology_path),
+        (step_key, step_path),
     ]:
         summary[key] = os.path.abspath(path)
         if os.path.exists(path):
@@ -635,6 +723,10 @@ elif mode == "distributed_reference" and status == "completed":
         summary["local_runtime_backend"] = topology.get("local_runtime_backend")
         summary["remote_runtime_backend"] = topology.get("remote_runtime_backend")
         summary["remote_worker_host"] = topology.get("remote_worker_host")
+        summary["secondary_remote_worker_host"] = topology.get("secondary_remote_worker_host")
+        summary["worker_hosts"] = topology.get("worker_hosts")
+        summary["runtime_backends"] = topology.get("runtime_backends")
+        summary["contributor_count"] = topology.get("contributor_count")
 elif mode == "local_reference" and status == "completed":
     stage_path = os.path.join(artifact_dir, "psion_reference_pilot_stage_receipt.json")
     observability_path = os.path.join(artifact_dir, "psion_reference_pilot_observability_receipt.json")
@@ -703,43 +795,78 @@ if [[ -n "${step_duration_ms}" ]]; then
 fi
 
 stage_remote_repo() {
-  if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
-    log_note "staging_strategy=remote_git_worktree git_ref=${git_ref} remote_seed_repo_dir=${remote_seed_repo_dir}"
-    ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
+  local ssh_target="$1"
+  local stage_strategy="$2"
+  local worktree_dir="$3"
+  local output_dir="$4"
+  if [[ "${stage_strategy}" == "remote_git_worktree" ]]; then
+    log_note "staging_strategy=remote_git_worktree ssh_target=${ssh_target} git_ref=${git_ref} remote_seed_repo_dir=${remote_seed_repo_dir}"
+    ssh "${ssh_opts[@]}" "${ssh_target}" "
       set -euo pipefail
-      rm -rf \"${remote_output_dir}\"
-      mkdir -p \"\$(dirname \"${remote_worktree_dir}\")\" \"${remote_output_dir}\"
+      rm -rf \"${output_dir}\"
+      mkdir -p \"\$(dirname \"${worktree_dir}\")\" \"${output_dir}\"
       git -C \"${remote_seed_repo_dir}\" fetch --quiet origin main >/dev/null 2>&1 || true
-      if git -C \"${remote_seed_repo_dir}\" worktree list --porcelain | grep -Fqx \"worktree ${remote_worktree_dir}\"; then
-        git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${remote_worktree_dir}\"
+      if git -C \"${remote_seed_repo_dir}\" worktree list --porcelain | grep -Fqx \"worktree ${worktree_dir}\"; then
+        git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${worktree_dir}\"
       else
-        rm -rf \"${remote_worktree_dir}\"
+        rm -rf \"${worktree_dir}\"
       fi
-      git -C \"${remote_seed_repo_dir}\" worktree add --detach --force \"${remote_worktree_dir}\" \"${git_ref}\"
+      git -C \"${remote_seed_repo_dir}\" worktree add --detach --force \"${worktree_dir}\" \"${git_ref}\"
     " >>"${local_log_path}" 2>&1
     return 0
   fi
 
   local local_stage_archive remote_stage_archive
   local_stage_archive="$(mktemp "${output_root}/stage-${run_id}.XXXXXX.tar")"
-  remote_stage_archive="${remote_worktree_dir}.tar"
-  log_note "staging_strategy=archive_tarball git_ref=${git_ref} local_stage_archive=${local_stage_archive}"
+  remote_stage_archive="${worktree_dir}.tar"
+  log_note "staging_strategy=archive_tarball ssh_target=${ssh_target} git_ref=${git_ref} local_stage_archive=${local_stage_archive}"
   git -C "${repo_root}" archive --format=tar -o "${local_stage_archive}" "${git_ref}" \
     >>"${local_log_path}" 2>&1
-  ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
+  ssh "${ssh_opts[@]}" "${ssh_target}" "
     set -euo pipefail
-    mkdir -p \"\$(dirname \"${remote_worktree_dir}\")\"
+    mkdir -p \"\$(dirname \"${worktree_dir}\")\"
   " >>"${local_log_path}" 2>&1
-  scp "${scp_opts[@]}" "${local_stage_archive}" "${remote_ssh_target}:${remote_stage_archive}" \
+  scp "${scp_opts[@]}" "${local_stage_archive}" "${ssh_target}:${remote_stage_archive}" \
     >>"${local_log_path}" 2>&1
-  ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
+  ssh "${ssh_opts[@]}" "${ssh_target}" "
     set -euo pipefail
-    rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
-    mkdir -p \"${remote_worktree_dir}\" \"${remote_output_dir}\"
-    tar -xf \"${remote_stage_archive}\" -C \"${remote_worktree_dir}\"
+    rm -rf \"${worktree_dir}\" \"${output_dir}\"
+    mkdir -p \"${worktree_dir}\" \"${output_dir}\"
+    tar -xf \"${remote_stage_archive}\" -C \"${worktree_dir}\"
     rm -f \"${remote_stage_archive}\"
   " >>"${local_log_path}" 2>&1
   rm -f "${local_stage_archive}"
+}
+
+cleanup_remote_target() {
+  local ssh_target="$1"
+  local stage_strategy="$2"
+  local worktree_dir="$3"
+  local output_dir="$4"
+  if [[ "${stage_strategy}" == "remote_git_worktree" ]]; then
+    ssh "${ssh_opts[@]}" "${ssh_target}" "
+      set -euo pipefail
+      git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${worktree_dir}\"
+      rm -rf \"${output_dir}\"
+      worktree_parent=\"\$(dirname \"${worktree_dir}\")\"
+      output_parent=\"\$(dirname \"${output_dir}\")\"
+      rmdir \"\${worktree_parent}\" 2>/dev/null || true
+      if [[ \"\${output_parent}\" != \"\${worktree_parent}\" ]]; then
+        rmdir \"\${output_parent}\" 2>/dev/null || true
+      fi
+    " >>"${local_log_path}" 2>&1
+  else
+    ssh "${ssh_opts[@]}" "${ssh_target}" "
+      set -euo pipefail
+      rm -rf \"${worktree_dir}\" \"${output_dir}\"
+      worktree_parent=\"\$(dirname \"${worktree_dir}\")\"
+      output_parent=\"\$(dirname \"${output_dir}\")\"
+      rmdir \"\${worktree_parent}\" 2>/dev/null || true
+      if [[ \"\${output_parent}\" != \"\${worktree_parent}\" ]]; then
+        rmdir \"\${output_parent}\" 2>/dev/null || true
+      fi
+    " >>"${local_log_path}" 2>&1
+  fi
 }
 
 on_exit() {
@@ -767,7 +894,10 @@ if [[ "${selected_mode}" == "local_reference" ]]; then
 fi
 
 log_note "launching ${selected_mode} control_plane_host=${control_plane_host} worker_host=${worker_host} worker_count=${worker_count}"
-stage_remote_repo
+stage_remote_repo "${remote_ssh_target}" "${remote_stage_strategy}" "${remote_worktree_dir}" "${remote_output_dir}"
+if [[ "${selected_mode}" == "distributed_reference" && -n "${secondary_remote_host}" ]]; then
+  stage_remote_repo "${secondary_remote_ssh_target}" "${secondary_remote_stage_strategy}" "${secondary_remote_worktree_dir}" "${secondary_remote_output_dir}"
+fi
 
 remote_reference_pilot_exports=""
 if [[ -n "${max_steps}" ]]; then
@@ -797,7 +927,7 @@ if [[ "${selected_mode}" == "accelerated_reference" ]]; then
 else
   rm -rf "${local_artifact_dir}"
   mkdir -p "${local_artifact_dir}"
-  log_note "launching distributed_reference control_plane_host=${control_plane_host} remote_worker_host=${remote_host}"
+  log_note "launching distributed_reference control_plane_host=${control_plane_host} remote_worker_host=${remote_host} secondary_remote_worker_host=${secondary_remote_host:-none}"
   run_with_reference_pilot_env \
     "PSION_REFERENCE_PILOT_REMOTE_SSH_TARGET=${remote_ssh_target}" \
     "PSION_REFERENCE_PILOT_REMOTE_WORKTREE_DIR=${remote_worktree_dir}" \
@@ -809,35 +939,24 @@ else
     "PSION_REFERENCE_PILOT_REMOTE_HOST=${remote_host}" \
     "PSION_REFERENCE_PILOT_REMOTE_TAILNET_IP=${remote_tailnet_ip}" \
     "PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND=cuda" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_HOST=${secondary_remote_host}" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_TAILNET_IP=${secondary_remote_tailnet_ip}" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_SSH_TARGET=${secondary_remote_ssh_target}" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_WORKTREE_DIR=${secondary_remote_worktree_dir}" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_OUTPUT_DIR=${secondary_remote_output_dir}" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_TARGET_DIR=${secondary_remote_target_dir}" \
+    "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_TMP_DIR=${secondary_remote_tmp_dir}" \
+    "PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND=cpu" \
     cargo run -q -p psionic-train --example psion_distributed_reference_pilot -- "${local_artifact_dir}" \
     >>"${local_log_path}" 2>&1
 fi
 
 if [[ "${cleanup_remote}" == "1" ]]; then
   log_note "cleanup_remote=1 remote_stage_strategy=${remote_stage_strategy}"
-  if [[ "${remote_stage_strategy}" == "remote_git_worktree" ]]; then
-    ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
-      set -euo pipefail
-      git -C \"${remote_seed_repo_dir}\" worktree remove --force \"${remote_worktree_dir}\"
-      rm -rf \"${remote_output_dir}\"
-      worktree_parent=\"\$(dirname \"${remote_worktree_dir}\")\"
-      output_parent=\"\$(dirname \"${remote_output_dir}\")\"
-      rmdir \"\${worktree_parent}\" 2>/dev/null || true
-      if [[ \"\${output_parent}\" != \"\${worktree_parent}\" ]]; then
-        rmdir \"\${output_parent}\" 2>/dev/null || true
-      fi
-    " >>"${local_log_path}" 2>&1
-  else
-    ssh "${ssh_opts[@]}" "${remote_ssh_target}" "
-      set -euo pipefail
-      rm -rf \"${remote_worktree_dir}\" \"${remote_output_dir}\"
-      worktree_parent=\"\$(dirname \"${remote_worktree_dir}\")\"
-      output_parent=\"\$(dirname \"${remote_output_dir}\")\"
-      rmdir \"\${worktree_parent}\" 2>/dev/null || true
-      if [[ \"\${output_parent}\" != \"\${worktree_parent}\" ]]; then
-        rmdir \"\${output_parent}\" 2>/dev/null || true
-      fi
-    " >>"${local_log_path}" 2>&1
+  cleanup_remote_target "${remote_ssh_target}" "${remote_stage_strategy}" "${remote_worktree_dir}" "${remote_output_dir}"
+  if [[ "${selected_mode}" == "distributed_reference" && -n "${secondary_remote_host}" ]]; then
+    log_note "cleanup_secondary_remote=1 secondary_remote_stage_strategy=${secondary_remote_stage_strategy}"
+    cleanup_remote_target "${secondary_remote_ssh_target}" "${secondary_remote_stage_strategy}" "${secondary_remote_worktree_dir}" "${secondary_remote_output_dir}"
   fi
 fi
 
