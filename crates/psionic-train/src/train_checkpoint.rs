@@ -1,16 +1,16 @@
 use std::{fs, path::Path};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PSIONIC_TRAIN_GROUPED_STAGE_RECOVERY_RECEIPT_RELATIVE_PATH,
-    PsionActualPretrainingAutoResumeReceipt, PsionActualPretrainingCheckpointBackupReceipt,
-    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
-    PsionActualPretrainingCurrentRunStatus, PsionicTrainCheckpointHandoffReceipt,
-    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageRecoveryReceipt,
-    PsionicTrainOperation, PsionicTrainRole, load_psionic_train_grouped_stage_recovery_receipt,
+    load_psionic_train_grouped_stage_recovery_receipt, PsionActualPretrainingAutoResumeReceipt,
+    PsionActualPretrainingCheckpointBackupReceipt, PsionActualPretrainingCheckpointManifest,
+    PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCurrentRunStatus,
+    PsionicTrainCheckpointHandoffReceipt, PsionicTrainGroupedReplicaStageAssignment,
+    PsionicTrainGroupedReplicaStageRecoveryReceipt, PsionicTrainOperation, PsionicTrainRole,
+    PSIONIC_TRAIN_GROUPED_STAGE_RECOVERY_RECEIPT_RELATIVE_PATH, PSION_ACTUAL_PRETRAINING_LANE_ID,
 };
 
 /// Stable schema version for the retained machine-readable checkpoint surface.
@@ -699,8 +699,16 @@ fn load_generic_checkpoint_surface(
                 })?
                 || receipt.checkpoint_manifest_digest != checkpoint_manifest.manifest_digest
                 || receipt.checkpoint_object_digest != checkpoint_manifest.checkpoint_object_digest
-                || receipt.checkpoint_pointer_path != checkpoint_pointer_path.display().to_string()
-                || receipt.checkpoint_manifest_path != checkpoint_manifest_path.display().to_string()
+                || receipt
+                    .checkpoint_pointer
+                    .materialized_path
+                    .as_deref()
+                    .is_some_and(|value| value != checkpoint_pointer_path.display().to_string())
+                || receipt
+                    .checkpoint_manifest
+                    .materialized_path
+                    .as_deref()
+                    .is_some_and(|value| value != checkpoint_manifest_path.display().to_string())
             {
                 return Err(PsionicTrainCheckpointSurfaceError::Invalid {
                     path: grouped_stage_recovery_receipt_path.display().to_string(),

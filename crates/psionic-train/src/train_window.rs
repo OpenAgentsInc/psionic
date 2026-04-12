@@ -8,14 +8,14 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    persist_psionic_train_grouped_stage_execution_summary,
+    persist_psionic_train_grouped_stage_output_transport, PsionicTrainArtifactBinding,
     PsionicTrainAuthorityOwner, PsionicTrainCapabilityProjection,
     PsionicTrainGroupedReplicaStageAssignment,
     PsionicTrainGroupedReplicaStageExecutionSummaryArtifacts,
     PsionicTrainGroupedReplicaStageTransportArtifacts, PsionicTrainInvocationManifest,
     PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
     PsionicTrainRuntimeAttestation, PsionicTrainWorkClass,
-    persist_psionic_train_grouped_stage_execution_summary,
-    persist_psionic_train_grouped_stage_output_transport,
 };
 
 pub const PSIONIC_TRAIN_WINDOW_EXECUTION_SCHEMA_VERSION: &str = "psionic.train.window_execution.v1";
@@ -88,9 +88,7 @@ pub struct PsionicTrainWindowExecution {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainContributionArtifact {
     pub artifact_kind: String,
-    pub artifact_path: String,
-    pub artifact_sha256: String,
-    pub artifact_bytes: u64,
+    pub binding: PsionicTrainArtifactBinding,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,7 +126,7 @@ pub struct PsionicTrainContributionReceipt {
     pub retryable: bool,
     pub authority_owner: PsionicTrainAuthorityOwner,
     pub refusal_class: Option<PsionicTrainRefusalClass>,
-    pub artifact_manifest_path: String,
+    pub artifact_manifest: PsionicTrainArtifactBinding,
     pub artifact_manifest_digest: String,
     pub artifact_count: usize,
     pub contribution_digest: String,
@@ -183,6 +181,9 @@ impl PsionicTrainContributionArtifactManifest {
     pub fn stable_artifact_manifest_digest(&self) -> String {
         let mut digest_basis = self.clone();
         digest_basis.artifact_manifest_digest.clear();
+        for artifact in &mut digest_basis.artifacts {
+            artifact.binding = artifact.binding.canonicalize_for_digest();
+        }
         stable_digest(
             b"psionic_train_contribution_artifact_manifest|",
             &digest_basis,
@@ -195,6 +196,7 @@ impl PsionicTrainContributionReceipt {
     pub fn stable_contribution_digest(&self) -> String {
         let mut digest_basis = self.clone();
         digest_basis.contribution_digest.clear();
+        digest_basis.artifact_manifest = digest_basis.artifact_manifest.canonicalize_for_digest();
         stable_digest(b"psionic_train_contribution_receipt|", &digest_basis)
     }
 }
@@ -357,10 +359,8 @@ pub fn persist_psionic_train_window_artifacts(
         artifact_manifest_digest: String::new(),
     };
     artifact_manifest.artifact_count = artifact_manifest.artifacts.len();
-    artifact_manifest.artifact_manifest_digest = stable_digest(
-        b"psionic_train_contribution_artifact_manifest|",
-        &artifact_manifest,
-    );
+    artifact_manifest.artifact_manifest_digest =
+        artifact_manifest.stable_artifact_manifest_digest();
     let contribution_artifact_manifest_path = contribution_root.join("artifact_manifest.json");
     write_json(
         contribution_artifact_manifest_path.as_path(),
@@ -385,16 +385,20 @@ pub fn persist_psionic_train_window_artifacts(
         retryable,
         authority_owner,
         refusal_class,
-        artifact_manifest_path: contribution_artifact_manifest_path.display().to_string(),
+        artifact_manifest: crate::build_psionic_train_artifact_binding_from_path(
+            "contribution_artifact_manifest",
+            contribution_artifact_manifest_path.as_path(),
+        )
+        .map_err(|detail| PsionicTrainWindowArtifactError::Read {
+            path: contribution_artifact_manifest_path.display().to_string(),
+            detail,
+        })?,
         artifact_manifest_digest: artifact_manifest.artifact_manifest_digest.clone(),
         artifact_count: artifact_manifest.artifact_count,
         contribution_digest: String::new(),
         detail: detail.to_string(),
     };
-    contribution_receipt.contribution_digest = stable_digest(
-        b"psionic_train_contribution_receipt|",
-        &contribution_receipt,
-    );
+    contribution_receipt.contribution_digest = contribution_receipt.stable_contribution_digest();
     let contribution_receipt_path = contribution_root.join("contribution_receipt.json");
     write_json(contribution_receipt_path.as_path(), &contribution_receipt)?;
 
@@ -572,9 +576,17 @@ fn collect_artifacts(
             })?;
         artifacts.push(PsionicTrainContributionArtifact {
             artifact_kind: String::from(kind),
-            artifact_path: path.display().to_string(),
-            artifact_sha256: sha256_hex(bytes.as_slice()),
-            artifact_bytes,
+            binding: PsionicTrainArtifactBinding {
+                artifact_ref: crate::PsionicTrainArtifactRef {
+                    artifact_id: crate::psionic_train_local_artifact_id(
+                        kind,
+                        sha256_hex(bytes.as_slice()).as_str(),
+                    ),
+                    artifact_digest: Some(sha256_hex(bytes.as_slice())),
+                    artifact_bytes: Some(artifact_bytes),
+                },
+                materialized_path: Some(path.display().to_string()),
+            },
         });
     }
     artifacts.sort_by(|left, right| left.artifact_kind.cmp(&right.artifact_kind));
@@ -696,22 +708,24 @@ mod tests {
     };
 
     use super::{
-        PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
-        PsionicTrainSealedWindowBundle, PsionicTrainWindowArtifactInputRefs,
-        PsionicTrainWindowExecution, persist_psionic_train_window_artifacts,
+        persist_psionic_train_window_artifacts, PsionicTrainContributionArtifactManifest,
+        PsionicTrainContributionReceipt, PsionicTrainSealedWindowBundle,
+        PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowExecution,
     };
     use crate::{
+        PsionicTrainAdmissionIdentity, PsionicTrainAuthorityOwner,
+        PsionicTrainCapabilityProjection, PsionicTrainContributionArtifact,
+        PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaStageAssignment,
+        PsionicTrainGroupedReplicaStageExecutionSummary, PsionicTrainGroupedReplicaStageRole,
+        PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainOutcomeKind,
+        PsionicTrainRole, PsionicTrainRuntimeAttestation, PsionicTrainWorkClass,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
+        PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
         PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-        PsionicTrainAdmissionIdentity, PsionicTrainAuthorityOwner,
-        PsionicTrainCapabilityProjection, PsionicTrainCoordinationContext,
-        PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageExecutionSummary,
-        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
-        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
-        PsionicTrainWorkClass,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -725,6 +739,17 @@ mod tests {
         }
         fs::create_dir_all(&path).expect("temp dir should create");
         path
+    }
+
+    fn artifact_binding(path: &str) -> crate::PsionicTrainArtifactBinding {
+        crate::PsionicTrainArtifactBinding {
+            artifact_ref: crate::PsionicTrainArtifactRef {
+                artifact_id: format!("artifact://{}", path.replace('/', "_")),
+                artifact_digest: Some(format!("sha256:test:{path}")),
+                artifact_bytes: Some(path.len() as u64),
+            },
+            materialized_path: Some(String::from(path)),
+        }
     }
 
     fn base_manifest() -> PsionicTrainInvocationManifest {
@@ -753,11 +778,11 @@ mod tests {
             output_root: Some(String::from("/tmp/run-window-test")),
             run_root: None,
             peer_node_pubkey: None,
-            peer_checkpoint_handoff_receipt_path: None,
-            validator_target_contribution_receipt_path: None,
-            validator_target_contribution_artifact_manifest_path: None,
+            peer_checkpoint_handoff_receipt: None,
+            validator_target_contribution_receipt: None,
+            validator_target_contribution_artifact_manifest: None,
             validator_target_work_class: None,
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -910,24 +935,18 @@ mod tests {
                 .expect("artifact manifest should read"),
         )
         .expect("artifact manifest should parse");
-        assert!(
-            artifact_manifest
-                .artifacts
-                .iter()
-                .any(|artifact| artifact.artifact_kind == "grouped_stage_output_transport")
-        );
-        assert!(
-            artifact_manifest
-                .artifacts
-                .iter()
-                .any(|artifact| artifact.artifact_kind == "grouped_stage_output_payload")
-        );
-        assert!(
-            artifact_manifest
-                .artifacts
-                .iter()
-                .any(|artifact| artifact.artifact_kind == "grouped_stage_execution_summary")
-        );
+        assert!(artifact_manifest
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_kind == "grouped_stage_output_transport"));
+        assert!(artifact_manifest
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_kind == "grouped_stage_output_payload"));
+        assert!(artifact_manifest
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_kind == "grouped_stage_execution_summary"));
         let expected_transport_path = run_root
             .join("windows")
             .join("window-0001")
@@ -1035,15 +1054,18 @@ mod tests {
         manifest_b
             .populate_manifest_digest()
             .expect("manifest digest should populate");
-        manifest_b.grouped_stage_input_transport_path =
-            outputs_a.grouped_stage_output_transport_path.clone();
+        manifest_b.grouped_stage_input_transport = outputs_a
+            .grouped_stage_output_transport_path
+            .as_deref()
+            .map(artifact_binding);
         let inputs_b = PsionicTrainWindowArtifactInputRefs {
             invocation_manifest_path: write_invocation_manifest(&run_root, &manifest_b),
             launch_manifest_path: None,
             membership_revision_path: None,
             grouped_stage_input_transport_path: manifest_b
-                .grouped_stage_input_transport_path
-                .clone(),
+                .grouped_stage_input_transport
+                .as_ref()
+                .and_then(|value| value.materialized_path.clone()),
             checkpoint_surface_path: None,
             checkpoint_pointer_path: None,
             checkpoint_manifest_path: None,
@@ -1075,6 +1097,87 @@ mod tests {
         assert_ne!(
             outputs_a.contribution_receipt_path, outputs_b.contribution_receipt_path,
             "grouped stage assignment must affect contribution identity"
+        );
+    }
+
+    #[test]
+    fn contribution_receipt_and_manifest_digests_ignore_materialized_paths() {
+        let artifact_binding = crate::PsionicTrainArtifactBinding {
+            artifact_ref: crate::PsionicTrainArtifactRef {
+                artifact_id: String::from("artifact://checkpoint-surface"),
+                artifact_digest: Some(String::from("sha256:checkpoint-surface")),
+                artifact_bytes: Some(128),
+            },
+            materialized_path: Some(String::from("/tmp/source/checkpoint_surface.json")),
+        };
+        let mut artifact_manifest = PsionicTrainContributionArtifactManifest {
+            schema_version: String::from(
+                PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+            ),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            run_id: String::from("run-window-test"),
+            window_id: String::from("window-0001"),
+            assignment_id: String::from("assignment-0001"),
+            contribution_id: String::from("contribution-0001"),
+            node_pubkey: String::from("npub1-window-test"),
+            grouped_stage_assignment: None,
+            artifact_count: 1,
+            artifacts: vec![PsionicTrainContributionArtifact {
+                artifact_kind: String::from("checkpoint_surface"),
+                binding: artifact_binding.clone(),
+            }],
+            artifact_manifest_digest: String::new(),
+        };
+        artifact_manifest.artifact_manifest_digest =
+            artifact_manifest.stable_artifact_manifest_digest();
+        let mut relocated_manifest = artifact_manifest.clone();
+        relocated_manifest.artifacts[0].binding.materialized_path =
+            Some(String::from("/var/tmp/relocated/checkpoint_surface.json"));
+        assert_eq!(
+            artifact_manifest.stable_artifact_manifest_digest(),
+            relocated_manifest.stable_artifact_manifest_digest()
+        );
+
+        let mut contribution_receipt = PsionicTrainContributionReceipt {
+            schema_version: String::from(PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            run_id: String::from("run-window-test"),
+            window_id: String::from("window-0001"),
+            window_execution_id: String::from("window-execution-1"),
+            assignment_id: String::from("assignment-0001"),
+            contribution_id: String::from("contribution-0001"),
+            node_pubkey: String::from("npub1-window-test"),
+            grouped_stage_assignment: None,
+            role: PsionicTrainRole::Worker,
+            operation: String::from("start"),
+            outcome: PsionicTrainOutcomeKind::Succeeded,
+            exit_code: 0,
+            retryable: false,
+            authority_owner: PsionicTrainAuthorityOwner::Pylon,
+            refusal_class: None,
+            artifact_manifest: crate::PsionicTrainArtifactBinding {
+                artifact_ref: crate::PsionicTrainArtifactRef {
+                    artifact_id: String::from("artifact://contribution-artifact-manifest"),
+                    artifact_digest: Some(String::from("sha256:artifact-manifest")),
+                    artifact_bytes: Some(256),
+                },
+                materialized_path: Some(String::from("/tmp/source/artifact_manifest.json")),
+            },
+            artifact_manifest_digest: artifact_manifest.artifact_manifest_digest.clone(),
+            artifact_count: artifact_manifest.artifact_count,
+            contribution_digest: String::new(),
+            detail: String::from("test contribution"),
+        };
+        contribution_receipt.contribution_digest =
+            contribution_receipt.stable_contribution_digest();
+        let mut relocated_receipt = contribution_receipt.clone();
+        relocated_receipt.artifact_manifest.materialized_path =
+            Some(String::from("/var/tmp/relocated/artifact_manifest.json"));
+        assert_eq!(
+            contribution_receipt.stable_contribution_digest(),
+            relocated_receipt.stable_contribution_digest()
         );
     }
 }

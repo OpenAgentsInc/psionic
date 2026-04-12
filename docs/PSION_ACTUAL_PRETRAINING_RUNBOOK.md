@@ -49,11 +49,24 @@ includes:
 - one admitted `build_digest`
 - one admitted `environment_ref`
 - one optional `peer_node_pubkey` for recovery-source `serve-checkpoint`
-- one optional `peer_checkpoint_handoff_receipt_path` for joiner `resume`
-- one optional `validator_target_contribution_receipt_path` for validator
-  `validate-contribution`
-- one optional `validator_target_contribution_artifact_manifest_path` for
+- one optional `peer_checkpoint_handoff_receipt` artifact binding for joiner
+  `resume`
+- one optional `validator_target_contribution_receipt` artifact binding for
   validator `validate-contribution`
+- one optional `validator_target_contribution_artifact_manifest` artifact
+  binding for validator `validate-contribution`
+- one optional `grouped_stage_input_transport` artifact binding for grouped
+  stage execution
+
+Each artifact binding now carries one stable `artifact_ref` tuple
+(`artifact_id`, optional digest, optional byte count) plus one optional local
+`materialized_path`. The logical artifact reference is the signed identity used
+in invocation-manifest, contribution-receipt, and checkpoint-handoff digests.
+The `materialized_path` is only one local execution binding for the current
+machine. Current launch code still requires that local path to exist before the
+runtime can open a handoff receipt, validator target, or grouped-stage
+transport. The next rematerialization issues remove that last manual fetch
+assumption.
 
 The runtime refuses before launch when the executing release id, build digest,
 or environment ref do not match the admitted identity in that manifest. When a
@@ -106,8 +119,11 @@ bit, and stable contribution id.
 the machine runtime. It scans the retained contribution receipts already stored
 for the same `window_id`, orders them deterministically by assignment and
 contribution id, and emits one count-and-digest summary over the current local
-receipt set. The machine-readable run/window status packets now repeat the
-absolute paths for `window_execution_path`, `contribution_receipt_path`,
+receipt set. Contribution receipts and artifact manifests now canonicalize away
+their local `materialized_path` fields before computing signed digests, so the
+same retained artifact family can move between machines without changing its
+logical identity. The machine-readable run/window status packets still repeat
+the absolute paths for `window_execution_path`, `contribution_receipt_path`,
 `contribution_artifact_manifest_path`, and `sealed_window_bundle_path` whenever
 those retained window artifacts exist.
 
@@ -122,13 +138,14 @@ plus one retained contribution artifact manifest, binds them to the declared
 
 The current validator replay is still deliberately bounded. It does not claim a
 full independent model rerun. It replays the retained contribution artifact
-family, rechecks canonical contribution and artifact-manifest digests, loads
-the retained checkpoint surface when the challenged contribution succeeded, and
-then emits a typed `accepted`, `quarantined`, `rejected`, or `replay_required`
-validator disposition. Missing checkpoint state, stale assignment binding, or
-artifact drift stay refusal-class failures at the machine process boundary. The
-run/window status packets now repeat the retained `validator_score_receipt_path`
-when validator replay completes successfully.
+family, rechecks canonical contribution and artifact-manifest digests against
+their logical artifact references, loads the retained checkpoint surface when
+the challenged contribution succeeded, and then emits a typed `accepted`,
+`quarantined`, `rejected`, or `replay_required` validator disposition. Missing
+checkpoint state, stale assignment binding, or artifact drift stay
+refusal-class failures at the machine process boundary. The run/window status
+packets now repeat the retained `validator_score_receipt_path` when validator
+replay completes successfully.
 That machine contract is now locked by focused validator-classification unit
 tests plus subprocess CLI coverage for stale assignment, missing replay-input,
 and artifact-digest drift refusal paths.
@@ -139,10 +156,12 @@ and a target `peer_node_pubkey` can retain
 `status/peer_checkpoint_handoff_receipt.json` from the latest accepted primary
 checkpoint or from the durable backup family when the primary pointer is
 missing. A joiner `resume` manifest can then point
-`peer_checkpoint_handoff_receipt_path` at that retained receipt, which copies
-the served checkpoint pointer and manifest into the local run root before the
-normal resume flow validates preflight and emits the ordinary
-`auto_resume_receipt.json`.
+`peer_checkpoint_handoff_receipt` at that retained receipt through one artifact
+binding. The retained handoff receipt now carries logical artifact references
+for the served checkpoint pointer and checkpoint manifest, while its local
+source path remains only an operator diagnostic. The resume path copies the
+materialized checkpoint pointer and manifest into the local run root before the
+normal preflight validation emits the ordinary `auto_resume_receipt.json`.
 
 `./TRAIN` remains the operator convenience path above the same actual lane
 logic.

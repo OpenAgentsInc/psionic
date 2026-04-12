@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use psionic_runtime::{ClusterShardHandoffKind, ClusterTransportClass};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -171,7 +171,15 @@ pub fn validate_psionic_train_grouped_stage_input_transport(
     Option<PsionicTrainGroupedReplicaStageTransportEnvelope>,
     PsionicTrainGroupedReplicaTransportError,
 > {
-    let Some(transport_path) = manifest.grouped_stage_input_transport_path.as_deref() else {
+    let Some(transport_path) = manifest
+        .grouped_stage_input_transport
+        .as_ref()
+        .map(|value| {
+            value.require_materialized_path("invocation_manifest.grouped_stage_input_transport")
+        })
+        .transpose()
+        .map_err(|detail| PsionicTrainGroupedReplicaTransportError::Invalid { detail })?
+    else {
         return Ok(None);
     };
     let stage_assignment = manifest.grouped_stage_assignment.as_ref().ok_or_else(|| {
@@ -502,17 +510,17 @@ mod tests {
     };
 
     use super::{
-        PsionicTrainGroupedReplicaTransportError,
         persist_psionic_train_grouped_stage_output_transport,
         validate_psionic_train_grouped_stage_input_transport,
+        PsionicTrainGroupedReplicaTransportError,
     };
     use crate::{
-        PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
-        PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
-        PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
         PsionicTrainAdmissionIdentity, PsionicTrainCoordinationContext,
         PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageRole,
         PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainRole,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+        PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -556,11 +564,11 @@ mod tests {
             output_root: Some(String::from("/tmp/grouped-stage-run")),
             run_root: None,
             peer_node_pubkey: None,
-            peer_checkpoint_handoff_receipt_path: None,
-            validator_target_contribution_receipt_path: None,
-            validator_target_contribution_artifact_manifest_path: None,
+            peer_checkpoint_handoff_receipt: None,
+            validator_target_contribution_receipt: None,
+            validator_target_contribution_artifact_manifest: None,
             validator_target_work_class: None,
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -615,8 +623,13 @@ mod tests {
             )
             .expect("destination stage should build"),
         );
-        destination_manifest.grouped_stage_input_transport_path =
-            Some(artifacts.grouped_stage_output_transport_path);
+        destination_manifest.grouped_stage_input_transport = Some(
+            crate::build_psionic_train_artifact_binding_from_path(
+                "grouped_stage_output_transport",
+                std::path::Path::new(artifacts.grouped_stage_output_transport_path.as_str()),
+            )
+            .expect("artifact binding should build"),
+        );
 
         let envelope = validate_psionic_train_grouped_stage_input_transport(&destination_manifest)
             .expect("destination stage input transport should validate")
@@ -668,8 +681,13 @@ mod tests {
             )
             .expect("destination stage should build"),
         );
-        destination_manifest.grouped_stage_input_transport_path =
-            Some(artifacts.grouped_stage_output_transport_path);
+        destination_manifest.grouped_stage_input_transport = Some(
+            crate::build_psionic_train_artifact_binding_from_path(
+                "grouped_stage_output_transport",
+                std::path::Path::new(artifacts.grouped_stage_output_transport_path.as_str()),
+            )
+            .expect("artifact binding should build"),
+        );
 
         let error = validate_psionic_train_grouped_stage_input_transport(&destination_manifest)
             .expect_err("drifted payload should fail validation");
@@ -718,8 +736,13 @@ mod tests {
             )
             .expect("destination stage should build"),
         );
-        destination_manifest.grouped_stage_input_transport_path =
-            Some(artifacts.grouped_stage_output_transport_path);
+        destination_manifest.grouped_stage_input_transport = Some(
+            crate::build_psionic_train_artifact_binding_from_path(
+                "grouped_stage_output_transport",
+                std::path::Path::new(artifacts.grouped_stage_output_transport_path.as_str()),
+            )
+            .expect("artifact binding should build"),
+        );
 
         let error = validate_psionic_train_grouped_stage_input_transport(&destination_manifest)
             .expect_err("wrong destination stage should fail validation");

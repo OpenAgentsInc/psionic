@@ -1,10 +1,11 @@
 use std::{fs, path::Path};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    build_psionic_train_artifact_binding_from_path, PsionicTrainArtifactBinding,
     PsionicTrainCheckpointSurface, PsionicTrainGroupedReplicaStageAssignment,
     PsionicTrainInvocationManifest,
 };
@@ -37,9 +38,10 @@ pub struct PsionicTrainGroupedReplicaStageRecoveryReceipt {
     pub recovery_source_kind: PsionicTrainGroupedReplicaRecoverySourceKind,
     pub resolution_state: String,
     pub restored_primary_pointer: bool,
-    pub checkpoint_pointer_path: String,
-    pub checkpoint_manifest_path: String,
-    pub checkpoint_handoff_receipt_path: Option<String>,
+    pub checkpoint_pointer: PsionicTrainArtifactBinding,
+    pub checkpoint_manifest: PsionicTrainArtifactBinding,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint_handoff_receipt: Option<PsionicTrainArtifactBinding>,
     pub detail: String,
     pub recovery_receipt_digest: String,
 }
@@ -70,6 +72,12 @@ impl PsionicTrainGroupedReplicaStageRecoveryReceipt {
     #[must_use]
     pub fn stable_recovery_receipt_digest(&self) -> String {
         let mut digest_basis = self.clone();
+        digest_basis.checkpoint_pointer = digest_basis.checkpoint_pointer.canonicalize_for_digest();
+        digest_basis.checkpoint_manifest =
+            digest_basis.checkpoint_manifest.canonicalize_for_digest();
+        digest_basis.checkpoint_handoff_receipt = digest_basis
+            .checkpoint_handoff_receipt
+            .map(|value| value.canonicalize_for_digest());
         digest_basis.recovery_receipt_digest.clear();
         stable_digest(
             b"psionic_train_grouped_stage_recovery_receipt|",
@@ -120,14 +128,12 @@ impl PsionicTrainGroupedReplicaStageRecoveryReceipt {
             self.checkpoint_object_digest.as_str(),
             "grouped stage recovery checkpoint_object_digest",
         )?;
-        require_nonempty(
-            self.checkpoint_pointer_path.as_str(),
-            "grouped stage recovery checkpoint_pointer_path",
-        )?;
-        require_nonempty(
-            self.checkpoint_manifest_path.as_str(),
-            "grouped stage recovery checkpoint_manifest_path",
-        )?;
+        self.checkpoint_pointer
+            .validate("grouped_stage_recovery_receipt.checkpoint_pointer")
+            .map_err(|detail| PsionicTrainGroupedReplicaCheckpointError::Invalid { detail })?;
+        self.checkpoint_manifest
+            .validate("grouped_stage_recovery_receipt.checkpoint_manifest")
+            .map_err(|detail| PsionicTrainGroupedReplicaCheckpointError::Invalid { detail })?;
         require_nonempty(self.detail.as_str(), "grouped stage recovery detail")?;
         match self.recovery_source_kind {
             PsionicTrainGroupedReplicaRecoverySourceKind::RetainedCheckpoint => {
@@ -145,10 +151,10 @@ impl PsionicTrainGroupedReplicaStageRecoveryReceipt {
                         ),
                     });
                 }
-                if self.checkpoint_handoff_receipt_path.is_some() {
+                if self.checkpoint_handoff_receipt.is_some() {
                     return Err(PsionicTrainGroupedReplicaCheckpointError::Invalid {
                         detail: String::from(
-                            "retained grouped stage recovery must not carry checkpoint_handoff_receipt_path",
+                            "retained grouped stage recovery must not carry checkpoint_handoff_receipt",
                         ),
                     });
                 }
@@ -168,10 +174,19 @@ impl PsionicTrainGroupedReplicaStageRecoveryReceipt {
                         ),
                     });
                 }
-                require_nonempty_option(
-                    self.checkpoint_handoff_receipt_path.as_deref(),
-                    "grouped stage recovery checkpoint_handoff_receipt_path",
-                )?;
+                let Some(checkpoint_handoff_receipt) = self.checkpoint_handoff_receipt.as_ref()
+                else {
+                    return Err(PsionicTrainGroupedReplicaCheckpointError::Invalid {
+                        detail: String::from(
+                            "grouped stage recovery checkpoint_handoff_receipt must not be empty",
+                        ),
+                    });
+                };
+                checkpoint_handoff_receipt
+                    .validate("grouped_stage_recovery_receipt.checkpoint_handoff_receipt")
+                    .map_err(
+                        |detail| PsionicTrainGroupedReplicaCheckpointError::Invalid { detail },
+                    )?;
             }
         }
         if self.recovery_receipt_digest != self.stable_recovery_receipt_digest() {
@@ -322,7 +337,23 @@ pub fn persist_psionic_train_grouped_stage_recovery_receipt_from_surface(
                 ),
             },
         )?;
-    let (resolution_state, restored_primary_pointer, checkpoint_handoff_receipt_path, detail) =
+    let checkpoint_pointer = build_psionic_train_artifact_binding_from_path(
+        "checkpoint_pointer",
+        Path::new(checkpoint_pointer_path.as_str()),
+    )
+    .map_err(|detail| PsionicTrainGroupedReplicaCheckpointError::Read {
+        path: checkpoint_pointer_path.clone(),
+        detail,
+    })?;
+    let checkpoint_manifest = build_psionic_train_artifact_binding_from_path(
+        "checkpoint_manifest",
+        Path::new(checkpoint_manifest_path.as_str()),
+    )
+    .map_err(|detail| PsionicTrainGroupedReplicaCheckpointError::Read {
+        path: checkpoint_manifest_path.clone(),
+        detail,
+    })?;
+    let (resolution_state, restored_primary_pointer, checkpoint_handoff_receipt, detail) =
         match recovery_source_kind {
             PsionicTrainGroupedReplicaRecoverySourceKind::RetainedCheckpoint => (
                 String::from("accepted_grouped_stage_checkpoint"),
@@ -339,8 +370,24 @@ pub fn persist_psionic_train_grouped_stage_recovery_receipt_from_surface(
                     checkpoint_surface
                         .artifacts
                         .peer_checkpoint_handoff_receipt_path
-                        .clone()
-                        .or_else(|| manifest.peer_checkpoint_handoff_receipt_path.clone())
+                        .as_deref()
+                        .map(Path::new)
+                        .map(|path| {
+                            build_psionic_train_artifact_binding_from_path(
+                                "checkpoint_handoff_receipt",
+                                path,
+                            )
+                        })
+                        .transpose()
+                        .map_err(|detail| PsionicTrainGroupedReplicaCheckpointError::Read {
+                            path: checkpoint_surface
+                                .artifacts
+                                .peer_checkpoint_handoff_receipt_path
+                                .clone()
+                                .unwrap_or_else(|| String::from("checkpoint_handoff_receipt")),
+                            detail,
+                        })?
+                        .or_else(|| manifest.peer_checkpoint_handoff_receipt.clone())
                         .ok_or_else(|| {
                             PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint {
                                 detail: String::from(
@@ -375,9 +422,9 @@ pub fn persist_psionic_train_grouped_stage_recovery_receipt_from_surface(
             recovery_source_kind,
             resolution_state,
             restored_primary_pointer,
-            checkpoint_pointer_path,
-            checkpoint_manifest_path,
-            checkpoint_handoff_receipt_path,
+            checkpoint_pointer,
+            checkpoint_manifest,
+            checkpoint_handoff_receipt,
             detail,
             recovery_receipt_digest: String::new(),
         },
@@ -439,16 +486,6 @@ fn require_nonempty(
         });
     }
     Ok(())
-}
-
-fn require_nonempty_option(
-    value: Option<&str>,
-    field: &str,
-) -> Result<(), PsionicTrainGroupedReplicaCheckpointError> {
-    let value = value.ok_or_else(|| PsionicTrainGroupedReplicaCheckpointError::Invalid {
-        detail: format!("{field} must not be empty"),
-    })?;
-    require_nonempty(value, field)
 }
 
 fn stable_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {

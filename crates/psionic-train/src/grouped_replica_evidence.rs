@@ -1,13 +1,13 @@
 use std::{fs, path::Path};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageTransportArtifacts,
-    PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, TrainingExecutionValidatorDisposition,
-    load_psionic_train_grouped_stage_transport,
+    load_psionic_train_grouped_stage_transport, PsionicTrainGroupedReplicaStageAssignment,
+    PsionicTrainGroupedReplicaStageTransportArtifacts, PsionicTrainInvocationManifest,
+    PsionicTrainOutcomeKind, TrainingExecutionValidatorDisposition,
 };
 
 pub const PSIONIC_TRAIN_GROUPED_STAGE_EXECUTION_SUMMARY_SCHEMA_VERSION: &str =
@@ -272,8 +272,9 @@ pub fn persist_psionic_train_grouped_stage_execution_summary(
         return Ok(None);
     };
     let input_transport = manifest
-        .grouped_stage_input_transport_path
-        .as_deref()
+        .grouped_stage_input_transport
+        .as_ref()
+        .and_then(|value| value.materialized_path.as_deref())
         .map(|path| load_psionic_train_grouped_stage_transport(Path::new(path)))
         .transpose()
         .map_err(map_transport_error)?;
@@ -289,7 +290,10 @@ pub fn persist_psionic_train_grouped_stage_execution_summary(
         node_pubkey: String::from(node_pubkey),
         grouped_stage_assignment: grouped_stage_assignment.clone(),
         outcome,
-        input_transport_path: manifest.grouped_stage_input_transport_path.clone(),
+        input_transport_path: manifest
+            .grouped_stage_input_transport
+            .as_ref()
+            .and_then(|value| value.materialized_path.clone()),
         input_transport_digest: input_transport
             .as_ref()
             .map(|value| value.envelope.transport_digest.clone()),

@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    PSIONIC_TRAIN_RUNTIME_SURFACE_ID, PsionicTrainCapabilityProjection,
-    PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainOutcomeKind,
-    PsionicTrainRole, PsionicTrainRuntimeAttestation,
+    PsionicTrainCapabilityProjection, PsionicTrainInvocationManifest, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
+    PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
 };
 
 /// Stable schema version for one retained cluster-membership revision receipt.
@@ -392,12 +392,12 @@ fn sha256_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::{
+        PsionicTrainAdmissionIdentity, PsionicTrainCoordinationContext,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
         PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-        PsionicTrainAdmissionIdentity, PsionicTrainCoordinationContext,
     };
 
     fn manifest_for(node_pubkey: &str) -> PsionicTrainInvocationManifest {
@@ -426,11 +426,11 @@ mod tests {
             output_root: Some(String::from("/tmp/psionic-train-membership-test")),
             run_root: None,
             peer_node_pubkey: None,
-            peer_checkpoint_handoff_receipt_path: None,
-            validator_target_contribution_receipt_path: None,
-            validator_target_contribution_artifact_manifest_path: None,
+            peer_checkpoint_handoff_receipt: None,
+            validator_target_contribution_receipt: None,
+            validator_target_contribution_artifact_manifest: None,
             validator_target_work_class: None,
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,

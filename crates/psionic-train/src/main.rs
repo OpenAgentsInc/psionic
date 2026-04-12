@@ -10,11 +10,15 @@ use std::{
 use sha2::Digest;
 
 use psionic_train::{
-    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCurrentRunStatus,
-    PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
-    PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    admitted_environment_ref_for_lane, admitted_release_id_for_lane,
+    build_psionic_train_checkpoint_handoff_receipt, execute_psionic_train_validator_replay,
+    inspect_psionic_train_checkpoint_surface, materialize_psionic_train_checkpoint_handoff,
+    persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
+    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
+    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
+    PsionActualPretrainingCurrentRunStatus, PsionicTrainArtifactSurfaceRefs,
+    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
+    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainGroupedReplicaCheckpointError, PsionicTrainGroupedReplicaRecoverySourceKind,
     PsionicTrainGroupedReplicaTransportError, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
@@ -22,13 +26,8 @@ use psionic_train::{
     PsionicTrainRuntimeContractError, PsionicTrainStatusPacket,
     PsionicTrainValidatorArtifactOutputs, PsionicTrainValidatorReplayError,
     PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowArtifactOutputs,
-    PsionicTrainWindowStatusPacket, admitted_environment_ref_for_lane,
-    admitted_release_id_for_lane, build_psionic_train_checkpoint_handoff_receipt,
-    execute_psionic_train_validator_replay, inspect_psionic_train_checkpoint_surface,
-    materialize_psionic_train_checkpoint_handoff,
-    persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
-    persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
-    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
+    PsionicTrainWindowStatusPacket, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
 };
 
 #[allow(dead_code)]
@@ -171,7 +170,10 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
     if manifest.operation == PsionicTrainOperation::Resume {
         if let (Some(run_root), Some(peer_receipt_path)) = (
             run_root.as_deref(),
-            manifest.peer_checkpoint_handoff_receipt_path.as_deref(),
+            manifest
+                .peer_checkpoint_handoff_receipt
+                .as_ref()
+                .and_then(|value| value.materialized_path.as_deref()),
         ) {
             if let Err(error) = materialize_psionic_train_checkpoint_handoff(
                 run_root,
@@ -196,7 +198,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
             if let Err(error) = persist_grouped_stage_resume_recovery(
                 &manifest,
                 run_root,
-                if manifest.peer_checkpoint_handoff_receipt_path.is_some() {
+                if manifest.peer_checkpoint_handoff_receipt.is_some() {
                     PsionicTrainGroupedReplicaRecoverySourceKind::PeerCheckpointHandoff
                 } else {
                     PsionicTrainGroupedReplicaRecoverySourceKind::RetainedCheckpoint
@@ -1501,21 +1503,18 @@ fn persist_grouped_stage_resume_recovery(
     if manifest.grouped_stage_assignment.is_none() {
         return Ok(());
     }
-    let checkpoint_surface = inspect_psionic_train_checkpoint_surface(
-        run_root,
-        manifest.role,
-        manifest.operation,
-    )
-    .map_err(|error| PsionicTrainGroupedReplicaCheckpointError::Invalid {
-        detail: error.to_string(),
-    })?
-    .ok_or_else(
-        || PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint {
+    let checkpoint_surface =
+        inspect_psionic_train_checkpoint_surface(run_root, manifest.role, manifest.operation)
+            .map_err(|error| PsionicTrainGroupedReplicaCheckpointError::Invalid {
+                detail: error.to_string(),
+            })?
+            .ok_or_else(|| {
+                PsionicTrainGroupedReplicaCheckpointError::MissingCheckpoint {
             detail: String::from(
                 "grouped stage resume requires one retained checkpoint surface under the run root",
             ),
-        },
-    )?;
+        }
+            })?;
     persist_psionic_train_grouped_stage_recovery_receipt_from_surface(
         run_root,
         manifest,
@@ -1844,7 +1843,10 @@ fn build_artifact_surface_refs(
             .map(|value| value.contribution_receipt_path.clone()),
         contribution_artifact_manifest_path: window_artifacts
             .map(|value| value.contribution_artifact_manifest_path.clone()),
-        grouped_stage_input_transport_path: manifest.grouped_stage_input_transport_path.clone(),
+        grouped_stage_input_transport_path: manifest
+            .grouped_stage_input_transport
+            .as_ref()
+            .and_then(|value| value.materialized_path.clone()),
         grouped_stage_output_transport_path: window_artifacts
             .and_then(|value| value.grouped_stage_output_transport_path.clone()),
         grouped_stage_output_payload_path: window_artifacts
@@ -1906,7 +1908,10 @@ fn build_window_artifact_inputs(
         invocation_manifest_path: String::from(manifest_path),
         launch_manifest_path: summary.and_then(|value| value.launch_manifest_path.clone()),
         membership_revision_path,
-        grouped_stage_input_transport_path: manifest.grouped_stage_input_transport_path.clone(),
+        grouped_stage_input_transport_path: manifest
+            .grouped_stage_input_transport
+            .as_ref()
+            .and_then(|value| value.materialized_path.clone()),
         checkpoint_surface_path: checkpoint_surface.map(|value| value.path.clone()),
         checkpoint_pointer_path: checkpoint_surface
             .and_then(|value| value.surface.artifacts.checkpoint_pointer_path.clone())

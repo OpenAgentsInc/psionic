@@ -5,11 +5,7 @@ use std::{
 };
 
 use psionic_train::{
-    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
-    PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
-    PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+    record_psionic_train_weak_device_accepted_outcome_proof, runtime_build_digest,
     PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
     PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
@@ -25,7 +21,11 @@ use psionic_train::{
     PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
     PsionicTrainWeakDeviceAcceptedOutcomeProof, PsionicTrainWindowExecution,
     PsionicTrainWindowStatusPacket, PsionicTrainWorkClass, TrainingExecutionValidatorDisposition,
-    record_psionic_train_weak_device_accepted_outcome_proof, runtime_build_digest,
+    PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
+    PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -49,6 +49,17 @@ fn git_head() -> String {
         .expect("git output should be utf8")
         .trim()
         .to_string()
+}
+
+fn artifact_binding(path: &Path) -> psionic_train::PsionicTrainArtifactBinding {
+    let artifact_role = match path.file_name().and_then(|value| value.to_str()) {
+        Some("artifact_manifest.json") => "contribution_artifact_manifest",
+        Some("contribution_receipt.json") => "contribution_receipt",
+        Some("peer_checkpoint_handoff_receipt.json") => "checkpoint_handoff_receipt",
+        _ => "cli_test_artifact",
+    };
+    psionic_train::build_psionic_train_artifact_binding_from_path(artifact_role, path)
+        .expect("artifact binding should build from path")
 }
 
 fn dirty_tree_build_inputs() -> (String, Option<String>) {
@@ -142,11 +153,11 @@ fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
         output_root: None,
         run_root: None,
         peer_node_pubkey: None,
-        peer_checkpoint_handoff_receipt_path: None,
-        validator_target_contribution_receipt_path: None,
-        validator_target_contribution_artifact_manifest_path: None,
+        peer_checkpoint_handoff_receipt: None,
+        validator_target_contribution_receipt: None,
+        validator_target_contribution_artifact_manifest: None,
         validator_target_work_class: None,
-        grouped_stage_input_transport_path: None,
+        grouped_stage_input_transport: None,
         selected_git_ref: Some(String::from("HEAD")),
         hardware_observation_path: None,
         run_shape_observation_path: None,
@@ -243,7 +254,7 @@ fn build_retained_operation_manifest(
     manifest.output_root = None;
     manifest.run_root = Some(run_root.display().to_string());
     manifest.peer_node_pubkey = None;
-    manifest.peer_checkpoint_handoff_receipt_path = None;
+    manifest.peer_checkpoint_handoff_receipt = None;
     manifest.allow_dirty_tree = true;
     add_admitted_observations(&mut manifest);
     manifest
@@ -262,7 +273,7 @@ fn build_retained_operation_manifest_for_lane(
     manifest.output_root = None;
     manifest.run_root = Some(run_root.display().to_string());
     manifest.peer_node_pubkey = None;
-    manifest.peer_checkpoint_handoff_receipt_path = None;
+    manifest.peer_checkpoint_handoff_receipt = None;
     manifest.allow_dirty_tree = true;
     if lane_id == psionic_train::PSION_ACTUAL_PRETRAINING_LANE_ID {
         add_admitted_observations(&mut manifest);
@@ -340,10 +351,10 @@ fn build_validator_manifest_for_lane(
     manifest.coordination.assignment_id = Some(String::from(assignment_id));
     manifest.coordination.challenge_id = Some(String::from(challenge_id));
     manifest.coordination.node_pubkey = Some(String::from("npub1-psionic-validator-cli-test"));
-    manifest.validator_target_contribution_receipt_path =
-        Some(contribution_receipt_path.display().to_string());
-    manifest.validator_target_contribution_artifact_manifest_path =
-        Some(contribution_artifact_manifest_path.display().to_string());
+    manifest.validator_target_contribution_receipt =
+        Some(artifact_binding(contribution_receipt_path));
+    manifest.validator_target_contribution_artifact_manifest =
+        Some(artifact_binding(contribution_artifact_manifest_path));
     manifest.validator_target_work_class = Some(if contribution_receipt_path.is_file() {
         parse_json::<PsionicTrainContributionReceipt>(contribution_receipt_path).work_class
     } else {
@@ -538,46 +549,38 @@ fn machine_manifest_record_checkpoint_persists_checkpoint_surface() {
         checkpoint_surface.upload_outcome.as_deref(),
         Some("succeeded")
     );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_manifest_path
-                .as_deref()
-                .expect("checkpoint manifest path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_backup_receipt_path
-                .as_deref()
-                .expect("checkpoint backup receipt path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_backup_pointer_path
-                .as_deref()
-                .expect("checkpoint backup pointer path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_backup_manifest_path
-                .as_deref()
-                .expect("checkpoint backup manifest path should exist"),
-        )
-        .is_file()
-    );
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_manifest_path
+            .as_deref()
+            .expect("checkpoint manifest path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_backup_receipt_path
+            .as_deref()
+            .expect("checkpoint backup receipt path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_backup_pointer_path
+            .as_deref()
+            .expect("checkpoint backup pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_backup_manifest_path
+            .as_deref()
+            .expect("checkpoint backup manifest path should exist"),
+    )
+    .is_file());
 }
 
 #[test]
@@ -938,7 +941,8 @@ fn apple_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         PsionicTrainOperation::Resume,
     );
     resume_manifest.coordination.node_pubkey = Some(String::from("npub1-apple-late-joiner"));
-    resume_manifest.peer_checkpoint_handoff_receipt_path = Some(handoff_receipt_path);
+    resume_manifest.peer_checkpoint_handoff_receipt =
+        Some(artifact_binding(Path::new(handoff_receipt_path.as_str())));
     resume_manifest.dry_run = true;
     write_manifest(&resume_manifest_path, &mut resume_manifest);
     let output = run_machine_manifest(&resume_manifest_path);
@@ -977,26 +981,22 @@ fn apple_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         Some("apple-resume-final")
     );
     assert_eq!(checkpoint_surface.optimizer_step, Some(4_096));
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_pointer_path
-                .as_deref()
-                .expect("apple checkpoint pointer path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .peer_checkpoint_handoff_receipt_path
-                .as_deref()
-                .expect("apple handoff receipt path should exist"),
-        )
-        .is_file()
-    );
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_deref()
+            .expect("apple checkpoint pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .peer_checkpoint_handoff_receipt_path
+            .as_deref()
+            .expect("apple handoff receipt path should exist"),
+    )
+    .is_file());
 }
 
 #[test]
@@ -1149,18 +1149,14 @@ fn apple_grouped_stage_record_checkpoint_persists_grouped_checkpoint_surface() {
             .as_ref()
             .expect("grouped contribution artifact manifest path should exist"),
     );
-    assert!(
-        contribution_artifact_manifest
-            .artifacts
-            .iter()
-            .any(|artifact| artifact.artifact_kind == "checkpoint_pointer")
-    );
-    assert!(
-        contribution_artifact_manifest
-            .artifacts
-            .iter()
-            .any(|artifact| artifact.artifact_kind == "checkpoint_manifest")
-    );
+    assert!(contribution_artifact_manifest
+        .artifacts
+        .iter()
+        .any(|artifact| artifact.artifact_kind == "checkpoint_pointer"));
+    assert!(contribution_artifact_manifest
+        .artifacts
+        .iter()
+        .any(|artifact| artifact.artifact_kind == "checkpoint_manifest"));
 }
 
 #[test]
@@ -1286,10 +1282,12 @@ fn apple_grouped_stage_resume_can_seed_from_peer_checkpoint_handoff() {
         None,
         Some("stage-02"),
     ));
-    resume_manifest.peer_checkpoint_handoff_receipt_path = serve_run_status
+    resume_manifest.peer_checkpoint_handoff_receipt = serve_run_status
         .artifacts
         .checkpoint_handoff_receipt_path
-        .clone();
+        .as_deref()
+        .map(Path::new)
+        .map(artifact_binding);
     resume_manifest.dry_run = true;
     write_manifest(&resume_manifest_path, &mut resume_manifest);
     let output = run_machine_manifest(&resume_manifest_path);
@@ -1528,26 +1526,22 @@ fn machine_manifest_resume_recovers_primary_pointer_from_backup() {
         Some("backup_receipt")
     );
     assert_eq!(checkpoint_surface.restored_primary_pointer, Some(true));
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_pointer_path
-                .as_deref()
-                .expect("checkpoint pointer path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .auto_resume_receipt_path
-                .as_deref()
-                .expect("auto-resume receipt path should exist"),
-        )
-        .is_file()
-    );
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_deref()
+            .expect("checkpoint pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .auto_resume_receipt_path
+            .as_deref()
+            .expect("auto-resume receipt path should exist"),
+    )
+    .is_file());
 }
 
 #[test]
@@ -1629,12 +1623,10 @@ fn machine_manifest_window_context_emits_window_and_contribution_artifacts() {
     );
     assert!(run_status.artifacts.window_execution_path.is_some());
     assert!(run_status.artifacts.contribution_receipt_path.is_some());
-    assert!(
-        run_status
-            .artifacts
-            .contribution_artifact_manifest_path
-            .is_some()
-    );
+    assert!(run_status
+        .artifacts
+        .contribution_artifact_manifest_path
+        .is_some());
     assert!(run_status.artifacts.sealed_window_bundle_path.is_some());
 
     let window_execution: PsionicTrainWindowExecution = parse_json(
@@ -1867,7 +1859,8 @@ fn machine_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         PsionicTrainOperation::Resume,
     );
     resume_manifest.coordination.node_pubkey = Some(String::from("npub1-late-joiner"));
-    resume_manifest.peer_checkpoint_handoff_receipt_path = Some(handoff_receipt_path);
+    resume_manifest.peer_checkpoint_handoff_receipt =
+        Some(artifact_binding(Path::new(handoff_receipt_path.as_str())));
     resume_manifest.dry_run = true;
     write_manifest(&resume_manifest_path, &mut resume_manifest);
     let output = run_machine_manifest(&resume_manifest_path);
@@ -1902,36 +1895,30 @@ fn machine_manifest_resume_can_seed_from_peer_checkpoint_handoff() {
         checkpoint_surface.recovery_resolution_state.as_deref(),
         Some("accepted_primary_pointer")
     );
-    assert!(
-        Path::new(
-            run_status
-                .artifacts
-                .checkpoint_handoff_receipt_path
-                .as_deref()
-                .expect("joiner checkpoint handoff receipt path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_pointer_path
-                .as_deref()
-                .expect("checkpoint pointer path should exist"),
-        )
-        .is_file()
-    );
-    assert!(
-        Path::new(
-            checkpoint_surface
-                .artifacts
-                .checkpoint_manifest_path
-                .as_deref()
-                .expect("checkpoint manifest path should exist"),
-        )
-        .is_file()
-    );
+    assert!(Path::new(
+        run_status
+            .artifacts
+            .checkpoint_handoff_receipt_path
+            .as_deref()
+            .expect("joiner checkpoint handoff receipt path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_pointer_path
+            .as_deref()
+            .expect("checkpoint pointer path should exist"),
+    )
+    .is_file());
+    assert!(Path::new(
+        checkpoint_surface
+            .artifacts
+            .checkpoint_manifest_path
+            .as_deref()
+            .expect("checkpoint manifest path should exist"),
+    )
+    .is_file());
 }
 
 #[test]
@@ -2117,11 +2104,9 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
         score_receipt.challenged_work_class,
         PsionicTrainWorkClass::FullIslandLocalUpdateTraining
     );
-    assert!(
-        score_receipt
-            .verified_hooks
-            .contains(&PsionicTrainValidatorHook::CheckpointLineage)
-    );
+    assert!(score_receipt
+        .verified_hooks
+        .contains(&PsionicTrainValidatorHook::CheckpointLineage));
 
     let score_artifact: PsionicTrainValidatorScoreArtifact =
         parse_json(&score_receipt.score_artifact_path);
@@ -2462,11 +2447,20 @@ fn validator_manifest_emits_multi_window_quality_drift_and_rollback_signals() {
         .iter()
         .find(|artifact| artifact.artifact_kind == "checkpoint_surface")
         .expect("second contribution should retain checkpoint surface");
-    let mut degraded_checkpoint_surface: PsionicTrainCheckpointSurface =
-        parse_json(&checkpoint_surface_artifact.artifact_path);
+    let mut degraded_checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        checkpoint_surface_artifact
+            .binding
+            .materialized_path
+            .as_deref()
+            .expect("checkpoint surface artifact path should exist"),
+    );
     degraded_checkpoint_surface.upload_outcome = Some(String::from("refused"));
     write_json(
-        &checkpoint_surface_artifact.artifact_path,
+        checkpoint_surface_artifact
+            .binding
+            .materialized_path
+            .as_deref()
+            .expect("checkpoint surface artifact path should exist"),
         &degraded_checkpoint_surface,
     );
 
@@ -2823,7 +2817,7 @@ fn grouped_stage_validator_manifest_refuses_missing_stage_evidence() {
         .artifacts
         .iter()
         .find(|artifact| artifact.artifact_kind == "grouped_stage_execution_summary")
-        .map(|artifact| artifact.artifact_path.clone())
+        .and_then(|artifact| artifact.binding.materialized_path.clone())
         .expect("grouped stage execution summary artifact should exist");
     fs::remove_file(&grouped_stage_execution_summary_path)
         .expect("grouped stage execution summary should delete");
@@ -3112,18 +3106,14 @@ fn apple_grouped_stage_records_weak_device_accepted_outcome_proof() {
         proof.validator.rollback_posture,
         PsionicTrainValidatorRollbackPosture::Hold
     );
-    assert!(
-        proof
-            .validator
-            .verified_hooks
-            .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity)
-    );
-    assert!(
-        proof
-            .cited_artifacts
-            .iter()
-            .any(|artifact| artifact.artifact_role == "grouped_stage_replay_evidence")
-    );
+    assert!(proof
+        .validator
+        .verified_hooks
+        .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity));
+    assert!(proof
+        .cited_artifacts
+        .iter()
+        .any(|artifact| artifact.artifact_role == "grouped_stage_replay_evidence"));
 
     let persisted: PsionicTrainWeakDeviceAcceptedOutcomeProof = parse_json(&proof_path);
     assert_eq!(persisted.bundle_digest, proof.bundle_digest);

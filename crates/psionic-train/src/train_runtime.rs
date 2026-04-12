@@ -1,9 +1,11 @@
+use std::{fs, path::Path};
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
 use crate::PsionicTrainGroupedReplicaStageAssignment;
+use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -222,6 +224,77 @@ pub struct PsionicTrainCapabilityProjection {
     pub environment_ref: String,
 }
 
+/// Logical identity for one retained training artifact independent of any one host path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainArtifactRef {
+    /// Stable artifact identifier suitable for resolver-backed rematerialization.
+    pub artifact_id: String,
+    /// Optional canonical artifact digest when the producer already knows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_digest: Option<String>,
+    /// Optional byte count when the producer already knows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_bytes: Option<u64>,
+}
+
+/// One logical artifact reference plus an optional machine-local materialization path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainArtifactBinding {
+    /// Canonical logical reference for the artifact family.
+    pub artifact_ref: PsionicTrainArtifactRef,
+    /// Optional machine-local materialization path used by the current process.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialized_path: Option<String>,
+}
+
+impl PsionicTrainArtifactRef {
+    pub fn validate(&self, field: &str) -> Result<(), String> {
+        if self.artifact_id.trim().is_empty() {
+            return Err(format!("{field}.artifact_id must not be empty"));
+        }
+        if let Some(artifact_digest) = self.artifact_digest.as_deref() {
+            if artifact_digest.trim().is_empty() {
+                return Err(format!("{field}.artifact_digest must not be empty"));
+            }
+        }
+        if matches!(self.artifact_bytes, Some(0)) {
+            return Err(format!("{field}.artifact_bytes must be non-zero"));
+        }
+        Ok(())
+    }
+}
+
+impl PsionicTrainArtifactBinding {
+    pub fn validate(&self, field: &str) -> Result<(), String> {
+        self.artifact_ref
+            .validate(format!("{field}.artifact_ref").as_str())?;
+        if let Some(materialized_path) = self.materialized_path.as_deref() {
+            if materialized_path.trim().is_empty() {
+                return Err(format!("{field}.materialized_path must not be empty"));
+            }
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn canonicalize_for_digest(&self) -> Self {
+        let mut clone = self.clone();
+        clone.materialized_path = None;
+        clone
+    }
+
+    pub fn require_materialized_path(&self, field: &str) -> Result<&str, String> {
+        let materialized_path = self
+            .materialized_path
+            .as_deref()
+            .ok_or_else(|| format!("{field}.materialized_path must not be empty"))?;
+        if materialized_path.trim().is_empty() {
+            return Err(format!("{field}.materialized_path must not be empty"));
+        }
+        Ok(materialized_path)
+    }
+}
+
 /// One shared set of retained artifact refs carried by run-status and window-status packets.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainArtifactSurfaceRefs {
@@ -300,17 +373,20 @@ pub struct PsionicTrainInvocationManifest {
     pub run_root: Option<String>,
     /// Optional admitted peer node pubkey for recovery-source checkpoint serving.
     pub peer_node_pubkey: Option<String>,
-    /// Optional retained peer checkpoint-handoff receipt path consumed before resume.
-    pub peer_checkpoint_handoff_receipt_path: Option<String>,
-    /// Optional challenged contribution receipt path consumed by validator replay.
-    pub validator_target_contribution_receipt_path: Option<String>,
-    /// Optional challenged contribution artifact-manifest path consumed by validator replay.
-    pub validator_target_contribution_artifact_manifest_path: Option<String>,
+    /// Optional retained peer checkpoint-handoff receipt consumed before resume.
+    #[serde(default)]
+    pub peer_checkpoint_handoff_receipt: Option<PsionicTrainArtifactBinding>,
+    /// Optional challenged contribution receipt consumed by validator replay.
+    #[serde(default)]
+    pub validator_target_contribution_receipt: Option<PsionicTrainArtifactBinding>,
+    /// Optional challenged contribution artifact manifest consumed by validator replay.
+    #[serde(default)]
+    pub validator_target_contribution_artifact_manifest: Option<PsionicTrainArtifactBinding>,
     /// Optional challenged work class consumed by validator replay.
     pub validator_target_work_class: Option<PsionicTrainWorkClass>,
     /// Optional retained grouped-stage input transport envelope for non-ingress grouped replicas.
     #[serde(default)]
-    pub grouped_stage_input_transport_path: Option<String>,
+    pub grouped_stage_input_transport: Option<PsionicTrainArtifactBinding>,
     /// Explicit git ref selection. Defaults are not allowed for machine mode.
     pub selected_git_ref: Option<String>,
     /// Optional retained hardware observation path.
@@ -627,17 +703,15 @@ impl PsionicTrainInvocationManifest {
                         });
                     }
                     if stage_assignment.upstream_stage_id.is_some() {
-                        require_nonempty_option(
-                            self.grouped_stage_input_transport_path.as_deref(),
-                            "invocation_manifest.grouped_stage_input_transport_path",
+                        require_artifact_binding_with_materialized_path(
+                            self.grouped_stage_input_transport.as_ref(),
+                            "invocation_manifest.grouped_stage_input_transport",
                         )?;
-                    } else if self.grouped_stage_input_transport_path.is_some() {
+                    } else if self.grouped_stage_input_transport.is_some() {
                         return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                            field: String::from(
-                                "invocation_manifest.grouped_stage_input_transport_path",
-                            ),
+                            field: String::from("invocation_manifest.grouped_stage_input_transport"),
                             detail: String::from(
-                                "ingress grouped stage must not declare grouped_stage_input_transport_path",
+                                "ingress grouped stage must not declare grouped_stage_input_transport",
                             ),
                         });
                     }
@@ -651,13 +725,11 @@ impl PsionicTrainInvocationManifest {
                             ),
                         });
                     }
-                    if self.grouped_stage_input_transport_path.is_some() {
+                    if self.grouped_stage_input_transport.is_some() {
                         return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                            field: String::from(
-                                "invocation_manifest.grouped_stage_input_transport_path",
-                            ),
+                            field: String::from("invocation_manifest.grouped_stage_input_transport"),
                             detail: String::from(
-                                "grouped_stage_input_transport_path is not admitted on grouped stage resume manifests",
+                                "grouped_stage_input_transport is not admitted on grouped stage resume manifests",
                             ),
                         });
                     }
@@ -671,11 +743,11 @@ impl PsionicTrainInvocationManifest {
                     });
                 }
             }
-        } else if self.grouped_stage_input_transport_path.is_some() {
+        } else if self.grouped_stage_input_transport.is_some() {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+                field: String::from("invocation_manifest.grouped_stage_input_transport"),
                 detail: String::from(
-                    "grouped_stage_input_transport_path is only admitted with grouped_stage_assignment on the machine runtime surface",
+                    "grouped_stage_input_transport is only admitted with grouped_stage_assignment on the machine runtime surface",
                 ),
             });
         }
@@ -704,26 +776,26 @@ impl PsionicTrainInvocationManifest {
             "invocation_manifest",
             "peer_node_pubkey",
         )?;
-        validate_optional_field(
-            self.peer_checkpoint_handoff_receipt_path.as_deref(),
+        validate_optional_artifact_binding(
+            self.peer_checkpoint_handoff_receipt.as_ref(),
             "invocation_manifest",
-            "peer_checkpoint_handoff_receipt_path",
+            "peer_checkpoint_handoff_receipt",
         )?;
-        validate_optional_field(
-            self.validator_target_contribution_receipt_path.as_deref(),
+        validate_optional_artifact_binding(
+            self.validator_target_contribution_receipt.as_ref(),
             "invocation_manifest",
-            "validator_target_contribution_receipt_path",
+            "validator_target_contribution_receipt",
         )?;
-        validate_optional_field(
-            self.validator_target_contribution_artifact_manifest_path
-                .as_deref(),
+        validate_optional_artifact_binding(
+            self.validator_target_contribution_artifact_manifest
+                .as_ref(),
             "invocation_manifest",
-            "validator_target_contribution_artifact_manifest_path",
+            "validator_target_contribution_artifact_manifest",
         )?;
-        validate_optional_field(
-            self.grouped_stage_input_transport_path.as_deref(),
+        validate_optional_artifact_binding(
+            self.grouped_stage_input_transport.as_ref(),
             "invocation_manifest",
-            "grouped_stage_input_transport_path",
+            "grouped_stage_input_transport",
         )?;
 
         if self.selected_git_ref.is_none() {
@@ -834,12 +906,12 @@ impl PsionicTrainInvocationManifest {
             });
         }
         if self.operation != PsionicTrainOperation::Resume
-            && self.peer_checkpoint_handoff_receipt_path.is_some()
+            && self.peer_checkpoint_handoff_receipt.is_some()
         {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                field: String::from("invocation_manifest.peer_checkpoint_handoff_receipt_path"),
+                field: String::from("invocation_manifest.peer_checkpoint_handoff_receipt"),
                 detail: String::from(
-                    "peer_checkpoint_handoff_receipt_path is only admitted for resume on the machine runtime surface",
+                    "peer_checkpoint_handoff_receipt is only admitted for resume on the machine runtime surface",
                 ),
             });
         }
@@ -856,14 +928,14 @@ impl PsionicTrainInvocationManifest {
                 self.coordination.challenge_id.as_deref(),
                 "invocation_manifest.coordination.challenge_id",
             )?;
-            require_nonempty_option(
-                self.validator_target_contribution_receipt_path.as_deref(),
-                "invocation_manifest.validator_target_contribution_receipt_path",
+            require_artifact_binding_with_materialized_path(
+                self.validator_target_contribution_receipt.as_ref(),
+                "invocation_manifest.validator_target_contribution_receipt",
             )?;
-            require_nonempty_option(
-                self.validator_target_contribution_artifact_manifest_path
-                    .as_deref(),
-                "invocation_manifest.validator_target_contribution_artifact_manifest_path",
+            require_artifact_binding_with_materialized_path(
+                self.validator_target_contribution_artifact_manifest
+                    .as_ref(),
+                "invocation_manifest.validator_target_contribution_artifact_manifest",
             )?;
             let validator_target_work_class =
                 self.validator_target_work_class.ok_or_else(|| {
@@ -880,16 +952,14 @@ impl PsionicTrainInvocationManifest {
                     ),
                 });
             }
-        } else if self.validator_target_contribution_receipt_path.is_some()
+        } else if self.validator_target_contribution_receipt.is_some()
             || self
-                .validator_target_contribution_artifact_manifest_path
+                .validator_target_contribution_artifact_manifest
                 .is_some()
             || self.validator_target_work_class.is_some()
         {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
-                field: String::from(
-                    "invocation_manifest.validator_target_contribution_receipt_path",
-                ),
+                field: String::from("invocation_manifest.validator_target_contribution_receipt"),
                 detail: String::from(
                     "validator target contribution inputs and target work class are only admitted for validate_contribution on the machine runtime surface",
                 ),
@@ -1273,6 +1343,78 @@ fn validate_optional_field(
     Ok(())
 }
 
+fn validate_optional_artifact_binding(
+    value: Option<&PsionicTrainArtifactBinding>,
+    field_prefix: &str,
+    field_name: &str,
+) -> Result<(), PsionicTrainRuntimeContractError> {
+    if let Some(value) = value {
+        value
+            .validate(format!("{field_prefix}.{field_name}").as_str())
+            .map_err(|detail| PsionicTrainRuntimeContractError::InvalidValue {
+                field: format!("{field_prefix}.{field_name}"),
+                detail,
+            })?;
+    }
+    Ok(())
+}
+
+fn require_artifact_binding_with_materialized_path(
+    value: Option<&PsionicTrainArtifactBinding>,
+    field: &'static str,
+) -> Result<(), PsionicTrainRuntimeContractError> {
+    let value = value.ok_or_else(|| PsionicTrainRuntimeContractError::MissingField {
+        field: String::from(field),
+    })?;
+    value
+        .validate(field)
+        .map_err(|detail| PsionicTrainRuntimeContractError::InvalidValue {
+            field: String::from(field),
+            detail,
+        })?;
+    value.require_materialized_path(field).map_err(|detail| {
+        PsionicTrainRuntimeContractError::InvalidValue {
+            field: String::from(field),
+            detail,
+        }
+    })?;
+    Ok(())
+}
+
+#[must_use]
+pub fn psionic_train_local_artifact_id(artifact_role: &str, artifact_digest: &str) -> String {
+    let sanitized_role = artifact_role
+        .chars()
+        .map(|value| {
+            if value.is_ascii_alphanumeric() {
+                value.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    format!("psionic.train.artifact.{sanitized_role}.{artifact_digest}")
+}
+
+pub fn build_psionic_train_artifact_binding_from_path(
+    artifact_role: &str,
+    path: &Path,
+) -> Result<PsionicTrainArtifactBinding, String> {
+    let bytes =
+        fs::read(path).map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let artifact_bytes = u64::try_from(bytes.len())
+        .map_err(|error| format!("failed to size `{}`: {error}", path.display()))?;
+    let artifact_digest = sha256_hex(bytes.as_slice());
+    Ok(PsionicTrainArtifactBinding {
+        artifact_ref: PsionicTrainArtifactRef {
+            artifact_id: psionic_train_local_artifact_id(artifact_role, artifact_digest.as_str()),
+            artifact_digest: Some(artifact_digest),
+            artifact_bytes: Some(artifact_bytes),
+        },
+        materialized_path: Some(path.display().to_string()),
+    })
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let mut digest = Sha256::new();
     digest.update(bytes);
@@ -1283,6 +1425,17 @@ fn sha256_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::PsionicTrainGroupedReplicaStageRole;
+
+    fn artifact_binding(path: &str) -> PsionicTrainArtifactBinding {
+        PsionicTrainArtifactBinding {
+            artifact_ref: PsionicTrainArtifactRef {
+                artifact_id: format!("artifact://{}", path.replace('/', "_")),
+                artifact_digest: Some(format!("sha256:{}", sha256_hex(path.as_bytes()))),
+                artifact_bytes: Some(path.len() as u64),
+            },
+            materialized_path: Some(String::from(path)),
+        }
+    }
 
     fn base_manifest() -> PsionicTrainInvocationManifest {
         PsionicTrainInvocationManifest {
@@ -1310,11 +1463,11 @@ mod tests {
             output_root: Some(String::from("/tmp/psion-train-contract-test")),
             run_root: None,
             peer_node_pubkey: None,
-            peer_checkpoint_handoff_receipt_path: None,
-            validator_target_contribution_receipt_path: None,
-            validator_target_contribution_artifact_manifest_path: None,
+            peer_checkpoint_handoff_receipt: None,
+            validator_target_contribution_receipt: None,
+            validator_target_contribution_artifact_manifest: None,
             validator_target_work_class: None,
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -1377,7 +1530,7 @@ mod tests {
     }
 
     #[test]
-    fn validator_manifest_requires_replay_target_paths() {
+    fn validator_manifest_requires_replay_target_bindings() {
         let mut manifest = base_manifest();
         manifest.role = PsionicTrainRole::Validator;
         manifest.operation = PsionicTrainOperation::ValidateContribution;
@@ -1393,9 +1546,7 @@ mod tests {
         assert_eq!(
             error,
             PsionicTrainRuntimeContractError::MissingField {
-                field: String::from(
-                    "invocation_manifest.validator_target_contribution_receipt_path"
-                ),
+                field: String::from("invocation_manifest.validator_target_contribution_receipt"),
             }
         );
     }
@@ -1514,10 +1665,10 @@ mod tests {
         manifest.coordination.window_id = Some(String::from("window-0001"));
         manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
         manifest.coordination.challenge_id = Some(String::from("challenge-0001"));
-        manifest.validator_target_contribution_receipt_path =
-            Some(String::from("/tmp/contribution_receipt.json"));
-        manifest.validator_target_contribution_artifact_manifest_path =
-            Some(String::from("/tmp/artifact_manifest.json"));
+        manifest.validator_target_contribution_receipt =
+            Some(artifact_binding("/tmp/contribution_receipt.json"));
+        manifest.validator_target_contribution_artifact_manifest =
+            Some(artifact_binding("/tmp/artifact_manifest.json"));
         manifest.validator_target_work_class = Some(PsionicTrainWorkClass::AdapterTraining);
         manifest.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
@@ -1546,7 +1697,7 @@ mod tests {
     }
 
     #[test]
-    fn downstream_grouped_stage_requires_input_transport_path() {
+    fn downstream_grouped_stage_requires_input_transport_binding() {
         let mut manifest = base_manifest();
         manifest.coordination.window_id = Some(String::from("window-0001"));
         manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
@@ -1569,13 +1720,13 @@ mod tests {
         assert_eq!(
             error,
             PsionicTrainRuntimeContractError::MissingField {
-                field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+                field: String::from("invocation_manifest.grouped_stage_input_transport"),
             }
         );
     }
 
     #[test]
-    fn ingress_grouped_stage_rejects_input_transport_path() {
+    fn ingress_grouped_stage_rejects_input_transport_binding() {
         let mut manifest = base_manifest();
         manifest.coordination.window_id = Some(String::from("window-0001"));
         manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
@@ -1592,17 +1743,17 @@ mod tests {
             )
             .expect("grouped stage assignment should build"),
         );
-        manifest.grouped_stage_input_transport_path =
-            Some(String::from("/tmp/grouped-stage-input-transport.json"));
+        manifest.grouped_stage_input_transport =
+            Some(artifact_binding("/tmp/grouped-stage-input-transport.json"));
         let error = manifest
             .validate_machine_contract()
             .expect_err("ingress grouped stage should reject input transport path");
         assert_eq!(
             error,
             PsionicTrainRuntimeContractError::InvalidValue {
-                field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
+                field: String::from("invocation_manifest.grouped_stage_input_transport"),
                 detail: String::from(
-                    "ingress grouped stage must not declare grouped_stage_input_transport_path",
+                    "ingress grouped stage must not declare grouped_stage_input_transport",
                 ),
             }
         );
@@ -1619,10 +1770,10 @@ mod tests {
         manifest.coordination.window_id = Some(String::from("window-0001"));
         manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
         manifest.coordination.challenge_id = Some(String::from("challenge-0001"));
-        manifest.validator_target_contribution_receipt_path =
-            Some(String::from("/tmp/contribution_receipt.json"));
-        manifest.validator_target_contribution_artifact_manifest_path =
-            Some(String::from("/tmp/artifact_manifest.json"));
+        manifest.validator_target_contribution_receipt =
+            Some(artifact_binding("/tmp/contribution_receipt.json"));
+        manifest.validator_target_contribution_artifact_manifest =
+            Some(artifact_binding("/tmp/artifact_manifest.json"));
         let error = manifest
             .validate_machine_contract()
             .expect_err("validator replay should require validator_target_work_class");

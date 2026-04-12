@@ -1,15 +1,16 @@
 use std::{fs, path::Path};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
+    build_psionic_train_artifact_binding_from_path, inspect_psionic_train_checkpoint_surface,
+    PsionActualPretrainingCheckpointManifest, PsionActualPretrainingCheckpointPointer,
+    PsionicTrainArtifactBinding, PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer,
+    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainOperation, PsionicTrainRole,
     PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCheckpointManifest,
-    PsionActualPretrainingCheckpointPointer, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainGroupedReplicaStageAssignment,
-    PsionicTrainOperation, PsionicTrainRole, inspect_psionic_train_checkpoint_surface,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
 };
 
 /// Stable schema version for the machine-readable peer checkpoint handoff receipt.
@@ -53,8 +54,9 @@ pub struct PsionicTrainCheckpointHandoffReceipt {
     /// Stable grouped stage assignment when the checkpoint belongs to one grouped replica stage.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
-    /// Absolute source run root.
-    pub source_run_root: String,
+    /// Optional source run root retained only for operator diagnostics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_run_root: Option<String>,
     /// Whether the source is the live primary pointer or a durable backup copy.
     pub source_kind: PsionicTrainCheckpointHandoffSourceKind,
     /// Latest checkpoint label.
@@ -69,10 +71,10 @@ pub struct PsionicTrainCheckpointHandoffReceipt {
     pub checkpoint_object_digest: String,
     /// Stable checkpoint byte count.
     pub checkpoint_total_bytes: u64,
-    /// Absolute path to the source checkpoint pointer.
-    pub source_checkpoint_pointer_path: String,
-    /// Absolute path to the source checkpoint manifest.
-    pub source_checkpoint_manifest_path: String,
+    /// Logical binding for the source checkpoint pointer.
+    pub source_checkpoint_pointer: PsionicTrainArtifactBinding,
+    /// Logical binding for the source checkpoint manifest.
+    pub source_checkpoint_manifest: PsionicTrainArtifactBinding,
     /// Whether the source handoff had to fall back to the durable backup copy.
     pub restored_from_backup: bool,
     /// Short claim boundary.
@@ -111,6 +113,10 @@ pub enum PsionicTrainCheckpointHandoffError {
 impl PsionicTrainCheckpointHandoffReceipt {
     pub fn stable_digest(&self) -> String {
         let mut clone = self.clone();
+        clone.source_run_root = None;
+        clone.source_checkpoint_pointer = clone.source_checkpoint_pointer.canonicalize_for_digest();
+        clone.source_checkpoint_manifest =
+            clone.source_checkpoint_manifest.canonicalize_for_digest();
         clone.receipt_digest.clear();
         stable_digest(&clone)
     }
@@ -142,10 +148,9 @@ impl PsionicTrainCheckpointHandoffReceipt {
             self.assignment_id.as_deref(),
             self.grouped_stage_assignment.as_ref(),
         )?;
-        require_nonempty(
-            self.source_run_root.as_str(),
-            "checkpoint handoff source_run_root",
-        )?;
+        if let Some(source_run_root) = self.source_run_root.as_deref() {
+            require_nonempty(source_run_root, "checkpoint handoff source_run_root")?;
+        }
         require_nonempty(
             self.checkpoint_label.as_str(),
             "checkpoint handoff checkpoint_label",
@@ -172,14 +177,12 @@ impl PsionicTrainCheckpointHandoffReceipt {
                 detail: String::from("checkpoint handoff checkpoint_total_bytes must be non-zero"),
             });
         }
-        require_nonempty(
-            self.source_checkpoint_pointer_path.as_str(),
-            "checkpoint handoff source_checkpoint_pointer_path",
-        )?;
-        require_nonempty(
-            self.source_checkpoint_manifest_path.as_str(),
-            "checkpoint handoff source_checkpoint_manifest_path",
-        )?;
+        self.source_checkpoint_pointer
+            .validate("checkpoint_handoff.source_checkpoint_pointer")
+            .map_err(|detail| PsionicTrainCheckpointHandoffError::Invalid { detail })?;
+        self.source_checkpoint_manifest
+            .validate("checkpoint_handoff.source_checkpoint_manifest")
+            .map_err(|detail| PsionicTrainCheckpointHandoffError::Invalid { detail })?;
         require_nonempty(self.detail.as_str(), "checkpoint handoff detail")?;
         if self.receipt_digest != self.stable_digest() {
             return Err(PsionicTrainCheckpointHandoffError::Invalid {
@@ -317,6 +320,22 @@ pub fn build_psionic_train_checkpoint_handoff_receipt(
             ),
         });
     };
+    let source_checkpoint_pointer = build_psionic_train_artifact_binding_from_path(
+        "checkpoint_pointer",
+        Path::new(source_checkpoint_pointer_path.as_str()),
+    )
+    .map_err(|detail| PsionicTrainCheckpointHandoffError::Read {
+        path: source_checkpoint_pointer_path.clone(),
+        detail,
+    })?;
+    let source_checkpoint_manifest = build_psionic_train_artifact_binding_from_path(
+        "checkpoint_manifest",
+        Path::new(source_checkpoint_manifest_path.as_str()),
+    )
+    .map_err(|detail| PsionicTrainCheckpointHandoffError::Read {
+        path: source_checkpoint_manifest_path.clone(),
+        detail,
+    })?;
 
     let mut receipt = PsionicTrainCheckpointHandoffReceipt {
         schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_HANDOFF_RECEIPT_SCHEMA_VERSION),
@@ -327,7 +346,7 @@ pub fn build_psionic_train_checkpoint_handoff_receipt(
         window_id: checkpoint_surface.window_id.clone(),
         assignment_id: checkpoint_surface.assignment_id.clone(),
         grouped_stage_assignment: checkpoint_surface.grouped_stage_assignment.clone(),
-        source_run_root: run_root.display().to_string(),
+        source_run_root: Some(run_root.display().to_string()),
         source_kind,
         checkpoint_label,
         optimizer_step,
@@ -335,8 +354,8 @@ pub fn build_psionic_train_checkpoint_handoff_receipt(
         checkpoint_manifest_digest,
         checkpoint_object_digest,
         checkpoint_total_bytes,
-        source_checkpoint_pointer_path,
-        source_checkpoint_manifest_path,
+        source_checkpoint_pointer,
+        source_checkpoint_manifest,
         restored_from_backup,
         detail,
         receipt_digest: String::new(),
@@ -362,7 +381,11 @@ pub fn materialize_psionic_train_checkpoint_handoff(
         });
     }
 
-    match checkpoint_schema_version(Path::new(receipt.source_checkpoint_pointer_path.as_str()))? {
+    let source_checkpoint_pointer_path = materialized_binding_path(
+        &receipt.source_checkpoint_pointer,
+        "checkpoint_handoff.source_checkpoint_pointer",
+    )?;
+    match checkpoint_schema_version(Path::new(source_checkpoint_pointer_path.as_str()))? {
         Some(schema_version)
             if schema_version == PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION =>
         {
@@ -480,19 +503,37 @@ fn load_json<T: DeserializeOwned>(path: &Path) -> Result<T, PsionicTrainCheckpoi
     })
 }
 
+fn materialized_binding_path(
+    binding: &PsionicTrainArtifactBinding,
+    field: &str,
+) -> Result<String, PsionicTrainCheckpointHandoffError> {
+    binding
+        .require_materialized_path(field)
+        .map(String::from)
+        .map_err(|detail| PsionicTrainCheckpointHandoffError::MissingCheckpoint { detail })
+}
+
 fn materialize_generic_checkpoint_handoff(
     joiner_run_root: &Path,
     receipt: &PsionicTrainCheckpointHandoffReceipt,
 ) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
+    let source_checkpoint_pointer_path = materialized_binding_path(
+        &receipt.source_checkpoint_pointer,
+        "checkpoint_handoff.source_checkpoint_pointer",
+    )?;
+    let source_checkpoint_manifest_path = materialized_binding_path(
+        &receipt.source_checkpoint_manifest,
+        "checkpoint_handoff.source_checkpoint_manifest",
+    )?;
     let checkpoint_pointer: PsionicTrainCheckpointPointer =
-        load_json(Path::new(receipt.source_checkpoint_pointer_path.as_str()))?;
+        load_json(Path::new(source_checkpoint_pointer_path.as_str()))?;
     checkpoint_pointer
         .validate()
         .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
             detail: error.to_string(),
         })?;
     let checkpoint_manifest: PsionicTrainCheckpointManifest =
-        load_json(Path::new(receipt.source_checkpoint_manifest_path.as_str()))?;
+        load_json(Path::new(source_checkpoint_manifest_path.as_str()))?;
     checkpoint_manifest.validate().map_err(|error| {
         PsionicTrainCheckpointHandoffError::Invalid {
             detail: error.to_string(),
@@ -539,15 +580,23 @@ fn materialize_actual_pretraining_checkpoint_handoff(
     joiner_run_root: &Path,
     receipt: &PsionicTrainCheckpointHandoffReceipt,
 ) -> Result<PsionicTrainCheckpointHandoffMaterialization, PsionicTrainCheckpointHandoffError> {
+    let source_checkpoint_pointer_path = materialized_binding_path(
+        &receipt.source_checkpoint_pointer,
+        "checkpoint_handoff.source_checkpoint_pointer",
+    )?;
+    let source_checkpoint_manifest_path = materialized_binding_path(
+        &receipt.source_checkpoint_manifest,
+        "checkpoint_handoff.source_checkpoint_manifest",
+    )?;
     let checkpoint_pointer: PsionActualPretrainingCheckpointPointer =
-        load_json(Path::new(receipt.source_checkpoint_pointer_path.as_str()))?;
+        load_json(Path::new(source_checkpoint_pointer_path.as_str()))?;
     checkpoint_pointer
         .validate()
         .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
             detail: format!("source checkpoint pointer is invalid: {error}"),
         })?;
     let checkpoint_manifest: PsionActualPretrainingCheckpointManifest =
-        load_json(Path::new(receipt.source_checkpoint_manifest_path.as_str()))?;
+        load_json(Path::new(source_checkpoint_manifest_path.as_str()))?;
     checkpoint_manifest.validate().map_err(|error| {
         PsionicTrainCheckpointHandoffError::Invalid {
             detail: format!("source checkpoint manifest is invalid: {error}"),
@@ -636,4 +685,61 @@ fn write_json<T: Serialize>(
         path: path.display().to_string(),
         detail: error.to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn artifact_binding(id: &str, path: &str) -> PsionicTrainArtifactBinding {
+        PsionicTrainArtifactBinding {
+            artifact_ref: crate::PsionicTrainArtifactRef {
+                artifact_id: String::from(id),
+                artifact_digest: Some(format!("sha256:{id}")),
+                artifact_bytes: Some(128),
+            },
+            materialized_path: Some(String::from(path)),
+        }
+    }
+
+    #[test]
+    fn handoff_receipt_digest_ignores_local_paths() {
+        let mut receipt = PsionicTrainCheckpointHandoffReceipt {
+            schema_version: String::from(PSIONIC_TRAIN_CHECKPOINT_HANDOFF_RECEIPT_SCHEMA_VERSION),
+            lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
+            serving_node_pubkey: String::from("npub1-serving"),
+            peer_node_pubkey: String::from("npub1-peer"),
+            source_run_id: String::from("source-run"),
+            window_id: None,
+            assignment_id: None,
+            grouped_stage_assignment: None,
+            source_run_root: Some(String::from("/tmp/source-run")),
+            source_kind: PsionicTrainCheckpointHandoffSourceKind::LivePrimaryPointer,
+            checkpoint_label: String::from("accepted"),
+            optimizer_step: 42,
+            checkpoint_ref: String::from("checkpoint://psion/test"),
+            checkpoint_manifest_digest: String::from("manifest-digest"),
+            checkpoint_object_digest: String::from("object-digest"),
+            checkpoint_total_bytes: 4096,
+            source_checkpoint_pointer: artifact_binding(
+                "artifact://checkpoint-pointer",
+                "/tmp/source/checkpoints/latest_pointer.json",
+            ),
+            source_checkpoint_manifest: artifact_binding(
+                "artifact://checkpoint-manifest",
+                "/tmp/source/checkpoints/manifest.json",
+            ),
+            restored_from_backup: false,
+            detail: String::from("test handoff"),
+            receipt_digest: String::new(),
+        };
+        receipt.receipt_digest = receipt.stable_digest();
+        let mut relocated = receipt.clone();
+        relocated.source_run_root = Some(String::from("/var/tmp/relocated-source-run"));
+        relocated.source_checkpoint_pointer.materialized_path =
+            Some(String::from("/var/tmp/relocated/latest_pointer.json"));
+        relocated.source_checkpoint_manifest.materialized_path =
+            Some(String::from("/var/tmp/relocated/manifest.json"));
+        assert_eq!(receipt.stable_digest(), relocated.stable_digest());
+    }
 }

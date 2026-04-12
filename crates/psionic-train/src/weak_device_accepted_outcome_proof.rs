@@ -4,13 +4,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS, PsionicTrainCheckpointManifest,
+    inspect_psionic_train_checkpoint_surface, load_psionic_train_grouped_stage_execution_summary,
+    load_psionic_train_grouped_stage_replay_evidence, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainContributionArtifactManifest,
     PsionicTrainContributionReceipt, PsionicTrainGroupedReplicaStageAssignment,
     PsionicTrainOutcomeKind, PsionicTrainRunStatusPacket, PsionicTrainSealedWindowBundle,
@@ -18,9 +18,8 @@ use crate::{
     PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorRollbackPosture,
     PsionicTrainValidatorRollbackSignal, PsionicTrainValidatorScoreArtifact,
     PsionicTrainValidatorScoreReceipt, PsionicTrainWindowExecution, PsionicTrainWorkClass,
-    TrainingExecutionValidatorDisposition, inspect_psionic_train_checkpoint_surface,
-    load_psionic_train_grouped_stage_execution_summary,
-    load_psionic_train_grouped_stage_replay_evidence,
+    TrainingExecutionValidatorDisposition, PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS,
 };
 
 pub const PSIONIC_TRAIN_WEAK_DEVICE_ACCEPTED_OUTCOME_PROOF_SCHEMA_VERSION: &str =
@@ -1230,13 +1229,27 @@ pub fn record_psionic_train_weak_device_accepted_outcome_proof(
             artifact_ref_with_digest(
                 "checkpoint_surface",
                 checkpoint_surface_path,
-                manifest_checkpoint_surface.artifact_sha256.as_str(),
+                manifest_checkpoint_surface
+                    .binding
+                    .artifact_ref
+                    .artifact_digest
+                    .as_deref()
+                    .ok_or_else(|| invalid(String::from(
+                        "checkpoint surface artifact binding is missing one digest",
+                    )))?,
                 "Checkpoint surface cited by the contribution manifest and inspected from the retained run root.",
             )?,
             artifact_ref_with_digest(
                 "checkpoint_pointer",
                 checkpoint_pointer_path,
-                manifest_checkpoint_pointer.artifact_sha256.as_str(),
+                manifest_checkpoint_pointer
+                    .binding
+                    .artifact_ref
+                    .artifact_digest
+                    .as_deref()
+                    .ok_or_else(|| invalid(String::from(
+                        "checkpoint pointer artifact binding is missing one digest",
+                    )))?,
                 "Accepted grouped-stage checkpoint pointer retained under the run root.",
             )?,
             artifact_ref(
@@ -1356,11 +1369,21 @@ fn require_manifest_artifact(
         .artifacts
         .iter()
         .find(|artifact| artifact.artifact_kind == artifact_kind)
-        .ok_or_else(|| invalid(format!(
+        .ok_or_else(|| {
+            invalid(format!(
             "contribution artifact manifest is missing required artifact kind `{artifact_kind}`",
-        )))?;
+        ))
+        })?;
     require_eq(
-        artifact.artifact_path.as_str(),
+        artifact
+            .binding
+            .materialized_path
+            .as_deref()
+            .ok_or_else(|| {
+                invalid(format!(
+                    "artifact manifest kind `{artifact_kind}` is missing one materialized path",
+                ))
+            })?,
         expected_path,
         format!("artifact manifest path for `{artifact_kind}`").as_str(),
     )?;

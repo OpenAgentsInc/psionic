@@ -405,11 +405,17 @@ run root or output root, git ref, role, operation, one shared coordination
 envelope, one required admitted `node_pubkey`, and one admitted
 release/build/environment identity. Recovery-source manifests can now also
 carry one target `peer_node_pubkey` for `serve_checkpoint` and one
-`peer_checkpoint_handoff_receipt_path` for joiner-side `resume`. Validator
-manifests can now also carry one
-`validator_target_contribution_receipt_path` plus one
-`validator_target_contribution_artifact_manifest_path` for
-`validate_contribution`. It now emits
+`peer_checkpoint_handoff_receipt` artifact binding for joiner-side `resume`.
+Validator manifests can now also carry one
+`validator_target_contribution_receipt` artifact binding plus one
+`validator_target_contribution_artifact_manifest` artifact binding for
+`validate_contribution`. Grouped-stage manifests can now also carry one
+`grouped_stage_input_transport` artifact binding. Each binding freezes one
+logical `artifact_ref` (`artifact_id`, optional digest, optional byte count)
+plus one optional local `materialized_path`. Stable manifest, contribution,
+and handoff digests now canonicalize away the local path so cross-machine
+resume and replay can preserve logical identity even when the receiving node
+stages the bytes somewhere else. It now emits
 one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
 bit, authority owner, optional refusal class, shared coordination fields,
@@ -441,8 +447,10 @@ also persists one deterministic local window artifact family under
 `contributions/<contribution_id>/artifact_manifest.json`,
 `contributions/<contribution_id>/contribution_receipt.json`, and one
 `sealed_window_bundle.json` rollup over the retained contribution receipts for
-that window. The run/window status packets repeat the absolute paths for those
-window artifacts through `window_execution_path`,
+that window. The contribution receipt and contribution artifact manifest now
+compute their signed digests over canonical artifact bindings, not over
+machine-local staging paths. The run/window status packets still repeat the
+absolute paths for those window artifacts through `window_execution_path`,
 `contribution_receipt_path`, `contribution_artifact_manifest_path`, and
 `sealed_window_bundle_path`. Validator replay now also writes
 `windows/<window_id>/validators/<challenge_id>/validator_score_artifact.json`
@@ -466,9 +474,9 @@ sealed-window rollup. That keeps grouped-replica stage work machine-legible and
 prevents a weak-device stage from collapsing back into one flat contributor
 lane. The same surface now also freezes the first inter-stage transport
 contract: non-ingress grouped stages must declare
-`grouped_stage_input_transport_path`, the runtime refuses stale or drifted
-handoff envelopes before local work starts, and every stage with a downstream
-neighbor emits deterministic `grouped_stage_output_transport.json` and
+`grouped_stage_input_transport`, the runtime refuses stale or drifted handoff
+envelopes before local work starts, and every stage with a downstream neighbor
+emits deterministic `grouped_stage_output_transport.json` and
 `grouped_stage_output_payload.json` artifacts under the retained contribution
 root. That gives grouped replicas one explicit handoff seam with lane, run,
 window, assignment, stage, and payload integrity all bound into machine-legible

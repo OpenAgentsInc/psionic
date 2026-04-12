@@ -1,17 +1,17 @@
 use std::{fs, path::Path};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PsionicTrainCheckpointSurface, PsionicTrainContributionArtifact,
-    PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
-    PsionicTrainGroupedReplicaEvidenceError, PsionicTrainGroupedReplicaStageExecutionSummary,
-    PsionicTrainGroupedReplicaStageReplayEvidence, PsionicTrainInvocationManifest,
-    PsionicTrainOutcomeKind, PsionicTrainWorkClass, TrainingExecutionValidatorDisposition,
     load_psionic_train_grouped_stage_execution_summary, load_psionic_train_grouped_stage_transport,
-    persist_psionic_train_grouped_stage_replay_evidence,
+    persist_psionic_train_grouped_stage_replay_evidence, PsionicTrainCheckpointSurface,
+    PsionicTrainContributionArtifact, PsionicTrainContributionArtifactManifest,
+    PsionicTrainContributionReceipt, PsionicTrainGroupedReplicaEvidenceError,
+    PsionicTrainGroupedReplicaStageExecutionSummary, PsionicTrainGroupedReplicaStageReplayEvidence,
+    PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainWorkClass,
+    TrainingExecutionValidatorDisposition,
 };
 
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
@@ -225,11 +225,16 @@ pub fn execute_psionic_train_validator_replay(
     let challenged_work_class = manifest
         .validator_target_work_class
         .expect("validated validator manifests always carry validator_target_work_class");
+    let contribution_receipt_binding = manifest
+        .validator_target_contribution_receipt
+        .as_ref()
+        .expect("validated validator manifests always carry target contribution receipt binding");
     let contribution_receipt_path = Path::new(
-        manifest
-            .validator_target_contribution_receipt_path
-            .as_deref()
-            .expect("validated validator manifests always carry target contribution receipt path"),
+        contribution_receipt_binding
+            .require_materialized_path("invocation_manifest.validator_target_contribution_receipt")
+            .expect(
+                "validated validator manifests always carry a materialized contribution receipt",
+            ),
     );
     let contribution_receipt: PsionicTrainContributionReceipt =
         read_json(contribution_receipt_path)?;
@@ -243,12 +248,17 @@ pub fn execute_psionic_train_validator_replay(
         });
     }
 
+    let contribution_artifact_manifest_binding = manifest
+        .validator_target_contribution_artifact_manifest
+        .as_ref()
+        .expect("validated validator manifests always carry target contribution artifact manifest binding");
     let contribution_artifact_manifest_path = Path::new(
-        manifest
-            .validator_target_contribution_artifact_manifest_path
-            .as_deref()
+        contribution_artifact_manifest_binding
+            .require_materialized_path(
+                "invocation_manifest.validator_target_contribution_artifact_manifest",
+            )
             .expect(
-                "validated validator manifests always carry target contribution artifact manifest path",
+                "validated validator manifests always carry a materialized contribution artifact manifest",
             ),
     );
     let contribution_artifact_manifest: PsionicTrainContributionArtifactManifest =
@@ -263,14 +273,40 @@ pub fn execute_psionic_train_validator_replay(
             ),
         });
     }
-    if contribution_receipt.artifact_manifest_path
-        != contribution_artifact_manifest_path.display().to_string()
+    if contribution_receipt
+        .artifact_manifest
+        .artifact_ref
+        .artifact_id
+        != contribution_artifact_manifest_binding
+            .artifact_ref
+            .artifact_id
     {
         return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
             detail: format!(
-                "contribution receipt references `{}` but validator replay opened `{}`",
-                contribution_receipt.artifact_manifest_path,
-                contribution_artifact_manifest_path.display()
+                "contribution receipt references artifact `{}` but validator replay targeted `{}`",
+                contribution_receipt
+                    .artifact_manifest
+                    .artifact_ref
+                    .artifact_id,
+                contribution_artifact_manifest_binding
+                    .artifact_ref
+                    .artifact_id
+            ),
+        });
+    }
+    if contribution_receipt
+        .artifact_manifest
+        .artifact_ref
+        .artifact_digest
+        .as_deref()
+        != contribution_artifact_manifest_binding
+            .artifact_ref
+            .artifact_digest
+            .as_deref()
+    {
+        return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
+            detail: String::from(
+                "contribution receipt artifact-manifest binding digest does not match the replay target binding",
             ),
         });
     }
@@ -341,7 +377,7 @@ pub fn execute_psionic_train_validator_replay(
                 &contribution_artifact_manifest,
                 "grouped_stage_execution_summary",
             )
-            .map(|artifact| artifact.artifact_path.clone())
+            .and_then(materialized_artifact_path)
         })
         .transpose()?;
 
@@ -849,7 +885,7 @@ fn load_checkpoint_surface(
         return Ok(None);
     };
     read_json(Path::new(
-        checkpoint_surface_artifact.artifact_path.as_str(),
+        materialized_artifact_path(checkpoint_surface_artifact)?.as_str(),
     ))
     .map(Some)
 }
@@ -916,7 +952,7 @@ fn load_grouped_stage_execution_summary(
         "grouped_stage_execution_summary",
     )?;
     let execution_summary = load_psionic_train_grouped_stage_execution_summary(Path::new(
-        execution_summary_artifact.artifact_path.as_str(),
+        materialized_artifact_path(&execution_summary_artifact)?.as_str(),
     ))
     .map_err(map_grouped_stage_evidence_error)?;
     if execution_summary.lane_id != contribution_receipt.lane_id
@@ -949,7 +985,12 @@ fn validate_grouped_stage_execution_summary_artifacts(
             contribution_artifact_manifest,
             "grouped_stage_input_transport",
         )?;
-        if input_transport_artifact.artifact_path != path {
+        if input_transport_artifact
+            .binding
+            .materialized_path
+            .as_deref()
+            != Some(path)
+        {
             return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
                 detail: String::from(
                     "grouped stage execution summary input transport path drifted from the artifact manifest",
@@ -975,7 +1016,12 @@ fn validate_grouped_stage_execution_summary_artifacts(
             contribution_artifact_manifest,
             "grouped_stage_output_transport",
         )?;
-        if output_transport_artifact.artifact_path != path {
+        if output_transport_artifact
+            .binding
+            .materialized_path
+            .as_deref()
+            != Some(path)
+        {
             return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
                 detail: String::from(
                     "grouped stage execution summary output transport path drifted from the artifact manifest",
@@ -993,7 +1039,8 @@ fn validate_grouped_stage_execution_summary_artifacts(
             contribution_artifact_manifest,
             "grouped_stage_output_payload",
         )?;
-        if output_payload_artifact.artifact_path != output_payload_path {
+        if output_payload_artifact.binding.materialized_path.as_deref() != Some(output_payload_path)
+        {
             return Err(PsionicTrainValidatorReplayError::ArtifactDigestMismatch {
                 detail: String::from(
                     "grouped stage execution summary output payload path drifted from the artifact manifest",
@@ -1066,9 +1113,8 @@ fn persist_grouped_stage_replay_evidence(
             execution_summary_path: require_artifact(
                 contribution_artifact_manifest,
                 "grouped_stage_execution_summary",
-            )?
-            .artifact_path
-            .clone(),
+            )
+            .and_then(materialized_artifact_path)?,
             execution_summary_digest: execution_summary.execution_summary_digest.clone(),
             input_transport_digest: execution_summary.input_transport_digest.clone(),
             output_transport_digest: execution_summary.output_transport_digest.clone(),
@@ -1098,6 +1144,22 @@ fn require_artifact<'a>(
                 "challenged contribution artifact manifest is missing required artifact kind `{artifact_kind}`"
             ),
         })
+}
+
+fn materialized_artifact_path(
+    artifact: &PsionicTrainContributionArtifact,
+) -> Result<String, PsionicTrainValidatorReplayError> {
+    artifact
+        .binding
+        .require_materialized_path(
+            format!(
+                "contribution_artifact_manifest.artifacts[{}]",
+                artifact.artifact_kind
+            )
+            .as_str(),
+        )
+        .map(String::from)
+        .map_err(|detail| PsionicTrainValidatorReplayError::ArtifactIncomplete { detail })
 }
 
 fn validator_hooks_for_target_work_class(
@@ -1338,14 +1400,23 @@ mod tests {
     };
 
     use super::{
-        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION, PsionicTrainValidatorHook,
-        PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorReplayReasonCode,
-        PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorScoreReceipt,
-        TrainingExecutionValidatorDisposition, build_validator_quality_drift_signal,
-        build_validator_rollback_signal, classify_validator_result,
-        execute_psionic_train_validator_replay, stable_digest,
+        build_validator_quality_drift_signal, build_validator_rollback_signal,
+        classify_validator_result, execute_psionic_train_validator_replay, stable_digest,
+        PsionicTrainValidatorHook, PsionicTrainValidatorQualityDriftState,
+        PsionicTrainValidatorReplayReasonCode, PsionicTrainValidatorRollbackPosture,
+        PsionicTrainValidatorScoreReceipt, TrainingExecutionValidatorDisposition,
+        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION,
     };
     use crate::{
+        build_psionic_train_artifact_binding_from_path,
+        load_psionic_train_grouped_stage_replay_evidence, persist_psionic_train_window_artifacts,
+        PsionicTrainAdmissionIdentity, PsionicTrainArtifactBinding, PsionicTrainAuthorityOwner,
+        PsionicTrainCapabilityProjection, PsionicTrainCheckpointArtifactPaths,
+        PsionicTrainCheckpointSurface, PsionicTrainContributionReceipt,
+        PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaStageAssignment,
+        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
+        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
+        PsionicTrainWindowArtifactInputRefs, PsionicTrainWorkClass,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
         PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
@@ -1353,14 +1424,6 @@ mod tests {
         PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
         PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
         PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-        PsionicTrainAdmissionIdentity, PsionicTrainAuthorityOwner,
-        PsionicTrainCapabilityProjection, PsionicTrainCheckpointArtifactPaths,
-        PsionicTrainCheckpointSurface, PsionicTrainContributionReceipt,
-        PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaStageAssignment,
-        PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
-        PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
-        PsionicTrainWindowArtifactInputRefs, PsionicTrainWorkClass,
-        load_psionic_train_grouped_stage_replay_evidence, persist_psionic_train_window_artifacts,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -1384,6 +1447,17 @@ mod tests {
             serde_json::to_vec_pretty(value).expect("json should serialize"),
         )
         .expect("json should write");
+    }
+
+    fn artifact_binding(path: &str) -> PsionicTrainArtifactBinding {
+        let artifact_role = match Path::new(path).file_name().and_then(|value| value.to_str()) {
+            Some("artifact_manifest.json") => "contribution_artifact_manifest",
+            Some("contribution_receipt.json") => "contribution_receipt",
+            Some("peer_checkpoint_handoff_receipt.json") => "checkpoint_handoff_receipt",
+            _ => "validator_test_artifact",
+        };
+        build_psionic_train_artifact_binding_from_path(artifact_role, Path::new(path))
+            .expect("artifact binding should build from path")
     }
 
     fn runtime_attestation() -> PsionicTrainRuntimeAttestation {
@@ -1444,11 +1518,11 @@ mod tests {
             output_root: Some(run_root.display().to_string()),
             run_root: None,
             peer_node_pubkey: None,
-            peer_checkpoint_handoff_receipt_path: None,
-            validator_target_contribution_receipt_path: None,
-            validator_target_contribution_artifact_manifest_path: None,
+            peer_checkpoint_handoff_receipt: None,
+            validator_target_contribution_receipt: None,
+            validator_target_contribution_artifact_manifest: None,
             validator_target_work_class: None,
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -1495,11 +1569,15 @@ mod tests {
             output_root: None,
             run_root: Some(run_root.display().to_string()),
             peer_node_pubkey: None,
-            peer_checkpoint_handoff_receipt_path: None,
-            validator_target_contribution_receipt_path: Some(contribution_receipt_path),
-            validator_target_contribution_artifact_manifest_path: Some(artifact_manifest_path),
+            peer_checkpoint_handoff_receipt: None,
+            validator_target_contribution_receipt: Some(artifact_binding(
+                contribution_receipt_path.as_str(),
+            )),
+            validator_target_contribution_artifact_manifest: Some(artifact_binding(
+                artifact_manifest_path.as_str(),
+            )),
             validator_target_work_class: Some(PsionicTrainWorkClass::GroupedReplicaStageExecution),
-            grouped_stage_input_transport_path: None,
+            grouped_stage_input_transport: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
             run_shape_observation_path: None,
@@ -1551,7 +1629,7 @@ mod tests {
             retryable: false,
             authority_owner: PsionicTrainAuthorityOwner::Pylon,
             refusal_class: None,
-            artifact_manifest_path: String::from("/tmp/artifact_manifest.json"),
+            artifact_manifest: artifact_binding("/tmp/artifact_manifest.json"),
             artifact_manifest_digest: String::from("artifact-digest-1"),
             artifact_count: 4,
             contribution_digest: String::new(),
@@ -1872,12 +1950,10 @@ mod tests {
             execution.score_receipt.challenged_work_class,
             PsionicTrainWorkClass::GroupedReplicaStageExecution
         );
-        assert!(
-            execution
-                .score_receipt
-                .verified_hooks
-                .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity)
-        );
+        assert!(execution
+            .score_receipt
+            .verified_hooks
+            .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity));
         let contribution_receipt: PsionicTrainContributionReceipt = serde_json::from_slice(
             &fs::read(&window_artifacts.contribution_receipt_path)
                 .expect("contribution receipt should read"),
@@ -1899,12 +1975,10 @@ mod tests {
             replay_evidence.grouped_stage_assignment.stage_id,
             "stage-01"
         );
-        assert!(
-            replay_evidence
-                .reason_codes
-                .iter()
-                .any(|reason_code| reason_code == "grouped_stage_evidence_verified")
-        );
+        assert!(replay_evidence
+            .reason_codes
+            .iter()
+            .any(|reason_code| reason_code == "grouped_stage_evidence_verified"));
         assert_eq!(
             execution
                 .score_receipt
