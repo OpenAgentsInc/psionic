@@ -276,9 +276,13 @@ distributed rehearsal segment on the same operator path:
 ./TRAIN rehearse-base-lane --remote-host archlinux --secondary-remote-host macbook-pro-m2
 ```
 
-That proof is still bounded. It records one actual-lane base rehearsal plus one
-retained distributed model-progress segment. It does not by itself claim the
-full broader actual-pretraining cluster lane.
+That proof is still bounded, but it now uses the actual workload rather than
+the smaller reference-only workload. The retained segment records the larger
+model id `psion-compact-decoder-internal-v1`, the canonical dataset identity
+`psion_corpus_tokenized@v1`, and one shared tri-host optimizer path across the
+local Apple-silicon machine, the Tailnet RTX 4080 host, and the admitted M2
+Mac. It does not by itself claim the full broader actual-pretraining cluster
+lane.
 
 ## Tassadar Training Shortcut
 

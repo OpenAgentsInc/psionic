@@ -523,7 +523,7 @@ Tri-host bounded distributed rehearsal on the same actual-lane path:
 This command replays the actual operator path in one retained sequence:
 
 - `start`
-- one bounded distributed reference rehearsal when `--remote-host` is supplied
+- one bounded distributed actual-pretraining bringup when `--remote-host` is supplied
 - `record-checkpoint`
 - `backup --inject-failed-upload`
 - `backup`
@@ -536,7 +536,7 @@ proof packet. That closeout bundle now carries:
 - exact git/ref provenance
 - explicit retained artifact refs for launch, checkpoint, backup, eval,
   continue-decision, resume, dashboard, and handoff truth
-- one bounded distributed-rehearsal evidence family when a remote host is configured
+- one bounded distributed-bringup evidence family when a remote host is configured
 - one retained failed-upload drill plus its recovered end state
 - explicit closeout gates
 - `can_now_claim` and `still_out_of_scope` sections
@@ -545,14 +545,17 @@ The final retained phase becomes `base_lane_rehearsal_complete`.
 
 When `--remote-host` is present, the operator retains:
 
-- `distributed_execution/distributed_reference_rehearsal.json`
-- the bounded reference-pilot cluster topology receipt
-- the bounded reference-pilot contribution receipts
-- the bounded reference-pilot checkpoint manifest and checkpoint weights
+- `distributed_execution/distributed_actual_pretraining_bringup.json`
+- the bounded actual-pretraining bringup cluster topology receipt
+- the bounded actual-pretraining bringup contribution receipts
+- the bounded actual-pretraining bringup checkpoint manifest and checkpoint weights
 
 That is a real model-progress-bearing multi-host optimizer segment inside the
-actual operator path. The claim boundary stays explicit: the runbook proves one
-bounded rehearsal segment, not the full broader actual-pretraining cluster lane.
+actual operator path using the larger actual-lane model id
+`psion-compact-decoder-internal-v1` and the canonical dataset identity
+`psion_corpus_tokenized@v1`. The claim boundary stays explicit: the runbook
+proves one bounded rehearsal segment, not the full broader actual-pretraining
+cluster lane.
 
 The repo also now commits one clean example run root for this proof gate under:
 
