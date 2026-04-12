@@ -20,6 +20,7 @@ From the Psionic repo root, that now means:
 
 - prefer the canonical accelerator-backed bounded reference pilot
 - support the bounded dual-host joint-gradient reference mode explicitly
+- support the bounded multi-host joint-gradient reference mode explicitly
 - stage the current committed git revision to the admitted Tailnet CUDA host
 - run `psion_accelerated_reference_pilot` there
 - copy the retained artifacts back locally
@@ -117,6 +118,19 @@ That means a successful distributed run is one real bounded joint optimizer
 path where the Mac and the remote CUDA worker both stay in the model-progress
 path for the full retained run.
 
+The bounded multi-host claim extends that same lane:
+
+- control plane: the local host that launched `./TRAIN --lane reference_pilot`
+- worker count: `3`
+- worker hosts: the local Apple-silicon host, the admitted remote CUDA host,
+  and one secondary remote Apple-silicon host
+- execution classification:
+  `multi_host_joint_gradient_average`
+
+That means a successful multi-host distributed run is one real bounded joint
+optimizer path where the local Mac, the remote CUDA worker, and the secondary
+remote Mac all remain in the model-progress path for the full retained run.
+
 ## Useful Options
 
 ### Dry run
@@ -149,6 +163,28 @@ training.
 Use `--cleanup-remote` on the live Tailnet lane unless you are actively
 debugging the staged remote worktree.
 
+### Explicit tri-host joint-gradient run
+
+```bash
+./TRAIN --lane reference_pilot \
+  --mode distributed_reference \
+  --secondary-remote-host macbook-pro-m2 \
+  --cleanup-remote
+```
+
+Use `--secondary-remote-host <host>` to add one more contributor to the same
+bounded distributed lane. The current shipped proof configuration is:
+
+- local M5 control-plane and CPU contributor
+- `archlinux` as the admitted CUDA contributor
+- `macbook-pro-m2` as the secondary CPU contributor
+
+The secondary remote path uses the same staged repo and
+`psion_reference_pilot_joint_contribution` example as the primary remote path.
+The remote SSH helper now wraps the full `bash -lc` command as one quoted
+shell string so macOS hosts resolve `cargo` correctly through non-interactive
+SSH.
+
 ### Auto mode with explicit fallback
 
 ```bash
@@ -178,6 +214,18 @@ The same override surface works for the dual-host lane:
 ```bash
 ./TRAIN --lane reference_pilot \
   --mode distributed_reference \
+  --cleanup-remote \
+  --max-steps 8 \
+  --steps-per-window 4 \
+  --windows-per-cadence 2
+```
+
+The same override surface works for the tri-host lane:
+
+```bash
+./TRAIN --lane reference_pilot \
+  --mode distributed_reference \
+  --secondary-remote-host macbook-pro-m2 \
   --cleanup-remote \
   --max-steps 8 \
   --steps-per-window 4 \
@@ -226,6 +274,13 @@ For distributed dual-host runs, `reference_pilot_artifacts/` should contain:
 - `psion_reference_pilot_dual_host_step_receipts.json`
 - `psion_reference_pilot_dual_host_exchange/`
 
+For distributed multi-host runs, `reference_pilot_artifacts/` should contain
+those dual-host compatibility files plus:
+
+- `psion_reference_pilot_cluster_topology_receipt.json`
+- `psion_reference_pilot_cluster_step_receipts.json`
+- `psion_reference_pilot_cluster_contribution_receipts.json`
+
 For local reference runs, `reference_pilot_artifacts/` should contain:
 
 - `psion_reference_pilot_stage_receipt.json`
@@ -237,6 +292,12 @@ The dual-host topology receipt is the canonical retained proof that both the
 local host and the remote CUDA worker remained in the optimizer path. The
 step-receipts file is the canonical per-step proof that each optimizer step
 merged one local contribution and one remote contribution before the shared
+checkpoint advanced.
+
+For distributed multi-host runs, the cluster topology receipt is the canonical
+retained proof that all contributors remained in the optimizer path. The
+cluster contribution receipts are the canonical per-step proof that each
+optimizer step merged one contribution from each host before the shared
 checkpoint advanced.
 
 ## Checkpoint Restore Verification
