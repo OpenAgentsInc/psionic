@@ -13,14 +13,15 @@ use psionic_train::{
     PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
     PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointManifest,
     PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
-    PsionicTrainContributionArtifactManifest, PsionicTrainCoordinationContext,
-    PsionicTrainGroupedReplicaRecoverySourceKind, PsionicTrainGroupedReplicaStageAssignment,
-    PsionicTrainGroupedReplicaStageRecoveryReceipt, PsionicTrainGroupedReplicaStageRole,
-    PsionicTrainInvocationManifest, PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation,
-    PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
-    PsionicTrainRunStatusPacket, PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket,
+    PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
+    PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaRecoverySourceKind,
+    PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageRecoveryReceipt,
+    PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest,
+    PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
+    PsionicTrainRefusalClass, PsionicTrainRole, PsionicTrainRunStatusPacket,
+    PsionicTrainSealedWindowBundle, PsionicTrainStatusPacket, PsionicTrainValidatorHook,
     PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
-    PsionicTrainWindowExecution, PsionicTrainWindowStatusPacket,
+    PsionicTrainWindowExecution, PsionicTrainWindowStatusPacket, PsionicTrainWorkClass,
     TrainingExecutionValidatorDisposition, runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
@@ -123,6 +124,7 @@ fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
         lane_id: String::from(lane_id),
         role: PsionicTrainRole::Worker,
         operation: PsionicTrainOperation::Start,
+        work_class: default_work_class_for_lane(lane_id),
         coordination: PsionicTrainCoordinationContext {
             network_id: Some(String::from("network.psionic.cli-test")),
             window_id: None,
@@ -140,6 +142,7 @@ fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
         peer_checkpoint_handoff_receipt_path: None,
         validator_target_contribution_receipt_path: None,
         validator_target_contribution_artifact_manifest_path: None,
+        validator_target_work_class: None,
         grouped_stage_input_transport_path: None,
         selected_git_ref: Some(String::from("HEAD")),
         hardware_observation_path: None,
@@ -154,6 +157,14 @@ fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
         inject_failed_upload: false,
         inject_eval_worker_unavailable: false,
         manifest_digest: None,
+    }
+}
+
+fn default_work_class_for_lane(lane_id: &str) -> PsionicTrainWorkClass {
+    if lane_id == PSION_APPLE_WINDOWED_TRAINING_LANE_ID {
+        PsionicTrainWorkClass::SmallModelLocalTraining
+    } else {
+        PsionicTrainWorkClass::FullIslandLocalUpdateTraining
     }
 }
 
@@ -313,6 +324,7 @@ fn build_validator_manifest_for_lane(
         PsionicTrainRole::Validator,
         PsionicTrainOperation::ValidateContribution,
     );
+    manifest.work_class = PsionicTrainWorkClass::ValidationReplay;
     manifest.coordination.window_id = Some(String::from(window_id));
     manifest.coordination.assignment_id = Some(String::from(assignment_id));
     manifest.coordination.challenge_id = Some(String::from(challenge_id));
@@ -321,6 +333,11 @@ fn build_validator_manifest_for_lane(
         Some(contribution_receipt_path.display().to_string());
     manifest.validator_target_contribution_artifact_manifest_path =
         Some(contribution_artifact_manifest_path.display().to_string());
+    manifest.validator_target_work_class = Some(if contribution_receipt_path.is_file() {
+        parse_json::<PsionicTrainContributionReceipt>(contribution_receipt_path).work_class
+    } else {
+        default_work_class_for_lane(lane_id)
+    });
     manifest
 }
 
@@ -984,6 +1001,7 @@ fn apple_grouped_stage_record_checkpoint_persists_grouped_checkpoint_surface() {
         "apple-grouped-assignment-0001",
         1,
     );
+    launch_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1012,6 +1030,7 @@ fn apple_grouped_stage_record_checkpoint_persists_grouped_checkpoint_surface() {
         "apple-grouped-assignment-0001",
         2,
     );
+    checkpoint_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1146,6 +1165,7 @@ fn apple_grouped_stage_resume_can_seed_from_peer_checkpoint_handoff() {
         "apple-grouped-assignment-0002",
         1,
     );
+    launch_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1176,6 +1196,7 @@ fn apple_grouped_stage_resume_can_seed_from_peer_checkpoint_handoff() {
         "apple-grouped-assignment-0002",
         2,
     );
+    checkpoint_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1245,6 +1266,7 @@ fn apple_grouped_stage_resume_can_seed_from_peer_checkpoint_handoff() {
         2,
     );
     resume_manifest.coordination.node_pubkey = Some(String::from("npub1-apple-grouped-joiner"));
+    resume_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     resume_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1334,6 +1356,7 @@ fn apple_grouped_stage_resume_refuses_mismatched_stage_checkpoint() {
         "apple-grouped-assignment-0003",
         1,
     );
+    launch_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1364,6 +1387,7 @@ fn apple_grouped_stage_resume_refuses_mismatched_stage_checkpoint() {
         "apple-grouped-assignment-0003",
         2,
     );
+    checkpoint_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-01",
         0,
@@ -1392,6 +1416,7 @@ fn apple_grouped_stage_resume_refuses_mismatched_stage_checkpoint() {
         "apple-grouped-assignment-0003",
         2,
     );
+    resume_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
     resume_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
         "stage-02",
         1,
@@ -2073,6 +2098,19 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
         TrainingExecutionValidatorDisposition::Accepted
     );
     assert_eq!(score_receipt.score_bps, 10_000);
+    assert_eq!(
+        score_receipt.validator_work_class,
+        PsionicTrainWorkClass::ValidationReplay
+    );
+    assert_eq!(
+        score_receipt.challenged_work_class,
+        PsionicTrainWorkClass::FullIslandLocalUpdateTraining
+    );
+    assert!(
+        score_receipt
+            .verified_hooks
+            .contains(&PsionicTrainValidatorHook::CheckpointLineage)
+    );
 
     let score_artifact: PsionicTrainValidatorScoreArtifact =
         parse_json(&score_receipt.score_artifact_path);
@@ -2081,6 +2119,10 @@ fn validator_manifest_emits_accepted_score_receipt_for_valid_contribution() {
         TrainingExecutionValidatorDisposition::Accepted
     );
     assert_eq!(score_artifact.challenge_id.as_str(), "challenge-0001");
+    assert_eq!(
+        score_artifact.challenged_work_class,
+        PsionicTrainWorkClass::FullIslandLocalUpdateTraining
+    );
 }
 
 #[test]
@@ -2123,7 +2165,9 @@ fn apple_validator_manifest_emits_accepted_score_receipt_for_valid_contribution(
     let worker_output = run_machine_manifest(&worker_checkpoint_manifest_path);
     assert!(
         worker_output.status.success(),
-        "apple worker checkpoint should succeed"
+        "apple worker checkpoint should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&worker_output.stdout),
+        String::from_utf8_lossy(&worker_output.stderr)
     );
 
     let worker_packet: PsionicTrainStatusPacket =
@@ -2192,6 +2236,14 @@ fn apple_validator_manifest_emits_accepted_score_receipt_for_valid_contribution(
         TrainingExecutionValidatorDisposition::Accepted
     );
     assert_eq!(score_receipt.score_bps, 10_000);
+    assert_eq!(
+        score_receipt.validator_work_class,
+        PsionicTrainWorkClass::ValidationReplay
+    );
+    assert_eq!(
+        score_receipt.challenged_work_class,
+        PsionicTrainWorkClass::SmallModelLocalTraining
+    );
 
     let score_artifact: PsionicTrainValidatorScoreArtifact =
         parse_json(&score_receipt.score_artifact_path);
@@ -2204,6 +2256,10 @@ fn apple_validator_manifest_emits_accepted_score_receipt_for_valid_contribution(
         TrainingExecutionValidatorDisposition::Accepted
     );
     assert_eq!(score_artifact.challenge_id.as_str(), "apple-challenge-0001");
+    assert_eq!(
+        score_artifact.challenged_work_class,
+        PsionicTrainWorkClass::SmallModelLocalTraining
+    );
 }
 
 #[test]
@@ -2373,6 +2429,128 @@ fn validator_manifest_refuses_missing_replay_inputs() {
     );
     let packet: PsionicTrainStatusPacket =
         serde_json::from_slice(&output.stderr).expect("refusal packet should parse");
+    assert_eq!(
+        packet.refusal_class,
+        Some(PsionicTrainRefusalClass::ArtifactIncomplete)
+    );
+}
+
+#[test]
+fn grouped_stage_validator_manifest_refuses_missing_stage_evidence() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("apple-grouped-validator-run");
+
+    let launch_manifest_path = tempdir.path().join("apple-grouped-validator-launch.json");
+    let mut launch_manifest = build_apple_launch_manifest(&worker_run_root);
+    bind_window_context(
+        &mut launch_manifest,
+        "apple-grouped-validator-window-0001",
+        "apple-grouped-validator-assignment-0001",
+        1,
+    );
+    launch_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
+    launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "grouped worker launch should succeed"
+    );
+
+    let checkpoint_manifest_path = tempdir
+        .path()
+        .join("apple-grouped-validator-record-checkpoint.json");
+    let mut checkpoint_manifest = build_apple_record_checkpoint_manifest(
+        &worker_run_root,
+        "apple-grouped-validator-target",
+        8_192,
+        "checkpoint://psion/apple/grouped/validator-target",
+    );
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "apple-grouped-validator-window-0001",
+        "apple-grouped-validator-assignment-0001",
+        2,
+    );
+    checkpoint_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
+    checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "grouped worker checkpoint should succeed"
+    );
+
+    let worker_packet: PsionicTrainStatusPacket = serde_json::from_slice(&checkpoint_output.stdout)
+        .expect("grouped worker packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("grouped worker run status path should exist"),
+    );
+    let artifact_manifest: PsionicTrainContributionArtifactManifest = parse_json(
+        worker_run_status
+            .artifacts
+            .contribution_artifact_manifest_path
+            .as_ref()
+            .expect("grouped artifact manifest path should exist"),
+    );
+    let grouped_stage_execution_summary_path = artifact_manifest
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.artifact_kind == "grouped_stage_execution_summary")
+        .map(|artifact| artifact.artifact_path.clone())
+        .expect("grouped stage execution summary artifact should exist");
+    fs::remove_file(&grouped_stage_execution_summary_path)
+        .expect("grouped stage execution summary should delete");
+
+    let validator_run_root = tempdir.path().join("apple-grouped-validator-replay-run");
+    let validator_manifest_path = tempdir.path().join("apple-grouped-validator-replay.json");
+    let mut validator_manifest = build_validator_manifest_for_lane(
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+        &validator_run_root,
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("grouped contribution receipt path should exist"),
+        ),
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("grouped contribution artifact manifest path should exist"),
+        ),
+        "apple-grouped-validator-window-0001",
+        "apple-grouped-validator-assignment-0001",
+        "apple-grouped-validator-challenge-0001",
+    );
+    write_manifest(&validator_manifest_path, &mut validator_manifest);
+
+    let output = run_machine_manifest(&validator_manifest_path);
+    assert!(
+        !output.status.success(),
+        "grouped validator with missing stage evidence should be refused"
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stderr).expect("grouped validator refusal should parse");
     assert_eq!(
         packet.refusal_class,
         Some(PsionicTrainRefusalClass::ArtifactIncomplete)

@@ -83,6 +83,47 @@ pub enum PsionicTrainOperation {
     RehearseBaseLane,
 }
 
+/// One stable work class consumed by `psionic-train`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionicTrainWorkClass {
+    ValidationReplay,
+    Evaluation,
+    AdapterTraining,
+    SmallModelLocalTraining,
+    GroupedReplicaStageExecution,
+    FullIslandLocalUpdateTraining,
+    Aggregation,
+    CheckpointPromotion,
+}
+
+impl PsionicTrainWorkClass {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ValidationReplay => "validation_replay",
+            Self::Evaluation => "evaluation",
+            Self::AdapterTraining => "adapter_training",
+            Self::SmallModelLocalTraining => "small_model_local_training",
+            Self::GroupedReplicaStageExecution => "grouped_replica_stage_execution",
+            Self::FullIslandLocalUpdateTraining => "full_island_local_update_training",
+            Self::Aggregation => "aggregation",
+            Self::CheckpointPromotion => "checkpoint_promotion",
+        }
+    }
+
+    #[must_use]
+    pub const fn is_validator_target_admitted(self) -> bool {
+        matches!(
+            self,
+            Self::AdapterTraining
+                | Self::SmallModelLocalTraining
+                | Self::GroupedReplicaStageExecution
+                | Self::FullIslandLocalUpdateTraining
+        )
+    }
+}
+
 /// Stable outcome class for the machine-readable status packet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -237,6 +278,8 @@ pub struct PsionicTrainInvocationManifest {
     pub role: PsionicTrainRole,
     /// Stable runtime operation.
     pub operation: PsionicTrainOperation,
+    /// Stable runtime work class.
+    pub work_class: PsionicTrainWorkClass,
     /// Shared coordination envelope for the run when the caller already knows those ids.
     #[serde(default)]
     pub coordination: PsionicTrainCoordinationContext,
@@ -259,6 +302,8 @@ pub struct PsionicTrainInvocationManifest {
     pub validator_target_contribution_receipt_path: Option<String>,
     /// Optional challenged contribution artifact-manifest path consumed by validator replay.
     pub validator_target_contribution_artifact_manifest_path: Option<String>,
+    /// Optional challenged work class consumed by validator replay.
+    pub validator_target_work_class: Option<PsionicTrainWorkClass>,
     /// Optional retained grouped-stage input transport envelope for non-ingress grouped replicas.
     #[serde(default)]
     pub grouped_stage_input_transport_path: Option<String>,
@@ -303,6 +348,8 @@ pub struct PsionicTrainStatusPacket {
     pub role: PsionicTrainRole,
     /// Stable runtime operation.
     pub operation: PsionicTrainOperation,
+    /// Stable runtime work class.
+    pub work_class: PsionicTrainWorkClass,
     /// Stable outcome kind.
     pub outcome: PsionicTrainOutcomeKind,
     /// Stable numeric exit code.
@@ -321,6 +368,8 @@ pub struct PsionicTrainStatusPacket {
     pub coordination: PsionicTrainCoordinationContext,
     /// Optional grouped-replica stage assignment projected by the admitted manifest.
     pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
+    /// Optional challenged work class for validator replay.
+    pub validator_target_work_class: Option<PsionicTrainWorkClass>,
     /// Runtime attestation resolved by the local machine before or during execution.
     pub runtime_attestation: Option<PsionicTrainRuntimeAttestation>,
     /// Minimal runtime capability projection.
@@ -358,6 +407,8 @@ pub struct PsionicTrainRunStatusPacket {
     pub role: PsionicTrainRole,
     /// Stable runtime operation.
     pub operation: PsionicTrainOperation,
+    /// Stable runtime work class.
+    pub work_class: PsionicTrainWorkClass,
     /// Stable outcome kind.
     pub outcome: PsionicTrainOutcomeKind,
     /// Stable numeric exit code.
@@ -372,6 +423,8 @@ pub struct PsionicTrainRunStatusPacket {
     pub coordination: PsionicTrainCoordinationContext,
     /// Optional grouped-replica stage assignment projected by the admitted manifest.
     pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
+    /// Optional challenged work class for validator replay.
+    pub validator_target_work_class: Option<PsionicTrainWorkClass>,
     /// Optional invocation manifest path.
     pub manifest_path: Option<String>,
     /// Optional invocation manifest digest.
@@ -411,6 +464,8 @@ pub struct PsionicTrainWindowStatusPacket {
     pub role: PsionicTrainRole,
     /// Stable runtime operation.
     pub operation: PsionicTrainOperation,
+    /// Stable runtime work class.
+    pub work_class: PsionicTrainWorkClass,
     /// Stable outcome kind.
     pub outcome: PsionicTrainOutcomeKind,
     /// Stable numeric exit code.
@@ -425,6 +480,8 @@ pub struct PsionicTrainWindowStatusPacket {
     pub coordination: PsionicTrainCoordinationContext,
     /// Optional grouped-replica stage assignment projected by the admitted manifest.
     pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
+    /// Optional challenged work class for validator replay.
+    pub validator_target_work_class: Option<PsionicTrainWorkClass>,
     /// Optional invocation manifest digest.
     pub manifest_digest: Option<String>,
     /// Optional run identifier.
@@ -523,6 +580,26 @@ impl PsionicTrainInvocationManifest {
                 });
             }
         }
+        if self.role == PsionicTrainRole::Validator
+            && self.work_class != PsionicTrainWorkClass::ValidationReplay
+        {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.work_class"),
+                detail: String::from(
+                    "validator manifests must declare work_class=validation_replay on the machine runtime surface",
+                ),
+            });
+        }
+        if self.role != PsionicTrainRole::Validator
+            && self.work_class == PsionicTrainWorkClass::ValidationReplay
+        {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.work_class"),
+                detail: String::from(
+                    "work_class=validation_replay is admitted only for validator manifests on the machine runtime surface",
+                ),
+            });
+        }
         self.coordination
             .validate("invocation_manifest.coordination")?;
         if let Some(stage_assignment) = &self.grouped_stage_assignment {
@@ -537,6 +614,14 @@ impl PsionicTrainInvocationManifest {
             )?;
             match (self.role, self.operation) {
                 (PsionicTrainRole::Worker, _) => {
+                    if self.work_class != PsionicTrainWorkClass::GroupedReplicaStageExecution {
+                        return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                            field: String::from("invocation_manifest.work_class"),
+                            detail: String::from(
+                                "grouped stage manifests must declare work_class=grouped_replica_stage_execution on the machine runtime surface",
+                            ),
+                        });
+                    }
                     if stage_assignment.upstream_stage_id.is_some() {
                         require_nonempty_option(
                             self.grouped_stage_input_transport_path.as_deref(),
@@ -554,6 +639,14 @@ impl PsionicTrainInvocationManifest {
                     }
                 }
                 (PsionicTrainRole::RecoverySource, PsionicTrainOperation::Resume) => {
+                    if self.work_class != PsionicTrainWorkClass::GroupedReplicaStageExecution {
+                        return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                            field: String::from("invocation_manifest.work_class"),
+                            detail: String::from(
+                                "grouped stage manifests must declare work_class=grouped_replica_stage_execution on the machine runtime surface",
+                            ),
+                        });
+                    }
                     if self.grouped_stage_input_transport_path.is_some() {
                         return Err(PsionicTrainRuntimeContractError::InvalidValue {
                             field: String::from(
@@ -579,6 +672,20 @@ impl PsionicTrainInvocationManifest {
                 field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
                 detail: String::from(
                     "grouped_stage_input_transport_path is only admitted with grouped_stage_assignment on the machine runtime surface",
+                ),
+            });
+        }
+        if self.grouped_stage_assignment.is_none()
+            && matches!(
+                self.role,
+                PsionicTrainRole::Worker | PsionicTrainRole::RecoverySource
+            )
+            && self.work_class == PsionicTrainWorkClass::GroupedReplicaStageExecution
+        {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.grouped_stage_assignment"),
+                detail: String::from(
+                    "work_class=grouped_replica_stage_execution requires grouped_stage_assignment on the machine runtime surface",
                 ),
             });
         }
@@ -754,17 +861,33 @@ impl PsionicTrainInvocationManifest {
                     .as_deref(),
                 "invocation_manifest.validator_target_contribution_artifact_manifest_path",
             )?;
+            let validator_target_work_class =
+                self.validator_target_work_class.ok_or_else(|| {
+                    PsionicTrainRuntimeContractError::MissingField {
+                        field: String::from("invocation_manifest.validator_target_work_class"),
+                    }
+                })?;
+            if !validator_target_work_class.is_validator_target_admitted() {
+                return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                    field: String::from("invocation_manifest.validator_target_work_class"),
+                    detail: format!(
+                        "validator replay does not yet admit target work_class={} on the machine runtime surface",
+                        validator_target_work_class.label()
+                    ),
+                });
+            }
         } else if self.validator_target_contribution_receipt_path.is_some()
             || self
                 .validator_target_contribution_artifact_manifest_path
                 .is_some()
+            || self.validator_target_work_class.is_some()
         {
             return Err(PsionicTrainRuntimeContractError::InvalidValue {
                 field: String::from(
                     "invocation_manifest.validator_target_contribution_receipt_path",
                 ),
                 detail: String::from(
-                    "validator target contribution inputs are only admitted for validate_contribution on the machine runtime surface",
+                    "validator target contribution inputs and target work class are only admitted for validate_contribution on the machine runtime surface",
                 ),
             });
         }
@@ -797,6 +920,7 @@ impl PsionicTrainStatusPacket {
             lane_id: manifest.lane_id.clone(),
             role: manifest.role,
             operation: manifest.operation,
+            work_class: manifest.work_class,
             outcome: PsionicTrainOutcomeKind::Succeeded,
             exit_code: 0,
             retryable: false,
@@ -806,6 +930,7 @@ impl PsionicTrainStatusPacket {
             manifest_digest: manifest.manifest_digest.clone(),
             coordination: manifest.coordination.clone(),
             grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
+            validator_target_work_class: manifest.validator_target_work_class,
             runtime_attestation: Some(runtime_attestation),
             capability_projection: Some(capability_projection),
             run_id,
@@ -845,6 +970,9 @@ impl PsionicTrainStatusPacket {
             operation: manifest
                 .map(|value| value.operation)
                 .unwrap_or(PsionicTrainOperation::Start),
+            work_class: manifest
+                .map(|value| value.work_class)
+                .unwrap_or(PsionicTrainWorkClass::FullIslandLocalUpdateTraining),
             outcome: PsionicTrainOutcomeKind::Refused,
             exit_code: refusal_class.exit_code(),
             retryable: refusal_class.retryable(),
@@ -857,6 +985,8 @@ impl PsionicTrainStatusPacket {
                 .unwrap_or_default(),
             grouped_stage_assignment: manifest
                 .and_then(|value| value.grouped_stage_assignment.clone()),
+            validator_target_work_class: manifest
+                .and_then(|value| value.validator_target_work_class),
             runtime_attestation,
             capability_projection,
             run_id,
@@ -1157,6 +1287,7 @@ mod tests {
             lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
             role: PsionicTrainRole::Worker,
             operation: PsionicTrainOperation::Start,
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
             coordination: PsionicTrainCoordinationContext {
                 network_id: Some(String::from("network.psionic.contract-test")),
                 window_id: None,
@@ -1178,6 +1309,7 @@ mod tests {
             peer_checkpoint_handoff_receipt_path: None,
             validator_target_contribution_receipt_path: None,
             validator_target_contribution_artifact_manifest_path: None,
+            validator_target_work_class: None,
             grouped_stage_input_transport_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
@@ -1225,6 +1357,7 @@ mod tests {
     fn validator_role_requires_validate_contribution_operation() {
         let mut manifest = base_manifest();
         manifest.role = PsionicTrainRole::Validator;
+        manifest.work_class = PsionicTrainWorkClass::ValidationReplay;
         let error = manifest
             .validate_machine_contract()
             .expect_err("validator role should reject worker operations");
@@ -1244,6 +1377,7 @@ mod tests {
         let mut manifest = base_manifest();
         manifest.role = PsionicTrainRole::Validator;
         manifest.operation = PsionicTrainOperation::ValidateContribution;
+        manifest.work_class = PsionicTrainWorkClass::ValidationReplay;
         manifest.output_root = None;
         manifest.run_root = Some(String::from("/tmp/validator-run"));
         manifest.coordination.window_id = Some(String::from("window-0001"));
@@ -1341,6 +1475,7 @@ mod tests {
     fn grouped_stage_assignment_requires_window_and_assignment_context() {
         let mut manifest = base_manifest();
         manifest.coordination.window_id = None;
+        manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
         manifest.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
@@ -1369,6 +1504,7 @@ mod tests {
         let mut manifest = base_manifest();
         manifest.role = PsionicTrainRole::Validator;
         manifest.operation = PsionicTrainOperation::ValidateContribution;
+        manifest.work_class = PsionicTrainWorkClass::ValidationReplay;
         manifest.output_root = None;
         manifest.run_root = Some(String::from("/tmp/validator-run"));
         manifest.coordination.window_id = Some(String::from("window-0001"));
@@ -1378,6 +1514,7 @@ mod tests {
             Some(String::from("/tmp/contribution_receipt.json"));
         manifest.validator_target_contribution_artifact_manifest_path =
             Some(String::from("/tmp/artifact_manifest.json"));
+        manifest.validator_target_work_class = Some(PsionicTrainWorkClass::AdapterTraining);
         manifest.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
@@ -1409,6 +1546,7 @@ mod tests {
         let mut manifest = base_manifest();
         manifest.coordination.window_id = Some(String::from("window-0001"));
         manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
         manifest.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
@@ -1437,6 +1575,7 @@ mod tests {
         let mut manifest = base_manifest();
         manifest.coordination.window_id = Some(String::from("window-0001"));
         manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
         manifest.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
@@ -1460,6 +1599,63 @@ mod tests {
                 field: String::from("invocation_manifest.grouped_stage_input_transport_path"),
                 detail: String::from(
                     "ingress grouped stage must not declare grouped_stage_input_transport_path",
+                ),
+            }
+        );
+    }
+
+    #[test]
+    fn validator_manifest_requires_target_work_class() {
+        let mut manifest = base_manifest();
+        manifest.role = PsionicTrainRole::Validator;
+        manifest.operation = PsionicTrainOperation::ValidateContribution;
+        manifest.work_class = PsionicTrainWorkClass::ValidationReplay;
+        manifest.output_root = None;
+        manifest.run_root = Some(String::from("/tmp/validator-run"));
+        manifest.coordination.window_id = Some(String::from("window-0001"));
+        manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.coordination.challenge_id = Some(String::from("challenge-0001"));
+        manifest.validator_target_contribution_receipt_path =
+            Some(String::from("/tmp/contribution_receipt.json"));
+        manifest.validator_target_contribution_artifact_manifest_path =
+            Some(String::from("/tmp/artifact_manifest.json"));
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("validator replay should require validator_target_work_class");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::MissingField {
+                field: String::from("invocation_manifest.validator_target_work_class"),
+            }
+        );
+    }
+
+    #[test]
+    fn grouped_stage_manifest_requires_grouped_work_class() {
+        let mut manifest = base_manifest();
+        manifest.coordination.window_id = Some(String::from("window-0001"));
+        manifest.coordination.assignment_id = Some(String::from("assignment-0001"));
+        manifest.grouped_stage_assignment = Some(
+            PsionicTrainGroupedReplicaStageAssignment::new(
+                "replica-01",
+                "stage-01",
+                0,
+                2,
+                PsionicTrainGroupedReplicaStageRole::Ingress,
+                None,
+                Some(String::from("stage-02")),
+            )
+            .expect("grouped stage assignment should build"),
+        );
+        let error = manifest
+            .validate_machine_contract()
+            .expect_err("grouped stage manifests should require grouped work class");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.work_class"),
+                detail: String::from(
+                    "grouped stage manifests must declare work_class=grouped_replica_stage_execution on the machine runtime surface",
                 ),
             }
         );

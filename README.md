@@ -214,6 +214,24 @@ from the requested worker window. Every grouped resume also writes one
 deterministic `checkpoints/grouped_stage_recovery_receipt.json` so supervisors
 can see whether the resumed stage came from one retained checkpoint or one
 peer checkpoint handoff without re-inferring that from process-local state.
+The machine contract now also carries one explicit `work_class` across the
+invocation manifest, final process packet, retained run/window status packets,
+window execution, contribution receipt, contribution artifact manifest, and
+sealed-window rollup. Validator manifests must declare
+`work_class=validation_replay` plus one admitted `validator_target_work_class`
+for the challenged contribution, and validator replay currently admits
+`adapter_training`, `small_model_local_training`,
+`grouped_replica_stage_execution`, and `full_island_local_update_training`
+targets without claiming full gradient recomputation. Retained validator score
+artifacts and receipts now record both the validator work class and the
+challenged work class plus the exact replay hooks that were verified:
+assignment correctness, checkpoint lineage, work-execution plausibility,
+update integrity, and grouped-stage integrity when the challenged work class is
+one grouped replica stage. Grouped-stage validator replay also fails closed as
+`ArtifactIncomplete` whenever the retained
+`grouped_stage_execution_summary.json` surface is missing, so a replacement
+validator cannot silently score one grouped stage without the retained
+transport-and-execution evidence bundle.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

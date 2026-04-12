@@ -817,7 +817,8 @@ fn refusal_for_validator_replay_error(
 ) -> PsionicTrainRefusalClass {
     match error {
         PsionicTrainValidatorReplayError::Read { .. }
-        | PsionicTrainValidatorReplayError::Write { .. } => {
+        | PsionicTrainValidatorReplayError::Write { .. }
+        | PsionicTrainValidatorReplayError::ArtifactIncomplete { .. } => {
             PsionicTrainRefusalClass::ArtifactIncomplete
         }
         PsionicTrainValidatorReplayError::Parse { .. }
@@ -1741,6 +1742,7 @@ fn write_status_surfaces(
         lane_id: manifest.lane_id.clone(),
         role: manifest.role,
         operation: manifest.operation,
+        work_class: manifest.work_class,
         outcome,
         exit_code,
         retryable,
@@ -1748,6 +1750,7 @@ fn write_status_surfaces(
         refusal_class,
         coordination: manifest.coordination.clone(),
         grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
+        validator_target_work_class: manifest.validator_target_work_class,
         manifest_path: Some(manifest_path.clone()),
         manifest_digest: manifest.manifest_digest.clone(),
         run_id: Some(resolved_run_id.clone()),
@@ -1769,6 +1772,7 @@ fn write_status_surfaces(
         lane_id: manifest.lane_id.clone(),
         role: manifest.role,
         operation: manifest.operation,
+        work_class: manifest.work_class,
         outcome,
         exit_code,
         retryable,
@@ -1776,6 +1780,7 @@ fn write_status_surfaces(
         refusal_class,
         coordination: manifest.coordination.clone(),
         grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
+        validator_target_work_class: manifest.validator_target_work_class,
         manifest_digest: manifest.manifest_digest.clone(),
         run_id: Some(resolved_run_id),
         run_root: Some(run_root.display().to_string()),

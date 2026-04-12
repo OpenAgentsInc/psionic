@@ -820,25 +820,20 @@ fn validate_grouped_checkpoint_scope(
         assignment_id,
         format!("{field_prefix}.assignment_id").as_str(),
     )?;
-    if let Some(grouped_stage_assignment) = grouped_stage_assignment {
+    if window_id.is_some() || assignment_id.is_some() {
         require_nonempty_option(window_id, format!("{field_prefix}.window_id").as_str())?;
         require_nonempty_option(
             assignment_id,
             format!("{field_prefix}.assignment_id").as_str(),
         )?;
+    }
+    if let Some(grouped_stage_assignment) = grouped_stage_assignment {
         grouped_stage_assignment
             .validate(format!("{field_prefix}.grouped_stage_assignment").as_str())
             .map_err(|error| PsionicTrainCheckpointSurfaceError::Invalid {
                 path: String::from(field_prefix),
                 detail: error.to_string(),
             })?;
-    } else if window_id.is_some() || assignment_id.is_some() {
-        return Err(PsionicTrainCheckpointSurfaceError::Invalid {
-            path: String::from(field_prefix),
-            detail: String::from(
-                "window_id and assignment_id are only admitted on grouped stage checkpoints",
-            ),
-        });
     }
     Ok(())
 }

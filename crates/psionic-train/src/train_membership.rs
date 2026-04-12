@@ -407,6 +407,7 @@ mod tests {
             lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
             role: PsionicTrainRole::Worker,
             operation: PsionicTrainOperation::Start,
+            work_class: crate::PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
             coordination: PsionicTrainCoordinationContext {
                 network_id: Some(String::from("network.psionic.test")),
                 window_id: Some(String::from("window-001")),
@@ -428,6 +429,7 @@ mod tests {
             peer_checkpoint_handoff_receipt_path: None,
             validator_target_contribution_receipt_path: None,
             validator_target_contribution_artifact_manifest_path: None,
+            validator_target_work_class: None,
             grouped_stage_input_transport_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,

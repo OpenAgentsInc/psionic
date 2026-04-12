@@ -514,6 +514,28 @@ validator replay now accepts the same retained contribution-plus-checkpoint
 surface shape as the CUDA lane, and Apple `resume` now refuses when no admitted
 checkpoint exists rather than silently claiming a rejoin path that the retained
 checkpoint lineage does not support.
+When the coordination envelope carries `window_id` and `assignment_id`, the
+generic Apple checkpoint pointer, checkpoint manifest, and peer handoff receipt
+now preserve that same non-grouped window lineage too instead of dropping it at
+the checkpoint boundary.
+
+The machine validator envelope is now also explicit about work class and replay
+scope. Invocation manifests, final status packets, retained run/window status
+packets, window execution records, contribution receipts, contribution artifact
+manifests, and sealed-window rollups all carry one admitted `work_class`.
+Validator manifests must use `work_class=validation_replay` and declare one
+`validator_target_work_class` for the challenged contribution. The current
+machine runtime admits validator targets for `adapter_training`,
+`small_model_local_training`, `grouped_replica_stage_execution`, and
+`full_island_local_update_training`; it does not claim full deterministic
+recomputation of dense training. Instead, validator replay records the concrete
+hook families that were actually verified: assignment correctness, checkpoint
+lineage, work-execution plausibility, update integrity, and grouped-stage
+integrity for grouped stage targets. Retained validator score artifacts and
+receipts now persist both the validator work class and the challenged work
+class plus that verified-hook set, and grouped-stage validator replay refuses
+as `ArtifactIncomplete` when the retained
+`grouped_stage_execution_summary.json` evidence surface is absent.
 
 The refusal surface is also now frozen at the `psionic-train` process boundary.
 The first machine runtime lane maps bad configuration, unsupported topology,

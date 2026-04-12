@@ -439,20 +439,16 @@ fn validate_grouped_stage_scope(
     if let Some(assignment_id) = assignment_id {
         require_nonempty(assignment_id, "checkpoint handoff assignment_id")?;
     }
-    if let Some(grouped_stage_assignment) = grouped_stage_assignment {
+    if window_id.is_some() || assignment_id.is_some() {
         require_nonempty_option(window_id, "checkpoint handoff window_id")?;
         require_nonempty_option(assignment_id, "checkpoint handoff assignment_id")?;
+    }
+    if let Some(grouped_stage_assignment) = grouped_stage_assignment {
         grouped_stage_assignment
             .validate("checkpoint_handoff.grouped_stage_assignment")
             .map_err(|error| PsionicTrainCheckpointHandoffError::Invalid {
                 detail: error.to_string(),
             })?;
-    } else if window_id.is_some() || assignment_id.is_some() {
-        return Err(PsionicTrainCheckpointHandoffError::Invalid {
-            detail: String::from(
-                "checkpoint handoff window_id and assignment_id are only admitted on grouped stage checkpoints",
-            ),
-        });
     }
     Ok(())
 }

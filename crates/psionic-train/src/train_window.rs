@@ -13,7 +13,8 @@ use crate::{
     PsionicTrainGroupedReplicaStageExecutionSummaryArtifacts,
     PsionicTrainGroupedReplicaStageTransportArtifacts, PsionicTrainInvocationManifest,
     PsionicTrainOutcomeKind, PsionicTrainRefusalClass, PsionicTrainRole,
-    PsionicTrainRuntimeAttestation, persist_psionic_train_grouped_stage_execution_summary,
+    PsionicTrainRuntimeAttestation, PsionicTrainWorkClass,
+    persist_psionic_train_grouped_stage_execution_summary,
     persist_psionic_train_grouped_stage_output_transport,
 };
 
@@ -69,6 +70,7 @@ pub struct PsionicTrainWindowAssignmentMaterialization {
 pub struct PsionicTrainWindowExecution {
     pub schema_version: String,
     pub lane_id: String,
+    pub work_class: PsionicTrainWorkClass,
     pub network_id: Option<String>,
     pub run_id: String,
     pub window_id: String,
@@ -95,6 +97,7 @@ pub struct PsionicTrainContributionArtifact {
 pub struct PsionicTrainContributionArtifactManifest {
     pub schema_version: String,
     pub lane_id: String,
+    pub work_class: PsionicTrainWorkClass,
     pub run_id: String,
     pub window_id: String,
     pub assignment_id: String,
@@ -110,6 +113,7 @@ pub struct PsionicTrainContributionArtifactManifest {
 pub struct PsionicTrainContributionReceipt {
     pub schema_version: String,
     pub lane_id: String,
+    pub work_class: PsionicTrainWorkClass,
     pub run_id: String,
     pub window_id: String,
     pub window_execution_id: String,
@@ -136,6 +140,7 @@ pub struct PsionicTrainSealedWindowContribution {
     pub assignment_id: String,
     pub contribution_id: String,
     pub node_pubkey: String,
+    pub work_class: PsionicTrainWorkClass,
     pub grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     pub outcome: PsionicTrainOutcomeKind,
     pub artifact_manifest_digest: String,
@@ -306,6 +311,7 @@ pub fn persist_psionic_train_window_artifacts(
     let mut window_execution = PsionicTrainWindowExecution {
         schema_version: String::from(PSIONIC_TRAIN_WINDOW_EXECUTION_SCHEMA_VERSION),
         lane_id: manifest.lane_id.clone(),
+        work_class: manifest.work_class,
         network_id: manifest.coordination.network_id.clone(),
         run_id: String::from(run_id),
         window_id: window_id.clone(),
@@ -335,6 +341,7 @@ pub fn persist_psionic_train_window_artifacts(
     let mut artifact_manifest = PsionicTrainContributionArtifactManifest {
         schema_version: String::from(PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION),
         lane_id: manifest.lane_id.clone(),
+        work_class: manifest.work_class,
         run_id: String::from(run_id),
         window_id: window_id.clone(),
         assignment_id: assignment_id.clone(),
@@ -363,6 +370,7 @@ pub fn persist_psionic_train_window_artifacts(
     let mut contribution_receipt = PsionicTrainContributionReceipt {
         schema_version: String::from(PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION),
         lane_id: manifest.lane_id.clone(),
+        work_class: manifest.work_class,
         run_id: String::from(run_id),
         window_id: window_id.clone(),
         window_execution_id: window_execution.window_execution_id.clone(),
@@ -402,6 +410,7 @@ pub fn persist_psionic_train_window_artifacts(
             assignment_id: entry.assignment_id.clone(),
             contribution_id: entry.contribution_id.clone(),
             node_pubkey: entry.node_pubkey.clone(),
+            work_class: entry.work_class,
             grouped_stage_assignment: entry.grouped_stage_assignment.clone(),
             outcome: entry.outcome,
             artifact_manifest_digest: entry.artifact_manifest_digest.clone(),
@@ -470,6 +479,7 @@ struct RetainedContributionEntry {
     assignment_id: String,
     contribution_id: String,
     node_pubkey: String,
+    work_class: PsionicTrainWorkClass,
     grouped_stage_assignment: Option<PsionicTrainGroupedReplicaStageAssignment>,
     outcome: PsionicTrainOutcomeKind,
     artifact_manifest_digest: String,
@@ -599,6 +609,7 @@ fn load_window_contributions(
             assignment_id: contribution_receipt.assignment_id,
             contribution_id: contribution_receipt.contribution_id,
             node_pubkey: contribution_receipt.node_pubkey,
+            work_class: contribution_receipt.work_class,
             grouped_stage_assignment: contribution_receipt.grouped_stage_assignment,
             outcome: contribution_receipt.outcome,
             artifact_manifest_digest: contribution_receipt.artifact_manifest_digest,
@@ -700,6 +711,7 @@ mod tests {
         PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageExecutionSummary,
         PsionicTrainGroupedReplicaStageRole, PsionicTrainInvocationManifest, PsionicTrainOperation,
         PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
+        PsionicTrainWorkClass,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -722,6 +734,7 @@ mod tests {
             lane_id: String::from(crate::PSION_ACTUAL_PRETRAINING_LANE_ID),
             role: PsionicTrainRole::Worker,
             operation: PsionicTrainOperation::Start,
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
             coordination: PsionicTrainCoordinationContext {
                 network_id: Some(String::from("network.psionic.window-test")),
                 window_id: Some(String::from("window-0001")),
@@ -743,6 +756,7 @@ mod tests {
             peer_checkpoint_handoff_receipt_path: None,
             validator_target_contribution_receipt_path: None,
             validator_target_contribution_artifact_manifest_path: None,
+            validator_target_work_class: None,
             grouped_stage_input_transport_path: None,
             selected_git_ref: Some(String::from("HEAD")),
             hardware_observation_path: None,
@@ -800,6 +814,7 @@ mod tests {
     fn grouped_stage_assignment_is_retained_in_window_artifacts() {
         let run_root = temp_root("grouped-stage-retained");
         let mut manifest = base_manifest();
+        manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
         manifest.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
@@ -954,6 +969,7 @@ mod tests {
     fn grouped_stage_assignment_changes_contribution_identity() {
         let run_root = temp_root("grouped-stage-identity");
         let mut manifest_a = base_manifest();
+        manifest_a.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
         manifest_a.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
@@ -1003,6 +1019,7 @@ mod tests {
         .expect("worker window artifacts should exist");
 
         let mut manifest_b = base_manifest();
+        manifest_b.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
         manifest_b.grouped_stage_assignment = Some(
             PsionicTrainGroupedReplicaStageAssignment::new(
                 "replica-01",
