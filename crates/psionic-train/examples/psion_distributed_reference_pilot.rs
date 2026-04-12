@@ -106,7 +106,7 @@ impl RemoteContributionInvoker {
             format!("{}:{}", self.ssh_target, remote_request_path).as_str(),
         )?;
         let remote_command = format!(
-            "export CARGO_TARGET_DIR={}; export TMPDIR={}; export RUST_MIN_STACK=16777216; mkdir -p {} {}; cd {} && cargo run -q -p psionic-train --example psion_reference_pilot_joint_contribution -- {} {}",
+            "export PATH=\"$HOME/.cargo/bin:$PATH\"; export CARGO_TARGET_DIR={}; export TMPDIR={}; export RUST_MIN_STACK=16777216; mkdir -p {} {}; cd {} && cargo run -q -p psionic-train --example psion_reference_pilot_joint_contribution -- {} {}",
             remote_shell_path(self.remote_target_dir.as_str()),
             remote_shell_path(self.remote_tmp_dir.as_str()),
             remote_shell_path(self.remote_target_dir.as_str()),
@@ -209,7 +209,7 @@ fn ssh_bash(target: &str, command: &str) -> Result<(), psionic_train::PsionRefer
         .arg("ConnectTimeout=5")
         .arg(target)
         .arg("bash")
-        .arg("-ic")
+        .arg("-lc")
         .arg(command)
         .status()
         .map_err(io_as_remote_error)?;
