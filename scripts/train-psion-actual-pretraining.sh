@@ -76,6 +76,10 @@ Options for `rehearse-base-lane`:
                            Optional retained hardware observation snapshot to consume instead of probing the local host.
   --run-shape-observation <path>
                            Optional retained throughput/storage/dataloader observation snapshot to consume instead of probing the local host.
+  --remote-host <host>     Optional admitted Tailnet host for one bounded distributed rehearsal segment inside the actual lane.
+  --secondary-remote-host <host>
+                           Optional second admitted Tailnet host for a tri-host bounded distributed rehearsal segment.
+  --cleanup-remote         Remove staged remote rehearsal repos and outputs after the bounded distributed segment finishes.
   --allow-dirty-tree       Override the default dirty-tree refusal and retain a status digest.
 
 Options for `status` and `dashboard`:

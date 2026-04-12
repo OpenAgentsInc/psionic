@@ -270,7 +270,7 @@ It does not yet claim:
 
 - external alert delivery or paging
 - a cluster-connected streaming dashboard
-- completed distributed cluster execution
+- completed broader actual-lane distributed cluster execution beyond one bounded retained rehearsal segment
 
 Those come later in the roadmap. This launcher is the operator contract, not
 the full hardening pass.
@@ -509,9 +509,21 @@ Canonical base-lane proof gate:
   --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json
 ```
 
+Tri-host bounded distributed rehearsal on the same actual-lane path:
+
+```bash
+./TRAIN rehearse-base-lane \
+  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
+  --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json \
+  --remote-host archlinux \
+  --secondary-remote-host macbook-pro-m2 \
+  --cleanup-remote
+```
+
 This command replays the actual operator path in one retained sequence:
 
 - `start`
+- one bounded distributed reference rehearsal when `--remote-host` is supplied
 - `record-checkpoint`
 - `backup --inject-failed-upload`
 - `backup`
@@ -524,11 +536,23 @@ proof packet. That closeout bundle now carries:
 - exact git/ref provenance
 - explicit retained artifact refs for launch, checkpoint, backup, eval,
   continue-decision, resume, dashboard, and handoff truth
+- one bounded distributed-rehearsal evidence family when a remote host is configured
 - one retained failed-upload drill plus its recovered end state
 - explicit closeout gates
 - `can_now_claim` and `still_out_of_scope` sections
 
 The final retained phase becomes `base_lane_rehearsal_complete`.
+
+When `--remote-host` is present, the operator retains:
+
+- `distributed_execution/distributed_reference_rehearsal.json`
+- the bounded reference-pilot cluster topology receipt
+- the bounded reference-pilot contribution receipts
+- the bounded reference-pilot checkpoint manifest and checkpoint weights
+
+That is a real model-progress-bearing multi-host optimizer segment inside the
+actual operator path. The claim boundary stays explicit: the runbook proves one
+bounded rehearsal segment, not the full broader actual-pretraining cluster lane.
 
 The repo also now commits one clean example run root for this proof gate under:
 

@@ -269,6 +269,17 @@ The older bounded reference pilot still exists as the smoke/reference lane:
 ./TRAIN --lane reference_pilot --mode local_reference
 ```
 
+The actual pretraining lane can now also retain one bounded multi-host
+distributed rehearsal segment on the same operator path:
+
+```bash
+./TRAIN rehearse-base-lane --remote-host archlinux --secondary-remote-host macbook-pro-m2
+```
+
+That proof is still bounded. It records one actual-lane base rehearsal plus one
+retained distributed model-progress segment. It does not by itself claim the
+full broader actual-pretraining cluster lane.
+
 ## Tassadar Training Shortcut
 
 If you want the current default Tassadar training lane instead of guessing
