@@ -508,6 +508,18 @@ Those generic checkpoint artifacts live at
 `checkpoints/manifests/checkpoint_manifest_step-<optimizer_step>.json`. The
 shared checkpoint-surface and handoff code now reads either the actual-lane
 checkpoint family or that generic family, which is what lets Apple runs use the
+same validator and recovery truth model without pretending the whole
+actual-pretraining operator stack already moved to consumer hardware. That
+Apple grouped-stage lane now also has one narrow accepted-outcome proof surface
+in `crates/psionic-train/src/weak_device_accepted_outcome_proof.rs`.
+`record_psionic_train_weak_device_accepted_outcome_proof()` reads one retained
+run-status pair plus the cited contribution, grouped-stage, validator, and
+checkpoint artifacts, then emits one
+`psionic.train.weak_device_accepted_outcome_proof.v1` bundle with explicit weak
+device, validator acceptance, rollback-hold, and checkpoint-lineage facts. The
+claim boundary on that proof stays narrow on purpose: it proves Psionic-side
+accepted progress for one consumer-device-bearing grouped stage, not payout
+closeout or network-wide finality.
 same `serve-checkpoint`, `resume`, and `validate-contribution` entrypoints
 without pretending mixed CUDA/Metal windows are already admitted. Apple
 validator replay now accepts the same retained contribution-plus-checkpoint

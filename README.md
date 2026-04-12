@@ -241,6 +241,16 @@ signal does not execute rollback itself; it emits one machine-readable `hold`
 or `candidate` posture that later `Nexus` or scheduler policy can consume
 without re-scanning validator history, and the run/window status packets now
 repeat both signal paths beside the validator score receipt.
+That same Apple grouped-stage path now also has one narrow weak-device accepted
+outcome proof surface. The
+`record_psionic_train_weak_device_accepted_outcome_proof()` helper consolidates
+one accepted Metal grouped-stage contribution, replay evidence,
+quality-drift/rollback signals, and grouped checkpoint lineage into
+`psionic.train.weak_device_accepted_outcome_proof.v1` with an explicit claim
+boundary that stops short of payout or network-wide finality. The subprocess
+CLI test `apple_grouped_stage_records_weak_device_accepted_outcome_proof`
+exercises that bundle against real retained artifacts instead of synthetic
+fixtures.
 
 The older bounded reference pilot still exists as the smoke/reference lane:
 

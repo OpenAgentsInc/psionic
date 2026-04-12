@@ -23,8 +23,9 @@ use psionic_train::{
     PsionicTrainValidatorQualityDriftSignal, PsionicTrainValidatorQualityDriftState,
     PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorRollbackSignal,
     PsionicTrainValidatorScoreArtifact, PsionicTrainValidatorScoreReceipt,
-    PsionicTrainWindowExecution, PsionicTrainWindowStatusPacket, PsionicTrainWorkClass,
-    TrainingExecutionValidatorDisposition, runtime_build_digest,
+    PsionicTrainWeakDeviceAcceptedOutcomeProof, PsionicTrainWindowExecution,
+    PsionicTrainWindowStatusPacket, PsionicTrainWorkClass, TrainingExecutionValidatorDisposition,
+    record_psionic_train_weak_device_accepted_outcome_proof, runtime_build_digest,
 };
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
@@ -2963,4 +2964,170 @@ fn build_identity_mismatch_is_refused_before_launch() {
         packet.refusal_class,
         Some(PsionicTrainRefusalClass::BuildRevoked)
     );
+}
+
+#[test]
+fn apple_grouped_stage_records_weak_device_accepted_outcome_proof() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let worker_run_root = tempdir.path().join("apple-grouped-weak-device-run");
+
+    let launch_manifest_path = tempdir.path().join("apple-grouped-weak-device-launch.json");
+    let mut launch_manifest = build_apple_launch_manifest(&worker_run_root);
+    bind_window_context(
+        &mut launch_manifest,
+        "apple-grouped-weak-device-window-0001",
+        "apple-grouped-weak-device-assignment-0001",
+        1,
+    );
+    launch_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
+    launch_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&launch_manifest_path, &mut launch_manifest);
+    let launch_output = run_machine_manifest(&launch_manifest_path);
+    assert!(
+        launch_output.status.success(),
+        "grouped weak-device launch should succeed"
+    );
+
+    let checkpoint_manifest_path = tempdir
+        .path()
+        .join("apple-grouped-weak-device-record-checkpoint.json");
+    let mut checkpoint_manifest = build_apple_record_checkpoint_manifest(
+        &worker_run_root,
+        "apple-grouped-weak-device-accepted",
+        6_144,
+        "checkpoint://psion/apple/grouped/weak-device/accepted",
+    );
+    bind_window_context(
+        &mut checkpoint_manifest,
+        "apple-grouped-weak-device-window-0001",
+        "apple-grouped-weak-device-assignment-0001",
+        2,
+    );
+    checkpoint_manifest.work_class = PsionicTrainWorkClass::GroupedReplicaStageExecution;
+    checkpoint_manifest.grouped_stage_assignment = Some(grouped_stage_assignment(
+        "stage-01",
+        0,
+        2,
+        PsionicTrainGroupedReplicaStageRole::Ingress,
+        None,
+        Some("stage-02"),
+    ));
+    write_manifest(&checkpoint_manifest_path, &mut checkpoint_manifest);
+    let checkpoint_output = run_machine_manifest(&checkpoint_manifest_path);
+    assert!(
+        checkpoint_output.status.success(),
+        "grouped weak-device checkpoint should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&checkpoint_output.stdout),
+        String::from_utf8_lossy(&checkpoint_output.stderr)
+    );
+
+    let worker_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&checkpoint_output.stdout).expect("worker packet should parse");
+    let worker_run_status: PsionicTrainRunStatusPacket = parse_json(
+        worker_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("worker run status path should exist"),
+    );
+
+    let validator_run_root = tempdir
+        .path()
+        .join("apple-grouped-weak-device-validator-run");
+    let validator_manifest_path = tempdir
+        .path()
+        .join("apple-grouped-weak-device-validator.json");
+    let mut validator_manifest = build_validator_manifest_for_lane(
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+        &validator_run_root,
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_receipt_path
+                .as_deref()
+                .expect("worker contribution receipt path should exist"),
+        ),
+        Path::new(
+            worker_run_status
+                .artifacts
+                .contribution_artifact_manifest_path
+                .as_deref()
+                .expect("worker contribution artifact manifest path should exist"),
+        ),
+        "apple-grouped-weak-device-window-0001",
+        "apple-grouped-weak-device-assignment-0001",
+        "apple-grouped-weak-device-challenge-0001",
+    );
+    write_manifest(&validator_manifest_path, &mut validator_manifest);
+    let validator_output = run_machine_manifest(&validator_manifest_path);
+    assert!(
+        validator_output.status.success(),
+        "grouped weak-device validator should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&validator_output.stdout),
+        String::from_utf8_lossy(&validator_output.stderr)
+    );
+
+    let validator_packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&validator_output.stdout).expect("validator packet should parse");
+    let validator_run_status: PsionicTrainRunStatusPacket = parse_json(
+        validator_packet
+            .run_status_packet_path
+            .as_ref()
+            .expect("validator run status path should exist"),
+    );
+
+    let proof_path = tempdir
+        .path()
+        .join("apple-grouped-weak-device-accepted-outcome-proof.json");
+    let proof = record_psionic_train_weak_device_accepted_outcome_proof(
+        proof_path.as_path(),
+        &worker_run_status,
+        &validator_run_status,
+    )
+    .expect("weak-device accepted-outcome proof should record");
+
+    assert_eq!(
+        proof.lane_id.as_str(),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+    );
+    assert_eq!(
+        proof.carrier.backend_family.as_str(),
+        psionic_train::PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY
+    );
+    assert_eq!(
+        proof.carrier.work_class,
+        PsionicTrainWorkClass::GroupedReplicaStageExecution
+    );
+    assert_eq!(
+        proof.validator.validator_disposition,
+        TrainingExecutionValidatorDisposition::Accepted
+    );
+    assert_eq!(
+        proof.validator.rollback_posture,
+        PsionicTrainValidatorRollbackPosture::Hold
+    );
+    assert!(
+        proof
+            .validator
+            .verified_hooks
+            .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity)
+    );
+    assert!(
+        proof
+            .cited_artifacts
+            .iter()
+            .any(|artifact| artifact.artifact_role == "grouped_stage_replay_evidence")
+    );
+
+    let persisted: PsionicTrainWeakDeviceAcceptedOutcomeProof = parse_json(&proof_path);
+    assert_eq!(persisted.bundle_digest, proof.bundle_digest);
+    persisted
+        .validate()
+        .expect("persisted weak-device proof should validate");
 }
