@@ -35,6 +35,33 @@ For machine supervision, the stable process boundary is now the repo-local
 cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
 ```
 
+For assigned strong-node execution, the actual lane now also has one typed
+packaging surface in
+`crates/psionic-train/src/psion_actual_pretraining_launcher.rs`:
+
+- `psion.actual_pretraining_automatic_execution_request.v1`
+- `psion.actual_pretraining_automatic_execution_outputs.v1`
+
+That request is the assignment-shaped wrapper around the same machine runtime.
+It compiles one admitted strong-node turn into the generic
+`psionic.train.invocation_manifest.v1` contract with fixed
+`lane_id = psion_actual_pretraining_v1`,
+`work_class = full_island_local_update_training`, and the fixed admitted
+actual-lane `release_id` and `environment_ref`. The caller supplies the
+admitted `build_digest`, `run_id`, coordination envelope, selected git ref,
+launch or retained-state root, and any resume or checkpoint-specific fields
+already declared by the generic runtime surface.
+
+The paired output plan names the deterministic retained surfaces the node will
+materialize from that same request: the machine run/window status packets,
+membership revision receipt, checkpoint surface, actual-lane status and
+summary files, the operation manifest path for `start` or `resume`, and the
+window contribution bundle under `windows/<window_id>/...` when the admitted
+coordination envelope already binds one `window_id`, `assignment_id`, and
+`node_pubkey`. That keeps strong-node launch automation on the same manifest,
+status, checkpoint, and sealed-window contracts already used by the weak-device
+lane instead of creating a second runtime path.
+
 That machine path consumes one explicit JSON manifest and emits one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
 bit, authority owner, refusal class when applicable, retained artifact paths,
@@ -99,6 +126,15 @@ phase, pointer state, checkpoint label and step, manifest digest, object
 digest, byte count, backup state, upload outcome, and auto-resume recovery
 result so supervisors can read the latest checkpoint posture without reopening
 the full retained artifact family themselves.
+
+For the strong actual-pretraining lane specifically, automatic `resume` can now
+keep the request and output plan resolver-safe. The request may name one
+`peer_checkpoint_handoff_receipt` by logical artifact id alone, while the
+compiled machine manifest still carries the same artifact binding that the
+runtime rematerializes from the local resolver cache before continuing. The
+output plan then points at the retained `checkpoints/auto_resume_receipt.json`
+surface under the same run root, which is the handoff from launch-time
+materialization back into the normal checkpoint surface and status-packet path.
 
 When the coordination envelope declares `window_id`, `assignment_id`, and the
 admitted `node_pubkey`, the machine path also retains one window contribution

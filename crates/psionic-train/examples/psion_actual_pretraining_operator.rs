@@ -8,28 +8,25 @@ use std::{
 };
 
 use psionic_eval::{
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
     build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
 };
 use psionic_train::{
-    PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_COMPARISON_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_CONTINUE_RESTART_DECISION_PATH,
-    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
-    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
-    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingAlertFeed,
+    build_psion_actual_pretraining_dashboard_packet, checkpoint_comparison_relative_path,
+    checkpoint_eval_decision_relative_path, checkpoint_eval_failure_relative_path,
+    continue_restart_decision_relative_path,
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    psion_actual_pretraining_retained_paths, record_psion_actual_pretraining_auto_resume_receipt,
+    record_psion_actual_pretraining_checkpoint_backup_receipt,
+    record_psion_actual_pretraining_checkpoint_comparison,
+    record_psion_actual_pretraining_checkpoint_eval_decision,
+    record_psion_actual_pretraining_checkpoint_eval_failure,
+    record_psion_actual_pretraining_checkpoint_failure_drill,
+    record_psion_actual_pretraining_checkpoint_manifest,
+    record_psion_actual_pretraining_continuation_handoff,
+    record_psion_actual_pretraining_continue_restart_decision,
+    record_psion_actual_pretraining_redacted_alert, PsionActualPretrainingAlertFeed,
     PsionActualPretrainingArtifactRef, PsionActualPretrainingAutoResumeReceipt,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointBackupReceipt,
     PsionActualPretrainingCheckpointComparison, PsionActualPretrainingCheckpointEvalDecision,
@@ -53,21 +50,24 @@ use psionic_train::{
     PsionActualPretrainingScalingBundle, PsionActualPretrainingStorageProbe,
     PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    build_psion_actual_pretraining_dashboard_packet, checkpoint_comparison_relative_path,
-    checkpoint_eval_decision_relative_path, checkpoint_eval_failure_relative_path,
-    continue_restart_decision_relative_path,
-    derive_psion_actual_pretraining_hardware_qualification,
-    derive_psion_actual_pretraining_run_shape_qualification,
-    record_psion_actual_pretraining_auto_resume_receipt,
-    record_psion_actual_pretraining_checkpoint_backup_receipt,
-    record_psion_actual_pretraining_checkpoint_comparison,
-    record_psion_actual_pretraining_checkpoint_eval_decision,
-    record_psion_actual_pretraining_checkpoint_eval_failure,
-    record_psion_actual_pretraining_checkpoint_failure_drill,
-    record_psion_actual_pretraining_checkpoint_manifest,
-    record_psion_actual_pretraining_continuation_handoff,
-    record_psion_actual_pretraining_continue_restart_decision,
-    record_psion_actual_pretraining_redacted_alert,
+    PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_COMPARISON_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_CONTINUE_RESTART_DECISION_PATH,
+    PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
+    PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
+    PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 use sha2::{Digest, Sha256};
 use std::time::Instant;
@@ -2227,41 +2227,7 @@ fn map_evidence_error(error: PsionActualPretrainingEvidenceContractError) -> Box
 }
 
 fn retained_paths() -> PsionActualPretrainingRetainedPathSet {
-    PsionActualPretrainingRetainedPathSet {
-        launch_manifest_path: String::from("manifests/launch_manifest.json"),
-        resume_manifest_path: String::from("manifests/resume_manifest.json"),
-        current_status_path: String::from("status/current_run_status.json"),
-        retained_summary_path: String::from("status/retained_summary.json"),
-        latest_checkpoint_pointer_path: String::from(
-            "checkpoints/latest_accepted_checkpoint_pointer.json",
-        ),
-        latest_checkpoint_backup_receipt_path: String::from(
-            "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
-        ),
-        auto_resume_receipt_path: String::from("checkpoints/auto_resume_receipt.json"),
-        latest_checkpoint_eval_decision_path: String::from(
-            PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_DECISION_PATH,
-        ),
-        latest_checkpoint_eval_failure_path: String::from(
-            PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_EVAL_FAILURE_PATH,
-        ),
-        latest_checkpoint_comparison_path: String::from(
-            PSION_ACTUAL_PRETRAINING_LATEST_CHECKPOINT_COMPARISON_PATH,
-        ),
-        latest_continue_restart_decision_path: String::from(
-            PSION_ACTUAL_PRETRAINING_LATEST_CONTINUE_RESTART_DECISION_PATH,
-        ),
-        current_dashboard_path: String::from(PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH),
-        hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
-        run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
-        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
-        closeout_bundle_path: String::from("closeout/closeout_bundle.json"),
-        launcher_log_path: String::from("logs/launcher.log"),
-        latest_redacted_alert_path: String::from(
-            PSION_ACTUAL_PRETRAINING_LATEST_REDACTED_ALERT_PATH,
-        ),
-        active_alert_feed_path: String::from(PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH),
-    }
+    psion_actual_pretraining_retained_paths()
 }
 
 fn launcher_surfaces() -> PsionActualPretrainingLauncherSurfaces {

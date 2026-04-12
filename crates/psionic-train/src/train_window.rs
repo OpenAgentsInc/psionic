@@ -56,6 +56,22 @@ pub struct PsionicTrainWindowArtifactOutputs {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainWindowArtifactPlan {
+    pub run_id: String,
+    pub window_id: String,
+    pub assignment_id: String,
+    pub node_pubkey: String,
+    pub window_execution_id: String,
+    pub contribution_id: String,
+    pub window_root: String,
+    pub contribution_root: String,
+    pub window_execution_path: String,
+    pub contribution_receipt_path: String,
+    pub contribution_artifact_manifest_path: String,
+    pub sealed_window_bundle_path: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainWindowAssignmentMaterialization {
     pub assignment_id: String,
     pub contribution_id: String,
@@ -201,6 +217,79 @@ impl PsionicTrainContributionReceipt {
     }
 }
 
+pub fn predict_psionic_train_window_artifacts(
+    manifest: &PsionicTrainInvocationManifest,
+    run_id: &str,
+    run_root: &Path,
+) -> Option<PsionicTrainWindowArtifactPlan> {
+    if manifest.role == PsionicTrainRole::Validator {
+        return None;
+    }
+    let Some(window_id) = manifest.coordination.window_id.as_ref() else {
+        return None;
+    };
+    let Some(assignment_id) = manifest.coordination.assignment_id.as_ref() else {
+        return None;
+    };
+    let Some(node_pubkey) = manifest.coordination.node_pubkey.as_ref() else {
+        return None;
+    };
+    let grouped_stage_assignment_digest = manifest
+        .grouped_stage_assignment
+        .as_ref()
+        .map(|value| value.assignment_digest.clone())
+        .unwrap_or_default();
+    let window_execution_id = stable_id(
+        b"psionic_train_window_execution_id|",
+        &[
+            manifest.lane_id.as_str(),
+            manifest.coordination.network_id.as_deref().unwrap_or(""),
+            run_id,
+            window_id,
+            grouped_stage_assignment_digest.as_str(),
+        ],
+    );
+    let contribution_id = stable_id(
+        b"psionic_train_contribution_id|",
+        &[
+            manifest.lane_id.as_str(),
+            run_id,
+            window_id,
+            assignment_id,
+            node_pubkey,
+            grouped_stage_assignment_digest.as_str(),
+        ],
+    );
+    let window_root = run_root.join("windows").join(window_id);
+    let contribution_root = window_root.join("contributions").join(&contribution_id);
+    Some(PsionicTrainWindowArtifactPlan {
+        run_id: String::from(run_id),
+        window_id: window_id.clone(),
+        assignment_id: assignment_id.clone(),
+        node_pubkey: node_pubkey.clone(),
+        window_execution_id,
+        contribution_id,
+        window_root: window_root.display().to_string(),
+        contribution_root: contribution_root.display().to_string(),
+        window_execution_path: window_root
+            .join("window_execution.json")
+            .display()
+            .to_string(),
+        contribution_receipt_path: contribution_root
+            .join("contribution_receipt.json")
+            .display()
+            .to_string(),
+        contribution_artifact_manifest_path: contribution_root
+            .join("artifact_manifest.json")
+            .display()
+            .to_string(),
+        sealed_window_bundle_path: window_root
+            .join("sealed_window_bundle.json")
+            .display()
+            .to_string(),
+    })
+}
+
 pub fn persist_psionic_train_window_artifacts(
     manifest: &PsionicTrainInvocationManifest,
     runtime_attestation: &PsionicTrainRuntimeAttestation,
@@ -232,28 +321,10 @@ pub fn persist_psionic_train_window_artifacts(
         .as_ref()
         .map(|value| value.assignment_digest.clone())
         .unwrap_or_default();
-
-    let window_execution_id = stable_id(
-        b"psionic_train_window_execution_id|",
-        &[
-            manifest.lane_id.as_str(),
-            manifest.coordination.network_id.as_deref().unwrap_or(""),
-            run_id,
-            window_id,
-            grouped_stage_assignment_digest.as_str(),
-        ],
-    );
-    let contribution_id = stable_id(
-        b"psionic_train_contribution_id|",
-        &[
-            manifest.lane_id.as_str(),
-            run_id,
-            window_id,
-            assignment_id,
-            node_pubkey,
-            grouped_stage_assignment_digest.as_str(),
-        ],
-    );
+    let plan = predict_psionic_train_window_artifacts(manifest, run_id, run_root)
+        .expect("worker manifests with declared window state should plan deterministic artifacts");
+    let window_execution_id = plan.window_execution_id.clone();
+    let contribution_id = plan.contribution_id.clone();
     let assignment_materialization_digest = stable_id(
         b"psionic_train_assignment_materialization|",
         &[
@@ -271,8 +342,8 @@ pub fn persist_psionic_train_window_artifacts(
         ],
     );
 
-    let window_root = run_root.join("windows").join(window_id);
-    let contribution_root = window_root.join("contributions").join(&contribution_id);
+    let window_root = PathBuf::from(&plan.window_root);
+    let contribution_root = PathBuf::from(&plan.contribution_root);
     fs::create_dir_all(&contribution_root).map_err(|error| {
         PsionicTrainWindowArtifactError::Write {
             path: contribution_root.display().to_string(),
@@ -337,7 +408,7 @@ pub fn persist_psionic_train_window_artifacts(
     };
     window_execution.window_digest =
         stable_digest(b"psionic_train_window_execution|", &window_execution);
-    let window_execution_path = window_root.join("window_execution.json");
+    let window_execution_path = PathBuf::from(&plan.window_execution_path);
     write_json(window_execution_path.as_path(), &window_execution)?;
 
     let mut artifact_manifest = PsionicTrainContributionArtifactManifest {
@@ -361,7 +432,8 @@ pub fn persist_psionic_train_window_artifacts(
     artifact_manifest.artifact_count = artifact_manifest.artifacts.len();
     artifact_manifest.artifact_manifest_digest =
         artifact_manifest.stable_artifact_manifest_digest();
-    let contribution_artifact_manifest_path = contribution_root.join("artifact_manifest.json");
+    let contribution_artifact_manifest_path =
+        PathBuf::from(&plan.contribution_artifact_manifest_path);
     write_json(
         contribution_artifact_manifest_path.as_path(),
         &artifact_manifest,
@@ -399,7 +471,7 @@ pub fn persist_psionic_train_window_artifacts(
         detail: detail.to_string(),
     };
     contribution_receipt.contribution_digest = contribution_receipt.stable_contribution_digest();
-    let contribution_receipt_path = contribution_root.join("contribution_receipt.json");
+    let contribution_receipt_path = PathBuf::from(&plan.contribution_receipt_path);
     write_json(contribution_receipt_path.as_path(), &contribution_receipt)?;
 
     let mut contributions = load_window_contributions(&window_root)?;
@@ -456,7 +528,7 @@ pub fn persist_psionic_train_window_artifacts(
         b"psionic_train_sealed_window_bundle|",
         &sealed_window_bundle,
     );
-    let sealed_window_bundle_path = window_root.join("sealed_window_bundle.json");
+    let sealed_window_bundle_path = PathBuf::from(&plan.sealed_window_bundle_path);
     write_json(sealed_window_bundle_path.as_path(), &sealed_window_bundle)?;
 
     Ok(Some(PsionicTrainWindowArtifactOutputs {
@@ -708,9 +780,10 @@ mod tests {
     };
 
     use super::{
-        persist_psionic_train_window_artifacts, PsionicTrainContributionArtifactManifest,
-        PsionicTrainContributionReceipt, PsionicTrainSealedWindowBundle,
-        PsionicTrainWindowArtifactInputRefs, PsionicTrainWindowExecution,
+        persist_psionic_train_window_artifacts, predict_psionic_train_window_artifacts,
+        PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
+        PsionicTrainSealedWindowBundle, PsionicTrainWindowArtifactInputRefs,
+        PsionicTrainWindowExecution,
     };
     use crate::{
         PsionicTrainAdmissionIdentity, PsionicTrainAuthorityOwner,
@@ -833,6 +906,66 @@ mod tests {
         )
         .expect("manifest should write");
         path.display().to_string()
+    }
+
+    #[test]
+    fn predicted_window_artifact_plan_matches_persisted_layout() {
+        let run_root = temp_root("window-plan");
+        let mut manifest = base_manifest();
+        manifest.output_root = Some(run_root.display().to_string());
+        manifest
+            .populate_manifest_digest()
+            .expect("manifest digest should populate");
+        let plan = predict_psionic_train_window_artifacts(&manifest, "run-window-test", &run_root)
+            .expect("worker window manifest should produce a deterministic plan");
+        let invocation_manifest_path = write_invocation_manifest(&run_root, &manifest);
+        let inputs = PsionicTrainWindowArtifactInputRefs {
+            invocation_manifest_path,
+            launch_manifest_path: None,
+            membership_revision_path: None,
+            grouped_stage_input_transport_path: None,
+            checkpoint_surface_path: None,
+            checkpoint_pointer_path: None,
+            checkpoint_manifest_path: None,
+            checkpoint_backup_receipt_path: None,
+            checkpoint_handoff_receipt_path: None,
+            recovery_receipt_path: None,
+            current_status_path: None,
+            retained_summary_path: None,
+            launcher_log_path: None,
+            final_closeout_bundle_path: None,
+        };
+
+        let outputs = persist_psionic_train_window_artifacts(
+            &manifest,
+            &attestation(),
+            &capability_projection(),
+            "run-window-test",
+            &run_root,
+            &inputs,
+            PsionicTrainOutcomeKind::Succeeded,
+            0,
+            false,
+            PsionicTrainAuthorityOwner::Pylon,
+            None,
+            "predicted window artifact plan should match persisted layout",
+        )
+        .expect("window artifacts should persist")
+        .expect("worker window artifacts should exist");
+
+        assert_eq!(outputs.window_execution_path, plan.window_execution_path);
+        assert_eq!(
+            outputs.contribution_receipt_path,
+            plan.contribution_receipt_path
+        );
+        assert_eq!(
+            outputs.contribution_artifact_manifest_path,
+            plan.contribution_artifact_manifest_path
+        );
+        assert_eq!(
+            outputs.sealed_window_bundle_path,
+            plan.sealed_window_bundle_path
+        );
     }
 
     #[test]

@@ -418,7 +418,24 @@ resume and replay can preserve logical identity even when the receiving node
 stages the bytes somewhere else. Resume can now also resolve the outer
 checkpoint handoff receipt plus its nested checkpoint pointer and manifest from
 the canonical local cache under `artifacts/resolved/` when only logical
-artifact ids are available. It now emits
+artifact ids are available.
+
+For the strong actual-pretraining lane, the same module now also exposes one
+typed packaging layer above that generic manifest:
+`psion.actual_pretraining_automatic_execution_request.v1` plus
+`psion.actual_pretraining_automatic_execution_outputs.v1`. That request is the
+assignment-shaped contract for a strong node. It fixes
+`lane_id = psion_actual_pretraining_v1`,
+`work_class = full_island_local_update_training`, and the admitted actual-lane
+release/environment ids, while the caller still provides the admitted build
+digest, run id, coordination envelope, selected git ref, roots, and any
+resume or checkpoint-specific fields already required by the generic runtime.
+The paired output plan names the deterministic retained status, checkpoint, and
+window-artifact paths that one packaged strong-node turn will materialize under
+the run root, so `Pylon` and `Nexus` can reason about the same actual lane
+without inventing a second runtime or status grammar.
+
+The machine runtime still emits
 one final
 `psionic.train.status_packet.v1` packet with a stable exit code, retryability
 bit, authority owner, optional refusal class, shared coordination fields,

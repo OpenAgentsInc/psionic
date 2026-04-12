@@ -132,16 +132,26 @@ wrapper:
 cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path-to-psionic.train.invocation_manifest.v1.json>
 ```
 
+The actual CUDA lane now also has one strong-node packaging contract above that
+same runtime in
+`crates/psionic-train/src/psion_actual_pretraining_launcher.rs`:
+`psion.actual_pretraining_automatic_execution_request.v1` compiles assigned
+actual-lane work into the generic invocation manifest, and
+`psion.actual_pretraining_automatic_execution_outputs.v1` names the
+deterministic retained status, checkpoint, and window-artifact paths that
+execution will materialize under the run root.
+
 That manifest now carries one frozen coordination envelope, including the
 admitted `node_pubkey`, plus one admitted release/build/environment identity
 that the runtime checks before launch. Recovery-source manifests can now also
 carry one `peer_node_pubkey` for the machine-only `serve-checkpoint` operation
-and one `peer_checkpoint_handoff_receipt_path` that seeds a joiner’s local
-checkpoint tree before `resume` runs. Validator manifests are now admitted for
-one machine-only `validate-contribution` operation as well, using one
-`validator_target_contribution_receipt_path` plus one
-`validator_target_contribution_artifact_manifest_path` to replay one retained
-worker contribution artifact set into one local validator score receipt. The emitted
+and one `peer_checkpoint_handoff_receipt` artifact binding that seeds a
+joiner’s local checkpoint tree before `resume` runs. Validator manifests are
+now admitted for one machine-only `validate-contribution` operation as well,
+using one `validator_target_contribution_receipt` artifact binding plus one
+`validator_target_contribution_artifact_manifest` artifact binding to replay
+one retained worker contribution artifact set into one local validator score
+receipt. The emitted
 `psionic.train.status_packet.v1` packet now also carries the resolved runtime
 attestation and the retained absolute paths for
 `status/psionic_train_run_status_packet.json` and

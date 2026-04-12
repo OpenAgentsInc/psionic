@@ -1,13 +1,21 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
+    predict_psionic_train_window_artifacts, PsionActualPretrainingArtifactRef,
+    PsionActualPretrainingLauncherSurfaces, PsionicTrainAdmissionIdentity,
+    PsionicTrainArtifactBinding, PsionicTrainArtifactSurfaceRefs, PsionicTrainCoordinationContext,
+    PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainRole,
+    PsionicTrainRuntimeContractError, PsionicTrainWorkClass,
+    PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+    PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
     PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
     PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
     PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_RECIPE_ID,
     PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID, PSION_ACTUAL_PRETRAINING_START_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingArtifactRef,
-    PsionActualPretrainingLauncherSurfaces,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 
 /// Stable schema version for the canonical actual-lane launch manifest.
@@ -25,6 +33,104 @@ pub const PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION: &str =
 /// Stable schema version for the canonical actual-lane closeout bundle.
 pub const PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION: &str =
     "psion.actual_pretraining_closeout_bundle.v1";
+
+/// Stable schema version for one strong-node automatic execution request.
+pub const PSION_ACTUAL_PRETRAINING_AUTOMATIC_EXECUTION_REQUEST_SCHEMA_VERSION: &str =
+    "psion.actual_pretraining_automatic_execution_request.v1";
+
+/// Stable schema version for one strong-node automatic execution output plan.
+pub const PSION_ACTUAL_PRETRAINING_AUTOMATIC_EXECUTION_OUTPUTS_SCHEMA_VERSION: &str =
+    "psion.actual_pretraining_automatic_execution_outputs.v1";
+
+/// Canonical request that packages assigned actual-lane work into the machine runtime contract.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionActualPretrainingAutomaticExecutionRequest {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable admitted runtime role.
+    pub role: PsionicTrainRole,
+    /// Stable runtime operation.
+    pub operation: PsionicTrainOperation,
+    /// Shared coordination envelope frozen for receipts and status packets.
+    #[serde(default)]
+    pub coordination: PsionicTrainCoordinationContext,
+    /// Admitted build digest expected before launch.
+    pub build_digest: String,
+    /// Stable run identifier the assignment belongs to.
+    pub run_id: String,
+    /// Explicit output root for launch-style operations.
+    pub output_root: Option<String>,
+    /// Explicit run root for retained-state operations.
+    pub run_root: Option<String>,
+    /// Explicit git ref selection.
+    pub selected_git_ref: String,
+    /// Optional retained hardware observation path.
+    pub hardware_observation_path: Option<String>,
+    /// Optional retained run-shape observation path.
+    pub run_shape_observation_path: Option<String>,
+    /// Optional admitted peer node pubkey for checkpoint serving.
+    pub peer_node_pubkey: Option<String>,
+    /// Optional resolver-backed peer checkpoint handoff receipt for resume.
+    #[serde(default)]
+    pub peer_checkpoint_handoff_receipt: Option<PsionicTrainArtifactBinding>,
+    /// Optional checkpoint label for checkpoint recording.
+    pub checkpoint_label: Option<String>,
+    /// Optional optimizer step for checkpoint recording.
+    pub optimizer_step: Option<u64>,
+    /// Optional checkpoint ref for checkpoint recording.
+    pub checkpoint_ref: Option<String>,
+    /// Optional checkpoint object digest override.
+    pub checkpoint_object_digest: Option<String>,
+    /// Optional checkpoint object byte count override.
+    pub checkpoint_total_bytes: Option<u64>,
+    /// Whether dirty-tree override is admitted.
+    #[serde(default)]
+    pub allow_dirty_tree: bool,
+    /// Whether execution remains in dry-run posture.
+    #[serde(default)]
+    pub dry_run: bool,
+    /// Optional failed-upload drill.
+    #[serde(default)]
+    pub inject_failed_upload: bool,
+    /// Optional eval-worker-unavailable drill.
+    #[serde(default)]
+    pub inject_eval_worker_unavailable: bool,
+}
+
+/// Deterministic retained outputs for one packaged actual-lane machine execution.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionActualPretrainingAutomaticExecutionOutputs {
+    /// Stable schema version.
+    pub schema_version: String,
+    /// Stable admitted lane identifier.
+    pub lane_id: String,
+    /// Stable runtime role.
+    pub role: PsionicTrainRole,
+    /// Stable runtime operation.
+    pub operation: PsionicTrainOperation,
+    /// Stable runtime work class.
+    pub work_class: PsionicTrainWorkClass,
+    /// Stable run identifier.
+    pub run_id: String,
+    /// Absolute run root the node will materialize or resume.
+    pub run_root: String,
+    /// Optional absolute window root when the coordination envelope binds one window.
+    pub window_root: Option<String>,
+    /// Optional absolute operation-manifest path under the run root.
+    pub operation_manifest_path: Option<String>,
+    /// Optional absolute current-status path under the run root.
+    pub current_status_path: Option<String>,
+    /// Optional absolute retained-summary path under the run root.
+    pub retained_summary_path: Option<String>,
+    /// Optional absolute launcher log path under the run root.
+    pub launcher_log_path: Option<String>,
+    /// Absolute retained machine run-status packet path.
+    pub run_status_packet_path: String,
+    /// Absolute retained machine window-status packet path.
+    pub window_status_packet_path: String,
+    /// Deterministic artifact-surface refs the execution can materialize.
+    pub artifacts: PsionicTrainArtifactSurfaceRefs,
+}
 
 /// Fixed retained paths used by the actual-lane launcher contract.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,6 +427,306 @@ pub struct PsionActualPretrainingCloseoutBundle {
     pub claim_boundary: String,
     /// Short detail.
     pub detail: String,
+}
+
+/// Returns the fixed retained-path contract for the actual pretraining lane.
+#[must_use]
+pub fn psion_actual_pretraining_retained_paths() -> PsionActualPretrainingRetainedPathSet {
+    PsionActualPretrainingRetainedPathSet {
+        launch_manifest_path: String::from("manifests/launch_manifest.json"),
+        resume_manifest_path: String::from("manifests/resume_manifest.json"),
+        current_status_path: String::from("status/current_run_status.json"),
+        retained_summary_path: String::from("status/retained_summary.json"),
+        latest_checkpoint_pointer_path: String::from(
+            "checkpoints/latest_accepted_checkpoint_pointer.json",
+        ),
+        latest_checkpoint_backup_receipt_path: String::from(
+            "checkpoints/latest_accepted_checkpoint_backup_receipt.json",
+        ),
+        auto_resume_receipt_path: String::from("checkpoints/auto_resume_receipt.json"),
+        latest_checkpoint_eval_decision_path: String::from(
+            "evals/latest_checkpoint_eval_decision.json",
+        ),
+        latest_checkpoint_eval_failure_path: String::from(
+            "evals/latest_checkpoint_eval_failure.json",
+        ),
+        latest_checkpoint_comparison_path: String::from(
+            "decisions/latest_checkpoint_comparison.json",
+        ),
+        latest_continue_restart_decision_path: String::from(
+            "decisions/latest_continue_restart_decision.json",
+        ),
+        current_dashboard_path: String::from("dashboard/current_dashboard.json"),
+        hardware_qualification_path: String::from("preflight/hardware_qualification.json"),
+        run_shape_qualification_path: String::from("preflight/run_shape_qualification.json"),
+        continuation_handoff_path: String::from(PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH),
+        closeout_bundle_path: String::from("closeout/closeout_bundle.json"),
+        launcher_log_path: String::from("logs/launcher.log"),
+        latest_redacted_alert_path: String::from("alerts/latest_redacted_alert.json"),
+        active_alert_feed_path: String::from("alerts/active_alerts.json"),
+    }
+}
+
+impl PsionActualPretrainingAutomaticExecutionRequest {
+    /// Validates the assignment-shaped automatic execution request.
+    pub fn validate(&self) -> Result<(), PsionActualPretrainingLauncherError> {
+        self.to_invocation_manifest().map(|_| ())
+    }
+
+    /// Builds the stable machine runtime invocation manifest for the actual lane.
+    pub fn to_invocation_manifest(
+        &self,
+    ) -> Result<PsionicTrainInvocationManifest, PsionActualPretrainingLauncherError> {
+        self.validate_request_fields()?;
+        let mut manifest = PsionicTrainInvocationManifest {
+            schema_version: String::from(PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION),
+            runtime_surface_id: String::from(PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+            lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+            role: self.role,
+            operation: self.operation,
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            coordination: self.coordination.clone(),
+            grouped_stage_assignment: None,
+            admission_identity: PsionicTrainAdmissionIdentity {
+                release_id: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
+                build_digest: self.build_digest.clone(),
+                environment_ref: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+            },
+            run_id: Some(self.run_id.clone()),
+            output_root: self.output_root.clone(),
+            run_root: self.run_root.clone(),
+            peer_node_pubkey: self.peer_node_pubkey.clone(),
+            peer_checkpoint_handoff_receipt: self.peer_checkpoint_handoff_receipt.clone(),
+            validator_target_contribution_receipt: None,
+            validator_target_contribution_artifact_manifest: None,
+            validator_target_work_class: None,
+            grouped_stage_input_transport: None,
+            selected_git_ref: Some(self.selected_git_ref.clone()),
+            hardware_observation_path: self.hardware_observation_path.clone(),
+            run_shape_observation_path: self.run_shape_observation_path.clone(),
+            allow_dirty_tree: self.allow_dirty_tree,
+            dry_run: self.dry_run,
+            checkpoint_label: self.checkpoint_label.clone(),
+            optimizer_step: self.optimizer_step,
+            checkpoint_ref: self.checkpoint_ref.clone(),
+            checkpoint_object_digest: self.checkpoint_object_digest.clone(),
+            checkpoint_total_bytes: self.checkpoint_total_bytes,
+            inject_failed_upload: self.inject_failed_upload,
+            inject_eval_worker_unavailable: self.inject_eval_worker_unavailable,
+            manifest_digest: None,
+        };
+        manifest
+            .populate_manifest_digest()
+            .map_err(map_runtime_contract_error)?;
+        manifest
+            .validate_machine_contract()
+            .map_err(map_runtime_contract_error)?;
+        Ok(manifest)
+    }
+
+    /// Computes the deterministic retained outputs for one packaged execution.
+    pub fn expected_outputs(
+        &self,
+    ) -> Result<PsionActualPretrainingAutomaticExecutionOutputs, PsionActualPretrainingLauncherError>
+    {
+        let manifest = self.to_invocation_manifest()?;
+        let retained_paths = psion_actual_pretraining_retained_paths();
+        retained_paths.validate()?;
+        let run_root = self.derived_run_root()?;
+        let operation_manifest_path =
+            operation_manifest_path(&run_root, &retained_paths, self.operation);
+        let writes_actual_lane_surfaces = operation_writes_actual_lane_surfaces(self.operation);
+        let window_plan =
+            predict_psionic_train_window_artifacts(&manifest, self.run_id.as_str(), &run_root);
+        let checkpoint_surface_path = run_root.join("status/checkpoint_surface.json");
+        let checkpoint_handoff_receipt_path =
+            run_root.join("status/peer_checkpoint_handoff_receipt.json");
+        let checkpoint_manifest_path = self.optimizer_step.map(|optimizer_step| {
+            run_root
+                .join(format!(
+                    "checkpoints/step-{optimizer_step}/checkpoint_manifest.json"
+                ))
+                .display()
+                .to_string()
+        });
+        Ok(PsionActualPretrainingAutomaticExecutionOutputs {
+            schema_version: String::from(
+                PSION_ACTUAL_PRETRAINING_AUTOMATIC_EXECUTION_OUTPUTS_SCHEMA_VERSION,
+            ),
+            lane_id: String::from(PSION_ACTUAL_PRETRAINING_LANE_ID),
+            role: self.role,
+            operation: self.operation,
+            work_class: PsionicTrainWorkClass::FullIslandLocalUpdateTraining,
+            run_id: self.run_id.clone(),
+            run_root: run_root.display().to_string(),
+            window_root: window_plan.as_ref().map(|value| value.window_root.clone()),
+            operation_manifest_path: operation_manifest_path.clone(),
+            current_status_path: writes_actual_lane_surfaces.then(|| {
+                run_root
+                    .join(&retained_paths.current_status_path)
+                    .display()
+                    .to_string()
+            }),
+            retained_summary_path: writes_actual_lane_surfaces.then(|| {
+                run_root
+                    .join(&retained_paths.retained_summary_path)
+                    .display()
+                    .to_string()
+            }),
+            launcher_log_path: writes_actual_lane_surfaces.then(|| {
+                run_root
+                    .join(&retained_paths.launcher_log_path)
+                    .display()
+                    .to_string()
+            }),
+            run_status_packet_path: run_root
+                .join("status/psionic_train_run_status_packet.json")
+                .display()
+                .to_string(),
+            window_status_packet_path: run_root
+                .join("status/psionic_train_window_status_packet.json")
+                .display()
+                .to_string(),
+            artifacts: PsionicTrainArtifactSurfaceRefs {
+                launch_manifest_path: operation_manifest_path,
+                membership_revision_path: Some(
+                    run_root
+                        .join("status/membership_revision_receipt.json")
+                        .display()
+                        .to_string(),
+                ),
+                window_execution_path: window_plan
+                    .as_ref()
+                    .map(|value| value.window_execution_path.clone()),
+                contribution_receipt_path: window_plan
+                    .as_ref()
+                    .map(|value| value.contribution_receipt_path.clone()),
+                contribution_artifact_manifest_path: window_plan
+                    .as_ref()
+                    .map(|value| value.contribution_artifact_manifest_path.clone()),
+                grouped_stage_input_transport_path: None,
+                grouped_stage_output_transport_path: None,
+                grouped_stage_output_payload_path: None,
+                grouped_stage_execution_summary_path: None,
+                grouped_stage_replay_evidence_path: None,
+                checkpoint_surface_path: Some(checkpoint_surface_path.display().to_string()),
+                checkpoint_pointer_path: Some(
+                    run_root
+                        .join(&retained_paths.latest_checkpoint_pointer_path)
+                        .display()
+                        .to_string(),
+                ),
+                checkpoint_manifest_path,
+                checkpoint_backup_receipt_path: matches!(
+                    self.operation,
+                    PsionicTrainOperation::Backup
+                )
+                .then(|| {
+                    run_root
+                        .join(&retained_paths.latest_checkpoint_backup_receipt_path)
+                        .display()
+                        .to_string()
+                }),
+                checkpoint_handoff_receipt_path: matches!(
+                    self.operation,
+                    PsionicTrainOperation::ServeCheckpoint
+                )
+                .then(|| checkpoint_handoff_receipt_path.display().to_string()),
+                recovery_receipt_path: matches!(self.operation, PsionicTrainOperation::Resume)
+                    .then(|| {
+                        run_root
+                            .join(&retained_paths.auto_resume_receipt_path)
+                            .display()
+                            .to_string()
+                    }),
+                validator_score_receipt_path: None,
+                validator_quality_drift_signal_path: None,
+                validator_rollback_signal_path: None,
+                weak_device_validation_replay_proof_path: None,
+                sealed_window_bundle_path: window_plan
+                    .as_ref()
+                    .map(|value| value.sealed_window_bundle_path.clone()),
+                final_closeout_bundle_path: writes_actual_lane_surfaces.then(|| {
+                    run_root
+                        .join(&retained_paths.closeout_bundle_path)
+                        .display()
+                        .to_string()
+                }),
+            },
+        })
+    }
+
+    fn validate_request_fields(&self) -> Result<(), PsionActualPretrainingLauncherError> {
+        ensure_exact(
+            self.schema_version.as_str(),
+            "automatic_execution_request.schema_version",
+            PSION_ACTUAL_PRETRAINING_AUTOMATIC_EXECUTION_REQUEST_SCHEMA_VERSION,
+        )?;
+        if self.role == PsionicTrainRole::Validator {
+            return Err(PsionActualPretrainingLauncherError::UnsupportedValue {
+                field: String::from("automatic_execution_request.role"),
+                detail: String::from(
+                    "actual-pretraining automatic execution is reserved for worker and recovery_source roles",
+                ),
+            });
+        }
+        if self.operation == PsionicTrainOperation::ValidateContribution {
+            return Err(PsionActualPretrainingLauncherError::UnsupportedValue {
+                field: String::from("automatic_execution_request.operation"),
+                detail: String::from(
+                    "actual-pretraining automatic execution does not package validator replay operations",
+                ),
+            });
+        }
+        ensure_nonempty(
+            self.build_digest.as_str(),
+            "automatic_execution_request.build_digest",
+        )?;
+        ensure_nonempty(self.run_id.as_str(), "automatic_execution_request.run_id")?;
+        ensure_nonempty(
+            self.selected_git_ref.as_str(),
+            "automatic_execution_request.selected_git_ref",
+        )?;
+        self.coordination
+            .validate("automatic_execution_request.coordination")
+            .map_err(
+                |error| PsionActualPretrainingLauncherError::NestedValidation {
+                    field: String::from("automatic_execution_request.coordination"),
+                    detail: error.to_string(),
+                },
+            )?;
+        if let Some(peer_checkpoint_handoff_receipt) = self.peer_checkpoint_handoff_receipt.as_ref()
+        {
+            peer_checkpoint_handoff_receipt
+                .validate("automatic_execution_request.peer_checkpoint_handoff_receipt")
+                .map_err(
+                    |detail| PsionActualPretrainingLauncherError::NestedValidation {
+                        field: String::from(
+                            "automatic_execution_request.peer_checkpoint_handoff_receipt",
+                        ),
+                        detail,
+                    },
+                )?;
+        }
+        Ok(())
+    }
+
+    fn derived_run_root(&self) -> Result<PathBuf, PsionActualPretrainingLauncherError> {
+        match self.operation {
+            PsionicTrainOperation::Start | PsionicTrainOperation::RehearseBaseLane => {
+                Ok(PathBuf::from(self.output_root.as_deref().ok_or_else(
+                    || PsionActualPretrainingLauncherError::MissingField {
+                        field: String::from("automatic_execution_request.output_root"),
+                    },
+                )?))
+            }
+            _ => Ok(PathBuf::from(self.run_root.as_deref().ok_or_else(
+                || PsionActualPretrainingLauncherError::MissingField {
+                    field: String::from("automatic_execution_request.run_root"),
+                },
+            )?)),
+        }
+    }
 }
 
 impl PsionActualPretrainingRetainedPathSet {
@@ -713,8 +1119,14 @@ impl PsionActualPretrainingCloseoutBundle {
             )?;
         }
         for gate in &self.closeout_gates {
-            ensure_nonempty(gate.gate_id.as_str(), "closeout_bundle.closeout_gates[].gate_id")?;
-            ensure_nonempty(gate.detail.as_str(), "closeout_bundle.closeout_gates[].detail")?;
+            ensure_nonempty(
+                gate.gate_id.as_str(),
+                "closeout_bundle.closeout_gates[].gate_id",
+            )?;
+            ensure_nonempty(
+                gate.detail.as_str(),
+                "closeout_bundle.closeout_gates[].detail",
+            )?;
         }
         for drill in &self.failure_drills {
             ensure_nonempty(
@@ -725,10 +1137,7 @@ impl PsionActualPretrainingCloseoutBundle {
                 drill.resolution_state.as_str(),
                 "closeout_bundle.failure_drills[].resolution_state",
             )?;
-            ensure_artifact_ref(
-                &drill.artifact,
-                "closeout_bundle.failure_drills[].artifact",
-            )?;
+            ensure_artifact_ref(&drill.artifact, "closeout_bundle.failure_drills[].artifact")?;
             ensure_nonempty(
                 drill.detail.as_str(),
                 "closeout_bundle.failure_drills[].detail",
@@ -790,9 +1199,7 @@ impl PsionActualPretrainingCloseoutBundle {
                     .any(|artifact| artifact.artifact_kind == required_kind)
                 {
                     return Err(PsionActualPretrainingLauncherError::MissingField {
-                        field: format!(
-                            "closeout_bundle.evidence_artifacts[{required_kind}]"
-                        ),
+                        field: format!("closeout_bundle.evidence_artifacts[{required_kind}]"),
                     });
                 }
             }
@@ -973,6 +1380,54 @@ fn ensure_dirty_tree_admission(
     }
 }
 
+fn operation_manifest_path(
+    run_root: &PathBuf,
+    retained_paths: &PsionActualPretrainingRetainedPathSet,
+    operation: PsionicTrainOperation,
+) -> Option<String> {
+    match operation {
+        PsionicTrainOperation::Start | PsionicTrainOperation::RehearseBaseLane => Some(
+            run_root
+                .join(&retained_paths.launch_manifest_path)
+                .display()
+                .to_string(),
+        ),
+        PsionicTrainOperation::Resume => Some(
+            run_root
+                .join(&retained_paths.resume_manifest_path)
+                .display()
+                .to_string(),
+        ),
+        _ => None,
+    }
+}
+
+fn operation_writes_actual_lane_surfaces(operation: PsionicTrainOperation) -> bool {
+    !matches!(operation, PsionicTrainOperation::ServeCheckpoint)
+}
+
+fn map_runtime_contract_error(
+    error: PsionicTrainRuntimeContractError,
+) -> PsionActualPretrainingLauncherError {
+    match error {
+        PsionicTrainRuntimeContractError::MissingField { field } => {
+            PsionActualPretrainingLauncherError::MissingField { field }
+        }
+        PsionicTrainRuntimeContractError::FieldMismatch {
+            field,
+            expected,
+            actual,
+        } => PsionActualPretrainingLauncherError::FieldMismatch {
+            field,
+            expected,
+            actual,
+        },
+        PsionicTrainRuntimeContractError::InvalidValue { field, detail } => {
+            PsionActualPretrainingLauncherError::UnsupportedValue { field, detail }
+        }
+    }
+}
+
 /// Validation errors for the actual-lane launcher surfaces.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PsionActualPretrainingLauncherError {
@@ -995,8 +1450,14 @@ pub enum PsionActualPretrainingLauncherError {
 #[cfg(test)]
 mod tests {
     use super::{
+        psion_actual_pretraining_retained_paths, PsionActualPretrainingAutomaticExecutionRequest,
         PsionActualPretrainingCheckpointPointer, PsionActualPretrainingCloseoutBundle,
         PsionActualPretrainingLaunchManifest, PsionActualPretrainingResumeManifest,
+        PSION_ACTUAL_PRETRAINING_AUTOMATIC_EXECUTION_REQUEST_SCHEMA_VERSION,
+    };
+    use crate::{
+        PsionicTrainArtifactBinding, PsionicTrainArtifactRef, PsionicTrainCoordinationContext,
+        PsionicTrainOperation, PsionicTrainRole, PsionicTrainWorkClass,
     };
 
     fn launch_manifest() -> PsionActualPretrainingLaunchManifest {
@@ -1027,6 +1488,42 @@ mod tests {
         .expect("actual pretraining closeout bundle fixture should parse")
     }
 
+    fn automatic_execution_request() -> PsionActualPretrainingAutomaticExecutionRequest {
+        PsionActualPretrainingAutomaticExecutionRequest {
+            schema_version: String::from(
+                PSION_ACTUAL_PRETRAINING_AUTOMATIC_EXECUTION_REQUEST_SCHEMA_VERSION,
+            ),
+            role: PsionicTrainRole::Worker,
+            operation: PsionicTrainOperation::Start,
+            coordination: PsionicTrainCoordinationContext {
+                network_id: Some(String::from("network.psion.trainnet-a")),
+                window_id: Some(String::from("window-0172")),
+                assignment_id: Some(String::from("assignment-0044")),
+                challenge_id: None,
+                node_pubkey: Some(String::from("npub1-strong-node")),
+                membership_revision: Some(9),
+            },
+            build_digest: String::from("sha256:test-build"),
+            run_id: String::from("psion-r172"),
+            output_root: Some(String::from("/tmp/psion-r172")),
+            run_root: None,
+            selected_git_ref: String::from("refs/heads/main"),
+            hardware_observation_path: Some(String::from("preflight/hardware_observation.json")),
+            run_shape_observation_path: Some(String::from("preflight/run_shape_observation.json")),
+            peer_node_pubkey: None,
+            peer_checkpoint_handoff_receipt: None,
+            checkpoint_label: None,
+            optimizer_step: None,
+            checkpoint_ref: None,
+            checkpoint_object_digest: None,
+            checkpoint_total_bytes: None,
+            allow_dirty_tree: false,
+            dry_run: false,
+            inject_failed_upload: false,
+            inject_eval_worker_unavailable: false,
+        }
+    }
+
     #[test]
     fn actual_pretraining_launch_manifest_fixture_validates() {
         launch_manifest()
@@ -1053,6 +1550,90 @@ mod tests {
         closeout_bundle()
             .validate()
             .expect("actual pretraining closeout bundle fixture should validate");
+    }
+
+    #[test]
+    fn actual_pretraining_automatic_execution_request_builds_start_manifest_and_outputs() {
+        let request = automatic_execution_request();
+        let manifest = request
+            .to_invocation_manifest()
+            .expect("automatic execution request should build a machine manifest");
+        assert_eq!(manifest.lane_id, crate::PSION_ACTUAL_PRETRAINING_LANE_ID);
+        assert_eq!(
+            manifest.work_class,
+            PsionicTrainWorkClass::FullIslandLocalUpdateTraining
+        );
+        assert_eq!(
+            manifest.admission_identity.release_id.as_str(),
+            crate::PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID
+        );
+        assert_eq!(
+            manifest.admission_identity.environment_ref.as_str(),
+            crate::PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF
+        );
+        let outputs = request
+            .expected_outputs()
+            .expect("automatic execution request should plan retained outputs");
+        let retained_paths = psion_actual_pretraining_retained_paths();
+        assert_eq!(outputs.run_root, "/tmp/psion-r172");
+        assert_eq!(
+            outputs.operation_manifest_path.as_deref(),
+            Some("/tmp/psion-r172/manifests/launch_manifest.json")
+        );
+        assert_eq!(
+            outputs.current_status_path.as_deref(),
+            Some("/tmp/psion-r172/status/current_run_status.json")
+        );
+        assert_eq!(
+            outputs.artifacts.checkpoint_pointer_path.as_deref(),
+            Some("/tmp/psion-r172/checkpoints/latest_accepted_checkpoint_pointer.json")
+        );
+        assert_eq!(
+            outputs.artifacts.sealed_window_bundle_path.as_deref(),
+            Some("/tmp/psion-r172/windows/window-0172/sealed_window_bundle.json")
+        );
+        assert_eq!(
+            outputs.artifacts.final_closeout_bundle_path.as_deref(),
+            Some("/tmp/psion-r172/closeout/closeout_bundle.json")
+        );
+        assert_eq!(
+            retained_paths.launch_manifest_path.as_str(),
+            "manifests/launch_manifest.json"
+        );
+    }
+
+    #[test]
+    fn actual_pretraining_automatic_execution_request_accepts_resolver_backed_resume_handoff() {
+        let mut request = automatic_execution_request();
+        request.role = PsionicTrainRole::RecoverySource;
+        request.operation = PsionicTrainOperation::Resume;
+        request.output_root = None;
+        request.run_root = Some(String::from("/tmp/psion-r172"));
+        request.peer_checkpoint_handoff_receipt = Some(PsionicTrainArtifactBinding {
+            artifact_ref: PsionicTrainArtifactRef {
+                artifact_id: String::from("artifact://handoff/agg-r171"),
+                artifact_digest: Some(String::from("sha256:handoff")),
+                artifact_bytes: Some(4096),
+            },
+            materialized_path: None,
+        });
+
+        let manifest = request
+            .to_invocation_manifest()
+            .expect("resume request should build a machine manifest");
+        assert!(manifest.peer_checkpoint_handoff_receipt.is_some());
+        let outputs = request
+            .expected_outputs()
+            .expect("resume request should plan retained outputs");
+        assert_eq!(
+            outputs.operation_manifest_path.as_deref(),
+            Some("/tmp/psion-r172/manifests/resume_manifest.json")
+        );
+        assert_eq!(
+            outputs.artifacts.recovery_receipt_path.as_deref(),
+            Some("/tmp/psion-r172/checkpoints/auto_resume_receipt.json")
+        );
+        assert_eq!(outputs.role, PsionicTrainRole::RecoverySource);
     }
 
     #[test]
