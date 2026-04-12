@@ -178,8 +178,9 @@ For local reference runs, `reference_pilot_artifacts/` should contain:
 
 ## Checkpoint Restore Verification
 
-After a bounded local reference run completes, verify that the retained
-checkpoint can be restored through the live resume-probe surface:
+After either a bounded local reference run or a copied-back accelerated
+reference run completes, verify that the retained checkpoint can be restored
+through the live resume-probe surface:
 
 ```bash
 cargo run -q -p psionic-train --example psion_reference_pilot_resume_probe -- \
@@ -193,7 +194,10 @@ That command writes:
 
 The resume-probe receipt is the retained proof that the saved checkpoint can be
 reloaded and advanced through one resumed optimizer step without inventing a
-second runtime path.
+second runtime path. Accelerated runs copied back from the admitted Tailnet
+CUDA host use the same probe entrypoint; the probe now rebinds the retained
+parameter-group device metadata to CPU before replaying the resumed optimizer
+step on the local host.
 
 ## Refusal Behavior
 
@@ -224,6 +228,9 @@ honest staging path:
 
 Both paths preserve the same claim boundary. The first is faster. The second is
 the escape hatch for a committed local ref that has not been published yet.
+The archive fallback now also creates the remote parent directory before `scp`
+and exports `RUST_MIN_STACK=16777216` for the remote `cargo run` so admitted
+Linux staging remains usable for unpushed committed refs.
 
 ## Claim Boundary
 
