@@ -8,10 +8,10 @@ use std::{
 };
 
 use psionic_train::{
-    PsionReferencePilotConfig, PsionReferencePilotContributionBackend,
-    PsionReferencePilotDualHostConfig, PsionReferencePilotJointContributionReceipt,
-    PsionReferencePilotJointContributionRequest, TrainingLoopBudget,
-    run_psion_dual_host_reference_pilot,
+    run_psion_dual_host_reference_pilot, PsionReferencePilotConfig,
+    PsionReferencePilotContributionBackend, PsionReferencePilotDualHostConfig,
+    PsionReferencePilotJointContributionReceipt, PsionReferencePilotJointContributionRequest,
+    TrainingLoopBudget,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -226,15 +226,16 @@ fn dual_host_config_from_env() -> Result<PsionReferencePilotDualHostConfig, Box<
     if let Some(value) =
         optional_nonempty_env("PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND")?
     {
-        let backend =
-            match value.as_str() {
-                "cpu" => PsionReferencePilotContributionBackend::Cpu,
-                "cuda" => PsionReferencePilotContributionBackend::Cuda,
-                other => return Err(format!(
+        let backend = match value.as_str() {
+            "cpu" => PsionReferencePilotContributionBackend::Cpu,
+            "cuda" => PsionReferencePilotContributionBackend::Cuda,
+            other => {
+                return Err(format!(
                     "unsupported PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND `{other}`"
                 )
-                .into()),
-            };
+                .into())
+            }
+        };
         config = config.with_secondary_remote_worker_backend(backend);
     }
     Ok(config)
@@ -284,15 +285,14 @@ fn ssh_status(
 }
 
 fn ssh_bash(target: &str, command: &str) -> Result<(), psionic_train::PsionReferencePilotError> {
+    let wrapped = format!("bash -lc {}", shell_quote(command));
     let status = Command::new("ssh")
         .arg("-o")
         .arg("BatchMode=yes")
         .arg("-o")
         .arg("ConnectTimeout=5")
         .arg(target)
-        .arg("bash")
-        .arg("-lc")
-        .arg(command)
+        .arg(wrapped)
         .status()
         .map_err(io_as_remote_error)?;
     if !status.success() {
