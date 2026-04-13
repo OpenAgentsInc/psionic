@@ -563,9 +563,9 @@ production-candidate canary target is:
 The current clean source-of-truth run for that canary is:
 
 - run id:
-  `psion-actual-pretraining-tri-host-actual-prodcanary-zstd-clean-20260413t134400Z`
+  `psion-actual-pretraining-tri-host-actual-prodcanary-optimized-20260413t101910Z`
 - run root:
-  `/Users/christopherdavid/scratch/psion_actual_pretraining_runs/psion-actual-pretraining-tri-host-actual-prodcanary-zstd-clean-20260413t134400Z`
+  `/Users/christopherdavid/scratch/psion_actual_pretraining_runs/psion-actual-pretraining-tri-host-actual-prodcanary-optimized-20260413t101910Z`
 - topology: `multi_host_joint_gradient_average`
 - contributor count: `3`
 - optimizer steps: `12`
@@ -573,9 +573,17 @@ The current clean source-of-truth run for that canary is:
 - retained progress checkpoint count: `4`
 - retained progress window count: `4`
 - retained progress cadence count: `2`
-- final cumulative train tokens processed: `775`
-- final cumulative mean tokens per second: `16`
+- final cumulative train tokens processed: `2194`
+- final cumulative mean tokens per second: `45`
 - accepted checkpoint label: `bounded-actual-pretraining-bringup-step-12`
+- full elapsed time from retained train-log timestamps: `1421s`
+- distributed execution elapsed time from retained train-log timestamps:
+  `1388s`
+
+The previous clean `zstd` baseline run for the same `12`-step shape took
+`2285s` full elapsed and `2243s` from distributed launch to remote cleanup.
+The optimized canary cut both elapsed views by about `38%` on the same step
+budget and admitted topology.
 
 This command replays the actual operator path in one retained sequence:
 
@@ -627,6 +635,20 @@ The distributed bringup summary now also records:
 - whether every configured contributor stayed in the optimizer path for every
   retained step
 
+Two implementation details now matter for the clean production-candidate
+canary:
+
+- remote contributions are collected concurrently instead of waiting for the
+  RTX `4080` host and the M2 host serially
+- default batch-row sizing is backend-aware on the actual bringup path:
+  local control plane `2`, primary CUDA remote `12`, secondary CPU remote `2`
+
+Those shipped defaults can still be overridden through:
+
+- `PSION_REFERENCE_PILOT_DUAL_HOST_CONTROL_BATCH_ROWS`
+- `PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BATCH_ROWS`
+- `PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BATCH_ROWS`
+
 The transport and staging path for this longer canary now stays on compressed
 artifacts throughout the distributed segment:
 
@@ -639,6 +661,12 @@ the optimizer work but stalled on oversized retained JSON receipts and large
 plain transport payloads. The current clean canary is the first source-of-truth
 run that completed end to end with compact retained receipts and compressed
 transport on the shipped path.
+
+The retained `final_cumulative_mean_tokens_per_second` field is still a bounded
+internal training metric, not a wall-clock measurement over the whole operator
+run. Use retained train-log timestamps or shell timing for honest elapsed-time
+claims and treat the retained throughput field as an internal model-progress
+signal only.
 
 Residual risk for the next phase stays explicit:
 
