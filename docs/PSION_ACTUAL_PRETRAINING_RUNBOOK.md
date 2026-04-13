@@ -563,9 +563,9 @@ production-candidate canary target is:
 The current clean source-of-truth run for that canary is:
 
 - run id:
-  `psion-actual-pretraining-tri-host-actual-prodcanary-optimized-20260413t101910Z`
+  `psion-actual-pretraining-tri-host-actual-prodcanary-metal-mainseed-20260413t183100Z`
 - run root:
-  `/Users/christopherdavid/scratch/psion_actual_pretraining_runs/psion-actual-pretraining-tri-host-actual-prodcanary-optimized-20260413t101910Z`
+  `/Users/christopherdavid/scratch/psion_actual_pretraining_runs/psion-actual-pretraining-tri-host-actual-prodcanary-metal-mainseed-20260413t183100Z`
 - topology: `multi_host_joint_gradient_average`
 - contributor count: `3`
 - optimizer steps: `12`
@@ -573,17 +573,46 @@ The current clean source-of-truth run for that canary is:
 - retained progress checkpoint count: `4`
 - retained progress window count: `4`
 - retained progress cadence count: `2`
-- final cumulative train tokens processed: `2194`
-- final cumulative mean tokens per second: `45`
+- remote stage strategy: `remote_git_worktree`
+- runtime backends: `metal`, `cuda`, `metal`
+- final cumulative train tokens processed: `3992`
+- final cumulative mean tokens per second: `83`
+- retained observability mean tokens per second: `94`
 - accepted checkpoint label: `bounded-actual-pretraining-bringup-step-12`
-- full elapsed time from retained train-log timestamps: `1421s`
-- distributed execution elapsed time from retained train-log timestamps:
-  `1388s`
+- full elapsed time from shell timing: `1459.39s`
+- effective train tokens per real elapsed second: `2.74`
 
-The previous clean `zstd` baseline run for the same `12`-step shape took
-`2285s` full elapsed and `2243s` from distributed launch to remote cleanup.
-The optimized canary cut both elapsed views by about `38%` on the same step
-budget and admitted topology.
+The progression for the same `12`-step admitted topology is now:
+
+- CPU Macs, CUDA `4080`:
+  `psion-actual-pretraining-tri-host-actual-prodcanary-optimized-20260413t101910Z`
+  - `2194` train tokens
+  - retained observability mean tokens per second: `56`
+  - shell elapsed: `1421.00s`
+  - effective train tokens per real elapsed second: `1.54`
+- first Metal Macs, CUDA `4080`:
+  `psion-actual-pretraining-tri-host-actual-prodcanary-metal-rerun-20260413t151200Z`
+  - `2827` train tokens
+  - retained observability mean tokens per second: `70`
+  - shell elapsed: `1441.71s`
+  - effective train tokens per real elapsed second: `1.96`
+- tuned Metal Macs, CUDA `4080`, tarball staging:
+  `psion-actual-pretraining-tri-host-actual-prodcanary-metal-tuned-20260413t161900Z`
+  - `3992` train tokens
+  - retained observability mean tokens per second: `94`
+  - shell elapsed: `1525.31s`
+  - effective train tokens per real elapsed second: `2.62`
+- tuned Metal Macs, CUDA `4080`, seed-repo staging:
+  `psion-actual-pretraining-tri-host-actual-prodcanary-metal-mainseed-20260413t183100Z`
+  - `3992` train tokens
+  - retained observability mean tokens per second: `94`
+  - shell elapsed: `1459.39s`
+  - effective train tokens per real elapsed second: `2.74`
+
+Compared to the clean CPU-Mac baseline, the current source-of-truth run keeps
+the same admitted three-host topology but increases retained train tokens by
+about `82%` and improves effective train tokens per real elapsed second by
+about `78%`.
 
 This command replays the actual operator path in one retained sequence:
 
@@ -641,7 +670,11 @@ canary:
 - remote contributions are collected concurrently instead of waiting for the
   RTX `4080` host and the M2 host serially
 - default batch-row sizing is backend-aware on the actual bringup path:
-  local control plane `2`, primary CUDA remote `12`, secondary CPU remote `2`
+  local control plane `metal=8`, primary CUDA remote `12`,
+  secondary remote `metal=8`
+- the cluster topology receipt now records the local Apple-silicon node as
+  `metal` inside `selected_nodes` instead of keeping one stale nested `cpu`
+  label
 
 Those shipped defaults can still be overridden through:
 
@@ -662,6 +695,18 @@ plain transport payloads. The current clean canary is the first source-of-truth
 run that completed end to end with compact retained receipts and compressed
 transport on the shipped path.
 
+One further operational detail now matters for honest elapsed-time claims:
+
+- if the run commit already exists on `origin/main`, the remotes can stage with
+  `remote_git_worktree`
+- if the run commit exists only in the local checkout, the remotes fall back to
+  `archive_tarball`
+
+The model-progress numbers above stayed the same across those two stage modes
+because the retained optimizer path was identical. The real elapsed time
+improved once the remotes could reuse the seed-repo path instead of waiting on
+tarball stage and unpack steps.
+
 The retained `final_cumulative_mean_tokens_per_second` field is still a bounded
 internal training metric, not a wall-clock measurement over the whole operator
 run. Use retained train-log timestamps or shell timing for honest elapsed-time
@@ -671,7 +716,8 @@ signal only.
 Residual risk for the next phase stays explicit:
 
 - first-run remote compile time still dominates startup
-- repo staging for a cold remote is still a noticeable part of run bringup
+- first-run remote worktree materialization is smaller than tarball staging but
+  still a noticeable part of run bringup
 - this is still a bounded production-candidate canary, not the continuous live
   actual-lane execution program
 
