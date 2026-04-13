@@ -724,9 +724,14 @@ checkpoint_path = os.path.join(artifact_dir, f"{stage_prefix}_checkpoint_manifes
 cluster_topology_path = os.path.join(artifact_dir, f"{stage_prefix}_cluster_topology_receipt.json")
 cluster_step_path = os.path.join(artifact_dir, f"{stage_prefix}_cluster_step_receipts.json")
 cluster_contribution_path = os.path.join(artifact_dir, f"{stage_prefix}_cluster_contribution_receipts.json")
+cluster_progress_checkpoint_path = os.path.join(artifact_dir, f"{stage_prefix}_cluster_progress_checkpoint_receipts.json")
+cluster_contributor_continuity_path = os.path.join(artifact_dir, f"{stage_prefix}_cluster_contributor_continuity_receipt.json")
 dual_host_topology_path = os.path.join(artifact_dir, f"{stage_prefix}_dual_host_topology_receipt.json")
 dual_host_step_path = os.path.join(artifact_dir, f"{stage_prefix}_dual_host_step_receipts.json")
 dual_host_contribution_path = os.path.join(artifact_dir, f"{stage_prefix}_dual_host_contribution_receipts.json")
+progress_checkpoint_path = os.path.join(artifact_dir, f"{stage_prefix}_progress_checkpoint_receipts.json")
+contributor_continuity_path = os.path.join(artifact_dir, f"{stage_prefix}_contributor_continuity_receipt.json")
+progress_checkpoint_dir = os.path.join(artifact_dir, f"{stage_prefix}_progress_checkpoints")
 
 def attach_common_run_surfaces():
     for key, path in [
@@ -762,6 +767,27 @@ def attach_common_run_surfaces():
         summary["checkpoint_parameter_state_digest"] = checkpoint.get("parameter_state_digest")
         summary["model_id"] = checkpoint.get("model_id")
         summary["dataset_identity"] = checkpoint.get("dataset_identity")
+    selected_progress_path = cluster_progress_checkpoint_path if os.path.exists(cluster_progress_checkpoint_path) else progress_checkpoint_path
+    selected_continuity_path = cluster_contributor_continuity_path if os.path.exists(cluster_contributor_continuity_path) else contributor_continuity_path
+    if os.path.exists(selected_progress_path):
+        summary["progress_checkpoint_receipts_path"] = os.path.abspath(selected_progress_path)
+        summary["progress_checkpoint_receipts_path_sha256"] = sha256_file(selected_progress_path)
+        with open(selected_progress_path, "r", encoding="utf-8") as handle:
+            progress_receipts = json.load(handle)
+        summary["progress_checkpoint_count"] = len(progress_receipts)
+        if progress_receipts:
+            summary["progress_window_count"] = len({receipt.get("window_index") for receipt in progress_receipts})
+            summary["progress_cadence_count"] = len({receipt.get("cadence_index") for receipt in progress_receipts if receipt.get("is_cadence_boundary")})
+            summary["final_cumulative_train_tokens_processed"] = progress_receipts[-1].get("cumulative_train_tokens_processed")
+            summary["final_cumulative_mean_tokens_per_second"] = progress_receipts[-1].get("cumulative_mean_tokens_per_second")
+    if os.path.exists(selected_continuity_path):
+        summary["contributor_continuity_receipt_path"] = os.path.abspath(selected_continuity_path)
+        summary["contributor_continuity_receipt_path_sha256"] = sha256_file(selected_continuity_path)
+        with open(selected_continuity_path, "r", encoding="utf-8") as handle:
+            continuity = json.load(handle)
+        summary["all_configured_contributors_present_each_step"] = continuity.get("all_configured_contributors_present_each_step")
+    if os.path.isdir(progress_checkpoint_dir):
+        summary["progress_checkpoint_directory"] = os.path.abspath(progress_checkpoint_dir)
 
 if mode == "accelerated_reference" and status == "completed":
     stage_path = os.path.join(artifact_dir, "psion_accelerated_reference_pilot_stage_receipt.json")

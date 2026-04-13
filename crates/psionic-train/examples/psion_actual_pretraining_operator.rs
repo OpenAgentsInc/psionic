@@ -8,23 +8,25 @@ use std::{
 };
 
 use psionic_eval::{
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
     build_psion_actual_pretraining_checkpoint_eval_benchmark_package,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_EVAL_BENCHMARK_FIXTURE_PATH,
 };
 use psionic_train::{
-    PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
-    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
-    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
-    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
-    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
-    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID, PsionActualPretrainingAlertFeed,
+    build_psion_actual_pretraining_dashboard_packet, checkpoint_comparison_relative_path,
+    checkpoint_eval_decision_relative_path, checkpoint_eval_failure_relative_path,
+    continue_restart_decision_relative_path,
+    derive_psion_actual_pretraining_hardware_qualification,
+    derive_psion_actual_pretraining_run_shape_qualification,
+    psion_actual_pretraining_retained_paths, record_psion_actual_pretraining_auto_resume_receipt,
+    record_psion_actual_pretraining_checkpoint_backup_receipt,
+    record_psion_actual_pretraining_checkpoint_comparison,
+    record_psion_actual_pretraining_checkpoint_eval_decision,
+    record_psion_actual_pretraining_checkpoint_eval_failure,
+    record_psion_actual_pretraining_checkpoint_failure_drill,
+    record_psion_actual_pretraining_checkpoint_manifest,
+    record_psion_actual_pretraining_continuation_handoff,
+    record_psion_actual_pretraining_continue_restart_decision,
+    record_psion_actual_pretraining_redacted_alert, PsionActualPretrainingAlertFeed,
     PsionActualPretrainingArtifactRef, PsionActualPretrainingAutoResumeReceipt,
     PsionActualPretrainingBaselineToolsBundle, PsionActualPretrainingCheckpointBackupReceipt,
     PsionActualPretrainingCheckpointComparison, PsionActualPretrainingCheckpointEvalDecision,
@@ -48,22 +50,21 @@ use psionic_train::{
     PsionActualPretrainingScalingBundle, PsionActualPretrainingStorageProbe,
     PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    PsionReferencePilotCheckpointManifest, PsionReferencePilotDualHostTopologyReceipt,
-    PsionReferencePilotJointContributionReceipt, build_psion_actual_pretraining_dashboard_packet,
-    checkpoint_comparison_relative_path, checkpoint_eval_decision_relative_path,
-    checkpoint_eval_failure_relative_path, continue_restart_decision_relative_path,
-    derive_psion_actual_pretraining_hardware_qualification,
-    derive_psion_actual_pretraining_run_shape_qualification,
-    psion_actual_pretraining_retained_paths, record_psion_actual_pretraining_auto_resume_receipt,
-    record_psion_actual_pretraining_checkpoint_backup_receipt,
-    record_psion_actual_pretraining_checkpoint_comparison,
-    record_psion_actual_pretraining_checkpoint_eval_decision,
-    record_psion_actual_pretraining_checkpoint_eval_failure,
-    record_psion_actual_pretraining_checkpoint_failure_drill,
-    record_psion_actual_pretraining_checkpoint_manifest,
-    record_psion_actual_pretraining_continuation_handoff,
-    record_psion_actual_pretraining_continue_restart_decision,
-    record_psion_actual_pretraining_redacted_alert,
+    PsionReferencePilotCheckpointManifest, PsionReferencePilotContributorContinuityReceipt,
+    PsionReferencePilotDualHostTopologyReceipt, PsionReferencePilotJointContributionReceipt,
+    PsionReferencePilotProgressCheckpointReceipt, PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
+    PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_CONTINUATION_HANDOFF_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_DASHBOARD_PATH,
+    PSION_ACTUAL_PRETRAINING_CURRENT_RUN_STATUS_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_DRY_RUN_SURFACE_ID, PSION_ACTUAL_PRETRAINING_EVIDENCE_CONTRACT_ID,
+    PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_ACTUAL_PRETRAINING_LAUNCH_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RECIPE_ID, PSION_ACTUAL_PRETRAINING_RESUME_MANIFEST_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_RESUME_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_RETAINED_SUMMARY_SCHEMA_VERSION,
+    PSION_ACTUAL_PRETRAINING_START_SURFACE_ID, PSION_ACTUAL_PRETRAINING_STATUS_SURFACE_ID,
+    PSION_ACTUAL_PRETRAINING_TOPOLOGY_STORAGE_BUNDLE_ID,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -171,6 +172,9 @@ struct PsionActualPretrainingDistributedBringupRehearsal {
     train_log_path: String,
     cluster_topology_receipt_path: String,
     cluster_contribution_receipts_path: String,
+    contributor_continuity_receipt_path: String,
+    progress_checkpoint_receipts_path: String,
+    progress_checkpoint_directory: String,
     checkpoint_manifest_path: String,
     checkpoint_weights_path: String,
     execution_topology_classification: String,
@@ -182,6 +186,11 @@ struct PsionActualPretrainingDistributedBringupRehearsal {
     checkpoint_total_bytes: u64,
     optimizer_steps: u64,
     contribution_receipt_count: usize,
+    progress_checkpoint_count: usize,
+    progress_window_count: usize,
+    progress_cadence_count: usize,
+    final_cumulative_train_tokens_processed: u64,
+    final_cumulative_mean_tokens_per_second: u64,
     claim_boundary: String,
     detail: String,
 }
@@ -206,6 +215,9 @@ impl PsionActualPretrainingDistributedBringupRehearsal {
             self.train_log_path.as_str(),
             self.cluster_topology_receipt_path.as_str(),
             self.cluster_contribution_receipts_path.as_str(),
+            self.contributor_continuity_receipt_path.as_str(),
+            self.progress_checkpoint_receipts_path.as_str(),
+            self.progress_checkpoint_directory.as_str(),
             self.checkpoint_manifest_path.as_str(),
             self.checkpoint_weights_path.as_str(),
             self.execution_topology_classification.as_str(),
@@ -254,6 +266,18 @@ impl PsionActualPretrainingDistributedBringupRehearsal {
         if self.contribution_receipt_count < self.contributor_count {
             return Err(std::io::Error::other(
                 "distributed bringup rehearsal contribution receipts are too small for the contributor count",
+            )
+            .into());
+        }
+        if self.progress_checkpoint_count == 0 {
+            return Err(std::io::Error::other(
+                "distributed bringup rehearsal must retain at least one progress checkpoint",
+            )
+            .into());
+        }
+        if self.progress_window_count == 0 {
+            return Err(std::io::Error::other(
+                "distributed bringup rehearsal must retain at least one progress window",
             )
             .into());
         }
@@ -3130,6 +3154,26 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
     } else {
         artifact_dir.join("psion_actual_pretraining_bringup_dual_host_contribution_receipts.json")
     };
+    let contributor_continuity_receipt_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_contributor_continuity_receipt.json")
+        .is_file()
+    {
+        artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_contributor_continuity_receipt.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_contributor_continuity_receipt.json")
+    };
+    let progress_checkpoint_receipts_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_progress_checkpoint_receipts.json")
+        .is_file()
+    {
+        artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_progress_checkpoint_receipts.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_progress_checkpoint_receipts.json")
+    };
+    let progress_checkpoint_directory =
+        artifact_dir.join("psion_actual_pretraining_bringup_progress_checkpoints");
     let checkpoint_manifest_path =
         artifact_dir.join("psion_actual_pretraining_bringup_checkpoint_manifest.json");
     let checkpoint_weights_path =
@@ -3139,6 +3183,10 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
         load_json(&cluster_topology_receipt_path)?;
     let contribution_receipts: Vec<PsionReferencePilotJointContributionReceipt> =
         load_json(&cluster_contribution_receipts_path)?;
+    let contributor_continuity_receipt: PsionReferencePilotContributorContinuityReceipt =
+        load_json(&contributor_continuity_receipt_path)?;
+    let progress_checkpoint_receipts: Vec<PsionReferencePilotProgressCheckpointReceipt> =
+        load_json(&progress_checkpoint_receipts_path)?;
     let checkpoint_manifest: PsionReferencePilotCheckpointManifest =
         load_json(&checkpoint_manifest_path)?;
     let checkpoint_object_digest = file_sha256(&checkpoint_weights_path)?;
@@ -3168,6 +3216,38 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
         )
         .into());
     }
+    if !contributor_continuity_receipt.all_configured_contributors_present_each_step {
+        return Err(std::io::Error::other(
+            "distributed bringup rehearsal retained contributor continuity gaps",
+        )
+        .into());
+    }
+    if progress_checkpoint_receipts.is_empty() {
+        return Err(std::io::Error::other(
+            "distributed bringup rehearsal retained no progress checkpoints",
+        )
+        .into());
+    }
+    if !progress_checkpoint_directory.is_dir() {
+        return Err(std::io::Error::other(
+            "distributed bringup rehearsal progress checkpoint directory is missing",
+        )
+        .into());
+    }
+    let progress_window_count = progress_checkpoint_receipts
+        .iter()
+        .map(|receipt| receipt.window_index)
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let progress_cadence_count = progress_checkpoint_receipts
+        .iter()
+        .filter(|receipt| receipt.is_cadence_boundary)
+        .map(|receipt| receipt.cadence_index)
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let final_progress_receipt = progress_checkpoint_receipts.last().ok_or_else(|| {
+        std::io::Error::other("distributed bringup rehearsal retained no final progress receipt")
+    })?;
 
     let receipt = PsionActualPretrainingDistributedBringupRehearsal {
         schema_version: String::from(
@@ -3199,6 +3279,18 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
             .strip_prefix(run_root)?
             .to_string_lossy()
             .replace('\\', "/"),
+        contributor_continuity_receipt_path: contributor_continuity_receipt_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        progress_checkpoint_receipts_path: progress_checkpoint_receipts_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        progress_checkpoint_directory: progress_checkpoint_directory
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
         checkpoint_manifest_path: checkpoint_manifest_path
             .strip_prefix(run_root)?
             .to_string_lossy()
@@ -3216,11 +3308,18 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
         checkpoint_total_bytes,
         optimizer_steps: checkpoint_manifest.step,
         contribution_receipt_count: contribution_receipts.len(),
+        progress_checkpoint_count: progress_checkpoint_receipts.len(),
+        progress_window_count,
+        progress_cadence_count,
+        final_cumulative_train_tokens_processed: final_progress_receipt
+            .cumulative_train_tokens_processed,
+        final_cumulative_mean_tokens_per_second: final_progress_receipt
+            .cumulative_mean_tokens_per_second,
         claim_boundary: String::from(
             "This retained rehearsal proves one bounded multi-host optimizer-bearing execution segment inside the actual pretraining operator path using the larger actual-pretraining model and canonical actual dataset identity. It does not by itself claim full broader long-run actual-lane cluster execution.",
         ),
         detail: String::from(
-            "Distributed bringup binds the actual-lane run root to one retained multi-host actual-pretraining bringup proof, its checkpoint bytes, and the exact operator/log surfaces used to produce that proof.",
+            "Distributed bringup binds the actual-lane run root to one retained multi-host actual-pretraining bringup proof, its progress checkpoints, continuity receipt, checkpoint bytes, and the exact operator/log surfaces used to produce that proof.",
         ),
     };
     receipt.validate()?;
@@ -3417,6 +3516,18 @@ fn build_base_lane_rehearsal_closeout_bundle(
             )?,
             closeout_artifact(
                 run_root,
+                "distributed_actual_pretraining_bringup_contributor_continuity_receipt",
+                &run_root.join(&rehearsal.contributor_continuity_receipt_path),
+                "Contributor continuity receipt proves that every configured contributor stayed in the optimization path throughout the bounded actual-pretraining bringup segment.",
+            )?,
+            closeout_artifact(
+                run_root,
+                "distributed_actual_pretraining_bringup_progress_checkpoint_receipts",
+                &run_root.join(&rehearsal.progress_checkpoint_receipts_path),
+                "Progress checkpoint receipts prove the bounded actual-pretraining bringup retained checkpoint evidence at window and cadence boundaries rather than only at terminal closeout.",
+            )?,
+            closeout_artifact(
+                run_root,
                 "distributed_actual_pretraining_bringup_checkpoint_manifest",
                 &run_root.join(&rehearsal.checkpoint_manifest_path),
                 "Distributed bringup checkpoint manifest proves the exact bounded checkpoint lineage promoted into the actual-lane checkpoint family.",
@@ -3479,10 +3590,12 @@ fn build_base_lane_rehearsal_closeout_bundle(
             gate_id: String::from("bounded_distributed_training_proof_retained"),
             satisfied: true,
             detail: format!(
-                "The actual-lane rehearsal retained one bounded {} proof with {} contributors and {} contribution receipts.",
+                "The actual-lane rehearsal retained one bounded {} proof with {} contributors, {} contribution receipts, and {} progress checkpoints across {} windows.",
                 rehearsal.execution_topology_classification,
                 rehearsal.contributor_count,
-                rehearsal.contribution_receipt_count
+                rehearsal.contribution_receipt_count,
+                rehearsal.progress_checkpoint_count,
+                rehearsal.progress_window_count
             ),
         });
     }

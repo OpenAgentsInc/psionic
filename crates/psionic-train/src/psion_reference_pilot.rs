@@ -9,10 +9,10 @@ use psionic_backend_cuda::CudaBackend;
 use psionic_cluster::NodeId;
 use psionic_core::{DType, Device, Shape, TensorData, TensorId, TensorSpec};
 use psionic_data::{
-    DatasetSplitKind, PSION_REFERENCE_DATASET_IDENTITY, PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
-    PsionArtifactLineageManifest, PsionReferenceCorpusBundle, PsionReferenceCorpusError,
-    PsionReferenceEncodedSequence, build_psion_actual_pretraining_reconstructed_corpus,
-    build_psion_reference_corpus,
+    build_psion_actual_pretraining_reconstructed_corpus, build_psion_reference_corpus,
+    DatasetSplitKind, PsionArtifactLineageManifest, PsionReferenceCorpusBundle,
+    PsionReferenceCorpusError, PsionReferenceEncodedSequence, PSION_REFERENCE_DATASET_IDENTITY,
+    PSION_REFERENCE_MAX_SEQUENCE_TOKENS,
 };
 use psionic_datastream::{
     DatastreamCheckpointBinding, DatastreamEncoding, DatastreamManifestRef, DatastreamSubjectKind,
@@ -34,20 +34,24 @@ use psionic_runtime::{
     TrainingDeviceMeshAxis, TrainingDeviceMeshAxisKind, TrainingDeviceMeshContext,
     TrainingElasticMembershipContext, TrainingRecoveryContext, TrainingRecoveryPosture,
 };
-use safetensors::{Dtype as SafeTensorsDType, SafeTensors, serialize, tensor::TensorView};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use safetensors::{serialize, tensor::TensorView, Dtype as SafeTensorsDType, SafeTensors};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ArtifactArchiveClass, ArtifactColdRestoreReceipt, ArtifactRetentionProfile,
-    ArtifactStorageSweepReceipt, CheckpointDurabilityPosture, CheckpointManifest,
-    CheckpointPointer, CheckpointRecoveryError, CheckpointScopeBinding, CheckpointScopeKind,
-    CheckpointShardManifest, CheckpointStoreReadOptions, FixedBudgetTrainingRun,
-    InMemoryCheckpointStore, PsionAcceptanceMatrix, PsionAcceptanceMatrixError,
-    PsionBenchmarkCatalog, PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily,
-    PsionBenchmarkPackageContract, PsionBenchmarkPackageError, PsionBenchmarkTaskContract,
-    PsionCapabilityMatrixView, PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
+    record_psion_pilot_held_out_loss, record_psion_pilot_pretraining_run,
+    record_psion_pilot_route_probe, record_psion_pretrain_run_observability,
+    record_psion_refusal_calibration_receipt, record_psion_route_class_evaluation_receipt,
+    run_psion_pretrain_stage, run_psion_pretrain_stage_with_execution, ArtifactArchiveClass,
+    ArtifactColdRestoreReceipt, ArtifactRetentionProfile, ArtifactStorageSweepReceipt,
+    CheckpointDurabilityPosture, CheckpointManifest, CheckpointPointer, CheckpointRecoveryError,
+    CheckpointScopeBinding, CheckpointScopeKind, CheckpointShardManifest,
+    CheckpointStoreReadOptions, FixedBudgetTrainingRun, InMemoryCheckpointStore,
+    PsionAcceptanceMatrix, PsionAcceptanceMatrixError, PsionBenchmarkCatalog,
+    PsionBenchmarkEvidenceReceipt, PsionBenchmarkFamily, PsionBenchmarkPackageContract,
+    PsionBenchmarkPackageError, PsionBenchmarkTaskContract, PsionCapabilityMatrixView,
+    PsionCheckpointRecoveryReceipt, PsionContaminationReviewDisposition,
     PsionContaminationReviewReceipt, PsionGoogleSingleNodeLiveVisualizationWriter,
     PsionGoogleSingleNodeStepTelemetry, PsionGoogleSingleNodeVisualizationError, PsionMetricKind,
     PsionObservedMetric, PsionPhaseGate, PsionPilotHeldOutLossFamily, PsionPilotHeldOutLossRow,
@@ -71,11 +75,7 @@ use crate::{
     TrainingGradientBatch, TrainingLoopBudget, TrainingOptimizerConfig,
     TrainingOptimizerResidencyPolicy, TrainingParameterClass, TrainingParameterGroupState,
     TrainingRecoveryMode, TrainingRunSummary, TrainingSessionState, TrainingStepInput,
-    TrainingStepReceipt, TrainingTensorBuffer, record_psion_pilot_held_out_loss,
-    record_psion_pilot_pretraining_run, record_psion_pilot_route_probe,
-    record_psion_pretrain_run_observability, record_psion_refusal_calibration_receipt,
-    record_psion_route_class_evaluation_receipt, run_psion_pretrain_stage,
-    run_psion_pretrain_stage_with_execution,
+    TrainingStepReceipt, TrainingTensorBuffer,
 };
 
 const TOKEN_EMBEDDING_GROUP_ID: &str = "decoder.embed_tokens.weight";
@@ -112,6 +112,81 @@ pub struct PsionReferencePilotCheckpointArtifact {
     pub manifest: PsionReferencePilotCheckpointManifest,
     pub weights_bytes: Vec<u8>,
     pub checkpoint: TrainingCheckpointReference,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionReferencePilotProgressCheckpointReceipt {
+    pub schema_version: String,
+    pub run_id: String,
+    pub stage_id: String,
+    pub checkpoint_family: String,
+    pub optimizer_steps_completed: u64,
+    pub window_index: u64,
+    pub step_in_window: u64,
+    pub cadence_index: u64,
+    pub window_in_cadence: u64,
+    pub is_window_boundary: bool,
+    pub is_cadence_boundary: bool,
+    pub is_terminal_boundary: bool,
+    pub checkpoint_ref: String,
+    pub checkpoint_manifest_digest: String,
+    pub checkpoint_object_digest: String,
+    pub checkpoint_total_bytes: u64,
+    pub parameter_state_digest: String,
+    pub expected_contributor_hosts: Vec<String>,
+    pub observed_contributor_hosts: Vec<String>,
+    pub runtime_backends: Vec<String>,
+    pub contribution_receipt_count: usize,
+    pub cumulative_train_tokens_processed: u64,
+    pub cumulative_mean_tokens_per_second: u64,
+    pub detail: String,
+    pub receipt_digest: String,
+}
+
+impl PsionReferencePilotProgressCheckpointReceipt {
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut stable_view = self.clone();
+        stable_view.receipt_digest.clear();
+        stable_digest(
+            b"psion_reference_pilot_progress_checkpoint_receipt|",
+            &stable_view,
+        )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionReferencePilotMissingContributorStep {
+    pub global_step: u64,
+    pub missing_hosts: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionReferencePilotContributorContinuityReceipt {
+    pub schema_version: String,
+    pub run_id: String,
+    pub stage_id: String,
+    pub checkpoint_family: String,
+    pub optimizer_steps_completed: u64,
+    pub expected_contributor_hosts: Vec<String>,
+    pub observed_contribution_counts_by_host: BTreeMap<String, u64>,
+    pub runtime_backends_by_host: BTreeMap<String, String>,
+    pub missing_contributors_by_step: Vec<PsionReferencePilotMissingContributorStep>,
+    pub all_configured_contributors_present_each_step: bool,
+    pub detail: String,
+    pub receipt_digest: String,
+}
+
+impl PsionReferencePilotContributorContinuityReceipt {
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        let mut stable_view = self.clone();
+        stable_view.receipt_digest.clear();
+        stable_digest(
+            b"psion_reference_pilot_contributor_continuity_receipt|",
+            &stable_view,
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -486,6 +561,9 @@ pub struct PsionReferencePilotDualHostRun {
     pub topology_receipt: PsionReferencePilotDualHostTopologyReceipt,
     pub contribution_receipts: Vec<PsionReferencePilotJointContributionReceipt>,
     pub joint_step_receipts: Vec<PsionReferencePilotDualHostStepReceipt>,
+    pub progress_checkpoint_receipts: Vec<PsionReferencePilotProgressCheckpointReceipt>,
+    pub progress_checkpoint_artifacts: Vec<PsionReferencePilotCheckpointArtifact>,
+    pub contributor_continuity_receipt: PsionReferencePilotContributorContinuityReceipt,
 }
 
 impl PsionReferencePilotDualHostRun {
@@ -506,6 +584,55 @@ impl PsionReferencePilotDualHostRun {
         write_json(topology_path.as_path(), &self.topology_receipt)?;
         write_json(step_path.as_path(), &self.joint_step_receipts)?;
         write_json(contribution_path.as_path(), &self.contribution_receipts)?;
+        write_json(
+            output_dir
+                .join(format!("{prefix}_progress_checkpoint_receipts.json"))
+                .as_path(),
+            &self.progress_checkpoint_receipts,
+        )?;
+        write_json(
+            output_dir
+                .join(format!("{prefix}_contributor_continuity_receipt.json"))
+                .as_path(),
+            &self.contributor_continuity_receipt,
+        )?;
+        let progress_dir = output_dir.join(format!("{prefix}_progress_checkpoints"));
+        fs::create_dir_all(&progress_dir).map_err(|error| {
+            PsionReferencePilotError::Serialization {
+                message: error.to_string(),
+            }
+        })?;
+        for (index, (receipt, artifact)) in self
+            .progress_checkpoint_receipts
+            .iter()
+            .zip(self.progress_checkpoint_artifacts.iter())
+            .enumerate()
+        {
+            let checkpoint_dir = progress_dir.join(format!(
+                "{:02}-step-{:04}-window-{:02}-cadence-{:02}",
+                index.saturating_add(1),
+                receipt.optimizer_steps_completed,
+                receipt.window_index,
+                receipt.cadence_index,
+            ));
+            fs::create_dir_all(&checkpoint_dir).map_err(|error| {
+                PsionReferencePilotError::Serialization {
+                    message: error.to_string(),
+                }
+            })?;
+            write_json(checkpoint_dir.join("receipt.json").as_path(), receipt)?;
+            write_json(
+                checkpoint_dir.join("checkpoint_manifest.json").as_path(),
+                &artifact.manifest,
+            )?;
+            fs::write(
+                checkpoint_dir.join("checkpoint.safetensors"),
+                &artifact.weights_bytes,
+            )
+            .map_err(|error| PsionReferencePilotError::Serialization {
+                message: error.to_string(),
+            })?;
+        }
         if self.topology_receipt.contributor_count > 2 {
             write_json(
                 output_dir
@@ -525,9 +652,212 @@ impl PsionReferencePilotDualHostRun {
                     .as_path(),
                 &self.contribution_receipts,
             )?;
+            write_json(
+                output_dir
+                    .join(format!(
+                        "{prefix}_cluster_progress_checkpoint_receipts.json"
+                    ))
+                    .as_path(),
+                &self.progress_checkpoint_receipts,
+            )?;
+            write_json(
+                output_dir
+                    .join(format!(
+                        "{prefix}_cluster_contributor_continuity_receipt.json"
+                    ))
+                    .as_path(),
+                &self.contributor_continuity_receipt,
+            )?;
         }
         Ok(())
     }
+}
+
+fn schedule_for_global_step(budget: TrainingLoopBudget, global_step: u64) -> (u64, u64, u64, u64) {
+    let window_index = ((global_step.saturating_sub(1)) / budget.steps_per_window) + 1;
+    let step_in_window = ((global_step.saturating_sub(1)) % budget.steps_per_window) + 1;
+    let cadence_index = ((window_index.saturating_sub(1)) / budget.windows_per_cadence) + 1;
+    let window_in_cadence = ((window_index.saturating_sub(1)) % budget.windows_per_cadence) + 1;
+    (
+        window_index,
+        step_in_window,
+        cadence_index,
+        window_in_cadence,
+    )
+}
+
+fn should_emit_progress_checkpoint_receipt(
+    budget: TrainingLoopBudget,
+    global_step: u64,
+) -> (bool, bool, bool) {
+    let (window_index, step_in_window, _, window_in_cadence) =
+        schedule_for_global_step(budget, global_step);
+    let _ = window_index;
+    let is_terminal_boundary = global_step == budget.max_steps;
+    let is_window_boundary = step_in_window == budget.steps_per_window || is_terminal_boundary;
+    let is_cadence_boundary = is_window_boundary
+        && (window_in_cadence == budget.windows_per_cadence || is_terminal_boundary);
+    (
+        is_window_boundary,
+        is_cadence_boundary,
+        is_terminal_boundary,
+    )
+}
+
+fn cumulative_train_tokens_processed(
+    train_examples: &[PsionReferenceTrainingExample],
+    contribution_receipts: &[PsionReferencePilotJointContributionReceipt],
+    global_step: u64,
+) -> u64 {
+    contribution_receipts
+        .iter()
+        .filter(|receipt| receipt.global_step <= global_step)
+        .map(|receipt| {
+            token_count(
+                joint_reference_examples_for_step(
+                    train_examples,
+                    receipt.global_step,
+                    receipt.batch_rows,
+                    receipt.contributor_index,
+                    receipt.contributor_count,
+                )
+                .as_slice(),
+            )
+        })
+        .sum::<u64>()
+}
+
+fn build_progress_checkpoint_receipt(
+    config: &PsionReferencePilotConfig,
+    checkpoint_artifact: &PsionReferencePilotCheckpointArtifact,
+    contribution_receipts: &[PsionReferencePilotJointContributionReceipt],
+    expected_contributor_hosts: &[String],
+    global_step: u64,
+    train_examples: &[PsionReferenceTrainingExample],
+) -> PsionReferencePilotProgressCheckpointReceipt {
+    let (window_index, step_in_window, cadence_index, window_in_cadence) =
+        schedule_for_global_step(config.budget, global_step);
+    let (is_window_boundary, is_cadence_boundary, is_terminal_boundary) =
+        should_emit_progress_checkpoint_receipt(config.budget, global_step);
+    let observed_hosts = contribution_receipts
+        .iter()
+        .filter(|receipt| receipt.global_step == global_step)
+        .map(|receipt| receipt.contributor_host.clone())
+        .collect::<Vec<_>>();
+    let runtime_backends = contribution_receipts
+        .iter()
+        .filter(|receipt| receipt.global_step == global_step)
+        .map(|receipt| receipt.runtime_backend.clone())
+        .collect::<Vec<_>>();
+    let cumulative_train_tokens_processed =
+        cumulative_train_tokens_processed(train_examples, contribution_receipts, global_step);
+    let wall_clock_ms = global_step.saturating_mul(config.step_duration_ms);
+    let checkpoint_total_bytes = checkpoint_artifact.weights_bytes.len() as u64;
+    let mut receipt = PsionReferencePilotProgressCheckpointReceipt {
+        schema_version: String::from("psion.reference_pilot_progress_checkpoint_receipt.v1"),
+        run_id: config.run_id.clone(),
+        stage_id: config.stage_id.clone(),
+        checkpoint_family: config.checkpoint_family.clone(),
+        optimizer_steps_completed: global_step,
+        window_index,
+        step_in_window,
+        cadence_index,
+        window_in_cadence,
+        is_window_boundary,
+        is_cadence_boundary,
+        is_terminal_boundary,
+        checkpoint_ref: checkpoint_artifact.manifest.checkpoint_ref.clone(),
+        checkpoint_manifest_digest: checkpoint_artifact.manifest.stable_digest(),
+        checkpoint_object_digest: checkpoint_artifact.checkpoint.object_digest.clone(),
+        checkpoint_total_bytes,
+        parameter_state_digest: checkpoint_artifact.manifest.parameter_state_digest.clone(),
+        expected_contributor_hosts: expected_contributor_hosts.to_vec(),
+        observed_contributor_hosts: observed_hosts.clone(),
+        runtime_backends,
+        contribution_receipt_count: contribution_receipts
+            .iter()
+            .filter(|receipt| receipt.global_step <= global_step)
+            .count(),
+        cumulative_train_tokens_processed,
+        cumulative_mean_tokens_per_second: (cumulative_train_tokens_processed * 1000)
+            / wall_clock_ms.max(1),
+        detail: format!(
+            "Progress checkpoint `{}` sealed step {} at window {} cadence {} after contributions from {}.",
+            checkpoint_artifact.manifest.checkpoint_ref,
+            global_step,
+            window_index,
+            cadence_index,
+            observed_hosts
+                .iter()
+                .map(|host| format!("`{host}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = receipt.stable_digest();
+    receipt
+}
+
+fn build_contributor_continuity_receipt(
+    config: &PsionReferencePilotConfig,
+    expected_contributor_hosts: &[String],
+    contribution_receipts: &[PsionReferencePilotJointContributionReceipt],
+) -> PsionReferencePilotContributorContinuityReceipt {
+    let mut observed_contribution_counts_by_host = BTreeMap::<String, u64>::new();
+    let mut runtime_backends_by_host = BTreeMap::<String, String>::new();
+    for receipt in contribution_receipts {
+        *observed_contribution_counts_by_host
+            .entry(receipt.contributor_host.clone())
+            .or_insert(0) += 1;
+        runtime_backends_by_host
+            .entry(receipt.contributor_host.clone())
+            .or_insert_with(|| receipt.runtime_backend.clone());
+    }
+    let mut missing_contributors_by_step = Vec::new();
+    for global_step in 1..=config.budget.max_steps {
+        let observed_hosts = contribution_receipts
+            .iter()
+            .filter(|receipt| receipt.global_step == global_step)
+            .map(|receipt| receipt.contributor_host.clone())
+            .collect::<BTreeSet<_>>();
+        let missing_hosts = expected_contributor_hosts
+            .iter()
+            .filter(|host| !observed_hosts.contains(host.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing_hosts.is_empty() {
+            missing_contributors_by_step.push(PsionReferencePilotMissingContributorStep {
+                global_step,
+                missing_hosts,
+            });
+        }
+    }
+    let mut receipt = PsionReferencePilotContributorContinuityReceipt {
+        schema_version: String::from("psion.reference_pilot_contributor_continuity_receipt.v1"),
+        run_id: config.run_id.clone(),
+        stage_id: config.stage_id.clone(),
+        checkpoint_family: config.checkpoint_family.clone(),
+        optimizer_steps_completed: config.budget.max_steps,
+        expected_contributor_hosts: expected_contributor_hosts.to_vec(),
+        observed_contribution_counts_by_host,
+        runtime_backends_by_host,
+        all_configured_contributors_present_each_step: missing_contributors_by_step.is_empty(),
+        missing_contributors_by_step,
+        detail: format!(
+            "Contributor continuity for `{}` expected {} on every optimizer step across {} completed steps.",
+            config.run_id,
+            expected_contributor_hosts
+                .iter()
+                .map(|host| format!("`{host}`"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            config.budget.max_steps
+        ),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = receipt.stable_digest();
+    receipt
 }
 
 #[derive(Clone, Debug)]
@@ -856,6 +1186,7 @@ pub fn run_psion_reference_pilot(
             .replay_contract
             .stable_dataset_identity
             .as_str(),
+        config.budget.max_steps,
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -1105,6 +1436,7 @@ pub fn run_psion_accelerated_reference_pilot_with_live_visualization(
             .replay_contract
             .stable_dataset_identity
             .as_str(),
+        config.budget.max_steps,
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -1732,8 +2064,13 @@ where
     } else {
         "multi_host_joint_gradient_average"
     };
+    let expected_contributor_hosts = std::iter::once(dual_host.control_plane_host.clone())
+        .chain(remote_nodes.iter().map(|(host, _, _, _)| host.clone()))
+        .collect::<Vec<_>>();
     let mut remote_device_inventory = BTreeMap::new();
     let mut remote_runtime_backends = BTreeMap::new();
+    let mut progress_checkpoint_receipts = Vec::new();
+    let mut progress_checkpoint_artifacts = Vec::new();
 
     for step_index in 0..config.budget.max_steps {
         let global_step = step_index.saturating_add(1);
@@ -1851,6 +2188,31 @@ where
             ),
         });
         contribution_receipts.extend(step_contributions);
+        if should_emit_progress_checkpoint_receipt(config.budget, global_step).0 {
+            let progress_checkpoint_artifact = export_checkpoint(
+                &current_model,
+                &train_examples,
+                &validation_examples,
+                config,
+                &model_descriptor,
+                corpus_bundle
+                    .tokenized_corpus_manifest
+                    .replay_contract
+                    .stable_dataset_identity
+                    .as_str(),
+                global_step,
+                finished_at_ms,
+            )?;
+            progress_checkpoint_receipts.push(build_progress_checkpoint_receipt(
+                config,
+                &progress_checkpoint_artifact,
+                contribution_receipts.as_slice(),
+                expected_contributor_hosts.as_slice(),
+                global_step,
+                train_examples.as_slice(),
+            ));
+            progress_checkpoint_artifacts.push(progress_checkpoint_artifact);
+        }
         step_receipts.push(receipt);
     }
 
@@ -1867,6 +2229,7 @@ where
             .replay_contract
             .stable_dataset_identity
             .as_str(),
+        config.budget.max_steps,
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -2031,6 +2394,11 @@ where
         topology_receipt_digest: String::new(),
     };
     topology_receipt.topology_receipt_digest = topology_receipt.stable_digest();
+    let contributor_continuity_receipt = build_contributor_continuity_receipt(
+        config,
+        expected_contributor_hosts.as_slice(),
+        contribution_receipts.as_slice(),
+    );
 
     Ok(PsionReferencePilotDualHostRun {
         run: PsionReferencePilotRun {
@@ -2052,6 +2420,9 @@ where
         topology_receipt,
         contribution_receipts,
         joint_step_receipts,
+        progress_checkpoint_receipts,
+        progress_checkpoint_artifacts,
+        contributor_continuity_receipt,
     })
 }
 
@@ -2109,8 +2480,13 @@ where
     } else {
         "multi_host_joint_gradient_average"
     };
+    let expected_contributor_hosts = std::iter::once(dual_host.control_plane_host.clone())
+        .chain(remote_nodes.iter().map(|(host, _, _, _)| host.clone()))
+        .collect::<Vec<_>>();
     let mut remote_device_inventory = BTreeMap::new();
     let mut remote_runtime_backends = BTreeMap::new();
+    let mut progress_checkpoint_receipts = Vec::new();
+    let mut progress_checkpoint_artifacts = Vec::new();
 
     for step_index in 0..config.budget.max_steps {
         let global_step = step_index.saturating_add(1);
@@ -2228,6 +2604,31 @@ where
             ),
         });
         contribution_receipts.extend(step_contributions);
+        if should_emit_progress_checkpoint_receipt(config.budget, global_step).0 {
+            let progress_checkpoint_artifact = export_checkpoint(
+                &current_model,
+                &train_examples,
+                &validation_examples,
+                config,
+                &model_descriptor,
+                corpus_bundle
+                    .tokenized_corpus_manifest
+                    .replay_contract
+                    .stable_dataset_identity
+                    .as_str(),
+                global_step,
+                finished_at_ms,
+            )?;
+            progress_checkpoint_receipts.push(build_progress_checkpoint_receipt(
+                config,
+                &progress_checkpoint_artifact,
+                contribution_receipts.as_slice(),
+                expected_contributor_hosts.as_slice(),
+                global_step,
+                train_examples.as_slice(),
+            ));
+            progress_checkpoint_artifacts.push(progress_checkpoint_artifact);
+        }
         step_receipts.push(receipt);
     }
 
@@ -2244,6 +2645,7 @@ where
             .replay_contract
             .stable_dataset_identity
             .as_str(),
+        config.budget.max_steps,
         config.started_at_ms.saturating_add(
             config
                 .budget
@@ -2408,6 +2810,11 @@ where
         topology_receipt_digest: String::new(),
     };
     topology_receipt.topology_receipt_digest = topology_receipt.stable_digest();
+    let contributor_continuity_receipt = build_contributor_continuity_receipt(
+        config,
+        expected_contributor_hosts.as_slice(),
+        contribution_receipts.as_slice(),
+    );
 
     Ok(PsionReferencePilotDualHostRun {
         run: PsionReferencePilotRun {
@@ -2429,6 +2836,9 @@ where
         topology_receipt,
         contribution_receipts,
         joint_step_receipts,
+        progress_checkpoint_receipts,
+        progress_checkpoint_artifacts,
+        contributor_continuity_receipt,
     })
 }
 
@@ -5298,6 +5708,7 @@ fn export_checkpoint(
     config: &PsionReferencePilotConfig,
     descriptor: &PsionCompactDecoderDescriptor,
     dataset_identity: &str,
+    checkpoint_step: u64,
     durable_at_ms: u64,
 ) -> Result<PsionReferencePilotCheckpointArtifact, PsionReferencePilotError> {
     let parameter_values = model.parameter_values();
@@ -5330,14 +5741,14 @@ fn export_checkpoint(
         ]
         .as_slice(),
     )?;
-    let checkpoint_ref = format!("psion-reference-pilot-step-{}", config.budget.max_steps);
+    let checkpoint_ref = format!("psion-reference-pilot-step-{checkpoint_step}");
     let manifest = PsionReferencePilotCheckpointManifest {
         schema_version: String::from("psion.reference_pilot_checkpoint_manifest.v1"),
         checkpoint_ref: checkpoint_ref.clone(),
         checkpoint_family: config.checkpoint_family.clone(),
         run_id: config.run_id.clone(),
         stage_id: config.stage_id.clone(),
-        step: config.budget.max_steps,
+        step: checkpoint_step,
         model_id: descriptor.model.model_id.clone(),
         model_descriptor_digest: descriptor.stable_digest(),
         dataset_identity: String::from(dataset_identity),
@@ -5367,7 +5778,7 @@ fn export_checkpoint(
         config.started_at_ms,
     )
     .with_checkpoint_ref(checkpoint_ref)
-    .with_step(config.budget.max_steps)
+    .with_step(checkpoint_step)
     .with_durable_at_ms(durable_at_ms);
     Ok(PsionReferencePilotCheckpointArtifact {
         manifest,
@@ -6042,7 +6453,8 @@ mod tests {
 
     #[test]
     fn actual_pretraining_bringup_runs_tri_host_cpu_merge_end_to_end() {
-        let config = PsionReferencePilotConfig::actual_pretraining_bringup().expect("config");
+        let mut config = PsionReferencePilotConfig::actual_pretraining_bringup().expect("config");
+        config.budget = TrainingLoopBudget::new(6, 3, 2).expect("budget");
         let dual_host = PsionReferencePilotDualHostConfig::new("macbook-pro-m5", "archlinux")
             .with_control_plane_tailnet_ip("100.127.107.31")
             .with_remote_worker_tailnet_ip("100.108.56.85")
@@ -6082,6 +6494,29 @@ mod tests {
             run.topology_receipt.execution_topology_classification,
             "multi_host_joint_gradient_average"
         );
+        assert_eq!(
+            run.progress_checkpoint_receipts.len(),
+            2,
+            "6 steps with 3 steps per window should retain one boundary checkpoint per window"
+        );
+        assert_eq!(
+            run.progress_checkpoint_artifacts.len(),
+            run.progress_checkpoint_receipts.len(),
+            "progress checkpoint receipts should track one artifact each"
+        );
+        assert!(
+            run.progress_checkpoint_receipts
+                .iter()
+                .all(|receipt| receipt.expected_contributor_hosts.len() == 3
+                    && receipt.observed_contributor_hosts.len() == 3
+                    && receipt.cumulative_train_tokens_processed > 0),
+            "progress checkpoint receipts should retain tri-host continuity and cumulative progress"
+        );
+        assert!(
+            run.contributor_continuity_receipt
+                .all_configured_contributors_present_each_step,
+            "continuity receipt should prove all configured contributors stayed in the optimization path"
+        );
         assert!(
             run.run.step_receipts.iter().any(|receipt| receipt
                 .group_telemetry
@@ -6096,8 +6531,8 @@ mod tests {
     }
 
     #[test]
-    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn reference_pilot_evidence_bundle_validates_against_matrix_and_benchmark_contracts(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let config = PsionReferencePilotConfig::reference()?;
         let bundle = run_psion_reference_pilot_evidence_bundle(repo_root().as_path(), &config)?;
         let acceptance_matrix: PsionAcceptanceMatrix = load_json_fixture(
