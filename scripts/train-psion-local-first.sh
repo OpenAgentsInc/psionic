@@ -1028,6 +1028,7 @@ else
     "PSION_REFERENCE_PILOT_REMOTE_TMP_DIR=${remote_tmp_dir}" \
     "PSION_REFERENCE_PILOT_CONTROL_PLANE_HOST=${control_plane_host}" \
     "PSION_REFERENCE_PILOT_CONTROL_PLANE_TAILNET_IP=${local_tailnet_ip}" \
+    "PSION_REFERENCE_PILOT_CONTROL_PLANE_BACKEND=metal" \
     "PSION_REFERENCE_PILOT_REMOTE_HOST=${remote_host}" \
     "PSION_REFERENCE_PILOT_REMOTE_TAILNET_IP=${remote_tailnet_ip}" \
     "PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND=cuda" \
@@ -1038,7 +1039,7 @@ else
     "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_OUTPUT_DIR=${secondary_remote_output_dir}" \
     "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_TARGET_DIR=${secondary_remote_target_dir}" \
     "PSION_REFERENCE_PILOT_SECONDARY_REMOTE_TMP_DIR=${secondary_remote_tmp_dir}" \
-    "PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND=cpu" \
+    "PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND=metal" \
     cargo run -q -p psionic-train --example "${distributed_example_name}" -- "${local_artifact_dir}" \
     >>"${local_log_path}" 2>&1
 fi

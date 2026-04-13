@@ -29,6 +29,7 @@ hex = { workspace = true }
 psionic-adapters = { path = "../psionic-adapters" }
 psionic-array = { path = "../psionic-array" }
 psionic-backend-cuda = { path = "../psionic-backend-cuda" }
+psionic-backend-metal = { path = "../psionic-backend-metal" }
 psionic-cluster = { path = "../psionic-cluster" }
 psionic-collectives = { path = "../psionic-collectives" }
 psionic-compiler = { path = "../psionic-compiler" }

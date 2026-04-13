@@ -9,18 +9,21 @@ use std::{
 };
 
 use psionic_train::{
-    PsionReferencePilotConfig, PsionReferencePilotContributionBackend,
-    PsionReferencePilotDualHostConfig, PsionReferencePilotJointContributionReceipt,
-    PsionReferencePilotJointContributionRequest, TrainingLoopBudget,
     load_psion_reference_pilot_resume_seed_from_artifact_dir,
-    run_psion_dual_host_actual_pretraining_bringup_with_resume,
+    run_psion_dual_host_actual_pretraining_bringup_with_resume, PsionReferencePilotConfig,
+    PsionReferencePilotContributionBackend, PsionReferencePilotDualHostConfig,
+    PsionReferencePilotJointContributionReceipt, PsionReferencePilotJointContributionRequest,
+    TrainingLoopBudget,
 };
 use zstd::stream::{decode_all as zstd_decode_all, encode_all as zstd_encode_all};
 
 const DEFAULT_CONTROL_PLANE_BATCH_ROWS: usize = 2;
+const DEFAULT_CONTROL_PLANE_METAL_BATCH_ROWS: usize = 4;
 const DEFAULT_PRIMARY_CUDA_BATCH_ROWS: usize = 12;
+const DEFAULT_PRIMARY_METAL_BATCH_ROWS: usize = 6;
 const DEFAULT_PRIMARY_CPU_BATCH_ROWS: usize = 4;
 const DEFAULT_SECONDARY_CUDA_BATCH_ROWS: usize = 8;
+const DEFAULT_SECONDARY_METAL_BATCH_ROWS: usize = 4;
 const DEFAULT_SECONDARY_CPU_BATCH_ROWS: usize = 2;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -191,6 +194,10 @@ fn dual_host_config_from_env() -> Result<PsionReferencePilotDualHostConfig, Box<
         "PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND",
         PsionReferencePilotContributionBackend::Cuda,
     )?;
+    let control_plane_backend = env_backend(
+        "PSION_REFERENCE_PILOT_CONTROL_PLANE_BACKEND",
+        default_control_plane_backend(),
+    )?;
     let secondary_backend =
         optional_nonempty_env("PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND")?
             .map(|value| {
@@ -202,7 +209,8 @@ fn dual_host_config_from_env() -> Result<PsionReferencePilotDualHostConfig, Box<
             .transpose()?
             .unwrap_or(PsionReferencePilotContributionBackend::Cpu);
     let mut config = PsionReferencePilotDualHostConfig::new(control_plane_host, remote_worker_host)
-        .with_control_plane_batch_rows(DEFAULT_CONTROL_PLANE_BATCH_ROWS)
+        .with_control_plane_backend(control_plane_backend)
+        .with_control_plane_batch_rows(default_control_plane_batch_rows(control_plane_backend))
         .with_remote_worker_batch_rows(default_primary_batch_rows(primary_backend))
         .with_secondary_remote_worker_batch_rows(default_secondary_batch_rows(secondary_backend))
         .with_remote_worker_backend(primary_backend)
@@ -246,6 +254,7 @@ fn default_primary_batch_rows(backend: PsionReferencePilotContributionBackend) -
     match backend {
         PsionReferencePilotContributionBackend::Cpu => DEFAULT_PRIMARY_CPU_BATCH_ROWS,
         PsionReferencePilotContributionBackend::Cuda => DEFAULT_PRIMARY_CUDA_BATCH_ROWS,
+        PsionReferencePilotContributionBackend::Metal => DEFAULT_PRIMARY_METAL_BATCH_ROWS,
     }
 }
 
@@ -253,6 +262,23 @@ fn default_secondary_batch_rows(backend: PsionReferencePilotContributionBackend)
     match backend {
         PsionReferencePilotContributionBackend::Cpu => DEFAULT_SECONDARY_CPU_BATCH_ROWS,
         PsionReferencePilotContributionBackend::Cuda => DEFAULT_SECONDARY_CUDA_BATCH_ROWS,
+        PsionReferencePilotContributionBackend::Metal => DEFAULT_SECONDARY_METAL_BATCH_ROWS,
+    }
+}
+
+fn default_control_plane_backend() -> PsionReferencePilotContributionBackend {
+    if cfg!(target_os = "macos") {
+        PsionReferencePilotContributionBackend::Metal
+    } else {
+        PsionReferencePilotContributionBackend::Cpu
+    }
+}
+
+fn default_control_plane_batch_rows(backend: PsionReferencePilotContributionBackend) -> usize {
+    match backend {
+        PsionReferencePilotContributionBackend::Metal => DEFAULT_CONTROL_PLANE_METAL_BATCH_ROWS,
+        PsionReferencePilotContributionBackend::Cpu
+        | PsionReferencePilotContributionBackend::Cuda => DEFAULT_CONTROL_PLANE_BATCH_ROWS,
     }
 }
 
@@ -273,6 +299,7 @@ fn parse_backend(
     match value {
         "cpu" => Ok(PsionReferencePilotContributionBackend::Cpu),
         "cuda" => Ok(PsionReferencePilotContributionBackend::Cuda),
+        "metal" | "mlx" => Ok(PsionReferencePilotContributionBackend::Metal),
         other => Err(format!("unsupported {name} `{other}`").into()),
     }
 }

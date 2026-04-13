@@ -4650,6 +4650,7 @@ dependencies = [
  "psionic-adapters",
  "psionic-array",
  "psionic-backend-cuda",
+ "psionic-backend-metal",
  "psionic-cluster",
  "psionic-collectives",
  "psionic-compiler",
