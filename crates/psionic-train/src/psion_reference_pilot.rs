@@ -5633,7 +5633,7 @@ fn dual_host_delivered_execution(
         worker_count
     ));
     let selected_nodes = std::iter::once(
-        ClusterSelectedNode::new(dual_host.control_plane_host.clone(), "cpu")
+        ClusterSelectedNode::new(dual_host.control_plane_host.clone(), local_runtime_backend)
             .with_role("trainer")
             .with_device_inventory(local_device),
     )
