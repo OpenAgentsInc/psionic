@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(&output_path, serde_json::to_vec_pretty(&receipt)?)?;
+    fs::write(&output_path, serde_json::to_vec(&receipt)?)?;
     println!(
         "psion actual pretraining joint contribution completed: step={} contributor={} backend={} output={}",
         receipt.global_step,

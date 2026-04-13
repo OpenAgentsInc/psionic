@@ -284,6 +284,23 @@ local Apple-silicon machine, the Tailnet RTX 4080 host, and the admitted M2
 Mac. It does not by itself claim the full broader actual-pretraining cluster
 lane.
 
+The current production-candidate canary on that same path widens the bounded
+segment to `12` optimizer steps with `3` steps per window and `2` windows per
+cadence via:
+
+```bash
+PSION_REFERENCE_PILOT_MAX_STEPS=12 \
+PSION_REFERENCE_PILOT_STEPS_PER_WINDOW=3 \
+PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=2 \
+./TRAIN rehearse-base-lane --remote-host archlinux --secondary-remote-host macbook-pro-m2 --cleanup-remote
+```
+
+That retained evidence family now includes contribution summary receipts,
+contributor continuity proof, per-window progress checkpoint receipts,
+progress checkpoint artifacts, and cumulative throughput/token counters, so the
+longer bounded canary is inspectable without claiming the full continuous
+production cluster lane.
+
 ## Tassadar Training Shortcut
 
 If you want the current default Tassadar training lane instead of guessing

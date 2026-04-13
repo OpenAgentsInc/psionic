@@ -124,7 +124,7 @@ impl RemoteContributionInvoker {
         let local_response_path = step_root.join(format!("{request_label}-response.json"));
         fs::write(
             &local_request_path,
-            serde_json::to_vec_pretty(request).map_err(|error| {
+            serde_json::to_vec(request).map_err(|error| {
                 psionic_train::PsionReferencePilotError::RemoteContribution {
                     message: error.to_string(),
                 }
@@ -330,6 +330,7 @@ fn ssh_status(
     args: &[String],
 ) -> Result<(), psionic_train::PsionReferencePilotError> {
     let status = Command::new("ssh")
+        .arg("-C")
         .arg("-o")
         .arg("BatchMode=yes")
         .arg("-o")
@@ -352,6 +353,7 @@ fn ssh_status(
 fn ssh_bash(target: &str, command: &str) -> Result<(), psionic_train::PsionReferencePilotError> {
     let wrapped = format!("bash -lc {}", shell_quote(command));
     let status = Command::new("ssh")
+        .arg("-C")
         .arg("-o")
         .arg("BatchMode=yes")
         .arg("-o")
@@ -377,6 +379,7 @@ fn scp_upload(
 ) -> Result<(), psionic_train::PsionReferencePilotError> {
     let status = Command::new("scp")
         .arg("-O")
+        .arg("-C")
         .arg("-o")
         .arg("BatchMode=yes")
         .arg("-o")
@@ -405,6 +408,7 @@ fn scp_download(
 ) -> Result<(), psionic_train::PsionReferencePilotError> {
     let status = Command::new("scp")
         .arg("-O")
+        .arg("-C")
         .arg("-o")
         .arg("BatchMode=yes")
         .arg("-o")

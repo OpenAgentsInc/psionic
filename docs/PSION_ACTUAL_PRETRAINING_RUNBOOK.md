@@ -535,9 +535,30 @@ PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=2 \
   --cleanup-remote
 ```
 
+Production-candidate canary target on the same shipped path:
+
+```bash
+PSION_REFERENCE_PILOT_MAX_STEPS=12 \
+PSION_REFERENCE_PILOT_STEPS_PER_WINDOW=3 \
+PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=2 \
+./TRAIN rehearse-base-lane \
+  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
+  --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json \
+  --remote-host archlinux \
+  --secondary-remote-host macbook-pro-m2 \
+  --cleanup-remote
+```
+
 Those environment variables only widen the bounded distributed bringup segment
 that the operator delegates. They do not change the command surface or turn the
-rehearsal into the full long-running production cluster lane.
+rehearsal into the full long-running production cluster lane. The current
+production-candidate canary target is:
+
+- `12` optimizer steps
+- `3` steps per window
+- `2` windows per cadence
+- one shared tri-host optimizer path across the local Apple-silicon machine,
+  the admitted M2 Mac, and the admitted Tailnet RTX `4080` host
 
 This command replays the actual operator path in one retained sequence:
 
@@ -566,7 +587,10 @@ When `--remote-host` is present, the operator retains:
 
 - `distributed_execution/distributed_actual_pretraining_bringup.json`
 - the bounded actual-pretraining bringup cluster topology receipt
-- the bounded actual-pretraining bringup contribution receipts
+- the bounded actual-pretraining bringup contribution summary receipts
+- the bounded actual-pretraining bringup contributor continuity receipt
+- the bounded actual-pretraining bringup progress checkpoint receipts
+- the bounded actual-pretraining bringup progress checkpoint directory
 - the bounded actual-pretraining bringup checkpoint manifest and checkpoint weights
 
 That is a real model-progress-bearing multi-host optimizer segment inside the
@@ -575,6 +599,16 @@ actual operator path using the larger actual-lane model id
 `psion_corpus_tokenized@v1`. The claim boundary stays explicit: the runbook
 proves one bounded rehearsal segment, not the full broader actual-pretraining
 cluster lane.
+
+The distributed bringup summary now also records:
+
+- total retained progress checkpoint count
+- total retained progress window count
+- total retained progress cadence count
+- final cumulative train tokens processed
+- final cumulative mean tokens per second
+- whether every configured contributor stayed in the optimizer path for every
+  retained step
 
 The repo also now commits one clean example run root for this proof gate under:
 
