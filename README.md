@@ -295,10 +295,27 @@ PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=2 \
 ./TRAIN rehearse-base-lane --remote-host archlinux --secondary-remote-host macbook-pro-m2 --cleanup-remote
 ```
 
-That retained evidence family now includes contribution summary receipts,
-contributor continuity proof, per-window progress checkpoint receipts,
-progress checkpoint artifacts, and cumulative throughput/token counters, so the
-longer bounded canary is inspectable without claiming the full continuous
+The current clean source-of-truth run for that canary is
+`psion-actual-pretraining-tri-host-actual-prodcanary-zstd-clean-20260413t134400Z`.
+It completed all `12` optimizer steps on the real actual workload with:
+
+- topology `multi_host_joint_gradient_average`
+- contributor count `3`
+- contribution receipt count `36`
+- retained progress checkpoint count `4`
+- retained progress window count `4`
+- retained progress cadence count `2`
+- final cumulative train tokens processed `775`
+- final cumulative mean tokens per second `16`
+- accepted checkpoint label `bounded-actual-pretraining-bringup-step-12`
+
+That retained evidence family now includes compact contribution summary
+receipts, contributor continuity proof, per-window progress checkpoint
+receipts, progress checkpoint artifacts, and cumulative throughput/token
+counters. The distributed exchange path now retains `.json.zst` step payloads
+and stages the repo to remotes as `.tar.gz`, which is what made the clean
+12-step canary complete end to end. The claim boundary stays the same: this is
+still a bounded production-candidate canary, not the full continuous
 production cluster lane.
 
 ## Tassadar Training Shortcut

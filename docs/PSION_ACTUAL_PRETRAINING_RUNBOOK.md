@@ -560,6 +560,23 @@ production-candidate canary target is:
 - one shared tri-host optimizer path across the local Apple-silicon machine,
   the admitted M2 Mac, and the admitted Tailnet RTX `4080` host
 
+The current clean source-of-truth run for that canary is:
+
+- run id:
+  `psion-actual-pretraining-tri-host-actual-prodcanary-zstd-clean-20260413t134400Z`
+- run root:
+  `/Users/christopherdavid/scratch/psion_actual_pretraining_runs/psion-actual-pretraining-tri-host-actual-prodcanary-zstd-clean-20260413t134400Z`
+- topology: `multi_host_joint_gradient_average`
+- contributor count: `3`
+- optimizer steps: `12`
+- contribution receipt count: `36`
+- retained progress checkpoint count: `4`
+- retained progress window count: `4`
+- retained progress cadence count: `2`
+- final cumulative train tokens processed: `775`
+- final cumulative mean tokens per second: `16`
+- accepted checkpoint label: `bounded-actual-pretraining-bringup-step-12`
+
 This command replays the actual operator path in one retained sequence:
 
 - `start`
@@ -609,6 +626,26 @@ The distributed bringup summary now also records:
 - final cumulative mean tokens per second
 - whether every configured contributor stayed in the optimizer path for every
   retained step
+
+The transport and staging path for this longer canary now stays on compressed
+artifacts throughout the distributed segment:
+
+- step exchange requests and responses are retained as `.json.zst`
+- repo staging for remotes now uses `.tar.gz`
+- SSH and SCP are run with compression enabled on the distributed bringup path
+
+That change is operationally important. The earlier 12-step attempts completed
+the optimizer work but stalled on oversized retained JSON receipts and large
+plain transport payloads. The current clean canary is the first source-of-truth
+run that completed end to end with compact retained receipts and compressed
+transport on the shipped path.
+
+Residual risk for the next phase stays explicit:
+
+- first-run remote compile time still dominates startup
+- repo staging for a cold remote is still a noticeable part of run bringup
+- this is still a bounded production-candidate canary, not the continuous live
+  actual-lane execution program
 
 The repo also now commits one clean example run root for this proof gate under:
 
