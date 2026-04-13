@@ -44,8 +44,8 @@ max_steps=""
 steps_per_window=""
 windows_per_cadence=""
 step_duration_ms=""
-ssh_opts=(-o BatchMode=yes -o ConnectTimeout=5)
-scp_opts=(-O -o BatchMode=yes -o ConnectTimeout=5)
+ssh_opts=(-o BatchMode=yes -o ConnectTimeout=5 -C)
+scp_opts=(-O -o BatchMode=yes -o ConnectTimeout=5 -C)
 
 usage() {
   cat <<'EOF' >&2
@@ -908,10 +908,10 @@ stage_remote_repo() {
   fi
 
   local local_stage_archive remote_stage_archive
-  local_stage_archive="$(mktemp "${output_root}/stage-${run_id}.XXXXXX.tar")"
-  remote_stage_archive="${worktree_dir}.tar"
+  local_stage_archive="$(mktemp "${output_root}/stage-${run_id}.XXXXXX.tar.gz")"
+  remote_stage_archive="${worktree_dir}.tar.gz"
   log_note "staging_strategy=archive_tarball ssh_target=${ssh_target} git_ref=${git_ref} local_stage_archive=${local_stage_archive}"
-  git -C "${repo_root}" archive --format=tar -o "${local_stage_archive}" "${git_ref}" \
+  git -C "${repo_root}" archive --format=tar.gz -o "${local_stage_archive}" "${git_ref}" \
     >>"${local_log_path}" 2>&1
   ssh "${ssh_opts[@]}" "${ssh_target}" "
     set -euo pipefail
@@ -923,7 +923,7 @@ stage_remote_repo() {
     set -euo pipefail
     rm -rf \"${worktree_dir}\" \"${output_dir}\"
     mkdir -p \"${worktree_dir}\" \"${output_dir}\"
-    tar -xf \"${remote_stage_archive}\" -C \"${worktree_dir}\"
+    tar -xzf \"${remote_stage_archive}\" -C \"${worktree_dir}\"
     rm -f \"${remote_stage_archive}\"
   " >>"${local_log_path}" 2>&1
   rm -f "${local_stage_archive}"

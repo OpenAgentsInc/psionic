@@ -3,6 +3,7 @@ use std::{
     env,
     error::Error,
     fs,
+    io::Cursor,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -13,6 +14,7 @@ use psionic_train::{
     PsionReferencePilotJointContributionRequest, TrainingLoopBudget,
     run_psion_dual_host_actual_pretraining_bringup,
 };
+use zstd::stream::{decode_all as zstd_decode_all, encode_all as zstd_encode_all};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let root = workspace_root()?;
@@ -120,24 +122,16 @@ impl RemoteContributionInvoker {
             .join(format!("step-{:04}", request.global_step));
         fs::create_dir_all(&step_root).map_err(io_as_remote_error)?;
         let request_label = sanitize_component(request.contributor_host.as_str());
-        let local_request_path = step_root.join(format!("{request_label}-request.json"));
-        let local_response_path = step_root.join(format!("{request_label}-response.json"));
-        fs::write(
-            &local_request_path,
-            serde_json::to_vec(request).map_err(|error| {
-                psionic_train::PsionReferencePilotError::RemoteContribution {
-                    message: error.to_string(),
-                }
-            })?,
-        )
-        .map_err(io_as_remote_error)?;
+        let local_request_path = step_root.join(format!("{request_label}-request.json.zst"));
+        let local_response_path = step_root.join(format!("{request_label}-response.json.zst"));
+        write_zstd_json(&local_request_path, request)?;
 
         let remote_step_dir = format!(
             "{}/step-{:04}",
             target.remote_output_dir, request.global_step
         );
-        let remote_request_path = format!("{remote_step_dir}/joint_request.json");
-        let remote_response_path = format!("{remote_step_dir}/joint_response.json");
+        let remote_request_path = format!("{remote_step_dir}/joint_request.json.zst");
+        let remote_response_path = format!("{remote_step_dir}/joint_response.json.zst");
 
         ssh_status(
             target.ssh_target.as_str(),
@@ -167,12 +161,7 @@ impl RemoteContributionInvoker {
             format!("{}:{}", target.ssh_target, remote_response_path).as_str(),
             &local_response_path,
         )?;
-        serde_json::from_slice(&fs::read(&local_response_path).map_err(io_as_remote_error)?)
-            .map_err(
-                |error| psionic_train::PsionReferencePilotError::RemoteContribution {
-                    message: error.to_string(),
-                },
-            )
+        read_zstd_json(&local_response_path)
     }
 }
 
@@ -323,6 +312,39 @@ fn sanitize_component(value: &str) -> String {
             _ => '_',
         })
         .collect()
+}
+
+fn write_zstd_json<T: serde::Serialize>(
+    path: &Path,
+    value: &T,
+) -> Result<(), psionic_train::PsionReferencePilotError> {
+    let json_bytes = serde_json::to_vec(value).map_err(|error| {
+        psionic_train::PsionReferencePilotError::RemoteContribution {
+            message: error.to_string(),
+        }
+    })?;
+    let encoded_bytes = zstd_encode_all(Cursor::new(json_bytes), 7).map_err(|error| {
+        psionic_train::PsionReferencePilotError::RemoteContribution {
+            message: error.to_string(),
+        }
+    })?;
+    fs::write(path, encoded_bytes).map_err(io_as_remote_error)
+}
+
+fn read_zstd_json<T: serde::de::DeserializeOwned>(
+    path: &Path,
+) -> Result<T, psionic_train::PsionReferencePilotError> {
+    let encoded_bytes = fs::read(path).map_err(io_as_remote_error)?;
+    let decoded_bytes = zstd_decode_all(Cursor::new(encoded_bytes)).map_err(|error| {
+        psionic_train::PsionReferencePilotError::RemoteContribution {
+            message: error.to_string(),
+        }
+    })?;
+    serde_json::from_slice(&decoded_bytes).map_err(|error| {
+        psionic_train::PsionReferencePilotError::RemoteContribution {
+            message: error.to_string(),
+        }
+    })
 }
 
 fn ssh_status(
