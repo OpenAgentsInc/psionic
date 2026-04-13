@@ -50,7 +50,8 @@ use psionic_train::{
     PsionActualPretrainingScalingBundle, PsionActualPretrainingStorageProbe,
     PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
-    PsionReferencePilotCheckpointManifest, PsionReferencePilotContributorContinuityReceipt,
+    PsionPretrainStageRunReceipt, PsionReferencePilotCheckpointManifest,
+    PsionReferencePilotContributorContinuityReceipt, PsionReferencePilotDualHostStepReceipt,
     PsionReferencePilotDualHostTopologyReceipt, PsionReferencePilotJointContributionSummaryReceipt,
     PsionReferencePilotProgressCheckpointReceipt, PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
     PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
@@ -131,6 +132,7 @@ enum Cli {
         allow_dirty_tree: bool,
         remote_host: Option<String>,
         secondary_remote_host: Option<String>,
+        planned_interruption_step: Option<u64>,
         cleanup_remote: bool,
     },
 }
@@ -177,6 +179,8 @@ struct PsionActualPretrainingDistributedBringupRehearsal {
     progress_checkpoint_directory: String,
     checkpoint_manifest_path: String,
     checkpoint_weights_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    recovery_drill_receipt_path: Option<String>,
     execution_topology_classification: String,
     contributor_count: usize,
     worker_hosts: Vec<String>,
@@ -281,8 +285,138 @@ impl PsionActualPretrainingDistributedBringupRehearsal {
             )
             .into());
         }
+        if self
+            .recovery_drill_receipt_path
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(std::io::Error::other(
+                "distributed bringup rehearsal recovery_drill_receipt_path must not be empty",
+            )
+            .into());
+        }
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct PsionActualPretrainingDistributedRecoveryDrillReceipt {
+    schema_version: String,
+    run_id: String,
+    recovery_state: String,
+    interruption_kind: String,
+    interruption_step: u64,
+    total_target_optimizer_steps: u64,
+    interrupted_segment_summary_path: String,
+    interrupted_segment_artifact_dir: String,
+    interrupted_checkpoint_ref: String,
+    interrupted_checkpoint_manifest_path: String,
+    interrupted_checkpoint_object_digest: String,
+    recovered_segment_summary_path: Option<String>,
+    recovered_segment_artifact_dir: Option<String>,
+    recovered_checkpoint_ref: Option<String>,
+    recovered_checkpoint_manifest_path: Option<String>,
+    recovered_checkpoint_object_digest: Option<String>,
+    lineage_preserved: bool,
+    refusal_reason: Option<String>,
+    detail: String,
+}
+
+impl PsionActualPretrainingDistributedRecoveryDrillReceipt {
+    fn validate(&self) -> Result<(), Box<dyn Error>> {
+        for value in [
+            self.schema_version.as_str(),
+            self.run_id.as_str(),
+            self.recovery_state.as_str(),
+            self.interruption_kind.as_str(),
+            self.interrupted_segment_summary_path.as_str(),
+            self.interrupted_segment_artifact_dir.as_str(),
+            self.interrupted_checkpoint_ref.as_str(),
+            self.interrupted_checkpoint_manifest_path.as_str(),
+            self.interrupted_checkpoint_object_digest.as_str(),
+            self.detail.as_str(),
+        ] {
+            if value.trim().is_empty() {
+                return Err(std::io::Error::other(
+                    "distributed recovery drill retained one empty field",
+                )
+                .into());
+            }
+        }
+        if self.interruption_step == 0 || self.total_target_optimizer_steps == 0 {
+            return Err(std::io::Error::other(
+                "distributed recovery drill steps must be nonzero",
+            )
+            .into());
+        }
+        if self.recovery_state == "recovered" {
+            for value in [
+                self.recovered_segment_summary_path.as_deref().unwrap_or_default(),
+                self.recovered_segment_artifact_dir.as_deref().unwrap_or_default(),
+                self.recovered_checkpoint_ref.as_deref().unwrap_or_default(),
+                self.recovered_checkpoint_manifest_path
+                    .as_deref()
+                    .unwrap_or_default(),
+                self.recovered_checkpoint_object_digest
+                    .as_deref()
+                    .unwrap_or_default(),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(std::io::Error::other(
+                        "recovered drill must retain recovered segment surfaces",
+                    )
+                    .into());
+                }
+            }
+            if !self.lineage_preserved {
+                return Err(std::io::Error::other(
+                    "recovered drill must preserve checkpoint lineage",
+                )
+                .into());
+            }
+        }
+        if self.recovery_state == "refused"
+            && self
+                .refusal_reason
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .is_empty()
+        {
+            return Err(std::io::Error::other(
+                "refused drill must retain refusal_reason",
+            )
+            .into());
+        }
+        Ok(())
+    }
+}
+
+struct DistributedBringupSegmentArtifacts {
+    output_root: PathBuf,
+    operator_manifest_path: PathBuf,
+    operator_summary_path: PathBuf,
+    train_log_path: PathBuf,
+    artifact_dir: PathBuf,
+    cluster_topology_receipt_path: PathBuf,
+    cluster_step_receipts_path: PathBuf,
+    cluster_contribution_receipts_path: PathBuf,
+    contributor_continuity_receipt_path: PathBuf,
+    progress_checkpoint_receipts_path: PathBuf,
+    progress_checkpoint_directory: PathBuf,
+    checkpoint_manifest_path: PathBuf,
+    checkpoint_weights_path: PathBuf,
+    checkpoint_optimizer_state_path: PathBuf,
+    checkpoint_stage_receipt_path: PathBuf,
+    topology_receipt: PsionReferencePilotDualHostTopologyReceipt,
+    joint_step_receipts: Vec<PsionReferencePilotDualHostStepReceipt>,
+    contribution_receipts: Vec<PsionReferencePilotJointContributionSummaryReceipt>,
+    contributor_continuity_receipt: PsionReferencePilotContributorContinuityReceipt,
+    progress_checkpoint_receipts: Vec<PsionReferencePilotProgressCheckpointReceipt>,
+    checkpoint_manifest: PsionReferencePilotCheckpointManifest,
+    checkpoint_stage_receipt: PsionPretrainStageRunReceipt,
+    checkpoint_object_digest: String,
+    checkpoint_total_bytes: u64,
 }
 
 pub fn set_human_output_enabled(enabled: bool) {
@@ -1787,6 +1921,7 @@ where
             allow_dirty_tree,
             remote_host,
             secondary_remote_host,
+            planned_interruption_step,
             cleanup_remote,
         } => {
             let current_exe = env::current_exe()?;
@@ -1809,6 +1944,7 @@ where
                     &selected_git_ref,
                     remote_host,
                     secondary_remote_host.as_deref(),
+                    planned_interruption_step,
                     cleanup_remote,
                 )?),
                 None => None,
@@ -1907,6 +2043,10 @@ where
                 load_json(&run_root.join(&retained_paths.current_status_path))?;
             current_status.phase = String::from("base_lane_rehearsal_complete");
             current_status.detail = match distributed_rehearsal.as_ref() {
+                Some(rehearsal) if rehearsal.recovery_drill_receipt_path.is_some() => format!(
+                    "Base-lane rehearsal completed one retained launch, one bounded {} distributed training proof, one planned interruption and recovery drill, accepted checkpoint retention, backup recovery drill, continue decision, and resume cycle for the actual pretraining lane.",
+                    rehearsal.execution_topology_classification
+                ),
                 Some(rehearsal) => format!(
                     "Base-lane rehearsal completed one retained launch, one bounded {} distributed training proof, accepted checkpoint retention, backup recovery drill, continue decision, and resume cycle for the actual pretraining lane.",
                     rehearsal.execution_topology_classification
@@ -1926,6 +2066,9 @@ where
                 load_json(&run_root.join(&retained_paths.retained_summary_path))?;
             retained_summary.last_known_phase = current_status.phase.clone();
             retained_summary.claim_boundary = match distributed_rehearsal.as_ref() {
+                Some(rehearsal) if rehearsal.recovery_drill_receipt_path.is_some() => String::from(
+                    "The retained summary now proves one full base-lane rehearsal for the actual pretraining operator path, including launch, one bounded multi-host distributed training proof, one planned interruption and recovery drill on the same checkpoint lineage, accepted checkpoint retention, backup recovery drill, continue-vs-restart decision, and resume. It does not claim external alert delivery, streaming dashboard publication, broader actual-lane distributed cluster execution beyond that bounded rehearsal segment, or plugin-conditioned continuation execution.",
+                ),
                 Some(_) => String::from(
                     "The retained summary now proves one full base-lane rehearsal for the actual pretraining operator path, including launch, one bounded multi-host distributed training proof, accepted checkpoint retention, backup recovery drill, continue-vs-restart decision, and resume. It does not claim external alert delivery, streaming dashboard publication, broader actual-lane distributed cluster execution beyond that bounded rehearsal segment, or plugin-conditioned continuation execution.",
                 ),
@@ -1934,6 +2077,10 @@ where
                 ),
             };
             retained_summary.detail = match distributed_rehearsal.as_ref() {
+                Some(rehearsal) if rehearsal.recovery_drill_receipt_path.is_some() => format!(
+                    "Retained summary now points at the exact base-lane rehearsal closeout state plus the bounded {} training proof and retained recovery drill for operator review.",
+                    rehearsal.execution_topology_classification
+                ),
                 Some(rehearsal) => format!(
                     "Retained summary now points at the exact base-lane rehearsal closeout state plus the bounded {} training proof for operator review.",
                     rehearsal.execution_topology_classification
@@ -2071,6 +2218,14 @@ where
                     "distributed_bringup={}",
                     run_root.join(&rehearsal.rehearsal_summary_path).display()
                 );
+                if let Some(recovery_drill_receipt_path) =
+                    rehearsal.recovery_drill_receipt_path.as_deref()
+                {
+                    println!(
+                        "distributed_recovery_drill={}",
+                        run_root.join(recovery_drill_receipt_path).display()
+                    );
+                }
                 println!(
                     "distributed_topology={}",
                     rehearsal.execution_topology_classification
@@ -2114,6 +2269,7 @@ where
     let mut run_shape_observation_path: Option<PathBuf> = None;
     let mut remote_host = String::new();
     let mut secondary_remote_host = String::new();
+    let mut planned_interruption_step: Option<u64> = None;
     let mut allow_dirty_tree = false;
     let mut dry_run = false;
     let mut cleanup_remote = false;
@@ -2192,6 +2348,17 @@ where
                 secondary_remote_host = args.next().ok_or_else(|| {
                     std::io::Error::other("--secondary-remote-host requires a value")
                 })?;
+            }
+            "--planned-interruption-step" => {
+                planned_interruption_step = Some(
+                    args.next()
+                        .ok_or_else(|| {
+                            std::io::Error::other(
+                                "--planned-interruption-step requires a value",
+                            )
+                        })?
+                        .parse::<u64>()?,
+                );
             }
             "--allow-dirty-tree" => allow_dirty_tree = true,
             "--dry-run" => dry_run = true,
@@ -2356,6 +2523,7 @@ where
                 } else {
                     Some(secondary_remote_host)
                 },
+                planned_interruption_step,
                 cleanup_remote,
             })
         }
@@ -2368,7 +2536,7 @@ where
 
 fn usage() {
     eprintln!(
-        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator decide-continue-restart --run-root <path> [--git-ref <ref>] [--allow-dirty-tree]\n  psion_actual_pretraining_operator rehearse-base-lane [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--remote-host <host>] [--secondary-remote-host <host>] [--cleanup-remote] [--allow-dirty-tree]"
+        "Usage:\n  psion_actual_pretraining_operator start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator record-checkpoint --run-root <path> --checkpoint-label <label> --optimizer-step <step> --checkpoint-ref <ref> [--checkpoint-object-digest <digest>] [--checkpoint-total-bytes <bytes>] [--git-ref <ref>] [--allow-dirty-tree] [--inject-eval-worker-unavailable]\n  psion_actual_pretraining_operator backup --run-root <path> [--git-ref <ref>] [--allow-dirty-tree] [--inject-failed-upload]\n  psion_actual_pretraining_operator resume --run-root <path> [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--allow-dirty-tree] [--dry-run]\n  psion_actual_pretraining_operator decide-continue-restart --run-root <path> [--git-ref <ref>] [--allow-dirty-tree]\n  psion_actual_pretraining_operator rehearse-base-lane [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--hardware-observation <path>] [--run-shape-observation <path>] [--remote-host <host>] [--secondary-remote-host <host>] [--planned-interruption-step <step>] [--cleanup-remote] [--allow-dirty-tree]"
     );
 }
 
@@ -3079,8 +3247,23 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
     selected_git_ref: &str,
     remote_host: &str,
     secondary_remote_host: Option<&str>,
+    planned_interruption_step: Option<u64>,
     cleanup_remote: bool,
 ) -> Result<PsionActualPretrainingDistributedBringupRehearsal, Box<dyn Error>> {
+    let total_target_steps = configured_actual_bringup_max_steps()?;
+    if let Some(interruption_step) = planned_interruption_step {
+        return run_actual_pretraining_distributed_bringup_recovery_drill(
+            repo_root,
+            run_root,
+            actual_run_id,
+            selected_git_ref,
+            remote_host,
+            secondary_remote_host,
+            interruption_step,
+            total_target_steps,
+            cleanup_remote,
+        );
+    }
     let bringup_run_id = format!("{actual_run_id}-distributed-actual-pretraining-bringup");
     let relative_output_root = PathBuf::from("distributed_actual_pretraining_bringup");
     let output_root = run_root.join(&relative_output_root);
@@ -3249,7 +3432,7 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
         std::io::Error::other("distributed bringup rehearsal retained no final progress receipt")
     })?;
 
-    let receipt = PsionActualPretrainingDistributedBringupRehearsal {
+        let receipt = PsionActualPretrainingDistributedBringupRehearsal {
         schema_version: String::from(
             PSION_ACTUAL_PRETRAINING_DISTRIBUTED_BRINGUP_REHEARSAL_SCHEMA_VERSION,
         ),
@@ -3287,19 +3470,20 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
             .strip_prefix(run_root)?
             .to_string_lossy()
             .replace('\\', "/"),
-        progress_checkpoint_directory: progress_checkpoint_directory
-            .strip_prefix(run_root)?
-            .to_string_lossy()
-            .replace('\\', "/"),
-        checkpoint_manifest_path: checkpoint_manifest_path
-            .strip_prefix(run_root)?
-            .to_string_lossy()
-            .replace('\\', "/"),
-        checkpoint_weights_path: checkpoint_weights_path
-            .strip_prefix(run_root)?
-            .to_string_lossy()
-            .replace('\\', "/"),
-        execution_topology_classification: topology_receipt.execution_topology_classification,
+            progress_checkpoint_directory: progress_checkpoint_directory
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+            checkpoint_manifest_path: checkpoint_manifest_path
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+            checkpoint_weights_path: checkpoint_weights_path
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+            recovery_drill_receipt_path: None,
+            execution_topology_classification: topology_receipt.execution_topology_classification,
         contributor_count: topology_receipt.contributor_count,
         worker_hosts: topology_receipt.worker_hosts,
         runtime_backends: topology_receipt.runtime_backends,
@@ -3320,6 +3504,772 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
         ),
         detail: String::from(
             "Distributed bringup binds the actual-lane run root to one retained multi-host actual-pretraining bringup proof, its progress checkpoints, continuity receipt, checkpoint bytes, and the exact operator/log surfaces used to produce that proof.",
+        ),
+    };
+    receipt.validate()?;
+    write_json_pretty(&run_root.join(&receipt.rehearsal_summary_path), &receipt)?;
+    Ok(receipt)
+}
+
+fn configured_actual_bringup_max_steps() -> Result<u64, Box<dyn Error>> {
+    match env::var("PSION_REFERENCE_PILOT_MAX_STEPS") {
+        Ok(value) => Ok(value.parse::<u64>()?),
+        Err(env::VarError::NotPresent) => Ok(
+            psionic_train::PsionReferencePilotConfig::actual_pretraining_bringup()?
+                .budget
+                .max_steps,
+        ),
+        Err(error) => Err(Box::new(error)),
+    }
+}
+
+fn configured_actual_bringup_step_duration_ms() -> Result<u64, Box<dyn Error>> {
+    match env::var("PSION_REFERENCE_PILOT_STEP_DURATION_MS") {
+        Ok(value) => Ok(value.parse::<u64>()?),
+        Err(env::VarError::NotPresent) => Ok(
+            psionic_train::PsionReferencePilotConfig::actual_pretraining_bringup()?
+                .step_duration_ms,
+        ),
+        Err(error) => Err(Box::new(error)),
+    }
+}
+
+fn run_distributed_bringup_segment(
+    repo_root: &Path,
+    output_root: &Path,
+    actual_run_id: &str,
+    selected_git_ref: &str,
+    remote_host: &str,
+    secondary_remote_host: Option<&str>,
+    cleanup_remote: bool,
+    max_steps_override: Option<u64>,
+    total_max_steps: Option<u64>,
+    resume_artifact_dir: Option<&Path>,
+) -> Result<DistributedBringupSegmentArtifacts, Box<dyn Error>> {
+    let segment_run_id = format!(
+        "{}-{}",
+        actual_run_id,
+        output_root
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("segment")
+    );
+    let resolved_git_ref = git_output(repo_root, &["rev-parse", selected_git_ref])?;
+    if output_root.exists() {
+        fs::remove_dir_all(output_root)?;
+    }
+    let mut command = Command::new(repo_root.join("scripts/train-psion-local-first.sh"));
+    command
+        .arg("--workload")
+        .arg("actual_pretraining_bringup")
+        .arg("--mode")
+        .arg("distributed_reference")
+        .arg("--remote-host")
+        .arg(remote_host)
+        .arg("--run-id")
+        .arg(&segment_run_id)
+        .arg("--output-root")
+        .arg(output_root)
+        .arg("--git-ref")
+        .arg(&resolved_git_ref);
+    if let Some(secondary_remote_host) = secondary_remote_host {
+        command
+            .arg("--secondary-remote-host")
+            .arg(secondary_remote_host);
+    }
+    if cleanup_remote {
+        command.arg("--cleanup-remote");
+    }
+    if let Some(max_steps_override) = max_steps_override {
+        command.env(
+            "PSION_REFERENCE_PILOT_MAX_STEPS",
+            max_steps_override.to_string(),
+        );
+    }
+    if let Some(total_max_steps) = total_max_steps {
+        command.env(
+            "PSION_REFERENCE_PILOT_TOTAL_MAX_STEPS",
+            total_max_steps.to_string(),
+        );
+    }
+    if let Some(resume_artifact_dir) = resume_artifact_dir {
+        command.env(
+            "PSION_REFERENCE_PILOT_RESUME_FROM_ARTIFACT_DIR",
+            resume_artifact_dir,
+        );
+    }
+    let output = command.output()?;
+    if !output.status.success() {
+        let local_log_tail = output_root.join("actual_pretraining_bringup_train.log");
+        let log_excerpt = if local_log_tail.is_file() {
+            let log = fs::read_to_string(&local_log_tail)?;
+            let lines: Vec<&str> = log.lines().rev().take(80).collect();
+            format!(
+                "\nlocal_train_log_tail:\n{}",
+                lines.into_iter().rev().collect::<Vec<_>>().join("\n")
+            )
+        } else {
+            String::new()
+        };
+        return Err(std::io::Error::other(format!(
+            "actual-lane distributed bringup segment failed\nstdout:\n{}\nstderr:\n{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+            log_excerpt,
+        ))
+        .into());
+    }
+    load_distributed_bringup_segment_artifacts(output_root)
+}
+
+fn load_distributed_bringup_segment_artifacts(
+    output_root: &Path,
+) -> Result<DistributedBringupSegmentArtifacts, Box<dyn Error>> {
+    let operator_manifest_path =
+        output_root.join("actual_pretraining_bringup_operator_manifest.json");
+    let operator_summary_path =
+        output_root.join("actual_pretraining_bringup_operator_summary.json");
+    let train_log_path = output_root.join("actual_pretraining_bringup_train.log");
+    let artifact_dir = output_root.join("actual_pretraining_bringup_artifacts");
+    let cluster_topology_receipt_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_topology_receipt.json")
+        .is_file()
+    {
+        artifact_dir.join("psion_actual_pretraining_bringup_cluster_topology_receipt.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_dual_host_topology_receipt.json")
+    };
+    let cluster_step_receipts_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_step_receipts.json")
+        .is_file()
+    {
+        artifact_dir.join("psion_actual_pretraining_bringup_cluster_step_receipts.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_dual_host_step_receipts.json")
+    };
+    let cluster_contribution_receipts_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_contribution_receipts.json")
+        .is_file()
+    {
+        artifact_dir.join("psion_actual_pretraining_bringup_cluster_contribution_receipts.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_dual_host_contribution_receipts.json")
+    };
+    let contributor_continuity_receipt_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_contributor_continuity_receipt.json")
+        .is_file()
+    {
+        artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_contributor_continuity_receipt.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_contributor_continuity_receipt.json")
+    };
+    let progress_checkpoint_receipts_path = if artifact_dir
+        .join("psion_actual_pretraining_bringup_cluster_progress_checkpoint_receipts.json")
+        .is_file()
+    {
+        artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_progress_checkpoint_receipts.json")
+    } else {
+        artifact_dir.join("psion_actual_pretraining_bringup_progress_checkpoint_receipts.json")
+    };
+    let progress_checkpoint_directory =
+        artifact_dir.join("psion_actual_pretraining_bringup_progress_checkpoints");
+    let checkpoint_manifest_path =
+        artifact_dir.join("psion_actual_pretraining_bringup_checkpoint_manifest.json");
+    let checkpoint_weights_path =
+        artifact_dir.join("psion_actual_pretraining_bringup_checkpoint.safetensors");
+    let checkpoint_optimizer_state_path =
+        artifact_dir.join("psion_actual_pretraining_bringup_optimizer_state.json");
+    let checkpoint_stage_receipt_path =
+        artifact_dir.join("psion_actual_pretraining_bringup_stage_receipt.json");
+
+    let topology_receipt: PsionReferencePilotDualHostTopologyReceipt =
+        load_json(&cluster_topology_receipt_path)?;
+    let joint_step_receipts: Vec<PsionReferencePilotDualHostStepReceipt> =
+        load_json(&cluster_step_receipts_path)?;
+    let contribution_receipts: Vec<PsionReferencePilotJointContributionSummaryReceipt> =
+        load_json(&cluster_contribution_receipts_path)?;
+    let contributor_continuity_receipt: PsionReferencePilotContributorContinuityReceipt =
+        load_json(&contributor_continuity_receipt_path)?;
+    let progress_checkpoint_receipts: Vec<PsionReferencePilotProgressCheckpointReceipt> =
+        load_json(&progress_checkpoint_receipts_path)?;
+    let checkpoint_manifest: PsionReferencePilotCheckpointManifest =
+        load_json(&checkpoint_manifest_path)?;
+    let checkpoint_stage_receipt: PsionPretrainStageRunReceipt =
+        load_json(&checkpoint_stage_receipt_path)?;
+    let checkpoint_object_digest = file_sha256(&checkpoint_weights_path)?;
+    let checkpoint_total_bytes = fs::metadata(&checkpoint_weights_path)?.len();
+
+    Ok(DistributedBringupSegmentArtifacts {
+        output_root: output_root.to_path_buf(),
+        operator_manifest_path,
+        operator_summary_path,
+        train_log_path,
+        artifact_dir,
+        cluster_topology_receipt_path,
+        cluster_step_receipts_path,
+        cluster_contribution_receipts_path,
+        contributor_continuity_receipt_path,
+        progress_checkpoint_receipts_path,
+        progress_checkpoint_directory,
+        checkpoint_manifest_path,
+        checkpoint_weights_path,
+        checkpoint_optimizer_state_path,
+        checkpoint_stage_receipt_path,
+        topology_receipt,
+        joint_step_receipts,
+        contribution_receipts,
+        contributor_continuity_receipt,
+        progress_checkpoint_receipts,
+        checkpoint_manifest,
+        checkpoint_stage_receipt,
+        checkpoint_object_digest,
+        checkpoint_total_bytes,
+    })
+}
+
+fn copy_dir_recursive(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
+    fs::create_dir_all(target)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&source_path, &target_path)?;
+        } else {
+            fs::copy(&source_path, &target_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn build_combined_contributor_continuity_receipt(
+    run_id: &str,
+    stage_id: &str,
+    checkpoint_family: &str,
+    expected_contributor_hosts: &[String],
+    contribution_receipts: &[PsionReferencePilotJointContributionSummaryReceipt],
+    runtime_backends: &[String],
+) -> PsionReferencePilotContributorContinuityReceipt {
+    let mut observed_contribution_counts_by_host = std::collections::BTreeMap::new();
+    let mut runtime_backends_by_host = std::collections::BTreeMap::new();
+    for (host, backend) in expected_contributor_hosts.iter().zip(runtime_backends.iter()) {
+        runtime_backends_by_host.insert(host.clone(), backend.clone());
+    }
+    for receipt in contribution_receipts {
+        *observed_contribution_counts_by_host
+            .entry(receipt.contributor_host.clone())
+            .or_insert(0) += 1;
+    }
+    let mut missing_contributors_by_step = Vec::new();
+    let max_step = contribution_receipts
+        .iter()
+        .map(|receipt| receipt.global_step)
+        .max()
+        .unwrap_or(0);
+    for global_step in 1..=max_step {
+        let observed = contribution_receipts
+            .iter()
+            .filter(|receipt| receipt.global_step == global_step)
+            .map(|receipt| receipt.contributor_host.clone())
+            .collect::<std::collections::BTreeSet<_>>();
+        let missing_hosts = expected_contributor_hosts
+            .iter()
+            .filter(|host| !observed.contains(*host))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing_hosts.is_empty() {
+            missing_contributors_by_step.push(psionic_train::PsionReferencePilotMissingContributorStep {
+                global_step,
+                missing_hosts,
+            });
+        }
+    }
+    let all_configured_contributors_present_each_step = missing_contributors_by_step.is_empty();
+    let mut receipt = PsionReferencePilotContributorContinuityReceipt {
+        schema_version: String::from("psion.reference_pilot_contributor_continuity_receipt.v1"),
+        run_id: String::from(run_id),
+        stage_id: String::from(stage_id),
+        checkpoint_family: String::from(checkpoint_family),
+        optimizer_steps_completed: max_step,
+        expected_contributor_hosts: expected_contributor_hosts.to_vec(),
+        observed_contribution_counts_by_host,
+        runtime_backends_by_host,
+        missing_contributors_by_step,
+        all_configured_contributors_present_each_step,
+        detail: format!(
+            "Combined contributor continuity receipt proves the recovered actual-pretraining bringup retained {} contributors across {} optimizer steps.",
+            expected_contributor_hosts.len(),
+            max_step
+        ),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = receipt.stable_digest();
+    receipt
+}
+
+fn write_refused_recovery_drill_receipt(
+    run_root: &Path,
+    output_root: &Path,
+    actual_run_id: &str,
+    interruption_step: u64,
+    total_target_steps: u64,
+    interrupted_segment: &DistributedBringupSegmentArtifacts,
+    refusal_reason: impl Into<String>,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let receipt = PsionActualPretrainingDistributedRecoveryDrillReceipt {
+        schema_version: String::from("psion.actual_pretraining_distributed_recovery_drill.v1"),
+        run_id: String::from(actual_run_id),
+        recovery_state: String::from("refused"),
+        interruption_kind: String::from("planned_checkpoint_boundary_interrupt"),
+        interruption_step,
+        total_target_optimizer_steps: total_target_steps,
+        interrupted_segment_summary_path: interrupted_segment
+            .operator_summary_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        interrupted_segment_artifact_dir: interrupted_segment
+            .artifact_dir
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        interrupted_checkpoint_ref: interrupted_segment.checkpoint_manifest.checkpoint_ref.clone(),
+        interrupted_checkpoint_manifest_path: interrupted_segment
+            .checkpoint_manifest_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        interrupted_checkpoint_object_digest: interrupted_segment.checkpoint_object_digest.clone(),
+        recovered_segment_summary_path: None,
+        recovered_segment_artifact_dir: None,
+        recovered_checkpoint_ref: None,
+        recovered_checkpoint_manifest_path: None,
+        recovered_checkpoint_object_digest: None,
+        lineage_preserved: false,
+        refusal_reason: Some(refusal_reason.into()),
+        detail: String::from(
+            "Recovery drill retained the interrupted checkpoint lineage but refused continuation because the resumed segment could not honestly stay on the same accepted checkpoint family.",
+        ),
+    };
+    receipt.validate()?;
+    let recovery_receipt_path = output_root.join("actual_pretraining_bringup_recovery_drill.json");
+    write_json_pretty(&recovery_receipt_path, &receipt)?;
+    Ok(recovery_receipt_path)
+}
+
+fn run_actual_pretraining_distributed_bringup_recovery_drill(
+    repo_root: &Path,
+    run_root: &Path,
+    actual_run_id: &str,
+    selected_git_ref: &str,
+    remote_host: &str,
+    secondary_remote_host: Option<&str>,
+    interruption_step: u64,
+    total_target_steps: u64,
+    cleanup_remote: bool,
+) -> Result<PsionActualPretrainingDistributedBringupRehearsal, Box<dyn Error>> {
+    if interruption_step == 0 || interruption_step >= total_target_steps {
+        return Err(std::io::Error::other(
+            "planned interruption step must be greater than zero and less than the total target steps",
+        )
+        .into());
+    }
+    let bringup_run_id = format!("{actual_run_id}-distributed-actual-pretraining-bringup");
+    let relative_output_root = PathBuf::from("distributed_actual_pretraining_bringup");
+    let output_root = run_root.join(&relative_output_root);
+    if output_root.exists() {
+        fs::remove_dir_all(&output_root)?;
+    }
+    fs::create_dir_all(&output_root)?;
+
+    let interrupted_segment_root = output_root.join("interrupted_segment");
+    let interrupted_segment = run_distributed_bringup_segment(
+        repo_root,
+        &interrupted_segment_root,
+        actual_run_id,
+        selected_git_ref,
+        remote_host,
+        secondary_remote_host,
+        cleanup_remote,
+        Some(interruption_step),
+        Some(total_target_steps),
+        None,
+    )?;
+    if interrupted_segment.checkpoint_manifest.step != interruption_step {
+        return Err(std::io::Error::other(
+            "interrupted segment checkpoint step drifted from the requested interruption boundary",
+        )
+        .into());
+    }
+
+    let recovered_segment_root = output_root.join("recovered_segment");
+    let recovered_segment = match run_distributed_bringup_segment(
+        repo_root,
+        &recovered_segment_root,
+        actual_run_id,
+        selected_git_ref,
+        remote_host,
+        secondary_remote_host,
+        cleanup_remote,
+        Some(total_target_steps.saturating_sub(interruption_step)),
+        Some(total_target_steps),
+        Some(&interrupted_segment.artifact_dir),
+    ) {
+        Ok(segment) => segment,
+        Err(error) => {
+            let receipt_path = write_refused_recovery_drill_receipt(
+                run_root,
+                &output_root,
+                actual_run_id,
+                interruption_step,
+                total_target_steps,
+                &interrupted_segment,
+                error.to_string(),
+            )?;
+            return Err(std::io::Error::other(format!(
+                "distributed recovery drill refused continuation; see {}: {}",
+                receipt_path.display(),
+                error
+            ))
+            .into());
+        }
+    };
+
+    let interrupted_checkpoint = &interrupted_segment
+        .checkpoint_stage_receipt
+        .checkpoint_lineage
+        .promoted_checkpoint;
+    let recovered_base_checkpoint = recovered_segment
+        .checkpoint_stage_receipt
+        .checkpoint_lineage
+        .base_checkpoint
+        .as_ref()
+        .ok_or_else(|| {
+            std::io::Error::other(
+                "recovered segment is missing the expected base checkpoint lineage",
+            )
+        })?;
+    if recovered_base_checkpoint.object_digest != interrupted_checkpoint.object_digest
+        || recovered_base_checkpoint.checkpoint_ref != interrupted_checkpoint.checkpoint_ref
+    {
+        let receipt_path = write_refused_recovery_drill_receipt(
+            run_root,
+            &output_root,
+            actual_run_id,
+            interruption_step,
+            total_target_steps,
+            &interrupted_segment,
+            "recovered segment base checkpoint drifted from the interrupted checkpoint lineage",
+        )?;
+        return Err(std::io::Error::other(format!(
+            "distributed recovery drill refused continuation because lineage drifted; see {}",
+            receipt_path.display()
+        ))
+        .into());
+    }
+
+    let combined_artifact_dir = output_root.join("actual_pretraining_bringup_artifacts");
+    if combined_artifact_dir.exists() {
+        fs::remove_dir_all(&combined_artifact_dir)?;
+    }
+    fs::create_dir_all(&combined_artifact_dir)?;
+
+    for filename in [
+        "psion_actual_pretraining_bringup_stage_config.json",
+        "psion_actual_pretraining_bringup_stage_receipt.json",
+        "psion_actual_pretraining_bringup_observability_receipt.json",
+        "psion_actual_pretraining_bringup_checkpoint_manifest.json",
+        "psion_actual_pretraining_bringup_optimizer_state.json",
+        "psion_actual_pretraining_bringup_summary.json",
+        "psion_actual_pretraining_bringup_checkpoint.safetensors",
+    ] {
+        fs::copy(
+            recovered_segment.artifact_dir.join(filename),
+            combined_artifact_dir.join(filename),
+        )?;
+    }
+
+    let mut combined_step_receipts = interrupted_segment.joint_step_receipts.clone();
+    combined_step_receipts.extend(recovered_segment.joint_step_receipts.clone());
+    combined_step_receipts.sort_by_key(|receipt| receipt.global_step);
+
+    let mut combined_contribution_receipts = interrupted_segment.contribution_receipts.clone();
+    combined_contribution_receipts.extend(recovered_segment.contribution_receipts.clone());
+    combined_contribution_receipts.sort_by_key(|receipt| {
+        (receipt.global_step, receipt.contributor_index as u64)
+    });
+
+    let step_duration_ms = configured_actual_bringup_step_duration_ms()?;
+    let mut combined_progress_checkpoint_receipts =
+        interrupted_segment.progress_checkpoint_receipts.clone();
+    let token_offset = interrupted_segment
+        .progress_checkpoint_receipts
+        .last()
+        .map(|receipt| receipt.cumulative_train_tokens_processed)
+        .unwrap_or(0);
+    for mut receipt in recovered_segment.progress_checkpoint_receipts.clone() {
+        receipt.cumulative_train_tokens_processed = receipt
+            .cumulative_train_tokens_processed
+            .saturating_add(token_offset);
+        receipt.cumulative_mean_tokens_per_second =
+            (receipt.cumulative_train_tokens_processed * 1000)
+                / receipt
+                    .optimizer_steps_completed
+                    .saturating_mul(step_duration_ms)
+                    .max(1);
+        combined_progress_checkpoint_receipts.push(receipt);
+    }
+    combined_progress_checkpoint_receipts
+        .sort_by_key(|receipt| receipt.optimizer_steps_completed);
+
+    let combined_contributor_continuity_receipt = build_combined_contributor_continuity_receipt(
+        actual_run_id,
+        &recovered_segment.checkpoint_stage_receipt.stage_id,
+        &recovered_segment.checkpoint_manifest.checkpoint_family,
+        recovered_segment.topology_receipt.worker_hosts.as_slice(),
+        combined_contribution_receipts.as_slice(),
+        recovered_segment.topology_receipt.runtime_backends.as_slice(),
+    );
+    if !combined_contributor_continuity_receipt.all_configured_contributors_present_each_step {
+        let receipt_path = write_refused_recovery_drill_receipt(
+            run_root,
+            &output_root,
+            actual_run_id,
+            interruption_step,
+            total_target_steps,
+            &interrupted_segment,
+            "combined contributor continuity drifted during the recovered segment",
+        )?;
+        return Err(std::io::Error::other(format!(
+            "distributed recovery drill refused continuation because contributor continuity drifted; see {}",
+            receipt_path.display()
+        ))
+        .into());
+    }
+
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_cluster_topology_receipt.json"),
+        &recovered_segment.topology_receipt,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_dual_host_topology_receipt.json"),
+        &recovered_segment.topology_receipt,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_cluster_step_receipts.json"),
+        &combined_step_receipts,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_dual_host_step_receipts.json"),
+        &combined_step_receipts,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_cluster_contribution_receipts.json"),
+        &combined_contribution_receipts,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_dual_host_contribution_receipts.json"),
+        &combined_contribution_receipts,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_cluster_contributor_continuity_receipt.json"),
+        &combined_contributor_continuity_receipt,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_contributor_continuity_receipt.json"),
+        &combined_contributor_continuity_receipt,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_cluster_progress_checkpoint_receipts.json"),
+        &combined_progress_checkpoint_receipts,
+    )?;
+    write_json_pretty(
+        &combined_artifact_dir.join("psion_actual_pretraining_bringup_progress_checkpoint_receipts.json"),
+        &combined_progress_checkpoint_receipts,
+    )?;
+
+    let combined_progress_dir =
+        combined_artifact_dir.join("psion_actual_pretraining_bringup_progress_checkpoints");
+    fs::create_dir_all(&combined_progress_dir)?;
+    for source_dir in [
+        &interrupted_segment.progress_checkpoint_directory,
+        &recovered_segment.progress_checkpoint_directory,
+    ] {
+        for entry in fs::read_dir(source_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                copy_dir_recursive(&entry.path(), &combined_progress_dir.join(entry.file_name()))?;
+            }
+        }
+    }
+
+    let recovery_receipt = PsionActualPretrainingDistributedRecoveryDrillReceipt {
+        schema_version: String::from("psion.actual_pretraining_distributed_recovery_drill.v1"),
+        run_id: String::from(actual_run_id),
+        recovery_state: String::from("recovered"),
+        interruption_kind: String::from("planned_checkpoint_boundary_interrupt"),
+        interruption_step,
+        total_target_optimizer_steps: total_target_steps,
+        interrupted_segment_summary_path: interrupted_segment
+            .operator_summary_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        interrupted_segment_artifact_dir: interrupted_segment
+            .artifact_dir
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        interrupted_checkpoint_ref: interrupted_segment.checkpoint_manifest.checkpoint_ref.clone(),
+        interrupted_checkpoint_manifest_path: interrupted_segment
+            .checkpoint_manifest_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        interrupted_checkpoint_object_digest: interrupted_segment.checkpoint_object_digest.clone(),
+        recovered_segment_summary_path: Some(
+            recovered_segment
+                .operator_summary_path
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+        recovered_segment_artifact_dir: Some(
+            recovered_segment
+                .artifact_dir
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+        recovered_checkpoint_ref: Some(recovered_segment.checkpoint_manifest.checkpoint_ref.clone()),
+        recovered_checkpoint_manifest_path: Some(
+            recovered_segment
+                .checkpoint_manifest_path
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+        recovered_checkpoint_object_digest: Some(recovered_segment.checkpoint_object_digest.clone()),
+        lineage_preserved: true,
+        refusal_reason: None,
+        detail: String::from(
+            "Recovery drill stopped the longer actual-lane bringup at one planned checkpoint boundary, resumed from the retained interrupted checkpoint artifact family, and completed the remaining optimizer steps without manual path surgery.",
+        ),
+    };
+    recovery_receipt.validate()?;
+    let recovery_receipt_path = output_root.join("actual_pretraining_bringup_recovery_drill.json");
+    write_json_pretty(&recovery_receipt_path, &recovery_receipt)?;
+
+    let final_progress_receipt = combined_progress_checkpoint_receipts.last().ok_or_else(|| {
+        std::io::Error::other("recovered distributed bringup retained no final progress receipt")
+    })?;
+    let progress_window_count = combined_progress_checkpoint_receipts
+        .iter()
+        .map(|receipt| receipt.window_index)
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let progress_cadence_count = combined_progress_checkpoint_receipts
+        .iter()
+        .filter(|receipt| receipt.is_cadence_boundary)
+        .map(|receipt| receipt.cadence_index)
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+
+    let receipt = PsionActualPretrainingDistributedBringupRehearsal {
+        schema_version: String::from(
+            PSION_ACTUAL_PRETRAINING_DISTRIBUTED_BRINGUP_REHEARSAL_SCHEMA_VERSION,
+        ),
+        run_id: String::from(actual_run_id),
+        bringup_run_id,
+        rehearsal_summary_path: String::from(
+            "distributed_execution/distributed_actual_pretraining_bringup.json",
+        ),
+        relative_output_root: relative_output_root.to_string_lossy().replace('\\', "/"),
+        operator_manifest_path: interrupted_segment
+            .operator_manifest_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        operator_summary_path: recovered_segment
+            .operator_summary_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        train_log_path: recovered_segment
+            .train_log_path
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        cluster_topology_receipt_path: combined_artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_topology_receipt.json")
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        cluster_contribution_receipts_path: combined_artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_contribution_receipts.json")
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        contributor_continuity_receipt_path: combined_artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_contributor_continuity_receipt.json")
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        progress_checkpoint_receipts_path: combined_artifact_dir
+            .join("psion_actual_pretraining_bringup_cluster_progress_checkpoint_receipts.json")
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        progress_checkpoint_directory: combined_progress_dir
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        checkpoint_manifest_path: combined_artifact_dir
+            .join("psion_actual_pretraining_bringup_checkpoint_manifest.json")
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        checkpoint_weights_path: combined_artifact_dir
+            .join("psion_actual_pretraining_bringup_checkpoint.safetensors")
+            .strip_prefix(run_root)?
+            .to_string_lossy()
+            .replace('\\', "/"),
+        recovery_drill_receipt_path: Some(
+            recovery_receipt_path
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ),
+        execution_topology_classification: recovered_segment
+            .topology_receipt
+            .execution_topology_classification
+            .clone(),
+        contributor_count: recovered_segment.topology_receipt.contributor_count,
+        worker_hosts: recovered_segment.topology_receipt.worker_hosts.clone(),
+        runtime_backends: recovered_segment.topology_receipt.runtime_backends.clone(),
+        checkpoint_ref: recovered_segment.checkpoint_manifest.checkpoint_ref.clone(),
+        checkpoint_object_digest: recovered_segment.checkpoint_object_digest.clone(),
+        checkpoint_total_bytes: recovered_segment.checkpoint_total_bytes,
+        optimizer_steps: recovered_segment.checkpoint_manifest.step,
+        contribution_receipt_count: combined_contribution_receipts.len(),
+        progress_checkpoint_count: combined_progress_checkpoint_receipts.len(),
+        progress_window_count,
+        progress_cadence_count,
+        final_cumulative_train_tokens_processed: final_progress_receipt
+            .cumulative_train_tokens_processed,
+        final_cumulative_mean_tokens_per_second: final_progress_receipt
+            .cumulative_mean_tokens_per_second,
+        claim_boundary: String::from(
+            "This retained rehearsal proves one bounded multi-host actual-lane execution that was intentionally interrupted at a checkpoint boundary and then recovered on the same checkpoint lineage and artifact family. It does not by itself claim continuous live cluster operation or control-plane truth outside the bounded rehearsal surface.",
+        ),
+        detail: format!(
+            "Distributed bringup recovery drill binds the interrupted segment, recovered segment, combined continuity/progress receipts, and retained recovery drill receipt into one operator-readable proof for the actual lane. Recovery receipt: {}",
+            recovery_receipt_path
+                .strip_prefix(run_root)?
+                .to_string_lossy()
+                .replace('\\', "/")
         ),
     };
     receipt.validate()?;
@@ -3533,6 +4483,15 @@ fn build_base_lane_rehearsal_closeout_bundle(
                 "Distributed bringup checkpoint manifest proves the exact bounded checkpoint lineage promoted into the actual-lane checkpoint family.",
             )?,
         ]);
+        if let Some(recovery_drill_receipt_path) = rehearsal.recovery_drill_receipt_path.as_deref()
+        {
+            evidence_artifacts.push(closeout_artifact(
+                run_root,
+                "distributed_actual_pretraining_recovery_drill",
+                &run_root.join(recovery_drill_receipt_path),
+                "Recovery drill receipt proves the longer actual-lane bringup was intentionally interrupted and then recovered on the same retained checkpoint lineage without manual path surgery.",
+            )?);
+        }
     }
     let mut closeout_gates = vec![
         PsionActualPretrainingCloseoutGate {
@@ -3598,6 +4557,15 @@ fn build_base_lane_rehearsal_closeout_bundle(
                 rehearsal.progress_window_count
             ),
         });
+        if rehearsal.recovery_drill_receipt_path.is_some() {
+            closeout_gates.push(PsionActualPretrainingCloseoutGate {
+                gate_id: String::from("bounded_distributed_recovery_drill_retained"),
+                satisfied: true,
+                detail: String::from(
+                    "The actual-lane rehearsal retained one planned interruption and successful recovery drill on the same accepted checkpoint lineage.",
+                ),
+            });
+        }
     }
     let failure_drills = vec![PsionActualPretrainingCloseoutFailureDrill {
         drill_id: String::from("failed_upload_drill"),
@@ -3625,6 +4593,11 @@ fn build_base_lane_rehearsal_closeout_bundle(
             rehearsal.execution_topology_classification,
             rehearsal.contributor_count
         ));
+        if rehearsal.recovery_drill_receipt_path.is_some() {
+            can_now_claim.push(String::from(
+                "The actual pretraining lane now retains one planned interruption and recovery proof where the longer tri-host bringup resumed from the interrupted checkpoint family without manual path surgery.",
+            ));
+        }
     }
     let mut still_out_of_scope = vec![
         String::from("External alert delivery or paging for actual-lane failures."),

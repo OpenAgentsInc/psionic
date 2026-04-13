@@ -651,6 +651,71 @@ The repo also now commits one clean example run root for this proof gate under:
 
 - `fixtures/psion/pretrain/psion_actual_pretraining_base_lane_rehearsal_example/run-psion-actual-20260402t160000z/`
 
+## Planned Interruption Recovery Drill
+
+The same shipped `rehearse-base-lane` surface now also proves planned
+checkpoint-boundary interruption and recovery without manual path surgery.
+
+Source-of-truth recovery command:
+
+```bash
+PSION_REFERENCE_PILOT_MAX_STEPS=6 \
+PSION_REFERENCE_PILOT_STEPS_PER_WINDOW=3 \
+PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=1 \
+./TRAIN rehearse-base-lane \
+  --run-id psion-actual-pretraining-tri-host-actual-recovery-20260413t154800Z \
+  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
+  --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json \
+  --remote-host archlinux \
+  --secondary-remote-host macbook-pro-m2 \
+  --planned-interruption-step 3 \
+  --cleanup-remote
+```
+
+This proof:
+
+- runs the interrupted segment for `3` optimizer steps
+- retains that interrupted checkpoint family under
+  `distributed_actual_pretraining_bringup/interrupted_segment/...`
+- resumes the recovered segment for the remaining `3` optimizer steps from the
+  retained interrupted artifact family
+- writes one retained recovery receipt at
+  `distributed_actual_pretraining_bringup/actual_pretraining_bringup_recovery_drill.json`
+- keeps one combined cluster topology, contribution, continuity, progress, and
+  checkpoint family under the canonical
+  `distributed_actual_pretraining_bringup/actual_pretraining_bringup_artifacts/`
+  root
+
+The current clean source-of-truth recovery run is:
+
+- run id:
+  `psion-actual-pretraining-tri-host-actual-recovery-20260413t154800Z`
+- run root:
+  `/Users/christopherdavid/scratch/psion_actual_pretraining_runs/psion-actual-pretraining-tri-host-actual-recovery-20260413t154800Z`
+- topology: `multi_host_joint_gradient_average`
+- contributor count: `3`
+- interruption step: `3`
+- total target optimizer steps: `6`
+- recovered checkpoint ref: `psion-reference-pilot-step-6`
+- interrupted checkpoint ref: `psion-reference-pilot-step-3`
+- recovered checkpoint label: `bounded-actual-pretraining-bringup-step-6`
+- lineage preserved: `true`
+- contribution receipt count: `18`
+- retained progress checkpoint count: `2`
+- final cumulative train tokens processed: `394`
+- final cumulative mean tokens per second: `16`
+
+The retained recovery receipt is now the machine-readable answer to:
+
+- what interruption was injected
+- where the interrupted segment stopped
+- whether the resumed run stayed on the same logical checkpoint lineage
+- whether the continuation was honestly refused or completed
+
+When recovery cannot proceed honestly, the same path writes a refused recovery
+receipt with `recovery_state = refused` and one explicit `refusal_reason`
+instead of silently forking the artifact family.
+
 ## Continuation-Handoff Rehearsal
 
 The continuation proof gate intentionally stays separate from the base-lane

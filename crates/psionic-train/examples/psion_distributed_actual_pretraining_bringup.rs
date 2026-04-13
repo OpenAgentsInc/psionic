@@ -9,10 +9,11 @@ use std::{
 };
 
 use psionic_train::{
+    load_psion_reference_pilot_resume_seed_from_artifact_dir,
     PsionReferencePilotConfig, PsionReferencePilotContributionBackend,
     PsionReferencePilotDualHostConfig, PsionReferencePilotJointContributionReceipt,
     PsionReferencePilotJointContributionRequest, TrainingLoopBudget,
-    run_psion_dual_host_actual_pretraining_bringup,
+    run_psion_dual_host_actual_pretraining_bringup_with_resume,
 };
 use zstd::stream::{decode_all as zstd_decode_all, encode_all as zstd_encode_all};
 
@@ -27,11 +28,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let remote = RemoteContributionInvoker::from_env(&output_dir)?;
     let mut config = PsionReferencePilotConfig::actual_pretraining_bringup()?;
     apply_env_overrides(&mut config)?;
+    let total_max_steps = optional_env_u64("PSION_REFERENCE_PILOT_TOTAL_MAX_STEPS")?;
+    let resume_seed = optional_nonempty_env("PSION_REFERENCE_PILOT_RESUME_FROM_ARTIFACT_DIR")?
+        .map(PathBuf::from)
+        .map(|artifact_dir| {
+            load_psion_reference_pilot_resume_seed_from_artifact_dir(
+                artifact_dir.as_path(),
+                "psion_actual_pretraining_bringup",
+            )
+        })
+        .transpose()?;
     let dual_host = dual_host_config_from_env()?;
-    let run = run_psion_dual_host_actual_pretraining_bringup(
+    let run = run_psion_dual_host_actual_pretraining_bringup_with_resume(
         root.as_path(),
         &config,
         &dual_host,
+        resume_seed.as_ref(),
+        total_max_steps,
         |request| remote.invoke(request),
     )?;
     run.write_to_dir_with_prefix(output_dir.as_path(), "psion_actual_pretraining_bringup")?;

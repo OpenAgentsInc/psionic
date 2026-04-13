@@ -211,6 +211,22 @@ impl PsionReferencePilotOptimizerStateArtifact {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PsionReferencePilotResumeSeed {
+    pub schema_version: String,
+    pub checkpoint_artifact: PsionReferencePilotCheckpointArtifact,
+    pub optimizer_state_artifact: PsionReferencePilotOptimizerStateArtifact,
+    pub promoted_checkpoint: TrainingCheckpointReference,
+    pub resume_step_offset: u64,
+}
+
+impl PsionReferencePilotResumeSeed {
+    #[must_use]
+    pub fn stable_digest(&self) -> String {
+        stable_digest(b"psion_reference_pilot_resume_seed|", self)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PsionReferencePilotResumeProbe {
     pub schema_version: String,
     pub run_id: String,
@@ -794,6 +810,7 @@ fn cumulative_train_tokens_processed(
 
 fn build_progress_checkpoint_receipt(
     config: &PsionReferencePilotConfig,
+    schedule_budget: TrainingLoopBudget,
     checkpoint_artifact: &PsionReferencePilotCheckpointArtifact,
     contribution_receipts: &[PsionReferencePilotJointContributionReceipt],
     expected_contributor_hosts: &[String],
@@ -801,9 +818,9 @@ fn build_progress_checkpoint_receipt(
     train_examples: &[PsionReferenceTrainingExample],
 ) -> PsionReferencePilotProgressCheckpointReceipt {
     let (window_index, step_in_window, cadence_index, window_in_cadence) =
-        schedule_for_global_step(config.budget, global_step);
+        schedule_for_global_step(schedule_budget, global_step);
     let (is_window_boundary, is_cadence_boundary, is_terminal_boundary) =
-        should_emit_progress_checkpoint_receipt(config.budget, global_step);
+        should_emit_progress_checkpoint_receipt(schedule_budget, global_step);
     let observed_hosts = contribution_receipts
         .iter()
         .filter(|receipt| receipt.global_step == global_step)
@@ -2270,6 +2287,7 @@ where
             )?;
             progress_checkpoint_receipts.push(build_progress_checkpoint_receipt(
                 config,
+                config.budget,
                 &progress_checkpoint_artifact,
                 contribution_receipts.as_slice(),
                 expected_contributor_hosts.as_slice(),
@@ -2499,6 +2517,88 @@ pub fn run_psion_dual_host_actual_pretraining_bringup<F>(
     repo_root: &Path,
     config: &PsionReferencePilotConfig,
     dual_host: &PsionReferencePilotDualHostConfig,
+    remote_contributor: F,
+) -> Result<PsionReferencePilotDualHostRun, PsionReferencePilotError>
+where
+    F: FnMut(
+        &PsionReferencePilotJointContributionRequest,
+    ) -> Result<PsionReferencePilotJointContributionReceipt, PsionReferencePilotError>,
+{
+    run_psion_dual_host_actual_pretraining_bringup_with_resume(
+        repo_root,
+        config,
+        dual_host,
+        None,
+        None,
+        remote_contributor,
+    )
+}
+
+pub fn load_psion_reference_pilot_resume_seed_from_artifact_dir(
+    artifact_dir: &Path,
+    prefix: &str,
+) -> Result<PsionReferencePilotResumeSeed, PsionReferencePilotError> {
+    let checkpoint_manifest: PsionReferencePilotCheckpointManifest = read_json_artifact(
+        artifact_dir.join(format!("{prefix}_checkpoint_manifest.json")).as_path(),
+    )?;
+    let optimizer_state_artifact: PsionReferencePilotOptimizerStateArtifact = read_json_artifact(
+        artifact_dir.join(format!("{prefix}_optimizer_state.json")).as_path(),
+    )?;
+    let stage_receipt: PsionPretrainStageRunReceipt = read_json_artifact(
+        artifact_dir.join(format!("{prefix}_stage_receipt.json")).as_path(),
+    )?;
+    let checkpoint_weights = fs::read(artifact_dir.join(format!("{prefix}_checkpoint.safetensors")))
+        .map_err(|error| PsionReferencePilotError::Serialization {
+            message: error.to_string(),
+        })?;
+    let promoted_checkpoint = stage_receipt.checkpoint_lineage.promoted_checkpoint.clone();
+    if promoted_checkpoint.checkpoint_ref.as_deref()
+        != Some(checkpoint_manifest.checkpoint_ref.as_str())
+    {
+        return Err(PsionReferencePilotError::Serialization {
+            message: String::from(
+                "resume seed checkpoint manifest drifted from promoted checkpoint ref",
+            ),
+        });
+    }
+    if optimizer_state_artifact.completed_steps != checkpoint_manifest.step {
+        return Err(PsionReferencePilotError::Serialization {
+            message: String::from(
+                "resume seed optimizer-state step drifted from checkpoint manifest step",
+            ),
+        });
+    }
+    let resume_step_offset = if let Some(step) = stage_receipt.checkpoint_lineage.promoted_checkpoint.step
+    {
+        step
+    } else if let Some(accelerator_execution) = &stage_receipt.accelerator_execution {
+        accelerator_execution.optimizer_steps_completed.into()
+    } else {
+        return Err(PsionReferencePilotError::Serialization {
+            message: String::from(
+                "resume seed missing both promoted checkpoint step and accelerator execution",
+            ),
+        });
+    };
+    Ok(PsionReferencePilotResumeSeed {
+        schema_version: String::from("psion.reference_pilot_resume_seed.v1"),
+        checkpoint_artifact: PsionReferencePilotCheckpointArtifact {
+            manifest: checkpoint_manifest,
+            weights_bytes: checkpoint_weights,
+            checkpoint: promoted_checkpoint.clone(),
+        },
+        optimizer_state_artifact,
+        promoted_checkpoint,
+        resume_step_offset,
+    })
+}
+
+pub fn run_psion_dual_host_actual_pretraining_bringup_with_resume<F>(
+    repo_root: &Path,
+    config: &PsionReferencePilotConfig,
+    dual_host: &PsionReferencePilotDualHostConfig,
+    resume_seed: Option<&PsionReferencePilotResumeSeed>,
+    total_max_steps: Option<u64>,
     mut remote_contributor: F,
 ) -> Result<PsionReferencePilotDualHostRun, PsionReferencePilotError>
 where
@@ -2509,21 +2609,89 @@ where
     let corpus_bundle = build_psion_actual_pretraining_reconstructed_corpus(repo_root)?;
     let sampling_policy = build_actual_pretraining_sampling_policy(repo_root)?;
     let model_descriptor = build_actual_pretraining_model_descriptor(repo_root)?;
-    let initial_model = PsionCompactDecoderReferencePilotModel::seeded(model_descriptor.clone());
     let train_examples = split_examples(&corpus_bundle, DatasetSplitKind::Train);
     let validation_examples = split_examples(&corpus_bundle, DatasetSplitKind::Validation);
     let held_out_examples = split_examples(&corpus_bundle, DatasetSplitKind::HeldOut);
-
-    let initial_validation_summary = evaluate_examples(&initial_model, &validation_examples);
-    let initial_held_out_summary = evaluate_examples(&initial_model, &held_out_examples);
-
-    let parameter_groups = build_parameter_groups(&initial_model, config)?;
-    let mut run = FixedBudgetTrainingRun::new(
-        config.run_id.clone(),
-        config.checkpoint_family.clone(),
-        config.budget,
-        parameter_groups,
+    let resumed_step_offset = resume_seed.map_or(0, |seed| seed.resume_step_offset);
+    let schedule_total_steps =
+        total_max_steps.unwrap_or(resumed_step_offset.saturating_add(config.budget.max_steps));
+    if schedule_total_steps < resumed_step_offset.saturating_add(config.budget.max_steps) {
+        return Err(PsionReferencePilotError::Serialization {
+            message: String::from(
+                "total_max_steps cannot be smaller than the resumed step offset plus segment budget",
+            ),
+        });
+    }
+    let schedule_budget = TrainingLoopBudget::new(
+        schedule_total_steps,
+        config.budget.steps_per_window,
+        config.budget.windows_per_cadence,
     )?;
+
+    let (
+        initial_model,
+        initial_validation_summary,
+        initial_held_out_summary,
+        mut run,
+        base_checkpoint,
+    ) = if let Some(seed) = resume_seed {
+        let restored_model = restore_psion_reference_pilot_checkpoint(
+            &model_descriptor,
+            &seed.checkpoint_artifact.manifest,
+            &seed.checkpoint_artifact.weights_bytes,
+        )?;
+        let parameter_groups = rebind_parameter_groups_to_device(
+            seed.optimizer_state_artifact.parameter_groups.as_slice(),
+            &Device::cpu(),
+        );
+        let parameter_state_digest =
+            parameter_state_digest_from_groups(parameter_groups.as_slice())?;
+        if parameter_state_digest != seed.optimizer_state_artifact.parameter_state_digest {
+            return Err(PsionReferencePilotError::Serialization {
+                message: format!(
+                    "resume seed optimizer-state digest drifted: expected {}, found {}",
+                    seed.optimizer_state_artifact.parameter_state_digest,
+                    parameter_state_digest
+                ),
+            });
+        }
+        let mut session = TrainingSessionState::new(
+            format!("{}-resume-session", config.run_id),
+            config.checkpoint_family.clone(),
+        );
+        session.latest_durable_checkpoint = Some(seed.promoted_checkpoint.clone());
+        session.latest_durable_manifest = Some(checkpoint_manifest_ref(
+            &seed.checkpoint_artifact.manifest,
+            &seed.promoted_checkpoint,
+            seed.checkpoint_artifact.weights_bytes.len() as u64,
+        ));
+        (
+            restored_model.clone(),
+            evaluate_examples(&restored_model, &validation_examples),
+            evaluate_examples(&restored_model, &held_out_examples),
+            session.restore_fixed_budget_run(
+                config.run_id.clone(),
+                config.budget,
+                parameter_groups,
+            )?,
+            Some(seed.promoted_checkpoint.clone()),
+        )
+    } else {
+        let seeded_model = PsionCompactDecoderReferencePilotModel::seeded(model_descriptor.clone());
+        let parameter_groups = build_parameter_groups(&seeded_model, config)?;
+        (
+            seeded_model.clone(),
+            evaluate_examples(&seeded_model, &validation_examples),
+            evaluate_examples(&seeded_model, &held_out_examples),
+            FixedBudgetTrainingRun::new(
+                config.run_id.clone(),
+                config.checkpoint_family.clone(),
+                config.budget,
+                parameter_groups,
+            )?,
+            None,
+        )
+    };
 
     let mut current_model = initial_model.clone();
     let mut step_receipts = Vec::new();
@@ -2558,7 +2726,9 @@ where
     let mut progress_checkpoint_artifacts = Vec::new();
 
     for step_index in 0..config.budget.max_steps {
-        let global_step = step_index.saturating_add(1);
+        let global_step = resumed_step_offset
+            .saturating_add(step_index)
+            .saturating_add(1);
         let parameter_values = current_model.parameter_values();
         let parameter_state_digest =
             stable_digest(b"psion_reference_pilot_parameter_state|", &parameter_values);
@@ -2673,7 +2843,7 @@ where
             ),
         });
         contribution_receipts.extend(step_contributions);
-        if should_emit_progress_checkpoint_receipt(config.budget, global_step).0 {
+        if should_emit_progress_checkpoint_receipt(schedule_budget, global_step).0 {
             let progress_checkpoint_artifact = export_checkpoint(
                 &current_model,
                 &train_examples,
@@ -2690,6 +2860,7 @@ where
             )?;
             progress_checkpoint_receipts.push(build_progress_checkpoint_receipt(
                 config,
+                schedule_budget,
                 &progress_checkpoint_artifact,
                 contribution_receipts.as_slice(),
                 expected_contributor_hosts.as_slice(),
@@ -2714,11 +2885,10 @@ where
             .replay_contract
             .stable_dataset_identity
             .as_str(),
-        config.budget.max_steps,
+        resumed_step_offset.saturating_add(config.budget.max_steps),
         config.started_at_ms.saturating_add(
-            config
-                .budget
-                .max_steps
+            resumed_step_offset
+                .saturating_add(config.budget.max_steps)
                 .saturating_mul(config.step_duration_ms),
         ),
     )?;
@@ -2744,7 +2914,7 @@ where
     let checkpoint_lineage = PsionPretrainCheckpointLineageReceipt::new(
         format!("{}-checkpoint-lineage", config.run_id),
         checkpoint_artifact.checkpoint.clone(),
-        None,
+        base_checkpoint,
         checkpoint_artifact.manifest.checkpoint_ref.clone(),
         model_descriptor.model.model_id.clone(),
         model_descriptor.stable_digest(),

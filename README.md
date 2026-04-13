@@ -121,6 +121,7 @@ Use:
 ./TRAIN --dry-run
 ./TRAIN resume --run-root <path>
 ./TRAIN status --run-root <path>
+./TRAIN rehearse-base-lane --planned-interruption-step <n>
 ```
 
 for plan inspection and operator follow-up on the actual lane.
