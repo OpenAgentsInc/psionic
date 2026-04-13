@@ -244,6 +244,53 @@ pub struct PsionicTrainCapabilityProjection {
     pub environment_ref: String,
 }
 
+/// Minimum admitted machine class for one canonical machine-runtime lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PsionicTrainMinimumMachineClass {
+    ReferenceHostCpuOperator,
+    AppleSiliconOperator,
+    StrongCudaTrainer,
+}
+
+impl PsionicTrainMinimumMachineClass {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ReferenceHostCpuOperator => "reference_host_cpu_operator",
+            Self::AppleSiliconOperator => "apple_silicon_operator",
+            Self::StrongCudaTrainer => "strong_cuda_trainer",
+        }
+    }
+}
+
+/// Canonical machine-runtime contract for one admitted lane.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionicTrainLaneContract {
+    /// Stable lane identifier.
+    pub lane_id: String,
+    /// Stable admitted release id.
+    pub release_id: String,
+    /// Stable admitted environment ref.
+    pub environment_ref: String,
+    /// Stable backend family.
+    pub backend_family: String,
+    /// Stable topology class.
+    pub topology_class: String,
+    /// Minimum machine class admitted for the lane.
+    pub minimum_machine_class: PsionicTrainMinimumMachineClass,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PsionicTrainLaneContractStatic {
+    lane_id: &'static str,
+    release_id: &'static str,
+    environment_ref: &'static str,
+    backend_family: &'static str,
+    topology_class: &'static str,
+    minimum_machine_class: PsionicTrainMinimumMachineClass,
+}
+
 /// Logical identity for one retained training artifact independent of any one host path.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionicTrainArtifactRef {
@@ -1155,6 +1202,21 @@ impl PsionicTrainRuntimeAttestation {
     }
 }
 
+impl PsionicTrainLaneContract {
+    /// Builds the canonical machine-runtime contract for one admitted lane.
+    pub fn for_lane(lane_id: &str) -> Result<Self, PsionicTrainRuntimeContractError> {
+        let contract = canonical_lane_contract_for_lane(lane_id)?;
+        Ok(Self {
+            lane_id: String::from(contract.lane_id),
+            release_id: String::from(contract.release_id),
+            environment_ref: String::from(contract.environment_ref),
+            backend_family: String::from(contract.backend_family),
+            topology_class: String::from(contract.topology_class),
+            minimum_machine_class: contract.minimum_machine_class,
+        })
+    }
+}
+
 impl PsionicTrainCapabilityProjection {
     /// Builds the frozen capability projection for one admitted lane and role.
     pub fn for_lane(
@@ -1162,33 +1224,24 @@ impl PsionicTrainCapabilityProjection {
         role: PsionicTrainRole,
         environment_ref: impl Into<String>,
     ) -> Result<Self, PsionicTrainRuntimeContractError> {
-        match lane_id {
-            PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(Self {
-                lane_id: String::from(lane_id),
-                role,
-                backend_family: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY),
-                topology_class: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS),
-                environment_ref: environment_ref.into(),
-            }),
-            PSION_CS336_A1_DEMO_LANE_ID => Ok(Self {
-                lane_id: String::from(lane_id),
-                role,
-                backend_family: String::from(PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY),
-                topology_class: String::from(PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS),
-                environment_ref: environment_ref.into(),
-            }),
-            PSION_APPLE_WINDOWED_TRAINING_LANE_ID => Ok(Self {
-                lane_id: String::from(lane_id),
-                role,
-                backend_family: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY),
-                topology_class: String::from(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS),
-                environment_ref: environment_ref.into(),
-            }),
-            other => Err(PsionicTrainRuntimeContractError::InvalidValue {
-                field: String::from("invocation_manifest.lane_id"),
-                detail: format!("lane `{other}` has no admitted machine capability projection"),
-            }),
+        let contract = canonical_lane_contract_for_lane(lane_id)?;
+        let environment_ref = environment_ref.into();
+        if environment_ref != contract.environment_ref {
+            return Err(PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.admission_identity.environment_ref"),
+                detail: format!(
+                    "lane `{lane_id}` expects admitted environment ref `{}` on the machine runtime surface",
+                    contract.environment_ref
+                ),
+            });
         }
+        Ok(Self {
+            lane_id: String::from(contract.lane_id),
+            role,
+            backend_family: String::from(contract.backend_family),
+            topology_class: String::from(contract.topology_class),
+            environment_ref,
+        })
     }
 }
 
@@ -1196,46 +1249,54 @@ impl PsionicTrainCapabilityProjection {
 pub fn admitted_release_id_for_lane(
     lane_id: &str,
 ) -> Result<&'static str, PsionicTrainRuntimeContractError> {
-    match lane_id {
-        PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
-        PSION_CS336_A1_DEMO_LANE_ID => Ok(PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID),
-        PSION_APPLE_WINDOWED_TRAINING_LANE_ID => {
-            Ok(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID)
-        }
-        other => Err(PsionicTrainRuntimeContractError::InvalidValue {
-            field: String::from("invocation_manifest.lane_id"),
-            detail: format!("lane `{other}` has no admitted release id on the machine runtime"),
-        }),
-    }
+    canonical_lane_contract_for_lane(lane_id).map(|contract| contract.release_id)
 }
 
 /// Returns the admitted environment ref for one machine-supported lane.
 pub fn admitted_environment_ref_for_lane(
     lane_id: &str,
 ) -> Result<&'static str, PsionicTrainRuntimeContractError> {
-    match lane_id {
-        PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
-        PSION_CS336_A1_DEMO_LANE_ID => Ok(PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF),
-        PSION_APPLE_WINDOWED_TRAINING_LANE_ID => {
-            Ok(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF)
-        }
-        other => Err(PsionicTrainRuntimeContractError::InvalidValue {
-            field: String::from("invocation_manifest.lane_id"),
-            detail: format!(
-                "lane `{other}` has no admitted environment ref on the machine runtime"
-            ),
-        }),
-    }
+    canonical_lane_contract_for_lane(lane_id).map(|contract| contract.environment_ref)
 }
 
 /// Whether the lane is admitted by the machine runtime surface.
 pub fn is_machine_admitted_lane(lane_id: &str) -> bool {
-    matches!(
-        lane_id,
-        PSION_ACTUAL_PRETRAINING_LANE_ID
-            | PSION_CS336_A1_DEMO_LANE_ID
-            | PSION_APPLE_WINDOWED_TRAINING_LANE_ID
-    )
+    canonical_lane_contract_for_lane(lane_id).is_ok()
+}
+
+fn canonical_lane_contract_for_lane(
+    lane_id: &str,
+) -> Result<PsionicTrainLaneContractStatic, PsionicTrainRuntimeContractError> {
+    match lane_id {
+        PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PsionicTrainLaneContractStatic {
+            lane_id: PSION_ACTUAL_PRETRAINING_LANE_ID,
+            release_id: PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+            environment_ref: PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+            backend_family: PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
+            topology_class: PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
+            minimum_machine_class: PsionicTrainMinimumMachineClass::StrongCudaTrainer,
+        }),
+        PSION_CS336_A1_DEMO_LANE_ID => Ok(PsionicTrainLaneContractStatic {
+            lane_id: PSION_CS336_A1_DEMO_LANE_ID,
+            release_id: PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID,
+            environment_ref: PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF,
+            backend_family: PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY,
+            topology_class: PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS,
+            minimum_machine_class: PsionicTrainMinimumMachineClass::ReferenceHostCpuOperator,
+        }),
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID => Ok(PsionicTrainLaneContractStatic {
+            lane_id: PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
+            release_id: PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
+            environment_ref: PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+            backend_family: PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY,
+            topology_class: PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS,
+            minimum_machine_class: PsionicTrainMinimumMachineClass::AppleSiliconOperator,
+        }),
+        other => Err(PsionicTrainRuntimeContractError::InvalidValue {
+            field: String::from("invocation_manifest.lane_id"),
+            detail: format!("lane `{other}` has no canonical machine-runtime lane contract"),
+        }),
+    }
 }
 
 /// Computes the stable runtime build digest from the resolved executable posture.
@@ -1760,6 +1821,54 @@ mod tests {
         assert_eq!(
             projection.topology_class,
             PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS
+        );
+    }
+
+    #[test]
+    fn cs336_a1_demo_lane_contract_is_frozen_as_cpu_reference_host() {
+        let contract = PsionicTrainLaneContract::for_lane(PSION_CS336_A1_DEMO_LANE_ID)
+            .expect("bounded A1 demo lane contract should exist");
+        assert_eq!(contract.lane_id, PSION_CS336_A1_DEMO_LANE_ID);
+        assert_eq!(contract.release_id, PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID);
+        assert_eq!(
+            contract.environment_ref,
+            PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF
+        );
+        assert_eq!(
+            contract.backend_family,
+            PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY
+        );
+        assert_eq!(
+            contract.topology_class,
+            PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS
+        );
+        assert_eq!(
+            contract.minimum_machine_class,
+            PsionicTrainMinimumMachineClass::ReferenceHostCpuOperator
+        );
+        assert_eq!(
+            contract.minimum_machine_class.label(),
+            "reference_host_cpu_operator"
+        );
+    }
+
+    #[test]
+    fn capability_projection_refuses_wrong_environment_ref_for_lane() {
+        let error = PsionicTrainCapabilityProjection::for_lane(
+            PSION_CS336_A1_DEMO_LANE_ID,
+            PsionicTrainRole::Worker,
+            PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+        )
+        .expect_err("capability projection should refuse conflicting environment truth");
+        assert_eq!(
+            error,
+            PsionicTrainRuntimeContractError::InvalidValue {
+                field: String::from("invocation_manifest.admission_identity.environment_ref"),
+                detail: format!(
+                    "lane `{}` expects admitted environment ref `{}` on the machine runtime surface",
+                    PSION_CS336_A1_DEMO_LANE_ID, PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF
+                ),
+            }
         );
     }
 

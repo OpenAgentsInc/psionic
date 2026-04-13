@@ -36,6 +36,25 @@ The lane is intentionally fixed to:
 - a four-step training budget
 - one accepted checkpoint labeled `bounded_step_000004`
 
+## Canonical Machine Contract
+
+The current packaged demo lane is explicitly a CPU reference lane.
+
+The exported `psionic-train` lane contract freezes it as:
+
+- release id: `psionic-train.psion_cs336_a1_demo.release.v1`
+- environment ref:
+  `psionic.environment.psion_cs336_a1_demo.host_cpu.operator@v1`
+- backend family: `cpu`
+- topology class: `single_host_cpu_reference`
+- minimum machine class: `reference_host_cpu_operator`
+
+There is currently no Apple or CUDA variant of this demo lane.
+
+If Episode 223 or later live demos need an Apple-admitted or CUDA-admitted A1
+path, that must land as a separate explicit lane/environment identity instead
+of silently stretching this CPU reference lane.
+
 ## Operator Entry Points
 
 Local rehearsal now uses the same packaged path that the machine runtime uses:
@@ -52,8 +71,8 @@ The lower-level machine boundary is the shared manifest entrypoint:
 cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path>
 ```
 
-That means the A1 demo lane no longer depends on ad hoc shell glue when a
-strong node receives a packaged assignment.
+That means the A1 demo lane no longer depends on ad hoc shell glue when one
+compatible CPU reference host receives a packaged assignment.
 
 ## Retained Outputs
 
@@ -97,7 +116,7 @@ This lane honestly claims only that:
 
 - the bounded CS336 A1 port can now be launched through the normal machine
   manifest path
-- one strong node can execute the tiny four-step run zero-touch
+- one CPU reference host can execute the tiny four-step run zero-touch
 - the retained outputs now look like normal machine-run artifacts instead of a
   special local bundle
 

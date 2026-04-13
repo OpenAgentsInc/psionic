@@ -155,7 +155,10 @@ That surface takes the already-owned bounded A1 port and packages it onto the
 same machine-runtime contracts that `Pylon` and `Nexus` already consume. It
 retains one admitted tiny corpus, one fixed four-step budget, one generic
 accepted checkpoint, and one closeout bundle without widening the claim into
-actual broader pretraining.
+actual broader pretraining. The runtime truth for that packaged lane now also
+exports one canonical machine-lane contract in
+`crates/psionic-train/src/train_runtime.rs` so downstream repos do not guess
+whether the same A1 environment is CPU, Metal, or CUDA.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator
