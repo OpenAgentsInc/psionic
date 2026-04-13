@@ -1,0 +1,11 @@
+{
+  "schema_version": "psion.cs336_a1_demo_current_run_status.v1",
+  "lane_id": "psion_cs336_a1_demo_v1",
+  "run_id": "psion-cs336-a1-demo-fixture",
+  "phase": "completed",
+  "completed_steps": 4,
+  "total_steps": 4,
+  "latest_loss": 5.472208,
+  "checkpoint_ref": "checkpoint://psion/cs336_a1_demo/psion-cs336-a1-demo-fixture/step-000004",
+  "detail": "Bounded CS336 A1 demo lane completed with one accepted checkpoint and one closeout bundle."
+}

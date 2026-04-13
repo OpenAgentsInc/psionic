@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::PSION_ACTUAL_PRETRAINING_LANE_ID;
 use crate::PsionicTrainGroupedReplicaStageAssignment;
+use crate::{PSION_ACTUAL_PRETRAINING_LANE_ID, PSION_CS336_A1_DEMO_LANE_ID};
 
 /// Stable admitted lane id for the first Apple-homogeneous machine training lane.
 pub const PSION_APPLE_WINDOWED_TRAINING_LANE_ID: &str = "psion_apple_windowed_training_v1";
@@ -50,9 +50,17 @@ pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF: &str =
 pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID: &str =
     "psionic-train.psion_apple_windowed_training.release.v1";
 
+/// Stable admitted release id for the bounded packaged CS336 A1 demo lane.
+pub const PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID: &str =
+    "psionic-train.psion_cs336_a1_demo.release.v1";
+
 /// Stable admitted environment ref for the first Apple machine lane on the runtime surface.
 pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF: &str =
     "psionic.environment.psion_apple_windowed_training.metal_mlx.operator@v1";
+
+/// Stable admitted environment ref for the bounded packaged CS336 A1 demo lane.
+pub const PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF: &str =
+    "psionic.environment.psion_cs336_a1_demo.host_cpu.operator@v1";
 
 /// Stable backend family projected by the first admitted actual-lane runtime.
 pub const PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY: &str = "cuda";
@@ -67,6 +75,12 @@ pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_BACKEND_FAMILY: &str = "metal";
 /// Stable topology class projected by the first admitted Apple machine runtime.
 pub const PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS: &str =
     "homogeneous_apple_silicon_data_parallel";
+
+/// Stable backend family projected by the packaged CS336 A1 demo runtime.
+pub const PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY: &str = "cpu";
+
+/// Stable topology class projected by the packaged CS336 A1 demo runtime.
+pub const PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS: &str = "single_host_cpu_reference";
 
 /// One stable machine role consumed by `psionic-train`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1156,6 +1170,13 @@ impl PsionicTrainCapabilityProjection {
                 topology_class: String::from(PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS),
                 environment_ref: environment_ref.into(),
             }),
+            PSION_CS336_A1_DEMO_LANE_ID => Ok(Self {
+                lane_id: String::from(lane_id),
+                role,
+                backend_family: String::from(PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY),
+                topology_class: String::from(PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS),
+                environment_ref: environment_ref.into(),
+            }),
             PSION_APPLE_WINDOWED_TRAINING_LANE_ID => Ok(Self {
                 lane_id: String::from(lane_id),
                 role,
@@ -1177,6 +1198,7 @@ pub fn admitted_release_id_for_lane(
 ) -> Result<&'static str, PsionicTrainRuntimeContractError> {
     match lane_id {
         PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID),
+        PSION_CS336_A1_DEMO_LANE_ID => Ok(PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID),
         PSION_APPLE_WINDOWED_TRAINING_LANE_ID => {
             Ok(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID)
         }
@@ -1193,6 +1215,7 @@ pub fn admitted_environment_ref_for_lane(
 ) -> Result<&'static str, PsionicTrainRuntimeContractError> {
     match lane_id {
         PSION_ACTUAL_PRETRAINING_LANE_ID => Ok(PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF),
+        PSION_CS336_A1_DEMO_LANE_ID => Ok(PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF),
         PSION_APPLE_WINDOWED_TRAINING_LANE_ID => {
             Ok(PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF)
         }
@@ -1209,7 +1232,9 @@ pub fn admitted_environment_ref_for_lane(
 pub fn is_machine_admitted_lane(lane_id: &str) -> bool {
     matches!(
         lane_id,
-        PSION_ACTUAL_PRETRAINING_LANE_ID | PSION_APPLE_WINDOWED_TRAINING_LANE_ID
+        PSION_ACTUAL_PRETRAINING_LANE_ID
+            | PSION_CS336_A1_DEMO_LANE_ID
+            | PSION_APPLE_WINDOWED_TRAINING_LANE_ID
     )
 }
 
@@ -1706,6 +1731,35 @@ mod tests {
         assert_eq!(
             projection.topology_class,
             PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_TOPOLOGY_CLASS
+        );
+    }
+
+    #[test]
+    fn cs336_a1_demo_lane_is_admitted_by_machine_contract() {
+        let mut manifest = base_manifest();
+        manifest.lane_id = String::from(PSION_CS336_A1_DEMO_LANE_ID);
+        manifest.work_class = PsionicTrainWorkClass::SmallModelLocalTraining;
+        manifest.admission_identity = PsionicTrainAdmissionIdentity {
+            release_id: String::from(PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID),
+            build_digest: String::from("sha256:cs336-a1-demo"),
+            environment_ref: String::from(PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF),
+        };
+        manifest
+            .validate_machine_contract()
+            .expect("bounded A1 demo machine manifests should validate");
+        let projection = PsionicTrainCapabilityProjection::for_lane(
+            PSION_CS336_A1_DEMO_LANE_ID,
+            PsionicTrainRole::Worker,
+            PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF,
+        )
+        .expect("bounded A1 demo capability projection should exist");
+        assert_eq!(
+            projection.backend_family,
+            PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY
+        );
+        assert_eq!(
+            projection.topology_class,
+            PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS
         );
     }
 

@@ -1,0 +1,115 @@
+{
+  "schema_version": "psion.cs336_a1_demo_closeout_bundle.v1",
+  "lane_id": "psion_cs336_a1_demo_v1",
+  "run_id": "psion-cs336-a1-demo-fixture",
+  "outcome": "accepted",
+  "claim_boundary": "This lane packages the tiny bounded CS336 A1 port into the shared Pylon machine-runtime contract: byte-level BPE, the owned A1 reference stack, four deterministic tiny training steps, one retained accepted checkpoint, and one closeout bundle. It does not claim broader-pretraining scale, production autograd closure, or that the bounded demo lane is the actual Psion pretraining lane.",
+  "corpus_fixture_path": "fixtures/training/cs336_a1_reference_tiny_corpus.txt",
+  "training_step_count": 4,
+  "launch_manifest": {
+    "schema_version": "psion.cs336_a1_demo_launch_manifest.v1",
+    "surface_id": "psion.cs336_a1_demo.start.v1",
+    "lane_id": "psion_cs336_a1_demo_v1",
+    "run_id": "psion-cs336-a1-demo-fixture",
+    "retained_paths": {
+      "launch_manifest_path": "manifests/launch_manifest.json",
+      "current_status_path": "status/current_run_status.json",
+      "retained_summary_path": "status/retained_summary.json",
+      "checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+      "checkpoint_manifest_path": "checkpoints/manifests/checkpoint_manifest_step-000004.json",
+      "checkpoint_payload_path": "checkpoints/step-000004/cs336_a1_reference_checkpoint.json",
+      "closeout_bundle_path": "closeout/closeout_bundle.json",
+      "launcher_log_path": "logs/launcher.log"
+    },
+    "corpus_fixture_path": "fixtures/training/cs336_a1_reference_tiny_corpus.txt",
+    "training_config": {
+      "requested_vocab_size": 256,
+      "batch_size": 1,
+      "context_length": 2,
+      "d_model": 2,
+      "num_layers": 1,
+      "num_heads": 1,
+      "d_ff": 4,
+      "rope_theta": 10000.0,
+      "rms_norm_eps": 0.00001,
+      "max_learning_rate": 0.15,
+      "min_learning_rate": 0.02,
+      "warmup_iters": 1,
+      "cosine_cycle_iters": 4,
+      "gradient_clip_norm": 1.0,
+      "finite_difference_epsilon": 0.005,
+      "adam_beta1": 0.9,
+      "adam_beta2": 0.95,
+      "adam_epsilon": 1e-8,
+      "weight_decay": 0.0
+    },
+    "training_step_count": 4,
+    "selected_git_ref": "refs/heads/main",
+    "claim_boundary": "This lane packages the tiny bounded CS336 A1 port into the shared Pylon machine-runtime contract: byte-level BPE, the owned A1 reference stack, four deterministic tiny training steps, one retained accepted checkpoint, and one closeout bundle. It does not claim broader-pretraining scale, production autograd closure, or that the bounded demo lane is the actual Psion pretraining lane."
+  },
+  "initial_loss": 5.5616503,
+  "final_loss": 5.472208,
+  "checkpoint_label": "bounded_step_000004",
+  "checkpoint_ref": "checkpoint://psion/cs336_a1_demo/psion-cs336-a1-demo-fixture/step-000004",
+  "checkpoint_digest": "8b91bb5bb1fc03e4ebd3482f25f6f8cc941478659f365657ef32bb66a8d93b0d",
+  "model_state_digest": "3774b63fa8b694711242d9e77c35a0ce7783a7dec2f55fe2226f63ae4a1fa301",
+  "optimizer_state_digest": "72f3c70203fe63c5bc228c0bf631ad7d0538e19cc6e8d7268e720ecbb8aca099",
+  "step_reports": [
+    {
+      "step_number": 1,
+      "learning_rate": 0.15,
+      "loss_before": 5.5616503,
+      "loss_after": 5.6156654,
+      "gradient_clip": {
+        "gradient_norm_l2_before": 1.1666901,
+        "gradient_norm_l2_after": 0.9999993,
+        "clipping_ratio": 0.85712564
+      },
+      "model_state_digest_before": "a7cf4fb61ba41cd4696286da00c2e797544341ac877c8f1296b776adda0e9c11",
+      "model_state_digest_after": "14b81ae8c1c20035ce561f17c6ea4cbc9102de195aa25bc6dfaabdd3d719490d",
+      "optimizer_state_digest_after": "05d63245f5adcd17b536c728828ea80fabaa6dc47d1697c54f7edd2eec893fef"
+    },
+    {
+      "step_number": 2,
+      "learning_rate": 0.15,
+      "loss_before": 5.537038,
+      "loss_after": 5.0804863,
+      "gradient_clip": {
+        "gradient_norm_l2_before": 1.5646048,
+        "gradient_norm_l2_after": 1.0000002,
+        "clipping_ratio": 0.63913906
+      },
+      "model_state_digest_before": "14b81ae8c1c20035ce561f17c6ea4cbc9102de195aa25bc6dfaabdd3d719490d",
+      "model_state_digest_after": "4d63556a6a867641bb6cb77039a826f522bd477e61092eba47e245e182a20eb0",
+      "optimizer_state_digest_after": "ad4b9af730282badb7d6c86581348f6325047a7a30c886da013f6aa4855c427d"
+    },
+    {
+      "step_number": 3,
+      "learning_rate": 0.11750001,
+      "loss_before": 5.45922,
+      "loss_after": 5.202415,
+      "gradient_clip": {
+        "gradient_norm_l2_before": 0.9996773,
+        "gradient_norm_l2_after": 0.9996773,
+        "clipping_ratio": 1.0
+      },
+      "model_state_digest_before": "4d63556a6a867641bb6cb77039a826f522bd477e61092eba47e245e182a20eb0",
+      "model_state_digest_after": "db6f3f023c59d57a69b89e07d9741e90ce629e3c663a88cdfb34a4b2b4fed522",
+      "optimizer_state_digest_after": "ad4eba31d887d5b2abba28a1291a4ab2f6622e0802e13a07611098090801f6b1"
+    },
+    {
+      "step_number": 4,
+      "learning_rate": 0.0525,
+      "loss_before": 5.6681156,
+      "loss_after": 5.472208,
+      "gradient_clip": {
+        "gradient_norm_l2_before": 4.6265945,
+        "gradient_norm_l2_after": 1.0000001,
+        "clipping_ratio": 0.2161417
+      },
+      "model_state_digest_before": "db6f3f023c59d57a69b89e07d9741e90ce629e3c663a88cdfb34a4b2b4fed522",
+      "model_state_digest_after": "3774b63fa8b694711242d9e77c35a0ce7783a7dec2f55fe2226f63ae4a1fa301",
+      "optimizer_state_digest_after": "72f3c70203fe63c5bc228c0bf631ad7d0538e19cc6e8d7268e720ecbb8aca099"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": "psion.cs336_a1_demo_launch_manifest.v1",
+  "surface_id": "psion.cs336_a1_demo.start.v1",
+  "lane_id": "psion_cs336_a1_demo_v1",
+  "run_id": "psion-cs336-a1-demo-fixture",
+  "retained_paths": {
+    "launch_manifest_path": "manifests/launch_manifest.json",
+    "current_status_path": "status/current_run_status.json",
+    "retained_summary_path": "status/retained_summary.json",
+    "checkpoint_pointer_path": "checkpoints/latest_accepted_checkpoint_pointer.json",
+    "checkpoint_manifest_path": "checkpoints/manifests/checkpoint_manifest_step-000004.json",
+    "checkpoint_payload_path": "checkpoints/step-000004/cs336_a1_reference_checkpoint.json",
+    "closeout_bundle_path": "closeout/closeout_bundle.json",
+    "launcher_log_path": "logs/launcher.log"
+  },
+  "corpus_fixture_path": "fixtures/training/cs336_a1_reference_tiny_corpus.txt",
+  "training_config": {
+    "requested_vocab_size": 256,
+    "batch_size": 1,
+    "context_length": 2,
+    "d_model": 2,
+    "num_layers": 1,
+    "num_heads": 1,
+    "d_ff": 4,
+    "rope_theta": 10000.0,
+    "rms_norm_eps": 0.00001,
+    "max_learning_rate": 0.15,
+    "min_learning_rate": 0.02,
+    "warmup_iters": 1,
+    "cosine_cycle_iters": 4,
+    "gradient_clip_norm": 1.0,
+    "finite_difference_epsilon": 0.005,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.95,
+    "adam_epsilon": 1e-8,
+    "weight_decay": 0.0
+  },
+  "training_step_count": 4,
+  "selected_git_ref": "refs/heads/main",
+  "claim_boundary": "This lane packages the tiny bounded CS336 A1 port into the shared Pylon machine-runtime contract: byte-level BPE, the owned A1 reference stack, four deterministic tiny training steps, one retained accepted checkpoint, and one closeout bundle. It does not claim broader-pretraining scale, production autograd closure, or that the bounded demo lane is the actual Psion pretraining lane."
+}

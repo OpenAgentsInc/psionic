@@ -1,0 +1,7 @@
+phase=launch_manifest_written run_id=psion-cs336-a1-demo-fixture surface_id=psion.cs336_a1_demo.start.v1
+phase=training_started run_id=psion-cs336-a1-demo-fixture initial_loss=5.561650
+phase=step_complete step=1 loss_before=5.561650 loss_after=5.615665
+phase=step_complete step=2 loss_before=5.537038 loss_after=5.080486
+phase=step_complete step=3 loss_before=5.459220 loss_after=5.202415
+phase=step_complete step=4 loss_before=5.668116 loss_after=5.472208
+phase=complete run_id=psion-cs336-a1-demo-fixture final_loss=5.472208 checkpoint_digest=8b91bb5bb1fc03e4ebd3482f25f6f8cc941478659f365657ef32bb66a8d93b0d

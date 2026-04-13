@@ -10,11 +10,11 @@ use std::{
 use sha2::Digest;
 
 use psionic_train::{
-    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionActualPretrainingCurrentRunStatus,
-    PsionicTrainArtifactSurfaceRefs, PsionicTrainCapabilityProjection,
-    PsionicTrainCheckpointHandoffError, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSION_CS336_A1_DEMO_LANE_ID,
+    PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionicTrainArtifactSurfaceRefs,
+    PsionicTrainCapabilityProjection, PsionicTrainCheckpointHandoffError,
+    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainGroupedReplicaCheckpointError, PsionicTrainGroupedReplicaRecoverySourceKind,
     PsionicTrainGroupedReplicaTransportError, PsionicTrainInvocationManifest,
     PsionicTrainMembershipRevisionReceipt, PsionicTrainOperation, PsionicTrainOutcomeKind,
@@ -28,7 +28,8 @@ use psionic_train::{
     materialize_psionic_train_checkpoint_handoff,
     persist_psionic_train_grouped_stage_recovery_receipt_from_surface,
     persist_psionic_train_window_artifacts, retain_psionic_train_checkpoint_handoff_receipt,
-    runtime_build_digest, validate_psionic_train_grouped_stage_input_transport,
+    run_psion_cs336_a1_demo_cli, run_psion_cs336_a1_demo_manifest, runtime_build_digest,
+    validate_psionic_train_grouped_stage_input_transport,
 };
 
 #[allow(dead_code)]
@@ -63,9 +64,10 @@ fn main() -> ExitCode {
     match args[0].as_str() {
         "manifest" => run_manifest_mode(&args[1..]),
         "actual-pretraining" => run_actual_pretraining_passthrough(&args[1..]),
+        "cs336-a1-demo" => run_cs336_a1_demo_passthrough(&args[1..]),
         other => {
             eprintln!(
-                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, actual-pretraining"
+                "error: unsupported psionic-train subcommand `{other}`\n\nsupported subcommands: manifest, actual-pretraining, cs336-a1-demo"
             );
             ExitCode::from(PsionicTrainRefusalClass::BadConfig.exit_code())
         }
@@ -121,9 +123,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
 
     let run_root = manifest_run_root(&manifest);
     if let Err(error) = validate_psionic_train_grouped_stage_input_transport(&manifest) {
-        let summary = run_root
-            .as_deref()
-            .and_then(actual_pretraining_run_surface_summary);
+        let summary = run_root.as_deref().and_then(machine_run_surface_summary);
         let mut packet = PsionicTrainStatusPacket::refusal(
             Some(&manifest),
             refusal_for_grouped_stage_transport_error(&error),
@@ -205,7 +205,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
                     PsionicTrainGroupedReplicaRecoverySourceKind::RetainedCheckpoint
                 },
             ) {
-                let summary = actual_pretraining_run_surface_summary(run_root);
+                let summary = machine_run_surface_summary(run_root);
                 let mut packet = PsionicTrainStatusPacket::refusal(
                     Some(&manifest),
                     refusal_for_grouped_stage_checkpoint_error(&error),
@@ -244,6 +244,14 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
             run_root.as_deref(),
         );
     }
+    if manifest.lane_id == PSION_CS336_A1_DEMO_LANE_ID {
+        return run_cs336_a1_demo_manifest_mode(
+            &manifest,
+            &manifest_path,
+            &runtime_identity,
+            run_root.as_deref(),
+        );
+    }
 
     let operator_args = match operator_args_from_manifest(&manifest) {
         Ok(args) => args,
@@ -264,9 +272,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
     };
 
     let manifest_path_text = Some(manifest_path.display().to_string());
-    let initial_summary = run_root
-        .as_deref()
-        .and_then(actual_pretraining_run_surface_summary);
+    let initial_summary = run_root.as_deref().and_then(machine_run_surface_summary);
 
     psion_actual_pretraining_operator::set_human_output_enabled(false);
     let execution = psion_actual_pretraining_operator::run_with_args(operator_args);
@@ -276,7 +282,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
         Ok(()) => {
             let summary = run_root
                 .as_deref()
-                .and_then(actual_pretraining_run_surface_summary)
+                .and_then(machine_run_surface_summary)
                 .or(initial_summary);
             let detail = success_detail(&manifest, summary.as_ref());
             let status_paths = match write_status_surfaces(
@@ -344,9 +350,7 @@ fn run_manifest_mode(args: &[String]) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            let refusal_summary = run_root
-                .as_deref()
-                .and_then(actual_pretraining_run_surface_summary);
+            let refusal_summary = run_root.as_deref().and_then(machine_run_surface_summary);
             let mut packet = refusal_packet_for_error(
                 Some(&manifest),
                 manifest_path.display().to_string(),
@@ -377,6 +381,134 @@ fn run_actual_pretraining_passthrough(args: &[String]) -> ExitCode {
         Err(error) => {
             eprintln!("error: {error}");
             ExitCode::from(1)
+        }
+    }
+}
+
+fn run_cs336_a1_demo_passthrough(args: &[String]) -> ExitCode {
+    match run_psion_cs336_a1_demo_cli(args.to_vec()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run_cs336_a1_demo_manifest_mode(
+    manifest: &PsionicTrainInvocationManifest,
+    manifest_path: &Path,
+    runtime_identity: &MachineRuntimeIdentity,
+    run_root: Option<&Path>,
+) -> ExitCode {
+    let Some(run_root) = run_root else {
+        let packet = PsionicTrainStatusPacket::refusal(
+            Some(manifest),
+            PsionicTrainRefusalClass::BadConfig,
+            Some(manifest_path.display().to_string()),
+            Some(runtime_identity.attestation.clone()),
+            Some(runtime_identity.capability_projection.clone()),
+            manifest.run_id.clone(),
+            None,
+            None,
+            None,
+            "bounded CS336 A1 demo lane requires one resolved output_root",
+        );
+        emit_refusal_packet(packet.clone());
+        return ExitCode::from(packet.exit_code);
+    };
+
+    let initial_summary = machine_run_surface_summary(run_root);
+    match run_psion_cs336_a1_demo_manifest(manifest) {
+        Ok(()) => {
+            let summary = machine_run_surface_summary(run_root).or(initial_summary);
+            let detail = success_detail(manifest, summary.as_ref());
+            let status_paths = match write_status_surfaces(
+                manifest,
+                manifest_path.display().to_string(),
+                Some(run_root),
+                summary.as_ref(),
+                None,
+                PsionicTrainOutcomeKind::Succeeded,
+                0,
+                false,
+                psionic_train::PsionicTrainAuthorityOwner::Pylon,
+                None,
+                detail.as_str(),
+                runtime_identity,
+            ) {
+                Ok(paths) => paths,
+                Err(error) => {
+                    let packet = PsionicTrainStatusPacket::refusal(
+                        Some(manifest),
+                        PsionicTrainRefusalClass::InternalError,
+                        Some(manifest_path.display().to_string()),
+                        Some(runtime_identity.attestation.clone()),
+                        Some(runtime_identity.capability_projection.clone()),
+                        summary
+                            .as_ref()
+                            .and_then(|value| value.run_id.clone())
+                            .or_else(|| manifest.run_id.clone()),
+                        Some(run_root.display().to_string()),
+                        None,
+                        None,
+                        format!("failed to persist machine status packets: {error}"),
+                    );
+                    emit_refusal_packet(packet.clone());
+                    return ExitCode::from(packet.exit_code);
+                }
+            };
+            let packet = PsionicTrainStatusPacket::success(
+                manifest,
+                Some(manifest_path.display().to_string()),
+                runtime_identity.attestation.clone(),
+                runtime_identity.capability_projection.clone(),
+                summary
+                    .as_ref()
+                    .and_then(|value| value.run_id.clone())
+                    .or_else(|| manifest.run_id.clone()),
+                Some(run_root.display().to_string()),
+                status_paths.run_status_packet_path,
+                status_paths.window_status_packet_path,
+                summary
+                    .as_ref()
+                    .and_then(|value| value.current_status_path.clone()),
+                summary
+                    .as_ref()
+                    .and_then(|value| value.retained_summary_path.clone()),
+                summary
+                    .as_ref()
+                    .and_then(|value| value.latest_checkpoint_pointer_path.clone()),
+                summary
+                    .as_ref()
+                    .and_then(|value| value.launcher_log_path.clone()),
+                detail,
+            );
+            emit_success_packet(&packet);
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            let summary = machine_run_surface_summary(run_root);
+            let mut packet = refusal_packet_for_error(
+                Some(manifest),
+                manifest_path.display().to_string(),
+                Some(run_root),
+                Some(runtime_identity),
+                &error,
+            );
+            let status_paths = write_status_surfaces_for_packet(
+                manifest,
+                manifest_path.display().to_string(),
+                Some(run_root),
+                summary.as_ref(),
+                &packet,
+            )
+            .unwrap_or_default();
+            packet.run_status_packet_path = status_paths.run_status_packet_path;
+            packet.window_status_packet_path = status_paths.window_status_packet_path;
+            let code = packet.exit_code;
+            emit_refusal_packet(packet);
+            ExitCode::from(code)
         }
     }
 }
@@ -439,7 +571,7 @@ fn run_checkpoint_handoff_manifest(
         );
     }
 
-    let summary = actual_pretraining_run_surface_summary(run_root);
+    let summary = machine_run_surface_summary(run_root);
     let detail = format!(
         "psionic-train completed serve-checkpoint for lane `{}` targeting peer `{peer_node_pubkey}`",
         manifest.lane_id
@@ -1327,7 +1459,7 @@ fn manifest_run_root(manifest: &PsionicTrainInvocationManifest) -> Option<PathBu
 
 fn success_detail(
     manifest: &PsionicTrainInvocationManifest,
-    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    summary: Option<&MachineRunSurfaceSummary>,
 ) -> String {
     match summary.and_then(|value| value.phase.as_deref()) {
         Some(phase) => format!(
@@ -1352,7 +1484,7 @@ fn refusal_packet_for_error(
 ) -> PsionicTrainStatusPacket {
     let detail = error.to_string();
     let refusal_class = classify_operator_error(&detail);
-    let summary = run_root.and_then(actual_pretraining_run_surface_summary);
+    let summary = run_root.and_then(machine_run_surface_summary);
     PsionicTrainStatusPacket::refusal(
         manifest,
         refusal_class,
@@ -1536,7 +1668,7 @@ fn emit_checkpoint_handoff_refusal(
     error: &PsionicTrainCheckpointHandoffError,
     detail_prefix: String,
 ) -> ExitCode {
-    let summary = actual_pretraining_run_surface_summary(run_root);
+    let summary = machine_run_surface_summary(run_root);
     let mut packet = PsionicTrainStatusPacket::refusal(
         Some(manifest),
         refusal_for_checkpoint_handoff_error(error),
@@ -1568,7 +1700,7 @@ fn emit_checkpoint_handoff_refusal(
 }
 
 #[derive(Clone, Debug)]
-struct ActualPretrainingRunSurfaceSummary {
+struct MachineRunSurfaceSummary {
     run_id: Option<String>,
     phase: Option<String>,
     current_status_path: Option<String>,
@@ -1580,22 +1712,26 @@ struct ActualPretrainingRunSurfaceSummary {
     launcher_log_path: Option<String>,
 }
 
-fn actual_pretraining_run_surface_summary(
-    run_root: &Path,
-) -> Option<ActualPretrainingRunSurfaceSummary> {
+fn machine_run_surface_summary(run_root: &Path) -> Option<MachineRunSurfaceSummary> {
     let current_status_path = run_root.join("status/current_run_status.json");
     let current_status = if current_status_path.is_file() {
         fs::read_to_string(&current_status_path)
             .ok()
-            .and_then(|value| {
-                serde_json::from_str::<PsionActualPretrainingCurrentRunStatus>(&value).ok()
-            })
+            .and_then(|value| serde_json::from_str::<serde_json::Value>(&value).ok())
     } else {
         None
     };
-    Some(ActualPretrainingRunSurfaceSummary {
-        run_id: current_status.as_ref().map(|value| value.run_id.clone()),
-        phase: current_status.as_ref().map(|value| value.phase.clone()),
+    Some(MachineRunSurfaceSummary {
+        run_id: current_status
+            .as_ref()
+            .and_then(|value| value.get("run_id"))
+            .and_then(|value| value.as_str())
+            .map(String::from),
+        phase: current_status
+            .as_ref()
+            .and_then(|value| value.get("phase"))
+            .and_then(|value| value.as_str())
+            .map(String::from),
         current_status_path: current_status_path
             .is_file()
             .then(|| current_status_path.display().to_string()),
@@ -1637,7 +1773,7 @@ fn write_status_surfaces_for_packet(
     manifest: &PsionicTrainInvocationManifest,
     manifest_path: String,
     run_root: Option<&Path>,
-    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    summary: Option<&MachineRunSurfaceSummary>,
     packet: &PsionicTrainStatusPacket,
 ) -> Result<MachineStatusSurfacePaths, String> {
     let Some(attestation) = packet.runtime_attestation.clone() else {
@@ -1670,7 +1806,7 @@ fn write_status_surfaces(
     manifest: &PsionicTrainInvocationManifest,
     manifest_path: String,
     run_root: Option<&Path>,
-    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    summary: Option<&MachineRunSurfaceSummary>,
     validator_artifacts: Option<&PsionicTrainValidatorArtifactOutputs>,
     outcome: PsionicTrainOutcomeKind,
     exit_code: u8,
@@ -1833,7 +1969,7 @@ fn write_status_surfaces(
 
 fn build_artifact_surface_refs(
     manifest: &PsionicTrainInvocationManifest,
-    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    summary: Option<&MachineRunSurfaceSummary>,
     membership_revision_path: Option<String>,
     checkpoint_surface: Option<&RetainedCheckpointSurface>,
     validator_artifacts: Option<&PsionicTrainValidatorArtifactOutputs>,
@@ -1905,7 +2041,7 @@ fn build_artifact_surface_refs(
 
 fn build_window_artifact_inputs(
     manifest: &PsionicTrainInvocationManifest,
-    summary: Option<&ActualPretrainingRunSurfaceSummary>,
+    summary: Option<&MachineRunSurfaceSummary>,
     manifest_path: &str,
     membership_revision_path: Option<String>,
     checkpoint_surface: Option<&RetainedCheckpointSurface>,
@@ -2253,7 +2389,7 @@ fn current_time_ms() -> Result<u64, String> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train actual-pretraining <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
+        "Usage:\n  psionic-train manifest --manifest <path>\n  psionic-train actual-pretraining <operator-args>\n  psionic-train cs336-a1-demo <operator-args>\n\nMachine mode requires a `{}` JSON manifest and emits one `{}` packet on completion.",
         psionic_train::PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION,
         psionic_train::PSIONIC_TRAIN_STATUS_PACKET_SCHEMA_VERSION
     );

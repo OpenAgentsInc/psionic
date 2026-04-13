@@ -1,0 +1,20 @@
+{
+  "schema_version": "psion.cs336_a1_demo_automatic_execution_request.v1",
+  "role": "worker",
+  "operation": "start",
+  "coordination": {
+    "network_id": "network.psionic.cs336-a1-demo-fixture",
+    "window_id": "window.cs336-a1-demo-fixture",
+    "assignment_id": "assignment.cs336-a1-demo-fixture",
+    "challenge_id": null,
+    "node_pubkey": "npub1-cs336-a1-demo-fixture",
+    "membership_revision": 1
+  },
+  "build_digest": "sha256:psion-cs336-a1-demo-fixture",
+  "run_id": "psion-cs336-a1-demo-fixture",
+  "output_root": "/Users/christopherdavid/work/.agent-worktrees/psionic-939/fixtures/training/psion_cs336_a1_demo_example/run-psion-cs336-a1-demo-fixture",
+  "run_root": null,
+  "selected_git_ref": "refs/heads/main",
+  "allow_dirty_tree": true,
+  "dry_run": false
+}

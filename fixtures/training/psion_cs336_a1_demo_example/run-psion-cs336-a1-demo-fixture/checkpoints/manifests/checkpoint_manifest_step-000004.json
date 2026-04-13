@@ -1,0 +1,14 @@
+{
+  "schema_version": "psionic.train.checkpoint_manifest.v1",
+  "lane_id": "psion_cs336_a1_demo_v1",
+  "run_id": "psion-cs336-a1-demo-fixture",
+  "window_id": "window.cs336-a1-demo-fixture",
+  "assignment_id": "assignment.cs336-a1-demo-fixture",
+  "checkpoint_label": "bounded_step_000004",
+  "optimizer_step": 4,
+  "checkpoint_ref": "checkpoint://psion/cs336_a1_demo/psion-cs336-a1-demo-fixture/step-000004",
+  "relative_manifest_path": "checkpoints/manifests/checkpoint_manifest_step-000004.json",
+  "checkpoint_object_digest": "8b91bb5bb1fc03e4ebd3482f25f6f8cc941478659f365657ef32bb66a8d93b0d",
+  "checkpoint_total_bytes": 79663,
+  "manifest_digest": "d54c174edfc16b86c6b4ef08840111ecdaab60f05e496eba15eb7ce0f68ba0c0"
+}

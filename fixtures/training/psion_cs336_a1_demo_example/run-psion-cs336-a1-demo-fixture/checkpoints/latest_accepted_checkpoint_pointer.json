@@ -1,0 +1,13 @@
+{
+  "schema_version": "psionic.train.checkpoint_pointer.v1",
+  "lane_id": "psion_cs336_a1_demo_v1",
+  "run_id": "psion-cs336-a1-demo-fixture",
+  "window_id": "window.cs336-a1-demo-fixture",
+  "assignment_id": "assignment.cs336-a1-demo-fixture",
+  "pointer_state": "accepted",
+  "checkpoint_label": "bounded_step_000004",
+  "optimizer_step": 4,
+  "checkpoint_ref": "checkpoint://psion/cs336_a1_demo/psion-cs336-a1-demo-fixture/step-000004",
+  "checkpoint_manifest_relative_path": "checkpoints/manifests/checkpoint_manifest_step-000004.json",
+  "detail": "Bounded CS336 A1 demo lane retained one accepted generic checkpoint for Pylon and Nexus closeout ingestion."
+}

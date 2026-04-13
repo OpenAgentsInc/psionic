@@ -96,6 +96,13 @@ It does not yet claim:
 - that the bounded A1 lane is the same thing as the actual `Psion`
   pretraining operator lane
 
+The packaged machine-runtime version of this work now lives separately in
+`docs/PSION_CS336_A1_DEMO_LANE.md`. That demo lane reuses the same tiny corpus,
+training config, and checkpoint family, but it exists to make one honest
+`Pylon` and `Nexus` demo path possible. It should not be confused with either
+the broader reference-lane completion claim here or the actual pretraining
+lane.
+
 The canonical completion matrix lives in
 `docs/PSION_CS336_A1_FULL_PORT_MATRIX.md`, and the retained machine-readable
 report lives in

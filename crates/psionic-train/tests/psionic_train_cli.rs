@@ -5,14 +5,14 @@ use std::{
 };
 
 use psionic_train::{
-    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
-    PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+    PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSION_CS336_A1_DEMO_LANE_ID,
+    PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF, PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
     PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
-    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
-    PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
-    PsionicTrainAdmissionIdentity, PsionicTrainCheckpointHandoffReceipt,
-    PsionicTrainCheckpointHandoffSourceKind, PsionicTrainCheckpointManifest,
-    PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
+    PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID, PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF,
+    PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID, PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION,
+    PSIONIC_TRAIN_RUNTIME_SURFACE_ID, PsionicTrainAdmissionIdentity,
+    PsionicTrainCheckpointHandoffReceipt, PsionicTrainCheckpointHandoffSourceKind,
+    PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer, PsionicTrainCheckpointSurface,
     PsionicTrainContributionArtifactManifest, PsionicTrainContributionReceipt,
     PsionicTrainCoordinationContext, PsionicTrainGroupedReplicaRecoverySourceKind,
     PsionicTrainGroupedReplicaStageAssignment, PsionicTrainGroupedReplicaStageRecoveryReceipt,
@@ -174,6 +174,10 @@ fn admitted_identity_for_lane(
             PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
             PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
         ),
+        PSION_CS336_A1_DEMO_LANE_ID => (
+            PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID,
+            PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF,
+        ),
         other => panic!("unexpected lane for admitted identity: {other}"),
     };
     PsionicTrainAdmissionIdentity {
@@ -236,7 +240,7 @@ fn base_manifest_for_lane(lane_id: &str) -> PsionicTrainInvocationManifest {
 }
 
 fn default_work_class_for_lane(lane_id: &str) -> PsionicTrainWorkClass {
-    if lane_id == PSION_APPLE_WINDOWED_TRAINING_LANE_ID {
+    if lane_id == PSION_APPLE_WINDOWED_TRAINING_LANE_ID || lane_id == PSION_CS336_A1_DEMO_LANE_ID {
         PsionicTrainWorkClass::SmallModelLocalTraining
     } else {
         PsionicTrainWorkClass::FullIslandLocalUpdateTraining
@@ -300,6 +304,14 @@ fn build_apple_launch_manifest(run_root: &Path) -> PsionicTrainInvocationManifes
     let mut manifest = base_manifest_for_lane(PSION_APPLE_WINDOWED_TRAINING_LANE_ID);
     manifest.output_root = Some(run_root.display().to_string());
     manifest.allow_dirty_tree = true;
+    manifest
+}
+
+fn build_cs336_a1_demo_launch_manifest(run_root: &Path) -> PsionicTrainInvocationManifest {
+    let mut manifest = base_manifest_for_lane(PSION_CS336_A1_DEMO_LANE_ID);
+    manifest.output_root = Some(run_root.display().to_string());
+    manifest.allow_dirty_tree = true;
+    manifest.dry_run = false;
     manifest
 }
 
@@ -527,6 +539,71 @@ fn machine_manifest_dry_run_emits_success_status_packet() {
         window_status.run_id.as_deref(),
         Some("psion-train-cli-test")
     );
+}
+
+#[test]
+fn machine_manifest_cs336_a1_demo_writes_checkpoint_and_closeout() {
+    let tempdir = tempdir().expect("tempdir should exist");
+    let run_root = tempdir.path().join("run");
+    let manifest_path = tempdir.path().join("cs336-a1-demo-invocation.json");
+    let mut manifest = build_cs336_a1_demo_launch_manifest(&run_root);
+    write_manifest(&manifest_path, &mut manifest);
+
+    let output = run_machine_manifest(&manifest_path);
+
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet: PsionicTrainStatusPacket =
+        serde_json::from_slice(&output.stdout).expect("status packet should parse");
+    assert_eq!(packet.outcome, PsionicTrainOutcomeKind::Succeeded);
+    assert_eq!(packet.lane_id.as_str(), PSION_CS336_A1_DEMO_LANE_ID);
+    assert_eq!(
+        packet.detail.as_str(),
+        "psionic-train completed start for lane `psion_cs336_a1_demo_v1` with retained phase `completed`"
+    );
+    let run_status: PsionicTrainRunStatusPacket = serde_json::from_slice(
+        &fs::read(
+            packet
+                .run_status_packet_path
+                .as_ref()
+                .expect("run status packet path should exist"),
+        )
+        .expect("run status packet should be readable"),
+    )
+    .expect("run status packet should parse");
+    assert_eq!(run_status.phase.as_deref(), Some("completed"));
+    assert_eq!(run_status.lane_id.as_str(), PSION_CS336_A1_DEMO_LANE_ID);
+    assert_eq!(
+        run_status.artifacts.checkpoint_pointer_path.as_deref(),
+        Some(
+            run_root
+                .join("checkpoints/latest_accepted_checkpoint_pointer.json")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
+    let checkpoint_surface: PsionicTrainCheckpointSurface = parse_json(
+        run_status
+            .artifacts
+            .checkpoint_surface_path
+            .as_deref()
+            .expect("checkpoint surface path should exist"),
+    );
+    assert_eq!(
+        checkpoint_surface.pointer_state.as_deref(),
+        Some("accepted")
+    );
+    assert_eq!(
+        checkpoint_surface.checkpoint_label.as_deref(),
+        Some("bounded_step_000004")
+    );
+    assert_eq!(checkpoint_surface.optimizer_step, Some(4));
+    assert!(run_root.join("status/retained_summary.json").is_file());
+    assert!(run_root.join("closeout/closeout_bundle.json").is_file());
 }
 
 #[test]
@@ -2450,7 +2527,9 @@ fn validator_manifest_can_replay_from_resolver_backed_artifact_ids() {
         "worker launch should succeed"
     );
 
-    let worker_checkpoint_manifest_path = tempdir.path().join("resolver-worker-record-checkpoint.json");
+    let worker_checkpoint_manifest_path = tempdir
+        .path()
+        .join("resolver-worker-record-checkpoint.json");
     let mut worker_checkpoint_manifest = build_retained_operation_manifest(
         &worker_run_root,
         PsionicTrainRole::Worker,
@@ -3191,9 +3270,7 @@ fn validator_manifest_refuses_missing_replay_inputs() {
     manifest.validator_target_contribution_receipt =
         Some(psionic_train::PsionicTrainArtifactBinding {
             artifact_ref: psionic_train::PsionicTrainArtifactRef {
-                artifact_id: String::from(
-                    "psionic.train.artifact.contribution_receipt.missing",
-                ),
+                artifact_id: String::from("psionic.train.artifact.contribution_receipt.missing"),
                 artifact_digest: None,
                 artifact_bytes: None,
             },
@@ -3210,7 +3287,8 @@ fn validator_manifest_refuses_missing_replay_inputs() {
             },
             materialized_path: None,
         });
-    manifest.validator_target_work_class = Some(PsionicTrainWorkClass::FullIslandLocalUpdateTraining);
+    manifest.validator_target_work_class =
+        Some(PsionicTrainWorkClass::FullIslandLocalUpdateTraining);
     write_manifest(&manifest_path, &mut manifest);
 
     let output = run_machine_manifest(&manifest_path);

@@ -145,6 +145,18 @@ and the retained report
 combination is the repo-owned completion bar for saying “full Stanford A1 port”
 inside the bounded reference lane.
 
+The repo now also owns one packaged A1 demo lane in
+`crates/psionic-train/src/psion_cs336_a1_demo_launcher.rs`,
+`crates/psionic-train/src/psion_cs336_a1_demo_operator.rs`, the focused doc
+`docs/PSION_CS336_A1_DEMO_LANE.md`, and the committed request/output fixtures
+under `fixtures/training/psion_cs336_a1_demo_automatic_execution_request_v1.json`
+and `fixtures/training/psion_cs336_a1_demo_automatic_execution_outputs_v1.json`.
+That surface takes the already-owned bounded A1 port and packages it onto the
+same machine-runtime contracts that `Pylon` and `Nexus` already consume. It
+retains one admitted tiny corpus, one fixed four-step budget, one generic
+accepted checkpoint, and one closeout bundle without widening the claim into
+actual broader pretraining.
+
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator
 `crates/psionic-train/examples/psion_cs336_a2_baseline_profile_bundle.rs`, the

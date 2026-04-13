@@ -9,6 +9,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || "${1:-}" == "help" ]]; then
 Usage:
   ./TRAIN [start|record-checkpoint|backup|resume|decide-continue-restart|rehearse-base-lane|status|dashboard] [options]
   ./TRAIN --lane actual_pretraining [same as the default actual-lane commands]
+  ./TRAIN --lane cs336_a1_demo [bounded CS336 A1 demo-lane commands]
   ./TRAIN --lane reference_pilot [reference-lane options]
 
 Default lane:
@@ -17,6 +18,10 @@ Default lane:
 Reference lane:
   reference_pilot remains available as the bounded smoke/reference path and no
   longer counts as the primary operator proof path.
+
+Packaged demo lane:
+  cs336_a1_demo packages the tiny bounded CS336 A1 port into the shared
+  machine-runtime path without replacing the actual pretraining lane.
 EOF
   exit 0
 fi
@@ -30,12 +35,15 @@ case "${lane}" in
   actual_pretraining)
     exec "${script_dir}/scripts/train-psion-actual-pretraining.sh" "$@"
     ;;
+  cs336_a1_demo)
+    exec "${script_dir}/scripts/train-psion-cs336-a1-demo.sh" "$@"
+    ;;
   reference_pilot)
     exec "${script_dir}/scripts/train-psion-reference-pilot.sh" "$@"
     ;;
   *)
     echo "error: unsupported lane ${lane}" >&2
-    echo "supported lanes: reference_pilot, actual_pretraining" >&2
+    echo "supported lanes: reference_pilot, actual_pretraining, cs336_a1_demo" >&2
     exit 1
     ;;
 esac
