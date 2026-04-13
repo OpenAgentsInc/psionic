@@ -492,6 +492,67 @@ impl PsionReferencePilotJointContributionReceipt {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PsionReferencePilotJointContributionSummaryReceipt {
+    pub schema_version: String,
+    pub run_id: String,
+    pub checkpoint_family: String,
+    pub global_step: u64,
+    pub contributor_id: String,
+    pub contributor_host: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contributor_tailnet_ip: Option<String>,
+    pub contributor_role: PsionReferencePilotJointContributionRole,
+    pub contributor_index: usize,
+    pub contributor_count: usize,
+    pub runtime_backend: String,
+    pub selected_device: DeviceInventoryQualifiers,
+    pub batch_rows: usize,
+    pub sample_count: u32,
+    pub example_selection_digest: String,
+    pub parameter_state_digest: String,
+    pub gradient_batch_id: String,
+    pub gradient_group_ids: Vec<String>,
+    pub detail: String,
+    pub contribution_digest: String,
+}
+
+impl From<&PsionReferencePilotJointContributionReceipt>
+    for PsionReferencePilotJointContributionSummaryReceipt
+{
+    fn from(value: &PsionReferencePilotJointContributionReceipt) -> Self {
+        Self {
+            schema_version: String::from(
+                "psion.reference_pilot_joint_contribution_summary_receipt.v1",
+            ),
+            run_id: value.run_id.clone(),
+            checkpoint_family: value.checkpoint_family.clone(),
+            global_step: value.global_step,
+            contributor_id: value.contributor_id.clone(),
+            contributor_host: value.contributor_host.clone(),
+            contributor_tailnet_ip: value.contributor_tailnet_ip.clone(),
+            contributor_role: value.contributor_role,
+            contributor_index: value.contributor_index,
+            contributor_count: value.contributor_count,
+            runtime_backend: value.runtime_backend.clone(),
+            selected_device: value.selected_device.clone(),
+            batch_rows: value.batch_rows,
+            sample_count: value.sample_count,
+            example_selection_digest: value.example_selection_digest.clone(),
+            parameter_state_digest: value.parameter_state_digest.clone(),
+            gradient_batch_id: value.gradient_batch.batch_id.clone(),
+            gradient_group_ids: value
+                .gradient_batch
+                .gradients
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+            detail: value.detail.clone(),
+            contribution_digest: value.contribution_digest.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PsionReferencePilotDualHostStepReceipt {
     pub schema_version: String,
     pub run_id: String,
@@ -560,6 +621,7 @@ pub struct PsionReferencePilotDualHostRun {
     pub run: PsionReferencePilotRun,
     pub topology_receipt: PsionReferencePilotDualHostTopologyReceipt,
     pub contribution_receipts: Vec<PsionReferencePilotJointContributionReceipt>,
+    pub contribution_summary_receipts: Vec<PsionReferencePilotJointContributionSummaryReceipt>,
     pub joint_step_receipts: Vec<PsionReferencePilotDualHostStepReceipt>,
     pub progress_checkpoint_receipts: Vec<PsionReferencePilotProgressCheckpointReceipt>,
     pub progress_checkpoint_artifacts: Vec<PsionReferencePilotCheckpointArtifact>,
@@ -583,7 +645,10 @@ impl PsionReferencePilotDualHostRun {
             output_dir.join(format!("{prefix}_dual_host_contribution_receipts.json"));
         write_json(topology_path.as_path(), &self.topology_receipt)?;
         write_json(step_path.as_path(), &self.joint_step_receipts)?;
-        write_json(contribution_path.as_path(), &self.contribution_receipts)?;
+        write_json(
+            contribution_path.as_path(),
+            &self.contribution_summary_receipts,
+        )?;
         write_json(
             output_dir
                 .join(format!("{prefix}_progress_checkpoint_receipts.json"))
@@ -650,7 +715,7 @@ impl PsionReferencePilotDualHostRun {
                 output_dir
                     .join(format!("{prefix}_cluster_contribution_receipts.json"))
                     .as_path(),
-                &self.contribution_receipts,
+                &self.contribution_summary_receipts,
             )?;
             write_json(
                 output_dir
@@ -2418,6 +2483,10 @@ where
             step_receipts,
         },
         topology_receipt,
+        contribution_summary_receipts: contribution_receipts
+            .iter()
+            .map(PsionReferencePilotJointContributionSummaryReceipt::from)
+            .collect(),
         contribution_receipts,
         joint_step_receipts,
         progress_checkpoint_receipts,
@@ -2834,6 +2903,10 @@ where
             step_receipts,
         },
         topology_receipt,
+        contribution_summary_receipts: contribution_receipts
+            .iter()
+            .map(PsionReferencePilotJointContributionSummaryReceipt::from)
+            .collect(),
         contribution_receipts,
         joint_step_receipts,
         progress_checkpoint_receipts,

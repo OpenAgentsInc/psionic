@@ -51,7 +51,7 @@ use psionic_train::{
     PsionActualPretrainingSystemsBundle, PsionActualPretrainingThroughputProbe,
     PsionActualPretrainingTopologyStorageBundle, PsionPluginConditionedSftStageManifest,
     PsionReferencePilotCheckpointManifest, PsionReferencePilotContributorContinuityReceipt,
-    PsionReferencePilotDualHostTopologyReceipt, PsionReferencePilotJointContributionReceipt,
+    PsionReferencePilotDualHostTopologyReceipt, PsionReferencePilotJointContributionSummaryReceipt,
     PsionReferencePilotProgressCheckpointReceipt, PSION_ACTUAL_PRETRAINING_ACTIVE_ALERT_FEED_PATH,
     PSION_ACTUAL_PRETRAINING_CHECKPOINT_POINTER_SCHEMA_VERSION,
     PSION_ACTUAL_PRETRAINING_CLOSEOUT_BUNDLE_SCHEMA_VERSION,
@@ -3181,7 +3181,7 @@ fn run_actual_pretraining_distributed_bringup_rehearsal(
 
     let topology_receipt: PsionReferencePilotDualHostTopologyReceipt =
         load_json(&cluster_topology_receipt_path)?;
-    let contribution_receipts: Vec<PsionReferencePilotJointContributionReceipt> =
+    let contribution_receipts: Vec<PsionReferencePilotJointContributionSummaryReceipt> =
         load_json(&cluster_contribution_receipts_path)?;
     let contributor_continuity_receipt: PsionReferencePilotContributorContinuityReceipt =
         load_json(&contributor_continuity_receipt_path)?;
