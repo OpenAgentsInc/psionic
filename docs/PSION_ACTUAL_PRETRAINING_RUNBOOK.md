@@ -520,6 +520,25 @@ Tri-host bounded distributed rehearsal on the same actual-lane path:
   --cleanup-remote
 ```
 
+Longer bounded tri-host rehearsal with the same actual workload and a larger
+step budget:
+
+```bash
+PSION_REFERENCE_PILOT_MAX_STEPS=6 \
+PSION_REFERENCE_PILOT_STEPS_PER_WINDOW=3 \
+PSION_REFERENCE_PILOT_WINDOWS_PER_CADENCE=2 \
+./TRAIN rehearse-base-lane \
+  --hardware-observation fixtures/psion/pretrain/psion_actual_pretraining_hardware_observation_admitted_v1.json \
+  --run-shape-observation fixtures/psion/pretrain/psion_actual_pretraining_run_shape_observation_admitted_v1.json \
+  --remote-host archlinux \
+  --secondary-remote-host macbook-pro-m2 \
+  --cleanup-remote
+```
+
+Those environment variables only widen the bounded distributed bringup segment
+that the operator delegates. They do not change the command surface or turn the
+rehearsal into the full long-running production cluster lane.
+
 This command replays the actual operator path in one retained sequence:
 
 - `start`
