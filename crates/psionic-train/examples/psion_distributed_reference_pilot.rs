@@ -8,11 +8,17 @@ use std::{
 };
 
 use psionic_train::{
-    run_psion_dual_host_reference_pilot, PsionReferencePilotConfig,
-    PsionReferencePilotContributionBackend, PsionReferencePilotDualHostConfig,
-    PsionReferencePilotJointContributionReceipt, PsionReferencePilotJointContributionRequest,
-    TrainingLoopBudget,
+    PsionReferencePilotConfig, PsionReferencePilotContributionBackend,
+    PsionReferencePilotDualHostConfig, PsionReferencePilotJointContributionReceipt,
+    PsionReferencePilotJointContributionRequest, TrainingLoopBudget,
+    run_psion_dual_host_reference_pilot,
 };
+
+const DEFAULT_CONTROL_PLANE_BATCH_ROWS: usize = 2;
+const DEFAULT_PRIMARY_CUDA_BATCH_ROWS: usize = 12;
+const DEFAULT_PRIMARY_CPU_BATCH_ROWS: usize = 4;
+const DEFAULT_SECONDARY_CUDA_BATCH_ROWS: usize = 8;
+const DEFAULT_SECONDARY_CPU_BATCH_ROWS: usize = 2;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let root = workspace_root()?;
@@ -177,7 +183,26 @@ impl RemoteContributionInvoker {
 fn dual_host_config_from_env() -> Result<PsionReferencePilotDualHostConfig, Box<dyn Error>> {
     let control_plane_host = required_env("PSION_REFERENCE_PILOT_CONTROL_PLANE_HOST")?;
     let remote_worker_host = required_env("PSION_REFERENCE_PILOT_REMOTE_HOST")?;
-    let mut config = PsionReferencePilotDualHostConfig::new(control_plane_host, remote_worker_host);
+    let primary_backend = env_backend(
+        "PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND",
+        PsionReferencePilotContributionBackend::Cuda,
+    )?;
+    let secondary_backend =
+        optional_nonempty_env("PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND")?
+            .map(|value| {
+                parse_backend(
+                    "PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND",
+                    &value,
+                )
+            })
+            .transpose()?
+            .unwrap_or(PsionReferencePilotContributionBackend::Cpu);
+    let mut config = PsionReferencePilotDualHostConfig::new(control_plane_host, remote_worker_host)
+        .with_control_plane_batch_rows(DEFAULT_CONTROL_PLANE_BATCH_ROWS)
+        .with_remote_worker_batch_rows(default_primary_batch_rows(primary_backend))
+        .with_secondary_remote_worker_batch_rows(default_secondary_batch_rows(secondary_backend))
+        .with_remote_worker_backend(primary_backend)
+        .with_secondary_remote_worker_backend(secondary_backend);
     if let Ok(value) = env::var("PSION_REFERENCE_PILOT_CONTROL_PLANE_TAILNET_IP") {
         if !value.trim().is_empty() {
             config = config.with_control_plane_tailnet_ip(value);
@@ -198,19 +223,6 @@ fn dual_host_config_from_env() -> Result<PsionReferencePilotDualHostConfig, Box<
     {
         config = config.with_remote_worker_batch_rows(batch_rows.max(1));
     }
-    if let Ok(value) = env::var("PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND") {
-        let backend = match value.as_str() {
-            "cpu" => PsionReferencePilotContributionBackend::Cpu,
-            "cuda" => PsionReferencePilotContributionBackend::Cuda,
-            other => {
-                return Err(format!(
-                    "unsupported PSION_REFERENCE_PILOT_DUAL_HOST_REMOTE_BACKEND `{other}`"
-                )
-                .into());
-            }
-        };
-        config = config.with_remote_worker_backend(backend);
-    }
     if let Some(value) = optional_nonempty_env("PSION_REFERENCE_PILOT_SECONDARY_REMOTE_HOST")? {
         config = config.with_secondary_remote_worker_host(value);
     }
@@ -223,22 +235,42 @@ fn dual_host_config_from_env() -> Result<PsionReferencePilotDualHostConfig, Box<
     {
         config = config.with_secondary_remote_worker_batch_rows(batch_rows.max(1));
     }
-    if let Some(value) =
-        optional_nonempty_env("PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND")?
-    {
-        let backend = match value.as_str() {
-            "cpu" => PsionReferencePilotContributionBackend::Cpu,
-            "cuda" => PsionReferencePilotContributionBackend::Cuda,
-            other => {
-                return Err(format!(
-                    "unsupported PSION_REFERENCE_PILOT_DUAL_HOST_SECONDARY_REMOTE_BACKEND `{other}`"
-                )
-                .into())
-            }
-        };
-        config = config.with_secondary_remote_worker_backend(backend);
-    }
     Ok(config)
+}
+
+fn default_primary_batch_rows(backend: PsionReferencePilotContributionBackend) -> usize {
+    match backend {
+        PsionReferencePilotContributionBackend::Cpu => DEFAULT_PRIMARY_CPU_BATCH_ROWS,
+        PsionReferencePilotContributionBackend::Cuda => DEFAULT_PRIMARY_CUDA_BATCH_ROWS,
+    }
+}
+
+fn default_secondary_batch_rows(backend: PsionReferencePilotContributionBackend) -> usize {
+    match backend {
+        PsionReferencePilotContributionBackend::Cpu => DEFAULT_SECONDARY_CPU_BATCH_ROWS,
+        PsionReferencePilotContributionBackend::Cuda => DEFAULT_SECONDARY_CUDA_BATCH_ROWS,
+    }
+}
+
+fn env_backend(
+    name: &str,
+    default: PsionReferencePilotContributionBackend,
+) -> Result<PsionReferencePilotContributionBackend, Box<dyn Error>> {
+    optional_nonempty_env(name)?
+        .map(|value| parse_backend(name, &value))
+        .transpose()
+        .map(|value| value.unwrap_or(default))
+}
+
+fn parse_backend(
+    name: &str,
+    value: &str,
+) -> Result<PsionReferencePilotContributionBackend, Box<dyn Error>> {
+    match value {
+        "cpu" => Ok(PsionReferencePilotContributionBackend::Cpu),
+        "cuda" => Ok(PsionReferencePilotContributionBackend::Cuda),
+        other => Err(format!("unsupported {name} `{other}`").into()),
+    }
 }
 
 fn apply_env_overrides(config: &mut PsionReferencePilotConfig) -> Result<(), Box<dyn Error>> {
