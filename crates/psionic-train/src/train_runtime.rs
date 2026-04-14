@@ -249,6 +249,7 @@ pub struct PsionicTrainCapabilityProjection {
 #[serde(rename_all = "snake_case")]
 pub enum PsionicTrainMinimumMachineClass {
     ReferenceHostCpuOperator,
+    CrossPlatformCpuCompatibleOperator,
     AppleSiliconOperator,
     StrongCudaTrainer,
 }
@@ -258,6 +259,7 @@ impl PsionicTrainMinimumMachineClass {
     pub const fn label(self) -> &'static str {
         match self {
             Self::ReferenceHostCpuOperator => "reference_host_cpu_operator",
+            Self::CrossPlatformCpuCompatibleOperator => "cross_platform_cpu_compatible_operator",
             Self::AppleSiliconOperator => "apple_silicon_operator",
             Self::StrongCudaTrainer => "strong_cuda_trainer",
         }
@@ -1282,7 +1284,8 @@ fn canonical_lane_contract_for_lane(
             environment_ref: PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF,
             backend_family: PSIONIC_TRAIN_CS336_A1_DEMO_BACKEND_FAMILY,
             topology_class: PSIONIC_TRAIN_CS336_A1_DEMO_TOPOLOGY_CLASS,
-            minimum_machine_class: PsionicTrainMinimumMachineClass::ReferenceHostCpuOperator,
+            minimum_machine_class:
+                PsionicTrainMinimumMachineClass::CrossPlatformCpuCompatibleOperator,
         }),
         PSION_APPLE_WINDOWED_TRAINING_LANE_ID => Ok(PsionicTrainLaneContractStatic {
             lane_id: PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
@@ -1825,7 +1828,7 @@ mod tests {
     }
 
     #[test]
-    fn cs336_a1_demo_lane_contract_is_frozen_as_cpu_reference_host() {
+    fn cs336_a1_demo_lane_contract_is_frozen_as_cross_platform_cpu_compatible() {
         let contract = PsionicTrainLaneContract::for_lane(PSION_CS336_A1_DEMO_LANE_ID)
             .expect("bounded A1 demo lane contract should exist");
         assert_eq!(contract.lane_id, PSION_CS336_A1_DEMO_LANE_ID);
@@ -1844,11 +1847,11 @@ mod tests {
         );
         assert_eq!(
             contract.minimum_machine_class,
-            PsionicTrainMinimumMachineClass::ReferenceHostCpuOperator
+            PsionicTrainMinimumMachineClass::CrossPlatformCpuCompatibleOperator
         );
         assert_eq!(
             contract.minimum_machine_class.label(),
-            "reference_host_cpu_operator"
+            "cross_platform_cpu_compatible_operator"
         );
     }
 

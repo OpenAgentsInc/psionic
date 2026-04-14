@@ -47,13 +47,17 @@ The exported `psionic-train` lane contract freezes it as:
   `psionic.environment.psion_cs336_a1_demo.host_cpu.operator@v1`
 - backend family: `cpu`
 - topology class: `single_host_cpu_reference`
-- minimum machine class: `reference_host_cpu_operator`
+- minimum machine class: `cross_platform_cpu_compatible_operator`
 
-There is currently no Apple or CUDA variant of this demo lane.
+The lane still executes the bounded host-CPU reference trainer. It is
+cross-platform because a Mac or Linux operator host can run that CPU path even
+when the machine also has Apple-silicon or CUDA accelerators present. Those
+accelerators are not the claim boundary for this lane.
 
-If Episode 223 or later live demos need an Apple-admitted or CUDA-admitted A1
-path, that must land as a separate explicit lane/environment identity instead
-of silently stretching this CPU reference lane.
+There is still no separate Apple-native or CUDA-native A1 variant. If a later
+live demo needs one of those accelerated paths, it must land as a separate
+explicit lane/environment identity instead of silently stretching this bounded
+host-CPU lane.
 
 ## Operator Entry Points
 
@@ -72,7 +76,8 @@ cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path>
 ```
 
 That means the A1 demo lane no longer depends on ad hoc shell glue when one
-compatible CPU reference host receives a packaged assignment.
+Mac or Linux operator host receives a packaged assignment for the bounded
+host-CPU path.
 
 ## Retained Outputs
 
@@ -116,7 +121,8 @@ This lane honestly claims only that:
 
 - the bounded CS336 A1 port can now be launched through the normal machine
   manifest path
-- one CPU reference host can execute the tiny four-step run zero-touch
+- one Mac or Linux operator host can execute the tiny four-step run zero-touch
+  through the bounded host-CPU path
 - the retained outputs now look like normal machine-run artifacts instead of a
   special local bundle
 
