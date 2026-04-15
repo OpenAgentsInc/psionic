@@ -123,6 +123,15 @@ into one generic engine claim.
     binding per conversation so follow-up turns stay on the same worker and
     placement digest while that shard state remains healthy, then rebind
     cleanly if the placement changes
+  - current Metal single-node closure = the native local Metal path now keeps
+    all `30 / 30` FFN layers on device for the real
+    `gemma-4-26B-A4B-it-Q4_K_M.gguf` artifact, including fused `Q4_K` sparse
+    gate/up experts and `Q5_0` dense plus sparse down projections; the
+    retained `2026-04-14` benchmark receipt moved from about `5.14 tok/s` to
+    about `24.22 tok/s` on the same host and prompt
+  - current boundary = that pass fixes the local fallback cliff but does not
+    yet close parity with `ollama` or `llama.cpp`, and the sparse 26B local
+    lane still returns malformed text on the shared benchmark prompt
   - claim boundary = one local single-node text lane plus one admitted
     distributed sparse extension only; this still does not promote multimodal,
     audio, structured-output, or training claims for `gemma4:26b`

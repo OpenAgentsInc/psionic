@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     collections::BTreeMap,
     env,
@@ -2603,6 +2604,484 @@ impl QuantizedExpertTensor {
     }
 }
 
+fn split_fused_gate_up_rows(
+    total_rows: usize,
+    label: &str,
+) -> Result<(usize, usize), crate::RuntimeError> {
+    if total_rows == 0 || total_rows % 2 != 0 {
+        return Err(crate::RuntimeError::Backend(format!(
+            "{label} fused gate_up rows must be even and non-zero, actual {total_rows}",
+        )));
+    }
+    let gate_rows = total_rows / 2;
+    Ok((gate_rows, gate_rows))
+}
+
+fn split_fused_expert_tensor_bytes(
+    tensor: &QuantizedExpertTensor,
+    gate_rows: usize,
+    up_rows: usize,
+    label: &str,
+) -> Result<(Vec<u8>, Vec<u8>), crate::RuntimeError> {
+    let total_rows = gate_rows.saturating_add(up_rows);
+    if tensor.rows != total_rows {
+        return Err(crate::RuntimeError::Backend(format!(
+            "{label} fused gate_up row mismatch: tensor rows {} do not match gate_rows {} + up_rows {}",
+            tensor.rows, gate_rows, up_rows,
+        )));
+    }
+    let expert_bytes = tensor.rows.saturating_mul(tensor.row_byte_len);
+    let gate_bytes_per_expert = gate_rows.saturating_mul(tensor.row_byte_len);
+    let up_bytes_per_expert = up_rows.saturating_mul(tensor.row_byte_len);
+    let all_bytes = tensor.storage.bytes().map_err(model_load_runtime_error)?;
+    let expected_bytes = tensor.outer.saturating_mul(expert_bytes);
+    if all_bytes.len() != expected_bytes {
+        return Err(crate::RuntimeError::Backend(format!(
+            "{label} fused gate_up byte length mismatch: expected {expected_bytes}, actual {}",
+            all_bytes.len()
+        )));
+    }
+    let mut gate_bytes = Vec::with_capacity(tensor.outer.saturating_mul(gate_bytes_per_expert));
+    let mut up_bytes = Vec::with_capacity(tensor.outer.saturating_mul(up_bytes_per_expert));
+    for expert_index in 0..tensor.outer {
+        let expert_offset = expert_index.saturating_mul(expert_bytes);
+        let gate_offset = expert_offset;
+        let up_offset = expert_offset.saturating_add(gate_bytes_per_expert);
+        gate_bytes.extend_from_slice(
+            &all_bytes[gate_offset..gate_offset.saturating_add(gate_bytes_per_expert)],
+        );
+        up_bytes.extend_from_slice(
+            &all_bytes[up_offset..up_offset.saturating_add(up_bytes_per_expert)],
+        );
+    }
+    Ok((gate_bytes, up_bytes))
+}
+
+fn split_fused_expert_bias_values(
+    bias: &[f32],
+    outer: usize,
+    gate_rows: usize,
+    up_rows: usize,
+    label: &str,
+) -> Result<(Vec<f32>, Vec<f32>), crate::RuntimeError> {
+    let total_rows = gate_rows.saturating_add(up_rows);
+    let expected = outer.saturating_mul(total_rows);
+    if bias.len() != expected {
+        return Err(crate::RuntimeError::Backend(format!(
+            "{label} fused gate_up bias length mismatch: expected {expected}, actual {}",
+            bias.len()
+        )));
+    }
+    let mut gate_bias = Vec::with_capacity(outer.saturating_mul(gate_rows));
+    let mut up_bias = Vec::with_capacity(outer.saturating_mul(up_rows));
+    for expert_index in 0..outer {
+        let expert_offset = expert_index.saturating_mul(total_rows);
+        let gate_offset = expert_offset;
+        let up_offset = expert_offset.saturating_add(gate_rows);
+        gate_bias.extend_from_slice(&bias[gate_offset..gate_offset.saturating_add(gate_rows)]);
+        up_bias.extend_from_slice(&bias[up_offset..up_offset.saturating_add(up_rows)]);
+    }
+    Ok((gate_bias, up_bias))
+}
+
+#[derive(Clone, Debug)]
+struct MetalDenseProjectionMatrix {
+    host: DenseMatrix,
+    device: MetalBuffer,
+}
+
+impl MetalDenseProjectionMatrix {
+    fn load(
+        backend: &mut MetalBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        Self::load_with_optional_column_scale(backend, artifact, name, None)
+    }
+
+    fn load_with_optional_column_scale(
+        backend: &mut MetalBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+        column_scale: Option<&[f32]>,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let host = load_dense_matrix(artifact, name)
+            .map_err(model_load_runtime_error)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(scale) = column_scale {
+            if scale.len() != host.columns {
+                return Err(ReferenceTextGenerationError::Runtime(
+                    crate::RuntimeError::Backend(format!(
+                        "metal dense projection column-scale width mismatch for `{name}`: expected {}, actual {}",
+                        host.columns,
+                        scale.len()
+                    )),
+                ));
+            }
+        }
+        let mut device_values = host.values.clone();
+        if let Some(scale) = column_scale {
+            for row in device_values.chunks_exact_mut(host.columns) {
+                for (value, scale) in row.iter_mut().zip(scale.iter().copied()) {
+                    *value *= scale;
+                }
+            }
+        }
+        let device = backend
+            .input_buffer(Shape::new(vec![host.rows, host.columns]), device_values)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        Ok(Self { host, device })
+    }
+
+    fn matvec_host(&self, input: &[f32], output: &mut Vec<f32>) -> Result<(), crate::RuntimeError> {
+        self.host.matvec(input, output)
+    }
+
+    fn byte_length(&self) -> usize {
+        self.host
+            .values
+            .len()
+            .saturating_mul(std::mem::size_of::<f32>())
+    }
+
+    fn device(&self) -> &MetalBuffer {
+        &self.device
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MetalQuantizedExpertMatrix {
+    host: QuantizedExpertTensor,
+    native_weights: Option<MetalBuffer>,
+}
+
+impl MetalQuantizedExpertMatrix {
+    fn load(
+        backend: &mut MetalBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let host = load_quantized_expert_tensor(artifact, name)
+            .map_err(model_load_runtime_error)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let storage = artifact.paged_tensor(name)?;
+        let metadata = storage.metadata();
+        let native_weights = if supports_native_metal_sparse_expert(metadata.quantization) {
+            let keepalive: Arc<PagedTensorStorage> = Arc::new(storage.clone());
+            let bytes_owner = Arc::clone(&keepalive);
+            let bytes = bytes_owner.bytes()?;
+            let keepalive: Arc<dyn std::any::Any> = keepalive;
+            Some(
+                backend
+                    .quantized_buffer_from_slice(
+                        Shape::new(vec![host.outer.saturating_mul(host.rows), host.columns]),
+                        metadata.quantization,
+                        bytes,
+                        Some(keepalive),
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?,
+            )
+        } else {
+            None
+        };
+        Ok(Self {
+            host,
+            native_weights,
+        })
+    }
+
+    fn is_native(&self) -> bool {
+        self.native_weights.is_some()
+    }
+
+    fn native_weights(&self) -> Result<&MetalBuffer, ReferenceTextGenerationError> {
+        self.native_weights.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                "metal sparse expert weights are unavailable for quantized mode {:?}",
+                self.host.mode
+            )))
+        })
+    }
+
+    fn byte_length(&self) -> usize {
+        self.native_weights
+            .as_ref()
+            .map(MetalBuffer::byte_len)
+            .unwrap_or_else(|| self.host.byte_length())
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MetalPackedGateUpExpertMatrix {
+    mode: QuantizationMode,
+    outer: usize,
+    gate_rows: usize,
+    up_rows: usize,
+    columns: usize,
+    row_stride: usize,
+    gate_weights: MetalBuffer,
+    up_weights: MetalBuffer,
+}
+
+impl MetalPackedGateUpExpertMatrix {
+    fn from_fused(
+        backend: &mut MetalBackend,
+        fused_gate_up: &QuantizedExpertTensor,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        if !supports_native_metal_sparse_expert(fused_gate_up.mode) {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "metal fused sparse gate_up weights are unavailable for quantized mode {:?}",
+                    fused_gate_up.mode
+                )),
+            ));
+        }
+        let (gate_rows, up_rows) =
+            split_fused_gate_up_rows(fused_gate_up.rows, "metal fused sparse gate_up tensor")
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        let (gate_bytes, up_bytes) = split_fused_expert_tensor_bytes(
+            fused_gate_up,
+            gate_rows,
+            up_rows,
+            "metal fused sparse gate_up tensor",
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+        let gate_owner = Arc::new(gate_bytes);
+        let up_owner = Arc::new(up_bytes);
+        let gate_keepalive: Arc<dyn std::any::Any> = gate_owner.clone();
+        let up_keepalive: Arc<dyn std::any::Any> = up_owner.clone();
+        let gate_weights = backend
+            .quantized_buffer_from_slice(
+                Shape::new(vec![
+                    fused_gate_up.outer.saturating_mul(gate_rows),
+                    fused_gate_up.columns,
+                ]),
+                fused_gate_up.mode,
+                gate_owner.as_slice(),
+                Some(gate_keepalive),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let up_weights = backend
+            .quantized_buffer_from_slice(
+                Shape::new(vec![
+                    fused_gate_up.outer.saturating_mul(up_rows),
+                    fused_gate_up.columns,
+                ]),
+                fused_gate_up.mode,
+                up_owner.as_slice(),
+                Some(up_keepalive),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        Ok(Self {
+            mode: fused_gate_up.mode,
+            outer: fused_gate_up.outer,
+            gate_rows,
+            up_rows,
+            columns: fused_gate_up.columns,
+            row_stride: fused_gate_up.row_byte_len,
+            gate_weights,
+            up_weights,
+        })
+    }
+
+    fn byte_length(&self) -> usize {
+        self.gate_weights
+            .byte_len()
+            .saturating_add(self.up_weights.byte_len())
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaDenseProjectionMatrix {
+    host: DenseMatrix,
+    device: Arc<CudaBuffer>,
+}
+
+impl CudaDenseProjectionMatrix {
+    fn load(
+        backend: &mut CudaBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let host = load_dense_matrix(artifact, name)
+            .map_err(model_load_runtime_error)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let device = backend
+            .input_buffer(
+                Shape::new(vec![host.rows, host.columns]),
+                host.values.clone(),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        Ok(Self {
+            host,
+            device: Arc::new(device),
+        })
+    }
+
+    fn byte_length(&self) -> usize {
+        self.host
+            .values
+            .len()
+            .saturating_mul(std::mem::size_of::<f32>())
+    }
+
+    fn device(&self) -> &CudaBuffer {
+        self.device.as_ref()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaQuantizedExpertMatrix {
+    host: QuantizedExpertTensor,
+    weights: Arc<CudaBuffer>,
+}
+
+impl CudaQuantizedExpertMatrix {
+    fn load(
+        backend: &mut CudaBackend,
+        artifact: &GgufBlobArtifact,
+        name: &str,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let host = load_quantized_expert_tensor(artifact, name)
+            .map_err(model_load_runtime_error)
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        let weights = backend
+            .byte_buffer(host.storage.bytes()?)
+            .map_err(|error| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                    "failed to upload `{name}` sparse expert weights to cuda: {error}",
+                )))
+            })?;
+        Ok(Self {
+            host,
+            weights: Arc::new(weights),
+        })
+    }
+
+    fn byte_length(&self) -> usize {
+        self.weights.byte_len()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CudaPackedGateUpExpertMatrix {
+    mode: QuantizationMode,
+    outer: usize,
+    gate_rows: usize,
+    up_rows: usize,
+    columns: usize,
+    row_stride: usize,
+    weights: Arc<CudaBuffer>,
+}
+
+impl CudaPackedGateUpExpertMatrix {
+    fn pack(
+        backend: &mut CudaBackend,
+        gate: &QuantizedExpertTensor,
+        up: &QuantizedExpertTensor,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        if gate.mode != up.mode
+            || gate.outer != up.outer
+            || gate.columns != up.columns
+            || gate.row_byte_len != up.row_byte_len
+        {
+            return Err(ReferenceTextGenerationError::Runtime(
+                crate::RuntimeError::Backend(format!(
+                    "cuda sparse gate/up packing requires matching mode, expert count, columns, and row stride: gate=({:?}, {}, {}, {}) up=({:?}, {}, {}, {})",
+                    gate.mode,
+                    gate.outer,
+                    gate.columns,
+                    gate.row_byte_len,
+                    up.mode,
+                    up.outer,
+                    up.columns,
+                    up.row_byte_len,
+                )),
+            ));
+        }
+
+        let gate_expert_bytes = gate.rows.saturating_mul(gate.row_byte_len);
+        let up_expert_bytes = up.rows.saturating_mul(up.row_byte_len);
+        let gate_bytes = gate.storage.bytes().map_err(model_load_runtime_error)?;
+        let up_bytes = up.storage.bytes().map_err(model_load_runtime_error)?;
+        let mut packed = Vec::with_capacity(
+            gate.outer
+                .saturating_mul(gate_expert_bytes.saturating_add(up_expert_bytes)),
+        );
+        for expert_index in 0..gate.outer {
+            let gate_offset = expert_index.saturating_mul(gate_expert_bytes);
+            packed.extend_from_slice(
+                &gate_bytes[gate_offset..gate_offset.saturating_add(gate_expert_bytes)],
+            );
+            let up_offset = expert_index.saturating_mul(up_expert_bytes);
+            packed
+                .extend_from_slice(&up_bytes[up_offset..up_offset.saturating_add(up_expert_bytes)]);
+        }
+        let weights = backend.byte_buffer(packed.as_slice()).map_err(|error| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                "failed to upload packed sparse gate/up weights to cuda: {error}",
+            )))
+        })?;
+        Ok(Self {
+            mode: gate.mode,
+            outer: gate.outer,
+            gate_rows: gate.rows,
+            up_rows: up.rows,
+            columns: gate.columns,
+            row_stride: gate.row_byte_len,
+            weights: Arc::new(weights),
+        })
+    }
+
+    fn rows_per_expert(&self) -> usize {
+        self.gate_rows.saturating_add(self.up_rows)
+    }
+
+    fn byte_length(&self) -> usize {
+        self.weights.byte_len()
+    }
+
+    fn pack_fused(
+        backend: &mut CudaBackend,
+        fused_gate_up: &QuantizedExpertTensor,
+    ) -> Result<Self, ReferenceTextGenerationError> {
+        let (gate_rows, up_rows) =
+            split_fused_gate_up_rows(fused_gate_up.rows, "cuda fused sparse gate_up tensor")
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        let weights = backend
+            .byte_buffer(
+                fused_gate_up
+                    .storage
+                    .bytes()
+                    .map_err(model_load_runtime_error)?,
+            )
+            .map_err(|error| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                    "failed to upload fused sparse gate_up weights to cuda: {error}",
+                )))
+            })?;
+        Ok(Self {
+            mode: fused_gate_up.mode,
+            outer: fused_gate_up.outer,
+            gate_rows,
+            up_rows,
+            columns: fused_gate_up.columns,
+            row_stride: fused_gate_up.row_byte_len,
+            weights: Arc::new(weights),
+        })
+    }
+}
+
+fn supports_native_metal_sparse_expert(mode: QuantizationMode) -> bool {
+    matches!(
+        mode,
+        QuantizationMode::GgmlQ4K
+            | QuantizationMode::GgmlQ5_0
+            | QuantizationMode::GgmlQ8_0
+            | QuantizationMode::GgmlMxfp4
+    )
+}
+
 #[derive(Clone, Debug)]
 struct DenseGgufForwardStep {
     key: Vec<f32>,
@@ -2846,6 +3325,16 @@ struct MetalGemma4StepPlan {
     hidden_buffer: MetalBuffer,
     residual_buffer: MetalBuffer,
     norm_buffer: MetalBuffer,
+    moe_router_input_buffer: Option<MetalBuffer>,
+    moe_expert_input_buffer: Option<MetalBuffer>,
+    moe_router_logits_buffer: Option<MetalBuffer>,
+    moe_selected_ids_buffer: Option<MetalBuffer>,
+    moe_selected_weights_buffer: Option<MetalBuffer>,
+    moe_gate_buffer: Option<MetalBuffer>,
+    moe_up_buffer: Option<MetalBuffer>,
+    moe_activated_buffer: Option<MetalBuffer>,
+    moe_projected_buffer: Option<MetalBuffer>,
+    moe_output_buffer: Option<MetalBuffer>,
     per_layer_inputs_token_buffer: Option<MetalBuffer>,
     per_layer_inputs_buffer: Option<MetalBuffer>,
     ffn_gate_up_buffer: Option<MetalBuffer>,
@@ -3663,6 +4152,54 @@ impl MetalGemma4GenerationModel {
                 native_ffn_layers,
                 per_layer_model_proj,
             );
+            for (layer_index, layer) in inner.layers.iter().enumerate() {
+                let dense_gate = layer
+                    .feed_forward_gate_weight
+                    .as_ref()
+                    .map(|matrix| format!("{:?}:{}", matrix.mode, matrix.is_native()))
+                    .unwrap_or_else(|| String::from("none"));
+                let dense_up = layer
+                    .feed_forward_up_weight
+                    .as_ref()
+                    .map(|matrix| format!("{:?}:{}", matrix.mode, matrix.is_native()))
+                    .unwrap_or_else(|| String::from("none"));
+                let dense_down = layer
+                    .feed_forward_down_weight
+                    .as_ref()
+                    .map(|matrix| format!("{:?}:{}", matrix.mode, matrix.is_native()))
+                    .unwrap_or_else(|| String::from("none"));
+                let sparse_gate = layer
+                    .feed_forward_gate_experts_weight_native
+                    .as_ref()
+                    .map(|matrix| format!("{:?}:{}", matrix.host.mode, matrix.is_native()))
+                    .or_else(|| {
+                        layer
+                            .feed_forward_gate_up_experts_weight_native
+                            .as_ref()
+                            .map(|matrix| format!("{:?}:packed", matrix.mode))
+                    })
+                    .unwrap_or_else(|| String::from("none"));
+                let sparse_up = layer
+                    .feed_forward_up_experts_weight_native
+                    .as_ref()
+                    .map(|matrix| format!("{:?}:{}", matrix.host.mode, matrix.is_native()))
+                    .unwrap_or_else(|| String::from("none"));
+                let sparse_down = layer
+                    .feed_forward_down_experts_weight_native
+                    .as_ref()
+                    .map(|matrix| format!("{:?}:{}", matrix.host.mode, matrix.is_native()))
+                    .unwrap_or_else(|| String::from("none"));
+                eprintln!(
+                    "psionic.gemma4.metal.layer layer={} dense_gate={} dense_up={} dense_down={} sparse_gate={} sparse_up={} sparse_down={}",
+                    layer_index,
+                    dense_gate,
+                    dense_up,
+                    dense_down,
+                    sparse_gate,
+                    sparse_up,
+                    sparse_down,
+                );
+            }
         }
         Ok(Self {
             inner: Arc::new(inner),
@@ -3864,6 +4401,40 @@ impl MetalGemma4ModelInner {
             })
             .max()
             .unwrap_or(0);
+        let max_sparse_router_rows = self
+            .layers
+            .iter()
+            .filter_map(|layer| {
+                layer
+                    .feed_forward_router_weight
+                    .as_ref()
+                    .map(|matrix| matrix.rows)
+            })
+            .max()
+            .unwrap_or(0);
+        let max_sparse_expert_width = self
+            .layers
+            .iter()
+            .filter_map(|layer| {
+                layer
+                    .feed_forward_gate_experts_weight
+                    .as_ref()
+                    .map(|experts| experts.rows)
+            })
+            .max()
+            .unwrap_or(0);
+        let max_sparse_output_width = self
+            .layers
+            .iter()
+            .filter_map(|layer| {
+                layer
+                    .feed_forward_down_experts_weight
+                    .as_ref()
+                    .map(|experts| experts.rows)
+            })
+            .max()
+            .unwrap_or(0);
+        let active_expert_count = self.family_metadata.expert_used_count.unwrap_or(1).max(1);
         let max_per_layer_width = self
             .layers
             .iter()
@@ -4051,6 +4622,62 @@ impl MetalGemma4ModelInner {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             norm_buffer: backend
                 .zeros_buffer(Shape::new(vec![hidden_size]))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_router_input_buffer: (max_sparse_router_rows > 0)
+                .then(|| backend.zeros_buffer(Shape::new(vec![hidden_size])))
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_expert_input_buffer: (max_sparse_expert_width > 0)
+                .then(|| backend.zeros_buffer(Shape::new(vec![hidden_size])))
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_router_logits_buffer: (max_sparse_router_rows > 0)
+                .then(|| backend.zeros_buffer(Shape::new(vec![max_sparse_router_rows])))
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_selected_ids_buffer: (max_sparse_router_rows > 0)
+                .then(|| backend.zeros_i32_buffer(Shape::new(vec![active_expert_count])))
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_selected_weights_buffer: (max_sparse_router_rows > 0)
+                .then(|| backend.zeros_buffer(Shape::new(vec![active_expert_count])))
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_gate_buffer: (max_sparse_expert_width > 0)
+                .then(|| {
+                    backend.zeros_buffer(Shape::new(vec![
+                        active_expert_count.saturating_mul(max_sparse_expert_width),
+                    ]))
+                })
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_up_buffer: (max_sparse_expert_width > 0)
+                .then(|| {
+                    backend.zeros_buffer(Shape::new(vec![
+                        active_expert_count.saturating_mul(max_sparse_expert_width),
+                    ]))
+                })
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_activated_buffer: (max_sparse_expert_width > 0)
+                .then(|| {
+                    backend.zeros_buffer(Shape::new(vec![
+                        active_expert_count.saturating_mul(max_sparse_expert_width),
+                    ]))
+                })
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_projected_buffer: (max_sparse_output_width > 0)
+                .then(|| {
+                    backend.zeros_buffer(Shape::new(vec![
+                        active_expert_count.saturating_mul(max_sparse_output_width),
+                    ]))
+                })
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_output_buffer: (max_sparse_output_width > 0)
+                .then(|| backend.zeros_buffer(Shape::new(vec![max_sparse_output_width])))
+                .transpose()
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             per_layer_inputs_token_buffer: (total_per_layer_input_width > 0)
                 .then(|| backend.zeros_buffer(Shape::new(vec![total_per_layer_input_width])))
@@ -4417,8 +5044,8 @@ impl MetalGemma4ModelInner {
         for (layer_index, layer) in self.layers.iter().enumerate() {
             let layer_plan = step_plan
                 .layer_plans
-                .get_mut(layer_index)
-                .and_then(Option::as_mut)
+                .get(layer_index)
+                .and_then(Option::as_ref)
                 .ok_or_else(|| {
                     ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
                         "gemma4 metal layer {layer_index} is missing a decode step plan",
@@ -4763,84 +5390,118 @@ impl MetalGemma4ModelInner {
                     self.family_metadata.rms_norm_epsilon,
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
-            let dense_gate_weight = layer.feed_forward_gate_weight.as_ref().ok_or_else(|| {
-                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
-                    "missing gemma4 dense feed_forward_gate_weight in local metal decode path",
-                )))
-            })?;
-            let dense_up_weight = layer.feed_forward_up_weight.as_ref().ok_or_else(|| {
-                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
-                    "missing gemma4 dense feed_forward_up_weight in local metal decode path",
-                )))
-            })?;
-            let dense_down_weight = layer.feed_forward_down_weight.as_ref().ok_or_else(|| {
-                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
-                    "missing gemma4 dense feed_forward_down_weight in local metal decode path",
-                )))
-            })?;
-            if let (Some(gate_up_weight), Some(gate_up_buffer)) = (
-                layer.feed_forward_gate_up_weight.as_ref(),
-                step_plan.ffn_gate_up_buffer.as_ref(),
-            ) {
-                backend
-                    .encode_quantized_matvec_submission(
-                        &mut submission,
-                        gate_up_weight.native_weights()?,
-                        0,
-                        gate_up_weight.mode,
-                        gate_up_weight.rows,
-                        gate_up_weight.columns,
-                        &step_plan.norm_buffer,
-                        gate_up_buffer,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
+            let sparse_ffn_present = self.family_metadata.family == GgufDecoderFamily::Gemma4
+                && layer.feed_forward_router_weight_native.is_some()
+                && layer.feed_forward_down_experts_weight_native.is_some()
+                && ((layer
+                    .feed_forward_gate_experts_weight_native
+                    .as_ref()
+                    .map(MetalQuantizedExpertMatrix::is_native)
+                    .unwrap_or(false)
+                    && layer
+                        .feed_forward_up_experts_weight_native
+                        .as_ref()
+                        .map(MetalQuantizedExpertMatrix::is_native)
+                        .unwrap_or(false))
+                    || layer.feed_forward_gate_up_experts_weight_native.is_some());
+            let ffn_bytes_moved = if sparse_ffn_present {
+                encode_gemma4_metal_sparse_ffn_submission(
+                    backend,
+                    &mut submission,
+                    layer,
+                    step_plan,
+                    &self.family_metadata,
+                    hidden_size,
+                )?
             } else {
+                let dense_gate_weight = layer.feed_forward_gate_weight.as_ref().ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from(
+                            "missing gemma4 dense feed_forward_gate_weight in local metal decode path",
+                        ),
+                    ))
+                })?;
+                let dense_up_weight = layer.feed_forward_up_weight.as_ref().ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from(
+                            "missing gemma4 dense feed_forward_up_weight in local metal decode path",
+                        ),
+                    ))
+                })?;
+                let dense_down_weight = layer.feed_forward_down_weight.as_ref().ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from(
+                            "missing gemma4 dense feed_forward_down_weight in local metal decode path",
+                        ),
+                    ))
+                })?;
+                if let (Some(gate_up_weight), Some(gate_up_buffer)) = (
+                    layer.feed_forward_gate_up_weight.as_ref(),
+                    step_plan.ffn_gate_up_buffer.as_ref(),
+                ) {
+                    backend
+                        .encode_quantized_matvec_submission(
+                            &mut submission,
+                            gate_up_weight.native_weights()?,
+                            0,
+                            gate_up_weight.mode,
+                            gate_up_weight.rows,
+                            gate_up_weight.columns,
+                            &step_plan.norm_buffer,
+                            gate_up_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                } else {
+                    backend
+                        .encode_quantized_matvec_submission(
+                            &mut submission,
+                            dense_gate_weight.native_weights()?,
+                            0,
+                            dense_gate_weight.mode,
+                            dense_gate_weight.rows,
+                            dense_gate_weight.columns,
+                            &step_plan.norm_buffer,
+                            &step_plan.ffn_gate_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    backend
+                        .encode_quantized_matvec_submission(
+                            &mut submission,
+                            dense_up_weight.native_weights()?,
+                            0,
+                            dense_up_weight.mode,
+                            dense_up_weight.rows,
+                            dense_up_weight.columns,
+                            &step_plan.norm_buffer,
+                            &step_plan.ffn_up_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
                 backend
-                    .encode_quantized_matvec_submission(
+                    .encode_gelu_glu_submission(
                         &mut submission,
-                        dense_gate_weight.native_weights()?,
-                        0,
-                        dense_gate_weight.mode,
-                        dense_gate_weight.rows,
-                        dense_gate_weight.columns,
-                        &step_plan.norm_buffer,
                         &step_plan.ffn_gate_buffer,
+                        &step_plan.ffn_up_buffer,
+                        &step_plan.ffn_activated_buffer,
+                        dense_gate_weight.rows,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 backend
                     .encode_quantized_matvec_submission(
                         &mut submission,
-                        dense_up_weight.native_weights()?,
+                        dense_down_weight.native_weights()?,
                         0,
-                        dense_up_weight.mode,
-                        dense_up_weight.rows,
-                        dense_up_weight.columns,
-                        &step_plan.norm_buffer,
-                        &step_plan.ffn_up_buffer,
+                        dense_down_weight.mode,
+                        dense_down_weight.rows,
+                        dense_down_weight.columns,
+                        &step_plan.ffn_activated_buffer,
+                        &step_plan.hidden_buffer,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
-            }
-            backend
-                .encode_gelu_glu_submission(
-                    &mut submission,
-                    &step_plan.ffn_gate_buffer,
-                    &step_plan.ffn_up_buffer,
-                    &step_plan.ffn_activated_buffer,
-                    dense_gate_weight.rows,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-            backend
-                .encode_quantized_matvec_submission(
-                    &mut submission,
-                    dense_down_weight.native_weights()?,
-                    0,
-                    dense_down_weight.mode,
-                    dense_down_weight.rows,
-                    dense_down_weight.columns,
-                    &step_plan.ffn_activated_buffer,
-                    &step_plan.hidden_buffer,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
+                (dense_gate_weight.byte_length()
+                    + dense_up_weight.byte_length()
+                    + dense_down_weight.byte_length()) as u64
+            };
             if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
                 backend
                     .encode_per_head_rms_norm_submission(
@@ -4949,9 +5610,7 @@ impl MetalGemma4ModelInner {
             bytes_moved = bytes_moved
                 .saturating_add(layer.attention_query_weight.byte_length() as u64)
                 .saturating_add(layer.attention_output_weight.byte_length() as u64)
-                .saturating_add(dense_gate_weight.byte_length() as u64)
-                .saturating_add(dense_up_weight.byte_length() as u64)
-                .saturating_add(dense_down_weight.byte_length() as u64);
+                .saturating_add(ffn_bytes_moved);
             if layer.attention_geometry.has_kv() {
                 bytes_moved = bytes_moved
                     .saturating_add(layer.attention_key_weight.byte_length() as u64)
@@ -5232,10 +5891,31 @@ impl MetalGemma4ModelInner {
                     .as_ref()
                     .map(MetalQuantizedProjectionMatrix::is_native)
                     .unwrap_or(true)
-                && layer.feed_forward_router_weight.is_none()
-                && layer.feed_forward_gate_experts_weight.is_none()
-                && layer.feed_forward_up_experts_weight.is_none()
-                && layer.feed_forward_down_experts_weight.is_none()
+                && {
+                    let sparse_present = layer.feed_forward_router_weight.is_some()
+                        || layer.feed_forward_gate_experts_weight.is_some()
+                        || layer.feed_forward_up_experts_weight.is_some()
+                        || layer.feed_forward_down_experts_weight.is_some();
+                    !sparse_present
+                        || (layer.feed_forward_router_weight_native.is_some()
+                            && ((layer
+                                .feed_forward_gate_experts_weight_native
+                                .as_ref()
+                                .map(MetalQuantizedExpertMatrix::is_native)
+                                .unwrap_or(false)
+                                && layer
+                                    .feed_forward_up_experts_weight_native
+                                    .as_ref()
+                                    .map(MetalQuantizedExpertMatrix::is_native)
+                                    .unwrap_or(false))
+                                || layer.feed_forward_gate_up_experts_weight_native.is_some())
+                            && layer
+                                .feed_forward_down_experts_weight_native
+                                .as_ref()
+                                .map(MetalQuantizedExpertMatrix::is_native)
+                                .unwrap_or(false)
+                            && layer.feed_forward_down_experts_scale_native.is_some())
+                }
         }) && self.output.is_native()
             && self
                 .gemma4_per_layer_inputs
@@ -5762,28 +6442,12 @@ impl MetalGemma4ModelInner {
                 } else {
                     ffn_input.clone()
                 };
-                let mut moe_ffn = evaluate_sparse_moe_host(
+                let mut moe_ffn = evaluate_sparse_moe_metal(
+                    backend,
                     &self.family_metadata,
                     router_input.as_slice(),
                     expert_input.as_slice(),
-                    layer
-                        .feed_forward_router_weight
-                        .as_ref()
-                        .expect("router checked"),
-                    layer.feed_forward_router_bias.as_deref(),
-                    layer
-                        .feed_forward_gate_experts_weight
-                        .as_ref()
-                        .expect("gate experts checked"),
-                    layer.feed_forward_gate_experts_bias.as_deref(),
-                    layer.feed_forward_up_experts_weight.as_ref(),
-                    layer.feed_forward_up_experts_bias.as_deref(),
-                    layer
-                        .feed_forward_down_experts_weight
-                        .as_ref()
-                        .expect("down experts checked"),
-                    layer.feed_forward_down_experts_bias.as_deref(),
-                    layer.feed_forward_down_experts_scale.as_deref(),
+                    layer,
                     self.family_metadata.expert_used_count.unwrap_or(1),
                 )?;
                 if let Some(norm) = layer.feed_forward_post_norm_2.as_ref() {
@@ -5799,25 +6463,18 @@ impl MetalGemma4ModelInner {
                     kernel_count: shared_ffn.kernel_count + moe_ffn.kernel_count,
                     bytes_moved: shared_ffn.bytes_moved + moe_ffn.bytes_moved,
                 }
-            } else if let (Some(router), Some(gate_experts), Some(up_experts), Some(down_experts)) = (
+            } else if let (Some(_), Some(_), Some(_), Some(_)) = (
                 layer.feed_forward_router_weight.as_ref(),
                 layer.feed_forward_gate_experts_weight.as_ref(),
                 layer.feed_forward_up_experts_weight.as_ref(),
                 layer.feed_forward_down_experts_weight.as_ref(),
             ) {
-                let moe_ffn = evaluate_sparse_moe_host(
+                let moe_ffn = evaluate_sparse_moe_metal(
+                    backend,
                     &self.family_metadata,
                     ffn_input.as_slice(),
                     ffn_input.as_slice(),
-                    router,
-                    layer.feed_forward_router_bias.as_deref(),
-                    gate_experts,
-                    layer.feed_forward_gate_experts_bias.as_deref(),
-                    Some(up_experts),
-                    layer.feed_forward_up_experts_bias.as_deref(),
-                    down_experts,
-                    layer.feed_forward_down_experts_bias.as_deref(),
-                    layer.feed_forward_down_experts_scale.as_deref(),
+                    layer,
                     self.family_metadata.expert_used_count.unwrap_or(1),
                 )?;
                 MetalProjectionStep {
@@ -6374,28 +7031,12 @@ impl MetalGemma4ModelInner {
                 } else {
                     ffn_input.clone()
                 };
-                let mut moe_ffn = evaluate_sparse_moe_host(
+                let mut moe_ffn = evaluate_sparse_moe_metal(
+                    backend,
                     &self.family_metadata,
                     router_input.as_slice(),
                     expert_input.as_slice(),
-                    layer
-                        .feed_forward_router_weight
-                        .as_ref()
-                        .expect("router checked"),
-                    layer.feed_forward_router_bias.as_deref(),
-                    layer
-                        .feed_forward_gate_experts_weight
-                        .as_ref()
-                        .expect("gate experts checked"),
-                    layer.feed_forward_gate_experts_bias.as_deref(),
-                    layer.feed_forward_up_experts_weight.as_ref(),
-                    layer.feed_forward_up_experts_bias.as_deref(),
-                    layer
-                        .feed_forward_down_experts_weight
-                        .as_ref()
-                        .expect("down experts checked"),
-                    layer.feed_forward_down_experts_bias.as_deref(),
-                    layer.feed_forward_down_experts_scale.as_deref(),
+                    layer,
                     self.family_metadata.expert_used_count.unwrap_or(1),
                 )?;
                 if let Some(norm) = layer.feed_forward_post_norm_2.as_ref() {
@@ -6411,25 +7052,18 @@ impl MetalGemma4ModelInner {
                     kernel_count: shared_ffn.kernel_count + moe_ffn.kernel_count,
                     bytes_moved: shared_ffn.bytes_moved + moe_ffn.bytes_moved,
                 }
-            } else if let (Some(router), Some(gate_experts), Some(up_experts), Some(down_experts)) = (
+            } else if let (Some(_), Some(_), Some(_), Some(_)) = (
                 layer.feed_forward_router_weight.as_ref(),
                 layer.feed_forward_gate_experts_weight.as_ref(),
                 layer.feed_forward_up_experts_weight.as_ref(),
                 layer.feed_forward_down_experts_weight.as_ref(),
             ) {
-                let moe_ffn = evaluate_sparse_moe_host(
+                let moe_ffn = evaluate_sparse_moe_metal(
+                    backend,
                     &self.family_metadata,
                     ffn_input.as_slice(),
                     ffn_input.as_slice(),
-                    router,
-                    layer.feed_forward_router_bias.as_deref(),
-                    gate_experts,
-                    layer.feed_forward_gate_experts_bias.as_deref(),
-                    Some(up_experts),
-                    layer.feed_forward_up_experts_bias.as_deref(),
-                    down_experts,
-                    layer.feed_forward_down_experts_bias.as_deref(),
-                    layer.feed_forward_down_experts_scale.as_deref(),
+                    layer,
                     self.family_metadata.expert_used_count.unwrap_or(1),
                 )?;
                 MetalProjectionStep {
@@ -6658,18 +7292,31 @@ struct MetalGemma4Layer {
     feed_forward_up_weight: Option<MetalQuantizedProjectionMatrix>,
     feed_forward_down_weight: Option<MetalQuantizedProjectionMatrix>,
     feed_forward_router_weight: Option<DenseMatrix>,
+    feed_forward_router_weight_native: Option<MetalDenseProjectionMatrix>,
     feed_forward_router_bias: Option<Vec<f32>>,
+    feed_forward_router_bias_native: Option<MetalStaticVector>,
     feed_forward_router_input_scale: Option<Vec<f32>>,
     feed_forward_gate_experts_weight: Option<QuantizedExpertTensor>,
+    feed_forward_gate_experts_weight_native: Option<MetalQuantizedExpertMatrix>,
+    feed_forward_gate_up_experts_weight_native: Option<MetalPackedGateUpExpertMatrix>,
     feed_forward_gate_experts_bias: Option<Vec<f32>>,
+    feed_forward_gate_experts_bias_native: Option<MetalStaticVector>,
     feed_forward_up_experts_weight: Option<QuantizedExpertTensor>,
+    feed_forward_up_experts_weight_native: Option<MetalQuantizedExpertMatrix>,
     feed_forward_up_experts_bias: Option<Vec<f32>>,
+    feed_forward_up_experts_bias_native: Option<MetalStaticVector>,
     feed_forward_down_experts_weight: Option<QuantizedExpertTensor>,
+    feed_forward_down_experts_weight_native: Option<MetalQuantizedExpertMatrix>,
     feed_forward_down_experts_bias: Option<Vec<f32>>,
+    feed_forward_down_experts_bias_native: Option<MetalStaticVector>,
     feed_forward_down_experts_scale: Option<Vec<f32>>,
+    feed_forward_down_experts_scale_native: Option<MetalStaticVector>,
     feed_forward_post_norm_1: Option<Vec<f32>>,
+    feed_forward_post_norm_1_native: Option<MetalStaticVector>,
     feed_forward_pre_norm_2: Option<Vec<f32>>,
+    feed_forward_pre_norm_2_native: Option<MetalStaticVector>,
     feed_forward_post_norm_2: Option<Vec<f32>>,
+    feed_forward_post_norm_2_native: Option<MetalStaticVector>,
     feed_forward_post_norm: Option<MetalStaticVector>,
     layer_output_scale: Option<f32>,
     per_layer_input_gate: Option<MetalQuantizedProjectionMatrix>,
@@ -6816,6 +7463,157 @@ impl MetalGemma4Layer {
             cache_write_offset,
             reuse_layer_index,
         )?;
+        let feed_forward_router_input_scale = load_first_named_optional_dense_vector(
+            artifact,
+            &[format!("blk.{layer_index}.ffn_gate_inp.scale")],
+        )?;
+        let feed_forward_router_weight = layout
+            .feed_forward_router_weight
+            .as_deref()
+            .map(|name| load_dense_matrix(artifact, name))
+            .transpose()?;
+        let feed_forward_router_weight_native = layout
+            .feed_forward_router_weight
+            .as_deref()
+            .map(|name| {
+                MetalDenseProjectionMatrix::load_with_optional_column_scale(
+                    backend,
+                    artifact,
+                    name,
+                    feed_forward_router_input_scale.as_deref(),
+                )
+            })
+            .transpose()?;
+        let feed_forward_router_bias = layout
+            .feed_forward_router_bias
+            .as_deref()
+            .map(|name| load_dense_vector(artifact, name))
+            .transpose()?;
+        let feed_forward_router_bias_native = load_optional_metal_static_vector(
+            backend,
+            artifact,
+            layout.feed_forward_router_bias.as_deref(),
+        )?;
+        let feed_forward_gate_experts_weight = layout
+            .feed_forward_gate_experts_weight
+            .as_deref()
+            .map(|name| load_quantized_expert_tensor(artifact, name))
+            .transpose()?;
+        let feed_forward_up_experts_weight = layout
+            .feed_forward_up_experts_weight
+            .as_deref()
+            .map(|name| load_quantized_expert_tensor(artifact, name))
+            .transpose()?;
+        let feed_forward_gate_experts_weight_native = if feed_forward_up_experts_weight.is_some() {
+            layout
+                .feed_forward_gate_experts_weight
+                .as_deref()
+                .map(|name| MetalQuantizedExpertMatrix::load(backend, artifact, name))
+                .transpose()?
+        } else {
+            None
+        };
+        let feed_forward_up_experts_weight_native = layout
+            .feed_forward_up_experts_weight
+            .as_deref()
+            .map(|name| MetalQuantizedExpertMatrix::load(backend, artifact, name))
+            .transpose()?;
+        let feed_forward_gate_up_experts_weight_native = if feed_forward_up_experts_weight.is_none()
+        {
+            feed_forward_gate_experts_weight
+                .as_ref()
+                .map(|fused| MetalPackedGateUpExpertMatrix::from_fused(backend, fused))
+                .transpose()?
+        } else {
+            None
+        };
+        let feed_forward_gate_experts_bias = layout
+            .feed_forward_gate_experts_bias
+            .as_deref()
+            .map(|name| load_dense_rank2_flat(artifact, name))
+            .transpose()?;
+        let (feed_forward_gate_experts_bias_native, feed_forward_up_experts_bias_native) =
+            if feed_forward_up_experts_weight.is_none() {
+                if let (Some(fused_bias), Some(fused_gate_up)) = (
+                    feed_forward_gate_experts_bias.as_deref(),
+                    feed_forward_gate_up_experts_weight_native.as_ref(),
+                ) {
+                    let (gate_bias, up_bias) = split_fused_expert_bias_values(
+                        fused_bias,
+                        fused_gate_up.outer,
+                        fused_gate_up.gate_rows,
+                        fused_gate_up.up_rows,
+                        "metal fused sparse gate_up bias",
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    (
+                        Some(MetalStaticVector::from_values(backend, gate_bias)?),
+                        Some(MetalStaticVector::from_values(backend, up_bias)?),
+                    )
+                } else {
+                    (None, None)
+                }
+            } else {
+                (
+                    layout
+                        .feed_forward_gate_experts_bias
+                        .as_deref()
+                        .map(|name| load_dense_rank2_flat(artifact, name))
+                        .transpose()?
+                        .map(|values| MetalStaticVector::from_values(backend, values))
+                        .transpose()?,
+                    layout
+                        .feed_forward_up_experts_bias
+                        .as_deref()
+                        .map(|name| load_dense_rank2_flat(artifact, name))
+                        .transpose()?
+                        .map(|values| MetalStaticVector::from_values(backend, values))
+                        .transpose()?,
+                )
+            };
+        let feed_forward_up_experts_bias = layout
+            .feed_forward_up_experts_bias
+            .as_deref()
+            .map(|name| load_dense_rank2_flat(artifact, name))
+            .transpose()?;
+        let feed_forward_down_experts_weight = layout
+            .feed_forward_down_experts_weight
+            .as_deref()
+            .map(|name| load_quantized_expert_tensor(artifact, name))
+            .transpose()?;
+        let feed_forward_down_experts_weight_native = layout
+            .feed_forward_down_experts_weight
+            .as_deref()
+            .map(|name| MetalQuantizedExpertMatrix::load(backend, artifact, name))
+            .transpose()?;
+        let feed_forward_down_experts_bias = layout
+            .feed_forward_down_experts_bias
+            .as_deref()
+            .map(|name| load_dense_rank2_flat(artifact, name))
+            .transpose()?;
+        let feed_forward_down_experts_bias_native = layout
+            .feed_forward_down_experts_bias
+            .as_deref()
+            .map(|name| load_dense_rank2_flat(artifact, name))
+            .transpose()?
+            .map(|values| MetalStaticVector::from_values(backend, values))
+            .transpose()?;
+        let feed_forward_down_experts_scale = load_first_named_optional_dense_vector(
+            artifact,
+            &[format!("blk.{layer_index}.ffn_down_exps.scale")],
+        )?;
+        let feed_forward_down_experts_scale_native = {
+            let values = if let Some(values) = feed_forward_down_experts_scale.clone() {
+                Some(values)
+            } else if let Some(experts) = feed_forward_down_experts_weight.as_ref() {
+                Some(vec![1.0; experts.outer])
+            } else {
+                None
+            };
+            values
+                .map(|values| MetalStaticVector::from_values(backend, values))
+                .transpose()?
+        };
         Ok(Self {
             attention_geometry,
             attention_norm: load_metal_static_vector(
@@ -6898,54 +7696,26 @@ impl MetalGemma4Layer {
                 .as_deref()
                 .map(|name| MetalQuantizedProjectionMatrix::load(backend, artifact, name))
                 .transpose()?,
-            feed_forward_router_weight: layout
-                .feed_forward_router_weight
-                .as_deref()
-                .map(|name| load_dense_matrix(artifact, name))
-                .transpose()?,
-            feed_forward_router_bias: layout
-                .feed_forward_router_bias
-                .as_deref()
-                .map(|name| load_dense_vector(artifact, name))
-                .transpose()?,
-            feed_forward_router_input_scale: load_first_named_optional_dense_vector(
-                artifact,
-                &[format!("blk.{layer_index}.ffn_gate_inp.scale")],
-            )?,
-            feed_forward_gate_experts_weight: layout
-                .feed_forward_gate_experts_weight
-                .as_deref()
-                .map(|name| load_quantized_expert_tensor(artifact, name))
-                .transpose()?,
-            feed_forward_gate_experts_bias: layout
-                .feed_forward_gate_experts_bias
-                .as_deref()
-                .map(|name| load_dense_rank2_flat(artifact, name))
-                .transpose()?,
-            feed_forward_up_experts_weight: layout
-                .feed_forward_up_experts_weight
-                .as_deref()
-                .map(|name| load_quantized_expert_tensor(artifact, name))
-                .transpose()?,
-            feed_forward_up_experts_bias: layout
-                .feed_forward_up_experts_bias
-                .as_deref()
-                .map(|name| load_dense_rank2_flat(artifact, name))
-                .transpose()?,
-            feed_forward_down_experts_weight: layout
-                .feed_forward_down_experts_weight
-                .as_deref()
-                .map(|name| load_quantized_expert_tensor(artifact, name))
-                .transpose()?,
-            feed_forward_down_experts_bias: layout
-                .feed_forward_down_experts_bias
-                .as_deref()
-                .map(|name| load_dense_rank2_flat(artifact, name))
-                .transpose()?,
-            feed_forward_down_experts_scale: load_first_named_optional_dense_vector(
-                artifact,
-                &[format!("blk.{layer_index}.ffn_down_exps.scale")],
-            )?,
+            feed_forward_router_weight,
+            feed_forward_router_weight_native,
+            feed_forward_router_bias,
+            feed_forward_router_bias_native,
+            feed_forward_router_input_scale,
+            feed_forward_gate_experts_weight,
+            feed_forward_gate_experts_weight_native,
+            feed_forward_gate_up_experts_weight_native,
+            feed_forward_gate_experts_bias,
+            feed_forward_gate_experts_bias_native,
+            feed_forward_up_experts_weight,
+            feed_forward_up_experts_weight_native,
+            feed_forward_up_experts_bias,
+            feed_forward_up_experts_bias_native,
+            feed_forward_down_experts_weight,
+            feed_forward_down_experts_weight_native,
+            feed_forward_down_experts_bias,
+            feed_forward_down_experts_bias_native,
+            feed_forward_down_experts_scale,
+            feed_forward_down_experts_scale_native,
             feed_forward_post_norm_1: load_first_named_optional_dense_vector(
                 artifact,
                 &[
@@ -6953,6 +7723,15 @@ impl MetalGemma4Layer {
                     format!("blk.{layer_index}.ffn_post_norm_1.weight"),
                 ],
             )?,
+            feed_forward_post_norm_1_native: load_first_named_optional_dense_vector(
+                artifact,
+                &[
+                    format!("blk.{layer_index}.post_ffw_norm_1.weight"),
+                    format!("blk.{layer_index}.ffn_post_norm_1.weight"),
+                ],
+            )?
+            .map(|values| MetalStaticVector::from_values(backend, values))
+            .transpose()?,
             feed_forward_pre_norm_2: load_first_named_optional_dense_vector(
                 artifact,
                 &[
@@ -6960,6 +7739,15 @@ impl MetalGemma4Layer {
                     format!("blk.{layer_index}.ffn_pre_norm_2.weight"),
                 ],
             )?,
+            feed_forward_pre_norm_2_native: load_first_named_optional_dense_vector(
+                artifact,
+                &[
+                    format!("blk.{layer_index}.pre_ffw_norm_2.weight"),
+                    format!("blk.{layer_index}.ffn_pre_norm_2.weight"),
+                ],
+            )?
+            .map(|values| MetalStaticVector::from_values(backend, values))
+            .transpose()?,
             feed_forward_post_norm_2: load_first_named_optional_dense_vector(
                 artifact,
                 &[
@@ -6967,6 +7755,15 @@ impl MetalGemma4Layer {
                     format!("blk.{layer_index}.ffn_post_norm_2.weight"),
                 ],
             )?,
+            feed_forward_post_norm_2_native: load_first_named_optional_dense_vector(
+                artifact,
+                &[
+                    format!("blk.{layer_index}.post_ffw_norm_2.weight"),
+                    format!("blk.{layer_index}.ffn_post_norm_2.weight"),
+                ],
+            )?
+            .map(|values| MetalStaticVector::from_values(backend, values))
+            .transpose()?,
             feed_forward_post_norm: load_optional_metal_static_vector(
                 backend,
                 artifact,
@@ -7572,7 +8369,8 @@ fn supports_native_metal_quantized_projection(mode: QuantizationMode) -> bool {
     }
     matches!(
         mode,
-        QuantizationMode::GgmlQ4K
+        QuantizationMode::GgmlQ5_0
+            | QuantizationMode::GgmlQ4K
             | QuantizationMode::GgmlQ5K
             | QuantizationMode::GgmlQ6K
             | QuantizationMode::GgmlQ8_0
@@ -7727,6 +8525,490 @@ struct MetalDeviceAttentionStep {
     value_values: Option<Vec<f32>>,
     kernel_count: usize,
     bytes_moved: u64,
+}
+
+fn encode_gemma4_metal_sparse_ffn_submission(
+    backend: &mut MetalBackend,
+    submission: &mut psionic_backend_metal::MetalSubmission,
+    layer: &MetalGemma4Layer,
+    step_plan: &MetalGemma4StepPlan,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    hidden_size: usize,
+) -> Result<u64, ReferenceTextGenerationError> {
+    let active_expert_count = family_metadata.expert_used_count.unwrap_or(1).max(1);
+    let router = layer
+        .feed_forward_router_weight_native
+        .as_ref()
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "missing gemma4 sparse router weights in local metal decode path",
+            )))
+        })?;
+    let down_experts = layer
+        .feed_forward_down_experts_weight_native
+        .as_ref()
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "missing gemma4 sparse down experts in local metal decode path",
+            )))
+        })?;
+    let router_input_buffer = step_plan.moe_router_input_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the router input buffer",
+        )))
+    })?;
+    let expert_input_buffer = step_plan.moe_expert_input_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the expert input buffer",
+        )))
+    })?;
+    let router_logits_buffer = step_plan.moe_router_logits_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the router logits buffer",
+        )))
+    })?;
+    let selected_ids_buffer = step_plan.moe_selected_ids_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the selected-id buffer",
+        )))
+    })?;
+    let selected_weights_buffer =
+        step_plan
+            .moe_selected_weights_buffer
+            .as_ref()
+            .ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "metal sparse decode step-plan is missing the selected-weight buffer",
+                )))
+            })?;
+    let gate_buffer = step_plan.moe_gate_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the sparse gate buffer",
+        )))
+    })?;
+    let up_buffer = step_plan.moe_up_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the sparse up buffer",
+        )))
+    })?;
+    let activated_buffer = step_plan.moe_activated_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the sparse activation buffer",
+        )))
+    })?;
+    let projected_buffer = step_plan.moe_projected_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the sparse projected buffer",
+        )))
+    })?;
+    let moe_output_buffer = step_plan.moe_output_buffer.as_ref().ok_or_else(|| {
+        ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+            "metal sparse decode step-plan is missing the sparse output buffer",
+        )))
+    })?;
+    let expert_scales = layer
+        .feed_forward_down_experts_scale_native
+        .as_ref()
+        .ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "metal sparse decode path is missing per-expert down scales",
+            )))
+        })?;
+    let (
+        gate_weights,
+        gate_mode,
+        gate_row_stride,
+        gate_rows,
+        gate_columns,
+        up_weights,
+        up_mode,
+        up_row_stride,
+        up_rows,
+        up_columns,
+        sparse_gate_up_bytes_moved,
+    ) = if let (Some(gate_experts), Some(up_experts)) = (
+        layer.feed_forward_gate_experts_weight_native.as_ref(),
+        layer.feed_forward_up_experts_weight_native.as_ref(),
+    ) {
+        (
+            gate_experts.native_weights()?,
+            gate_experts.host.mode,
+            gate_experts.host.row_byte_len,
+            gate_experts.host.rows,
+            gate_experts.host.columns,
+            up_experts.native_weights()?,
+            up_experts.host.mode,
+            up_experts.host.row_byte_len,
+            up_experts.host.rows,
+            up_experts.host.columns,
+            gate_experts.byte_length() as u64 + up_experts.byte_length() as u64,
+        )
+    } else if let Some(gate_up) = layer.feed_forward_gate_up_experts_weight_native.as_ref() {
+        (
+            &gate_up.gate_weights,
+            gate_up.mode,
+            gate_up.row_stride,
+            gate_up.gate_rows,
+            gate_up.columns,
+            &gate_up.up_weights,
+            gate_up.mode,
+            gate_up.row_stride,
+            gate_up.up_rows,
+            gate_up.columns,
+            gate_up.byte_length() as u64,
+        )
+    } else {
+        return Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(String::from(
+                "missing gemma4 sparse gate/up experts in local metal decode path",
+            )),
+        ));
+    };
+    if gate_columns != hidden_size || up_columns != hidden_size {
+        return Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(format!(
+                "metal sparse gate/up expert input width mismatch: expected hidden_size {hidden_size}, gate columns {gate_columns}, up columns {up_columns}",
+            )),
+        ));
+    }
+    if gate_rows != down_experts.host.columns || up_rows != down_experts.host.columns {
+        return Err(ReferenceTextGenerationError::Runtime(
+            crate::RuntimeError::Backend(format!(
+                "metal sparse gate/up output width mismatch: down columns {}, gate rows {gate_rows}, up rows {up_rows}",
+                down_experts.host.columns,
+            )),
+        ));
+    }
+
+    let mut bytes_moved = 0u64;
+    let has_shared_path = layer.feed_forward_gate_weight.is_some()
+        && layer.feed_forward_up_weight.is_some()
+        && layer.feed_forward_down_weight.is_some();
+
+    if has_shared_path {
+        let dense_gate_weight = layer.feed_forward_gate_weight.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "missing gemma4 dense feed_forward_gate_weight in local metal sparse decode path",
+            )))
+        })?;
+        let dense_up_weight = layer.feed_forward_up_weight.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "missing gemma4 dense feed_forward_up_weight in local metal sparse decode path",
+            )))
+        })?;
+        let dense_down_weight = layer.feed_forward_down_weight.as_ref().ok_or_else(|| {
+            ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                "missing gemma4 dense feed_forward_down_weight in local metal sparse decode path",
+            )))
+        })?;
+        if let (Some(gate_up_weight), Some(gate_up_buffer)) = (
+            layer.feed_forward_gate_up_weight.as_ref(),
+            step_plan.ffn_gate_up_buffer.as_ref(),
+        ) {
+            backend
+                .encode_quantized_matvec_submission(
+                    submission,
+                    gate_up_weight.native_weights()?,
+                    0,
+                    gate_up_weight.mode,
+                    gate_up_weight.rows,
+                    gate_up_weight.columns,
+                    &step_plan.norm_buffer,
+                    gate_up_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        } else {
+            backend
+                .encode_quantized_matvec_submission(
+                    submission,
+                    dense_gate_weight.native_weights()?,
+                    0,
+                    dense_gate_weight.mode,
+                    dense_gate_weight.rows,
+                    dense_gate_weight.columns,
+                    &step_plan.norm_buffer,
+                    &step_plan.ffn_gate_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            backend
+                .encode_quantized_matvec_submission(
+                    submission,
+                    dense_up_weight.native_weights()?,
+                    0,
+                    dense_up_weight.mode,
+                    dense_up_weight.rows,
+                    dense_up_weight.columns,
+                    &step_plan.norm_buffer,
+                    &step_plan.ffn_up_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        backend
+            .encode_gelu_glu_submission(
+                submission,
+                &step_plan.ffn_gate_buffer,
+                &step_plan.ffn_up_buffer,
+                &step_plan.ffn_activated_buffer,
+                dense_gate_weight.rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_quantized_matvec_submission(
+                submission,
+                dense_down_weight.native_weights()?,
+                0,
+                dense_down_weight.mode,
+                dense_down_weight.rows,
+                dense_down_weight.columns,
+                &step_plan.ffn_activated_buffer,
+                &step_plan.hidden_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(norm) = layer.feed_forward_post_norm_1_native.as_ref() {
+            backend
+                .encode_per_head_rms_norm_submission(
+                    submission,
+                    &step_plan.hidden_buffer,
+                    norm.device(),
+                    1,
+                    hidden_size,
+                    family_metadata.rms_norm_epsilon,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        bytes_moved = bytes_moved
+            .saturating_add(dense_gate_weight.byte_length() as u64)
+            .saturating_add(dense_up_weight.byte_length() as u64)
+            .saturating_add(dense_down_weight.byte_length() as u64);
+    }
+
+    backend
+        .encode_copy_f32_slice_submission(
+            submission,
+            &step_plan.residual_buffer,
+            router_input_buffer,
+            hidden_size,
+            0,
+            0,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    backend
+        .encode_per_head_rms_norm_unit_submission(
+            submission,
+            router_input_buffer,
+            1,
+            hidden_size,
+            family_metadata.rms_norm_epsilon,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    backend
+        .encode_scale_inplace_submission(
+            submission,
+            router_input_buffer,
+            (hidden_size as f32).sqrt().recip(),
+            hidden_size,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    if let Some(norm) = layer.feed_forward_pre_norm_2_native.as_ref() {
+        backend
+            .encode_copy_f32_slice_submission(
+                submission,
+                &step_plan.residual_buffer,
+                expert_input_buffer,
+                hidden_size,
+                0,
+                0,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_per_head_rms_norm_submission(
+                submission,
+                expert_input_buffer,
+                norm.device(),
+                1,
+                hidden_size,
+                family_metadata.rms_norm_epsilon,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+
+    let expert_input = if layer.feed_forward_pre_norm_2_native.is_some() {
+        expert_input_buffer
+    } else {
+        &step_plan.norm_buffer
+    };
+
+    backend
+        .encode_matmul_submission(
+            submission,
+            router.device(),
+            router_input_buffer,
+            router_logits_buffer,
+            router.host.rows,
+            router.host.columns,
+            1,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias) = layer.feed_forward_router_bias_native.as_ref() {
+        backend
+            .encode_add_inplace_submission(
+                submission,
+                router_logits_buffer,
+                bias.device(),
+                router.host.rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    backend
+        .encode_top_k_softmax_single_row_submission(
+            submission,
+            router_logits_buffer,
+            router.host.rows,
+            active_expert_count,
+            selected_ids_buffer,
+            selected_weights_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    backend
+        .encode_grouped_quantized_matvec_id_buffer_submission(
+            submission,
+            gate_weights,
+            gate_mode,
+            gate_row_stride,
+            gate_rows,
+            gate_columns,
+            selected_ids_buffer,
+            active_expert_count,
+            expert_input,
+            gate_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias) = layer.feed_forward_gate_experts_bias_native.as_ref() {
+        backend
+            .encode_add_selected_expert_bias_submission(
+                submission,
+                gate_buffer,
+                bias.device(),
+                selected_ids_buffer,
+                active_expert_count,
+                gate_rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    backend
+        .encode_grouped_quantized_matvec_id_buffer_submission(
+            submission,
+            up_weights,
+            up_mode,
+            up_row_stride,
+            up_rows,
+            up_columns,
+            selected_ids_buffer,
+            active_expert_count,
+            expert_input,
+            up_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias) = layer.feed_forward_up_experts_bias_native.as_ref() {
+        backend
+            .encode_add_selected_expert_bias_submission(
+                submission,
+                up_buffer,
+                bias.device(),
+                selected_ids_buffer,
+                active_expert_count,
+                up_rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    backend
+        .encode_gelu_glu_submission(
+            submission,
+            gate_buffer,
+            up_buffer,
+            activated_buffer,
+            active_expert_count.saturating_mul(gate_rows),
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    backend
+        .encode_expert_matvec_f32_id_buffer_submission(
+            submission,
+            down_experts.native_weights()?,
+            down_experts.host.mode,
+            down_experts.host.row_byte_len,
+            down_experts.host.rows,
+            down_experts.host.columns,
+            selected_ids_buffer,
+            active_expert_count,
+            activated_buffer,
+            projected_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias) = layer.feed_forward_down_experts_bias_native.as_ref() {
+        backend
+            .encode_add_selected_expert_bias_submission(
+                submission,
+                projected_buffer,
+                bias.device(),
+                selected_ids_buffer,
+                active_expert_count,
+                down_experts.host.rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    backend
+        .encode_aggregate_selected_expert_rows_submission(
+            submission,
+            projected_buffer,
+            selected_ids_buffer,
+            selected_weights_buffer,
+            expert_scales.device(),
+            moe_output_buffer,
+            active_expert_count,
+            down_experts.host.rows,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(norm) = layer.feed_forward_post_norm_2_native.as_ref() {
+        backend
+            .encode_per_head_rms_norm_submission(
+                submission,
+                moe_output_buffer,
+                norm.device(),
+                1,
+                hidden_size,
+                family_metadata.rms_norm_epsilon,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    if has_shared_path {
+        backend
+            .encode_add_inplace_submission(
+                submission,
+                &step_plan.hidden_buffer,
+                moe_output_buffer,
+                hidden_size,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    } else {
+        backend
+            .encode_copy_f32_slice_submission(
+                submission,
+                moe_output_buffer,
+                &step_plan.hidden_buffer,
+                hidden_size,
+                0,
+                0,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+
+    bytes_moved = bytes_moved
+        .saturating_add(router.byte_length() as u64)
+        .saturating_add(sparse_gate_up_bytes_moved)
+        .saturating_add(down_experts.byte_length() as u64);
+    Ok(bytes_moved)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -11324,28 +12606,12 @@ impl CudaGemma4ModelInner {
                     } else {
                         ffn_input.clone()
                     };
-                    let mut moe_ffn = evaluate_sparse_moe_host(
+                    let mut moe_ffn = evaluate_sparse_moe_cuda(
+                        backend,
                         &self.family_metadata,
                         router_input.as_slice(),
                         expert_input.as_slice(),
-                        layer
-                            .feed_forward_router_weight
-                            .as_ref()
-                            .expect("router checked"),
-                        layer.feed_forward_router_bias.as_deref(),
-                        layer
-                            .feed_forward_gate_experts_weight
-                            .as_ref()
-                            .expect("gate experts checked"),
-                        layer.feed_forward_gate_experts_bias.as_deref(),
-                        layer.feed_forward_up_experts_weight.as_ref(),
-                        layer.feed_forward_up_experts_bias.as_deref(),
-                        layer
-                            .feed_forward_down_experts_weight
-                            .as_ref()
-                            .expect("down experts checked"),
-                        layer.feed_forward_down_experts_bias.as_deref(),
-                        layer.feed_forward_down_experts_scale.as_deref(),
+                        layer,
                         self.family_metadata.expert_used_count.unwrap_or(1),
                     )?;
                     if let Some(norm) = layer.feed_forward_post_norm_2.as_ref() {
@@ -11370,24 +12636,17 @@ impl CudaGemma4ModelInner {
                         up.kernel_count,
                         up.bytes_moved,
                     )
-                } else if let (Some(router), Some(gate_experts), Some(down_experts)) = (
+                } else if let (Some(_), Some(_), Some(_)) = (
                     layer.feed_forward_router_weight.as_ref(),
                     layer.feed_forward_gate_experts_weight.as_ref(),
                     layer.feed_forward_down_experts_weight.as_ref(),
                 ) {
-                    let moe_ffn = evaluate_sparse_moe_host(
+                    let moe_ffn = evaluate_sparse_moe_cuda(
+                        backend,
                         &self.family_metadata,
                         ffn_input.as_slice(),
                         ffn_input.as_slice(),
-                        router,
-                        layer.feed_forward_router_bias.as_deref(),
-                        gate_experts,
-                        layer.feed_forward_gate_experts_bias.as_deref(),
-                        layer.feed_forward_up_experts_weight.as_ref(),
-                        layer.feed_forward_up_experts_bias.as_deref(),
-                        down_experts,
-                        layer.feed_forward_down_experts_bias.as_deref(),
-                        layer.feed_forward_down_experts_scale.as_deref(),
+                        layer,
                         self.family_metadata.expert_used_count.unwrap_or(1),
                     )?;
                     (
@@ -11880,28 +13139,12 @@ impl CudaGemma4ModelInner {
                     } else {
                         ffn_input.clone()
                     };
-                    let mut moe_ffn = evaluate_sparse_moe_host(
+                    let mut moe_ffn = evaluate_sparse_moe_cuda(
+                        backend,
                         &self.family_metadata,
                         router_input.as_slice(),
                         expert_input.as_slice(),
-                        layer
-                            .feed_forward_router_weight
-                            .as_ref()
-                            .expect("router checked"),
-                        layer.feed_forward_router_bias.as_deref(),
-                        layer
-                            .feed_forward_gate_experts_weight
-                            .as_ref()
-                            .expect("gate experts checked"),
-                        layer.feed_forward_gate_experts_bias.as_deref(),
-                        layer.feed_forward_up_experts_weight.as_ref(),
-                        layer.feed_forward_up_experts_bias.as_deref(),
-                        layer
-                            .feed_forward_down_experts_weight
-                            .as_ref()
-                            .expect("down experts checked"),
-                        layer.feed_forward_down_experts_bias.as_deref(),
-                        layer.feed_forward_down_experts_scale.as_deref(),
+                        layer,
                         self.family_metadata.expert_used_count.unwrap_or(1),
                     )?;
                     if let Some(norm) = layer.feed_forward_post_norm_2.as_ref() {
@@ -11926,24 +13169,17 @@ impl CudaGemma4ModelInner {
                         up.kernel_count,
                         up.bytes_moved,
                     )
-                } else if let (Some(router), Some(gate_experts), Some(down_experts)) = (
+                } else if let (Some(_), Some(_), Some(_)) = (
                     layer.feed_forward_router_weight.as_ref(),
                     layer.feed_forward_gate_experts_weight.as_ref(),
                     layer.feed_forward_down_experts_weight.as_ref(),
                 ) {
-                    let moe_ffn = evaluate_sparse_moe_host(
+                    let moe_ffn = evaluate_sparse_moe_cuda(
+                        backend,
                         &self.family_metadata,
                         ffn_input.as_slice(),
                         ffn_input.as_slice(),
-                        router,
-                        layer.feed_forward_router_bias.as_deref(),
-                        gate_experts,
-                        layer.feed_forward_gate_experts_bias.as_deref(),
-                        layer.feed_forward_up_experts_weight.as_ref(),
-                        layer.feed_forward_up_experts_bias.as_deref(),
-                        down_experts,
-                        layer.feed_forward_down_experts_bias.as_deref(),
-                        layer.feed_forward_down_experts_scale.as_deref(),
+                        layer,
                         self.family_metadata.expert_used_count.unwrap_or(1),
                     )?;
                     (
@@ -12118,13 +13354,18 @@ struct CudaGemma4Layer {
     feed_forward_up_weight: Option<CudaQuantizedProjectionMatrix>,
     feed_forward_down_weight: Option<CudaQuantizedProjectionMatrix>,
     feed_forward_router_weight: Option<DenseMatrix>,
+    feed_forward_router_weight_native: Option<CudaDenseProjectionMatrix>,
     feed_forward_router_bias: Option<Vec<f32>>,
     feed_forward_router_input_scale: Option<Vec<f32>>,
     feed_forward_gate_experts_weight: Option<QuantizedExpertTensor>,
+    feed_forward_gate_experts_weight_native: Option<CudaQuantizedExpertMatrix>,
+    feed_forward_gate_up_experts_weight_native: Option<CudaPackedGateUpExpertMatrix>,
     feed_forward_gate_experts_bias: Option<Vec<f32>>,
     feed_forward_up_experts_weight: Option<QuantizedExpertTensor>,
+    feed_forward_up_experts_weight_native: Option<CudaQuantizedExpertMatrix>,
     feed_forward_up_experts_bias: Option<Vec<f32>>,
     feed_forward_down_experts_weight: Option<QuantizedExpertTensor>,
+    feed_forward_down_experts_weight_native: Option<CudaQuantizedExpertMatrix>,
     feed_forward_down_experts_bias: Option<Vec<f32>>,
     feed_forward_down_experts_scale: Option<Vec<f32>>,
     feed_forward_post_norm_1: Option<Vec<f32>>,
@@ -12270,6 +13511,11 @@ impl CudaGemma4Layer {
                 .as_deref()
                 .map(|name| load_dense_matrix(artifact, name))
                 .transpose()?,
+            feed_forward_router_weight_native: layout
+                .feed_forward_router_weight
+                .as_deref()
+                .map(|name| CudaDenseProjectionMatrix::load(backend, artifact, name))
+                .transpose()?,
             feed_forward_router_bias: layout
                 .feed_forward_router_bias
                 .as_deref()
@@ -12284,6 +13530,26 @@ impl CudaGemma4Layer {
                 .as_deref()
                 .map(|name| load_quantized_expert_tensor(artifact, name))
                 .transpose()?,
+            feed_forward_gate_experts_weight_native: layout
+                .feed_forward_gate_experts_weight
+                .as_deref()
+                .map(|name| CudaQuantizedExpertMatrix::load(backend, artifact, name))
+                .transpose()?,
+            feed_forward_gate_up_experts_weight_native: match (
+                layout.feed_forward_gate_experts_weight.as_deref(),
+                layout.feed_forward_up_experts_weight.as_deref(),
+            ) {
+                (Some(gate_name), Some(up_name)) => {
+                    let gate = load_quantized_expert_tensor(artifact, gate_name)
+                        .map_err(model_load_runtime_error)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    let up = load_quantized_expert_tensor(artifact, up_name)
+                        .map_err(model_load_runtime_error)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    Some(CudaPackedGateUpExpertMatrix::pack(backend, &gate, &up)?)
+                }
+                _ => None,
+            },
             feed_forward_gate_experts_bias: layout
                 .feed_forward_gate_experts_bias
                 .as_deref()
@@ -12294,6 +13560,11 @@ impl CudaGemma4Layer {
                 .as_deref()
                 .map(|name| load_quantized_expert_tensor(artifact, name))
                 .transpose()?,
+            feed_forward_up_experts_weight_native: layout
+                .feed_forward_up_experts_weight
+                .as_deref()
+                .map(|name| CudaQuantizedExpertMatrix::load(backend, artifact, name))
+                .transpose()?,
             feed_forward_up_experts_bias: layout
                 .feed_forward_up_experts_bias
                 .as_deref()
@@ -12303,6 +13574,11 @@ impl CudaGemma4Layer {
                 .feed_forward_down_experts_weight
                 .as_deref()
                 .map(|name| load_quantized_expert_tensor(artifact, name))
+                .transpose()?,
+            feed_forward_down_experts_weight_native: layout
+                .feed_forward_down_experts_weight
+                .as_deref()
+                .map(|name| CudaQuantizedExpertMatrix::load(backend, artifact, name))
                 .transpose()?,
             feed_forward_down_experts_bias: layout
                 .feed_forward_down_experts_bias
@@ -13445,10 +14721,650 @@ fn softmax_selected(values: &[f32], indices: &[usize]) -> Vec<f32> {
 }
 
 #[derive(Clone, Debug)]
-struct SparseMoeHostProjection {
+struct SparseMoeProjection {
     values: Vec<f32>,
     kernel_count: usize,
     bytes_moved: u64,
+    sparse_ffn_backend: &'static str,
+    router_backend: &'static str,
+    expert_dispatch_backend: &'static str,
+}
+
+fn selected_expert_bias_values(
+    bias: &[f32],
+    selected: &[usize],
+    rows_per_expert: usize,
+) -> Vec<f32> {
+    let mut gathered = Vec::with_capacity(selected.len().saturating_mul(rows_per_expert));
+    for &expert_index in selected {
+        let start = expert_index.saturating_mul(rows_per_expert);
+        if start >= bias.len() {
+            gathered.resize(gathered.len().saturating_add(rows_per_expert), 0.0);
+            continue;
+        }
+        let end = start.saturating_add(rows_per_expert).min(bias.len());
+        gathered.extend_from_slice(&bias[start..end]);
+        let copied = end.saturating_sub(start);
+        if copied < rows_per_expert {
+            gathered.resize(gathered.len().saturating_add(rows_per_expert - copied), 0.0);
+        }
+    }
+    gathered
+}
+
+fn selected_expert_scales(scales: Option<&[f32]>, selected: &[usize], routes: &mut [f32]) {
+    let Some(scales) = scales else {
+        return;
+    };
+    for (route, &expert_index) in routes.iter_mut().zip(selected.iter()) {
+        *route *= scales.get(expert_index).copied().unwrap_or(1.0);
+    }
+}
+
+fn decode_i32_values_from_bytes(
+    bytes: &[u8],
+    value_count: usize,
+    label: &str,
+) -> Result<Vec<i32>, crate::RuntimeError> {
+    let expected = value_count.saturating_mul(std::mem::size_of::<i32>());
+    if bytes.len() < expected {
+        return Err(crate::RuntimeError::Backend(format!(
+            "{label} byte length mismatch: expected at least {expected}, actual {}",
+            bytes.len()
+        )));
+    }
+    Ok(bytes[..expected]
+        .chunks_exact(std::mem::size_of::<i32>())
+        .map(|chunk| i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect())
+}
+
+fn evaluate_sparse_moe_metal(
+    backend: &mut MetalBackend,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    router_input: &[f32],
+    expert_input: &[f32],
+    layer: &MetalGemma4Layer,
+    active_expert_count: usize,
+) -> Result<SparseMoeProjection, ReferenceTextGenerationError> {
+    let fallback = || {
+        evaluate_sparse_moe_host(
+            family_metadata,
+            router_input,
+            expert_input,
+            layer
+                .feed_forward_router_weight
+                .as_ref()
+                .expect("metal host sparse router checked"),
+            layer.feed_forward_router_bias.as_deref(),
+            layer
+                .feed_forward_gate_experts_weight
+                .as_ref()
+                .expect("metal host sparse gate experts checked"),
+            layer.feed_forward_gate_experts_bias.as_deref(),
+            layer.feed_forward_up_experts_weight.as_ref(),
+            layer.feed_forward_up_experts_bias.as_deref(),
+            layer
+                .feed_forward_down_experts_weight
+                .as_ref()
+                .expect("metal host sparse down experts checked"),
+            layer.feed_forward_down_experts_bias.as_deref(),
+            layer.feed_forward_down_experts_scale.as_deref(),
+            active_expert_count,
+        )
+    };
+    let Some(router) = layer.feed_forward_router_weight_native.as_ref() else {
+        return fallback();
+    };
+    let Some(down_experts) = layer.feed_forward_down_experts_weight_native.as_ref() else {
+        return fallback();
+    };
+    if !down_experts.is_native() {
+        return fallback();
+    }
+    let (
+        gate_weights,
+        gate_mode,
+        gate_row_stride,
+        gate_rows,
+        gate_columns,
+        up_weights,
+        up_mode,
+        up_row_stride,
+        up_rows,
+        up_columns,
+        sparse_gate_up_bytes_moved,
+    ) = if let (Some(gate_experts), Some(up_experts)) = (
+        layer.feed_forward_gate_experts_weight_native.as_ref(),
+        layer.feed_forward_up_experts_weight_native.as_ref(),
+    ) {
+        if !gate_experts.is_native() || !up_experts.is_native() {
+            return fallback();
+        }
+        (
+            gate_experts.native_weights()?,
+            gate_experts.host.mode,
+            gate_experts.host.row_byte_len,
+            gate_experts.host.rows,
+            gate_experts.host.columns,
+            up_experts.native_weights()?,
+            up_experts.host.mode,
+            up_experts.host.row_byte_len,
+            up_experts.host.rows,
+            up_experts.host.columns,
+            gate_experts.byte_length() as u64 + up_experts.byte_length() as u64,
+        )
+    } else if let Some(gate_up) = layer.feed_forward_gate_up_experts_weight_native.as_ref() {
+        (
+            &gate_up.gate_weights,
+            gate_up.mode,
+            gate_up.row_stride,
+            gate_up.gate_rows,
+            gate_up.columns,
+            &gate_up.up_weights,
+            gate_up.mode,
+            gate_up.row_stride,
+            gate_up.up_rows,
+            gate_up.columns,
+            gate_up.byte_length() as u64,
+        )
+    } else {
+        return fallback();
+    };
+    if gate_columns != expert_input.len() || up_columns != expert_input.len() {
+        return fallback();
+    }
+    if gate_rows != down_experts.host.columns || up_rows != down_experts.host.columns {
+        return fallback();
+    }
+    let (gate_bias_values, up_bias_values): (Option<Cow<'_, [f32]>>, Option<Cow<'_, [f32]>>) =
+        if layer.feed_forward_up_experts_weight.is_none() {
+            if let (Some(fused_bias), Some(gate_up)) = (
+                layer.feed_forward_gate_experts_bias.as_deref(),
+                layer.feed_forward_gate_up_experts_weight_native.as_ref(),
+            ) {
+                let (gate_bias, up_bias) = split_fused_expert_bias_values(
+                    fused_bias,
+                    gate_up.outer,
+                    gate_up.gate_rows,
+                    gate_up.up_rows,
+                    "metal fused sparse gate_up bias",
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+                (Some(Cow::Owned(gate_bias)), Some(Cow::Owned(up_bias)))
+            } else {
+                (None, None)
+            }
+        } else {
+            (
+                layer
+                    .feed_forward_gate_experts_bias
+                    .as_deref()
+                    .map(Cow::Borrowed),
+                layer
+                    .feed_forward_up_experts_bias
+                    .as_deref()
+                    .map(Cow::Borrowed),
+            )
+        };
+
+    let mut router_logits = Vec::new();
+    router
+        .matvec_host(router_input, &mut router_logits)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias) = layer.feed_forward_router_bias.as_deref() {
+        add_bias_in_place(&mut router_logits, bias);
+    }
+    let selected = top_k_indices(router_logits.as_slice(), active_expert_count.max(1));
+    let mut routing = softmax_selected(router_logits.as_slice(), selected.as_slice());
+    selected_expert_scales(
+        layer.feed_forward_down_experts_scale.as_deref(),
+        selected.as_slice(),
+        routing.as_mut_slice(),
+    );
+    let selected_ids = selected
+        .iter()
+        .copied()
+        .map(|expert_index| {
+            i32::try_from(expert_index).map_err(|_| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(format!(
+                    "metal sparse expert id {expert_index} exceeds i32 range",
+                )))
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let input_buffer = backend
+        .input_buffer(Shape::new(vec![expert_input.len()]), expert_input.to_vec())
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let gate_buffer = backend
+        .zeros_buffer(Shape::new(vec![selected.len().saturating_mul(gate_rows)]))
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let up_buffer = backend
+        .zeros_buffer(Shape::new(vec![selected.len().saturating_mul(up_rows)]))
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let activated_buffer = backend
+        .zeros_buffer(Shape::new(vec![selected.len().saturating_mul(gate_rows)]))
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let projected_buffer = backend
+        .zeros_buffer(Shape::new(vec![
+            selected.len().saturating_mul(down_experts.host.rows),
+        ]))
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let output_buffer = backend
+        .zeros_buffer(Shape::new(vec![down_experts.host.rows]))
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    let gate_bias_buffer = gate_bias_values
+        .as_deref()
+        .map(|bias| {
+            backend.input_buffer(
+                Shape::new(vec![selected.len().saturating_mul(gate_rows)]),
+                selected_expert_bias_values(bias, selected.as_slice(), gate_rows),
+            )
+        })
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let up_bias_buffer = up_bias_values
+        .as_deref()
+        .map(|bias| {
+            backend.input_buffer(
+                Shape::new(vec![selected.len().saturating_mul(up_rows)]),
+                selected_expert_bias_values(bias, selected.as_slice(), up_rows),
+            )
+        })
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let down_bias_buffer = layer
+        .feed_forward_down_experts_bias
+        .as_deref()
+        .map(|bias| {
+            backend.input_buffer(
+                Shape::new(vec![selected.len().saturating_mul(down_experts.host.rows)]),
+                selected_expert_bias_values(bias, selected.as_slice(), down_experts.host.rows),
+            )
+        })
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    let mut submission = backend
+        .begin_submission(String::from("psionic.gemma4.metal.sparse_ffn"))
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    backend
+        .encode_grouped_quantized_matvec_submission(
+            &mut submission,
+            gate_weights,
+            gate_mode,
+            gate_row_stride,
+            gate_rows,
+            gate_columns,
+            selected_ids.as_slice(),
+            &input_buffer,
+            &gate_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    backend
+        .encode_grouped_quantized_matvec_submission(
+            &mut submission,
+            up_weights,
+            up_mode,
+            up_row_stride,
+            up_rows,
+            up_columns,
+            selected_ids.as_slice(),
+            &input_buffer,
+            &up_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias_buffer) = gate_bias_buffer.as_ref() {
+        backend
+            .encode_add_inplace_submission(
+                &mut submission,
+                &gate_buffer,
+                bias_buffer,
+                selected.len().saturating_mul(gate_rows),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    if let Some(bias_buffer) = up_bias_buffer.as_ref() {
+        backend
+            .encode_add_inplace_submission(
+                &mut submission,
+                &up_buffer,
+                bias_buffer,
+                selected.len().saturating_mul(up_rows),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    backend
+        .encode_gelu_glu_submission(
+            &mut submission,
+            &gate_buffer,
+            &up_buffer,
+            &activated_buffer,
+            selected.len().saturating_mul(gate_rows),
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    backend
+        .encode_expert_matvec_f32_ids_submission(
+            &mut submission,
+            down_experts.native_weights()?,
+            down_experts.host.mode,
+            down_experts.host.row_byte_len,
+            down_experts.host.rows,
+            down_experts.host.columns,
+            selected_ids.as_slice(),
+            &activated_buffer,
+            &projected_buffer,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    if let Some(bias_buffer) = down_bias_buffer.as_ref() {
+        backend
+            .encode_add_inplace_submission(
+                &mut submission,
+                &projected_buffer,
+                bias_buffer,
+                selected.len().saturating_mul(down_experts.host.rows),
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    for (selected_index, route) in routing.iter().copied().enumerate() {
+        let expert_output = projected_buffer
+            .dense_f32_view(
+                selected_index.saturating_mul(down_experts.host.rows),
+                down_experts.host.rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if route != 1.0 {
+            backend
+                .encode_scale_inplace_submission(
+                    &mut submission,
+                    &expert_output,
+                    route,
+                    down_experts.host.rows,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        backend
+            .encode_add_inplace_submission(
+                &mut submission,
+                &output_buffer,
+                &expert_output,
+                down_experts.host.rows,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+    submission
+        .synchronize_buffer(&output_buffer)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let report = submission
+        .commit(psionic_backend_metal::MetalCommandWait::Completed)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    Ok(SparseMoeProjection {
+        values: output_buffer
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?,
+        kernel_count: report.encoded_operations,
+        bytes_moved: (router.byte_length() as u64)
+            .saturating_add(sparse_gate_up_bytes_moved)
+            .saturating_add(down_experts.byte_length() as u64),
+        sparse_ffn_backend: "metal_grouped_experts",
+        router_backend: "host_topk_device_experts",
+        expert_dispatch_backend: "metal_grouped_ids",
+    })
+}
+
+fn evaluate_sparse_moe_cuda(
+    backend: &mut CudaBackend,
+    family_metadata: &GgufDecoderFamilyMetadata,
+    router_input: &[f32],
+    expert_input: &[f32],
+    layer: &CudaGemma4Layer,
+    active_expert_count: usize,
+) -> Result<SparseMoeProjection, ReferenceTextGenerationError> {
+    let Some(router) = layer.feed_forward_router_weight_native.as_ref() else {
+        return evaluate_sparse_moe_host(
+            family_metadata,
+            router_input,
+            expert_input,
+            layer
+                .feed_forward_router_weight
+                .as_ref()
+                .expect("cuda host sparse router checked"),
+            layer.feed_forward_router_bias.as_deref(),
+            layer
+                .feed_forward_gate_experts_weight
+                .as_ref()
+                .expect("cuda host sparse gate experts checked"),
+            layer.feed_forward_gate_experts_bias.as_deref(),
+            layer.feed_forward_up_experts_weight.as_ref(),
+            layer.feed_forward_up_experts_bias.as_deref(),
+            layer
+                .feed_forward_down_experts_weight
+                .as_ref()
+                .expect("cuda host sparse down experts checked"),
+            layer.feed_forward_down_experts_bias.as_deref(),
+            layer.feed_forward_down_experts_scale.as_deref(),
+            active_expert_count,
+        );
+    };
+    let Some(gate_up) = layer.feed_forward_gate_up_experts_weight_native.as_ref() else {
+        return evaluate_sparse_moe_host(
+            family_metadata,
+            router_input,
+            expert_input,
+            layer
+                .feed_forward_router_weight
+                .as_ref()
+                .expect("cuda host sparse router checked"),
+            layer.feed_forward_router_bias.as_deref(),
+            layer
+                .feed_forward_gate_experts_weight
+                .as_ref()
+                .expect("cuda host sparse gate experts checked"),
+            layer.feed_forward_gate_experts_bias.as_deref(),
+            layer.feed_forward_up_experts_weight.as_ref(),
+            layer.feed_forward_up_experts_bias.as_deref(),
+            layer
+                .feed_forward_down_experts_weight
+                .as_ref()
+                .expect("cuda host sparse down experts checked"),
+            layer.feed_forward_down_experts_bias.as_deref(),
+            layer.feed_forward_down_experts_scale.as_deref(),
+            active_expert_count,
+        );
+    };
+    let Some(down) = layer.feed_forward_down_experts_weight_native.as_ref() else {
+        return evaluate_sparse_moe_host(
+            family_metadata,
+            router_input,
+            expert_input,
+            layer
+                .feed_forward_router_weight
+                .as_ref()
+                .expect("cuda host sparse router checked"),
+            layer.feed_forward_router_bias.as_deref(),
+            layer
+                .feed_forward_gate_experts_weight
+                .as_ref()
+                .expect("cuda host sparse gate experts checked"),
+            layer.feed_forward_gate_experts_bias.as_deref(),
+            layer.feed_forward_up_experts_weight.as_ref(),
+            layer.feed_forward_up_experts_bias.as_deref(),
+            layer
+                .feed_forward_down_experts_weight
+                .as_ref()
+                .expect("cuda host sparse down experts checked"),
+            layer.feed_forward_down_experts_bias.as_deref(),
+            layer.feed_forward_down_experts_scale.as_deref(),
+            active_expert_count,
+        );
+    };
+
+    let selected_count = active_expert_count.max(1);
+    let selected_ids = backend
+        .byte_buffer(&vec![
+            0_u8;
+            selected_count
+                .saturating_mul(std::mem::size_of::<i32>())
+        ])
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let mut selected_weights = backend
+        .f32_buffer(selected_count)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let router_input_buffer = backend
+        .input_buffer(Shape::new(vec![router_input.len()]), router_input.to_vec())
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let mut router_submission = backend
+        .begin_submission()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let router_bias_buffer = layer
+        .feed_forward_router_bias
+        .as_deref()
+        .map(|bias| backend.input_buffer(Shape::new(vec![bias.len()]), bias.to_vec()))
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    router_submission
+        .router_topk_softmax(
+            router.device(),
+            router_bias_buffer.as_ref(),
+            &router_input_buffer,
+            router.host.rows,
+            router.host.columns,
+            selected_count,
+            &selected_ids,
+            &selected_weights,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let router_report = router_submission
+        .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    if let Some(scales) = layer.feed_forward_down_experts_scale.as_deref() {
+        let selected_id_values = decode_i32_values_from_bytes(
+            selected_ids
+                .read_bytes()
+                .map_err(ReferenceTextGenerationError::Runtime)?
+                .as_slice(),
+            selected_count,
+            "cuda sparse selected expert ids",
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+        let mut weight_values = selected_weights
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        for (weight, selected_id) in weight_values
+            .iter_mut()
+            .zip(selected_id_values.iter().copied())
+        {
+            let expert_index = usize::try_from(selected_id.max(0)).unwrap_or(usize::MAX);
+            *weight *= scales.get(expert_index).copied().unwrap_or(1.0);
+        }
+        selected_weights
+            .write_f32(weight_values.as_slice())
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    }
+
+    let expert_input_buffer = backend
+        .input_buffer(Shape::new(vec![expert_input.len()]), expert_input.to_vec())
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let input_q8_1 = backend
+        .byte_buffer(&vec![
+            0_u8;
+            psionic_backend_cuda::ggml_q8_1_storage_bytes(
+                1,
+                gate_up.columns
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?
+        ])
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let activated_q8_1 = backend
+        .byte_buffer(&vec![
+            0_u8;
+            psionic_backend_cuda::ggml_q8_1_storage_bytes(
+                selected_count,
+                gate_up.gate_rows
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?
+        ])
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let output = backend
+        .f32_buffer(down.host.rows)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let gate_bias_buffer = layer
+        .feed_forward_gate_experts_bias
+        .as_deref()
+        .map(|bias| backend.input_buffer(Shape::new(vec![bias.len()]), bias.to_vec()))
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let up_bias_buffer = layer
+        .feed_forward_up_experts_bias
+        .as_deref()
+        .map(|bias| backend.input_buffer(Shape::new(vec![bias.len()]), bias.to_vec()))
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let down_bias_buffer = layer
+        .feed_forward_down_experts_bias
+        .as_deref()
+        .map(|bias| backend.input_buffer(Shape::new(vec![bias.len()]), bias.to_vec()))
+        .transpose()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let mut expert_submission = backend
+        .begin_submission()
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    expert_submission
+        .quantize_f32_to_q8_1(&expert_input_buffer, 1, gate_up.columns, &input_q8_1)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    expert_submission
+        .expert_gate_up_swiglu_q8_1_ids(
+            gate_up.weights.as_ref(),
+            gate_up.mode,
+            gate_up.row_stride,
+            gate_up.rows_per_expert(),
+            gate_up.columns,
+            gate_up.gate_rows,
+            gate_up.up_rows,
+            &selected_ids,
+            selected_count,
+            &input_q8_1,
+            gate_bias_buffer.as_ref(),
+            up_bias_buffer.as_ref(),
+            &activated_q8_1,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    expert_submission
+        .moe_down_aggregate_q8_1(
+            down.weights.as_ref(),
+            down.host.mode,
+            down.host.row_byte_len,
+            down.host.rows,
+            down.host.columns,
+            &selected_ids,
+            &selected_weights,
+            selected_count,
+            &activated_q8_1,
+            down_bias_buffer.as_ref(),
+            None,
+            &output,
+        )
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+    let expert_report = expert_submission
+        .commit(psionic_backend_cuda::CudaCommandWait::Completed)
+        .map_err(ReferenceTextGenerationError::Runtime)?;
+
+    Ok(SparseMoeProjection {
+        values: output
+            .read_f32()
+            .map_err(ReferenceTextGenerationError::Runtime)?,
+        kernel_count: router_report
+            .encoded_operations
+            .saturating_add(expert_report.encoded_operations),
+        bytes_moved: (router.byte_length() + gate_up.byte_length() + down.byte_length()) as u64,
+        sparse_ffn_backend: "cuda_native_q8_1",
+        router_backend: "cuda_router_topk_softmax",
+        expert_dispatch_backend: "cuda_expert_gate_up_and_down_q8_1",
+    })
 }
 
 fn evaluate_sparse_moe_host(
@@ -13465,7 +15381,7 @@ fn evaluate_sparse_moe_host(
     down_bias: Option<&[f32]>,
     down_scale: Option<&[f32]>,
     active_expert_count: usize,
-) -> Result<SparseMoeHostProjection, ReferenceTextGenerationError> {
+) -> Result<SparseMoeProjection, ReferenceTextGenerationError> {
     let mut router_logits = Vec::new();
     router
         .matvec(router_input, &mut router_logits)
@@ -13515,10 +15431,13 @@ fn evaluate_sparse_moe_host(
             *dst += value;
         }
     }
-    Ok(SparseMoeHostProjection {
+    Ok(SparseMoeProjection {
         values: moe_out,
         kernel_count: 1 + selected.len().saturating_mul(per_expert_kernels),
         bytes_moved,
+        sparse_ffn_backend: "host_fallback",
+        router_backend: "host_dense",
+        expert_dispatch_backend: "host_quantized_rows",
     })
 }
 
