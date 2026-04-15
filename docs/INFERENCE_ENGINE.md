@@ -132,6 +132,18 @@ into one generic engine claim.
     the same retained prompt again to about `29.58 tok/s` while keeping greedy
     readback bounded to `4 B/token` and timed-request host KV materialization
     at `0`
+  - current competitive benchmark gate = the repo now also has one fail-closed
+    same-host benchmark gate for this exact lane at
+    `scripts/release/run-gemma4-26b-competitive-benchmark.sh`; the retained
+    `2026-04-15` receipt keeps the sparse path honest with
+    `native_sparse_execution = true`,
+    `host_fallback_observed = false`,
+    `sparse_ffn_backend = metal_grouped_experts`, and
+    `router_backend = metal_router_topk_softmax`, but still reports
+    `decode_tok_s = 30.63` for Psionic versus `102.34` on `ollama` and
+    `113.79` on `llama.cpp`, so the gate currently fails for competitive
+    throughput rather than sparse-receipt dishonesty; the canonical audit is
+    `docs/audits/2026-04-15-gemma4-26b-competitive-benchmark-gate-audit.md`
   - current boundary = that pass fixes the local fallback cliff but does not
     yet close parity with `ollama` or `llama.cpp`, and the sparse 26B local
     lane still returns malformed text on the shared benchmark prompt

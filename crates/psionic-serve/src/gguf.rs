@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     cmp::Ordering,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     env,
     path::Path,
     process::{Child, Command, Stdio},
@@ -3143,6 +3143,13 @@ impl MetalGemma4TextGenerationService {
     }
 
     #[must_use]
+    pub fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        self.models
+            .active(self.model_descriptor.model.model_id.as_str())
+            .and_then(MetalGemma4GenerationModel::sparse_execution_observation)
+    }
+
+    #[must_use]
     pub fn loaded_model_views(&mut self) -> Vec<LoadedModelView> {
         self.loaded_model_views_at(super::current_time_millis())
     }
@@ -4305,6 +4312,11 @@ impl MetalGemma4GenerationModel {
         ];
         support
     }
+
+    #[must_use]
+    fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        self.inner.sparse_execution_observation()
+    }
 }
 
 fn metal_gemma4_can_use_greedy_selected_token(request: &GenerationRequest) -> bool {
@@ -4504,6 +4516,14 @@ impl MetalGemma4ModelInner {
             .map(|layer| layer.attention_geometry.cache_end())
             .max()
             .unwrap_or(0)
+    }
+
+    fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        aggregate_gemma4_sparse_execution_observation(
+            self.layers
+                .iter()
+                .filter_map(MetalGemma4Layer::sparse_execution_backends),
+        )
     }
 
     fn build_decode_step_plan(
@@ -8101,6 +8121,37 @@ impl MetalGemma4Layer {
     fn cache_write_width(&self) -> usize {
         self.attention_geometry.cache_write_width()
     }
+
+    fn sparse_execution_backends(&self) -> Option<Gemma4SparseLayerExecutionBackends> {
+        if self.feed_forward_router_weight.is_none()
+            || self.feed_forward_gate_experts_weight.is_none()
+            || self.feed_forward_down_experts_weight.is_none()
+        {
+            return None;
+        }
+        let Some(_router) = self.feed_forward_router_weight_native.as_ref() else {
+            return Some(Gemma4SparseLayerExecutionBackends::host_fallback());
+        };
+        let Some(down_experts) = self.feed_forward_down_experts_weight_native.as_ref() else {
+            return Some(Gemma4SparseLayerExecutionBackends::host_fallback());
+        };
+        if !down_experts.is_native() {
+            return Some(Gemma4SparseLayerExecutionBackends::host_fallback());
+        }
+        if let (Some(gate_experts), Some(up_experts)) = (
+            self.feed_forward_gate_experts_weight_native.as_ref(),
+            self.feed_forward_up_experts_weight_native.as_ref(),
+        ) {
+            if gate_experts.is_native() && up_experts.is_native() {
+                return Some(Gemma4SparseLayerExecutionBackends::metal_native());
+            }
+            return Some(Gemma4SparseLayerExecutionBackends::host_fallback());
+        }
+        if self.feed_forward_gate_up_experts_weight_native.is_some() {
+            return Some(Gemma4SparseLayerExecutionBackends::metal_native());
+        }
+        Some(Gemma4SparseLayerExecutionBackends::host_fallback())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -10589,6 +10640,11 @@ impl DistributedGemma4GenerationModel {
         ];
         support
     }
+
+    #[must_use]
+    fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        self.inner.sparse_execution_observation()
+    }
 }
 
 impl crate::GenerationModelHandle for DistributedGemma4GenerationModel {
@@ -11670,6 +11726,13 @@ impl CudaGemma4TextGenerationService {
     }
 
     #[must_use]
+    pub fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        self.models
+            .active(self.model_descriptor.model.model_id.as_str())
+            .and_then(CudaGemma4GenerationModel::sparse_execution_observation)
+    }
+
+    #[must_use]
     pub fn loaded_model_views(&mut self) -> Vec<LoadedModelView> {
         self.loaded_model_views_at(super::current_time_millis())
     }
@@ -12231,6 +12294,11 @@ impl CudaGemma4GenerationModel {
         ];
         support
     }
+
+    #[must_use]
+    fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        self.inner.sparse_execution_observation()
+    }
 }
 
 impl crate::GenerationModelHandle for CudaGemma4GenerationModel {
@@ -12376,6 +12444,14 @@ impl CudaGemma4ModelInner {
             .map(|layer| layer.attention_geometry.cache_end())
             .max()
             .unwrap_or(0)
+    }
+
+    fn sparse_execution_observation(&self) -> Option<crate::Gemma4SparseExecutionObservation> {
+        aggregate_gemma4_sparse_execution_observation(
+            self.layers
+                .iter()
+                .filter_map(CudaGemma4Layer::sparse_execution_backends),
+        )
     }
 
     fn forward_step(
@@ -13949,6 +14025,22 @@ impl CudaGemma4Layer {
     fn cache_write_width(&self) -> usize {
         self.attention_geometry.cache_write_width()
     }
+
+    fn sparse_execution_backends(&self) -> Option<Gemma4SparseLayerExecutionBackends> {
+        if self.feed_forward_router_weight.is_none()
+            || self.feed_forward_gate_experts_weight.is_none()
+            || self.feed_forward_down_experts_weight.is_none()
+        {
+            return None;
+        }
+        if self.feed_forward_router_weight_native.is_some()
+            && self.feed_forward_gate_up_experts_weight_native.is_some()
+            && self.feed_forward_down_experts_weight_native.is_some()
+        {
+            return Some(Gemma4SparseLayerExecutionBackends::cuda_native());
+        }
+        Some(Gemma4SparseLayerExecutionBackends::host_fallback())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -15042,6 +15134,92 @@ struct SparseMoeProjection {
     expert_dispatch_backend: &'static str,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Gemma4SparseLayerExecutionBackends {
+    sparse_ffn_backend: &'static str,
+    router_backend: &'static str,
+    expert_dispatch_backend: &'static str,
+}
+
+impl Gemma4SparseLayerExecutionBackends {
+    const fn metal_native() -> Self {
+        Self {
+            sparse_ffn_backend: "metal_grouped_experts",
+            router_backend: "metal_router_topk_softmax",
+            expert_dispatch_backend: "metal_grouped_ids",
+        }
+    }
+
+    const fn cuda_native() -> Self {
+        Self {
+            sparse_ffn_backend: "cuda_native_q8_1",
+            router_backend: "cuda_router_topk_softmax",
+            expert_dispatch_backend: "cuda_expert_gate_up_and_down_q8_1",
+        }
+    }
+
+    const fn host_fallback() -> Self {
+        Self {
+            sparse_ffn_backend: "host_fallback",
+            router_backend: "host_dense",
+            expert_dispatch_backend: "host_quantized_rows",
+        }
+    }
+
+    fn host_fallback_observed(self) -> bool {
+        self.sparse_ffn_backend == "host_fallback"
+    }
+}
+
+fn collapse_gemma4_sparse_backend_labels(labels: BTreeSet<&'static str>) -> String {
+    let labels = labels.into_iter().collect::<Vec<_>>();
+    match labels.as_slice() {
+        [] => String::new(),
+        [label] => (*label).to_string(),
+        _ => format!("mixed:{}", labels.join("+")),
+    }
+}
+
+fn aggregate_gemma4_sparse_execution_observation<I>(
+    layers: I,
+) -> Option<crate::Gemma4SparseExecutionObservation>
+where
+    I: IntoIterator<Item = Gemma4SparseLayerExecutionBackends>,
+{
+    let layers = layers.into_iter().collect::<Vec<_>>();
+    if layers.is_empty() {
+        return None;
+    }
+    let host_fallback_layer_count = layers
+        .iter()
+        .filter(|layer| layer.host_fallback_observed())
+        .count();
+    Some(crate::Gemma4SparseExecutionObservation {
+        sparse_layer_count: layers.len(),
+        host_fallback_layer_count,
+        sparse_ffn_backend: collapse_gemma4_sparse_backend_labels(
+            layers
+                .iter()
+                .map(|layer| layer.sparse_ffn_backend)
+                .collect::<BTreeSet<_>>(),
+        ),
+        router_backend: collapse_gemma4_sparse_backend_labels(
+            layers
+                .iter()
+                .map(|layer| layer.router_backend)
+                .collect::<BTreeSet<_>>(),
+        ),
+        expert_dispatch_backend: collapse_gemma4_sparse_backend_labels(
+            layers
+                .iter()
+                .map(|layer| layer.expert_dispatch_backend)
+                .collect::<BTreeSet<_>>(),
+        ),
+        native_sparse_execution: host_fallback_layer_count == 0,
+        host_fallback_observed: host_fallback_layer_count > 0,
+    })
+}
+
 fn selected_expert_bias_values(
     bias: &[f32],
     selected: &[usize],
@@ -15422,7 +15600,7 @@ fn evaluate_sparse_moe_metal(
             .saturating_add(sparse_gate_up_bytes_moved)
             .saturating_add(down_experts.byte_length() as u64),
         sparse_ffn_backend: "metal_grouped_experts",
-        router_backend: "host_topk_device_experts",
+        router_backend: "metal_router_topk_softmax",
         expert_dispatch_backend: "metal_grouped_ids",
     })
 }
@@ -17032,8 +17210,9 @@ impl GenerationEventStream for CompletedGenerationStream {
 mod tests {
     use super::{
         CpuGgufServiceKind, CpuGgufTextGenerationService, DistributedGemma4RemoteStepRequest,
-        DistributedGemma4RemoteStepResponse, MetalGemma4TextGenerationService,
-        PromotedGemmaRevisionEntry, PromotedGemmaRevisionState, attend_impl, axpy,
+        DistributedGemma4RemoteStepResponse, Gemma4SparseLayerExecutionBackends,
+        MetalGemma4TextGenerationService, PromotedGemmaRevisionEntry, PromotedGemmaRevisionState,
+        aggregate_gemma4_sparse_execution_observation, attend_impl, axpy,
         decode_distributed_gemma4_remote_step_request,
         decode_distributed_gemma4_remote_step_response, dot,
         encode_distributed_gemma4_remote_step_request,
@@ -17074,6 +17253,49 @@ mod tests {
         sync::{Mutex, OnceLock},
     };
     use tempfile::tempdir;
+
+    #[test]
+    fn aggregate_gemma4_sparse_execution_observation_reports_uniform_native_backend() {
+        let observation = aggregate_gemma4_sparse_execution_observation([
+            Gemma4SparseLayerExecutionBackends::metal_native(),
+            Gemma4SparseLayerExecutionBackends::metal_native(),
+        ])
+        .expect("sparse observation");
+
+        assert_eq!(observation.sparse_layer_count, 2);
+        assert_eq!(observation.host_fallback_layer_count, 0);
+        assert_eq!(observation.sparse_ffn_backend, "metal_grouped_experts");
+        assert_eq!(observation.router_backend, "metal_router_topk_softmax");
+        assert_eq!(observation.expert_dispatch_backend, "metal_grouped_ids");
+        assert!(observation.native_sparse_execution);
+        assert!(!observation.host_fallback_observed);
+    }
+
+    #[test]
+    fn aggregate_gemma4_sparse_execution_observation_reports_mixed_host_fallback() {
+        let observation = aggregate_gemma4_sparse_execution_observation([
+            Gemma4SparseLayerExecutionBackends::metal_native(),
+            Gemma4SparseLayerExecutionBackends::host_fallback(),
+        ])
+        .expect("sparse observation");
+
+        assert_eq!(observation.sparse_layer_count, 2);
+        assert_eq!(observation.host_fallback_layer_count, 1);
+        assert_eq!(
+            observation.sparse_ffn_backend,
+            "mixed:host_fallback+metal_grouped_experts"
+        );
+        assert_eq!(
+            observation.router_backend,
+            "mixed:host_dense+metal_router_topk_softmax"
+        );
+        assert_eq!(
+            observation.expert_dispatch_backend,
+            "mixed:host_quantized_rows+metal_grouped_ids"
+        );
+        assert!(!observation.native_sparse_execution);
+        assert!(observation.host_fallback_observed);
+    }
 
     #[derive(Clone, Debug)]
     struct TestGgufTensor {

@@ -1966,6 +1966,26 @@ impl Gemma4MetalDecodeOutputMetrics {
     }
 }
 
+/// Aggregate sparse-execution evidence for one loaded Gemma4 runtime.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Gemma4SparseExecutionObservation {
+    /// Number of Gemma4 sparse FFN layers observed on the active model.
+    pub sparse_layer_count: usize,
+    /// Number of those sparse FFN layers that resolved to host fallback.
+    #[serde(default, skip_serializing_if = "is_zero_usize")]
+    pub host_fallback_layer_count: usize,
+    /// Collapsed sparse FFN backend label across the active sparse layers.
+    pub sparse_ffn_backend: String,
+    /// Collapsed router backend label across the active sparse layers.
+    pub router_backend: String,
+    /// Collapsed expert-dispatch backend label across the active sparse layers.
+    pub expert_dispatch_backend: String,
+    /// Whether every observed sparse FFN layer stayed on the native accelerator path.
+    pub native_sparse_execution: bool,
+    /// Whether any observed sparse FFN layer fell back to the host path.
+    pub host_fallback_observed: bool,
+}
+
 /// CUDA decode-output mode used by qwen35 request steps.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]

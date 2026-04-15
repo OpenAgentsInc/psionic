@@ -1064,6 +1064,7 @@ impl CudaGgufQwen35TextGenerationService {
             kv_cache_encoding: None,
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: (!decode_output_metrics.is_zero()).then_some(decode_output_metrics),
             gpt_oss_perf: None,
         };
@@ -1487,6 +1488,7 @@ impl CpuGgufQwen35TextGenerationService {
             kv_cache_encoding: None,
             prefix_tokens_reused: None,
             termination_detail,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -2029,6 +2031,7 @@ impl MetalGgufQwen35TextGenerationService {
             kv_cache_encoding: None,
             prefix_tokens_reused: None,
             termination_detail,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "report_kind": "ollama_gemma4_26b_bench",
+  "model_artifact": "gemma-4-26B-A4B-it-Q4_K_M.gguf",
+  "model_name": "psionic-gemma4-26b-bench-20260415_072548-11217",
+  "benchmark_prompt_id": "gemma4_26b_single_node_tradeoffs_v1",
+  "max_output_tokens": 64,
+  "load_s": 1.489868583,
+  "prompt_eval": 0.390926666,
+  "decode": 0.625358454,
+  "total": 2.580203792,
+  "decode_tok_s": 102.34130456002438,
+  "output_tokens": 64,
+  "termination": "length",
+  "output_text": "\n\n_A_A_A_A_4B_A_A_A_A_4B_A_A_A_A_4B_A_A_A_A_4B_A_A_A_A_4B_A_A_A_A",
+  "state_readback_bytes": null
+}

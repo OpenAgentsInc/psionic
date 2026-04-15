@@ -20,9 +20,10 @@ use psionic_models::{
 };
 use psionic_serve::{
     CpuGgufTextGenerationService, CudaGemma4TextGenerationService, DistributedGemma4PeerConfig,
-    DistributedGemma4TextGenerationService, GenerationMetrics, GenerationOptions,
-    GenerationRequest, GenerationResponse, MetalGemma4TextGenerationService, OpenAiCompatBackend,
-    OpenAiCompatConfig, OpenAiCompatServer, TerminationReason, TextGenerationExecutor,
+    DistributedGemma4TextGenerationService, Gemma4SparseExecutionObservation, GenerationMetrics,
+    GenerationOptions, GenerationRequest, GenerationResponse, MetalGemma4TextGenerationService,
+    OpenAiCompatBackend, OpenAiCompatConfig, OpenAiCompatServer, TerminationReason,
+    TextGenerationExecutor,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -286,6 +287,7 @@ struct BenchConfig {
     model_path: PathBuf,
     mode: BenchMode,
     backend: DenseBenchBackend,
+    benchmark_prompt_id: String,
     prompt_mode: PromptMode,
     prompt: String,
     max_output_tokens: usize,
@@ -304,6 +306,7 @@ impl BenchConfig {
         let mut model_path = None::<PathBuf>;
         let mut mode = BenchMode::Single;
         let mut backend = DenseBenchBackend::Auto;
+        let mut benchmark_prompt_id = String::from("custom_inline_prompt");
         let mut prompt_mode = PromptMode::RenderedTokens;
         let mut prompt =
             String::from("Write one short sentence about decentralized Gemma inference.");
@@ -336,6 +339,11 @@ impl BenchConfig {
                             .ok_or_else(|| String::from("missing value for --backend"))?
                             .as_str(),
                     )?;
+                }
+                "--prompt-id" => {
+                    benchmark_prompt_id = args
+                        .next()
+                        .ok_or_else(|| String::from("missing value for --prompt-id"))?;
                 }
                 "--prompt-mode" => {
                     prompt_mode = PromptMode::parse(
@@ -413,6 +421,7 @@ impl BenchConfig {
             model_path,
             mode,
             backend,
+            benchmark_prompt_id,
             prompt_mode,
             prompt,
             max_output_tokens,
@@ -443,8 +452,17 @@ struct BenchReport {
     mode: String,
     model_id: String,
     model_path: String,
+    model_artifact: String,
+    benchmark_prompt_id: String,
     runtime_backend: String,
     sparse_expert_topology: bool,
+    sparse_layer_count: Option<usize>,
+    host_fallback_layer_count: Option<usize>,
+    sparse_ffn_backend: Option<String>,
+    router_backend: Option<String>,
+    expert_dispatch_backend: Option<String>,
+    native_sparse_execution: Option<bool>,
+    host_fallback_observed: Option<bool>,
     peer_base_url: Option<String>,
     split_layer: Option<usize>,
     prompt: String,
@@ -452,6 +470,13 @@ struct BenchReport {
     max_output_tokens: usize,
     repeats: usize,
     load_s: f64,
+    prompt_eval: Option<f64>,
+    decode: Option<f64>,
+    total: f64,
+    decode_tok_s: Option<f64>,
+    ttft: Option<f64>,
+    state_readback_bytes: Option<u64>,
+    state_readback_bytes_per_token: Option<f64>,
     cluster_topology: Option<String>,
     runs: Vec<BenchRunReport>,
     mean_output_tokens: f64,
@@ -466,6 +491,10 @@ struct BenchRunReport {
     run_index: usize,
     output_tokens: usize,
     output_token_ids: Vec<u32>,
+    prompt_eval: Option<f64>,
+    decode: Option<f64>,
+    total: f64,
+    state_readback_bytes: Option<u64>,
     total_s: f64,
     prompt_s: Option<f64>,
     decode_s: Option<f64>,
@@ -514,6 +543,14 @@ impl DenseRuntime {
             Self::Distributed(service) => {
                 service.generate(request).map_err(|error| error.to_string())
             }
+        }
+    }
+
+    fn sparse_execution_observation(&self) -> Option<Gemma4SparseExecutionObservation> {
+        match self {
+            Self::Cpu(_) | Self::Distributed(_) => None,
+            Self::Metal(service) => service.sparse_execution_observation(),
+            Self::Cuda(service) => service.sparse_execution_observation(),
         }
     }
 }
@@ -612,6 +649,7 @@ fn run_dense_benchmark(
     };
     let load_s = load_started.elapsed().as_secs_f64();
     let model_descriptor = runtime.model_descriptor();
+    let sparse_execution_observation = runtime.sparse_execution_observation();
     let mut runs = Vec::with_capacity(config.repeats);
     for run_index in 0..config.repeats {
         let mut options = GenerationOptions::greedy(config.max_output_tokens);
@@ -642,6 +680,7 @@ fn run_dense_benchmark(
         runtime.model_id().to_string(),
         backend.runtime_label().to_string(),
         sparse,
+        sparse_execution_observation,
         load_s,
         match backend {
             DenseBenchBackend::Distributed => Some(String::from("pipeline_sharded")),
@@ -800,6 +839,19 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
             run_index: run_index + 1,
             output_tokens,
             output_token_ids: Vec::new(),
+            prompt_eval: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.prompt_eval_duration_ns)
+                .map(ns_to_s),
+            decode: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.eval_duration_ns)
+                .map(ns_to_s),
+            total: total_s,
+            state_readback_bytes: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
+                .map(|metrics| metrics.readback_bytes),
             total_s,
             prompt_s: metrics
                 .as_ref()
@@ -864,6 +916,7 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
             topology.active_expert_count.unwrap_or(0)
         ),
         true,
+        None,
         load_s,
         Some(String::from("tensor_sharded")),
         None,
@@ -876,15 +929,19 @@ fn finish_report(
     model_id: String,
     runtime_backend: String,
     sparse_expert_topology: bool,
+    sparse_execution_observation: Option<Gemma4SparseExecutionObservation>,
     load_s: f64,
     cluster_topology: Option<String>,
     split_layer: Option<usize>,
     runs: Vec<BenchRunReport>,
 ) -> BenchReport {
     let mean_output_tokens = mean(runs.iter().map(|run| run.output_tokens as f64));
+    let prompt_eval = mean_option(runs.iter().map(|run| run.prompt_eval));
+    let decode = mean_option(runs.iter().map(|run| run.decode));
     let mean_total_s = mean(runs.iter().map(|run| run.total_s));
     let mean_ttft_s = mean_option(runs.iter().map(|run| run.ttft_s));
     let mean_decode_tok_s = mean_option(runs.iter().map(|run| run.decode_tok_s));
+    let state_readback_bytes = mean_u64_option(runs.iter().map(|run| run.state_readback_bytes));
     let mean_gemma4_metal_decode_readback_bytes_per_token = mean_option(
         runs.iter()
             .map(|run| run.gemma4_metal_decode_readback_bytes_per_token),
@@ -895,8 +952,31 @@ fn finish_report(
         mode: config.mode.label().to_string(),
         model_id,
         model_path: config.model_path.display().to_string(),
+        model_artifact: model_artifact(config.model_path.as_path()),
+        benchmark_prompt_id: config.benchmark_prompt_id.clone(),
         runtime_backend,
         sparse_expert_topology,
+        sparse_layer_count: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.sparse_layer_count),
+        host_fallback_layer_count: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.host_fallback_layer_count),
+        sparse_ffn_backend: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.sparse_ffn_backend.clone()),
+        router_backend: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.router_backend.clone()),
+        expert_dispatch_backend: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.expert_dispatch_backend.clone()),
+        native_sparse_execution: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.native_sparse_execution),
+        host_fallback_observed: sparse_execution_observation
+            .as_ref()
+            .map(|value| value.host_fallback_observed),
         peer_base_url: config.peer_base_url.clone(),
         split_layer,
         prompt: config.prompt.clone(),
@@ -904,6 +984,13 @@ fn finish_report(
         max_output_tokens: config.max_output_tokens,
         repeats: config.repeats,
         load_s,
+        prompt_eval,
+        decode,
+        total: mean_total_s,
+        decode_tok_s: mean_decode_tok_s,
+        ttft: mean_ttft_s,
+        state_readback_bytes,
+        state_readback_bytes_per_token: mean_gemma4_metal_decode_readback_bytes_per_token,
         cluster_topology,
         runs,
         mean_output_tokens,
@@ -930,6 +1017,10 @@ fn run_report_from_generation(
             .iter()
             .map(|token| token.as_u32())
             .collect(),
+        prompt_eval: response.metrics.prompt_eval_duration_ns.map(ns_to_s),
+        decode: response.metrics.eval_duration_ns.map(ns_to_s),
+        total: total_s,
+        state_readback_bytes: gemma4_metal_decode.map(|metrics| metrics.readback_bytes),
         total_s,
         prompt_s: response.metrics.prompt_eval_duration_ns.map(ns_to_s),
         decode_s: response.metrics.eval_duration_ns.map(ns_to_s),
@@ -995,6 +1086,17 @@ where
     Some(values.iter().sum::<f64>() / values.len() as f64)
 }
 
+fn mean_u64_option<I>(values: I) -> Option<u64>
+where
+    I: IntoIterator<Item = Option<u64>>,
+{
+    let values: Vec<u64> = values.into_iter().flatten().collect();
+    if values.is_empty() {
+        return None;
+    }
+    Some((values.iter().sum::<u64>() as f64 / values.len() as f64).round() as u64)
+}
+
 fn ns_to_s(value: u64) -> f64 {
     Duration::from_nanos(value).as_secs_f64()
 }
@@ -1017,15 +1119,38 @@ fn termination_label(reason: TerminationReason) -> &'static str {
     }
 }
 
+fn model_artifact(path: &std::path::Path) -> String {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| path.display().to_string())
+}
+
 fn render_human_report(report: &BenchReport) -> String {
     let mut lines = vec![
         format!("model: {}", report.model_id),
         format!("mode: {}", report.mode),
         format!("backend: {}", report.runtime_backend),
         format!("path: {}", report.model_path),
+        format!("artifact: {}", report.model_artifact),
+        format!("prompt id: {}", report.benchmark_prompt_id),
         format!("load: {:.3}s", report.load_s),
         format!("repeats: {}", report.repeats),
     ];
+    if let Some(sparse_ffn_backend) = report.sparse_ffn_backend.as_deref() {
+        lines.push(format!("sparse ffn backend: {sparse_ffn_backend}"));
+    }
+    if let Some(router_backend) = report.router_backend.as_deref() {
+        lines.push(format!("router backend: {router_backend}"));
+    }
+    if let Some(expert_dispatch_backend) = report.expert_dispatch_backend.as_deref() {
+        lines.push(format!(
+            "expert dispatch backend: {expert_dispatch_backend}"
+        ));
+    }
+    if let Some(host_fallback_observed) = report.host_fallback_observed {
+        lines.push(format!("host fallback observed: {host_fallback_observed}"));
+    }
     if let Some(peer_base_url) = report.peer_base_url.as_deref() {
         lines.push(format!("peer: {peer_base_url}"));
     }
@@ -1055,6 +1180,28 @@ fn render_human_report(report: &BenchReport) -> String {
         ));
     }
     lines.push(String::new());
+    if let Some(prompt_eval) = report.prompt_eval {
+        lines.push(format!("prompt eval: {:.3}s", prompt_eval));
+    }
+    if let Some(decode) = report.decode {
+        lines.push(format!("decode: {:.3}s", decode));
+    }
+    lines.push(format!("total: {:.3}s", report.total));
+    if let Some(decode_tok_s) = report.decode_tok_s {
+        lines.push(format!("decode tok/s: {:.2}", decode_tok_s));
+    }
+    if let Some(ttft) = report.ttft {
+        lines.push(format!("ttft: {:.3}s", ttft));
+    }
+    if let Some(state_readback_bytes) = report.state_readback_bytes {
+        lines.push(format!("state readback bytes: {state_readback_bytes}"));
+    }
+    if let Some(state_readback_bytes_per_token) = report.state_readback_bytes_per_token {
+        lines.push(format!(
+            "state readback bytes/token: {:.1}",
+            state_readback_bytes_per_token
+        ));
+    }
     lines.push(format!("mean total: {:.3}s", report.mean_total_s));
     if let Some(mean_ttft_s) = report.mean_ttft_s {
         lines.push(format!("mean ttft: {:.3}s", mean_ttft_s));
@@ -1197,7 +1344,7 @@ fn usage() -> &'static str {
 Usage: cargo run -p psionic-serve --example gemma4_bench -- \\\n\
   --model-path <gguf> [--mode single|distributed-dense|distributed-sparse] \\\n\
   [--backend auto|cpu|metal|cuda] [--peer-base-url <url>] [--split-layer <n>] \\\n\
-  [--prompt-mode rendered-tokens|text] [--prompt <text>] [--max-output-tokens <n>] \\\n\
+  [--prompt-id <id>] [--prompt-mode rendered-tokens|text] [--prompt <text>] [--max-output-tokens <n>] \\\n\
   [--repeats <n>] [--json] [--json-out <path>]\n\
 \n\
 Notes:\n\

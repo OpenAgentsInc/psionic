@@ -2271,6 +2271,7 @@ fn run_cuda_generation_request(
             kv_cache_encoding: Some(kv_cache_encoding.accounting.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
             qwen35_cuda_decode: None,
         };
@@ -2765,6 +2766,7 @@ fn run_cuda_hybrid_generation_request(
             kv_cache_encoding: Some(kv_cache_encoding.accounting.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
             qwen35_cuda_decode: None,
         };
@@ -3483,6 +3485,7 @@ fn run_metal_generation_request(
             kv_cache_encoding: Some(kv_cache_encoding.clone()),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
             qwen35_cuda_decode: None,
         };
@@ -4000,7 +4003,6 @@ impl CpuGgufGptOssGenerationModel {
     pub fn plan_digest(&self) -> &str {
         self.inner.plan_digest.as_str()
     }
-
 }
 
 impl GenerationModelHandle for CpuGgufGptOssGenerationModel {
@@ -4173,7 +4175,6 @@ impl MetalGgufGptOssGenerationModel {
     pub fn plan_digest(&self) -> &str {
         self.inner.plan_digest.as_str()
     }
-
 }
 
 impl GenerationModelHandle for MetalGgufGptOssGenerationModel {
