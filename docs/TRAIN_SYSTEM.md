@@ -159,6 +159,12 @@ actual broader pretraining. The runtime truth for that packaged lane now also
 exports one canonical machine-lane contract in
 `crates/psionic-train/src/train_runtime.rs` so downstream repos do not guess
 whether the same A1 environment is CPU, Metal, or CUDA.
+The same lane now also ships a first-class verifier at
+`./TRAIN --lane cs336_a1_demo verify --run-root <path>` plus the wrapper
+`scripts/check-psion-cs336-a1-demo-lane.sh`, so operators can prove that a
+fresh bounded run wrote the retained status packets, generic checkpoint
+surface, accepted checkpoint, and closeout bundle before calling the lane
+demo-ready.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator

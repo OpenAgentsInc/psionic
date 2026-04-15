@@ -67,6 +67,8 @@ Local rehearsal now uses the same packaged path that the machine runtime uses:
 ./TRAIN --lane cs336_a1_demo start
 ./TRAIN --lane cs336_a1_demo rehearse-base-lane
 ./TRAIN --lane cs336_a1_demo status --run-root <path>
+./TRAIN --lane cs336_a1_demo verify --run-root <path>
+bash scripts/check-psion-cs336-a1-demo-lane.sh
 ```
 
 The lower-level machine boundary is the shared manifest entrypoint:
@@ -78,6 +80,13 @@ cargo run -q -p psionic-train --bin psionic-train -- manifest --manifest <path>
 That means the A1 demo lane no longer depends on ad hoc shell glue when one
 Mac or Linux operator host receives a packaged assignment for the bounded
 host-CPU path.
+
+The new `verify` surface is the bounded acceptance gate for a fresh local run.
+It refuses to call a run demo-valid unless the retained runtime packets, the
+generic checkpoint surface, the accepted checkpoint pointer, the closeout
+bundle, and the descending loss pair all exist together under one run root.
+The checker script wraps that path and can either validate an existing run root
+or launch one fresh rehearsal run and verify it immediately.
 
 ## Retained Outputs
 
@@ -102,6 +111,24 @@ surfaces above those files:
 That is the key distinction from the older reference bundle. The underlying A1
 math is still the same bounded tiny lane, but the retained outputs now fit the
 normal machine supervision path.
+
+## Demo-Valid Success Gate
+
+For Episode 224, one bounded run is demo-valid only when all of the following
+are true:
+
+- `status/current_run_status.json` ends in phase `completed` or `rehearsed`
+- `status/retained_summary.json` carries both `initial_loss` and `final_loss`
+  with `final_loss < initial_loss`
+- `status/psionic_train_run_status_packet.json` exists
+- `status/psionic_train_window_status_packet.json` exists
+- `status/checkpoint_surface.json` exists and reports pointer state `accepted`
+- `checkpoints/latest_accepted_checkpoint_pointer.json` exists
+- `closeout/closeout_bundle.json` exists with outcome `accepted`
+
+The bounded checker intentionally does not claim fresh multi-host proof by
+itself. Multi-host proof still requires live `Pylon`/`Nexus` assignment intake
+above this single-host lane contract.
 
 ## Fixtures
 

@@ -7,6 +7,7 @@ Usage:
   ./TRAIN --lane cs336_a1_demo [start] [options]
   ./TRAIN --lane cs336_a1_demo rehearse-base-lane [options]
   ./TRAIN --lane cs336_a1_demo status --run-root <path>
+  ./TRAIN --lane cs336_a1_demo verify --run-root <path>
 
 Options for `start` and `rehearse-base-lane`:
   --run-id <id>            Stable run identifier.
@@ -18,6 +19,9 @@ Options for `start` and `rehearse-base-lane`:
 Options for `status`:
   --run-root <path>        Existing A1 demo run root containing retained status, summary, and checkpoint surfaces.
 
+Options for `verify`:
+  --run-root <path>        Existing A1 demo run root containing one real retained checkpoint and closeout bundle.
+
 This lane is the packaged bounded CS336 A1 demo path for Pylon/Nexus rehearsal.
 It always uses the admitted tiny corpus and the fixed four-step training budget.
 EOF
@@ -26,7 +30,7 @@ EOF
 command="start"
 if [[ $# -ge 1 ]]; then
   case "$1" in
-    start|rehearse-base-lane|status)
+    start|rehearse-base-lane|status|verify)
       command="$1"
       shift
       ;;
@@ -40,7 +44,7 @@ if [[ $# -ge 1 ]]; then
 fi
 
 case "${command}" in
-  start|rehearse-base-lane|status)
+  start|rehearse-base-lane|status|verify)
     exec cargo run -q -p psionic-train --bin psionic-train -- cs336-a1-demo "${command}" "$@"
     ;;
   *)

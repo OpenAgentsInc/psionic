@@ -1,10 +1,12 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
@@ -14,13 +16,22 @@ use crate::{
     PSION_CS336_A1_DEMO_CURRENT_RUN_STATUS_SCHEMA_VERSION, PSION_CS336_A1_DEMO_LANE_ID,
     PSION_CS336_A1_DEMO_RETAINED_SUMMARY_SCHEMA_VERSION, PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT,
     PSIONIC_TRAIN_CHECKPOINT_MANIFEST_SCHEMA_VERSION,
-    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION, PsionCs336A1DemoAutomaticExecutionRequest,
+    PSIONIC_TRAIN_CHECKPOINT_POINTER_SCHEMA_VERSION,
+    PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION,
+    PSIONIC_TRAIN_RUNTIME_ATTESTATION_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+    PSIONIC_TRAIN_WINDOW_STATUS_PACKET_SCHEMA_VERSION, PsionCs336A1DemoAutomaticExecutionRequest,
     PsionCs336A1DemoCurrentRunStatus, PsionCs336A1DemoLaunchManifest,
-    PsionCs336A1DemoRetainedSummary, PsionicTrainCheckpointManifest, PsionicTrainCheckpointPointer,
-    PsionicTrainInvocationManifest, PsionicTrainOperation, PsionicTrainRole,
+    PsionCs336A1DemoRetainedSummary, PsionicTrainArtifactSurfaceRefs, PsionicTrainAuthorityOwner,
+    PsionicTrainCapabilityProjection, PsionicTrainCheckpointManifest,
+    PsionicTrainCheckpointPointer, PsionicTrainInvocationManifest, PsionicTrainOperation,
+    PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRunStatusPacket,
+    PsionicTrainRuntimeAttestation, PsionicTrainWindowStatusPacket,
     build_psion_cs336_a1_demo_launch_manifest, inspect_psionic_train_checkpoint_surface,
     load_cs336_a1_reference_checkpoint, psion_cs336_a1_demo_retained_paths,
 };
+
+pub const PSION_CS336_A1_DEMO_VERIFICATION_REPORT_SCHEMA_VERSION: &str =
+    "psion.cs336_a1_demo_verification_report.v1";
 
 #[derive(Debug, Error)]
 pub enum PsionCs336A1DemoOperatorError {
@@ -38,6 +49,8 @@ pub enum PsionCs336A1DemoOperatorError {
     Training(#[from] crate::Cs336A1ReferenceTrainingError),
     #[error(transparent)]
     Launcher(#[from] crate::PsionCs336A1DemoLauncherError),
+    #[error(transparent)]
+    RuntimeContract(#[from] crate::PsionicTrainRuntimeContractError),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -58,6 +71,25 @@ pub struct PsionCs336A1DemoCloseoutBundle {
     pub model_state_digest: String,
     pub optimizer_state_digest: String,
     pub step_reports: Vec<Cs336A1ReferenceTrainingStepReport>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PsionCs336A1DemoVerificationReport {
+    pub schema_version: String,
+    pub run_root: String,
+    pub lane_id: String,
+    pub release_id: String,
+    pub environment_ref: String,
+    pub current_phase: Option<String>,
+    pub ready_for_demo: bool,
+    pub has_status_packet: bool,
+    pub has_window_status_packet: bool,
+    pub has_checkpoint_surface: bool,
+    pub has_closeout_bundle: bool,
+    pub final_loss_descended: bool,
+    pub checkpoint_ref: Option<String>,
+    pub failures: Vec<String>,
+    pub caveats: Vec<String>,
 }
 
 pub fn run_psion_cs336_a1_demo_cli(args: Vec<String>) -> Result<(), PsionCs336A1DemoOperatorError> {
@@ -91,8 +123,12 @@ pub fn run_psion_cs336_a1_demo_cli(args: Vec<String>) -> Result<(), PsionCs336A1
             run_psion_cs336_a1_demo_manifest(&manifest)
         }
         "status" => {
-            let run_root = parse_status_args(&args[1..])?;
+            let run_root = parse_run_root_args(&args[1..], "status")?;
             print_status(Path::new(run_root.as_str()))
+        }
+        "verify" => {
+            let run_root = parse_run_root_args(&args[1..], "verify")?;
+            print_verification_report(Path::new(run_root.as_str()))
         }
         other => Err(PsionCs336A1DemoOperatorError::UnsupportedOperation(
             other.to_string(),
@@ -213,6 +249,12 @@ fn run_start_like(
         append_log(
             run_root.join(&retained_paths.launcher_log_path).as_path(),
             "phase=dry_run_complete detail=retained_launcher_surfaces_only",
+        )?;
+        write_runtime_packets(
+            &run_root,
+            manifest,
+            &current_status,
+            summary.detail.as_str(),
         )?;
         return Ok(());
     }
@@ -400,6 +442,12 @@ fn run_start_like(
         )
         .as_str(),
     )?;
+    write_runtime_packets(
+        &run_root,
+        manifest,
+        &current_status,
+        current_status.detail.as_str(),
+    )?;
     Ok(())
 }
 
@@ -432,6 +480,215 @@ fn print_status(run_root: &Path) -> Result<(), PsionCs336A1DemoOperatorError> {
         }))?
     );
     Ok(())
+}
+
+fn print_verification_report(run_root: &Path) -> Result<(), PsionCs336A1DemoOperatorError> {
+    println!("{}", serde_json::to_string_pretty(&verify_run(run_root)?)?);
+    Ok(())
+}
+
+fn verify_run(
+    run_root: &Path,
+) -> Result<PsionCs336A1DemoVerificationReport, PsionCs336A1DemoOperatorError> {
+    let retained_paths = psion_cs336_a1_demo_retained_paths();
+    let launch_manifest: PsionCs336A1DemoLaunchManifest = load_json_file(
+        run_root
+            .join(&retained_paths.launch_manifest_path)
+            .as_path(),
+    )?;
+    let current_status: PsionCs336A1DemoCurrentRunStatus =
+        load_json_file(run_root.join(&retained_paths.current_status_path).as_path())?;
+    let summary: PsionCs336A1DemoRetainedSummary = load_json_file(
+        run_root
+            .join(&retained_paths.retained_summary_path)
+            .as_path(),
+    )?;
+    let closeout_path = run_root.join(&retained_paths.closeout_bundle_path);
+    let closeout: Option<PsionCs336A1DemoCloseoutBundle> = if closeout_path.is_file() {
+        Some(load_json_file(closeout_path.as_path())?)
+    } else {
+        None
+    };
+    let checkpoint_surface = inspect_psionic_train_checkpoint_surface(
+        run_root,
+        PsionicTrainRole::Worker,
+        launch_manifest_surface_operation(&launch_manifest),
+    )
+    .ok()
+    .flatten();
+    let mut failures = Vec::new();
+    let mut caveats = vec![
+        String::from(
+            "This verifier only proves the bounded single-host lane contract. Fresh multi-host proof still depends on live Pylon and Nexus assignment intake.",
+        ),
+        String::from(
+            "Treasury, payout reconciliation, and contribution validation remain downstream concerns outside this bounded lane checker.",
+        ),
+    ];
+
+    for (field, actual) in [
+        ("launch_manifest.lane_id", launch_manifest.lane_id.as_str()),
+        ("current_status.lane_id", current_status.lane_id.as_str()),
+        ("retained_summary.lane_id", summary.lane_id.as_str()),
+    ] {
+        if actual != PSION_CS336_A1_DEMO_LANE_ID {
+            failures.push(format!(
+                "{field} expected `{PSION_CS336_A1_DEMO_LANE_ID}` but found `{actual}`"
+            ));
+        }
+    }
+
+    if launch_manifest.training_step_count != PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT {
+        failures.push(format!(
+            "launch_manifest.training_step_count expected `{PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT}` but found `{}`",
+            launch_manifest.training_step_count
+        ));
+    }
+    if current_status.total_steps != PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT {
+        failures.push(format!(
+            "current_status.total_steps expected `{PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT}` but found `{}`",
+            current_status.total_steps
+        ));
+    }
+    if summary.total_steps != PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT {
+        failures.push(format!(
+            "retained_summary.total_steps expected `{PSION_CS336_A1_DEMO_TRAINING_STEP_COUNT}` but found `{}`",
+            summary.total_steps
+        ));
+    }
+    if launch_manifest.corpus_fixture_path != crate::CS336_A1_REFERENCE_TINY_CORPUS_FIXTURE_PATH {
+        failures.push(format!(
+            "launch_manifest.corpus_fixture_path expected `{}` but found `{}`",
+            crate::CS336_A1_REFERENCE_TINY_CORPUS_FIXTURE_PATH,
+            launch_manifest.corpus_fixture_path
+        ));
+    }
+
+    let has_status_packet = run_root
+        .join("status/psionic_train_run_status_packet.json")
+        .is_file();
+    if !has_status_packet {
+        failures.push(String::from(
+            "missing retained status/psionic_train_run_status_packet.json runtime packet",
+        ));
+    }
+    let has_window_status_packet = run_root
+        .join("status/psionic_train_window_status_packet.json")
+        .is_file();
+    if !has_window_status_packet {
+        failures.push(String::from(
+            "missing retained status/psionic_train_window_status_packet.json runtime packet",
+        ));
+    }
+
+    let final_loss_descended = match (summary.initial_loss, summary.final_loss) {
+        (Some(initial_loss), Some(final_loss)) if final_loss < initial_loss => true,
+        (Some(_), Some(_)) => {
+            failures.push(String::from(
+                "retained_summary.final_loss did not descend below retained_summary.initial_loss",
+            ));
+            false
+        }
+        _ => {
+            failures.push(String::from(
+                "retained_summary is missing the initial_loss/final_loss pair required for a real bounded run",
+            ));
+            false
+        }
+    };
+
+    let has_checkpoint_surface = checkpoint_surface.is_some();
+    match checkpoint_surface.as_ref() {
+        Some(surface) => {
+            if surface.lane_id != PSION_CS336_A1_DEMO_LANE_ID {
+                failures.push(format!(
+                    "checkpoint_surface.lane_id expected `{PSION_CS336_A1_DEMO_LANE_ID}` but found `{}`",
+                    surface.lane_id
+                ));
+            }
+            if surface.pointer_state.as_deref() != Some("accepted") {
+                failures.push(format!(
+                    "checkpoint surface pointer_state expected `accepted` but found `{}`",
+                    surface.pointer_state.as_deref().unwrap_or("missing")
+                ));
+            }
+            if surface.checkpoint_ref != summary.latest_checkpoint_ref {
+                failures.push(String::from(
+                    "checkpoint surface checkpoint_ref does not match retained_summary.latest_checkpoint_ref",
+                ));
+            }
+        }
+        None => failures.push(String::from(
+            "missing retained generic checkpoint surface for bounded lane run",
+        )),
+    }
+
+    match closeout.as_ref() {
+        Some(bundle) => {
+            if bundle.lane_id != PSION_CS336_A1_DEMO_LANE_ID {
+                failures.push(format!(
+                    "closeout_bundle.lane_id expected `{PSION_CS336_A1_DEMO_LANE_ID}` but found `{}`",
+                    bundle.lane_id
+                ));
+            }
+            if bundle.outcome != "accepted" {
+                failures.push(format!(
+                    "closeout_bundle.outcome expected `accepted` but found `{}`",
+                    bundle.outcome
+                ));
+            }
+            if Some(bundle.checkpoint_ref.clone()) != summary.latest_checkpoint_ref {
+                failures.push(String::from(
+                    "closeout bundle checkpoint_ref does not match retained_summary.latest_checkpoint_ref",
+                ));
+            }
+            if bundle.final_loss >= bundle.initial_loss {
+                failures.push(String::from(
+                    "closeout bundle final_loss did not descend below initial_loss",
+                ));
+            }
+        }
+        None => failures.push(String::from(
+            "missing closeout/closeout_bundle.json required for a demo-valid bounded run",
+        )),
+    }
+
+    if current_status.phase == "dry_run_materialized" {
+        failures.push(String::from(
+            "dry_run materialized launcher surfaces only; it is not a demo-valid bounded execution",
+        ));
+        caveats.push(String::from(
+            "Dry runs are still useful for launch-contract rehearsal, but they do not prove checkpoint or closeout retention.",
+        ));
+    }
+
+    Ok(PsionCs336A1DemoVerificationReport {
+        schema_version: String::from(PSION_CS336_A1_DEMO_VERIFICATION_REPORT_SCHEMA_VERSION),
+        run_root: run_root.display().to_string(),
+        lane_id: String::from(PSION_CS336_A1_DEMO_LANE_ID),
+        release_id: String::from(crate::PSIONIC_TRAIN_CS336_A1_DEMO_RELEASE_ID),
+        environment_ref: String::from(crate::PSIONIC_TRAIN_CS336_A1_DEMO_ENVIRONMENT_REF),
+        current_phase: Some(current_status.phase),
+        ready_for_demo: failures.is_empty(),
+        has_status_packet,
+        has_window_status_packet,
+        has_checkpoint_surface,
+        has_closeout_bundle: closeout.is_some(),
+        final_loss_descended,
+        checkpoint_ref: summary.latest_checkpoint_ref,
+        failures,
+        caveats,
+    })
+}
+
+fn launch_manifest_surface_operation(
+    launch_manifest: &PsionCs336A1DemoLaunchManifest,
+) -> PsionicTrainOperation {
+    if launch_manifest.surface_id == crate::PSION_CS336_A1_DEMO_REHEARSAL_SURFACE_ID {
+        PsionicTrainOperation::RehearseBaseLane
+    } else {
+        PsionicTrainOperation::Start
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -501,7 +758,10 @@ fn parse_start_like_args(
     })
 }
 
-fn parse_status_args(args: &[String]) -> Result<String, PsionCs336A1DemoOperatorError> {
+fn parse_run_root_args(
+    args: &[String],
+    command: &str,
+) -> Result<String, PsionCs336A1DemoOperatorError> {
     let mut run_root = None;
     let mut index = 0;
     while index < args.len() {
@@ -514,7 +774,7 @@ fn parse_status_args(args: &[String]) -> Result<String, PsionCs336A1DemoOperator
             }
             other => {
                 return Err(PsionCs336A1DemoOperatorError::UnsupportedOperation(
-                    format!("unknown argument `{other}`"),
+                    format!("unknown argument `{other}` for `{command}`"),
                 ));
             }
         }
@@ -569,6 +829,211 @@ fn append_log(path: &Path, line: &str) -> Result<(), PsionCs336A1DemoOperatorErr
     Ok(())
 }
 
+fn write_runtime_packets(
+    run_root: &Path,
+    manifest: &PsionicTrainInvocationManifest,
+    current_status: &PsionCs336A1DemoCurrentRunStatus,
+    detail: &str,
+) -> Result<(), PsionCs336A1DemoOperatorError> {
+    let retained_paths = psion_cs336_a1_demo_retained_paths();
+    let runtime_attestation = runtime_attestation_for_manifest(manifest)?;
+    let capability_projection = PsionicTrainCapabilityProjection::for_lane(
+        manifest.lane_id.as_str(),
+        manifest.role,
+        manifest.admission_identity.environment_ref.clone(),
+    )?;
+    let checkpoint_surface =
+        inspect_psionic_train_checkpoint_surface(run_root, manifest.role, manifest.operation)
+            .ok()
+            .flatten();
+    let artifacts = checkpoint_surface
+        .as_ref()
+        .map(|value| PsionicTrainArtifactSurfaceRefs {
+            launch_manifest_path: Some(
+                run_root
+                    .join(&retained_paths.launch_manifest_path)
+                    .display()
+                    .to_string(),
+            ),
+            checkpoint_surface_path: Some(
+                run_root
+                    .join("status/checkpoint_surface.json")
+                    .display()
+                    .to_string(),
+            ),
+            checkpoint_pointer_path: value.artifacts.checkpoint_pointer_path.clone(),
+            checkpoint_manifest_path: value.artifacts.checkpoint_manifest_path.clone(),
+            checkpoint_backup_receipt_path: value.artifacts.checkpoint_backup_receipt_path.clone(),
+            checkpoint_handoff_receipt_path: value
+                .artifacts
+                .peer_checkpoint_handoff_receipt_path
+                .clone(),
+            recovery_receipt_path: value.artifacts.auto_resume_receipt_path.clone(),
+            final_closeout_bundle_path: run_root
+                .join(&retained_paths.closeout_bundle_path)
+                .is_file()
+                .then(|| {
+                    run_root
+                        .join(&retained_paths.closeout_bundle_path)
+                        .display()
+                        .to_string()
+                }),
+            ..Default::default()
+        })
+        .unwrap_or_else(|| PsionicTrainArtifactSurfaceRefs {
+            launch_manifest_path: Some(
+                run_root
+                    .join(&retained_paths.launch_manifest_path)
+                    .display()
+                    .to_string(),
+            ),
+            final_closeout_bundle_path: run_root
+                .join(&retained_paths.closeout_bundle_path)
+                .is_file()
+                .then(|| {
+                    run_root
+                        .join(&retained_paths.closeout_bundle_path)
+                        .display()
+                        .to_string()
+                }),
+            ..Default::default()
+        });
+    let run_status_path = run_root.join("status/psionic_train_run_status_packet.json");
+    let window_status_path = run_root.join("status/psionic_train_window_status_packet.json");
+    let run_packet = PsionicTrainRunStatusPacket {
+        schema_version: String::from(PSIONIC_TRAIN_RUN_STATUS_PACKET_SCHEMA_VERSION),
+        runtime_surface_id: String::from(PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+        lane_id: manifest.lane_id.clone(),
+        role: manifest.role,
+        operation: manifest.operation,
+        work_class: manifest.work_class,
+        outcome: PsionicTrainOutcomeKind::Succeeded,
+        exit_code: 0,
+        retryable: false,
+        authority_owner: PsionicTrainAuthorityOwner::Pylon,
+        refusal_class: None,
+        coordination: manifest.coordination.clone(),
+        grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
+        validator_target_work_class: manifest.validator_target_work_class,
+        manifest_path: Some(
+            run_root
+                .join(&retained_paths.launch_manifest_path)
+                .display()
+                .to_string(),
+        ),
+        manifest_digest: manifest.manifest_digest.clone(),
+        run_id: manifest.run_id.clone(),
+        run_root: Some(run_root.display().to_string()),
+        phase: Some(current_status.phase.clone()),
+        runtime_attestation: runtime_attestation.clone(),
+        capability_projection: capability_projection.clone(),
+        artifacts: artifacts.clone(),
+        current_status_path: Some(
+            run_root
+                .join(&retained_paths.current_status_path)
+                .display()
+                .to_string(),
+        ),
+        retained_summary_path: Some(
+            run_root
+                .join(&retained_paths.retained_summary_path)
+                .display()
+                .to_string(),
+        ),
+        launcher_log_path: Some(
+            run_root
+                .join(&retained_paths.launcher_log_path)
+                .display()
+                .to_string(),
+        ),
+        detail: String::from(detail),
+    };
+    let window_packet = PsionicTrainWindowStatusPacket {
+        schema_version: String::from(PSIONIC_TRAIN_WINDOW_STATUS_PACKET_SCHEMA_VERSION),
+        runtime_surface_id: String::from(PSIONIC_TRAIN_RUNTIME_SURFACE_ID),
+        lane_id: manifest.lane_id.clone(),
+        role: manifest.role,
+        operation: manifest.operation,
+        work_class: manifest.work_class,
+        outcome: PsionicTrainOutcomeKind::Succeeded,
+        exit_code: 0,
+        retryable: false,
+        authority_owner: PsionicTrainAuthorityOwner::Pylon,
+        refusal_class: None,
+        coordination: manifest.coordination.clone(),
+        grouped_stage_assignment: manifest.grouped_stage_assignment.clone(),
+        validator_target_work_class: manifest.validator_target_work_class,
+        manifest_digest: manifest.manifest_digest.clone(),
+        run_id: manifest.run_id.clone(),
+        run_root: Some(run_root.display().to_string()),
+        window_state: manifest
+            .coordination
+            .window_id
+            .as_ref()
+            .map(|_| current_status.phase.clone()),
+        runtime_attestation,
+        capability_projection,
+        artifacts,
+        detail: if manifest.coordination.window_id.is_some() {
+            String::from(detail)
+        } else {
+            format!(
+                "{detail}; this admitted lane does not yet materialize dedicated sealed-window artifacts"
+            )
+        },
+    };
+    write_json_pretty(&run_status_path, &run_packet)?;
+    write_json_pretty(&window_status_path, &window_packet)?;
+    Ok(())
+}
+
+fn runtime_attestation_for_manifest(
+    manifest: &PsionicTrainInvocationManifest,
+) -> Result<PsionicTrainRuntimeAttestation, PsionCs336A1DemoOperatorError> {
+    let git_commit_sha =
+        git_stdout(["rev-parse", "HEAD"]).unwrap_or_else(|| String::from("unknown_git_commit"));
+    let workspace_status_sha256 = if manifest.allow_dirty_tree {
+        git_stdout(["status", "--porcelain=v1"])
+            .map(|value| sha256_hex(value.as_bytes()))
+            .or_else(|| Some(sha256_hex(b"dirty_tree_status_unavailable")))
+    } else {
+        None
+    };
+    Ok(PsionicTrainRuntimeAttestation {
+        schema_version: String::from(PSIONIC_TRAIN_RUNTIME_ATTESTATION_SCHEMA_VERSION),
+        release_id: manifest.admission_identity.release_id.clone(),
+        build_digest: manifest.admission_identity.build_digest.clone(),
+        git_commit_sha,
+        dirty_tree_admission: String::from(if manifest.allow_dirty_tree {
+            "allowed_by_operator_override"
+        } else {
+            "refuse_by_default"
+        }),
+        workspace_status_sha256,
+        environment_ref: manifest.admission_identity.environment_ref.clone(),
+    })
+}
+
+fn git_stdout<const N: usize>(args: [&str; N]) -> Option<String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(repo_root())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8(output.stdout).ok()?;
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then(|| String::from(trimmed))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut digest = Sha256::new();
+    digest.update(bytes);
+    format!("{:x}", digest.finalize())
+}
+
 fn default_run_id() -> String {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -596,7 +1061,7 @@ fn repo_root() -> PathBuf {
 
 fn print_usage() {
     println!(
-        "Usage:\n  psionic-train cs336-a1-demo start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--allow-dirty-tree] [--dry-run]\n  psionic-train cs336-a1-demo rehearse-base-lane [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--allow-dirty-tree] [--dry-run]\n  psionic-train cs336-a1-demo status --run-root <path>\n\nThis is the bounded packaged CS336 A1 demo lane. It always uses the admitted tiny corpus and the fixed four-step training budget."
+        "Usage:\n  psionic-train cs336-a1-demo start [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--allow-dirty-tree] [--dry-run]\n  psionic-train cs336-a1-demo rehearse-base-lane [--run-id <id>] [--output-root <path>] [--git-ref <ref>] [--allow-dirty-tree] [--dry-run]\n  psionic-train cs336-a1-demo status --run-root <path>\n  psionic-train cs336-a1-demo verify --run-root <path>\n\nThis is the bounded packaged CS336 A1 demo lane. It always uses the admitted tiny corpus and the fixed four-step training budget."
     );
 }
 
@@ -604,7 +1069,7 @@ fn print_usage() {
 mod tests {
     use super::{
         PSION_CS336_A1_DEMO_CLOSEOUT_BUNDLE_SCHEMA_VERSION, PsionCs336A1DemoCloseoutBundle,
-        run_psion_cs336_a1_demo_manifest,
+        run_psion_cs336_a1_demo_manifest, verify_run,
     };
     use crate::{
         PSION_CS336_A1_DEMO_AUTOMATIC_EXECUTION_REQUEST_SCHEMA_VERSION,
@@ -678,6 +1143,50 @@ mod tests {
                 .is_file()
         );
         assert!(!run_root.join("closeout/closeout_bundle.json").is_file());
+        Ok(())
+    }
+
+    #[test]
+    fn packaged_demo_verify_reports_success_for_real_run() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempdir()?;
+        let run_root = temp.path().join("run");
+        let manifest = request(run_root.to_str().expect("temp run root should be utf8"))
+            .to_invocation_manifest()?;
+        run_psion_cs336_a1_demo_manifest(&manifest)?;
+        let report = verify_run(&run_root)?;
+        assert!(
+            report.ready_for_demo,
+            "fresh bounded run should verify cleanly"
+        );
+        assert!(report.failures.is_empty());
+        assert!(report.has_checkpoint_surface);
+        assert!(report.has_closeout_bundle);
+        assert!(report.final_loss_descended);
+        Ok(())
+    }
+
+    #[test]
+    fn packaged_demo_verify_rejects_dry_run_as_demo_ready() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempdir()?;
+        let run_root = temp.path().join("run");
+        let mut request = request(run_root.to_str().expect("temp run root should be utf8"));
+        request.dry_run = true;
+        let manifest = request.to_invocation_manifest()?;
+        run_psion_cs336_a1_demo_manifest(&manifest)?;
+        let report = verify_run(&run_root)?;
+        assert!(
+            !report.ready_for_demo,
+            "dry-run surfaces should not count as a demo-valid bounded execution"
+        );
+        assert!(
+            report
+                .failures
+                .iter()
+                .any(|value| value.contains("dry_run")),
+            "verification report should explain why the dry run is insufficient"
+        );
         Ok(())
     }
 }
