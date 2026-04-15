@@ -196,13 +196,19 @@ these facts machine-checkable before any native serve claim:
 For `gpt-oss`, that runtime contract can stay `gpt_oss_native_moe`. For other
 expert families, the honest posture is currently `family_specific_placement`.
 That means Psionic can describe the lane and carry its artifact and topology
-truth into cluster state, but it must still refuse native execution until the
-later expert-placement issues land.
+truth into cluster state. Most expert families still stop there until a later
+family-specific runtime lands, but `gemma4:26b` is now the first bounded
+exception: the generic server admits one local single-node text lane on CUDA
+and Metal, while clustered sparse execution still depends on the explicit
+placement contract below.
 
 The first published sparse-family lane on that contract is `gemma4:26b`. The
-generic server now carries its `64`-expert, `4`-active-expert topology and one
-explicit refusal reason into `/health`, `/v1/models`, and routed inventory
-instead of collapsing it into a generic unsupported-decoder error.
+generic server now carries the lane's sparse topology into `/health`,
+`/v1/models`, and routed inventory, and the same row can now either execute on
+one local host or widen into the admitted sparse distributed path instead of
+collapsing into a generic unsupported-decoder error. Current retained cluster
+fixtures still exercise the older `64`-expert, `4`-active-expert planning
+shape, so topology-value reconciliation remains a separate consistency task.
 
 `psionic-cluster` replicated lane identity now has an optional
 expert-topology-requirement field so future sparse-family lanes can carry the
@@ -217,9 +223,9 @@ The first specialized lane on that contract is `gemma4:26b`:
 
 - model id = `gemma4:26b`
 - runtime contract = `family_specific_placement`
-- expert count = `64`
-- active expert count = `4`
-- expert feed-forward length = `4096`
+- current retained planner fixture = `expert_count = 64`
+- current retained planner fixture = `active_expert_count = 4`
+- current retained planner fixture = `expert_feed_forward_length = 4096`
 - first planning policy = two ready hosts may each carry one contiguous half of
   the expert space while still producing one stable placement digest
 
@@ -269,8 +275,11 @@ family executes natively today. The current honest boundary is:
   family contract.
 - Psionic can now keep those lanes inside native cluster identity and sharded
   execution receipts.
-- Family-specific runtime execution remains gated on later model-family
-  implementations above this placement truth.
+- `gemma4:26b` now also has one admitted local single-node text runtime on the
+  generic server plus one admitted distributed sparse extension on top of this
+  placement truth.
+- Broader family-specific runtime execution for other expert families remains
+  gated on later model-family implementations above this placement truth.
 
 ## Demand And Rebalance
 

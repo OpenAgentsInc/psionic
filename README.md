@@ -53,9 +53,10 @@ promotion decision that refuses held-out regressions or failed operator review.
   - generic OpenAI-compatible server surfaces
   - hardware validation and backend truth
   - bounded non-`GptOss` lanes including `qwen35`, the published dense
-    `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` topology-publication and
-    refusal lane, and the optional dense `Gemma 4 31B` validation repeat that
-    keeps the same family contract without widening the first claim
+    `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` single-node text lane plus
+    its optional admitted distributed sparse extension, and the optional dense
+    `Gemma 4 31B` validation repeat that keeps the same family contract without
+    widening the first claim
   - the Gemma image or video path now publishes as a processor-owned refusal
     lane instead of pretending the dense text surface can consume media URLs
   - the dense `Gemma 4` `e2b` and `e4b` rows now also publish a separate
@@ -63,8 +64,8 @@ promotion decision that refuses held-out regressions or failed operator review.
     real audio processor lands, while `31B` and `26B` still fail closed
   - the generic server now also publishes one first-class `Gemma 4` Metal lane
     contract with `backend = metal`, `execution_mode = native`, and
-    `fallback_policy = refuse`, and it returns an explicit refusal instead of
-    silently falling back to CPU or CUDA until a real Metal decoder lands
+    `fallback_policy = refuse`, and it now executes the admitted local Gemma
+    text lanes on Apple Silicon instead of silently falling back to CPU or CUDA
   - the generic server, routed inventory, and mesh management status now also
     publish family-agnostic clustered execution truth so downstream consumers
     can tell whether a model is remote-proxied, replicated, split across
@@ -87,14 +88,15 @@ promotion decision that refuses held-out regressions or failed operator review.
     status, finding, question, tip, and done packets with TTL, visibility, provenance, search,
     and redaction semantics outside the inference critical path
   - expert-family GGUF admission now stays explicit: `psionic-models` can inspect non-`gpt-oss`
-    expert artifacts, carry artifact identity plus expert-topology requirements, and refuse native
-    execution with a machine-checkable topology-contract error instead of collapsing them into a
-    generic unsupported-family bucket
+    expert artifacts, carry artifact identity plus expert-topology requirements, and keep
+    unsupported expert families explicit with a machine-checkable topology contract instead of
+    collapsing them into a generic unsupported-family bucket
   - `psionic-cluster` now also owns one native sparse expert-placement contract over explicit
     expert-host inventory, stable placement digests, typed refusal codes, and reusable sharded
     execution receipts instead of a sidecar-only MoE control plane; the first specialized lane is
-    `gemma4:26b` with `64` experts, `4` active experts, `family_specific_placement`, and a
-    truthful two-host partitioned planning policy
+    `gemma4:26b`, with inspection-driven sparse topology truth, one local single-node text lane on
+    CUDA and Metal, and one truthful two-host partitioned planning policy for the admitted
+    distributed sparse extension
   - start with [docs/ROADMAP_CLUSTER.md](docs/ROADMAP_CLUSTER.md)
   - supporting docs: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md), [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md), [docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md](docs/FIRST_SWARM_TRUSTED_LAN_RUNBOOK.md), [docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md](docs/PSION_GOOGLE_TWO_NODE_SWARM_RUNBOOK.md), [docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md](docs/TRAIN_ARTIFACT_STORAGE_REFERENCE.md)
 - Psion learned-model program

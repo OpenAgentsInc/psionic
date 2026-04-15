@@ -94,14 +94,20 @@ into one generic engine claim.
   the dense first claim:
   - artifact class = sparse `gemma4:26b`
   - runtime contract = `family_specific_placement`
-  - published topology = `expert_count = 64`, `active_expert_count = 4`,
-    `expert_feed_forward_length = 4096`
+  - published topology = the sparse expert topology inspected from the loaded
+    GGUF; current retained cluster fixtures still exercise the older
+    `expert_count = 64`, `active_expert_count = 4`,
+    `expert_feed_forward_length = 4096` shape, so topology-value reconciliation
+    remains a follow-on consistency task instead of part of this lane claim
   - publication surfaces = `/health`, `/v1/models`, routed inventory, and mesh
-    management status all carry the same sparse-topology truth plus one
-    explicit execution refusal reason
-  - default request posture = the local generic OpenAI-compatible server fails
-    closed on `/v1/chat/completions` and `/v1/responses` until an explicit
-    distributed sparse schedule is admitted
+    management status all carry the same sparse-topology truth
+  - default request posture = the local generic OpenAI-compatible server now
+    admits one single-node text lane for `gemma4:26b` on `cuda` and `metal`
+    without requiring a distributed sparse schedule
+  - single-node hardware posture = one host must admit the full quantized
+    sparse GGUF plus active KV cache on the chosen backend; otherwise the
+    server must fail closed or the operator must admit a distributed sparse
+    schedule instead
   - admitted request posture = once the operator admits a real
     two-or-more-node sparse schedule, the same server can execute
     `gemma4:26b` and publish `disposition = sharded`,
@@ -117,8 +123,9 @@ into one generic engine claim.
     binding per conversation so follow-up turns stay on the same worker and
     placement digest while that shard state remains healthy, then rebind
     cleanly if the placement changes
-  - claim boundary = admitted distributed sparse execution only; this still
-    does not promote single-node native `gemma4:26b` execution
+  - claim boundary = one local single-node text lane plus one admitted
+    distributed sparse extension only; this still does not promote multimodal,
+    audio, structured-output, or training claims for `gemma4:26b`
 - The first real distributed `Gemma 4` proof is now one split
   `pipeline_sharded` `gemma4:e4b` request across two CUDA machines:
   - execution target = dense `gemma4:e4b`
@@ -178,16 +185,18 @@ into one generic engine claim.
   - the same `/v1/chat/completions` and `/v1/responses` publication surface as
     the admitted CUDA lane
   - no scheduler policy claim
-  - explicit request-time refusal until a real native Metal decoder lands
+  - current execution posture = live native single-node execution on Apple
+    Silicon for the admitted local Gemma text lanes, including dense
+    `gemma4:e4b` and sparse `gemma4:26b`
 - The first bounded `Gemma 4` claim must stay explicit about its unsupported
   regions:
   - admitted image execution on the processor-owned lane
   - admitted video execution on the processor-owned lane
   - admitted audio execution on the processor-owned audio lane
   - `31B`
-  - successful native `gemma4:26b` execution without admitted distributed
-    sparse placement
-  - successful native Metal execution
+  - broader `gemma4:26b` support beyond the admitted single-node text lane and
+    optional admitted distributed sparse extension
+  - full Metal parity across Gemma artifacts and clustered roles
   - generic structured outputs
   - unquantized projection tensors on the native CUDA lane
   - full parity with `llama.cpp` or `ollama`

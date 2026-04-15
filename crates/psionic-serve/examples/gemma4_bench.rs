@@ -525,12 +525,11 @@ fn run_dense_benchmark(
             )
         })?;
     let sparse = adapter.family_metadata().expert_count.unwrap_or(0) > 0;
-    if sparse {
-        return Err(format!(
-            "model `{}` declares sparse expert topology and must use --mode distributed-sparse",
-            adapter.descriptor().model.model_id
-        ));
-    }
+    let resolved_single_backend = validate_single_benchmark_backend(
+        adapter.descriptor().model.model_id.as_str(),
+        sparse,
+        backend,
+    )?;
     let rendered = adapter
         .render_prompt(
             None,
@@ -554,7 +553,7 @@ fn run_dense_benchmark(
         DenseBenchBackend::Auto
         | DenseBenchBackend::Cpu
         | DenseBenchBackend::Metal
-        | DenseBenchBackend::Cuda => match backend.resolve_single() {
+        | DenseBenchBackend::Cuda => match resolved_single_backend {
             DenseBenchBackend::Cpu => DenseRuntime::Cpu(
                 CpuGgufTextGenerationService::from_gguf_path(config.model_path.as_path()).map_err(
                     |error| {
@@ -645,6 +644,20 @@ fn run_dense_benchmark(
         Some(split_layer),
         runs,
     ))
+}
+
+fn validate_single_benchmark_backend(
+    model_id: &str,
+    sparse: bool,
+    backend: DenseBenchBackend,
+) -> Result<DenseBenchBackend, String> {
+    let resolved = backend.resolve_single();
+    if sparse && !matches!(resolved, DenseBenchBackend::Metal | DenseBenchBackend::Cuda) {
+        return Err(format!(
+            "model `{model_id}` declares sparse expert topology and single-node benchmarking is currently admitted only on metal or cuda; use --backend metal or --backend cuda, or use --mode distributed-sparse for the admitted clustered sparse lane",
+        ));
+    }
+    Ok(resolved)
 }
 
 async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, String> {
@@ -1107,7 +1120,7 @@ Usage: cargo run -p psionic-serve --example gemma4_bench -- \\\n\
   [--repeats <n>] [--json] [--json-out <path>]\n\
 \n\
 Notes:\n\
-  - single runs dense Gemma 4 on one local backend, including the CPU reference path.\n\
+  - single runs one local Gemma 4 text lane on one backend; sparse `gemma4:26b` is admitted only on metal or cuda, while the CPU reference path stays dense-only.\n\
   - distributed-dense runs the Metal+CUDA split-execution lane and requires --peer-base-url.\n\
   - distributed-sparse runs the admitted Gemma 4 26B sparse lane through the generic server on the selected local backend.\n\
   - local Metal runs refuse parallel launch on an interactive Mac by default; set PSIONIC_ALLOW_PARALLEL_METAL_BENCH=1 only when you intentionally want to override that lock.\n"
@@ -1115,7 +1128,7 @@ Notes:\n\
 
 #[cfg(test)]
 mod tests {
-    use super::LocalMetalBenchGuard;
+    use super::{DenseBenchBackend, LocalMetalBenchGuard, validate_single_benchmark_backend};
 
     #[test]
     fn local_metal_bench_guard_releases_lock_on_drop() {
@@ -1134,5 +1147,23 @@ mod tests {
         let error =
             LocalMetalBenchGuard::acquire_at_path(lock_path).expect_err("second guard rejects");
         assert!(error.contains("refusing to start a second local Metal Gemma benchmark"));
+    }
+
+    #[test]
+    fn sparse_single_benchmark_backend_requires_accelerator_lane() {
+        let error = validate_single_benchmark_backend("gemma4:26b", true, DenseBenchBackend::Cpu)
+            .expect_err("cpu sparse single-node lane should be refused");
+        assert!(error.contains("metal or cuda"), "unexpected error: {error}");
+
+        assert_eq!(
+            validate_single_benchmark_backend("gemma4:26b", true, DenseBenchBackend::Metal)
+                .expect("metal sparse single-node lane should be admitted"),
+            DenseBenchBackend::Metal
+        );
+        assert_eq!(
+            validate_single_benchmark_backend("gemma4:26b", true, DenseBenchBackend::Cuda)
+                .expect("cuda sparse single-node lane should be admitted"),
+            DenseBenchBackend::Cuda
+        );
     }
 }

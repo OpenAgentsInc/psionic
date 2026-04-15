@@ -10219,6 +10219,19 @@ fn gemma4_audio_lane_variant_is_admitted(model_key: &str, canonical_name: &str) 
     lowered.contains("e2b") || lowered.contains("e4b")
 }
 
+fn generic_backend_supports_single_node_gemma4_sparse(
+    backend: OpenAiCompatBackend,
+    family: GgufDecoderFamily,
+    sparse_expert_topology: Option<&RoutedSparseExpertTopology>,
+) -> bool {
+    matches!(family, GgufDecoderFamily::Gemma4)
+        && sparse_expert_topology.is_some()
+        && matches!(
+            backend,
+            OpenAiCompatBackend::Cuda | OpenAiCompatBackend::Metal
+        )
+}
+
 fn load_generic_decoder_model(
     model_path: &Path,
     reasoning_budget: u8,
@@ -10239,15 +10252,23 @@ fn load_generic_decoder_model(
     let descriptor = inspection.descriptor().clone();
     let family = inspection.family_metadata().family;
     let sparse_expert_topology = routed_sparse_expert_topology_from_inspection(&inspection);
-    let distributed_front = distributed_gemma4_front_peer_from_env()?;
-    let pending_topology_refusal = matches!(
+    let single_node_sparse_gemma4 = generic_backend_supports_single_node_gemma4_sparse(
+        backend,
+        family,
+        sparse_expert_topology.as_ref(),
+    );
+    let distributed_front =
+        distributed_gemma4_front_peer_from_env()?.filter(|_| !single_node_sparse_gemma4);
+    let execution_refusal_reason = matches!(
         inspection.admission().kind,
         GgufDecoderServingAdmissionKind::PendingExpertTopology
     )
-    .then(|| {
+    .then_some(())
+    .filter(|_| !single_node_sparse_gemma4)
+    .map(|_| {
         pending_topology_execution_refusal_reason(&descriptor, sparse_expert_topology.as_ref())
     });
-    let runtime_kind = match (backend, family, pending_topology_refusal.is_some()) {
+    let runtime_kind = match (backend, family, execution_refusal_reason.is_some()) {
         (OpenAiCompatBackend::Cpu, _, true) => {
             OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
         }
@@ -10317,7 +10338,7 @@ fn load_generic_decoder_model(
                 descriptor.model.model_id.as_str(),
                 canonical_name.as_str(),
             ),
-            execution_refusal_reason: pending_topology_refusal,
+            execution_refusal_reason,
             cluster_execution_modes,
             cluster_execution_topologies,
             cluster_execution_capability_profile,
@@ -11458,7 +11479,7 @@ mod tests {
         generic_management_status, gpt_oss_local_serving_truth, handle_generic_chat_completions,
         handle_generic_embeddings, handle_generic_responses, insert_local_serving_truth_headers,
         load_generic_decoder_model, local_loaded_model_for_route, model_endpoint_paths,
-        prompt_request_cache_key, refused_local_backend_error, render_prompt_for_model,
+        prompt_request_cache_key, render_prompt_for_model,
         required_tool_call_floor_from_chat_messages, resolve_execution_summary,
         resolve_generic_model, resolve_generic_model_for_endpoint,
         response_input_to_prompt_messages_with_options, responses_output_items,
@@ -13933,7 +13954,7 @@ mod tests {
     }
 
     #[test]
-    fn generic_cuda_gemma4_26b_load_plan_publishes_sparse_topology_refusal_contract()
+    fn generic_cuda_gemma4_26b_load_plan_admits_single_node_sparse_native_runtime()
     -> Result<(), Box<dyn std::error::Error>> {
         let temp = tempfile::tempdir()?;
         let gemma_path = temp.path().join("tiny-gemma4-26b.gguf");
@@ -13953,11 +13974,12 @@ mod tests {
 
         assert_eq!(
             load_plan.runtime_kind,
-            OpenAiCompatRuntimeKind::GgufDecoderPendingTopologyRefusal
+            OpenAiCompatRuntimeKind::GgufDecoderCudaGemma4
         );
         assert_eq!(loaded_model.backend_label(), "cuda");
         assert_eq!(loaded_model.execution_mode_label(), "native");
         assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(loaded_model.execution_refusal_reason(), None);
         assert_eq!(topology.family, "gemma4");
         assert_eq!(topology.expert_count, 64);
         assert_eq!(topology.active_expert_count, Some(4));
@@ -13965,12 +13987,50 @@ mod tests {
             topology.runtime_contract,
             RoutedSparseExpertRuntimeContract::FamilySpecificPlacement
         );
-        assert!(
-            loaded_model
-                .execution_refusal_reason()
-                .is_some_and(|reason| reason.contains("family_specific_placement"))
+        assert_eq!(
+            model_endpoint_paths(&loaded_model),
+            vec!["/v1/chat/completions", "/v1/responses"]
         );
         assert!(accepted_names.contains("tiny-gemma4-26b.gguf"));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_metal_gemma4_26b_load_plan_admits_single_node_sparse_native_runtime()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-26b-metal.gguf");
+        write_test_gguf(
+            &gemma_path,
+            sparse_gemma4_26b_metal_metadata_with_chat_template("tiny pilot gemma4 26b metal")
+                .as_slice(),
+            dense_gemma4_metal_decoder_tensors_with_vocab(7, 5).as_slice(),
+        )?;
+
+        let (loaded_model, accepted_names, load_plan) =
+            load_generic_decoder_model(&gemma_path, 0, OpenAiCompatBackend::Metal)?;
+        let decoder = loaded_model.decoder().expect("decoder model");
+        let topology = decoder
+            .sparse_expert_topology
+            .as_ref()
+            .expect("sparse gemma topology should be published");
+
+        assert_eq!(
+            load_plan.runtime_kind,
+            OpenAiCompatRuntimeKind::GgufDecoderMetalGemma4
+        );
+        assert_eq!(loaded_model.backend_label(), "metal");
+        assert_eq!(loaded_model.execution_mode_label(), "native");
+        assert_eq!(loaded_model.execution_engine_label(), "psionic");
+        assert_eq!(loaded_model.execution_refusal_reason(), None);
+        assert_eq!(topology.family, "gemma4");
+        assert_eq!(topology.expert_count, 64);
+        assert_eq!(topology.active_expert_count, Some(4));
+        assert_eq!(
+            model_endpoint_paths(&loaded_model),
+            vec!["/v1/chat/completions", "/v1/responses"]
+        );
+        assert!(accepted_names.contains("tiny-gemma4-26b-metal.gguf"));
         Ok(())
     }
 
@@ -14757,13 +14817,18 @@ mod tests {
     }
 
     #[test]
-    fn generic_server_gemma4_26b_sparse_lane_publishes_topology_truth_and_fails_closed()
+    fn generic_server_gemma4_26b_single_node_lane_executes_on_cuda_without_sparse_schedule()
     -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_cuda::CudaBackend::new();
+        if !backend.quantized_kernels_available() {
+            return Ok(());
+        }
+
         let temp = tempfile::tempdir()?;
         let gemma_path = temp.path().join("tiny-gemma4-26b-server.gguf");
         write_test_gguf(
             &gemma_path,
-            sparse_gemma4_26b_metadata_with_chat_template("tiny gemma4 26b sparse lane").as_slice(),
+            sparse_gemma4_26b_metadata_with_chat_template("tiny gemma4 26b single node").as_slice(),
             dense_decoder_tensors_with_vocab(false, 7, 5, 6).as_slice(),
         )?;
 
@@ -14785,13 +14850,7 @@ mod tests {
         assert_eq!(routed_topology.active_expert_count, Some(4));
 
         let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
-        let refusal_reason = health
-            .0
-            .execution_refusal_reason
-            .clone()
-            .expect("sparse gemma lane should publish one refusal reason");
-        let expected_error_message =
-            refused_local_backend_error("cuda", refusal_reason.as_str()).to_string();
+        assert_eq!(health.0.execution_refusal_reason, None);
         let health_topology = health
             .0
             .sparse_expert_topology
@@ -14835,59 +14894,130 @@ mod tests {
             vec![ExecutionTopologyKind::TensorSharded]
         );
         assert!(model.psionic_sparse_shard_state.is_none());
-        assert_eq!(
-            model.psionic_execution_refusal_reason,
-            Some(refusal_reason.clone())
-        );
+        assert_eq!(model.psionic_execution_refusal_reason, None);
 
-        let chat_error = runtime
-            .block_on(handle_generic_chat_completions(
-                std::sync::Arc::clone(&server.state),
-                ChatCompletionRequest {
-                    model: Some(model.id.clone()),
-                    messages: vec![ChatCompletionMessage::text("user", "hello")],
-                    temperature: Some(0.0),
-                    max_tokens: Some(1),
-                    stop: None,
-                    stream: false,
-                    tools: Vec::new(),
-                    tool_choice: None,
-                    response_format: None,
-                    psionic_grammar: None,
-                    psionic_structured_output: None,
-                    psionic_reasoning: None,
-                    psionic_prefix_cache: None,
-                    ..Default::default()
-                },
-            ))
-            .expect_err("gemma4 26b sparse lane should fail closed for chat completions");
-        let chat_response = chat_error.into_response();
-        assert_eq!(chat_response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        let chat_payload = runtime.block_on(response_json(chat_response))?;
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(model.id.clone()),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
         assert_eq!(
-            chat_payload["error"]["message"],
-            serde_json::json!(expected_error_message)
+            header_value(response.headers(), "x-psionic-backend"),
+            Some(String::from("cuda"))
         );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-cluster-topology"),
+            None
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        let content = payload["choices"][0]["message"]["content"]
+            .as_str()
+            .expect("single-node sparse cuda fixture should render text");
+        assert!(!content.is_empty());
+        assert!(payload["psionic_cluster_execution"].is_null());
 
-        let responses_error = runtime
-            .block_on(handle_generic_responses(
-                std::sync::Arc::clone(&server.state),
-                ResponsesRequest {
-                    model: Some(model.id.clone()),
-                    input: ResponsesInput::Messages(vec![ChatCompletionMessage::text(
-                        "user", "hello",
-                    )]),
-                    ..Default::default()
-                },
-            ))
-            .expect_err("gemma4 26b sparse lane should fail closed for responses");
-        let responses_response = responses_error.into_response();
-        assert_eq!(responses_response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        let responses_payload = runtime.block_on(response_json(responses_response))?;
-        assert_eq!(
-            responses_payload["error"]["message"],
-            serde_json::json!(expected_error_message)
+        let responses = runtime.block_on(handle_generic_responses(
+            std::sync::Arc::clone(&server.state),
+            ResponsesRequest {
+                model: Some(model.id.clone()),
+                input: ResponsesInput::Messages(vec![ChatCompletionMessage::text("user", "hello")]),
+                max_output_tokens: Some(1),
+                ..Default::default()
+            },
+        ))?;
+        let responses_payload = runtime.block_on(response_json(responses))?;
+        assert!(
+            responses_payload["output_text"]
+                .as_str()
+                .is_some_and(|text| !text.is_empty())
         );
+        assert!(responses_payload["psionic_cluster_execution"].is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn generic_server_gemma4_26b_single_node_lane_executes_on_metal_without_sparse_schedule()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let backend = psionic_backend_metal::MetalBackend::new();
+        if backend.selected_device().is_none() {
+            return Ok(());
+        }
+
+        let temp = tempfile::tempdir()?;
+        let gemma_path = temp.path().join("tiny-gemma4-26b-metal-server.gguf");
+        write_test_gguf(
+            &gemma_path,
+            sparse_gemma4_26b_metal_metadata_with_chat_template(
+                "tiny gemma4 26b single node metal",
+            )
+            .as_slice(),
+            dense_gemma4_metal_decoder_tensors_with_vocab(7, 5).as_slice(),
+        )?;
+
+        let mut config = OpenAiCompatConfig::new(&gemma_path);
+        config.backend = OpenAiCompatBackend::Metal;
+        let server = OpenAiCompatServer::from_config(&config)?;
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        let health = runtime.block_on(generic_health(State(std::sync::Arc::clone(&server.state))));
+        assert_eq!(health.0.execution_refusal_reason, None);
+        assert!(health.0.sparse_shard_state.is_none());
+        let topology = health
+            .0
+            .sparse_expert_topology
+            .clone()
+            .expect("health should publish sparse topology truth");
+        assert_eq!(topology.family, "gemma4");
+        assert_eq!(topology.expert_count, 64);
+        assert_eq!(topology.active_expert_count, Some(4));
+
+        let response = runtime.block_on(handle_generic_chat_completions(
+            std::sync::Arc::clone(&server.state),
+            ChatCompletionRequest {
+                model: Some(String::from("tiny-gemma4-26b-metal-server")),
+                messages: vec![ChatCompletionMessage::text("user", "hello")],
+                temperature: Some(0.0),
+                max_tokens: Some(1),
+                stop: None,
+                stream: false,
+                tools: Vec::new(),
+                tool_choice: None,
+                response_format: None,
+                psionic_grammar: None,
+                psionic_structured_output: None,
+                psionic_reasoning: None,
+                psionic_prefix_cache: None,
+                ..Default::default()
+            },
+        ))?;
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-backend"),
+            Some(String::from("metal"))
+        );
+        assert_eq!(
+            header_value(response.headers(), "x-psionic-cluster-topology"),
+            None
+        );
+        let payload = runtime.block_on(response_json(response))?;
+        let content = payload["choices"][0]["message"]["content"]
+            .as_str()
+            .expect("single-node sparse metal fixture should render text");
+        assert!(!content.is_empty());
+        assert!(payload["psionic_cluster_execution"].is_null());
         Ok(())
     }
 

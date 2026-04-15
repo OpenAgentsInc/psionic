@@ -10,7 +10,10 @@
 > publication into admitted sparse distributed execution when the generic
 > server is given a real multi-node sparse schedule; `#896` then turned the
 > old Metal refusal-only contract into live native Apple-Silicon execution and
-> added one live mixed-device `metal+cuda` split-execution proof.
+> added one live mixed-device `metal+cuda` split-execution proof; `#942` then
+> admitted one bounded single-node `gemma4:26b` text lane on the generic
+> server for CUDA and Metal, keeping the sparse distributed schedule as an
+> optional extension instead of the entry requirement.
 
 This document freezes what the first honest `Gemma 4` claim means and now
 records the published first lane.
@@ -177,6 +180,37 @@ What that means:
 - the same Mac row can also become one real split-execution front for a remote
   CUDA suffix worker without pretending the whole request stayed local.
 
+## Sparse 26B Single-Node Lane
+
+After `#942`, the generic OpenAI-compatible server also admits one bounded
+single-node sparse `Gemma 4 26B A4B` text lane:
+
+- model id = `gemma4:26b`
+- artifact class = quantized sparse GGUF; the retained benchmark and operator
+  examples use `gemma-4-26B-A4B-it-Q4_K_M.gguf`
+- admitted backends = `cuda`, `metal`
+- topology = one local host, no distributed sparse schedule required
+- runtime = native local Gemma runtime on the generic OpenAI-compatible server
+- admitted request surfaces = `/v1/chat/completions` and `/v1/responses`
+- publication posture = the same sparse-topology truth still appears on
+  `/health`, `/v1/models`, routed inventory, and mesh management status
+- hardware expectation = the chosen host must be able to admit the full
+  quantized sparse artifact plus active KV cache locally; if not, the server
+  must fail closed or the operator must admit the distributed sparse schedule
+  instead
+- distributed extension = if the operator later admits a real sparse schedule,
+  the same row widens into `tensor_sharded` sparse execution instead of
+  pretending that single-node and clustered execution are the same lane
+
+What that means:
+
+- Psionic can now honestly say that `gemma4:26b` text inference works on one
+  host through the generic server.
+- Psionic still does not widen that into multimodal, audio, structured-output,
+  or training claims for sparse Gemma.
+- The distributed sparse path remains useful, but it is no longer the entry
+  condition for `gemma4:26b` text serving.
+
 ## Explicit Non-Goals
 
 The first `Gemma 4` claim does not include:
@@ -185,8 +219,8 @@ The first `Gemma 4` claim does not include:
 - admitted video execution on the processor-owned lane
 - admitted audio execution on the processor-owned audio lane
 - `31B Dense`
-- default or single-node `gemma4:26b` sparse execution without an admitted
-  distributed schedule
+- broader `gemma4:26b` support beyond the admitted single-node text lane and
+  optional admitted distributed sparse extension
 - full parity with `llama.cpp`
 - full parity with `ollama`
 
@@ -205,9 +239,9 @@ conformance work:
 - the local `gemma4:e4b` GGUF tokenizer facts are now fixture-covered,
   including the Gemma-specific turn, tool-call, tool-response, and channel
   tags.
-- dense `Gemma 4` artifacts classify cleanly, while expert-bearing `Gemma 4`
-  artifacts still fail closed by default at the current non-`GptOss` MoE gate
-  unless the server is given an admitted distributed sparse schedule.
+- dense `Gemma 4` artifacts classify cleanly, and the generic server now also
+  admits one bounded single-node sparse `gemma4:26b` text lane on CUDA and
+  Metal while keeping the broader expert-family contract explicit.
 - the local `e4b` GGUF does not currently embed `tokenizer.chat_template`, so
   the repo now carries one checked-in bounded text template fixture at
   `crates/psionic-models/src/testdata/gemma4_chat_template.jinja`.
@@ -253,14 +287,14 @@ conformance work:
 - the older bootstrap-mesh path is still useful, but it now stays explicitly
   classified as remote whole-request proxying instead of being treated as the
   distributed proof.
-- the same generic server now also has one admitted sparse distributed
-  `gemma4:26b` execution path above the existing topology-publication surface:
-  the default path still fails closed, but an operator can now admit one real
-  multi-node sparse schedule and get successful `/v1/chat/completions` and
-  `/v1/responses` execution together with `tensor_sharded` cluster receipts,
-  selected-node truth, request-specific expert-routing diagnostics, published
-  shard artifact cache truth, and conversation-local sticky placement on
-  `/v1/responses`.
+- the same generic server now also has one admitted sparse `gemma4:26b`
+  execution ladder above the existing topology-publication surface:
+  single-node `/v1/chat/completions` and `/v1/responses` now execute locally on
+  CUDA and Metal without a distributed schedule, and an operator can still
+  admit one real multi-node sparse schedule to widen that same row into
+  `tensor_sharded` clustered execution together with selected-node truth,
+  request-specific expert-routing diagnostics, published shard artifact cache
+  truth, and conversation-local sticky placement on `/v1/responses`.
 - the managed dense-GGUF lane now allocates whole-model KV-cache width instead
   of silently falling back to one-layer fixture geometry, and the repo now
   carries a multi-layer regression that keeps that boundary explicit.
@@ -346,9 +380,10 @@ What still does not exist:
   adapter-SFT lane
 - no RL-first, DPO-first, or full-model Gemma finetuning claim
 - no broader published support claim beyond the bounded dense `e4b` CUDA lane,
-  one real dense split-execution proof, one admitted sparse distributed
-  `gemma4:26b` path, the refusal-only Metal contract, routed mesh publication,
-  repo-owned conformance coverage, and the optional `31B` validation repeat
+  one real dense split-execution proof, one admitted single-node sparse
+  `gemma4:26b` text lane plus its optional admitted distributed extension, the
+  live Metal Gemma contract, routed mesh publication, repo-owned conformance
+  coverage, and the optional `31B` validation repeat
 
 ## Canonical Repeat
 
@@ -368,6 +403,18 @@ cargo test -p psionic-cluster \
   --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-cluster \
   sparse_shard_materialization_reuses_cached_artifacts \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_cuda_gemma4_26b_load_plan_admits_single_node_sparse_native_runtime \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_metal_gemma4_26b_load_plan_admits_single_node_sparse_native_runtime \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_server_gemma4_26b_single_node_lane_executes_on_cuda_without_sparse_schedule \
+  --manifest-path Cargo.toml --no-default-features
+cargo test -p psionic-serve \
+  generic_server_gemma4_26b_single_node_lane_executes_on_metal_without_sparse_schedule \
   --manifest-path Cargo.toml --no-default-features
 cargo test -p psionic-serve \
   generic_execution_headers_surface_gemma4_pipeline_cluster_truth \
@@ -431,6 +478,12 @@ cargo run -p psionic-serve --example gemma4_bench -- \
 
 cargo run -p psionic-serve --example gemma4_bench -- \
   --model-path /abs/path/to/gemma-4-26B-A4B-it-Q4_K_M.gguf \
+  --mode single \
+  --backend metal \
+  --json
+
+cargo run -p psionic-serve --example gemma4_bench -- \
+  --model-path /abs/path/to/gemma-4-26B-A4B-it-Q4_K_M.gguf \
   --mode distributed-sparse \
   --json
 ```
@@ -449,7 +502,8 @@ The supported benchmark matrix is explicit:
 - `gemma4:e2b`: dense single-node
 - `gemma4:e4b`: dense single-node and dense split execution
 - `gemma4:31b`: dense single-node and dense split execution
-- `gemma4:26b`: admitted distributed sparse only
+- `gemma4:26b`: single-node sparse text on Metal or CUDA, plus admitted
+  distributed sparse execution
 
 The harness refuses unsupported combinations instead of pretending every
 Gemma 4 row is interchangeable.
@@ -465,7 +519,9 @@ pilot cut:
   local Metal instead of failing at tokenizer admission
 - the official `26B-A4B` artifact now runs through the admitted sparse
   benchmark harness on local Metal instead of failing immediately on
-  unsupported GGUF metadata or unsupported `Q5_0` execution
+  unsupported GGUF metadata or unsupported `Q5_0` execution, and the same
+  harness now also admits the bounded single-node `--mode single` sparse text
+  lane on Metal or CUDA
 
 One honest boundary remains:
 
@@ -487,15 +543,19 @@ Those runs are the current publication bar. They prove:
 
 - bounded prompt-render and fixture alignment for the real `gemma4:e4b`
   instruction-first shape
-- dense `Gemma 4` family admission and fail-closed refusal for expert-bearing
-  `Gemma 4` artifacts
-- native CUDA load planning for quantized dense projection artifacts
+- dense `Gemma 4` family admission plus one bounded sparse `gemma4:26b`
+  single-node text lane instead of a blanket expert-family refusal
+- native CUDA and Metal load planning for the admitted sparse `gemma4:26b`
+  single-node lane
 - honest generic-server publication with:
   - `backend = cuda`
   - `execution_mode = native`
   - `execution_engine = psionic`
 - admitted `/v1/chat/completions` and `/v1/responses` execution on the bounded
   lane
+- admitted `/v1/chat/completions` and `/v1/responses` execution on the
+  single-node sparse `gemma4:26b` lane without requiring a distributed sparse
+  schedule first
 - admitted Gemma-native tool calling with JSON-schema-subset argument
   validation and replayable response-state storage
 - explicit refusal for:
@@ -545,8 +605,9 @@ The pilot stays green only if all of the following remain true:
 - when `PSIONIC_GEMMA4_31B_PILOT_GGUF_PATH` is supplied, the dense `31B`
   validation lane still matches the same tokenizer, prompt, backend-truth,
   and refusal contract instead of forking the family semantics
-- `gemma4:26b` now publishes sparse-topology truth with one explicit refusal
-  reason by default, and the same row can now cross into admitted distributed
+- `gemma4:26b` now publishes sparse-topology truth while still admitting one
+  local single-node text lane on CUDA and Metal by default
+- that same `gemma4:26b` row can still cross into admitted distributed
   execution with machine-checkable clustered receipts instead of falling back
   to a generic unsupported-family error
 
@@ -554,8 +615,9 @@ The pilot stays green only if all of the following remain true:
 
 `Gemma 4` is a family, not one model. The first useful Psionic result is not
 "supports Gemma 4" in the broad sense. The first useful result is a narrow,
-truthful lane that proves Psionic can admit a dense `Gemma 4` artifact, run it
-through a CUDA-backed serving path, and publish exactly what still remains
+truthful set of lanes that proves Psionic can admit one dense `Gemma 4`
+artifact, one sparse `gemma4:26b` single-node text lane, the bounded split and
+distributed extensions above those rows, and publish exactly what still remains
 unsupported.
 
 That bounded claim keeps later work cleanly separated:
