@@ -484,6 +484,8 @@ struct BenchReport {
     mean_ttft_s: Option<f64>,
     mean_decode_tok_s: Option<f64>,
     mean_gemma4_metal_decode_readback_bytes_per_token: Option<f64>,
+    mean_delivery_kernel_count: Option<f64>,
+    mean_delivery_bytes_moved: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -500,6 +502,8 @@ struct BenchRunReport {
     decode_s: Option<f64>,
     ttft_s: Option<f64>,
     decode_tok_s: Option<f64>,
+    delivery_kernel_count: Option<usize>,
+    delivery_bytes_moved: Option<u64>,
     gemma4_metal_decode_output_modes: Option<Vec<String>>,
     gemma4_metal_decode_readback_bytes: Option<u64>,
     gemma4_metal_decode_readback_bytes_per_token: Option<f64>,
@@ -869,6 +873,8 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
                 .as_ref()
                 .and_then(|metrics| metrics.eval_duration_ns)
                 .and_then(|decode_ns| tokens_per_second(output_tokens, decode_ns)),
+            delivery_kernel_count: None,
+            delivery_bytes_moved: None,
             gemma4_metal_decode_output_modes: metrics
                 .as_ref()
                 .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
@@ -946,6 +952,10 @@ fn finish_report(
         runs.iter()
             .map(|run| run.gemma4_metal_decode_readback_bytes_per_token),
     );
+    let mean_delivery_kernel_count =
+        mean_option(runs.iter().map(|run| run.delivery_kernel_count.map(|value| value as f64)));
+    let mean_delivery_bytes_moved =
+        mean_option(runs.iter().map(|run| run.delivery_bytes_moved.map(|value| value as f64)));
     BenchReport {
         schema_version: 1,
         report_kind: String::from("psionic_gemma4_bench"),
@@ -998,6 +1008,8 @@ fn finish_report(
         mean_ttft_s,
         mean_decode_tok_s,
         mean_gemma4_metal_decode_readback_bytes_per_token,
+        mean_delivery_kernel_count,
+        mean_delivery_bytes_moved,
     }
 }
 
@@ -1007,6 +1019,10 @@ fn run_report_from_generation(
     total_s: f64,
 ) -> BenchRunReport {
     let gemma4_metal_decode = response.metrics.gemma4_metal_decode.as_ref();
+    let delivery_proof = response
+        .provenance
+        .as_ref()
+        .and_then(|provenance| provenance.delivery_proof.as_ref());
     BenchRunReport {
         run_index: run_index + 1,
         output_tokens: response.usage.output_tokens,
@@ -1029,6 +1045,8 @@ fn run_report_from_generation(
             .metrics
             .eval_duration_ns
             .and_then(|decode_ns| tokens_per_second(response.usage.output_tokens, decode_ns)),
+        delivery_kernel_count: delivery_proof.map(|proof| proof.kernel_count),
+        delivery_bytes_moved: delivery_proof.map(|proof| proof.bytes_moved),
         gemma4_metal_decode_output_modes: gemma4_metal_decode.map(|metrics| {
             metrics
                 .output_modes

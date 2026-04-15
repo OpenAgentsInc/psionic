@@ -237,17 +237,25 @@ pub fn default_kv_cache_encoding_policy(
         .saturating_mul(std::mem::size_of::<u16>())
         .try_into()
         .unwrap_or(u64::MAX);
-    if runtime_backend.starts_with("cuda") || runtime_backend == "metal" {
+    let enable_metal_f16_mirror = runtime_backend == "metal"
+        && std::env::var_os("PSIONIC_METAL_KV_CACHE_F16_MIRROR").is_some();
+    if runtime_backend.starts_with("cuda") || enable_metal_f16_mirror {
         return KvCacheEncodingPolicy::dense_f16_mirror(
             host_bytes_per_token,
             device_bytes_per_token,
             model_family,
             max_context,
         )
-        .with_detail("host rows stay dense while active decode uses an f16 device mirror");
+        .with_detail(
+            "host rows stay dense while active decode uses an f16 device mirror",
+        );
     }
     KvCacheEncodingPolicy::dense_f32(host_bytes_per_token, model_family, max_context)
-        .with_detail("host-resident dense rows remain the active KV representation")
+        .with_detail(if runtime_backend == "metal" {
+            "metal defaults to dense_f32 KV rows until the f16 mirror path wins the retained bench; set PSIONIC_METAL_KV_CACHE_F16_MIRROR=1 to opt in"
+        } else {
+            "host-resident dense rows remain the active KV representation"
+        })
 }
 
 /// Returns default KV-cache encoding accounting for one runtime backend.

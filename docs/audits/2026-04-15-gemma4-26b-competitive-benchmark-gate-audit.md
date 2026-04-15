@@ -156,6 +156,26 @@ Gate verdict:
 - `beats_llama_cpp = false`
 - `pass = false`
 
+## Same-Day Follow-On Tuning Note
+
+One same-day branch pass after this gate receipt kept the benchmark prompt and
+artifact fixed while trying three narrow Metal follow-ons:
+
+- a real `DenseF16Mirror` device KV path
+- a local sparse decode control-flow fix for the dense shared q8_1 branch
+- wider dense `q5_0` / `q8_0` Metal matvec threadgroups
+
+The practical result is still the same competitive boundary.
+
+- the real `DenseF16Mirror` path was slower on this lane, so Metal now keeps
+  dense-`f32` KV rows as the default and exposes the f16 mirror only behind
+  `PSIONIC_METAL_KV_CACHE_F16_MIRROR=1`
+- the widened dense `q5_0` / `q8_0` threadgroups only moved the retained local
+  check to about `decode_tok_s = 30.20`
+- that follow-on remains far below same-host `ollama` and `llama.cpp`, so the
+  next honest step is still a broader runtime and kernel rewrite rather than
+  more tiny receipt-chasing tweaks
+
 ## What This Actually Proves
 
 This closes the benchmark-gate issue because the benchmark is now honest and

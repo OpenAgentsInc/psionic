@@ -147,6 +147,13 @@ into one generic engine claim.
   - current boundary = that pass fixes the local fallback cliff but does not
     yet close parity with `ollama` or `llama.cpp`, and the sparse 26B local
     lane still returns malformed text on the shared benchmark prompt
+  - current follow-on tuning note = a same-day retained branch pass widened
+    the dense `q5_0` / `q8_0` Metal matvec threadgroups and restored
+    dense-`f32` KV rows as the default Metal cache policy while keeping the
+    real `DenseF16Mirror` path behind
+    `PSIONIC_METAL_KV_CACHE_F16_MIRROR=1`; the latest retained local check on
+    the same benchmark prompt still lands at about `30.20 tok/s`, so the lane
+    remains materially behind `ollama` and `llama.cpp`
   - claim boundary = one local single-node text lane plus one admitted
     distributed sparse extension only; this still does not promote multimodal,
     audio, structured-output, or training claims for `gemma4:26b`

@@ -110,6 +110,11 @@ pub const TEXT_GENERATION_SUPPORTED_OPS: &[&str] = &[
     "backend_extension:rms_norm",
     "backend_extension:rotary_embedding",
     "backend_extension:scaled_dot_product_attention",
+    "residual_post_norm_and_rms_to_output_f32",
+    "post_norm_add_residual_f32",
+    "query_rms_rope_f32",
+    "qk_rms_rope_append_dense_kv_f32",
+    "qkv_rms_rope_append_dense_kv_f32",
     "argmax_f32",
     "top_k_f32",
     "top_k_single_row_f32",
@@ -121,6 +126,14 @@ pub const TEXT_GENERATION_SUPPORTED_OPS: &[&str] = &[
     "expert_matvec_f32_ids_q4_k",
     "expert_matvec_f32_ids_q8_0",
     "expert_matvec_f32_ids_mxfp4",
+    "quantize_f32_to_q8_1",
+    "grouped_expert_gate_up_swiglu_q4_k",
+    "grouped_expert_gate_up_swiglu_q4_k_q8_1",
+    "moe_down_aggregate_f32_ids_q4_k",
+    "moe_down_aggregate_f32_ids_q5_0",
+    "moe_down_aggregate_f32_ids_q8_0",
+    "moe_down_aggregate_q8_1_ids_q5_0",
+    "moe_down_aggregate_q8_1_ids_q8_0",
     "top_k_softmax_single_row_f32",
     "add_selected_expert_bias_f32",
     "aggregate_selected_expert_rows_f32",
@@ -1286,6 +1299,19 @@ impl MetalBackend {
             )));
         };
         self.allocate(&TensorSpec::new(shape, DType::I32, device))
+    }
+
+    /// Creates a zeroed dense `i8` buffer on the selected Metal device.
+    pub fn zeros_i8_buffer(&mut self, shape: Shape) -> Result<MetalBuffer, RuntimeError> {
+        let Some(device) = self
+            .selected_device()
+            .map(|descriptor| descriptor.device.clone())
+        else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        self.allocate(&TensorSpec::new(shape, DType::I8, device))
     }
 
     /// Creates a backend-owned quantized GGML/GGUF buffer on the selected Metal device.
@@ -2476,6 +2502,63 @@ impl MetalBackend {
         Ok(())
     }
 
+    /// Encodes one ids-driven quantized down-expert projection and aggregates
+    /// the selected expert rows into one output vector inside the same kernel.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_moe_down_aggregate_f32_id_buffer_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        weights: &MetalBuffer,
+        mode: psionic_core::QuantizationMode,
+        row_stride: usize,
+        rows_per_expert: usize,
+        columns: usize,
+        input: &MetalBuffer,
+        selected_ids: &MetalBuffer,
+        selected_count: usize,
+        selected_weights: &MetalBuffer,
+        expert_scales: &MetalBuffer,
+        bias: Option<&MetalBuffer>,
+        output: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_moe_down_aggregate_f32_ids_buffer_request(
+            weights,
+            mode,
+            row_stride,
+            rows_per_expert,
+            columns,
+            input,
+            selected_ids,
+            selected_count,
+            selected_weights,
+            expert_scales,
+            bias,
+            output,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_moe_down_aggregate_f32_ids_buffer(
+            &mut submission.platform,
+            weights,
+            mode,
+            row_stride,
+            rows_per_expert,
+            columns,
+            input,
+            selected_ids,
+            selected_count,
+            selected_weights,
+            expert_scales,
+            bias,
+            output,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
     /// Applies per-head RMS normalization with learned weights in place.
     pub fn encode_per_head_rms_norm_submission(
         &mut self,
@@ -2539,6 +2622,78 @@ impl MetalBackend {
             output,
             head_count,
             head_dim,
+            epsilon,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies optional bias and post-norm in place, adds the residual input,
+    /// and emits the next normalized buffer in one pass.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_residual_post_norm_and_rms_to_output_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        residual: &MetalBuffer,
+        bias: Option<&MetalBuffer>,
+        post_norm: Option<&MetalBuffer>,
+        next_norm_weight: &MetalBuffer,
+        next_norm_output: &MetalBuffer,
+        width: usize,
+        epsilon: f32,
+    ) -> Result<(), RuntimeError> {
+        validate_residual_post_norm_and_rms_to_output_request(
+            values,
+            residual,
+            bias,
+            post_norm,
+            next_norm_weight,
+            next_norm_output,
+            width,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_residual_post_norm_and_rms_to_output(
+            &mut submission.platform,
+            values,
+            residual,
+            bias,
+            post_norm,
+            next_norm_weight,
+            next_norm_output,
+            width,
+            epsilon,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies optional post-norm in place and adds the residual input.
+    pub fn encode_post_norm_add_residual_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        values: &MetalBuffer,
+        residual: &MetalBuffer,
+        post_norm: Option<&MetalBuffer>,
+        width: usize,
+        epsilon: f32,
+    ) -> Result<(), RuntimeError> {
+        validate_post_norm_add_residual_request(values, residual, post_norm, width)?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_post_norm_add_residual(
+            &mut submission.platform,
+            values,
+            residual,
+            post_norm,
+            width,
             epsilon,
         )?;
         submission.encoded_operations += 1;
@@ -2656,6 +2811,229 @@ impl MetalBackend {
         Ok(())
     }
 
+    /// Applies query bias, per-head RMS norm, and RoPE in-place for one dense
+    /// query projection buffer.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_query_rms_rope_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        query: &MetalBuffer,
+        query_bias: Option<&MetalBuffer>,
+        query_norm: Option<&MetalBuffer>,
+        freq_factors: &MetalBuffer,
+        head_count: usize,
+        head_dim: usize,
+        rotary_half: usize,
+        position: usize,
+        theta_scale: f32,
+        freq_scale: f32,
+        corr_dims: [f32; 2],
+        ext_factor: f32,
+        yarn_mscale: f32,
+        epsilon: f32,
+    ) -> Result<(), RuntimeError> {
+        validate_query_rms_rope_request(
+            query,
+            query_bias,
+            query_norm,
+            freq_factors,
+            head_count,
+            head_dim,
+            rotary_half,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_query_rms_rope(
+            &mut submission.platform,
+            query,
+            query_bias,
+            query_norm,
+            freq_factors,
+            head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Applies query/key bias, per-head RMS norm, RoPE, and appends K/V into the
+    /// dense KV cache from one fused QK projection buffer and a separate V
+    /// projection buffer. When `value_from_key` is true, the kernel derives the
+    /// value activations from the raw K slice before key post-processing.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_qk_rms_rope_append_dense_kv_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        qk: &MetalBuffer,
+        value: &MetalBuffer,
+        value_from_key: bool,
+        query_bias: Option<&MetalBuffer>,
+        query_norm: Option<&MetalBuffer>,
+        key_bias: Option<&MetalBuffer>,
+        key_norm: Option<&MetalBuffer>,
+        value_bias: Option<&MetalBuffer>,
+        freq_factors: &MetalBuffer,
+        query_head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        rotary_half: usize,
+        position: usize,
+        theta_scale: f32,
+        freq_scale: f32,
+        corr_dims: [f32; 2],
+        ext_factor: f32,
+        yarn_mscale: f32,
+        epsilon: f32,
+        cache: &mut MetalKvCacheMirror,
+    ) -> Result<usize, RuntimeError> {
+        validate_qk_rms_rope_append_dense_kv_request(
+            qk,
+            value,
+            query_bias,
+            query_norm,
+            key_bias,
+            key_norm,
+            value_bias,
+            freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            cache,
+        )?;
+        if cache.len() >= cache.max_context_tokens {
+            return Err(RuntimeError::Backend(format!(
+                "metal kv cache exceeded max context {}",
+                cache.max_context_tokens
+            )));
+        }
+        cache.ensure_capacity(self, cache.len().saturating_add(1))?;
+        let write_index = cache.len();
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_qk_rms_rope_append_dense_kv(
+            &mut submission.platform,
+            qk,
+            value,
+            value_from_key,
+            query_bias,
+            query_norm,
+            key_bias,
+            key_norm,
+            value_bias,
+            freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+            cache,
+        )?;
+        cache.len = cache.len.saturating_add(1);
+        submission.encoded_operations += 1;
+        Ok(write_index)
+    }
+
+    /// Applies Q/K/V bias, per-head RMS norm, RoPE, and appends K/V into the
+    /// dense KV cache directly from one fused QKV projection buffer.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_qkv_rms_rope_append_dense_kv_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        qkv: &MetalBuffer,
+        query_bias: Option<&MetalBuffer>,
+        query_norm: Option<&MetalBuffer>,
+        key_bias: Option<&MetalBuffer>,
+        key_norm: Option<&MetalBuffer>,
+        value_bias: Option<&MetalBuffer>,
+        freq_factors: &MetalBuffer,
+        query_head_count: usize,
+        kv_head_count: usize,
+        head_dim: usize,
+        rotary_half: usize,
+        position: usize,
+        theta_scale: f32,
+        freq_scale: f32,
+        corr_dims: [f32; 2],
+        ext_factor: f32,
+        yarn_mscale: f32,
+        epsilon: f32,
+        cache: &mut MetalKvCacheMirror,
+    ) -> Result<usize, RuntimeError> {
+        validate_qkv_rms_rope_append_dense_kv_request(
+            qkv,
+            query_bias,
+            query_norm,
+            key_bias,
+            key_norm,
+            value_bias,
+            freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            cache,
+        )?;
+        if cache.len() >= cache.max_context_tokens {
+            return Err(RuntimeError::Backend(format!(
+                "metal kv cache exceeded max context {}",
+                cache.max_context_tokens
+            )));
+        }
+        cache.ensure_capacity(self, cache.len().saturating_add(1))?;
+        let write_index = cache.len();
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_qkv_rms_rope_append_dense_kv(
+            &mut submission.platform,
+            qkv,
+            query_bias,
+            query_norm,
+            key_bias,
+            key_norm,
+            value_bias,
+            freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+            cache,
+        )?;
+        cache.len = cache.len.saturating_add(1);
+        submission.encoded_operations += 1;
+        Ok(write_index)
+    }
+
     /// Appends one dense KV row from Metal buffers into a dense Metal KV cache.
     pub fn encode_append_dense_kv_submission(
         &mut self,
@@ -2694,28 +3072,54 @@ impl MetalBackend {
         }
         cache.ensure_capacity(self, cache.len().saturating_add(1))?;
         let write_index = cache.len();
-        let byte_offset = write_index.saturating_mul(cache.row_byte_len);
+        let element_offset = write_index.saturating_mul(cache.width());
         let Some(backend) = self.selected_backend_mut() else {
             return Err(RuntimeError::Backend(String::from(
                 "metal backend unavailable: no selected execution device",
             )));
         };
-        backend.platform.encode_copy_f32_with_offset(
-            &mut submission.platform,
-            key,
-            &cache.key_buffer,
-            cache.width(),
-            byte_offset / size_of::<f32>(),
-        )?;
-        backend.platform.encode_copy_f32_with_offset(
-            &mut submission.platform,
-            value,
-            &cache.value_buffer,
-            cache.width(),
-            byte_offset / size_of::<f32>(),
-        )?;
+        match cache.kv_cache_encoding_policy().family {
+            KvCacheEncodingFamily::DenseF32 => {
+                backend.platform.encode_copy_f32_with_offset(
+                    &mut submission.platform,
+                    key,
+                    &cache.key_buffer,
+                    cache.width(),
+                    element_offset,
+                )?;
+                backend.platform.encode_copy_f32_with_offset(
+                    &mut submission.platform,
+                    value,
+                    &cache.value_buffer,
+                    cache.width(),
+                    element_offset,
+                )?;
+                submission.encoded_operations = submission.encoded_operations.saturating_add(2);
+            }
+            KvCacheEncodingFamily::DenseF16Mirror => {
+                backend.platform.encode_copy_f32_to_f16_with_offset(
+                    &mut submission.platform,
+                    key,
+                    &cache.key_buffer,
+                    cache.width(),
+                    element_offset,
+                )?;
+                backend.platform.encode_copy_f32_to_f16_with_offset(
+                    &mut submission.platform,
+                    value,
+                    &cache.value_buffer,
+                    cache.width(),
+                    element_offset,
+                )?;
+                submission.encoded_operations = submission.encoded_operations.saturating_add(2);
+            }
+            family => {
+                return Err(RuntimeError::Backend(format!(
+                    "metal dense kv append does not support cache encoding family {family:?}",
+                )));
+            }
+        }
         cache.len = cache.len.saturating_add(1);
-        submission.encoded_operations = submission.encoded_operations.saturating_add(2);
         Ok(write_index)
     }
 
@@ -3008,6 +3412,220 @@ impl MetalBackend {
             selected_ids,
             selected_count,
             input,
+            output,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one ids-driven grouped gate/up expert projection plus SwiGLU
+    /// activation directly into one output surface.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_grouped_expert_gate_up_swiglu_id_buffer_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        gate_weights: &MetalBuffer,
+        gate_mode: psionic_core::QuantizationMode,
+        gate_row_stride: usize,
+        up_weights: &MetalBuffer,
+        up_mode: psionic_core::QuantizationMode,
+        up_row_stride: usize,
+        rows_per_expert: usize,
+        columns: usize,
+        gate_bias: Option<&MetalBuffer>,
+        up_bias: Option<&MetalBuffer>,
+        selected_ids: &MetalBuffer,
+        selected_count: usize,
+        input: &MetalBuffer,
+        output: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_grouped_expert_gate_up_swiglu_buffer_ids_request(
+            gate_weights,
+            gate_mode,
+            gate_row_stride,
+            up_weights,
+            up_mode,
+            up_row_stride,
+            rows_per_expert,
+            columns,
+            gate_bias,
+            up_bias,
+            selected_ids,
+            selected_count,
+            input,
+            output,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend
+            .platform
+            .encode_grouped_expert_gate_up_swiglu_buffer_ids(
+                &mut submission.platform,
+                gate_weights,
+                gate_mode,
+                gate_row_stride,
+                up_weights,
+                up_mode,
+                up_row_stride,
+                rows_per_expert,
+                columns,
+                gate_bias,
+                up_bias,
+                selected_ids,
+                selected_count,
+                input,
+                output,
+            )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Quantizes one dense `f32` surface into GGML `q8_1` row blocks.
+    pub fn encode_quantize_f32_to_q8_1_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        input: &MetalBuffer,
+        rows: usize,
+        columns: usize,
+        output: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_quantize_f32_to_q8_1_request(input, rows, columns, output)?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_quantize_f32_to_q8_1(
+            &mut submission.platform,
+            input,
+            rows,
+            columns,
+            output,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one ids-driven grouped gate/up expert projection plus GELU-Gated
+    /// activation with GGML `q8_1` activation input.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_grouped_expert_gate_up_swiglu_q8_1_id_buffer_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        gate_weights: &MetalBuffer,
+        gate_mode: psionic_core::QuantizationMode,
+        gate_row_stride: usize,
+        up_weights: &MetalBuffer,
+        up_mode: psionic_core::QuantizationMode,
+        up_row_stride: usize,
+        rows_per_expert: usize,
+        columns: usize,
+        gate_bias: Option<&MetalBuffer>,
+        up_bias: Option<&MetalBuffer>,
+        selected_ids: &MetalBuffer,
+        selected_count: usize,
+        input_q8_1: &MetalBuffer,
+        output: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_grouped_expert_gate_up_swiglu_q8_1_buffer_ids_request(
+            gate_weights,
+            gate_mode,
+            gate_row_stride,
+            up_weights,
+            up_mode,
+            up_row_stride,
+            rows_per_expert,
+            columns,
+            gate_bias,
+            up_bias,
+            selected_ids,
+            selected_count,
+            input_q8_1,
+            output,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend
+            .platform
+            .encode_grouped_expert_gate_up_swiglu_q8_1_buffer_ids(
+                &mut submission.platform,
+                gate_weights,
+                gate_mode,
+                gate_row_stride,
+                up_weights,
+                up_mode,
+                up_row_stride,
+                rows_per_expert,
+                columns,
+                gate_bias,
+                up_bias,
+                selected_ids,
+                selected_count,
+                input_q8_1,
+                output,
+            )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one ids-driven quantized down-expert projection and aggregates
+    /// the selected expert rows into one output vector using GGML `q8_1`
+    /// activation rows.
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_moe_down_aggregate_q8_1_id_buffer_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        weights: &MetalBuffer,
+        mode: psionic_core::QuantizationMode,
+        row_stride: usize,
+        rows_per_expert: usize,
+        columns: usize,
+        input_q8_1: &MetalBuffer,
+        selected_ids: &MetalBuffer,
+        selected_count: usize,
+        selected_weights: &MetalBuffer,
+        expert_scales: &MetalBuffer,
+        bias: Option<&MetalBuffer>,
+        output: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_moe_down_aggregate_q8_1_ids_buffer_request(
+            weights,
+            mode,
+            row_stride,
+            rows_per_expert,
+            columns,
+            input_q8_1,
+            selected_ids,
+            selected_count,
+            selected_weights,
+            expert_scales,
+            bias,
+            output,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_moe_down_aggregate_q8_1_ids_buffer(
+            &mut submission.platform,
+            weights,
+            mode,
+            row_stride,
+            rows_per_expert,
+            columns,
+            input_q8_1,
+            selected_ids,
+            selected_count,
+            selected_weights,
+            expert_scales,
+            bias,
             output,
         )?;
         submission.encoded_operations += 1;
@@ -3748,15 +4366,24 @@ fn metal_kv_row_byte_len(
 ) -> Result<usize, RuntimeError> {
     match kv_cache_encoding_policy.family {
         KvCacheEncodingFamily::TurboQuant => ggml_q8_1_storage_bytes(width),
-        KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => width
-            .checked_mul(std::mem::size_of::<f32>())
-            .ok_or_else(|| {
-                RuntimeError::Backend(String::from("metal kv row byte length overflow"))
-            }),
+        KvCacheEncodingFamily::DenseF32 => {
+            width
+                .checked_mul(std::mem::size_of::<f32>())
+                .ok_or_else(|| {
+                    RuntimeError::Backend(String::from("metal kv row byte length overflow"))
+                })
+        }
+        KvCacheEncodingFamily::DenseF16Mirror => {
+            width
+                .checked_mul(std::mem::size_of::<u16>())
+                .ok_or_else(|| {
+                    RuntimeError::Backend(String::from("metal kv row byte length overflow"))
+                })
+        }
     }
 }
 
-fn ggml_q8_1_storage_bytes(width: usize) -> Result<usize, RuntimeError> {
+pub fn ggml_q8_1_storage_bytes(width: usize) -> Result<usize, RuntimeError> {
     if width == 0 || width % GGML_Q8_1_BLOCK_ELEMENTS != 0 {
         return Err(RuntimeError::Backend(format!(
             "metal TurboQuant rows require width divisible by {}, actual {}",
@@ -3778,8 +4405,20 @@ fn encode_metal_kv_rows(
 ) -> Result<Vec<u8>, RuntimeError> {
     match kv_cache_encoding_policy.family {
         KvCacheEncodingFamily::TurboQuant => f32_slice_to_q8_1_bytes(values, width),
-        KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => {
-            Ok(f32_slice_to_bytes(values))
+        KvCacheEncodingFamily::DenseF32 => Ok(f32_slice_to_bytes(values)),
+        KvCacheEncodingFamily::DenseF16Mirror => {
+            if values.len() % width.max(1) != 0 {
+                return Err(RuntimeError::Backend(format!(
+                    "metal dense_f16_mirror rows length mismatch: width={} values={}",
+                    width,
+                    values.len()
+                )));
+            }
+            let mut bytes = Vec::with_capacity(values.len().saturating_mul(size_of::<u16>()));
+            for &value in values {
+                bytes.extend_from_slice(&f32_to_f16_bits(value).to_le_bytes());
+            }
+            Ok(bytes)
         }
     }
 }
@@ -3791,9 +4430,8 @@ fn decode_metal_kv_row(
 ) -> Result<Vec<f32>, RuntimeError> {
     match kv_cache_encoding_policy.family {
         KvCacheEncodingFamily::TurboQuant => q8_1_bytes_to_f32_vec(bytes, width),
-        KvCacheEncodingFamily::DenseF32 | KvCacheEncodingFamily::DenseF16Mirror => {
-            bytes_to_f32_vec(bytes)
-        }
+        KvCacheEncodingFamily::DenseF32 => bytes_to_f32_vec(bytes),
+        KvCacheEncodingFamily::DenseF16Mirror => dense_f16_kv_bytes_to_f32_vec(bytes),
     }
 }
 
@@ -6585,11 +7223,12 @@ fn decode_attention_over_dense_kv_cache_rows(
     cache
         .key_buffer
         .with_bytes_at_offset(0, byte_len, |key_bytes| {
-            let key_rows = dense_kv_bytes_as_f32_cow(key_bytes)?;
+            let key_rows = dense_kv_bytes_as_f32_cow(key_bytes, cache.kv_cache_encoding_policy())?;
             cache
                 .value_buffer
                 .with_bytes_at_offset(0, byte_len, |value_bytes| {
-                    let value_rows = dense_kv_bytes_as_f32_cow(value_bytes)?;
+                    let value_rows =
+                        dense_kv_bytes_as_f32_cow(value_bytes, cache.kv_cache_encoding_policy())?;
                     dense_decode_attention_from_row_major_cache(
                         query,
                         key_rows.as_ref(),
@@ -6603,19 +7242,46 @@ fn decode_attention_over_dense_kv_cache_rows(
         })
 }
 
-fn dense_kv_bytes_as_f32_cow(bytes: &[u8]) -> Result<Cow<'_, [f32]>, RuntimeError> {
-    if bytes.len() % size_of::<f32>() != 0 {
+fn dense_kv_bytes_as_f32_cow<'a>(
+    bytes: &'a [u8],
+    kv_cache_encoding_policy: &KvCacheEncodingPolicy,
+) -> Result<Cow<'a, [f32]>, RuntimeError> {
+    match kv_cache_encoding_policy.family {
+        KvCacheEncodingFamily::DenseF32 => {
+            if bytes.len() % size_of::<f32>() != 0 {
+                return Err(RuntimeError::Backend(format!(
+                    "metal dense kv cache bytes require 4-byte alignment, actual {}",
+                    bytes.len()
+                )));
+            }
+            let (prefix, aligned, suffix) = unsafe { bytes.align_to::<f32>() };
+            if prefix.is_empty() && suffix.is_empty() {
+                Ok(Cow::Borrowed(aligned))
+            } else {
+                Ok(Cow::Owned(bytes_to_f32_vec(bytes)?))
+            }
+        }
+        KvCacheEncodingFamily::DenseF16Mirror => {
+            Ok(Cow::Owned(dense_f16_kv_bytes_to_f32_vec(bytes)?))
+        }
+        family => Err(RuntimeError::Backend(format!(
+            "metal dense kv helper does not support cache encoding family {family:?}",
+        ))),
+    }
+}
+
+fn dense_f16_kv_bytes_to_f32_vec(bytes: &[u8]) -> Result<Vec<f32>, RuntimeError> {
+    if bytes.len() % size_of::<u16>() != 0 {
         return Err(RuntimeError::Backend(format!(
-            "metal dense kv cache bytes require 4-byte alignment, actual {}",
+            "metal dense_f16_mirror kv bytes require 2-byte alignment, actual {}",
             bytes.len()
         )));
     }
-    let (prefix, aligned, suffix) = unsafe { bytes.align_to::<f32>() };
-    if prefix.is_empty() && suffix.is_empty() {
-        Ok(Cow::Borrowed(aligned))
-    } else {
-        Ok(Cow::Owned(bytes_to_f32_vec(bytes)?))
+    let mut values = Vec::with_capacity(bytes.len() / size_of::<u16>());
+    for chunk in bytes.chunks_exact(size_of::<u16>()) {
+        values.push(f16_bits_to_f32(u16::from_le_bytes([chunk[0], chunk[1]])));
     }
+    Ok(values)
 }
 
 fn dense_decode_attention_from_row_major_cache(
@@ -7114,6 +7780,777 @@ fn validate_expert_matvec_f32_ids_buffer_request(
             "metal expert_matvec_f32_ids output size mismatch: required at least {total_rows}, actual {}",
             output.spec().storage_size()
         )));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_grouped_expert_gate_up_swiglu_buffer_ids_request(
+    gate_weights: &MetalBuffer,
+    gate_mode: psionic_core::QuantizationMode,
+    gate_row_stride: usize,
+    up_weights: &MetalBuffer,
+    up_mode: psionic_core::QuantizationMode,
+    up_row_stride: usize,
+    rows_per_expert: usize,
+    columns: usize,
+    gate_bias: Option<&MetalBuffer>,
+    up_bias: Option<&MetalBuffer>,
+    selected_ids: &MetalBuffer,
+    selected_count: usize,
+    input: &MetalBuffer,
+    output: &MetalBuffer,
+) -> Result<(), RuntimeError> {
+    let gate_expert_count = validate_grouped_expert_layout(
+        gate_weights,
+        gate_mode,
+        gate_row_stride,
+        rows_per_expert,
+        columns,
+    )?;
+    let up_expert_count = validate_grouped_expert_layout(
+        up_weights,
+        up_mode,
+        up_row_stride,
+        rows_per_expert,
+        columns,
+    )?;
+    if gate_expert_count != up_expert_count {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up expert count mismatch: gate={gate_expert_count} up={up_expert_count}",
+        )));
+    }
+    if input.storage_kind() != BufferStorageKind::DenseF32 || input.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up input requires dense f32 storage, actual {:?}",
+            input.storage_kind()
+        )));
+    }
+    if output.storage_kind() != BufferStorageKind::DenseF32 || output.spec().dtype() != DType::F32
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up output requires dense f32 storage, actual {:?}",
+            output.storage_kind()
+        )));
+    }
+    if selected_ids.spec().dtype() != DType::I32
+        || selected_ids.spec().storage_size() < selected_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up selected-id buffer is too small: need {selected_count} i32 values, actual {:?} with {} elements",
+            selected_ids.spec().dtype(),
+            selected_ids.spec().storage_size()
+        )));
+    }
+    if input.spec().storage_size() < columns {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up input width mismatch: required at least {columns}, actual {}",
+            input.spec().storage_size()
+        )));
+    }
+    let total_rows = rows_per_expert.saturating_mul(selected_count);
+    if output.spec().storage_size() < total_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up output rows mismatch: required at least {total_rows}, actual {}",
+            output.spec().storage_size()
+        )));
+    }
+    for (label, bias) in [("gate", gate_bias), ("up", up_bias)] {
+        if let Some(bias) = bias {
+            if bias.storage_kind() != BufferStorageKind::DenseF32 || bias.spec().dtype() != DType::F32
+            {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up {label} bias requires dense f32 storage, actual {:?}",
+                    bias.storage_kind()
+                )));
+            }
+            let required = gate_expert_count.saturating_mul(rows_per_expert);
+            if bias.spec().storage_size() < required {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up {label} bias rows mismatch: required at least {required}, actual {}",
+                    bias.spec().storage_size()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_quantize_f32_to_q8_1_request(
+    input: &MetalBuffer,
+    rows: usize,
+    columns: usize,
+    output: &MetalBuffer,
+) -> Result<(), RuntimeError> {
+    if input.storage_kind() != BufferStorageKind::DenseF32 || input.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal q8_1 quantize input requires dense f32 storage, actual {:?}",
+            input.storage_kind()
+        )));
+    }
+    if output.spec().dtype() != DType::I8 {
+        return Err(RuntimeError::Backend(format!(
+            "metal q8_1 quantize output requires i8 storage, actual {:?}",
+            output.spec().dtype()
+        )));
+    }
+    let required_input = rows.saturating_mul(columns);
+    if input.spec().storage_size() < required_input {
+        return Err(RuntimeError::Backend(format!(
+            "metal q8_1 quantize input size mismatch: required at least {required_input}, actual {}",
+            input.spec().storage_size()
+        )));
+    }
+    let required_output = rows.saturating_mul(ggml_q8_1_storage_bytes(columns)?);
+    if output.byte_len() < required_output {
+        return Err(RuntimeError::Backend(format!(
+            "metal q8_1 quantize output size mismatch: required at least {required_output} bytes, actual {}",
+            output.byte_len()
+        )));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_grouped_expert_gate_up_swiglu_q8_1_buffer_ids_request(
+    gate_weights: &MetalBuffer,
+    gate_mode: psionic_core::QuantizationMode,
+    gate_row_stride: usize,
+    up_weights: &MetalBuffer,
+    up_mode: psionic_core::QuantizationMode,
+    up_row_stride: usize,
+    rows_per_expert: usize,
+    columns: usize,
+    gate_bias: Option<&MetalBuffer>,
+    up_bias: Option<&MetalBuffer>,
+    selected_ids: &MetalBuffer,
+    selected_count: usize,
+    input_q8_1: &MetalBuffer,
+    output: &MetalBuffer,
+) -> Result<(), RuntimeError> {
+    let gate_expert_count = validate_grouped_expert_layout(
+        gate_weights,
+        gate_mode,
+        gate_row_stride,
+        rows_per_expert,
+        columns,
+    )?;
+    let up_expert_count = validate_grouped_expert_layout(
+        up_weights,
+        up_mode,
+        up_row_stride,
+        rows_per_expert,
+        columns,
+    )?;
+    if gate_expert_count != up_expert_count {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up q8_1 expert count mismatch: gate={gate_expert_count} up={up_expert_count}",
+        )));
+    }
+    if input_q8_1.spec().dtype() != DType::I8 {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up q8_1 input requires i8 storage, actual {:?}",
+            input_q8_1.spec().dtype()
+        )));
+    }
+    if output.storage_kind() != BufferStorageKind::DenseF32 || output.spec().dtype() != DType::F32
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up q8_1 output requires dense f32 storage, actual {:?}",
+            output.storage_kind()
+        )));
+    }
+    if selected_ids.spec().dtype() != DType::I32
+        || selected_ids.spec().storage_size() < selected_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up q8_1 selected-id buffer is too small: need {selected_count} i32 values, actual {:?} with {} elements",
+            selected_ids.spec().dtype(),
+            selected_ids.spec().storage_size()
+        )));
+    }
+    let required_input = ggml_q8_1_storage_bytes(columns)?;
+    if input_q8_1.byte_len() < selected_count.saturating_mul(required_input) {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up q8_1 input size mismatch: required at least {} bytes, actual {}",
+            selected_count.saturating_mul(required_input),
+            input_q8_1.byte_len()
+        )));
+    }
+    let total_rows = rows_per_expert.saturating_mul(selected_count);
+    if output.spec().storage_size() < total_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal grouped gate/up q8_1 output rows mismatch: required at least {total_rows}, actual {}",
+            output.spec().storage_size()
+        )));
+    }
+    for (label, bias) in [("gate", gate_bias), ("up", up_bias)] {
+        if let Some(bias) = bias {
+            if bias.storage_kind() != BufferStorageKind::DenseF32 || bias.spec().dtype() != DType::F32
+            {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up q8_1 {label} bias requires dense f32 storage, actual {:?}",
+                    bias.storage_kind()
+                )));
+            }
+            let required = gate_expert_count.saturating_mul(rows_per_expert);
+            if bias.spec().storage_size() < required {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up q8_1 {label} bias rows mismatch: required at least {required}, actual {}",
+                    bias.spec().storage_size()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_moe_down_aggregate_f32_ids_buffer_request(
+    weights: &MetalBuffer,
+    mode: psionic_core::QuantizationMode,
+    row_stride: usize,
+    rows_per_expert: usize,
+    columns: usize,
+    input: &MetalBuffer,
+    selected_ids: &MetalBuffer,
+    selected_count: usize,
+    selected_weights: &MetalBuffer,
+    expert_scales: &MetalBuffer,
+    bias: Option<&MetalBuffer>,
+    output: &MetalBuffer,
+) -> Result<(), RuntimeError> {
+    let expert_count =
+        validate_grouped_expert_layout(weights, mode, row_stride, rows_per_expert, columns)?;
+    let total_inputs = columns.saturating_mul(selected_count);
+    if input.storage_kind() != BufferStorageKind::DenseF32 || input.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate input requires dense f32 storage, actual {:?}",
+            input.storage_kind()
+        )));
+    }
+    if selected_ids.spec().dtype() != DType::I32
+        || selected_ids.spec().storage_size() < selected_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate selected-id buffer is too small: need {selected_count} i32 values, actual {:?} with {} elements",
+            selected_ids.spec().dtype(),
+            selected_ids.spec().storage_size()
+        )));
+    }
+    if selected_weights.storage_kind() != BufferStorageKind::DenseF32
+        || selected_weights.spec().dtype() != DType::F32
+        || selected_weights.spec().storage_size() < selected_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate selected-weight buffer must provide {selected_count} f32 values, actual {:?} with {} elements",
+            selected_weights.storage_kind(),
+            selected_weights.spec().storage_size()
+        )));
+    }
+    if expert_scales.storage_kind() != BufferStorageKind::DenseF32
+        || expert_scales.spec().dtype() != DType::F32
+        || expert_scales.spec().storage_size() < expert_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate expert-scale buffer must provide {expert_count} f32 values, actual {:?} with {} elements",
+            expert_scales.storage_kind(),
+            expert_scales.spec().storage_size()
+        )));
+    }
+    if output.storage_kind() != BufferStorageKind::DenseF32 || output.spec().dtype() != DType::F32
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate output requires dense f32 storage, actual {:?}",
+            output.storage_kind()
+        )));
+    }
+    if input.spec().storage_size() < total_inputs {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate input size mismatch: required at least {total_inputs}, actual {}",
+            input.spec().storage_size()
+        )));
+    }
+    if output.spec().storage_size() < rows_per_expert {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate output rows mismatch: required at least {rows_per_expert}, actual {}",
+            output.spec().storage_size()
+        )));
+    }
+    if let Some(bias) = bias {
+        if bias.storage_kind() != BufferStorageKind::DenseF32 || bias.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(format!(
+                "metal moe down aggregate bias requires dense f32 storage, actual {:?}",
+                bias.storage_kind()
+            )));
+        }
+        let required = expert_count.saturating_mul(rows_per_expert);
+        if bias.spec().storage_size() < required {
+            return Err(RuntimeError::Backend(format!(
+                "metal moe down aggregate bias rows mismatch: required at least {required}, actual {}",
+                    bias.spec().storage_size()
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_moe_down_aggregate_q8_1_ids_buffer_request(
+    weights: &MetalBuffer,
+    mode: psionic_core::QuantizationMode,
+    row_stride: usize,
+    rows_per_expert: usize,
+    columns: usize,
+    input_q8_1: &MetalBuffer,
+    selected_ids: &MetalBuffer,
+    selected_count: usize,
+    selected_weights: &MetalBuffer,
+    expert_scales: &MetalBuffer,
+    bias: Option<&MetalBuffer>,
+    output: &MetalBuffer,
+) -> Result<(), RuntimeError> {
+    let expert_count =
+        validate_grouped_expert_layout(weights, mode, row_stride, rows_per_expert, columns)?;
+    if input_q8_1.spec().dtype() != DType::I8 {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 input requires i8 storage, actual {:?}",
+            input_q8_1.spec().dtype()
+        )));
+    }
+    if selected_ids.spec().dtype() != DType::I32
+        || selected_ids.spec().storage_size() < selected_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 selected-id buffer is too small: need {selected_count} i32 values, actual {:?} with {} elements",
+            selected_ids.spec().dtype(),
+            selected_ids.spec().storage_size()
+        )));
+    }
+    if selected_weights.storage_kind() != BufferStorageKind::DenseF32
+        || selected_weights.spec().dtype() != DType::F32
+        || selected_weights.spec().storage_size() < selected_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 selected-weight buffer must provide {selected_count} f32 values, actual {:?} with {} elements",
+            selected_weights.storage_kind(),
+            selected_weights.spec().storage_size()
+        )));
+    }
+    if expert_scales.storage_kind() != BufferStorageKind::DenseF32
+        || expert_scales.spec().dtype() != DType::F32
+        || expert_scales.spec().storage_size() < expert_count
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 expert-scale buffer must provide {expert_count} f32 values, actual {:?} with {} elements",
+            expert_scales.storage_kind(),
+            expert_scales.spec().storage_size()
+        )));
+    }
+    if output.storage_kind() != BufferStorageKind::DenseF32 || output.spec().dtype() != DType::F32
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 output requires dense f32 storage, actual {:?}",
+            output.storage_kind()
+        )));
+    }
+    let required_input = selected_count.saturating_mul(ggml_q8_1_storage_bytes(columns)?);
+    if input_q8_1.byte_len() < required_input {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 input size mismatch: required at least {required_input} bytes, actual {}",
+            input_q8_1.byte_len()
+        )));
+    }
+    if output.spec().storage_size() < rows_per_expert {
+        return Err(RuntimeError::Backend(format!(
+            "metal moe down aggregate q8_1 output rows mismatch: required at least {rows_per_expert}, actual {}",
+            output.spec().storage_size()
+        )));
+    }
+    if let Some(bias) = bias {
+        if bias.storage_kind() != BufferStorageKind::DenseF32 || bias.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(format!(
+                "metal moe down aggregate q8_1 bias requires dense f32 storage, actual {:?}",
+                bias.storage_kind()
+            )));
+        }
+        let required = expert_count.saturating_mul(rows_per_expert);
+        if bias.spec().storage_size() < required {
+            return Err(RuntimeError::Backend(format!(
+                "metal moe down aggregate q8_1 bias rows mismatch: required at least {required}, actual {}",
+                bias.spec().storage_size()
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_qkv_rms_rope_append_dense_kv_request(
+    qkv: &MetalBuffer,
+    query_bias: Option<&MetalBuffer>,
+    query_norm: Option<&MetalBuffer>,
+    key_bias: Option<&MetalBuffer>,
+    key_norm: Option<&MetalBuffer>,
+    value_bias: Option<&MetalBuffer>,
+    freq_factors: &MetalBuffer,
+    query_head_count: usize,
+    kv_head_count: usize,
+    head_dim: usize,
+    rotary_half: usize,
+    cache: &MetalKvCacheMirror,
+) -> Result<(), RuntimeError> {
+    if query_head_count == 0 || kv_head_count == 0 || head_dim == 0 {
+        return Err(RuntimeError::Backend(String::from(
+            "metal fused qkv postprocess requires non-zero query_head_count, kv_head_count, and head_dim",
+        )));
+    }
+    let half_dim = head_dim / 2;
+    if half_dim == 0 || rotary_half > half_dim {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qkv rotary shape mismatch: head_dim={head_dim} rotary_half={rotary_half}",
+        )));
+    }
+    let q_rows = query_head_count.saturating_mul(head_dim);
+    let kv_rows = kv_head_count.saturating_mul(head_dim);
+    let total_rows = q_rows.saturating_add(kv_rows.saturating_mul(2));
+    if qkv.storage_kind() != BufferStorageKind::DenseF32 || qkv.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qkv postprocess requires dense f32 qkv storage, actual {:?}",
+            qkv.storage_kind()
+        )));
+    }
+    if qkv.spec().storage_size() < total_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qkv postprocess qkv buffer is too small: need at least {total_rows} f32 values, actual {}",
+            qkv.spec().storage_size()
+        )));
+    }
+    if freq_factors.storage_kind() != BufferStorageKind::DenseF32
+        || freq_factors.spec().dtype() != DType::F32
+        || freq_factors.spec().storage_size() < half_dim
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qkv postprocess freq-factor buffer must provide at least {half_dim} f32 values, actual {:?} with {} elements",
+            freq_factors.storage_kind(),
+            freq_factors.spec().storage_size()
+        )));
+    }
+    if cache.kv_cache_encoding_policy().family != KvCacheEncodingFamily::DenseF32
+        && cache.kv_cache_encoding_policy().family != KvCacheEncodingFamily::DenseF16Mirror
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qkv postprocess requires dense KV cache encoding, actual {:?}",
+            cache.kv_cache_encoding_policy().family
+        )));
+    }
+    if cache.width() != kv_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qkv postprocess cache width mismatch: expected {kv_rows}, actual {}",
+            cache.width()
+        )));
+    }
+    for (label, buffer, required) in [
+        ("query_bias", query_bias, q_rows),
+        ("query_norm", query_norm, head_dim),
+        ("key_bias", key_bias, kv_rows),
+        ("key_norm", key_norm, head_dim),
+        ("value_bias", value_bias, kv_rows),
+    ] {
+        if let Some(buffer) = buffer {
+            if buffer.storage_kind() != BufferStorageKind::DenseF32
+                || buffer.spec().dtype() != DType::F32
+            {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused qkv postprocess {label} requires dense f32 storage, actual {:?}",
+                    buffer.storage_kind()
+                )));
+            }
+            if buffer.spec().storage_size() < required {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused qkv postprocess {label} is too small: need at least {required} f32 values, actual {}",
+                    buffer.spec().storage_size()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_qk_rms_rope_append_dense_kv_request(
+    qk: &MetalBuffer,
+    value: &MetalBuffer,
+    query_bias: Option<&MetalBuffer>,
+    query_norm: Option<&MetalBuffer>,
+    key_bias: Option<&MetalBuffer>,
+    key_norm: Option<&MetalBuffer>,
+    value_bias: Option<&MetalBuffer>,
+    freq_factors: &MetalBuffer,
+    query_head_count: usize,
+    kv_head_count: usize,
+    head_dim: usize,
+    rotary_half: usize,
+    cache: &MetalKvCacheMirror,
+) -> Result<(), RuntimeError> {
+    if query_head_count == 0 || kv_head_count == 0 || head_dim == 0 {
+        return Err(RuntimeError::Backend(String::from(
+            "metal fused qk postprocess requires non-zero query_head_count, kv_head_count, and head_dim",
+        )));
+    }
+    let half_dim = head_dim / 2;
+    if half_dim == 0 || rotary_half > half_dim {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk rotary shape mismatch: head_dim={head_dim} rotary_half={rotary_half}",
+        )));
+    }
+    let q_rows = query_head_count.saturating_mul(head_dim);
+    let kv_rows = kv_head_count.saturating_mul(head_dim);
+    let qk_rows = q_rows.saturating_add(kv_rows);
+    if qk.storage_kind() != BufferStorageKind::DenseF32 || qk.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess requires dense f32 qk storage, actual {:?}",
+            qk.storage_kind()
+        )));
+    }
+    if qk.spec().storage_size() < qk_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess qk buffer is too small: need at least {qk_rows} f32 values, actual {}",
+            qk.spec().storage_size()
+        )));
+    }
+    if value.storage_kind() != BufferStorageKind::DenseF32 || value.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess requires dense f32 value storage, actual {:?}",
+            value.storage_kind()
+        )));
+    }
+    if value.spec().storage_size() < kv_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess value buffer is too small: need at least {kv_rows} f32 values, actual {}",
+            value.spec().storage_size()
+        )));
+    }
+    if freq_factors.storage_kind() != BufferStorageKind::DenseF32
+        || freq_factors.spec().dtype() != DType::F32
+        || freq_factors.spec().storage_size() < half_dim
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess freq-factor buffer must provide at least {half_dim} f32 values, actual {:?} with {} elements",
+            freq_factors.storage_kind(),
+            freq_factors.spec().storage_size()
+        )));
+    }
+    if cache.kv_cache_encoding_policy().family != KvCacheEncodingFamily::DenseF32
+        && cache.kv_cache_encoding_policy().family != KvCacheEncodingFamily::DenseF16Mirror
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess requires dense KV cache encoding, actual {:?}",
+            cache.kv_cache_encoding_policy().family
+        )));
+    }
+    if cache.width() != kv_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused qk postprocess cache width mismatch: expected {kv_rows}, actual {}",
+            cache.width()
+        )));
+    }
+    for (label, buffer, required) in [
+        ("query_bias", query_bias, q_rows),
+        ("query_norm", query_norm, head_dim),
+        ("key_bias", key_bias, kv_rows),
+        ("key_norm", key_norm, head_dim),
+        ("value_bias", value_bias, kv_rows),
+    ] {
+        if let Some(buffer) = buffer {
+            if buffer.storage_kind() != BufferStorageKind::DenseF32
+                || buffer.spec().dtype() != DType::F32
+            {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused qk postprocess {label} requires dense f32 storage, actual {:?}",
+                    buffer.storage_kind()
+                )));
+            }
+            if buffer.spec().storage_size() < required {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused qk postprocess {label} is too small: need at least {required} f32 values, actual {}",
+                    buffer.spec().storage_size()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_query_rms_rope_request(
+    query: &MetalBuffer,
+    query_bias: Option<&MetalBuffer>,
+    query_norm: Option<&MetalBuffer>,
+    freq_factors: &MetalBuffer,
+    head_count: usize,
+    head_dim: usize,
+    rotary_half: usize,
+) -> Result<(), RuntimeError> {
+    if head_count == 0 || head_dim == 0 {
+        return Err(RuntimeError::Backend(String::from(
+            "metal fused query postprocess requires non-zero head_count and head_dim",
+        )));
+    }
+    let half_dim = head_dim / 2;
+    if half_dim == 0 || rotary_half > half_dim {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused query rotary shape mismatch: head_dim={head_dim} rotary_half={rotary_half}",
+        )));
+    }
+    let q_rows = head_count.saturating_mul(head_dim);
+    if query.storage_kind() != BufferStorageKind::DenseF32 || query.spec().dtype() != DType::F32 {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused query postprocess requires dense f32 query storage, actual {:?}",
+            query.storage_kind()
+        )));
+    }
+    if query.spec().storage_size() < q_rows {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused query postprocess query buffer is too small: need at least {q_rows} f32 values, actual {}",
+            query.spec().storage_size()
+        )));
+    }
+    if freq_factors.storage_kind() != BufferStorageKind::DenseF32
+        || freq_factors.spec().dtype() != DType::F32
+        || freq_factors.spec().storage_size() < half_dim
+    {
+        return Err(RuntimeError::Backend(format!(
+            "metal fused query postprocess freq-factor buffer must provide at least {half_dim} f32 values, actual {:?} with {} elements",
+            freq_factors.storage_kind(),
+            freq_factors.spec().storage_size()
+        )));
+    }
+    for (label, buffer, required) in [
+        ("query_bias", query_bias, q_rows),
+        ("query_norm", query_norm, head_dim),
+    ] {
+        if let Some(buffer) = buffer {
+            if buffer.storage_kind() != BufferStorageKind::DenseF32
+                || buffer.spec().dtype() != DType::F32
+            {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused query postprocess {label} requires dense f32 storage, actual {:?}",
+                    buffer.storage_kind()
+                )));
+            }
+            if buffer.spec().storage_size() < required {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused query postprocess {label} is too small: need at least {required} f32 values, actual {}",
+                    buffer.spec().storage_size()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_residual_post_norm_and_rms_to_output_request(
+    values: &MetalBuffer,
+    residual: &MetalBuffer,
+    bias: Option<&MetalBuffer>,
+    post_norm: Option<&MetalBuffer>,
+    next_norm_weight: &MetalBuffer,
+    next_norm_output: &MetalBuffer,
+    width: usize,
+) -> Result<(), RuntimeError> {
+    if width == 0 {
+        return Err(RuntimeError::Backend(String::from(
+            "metal fused residual path requires non-zero width",
+        )));
+    }
+    for (label, buffer) in [
+        ("values", values),
+        ("residual", residual),
+        ("next_norm_weight", next_norm_weight),
+        ("next_norm_output", next_norm_output),
+    ] {
+        if buffer.storage_kind() != BufferStorageKind::DenseF32
+            || buffer.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(format!(
+                "metal fused residual path {label} requires dense f32 storage, actual {:?}",
+                buffer.storage_kind()
+            )));
+        }
+        if buffer.spec().storage_size() < width {
+            return Err(RuntimeError::Backend(format!(
+                "metal fused residual path {label} is too small: need at least {width} f32 values, actual {}",
+                buffer.spec().storage_size()
+            )));
+        }
+    }
+    for (label, buffer) in [("bias", bias), ("post_norm", post_norm)] {
+        if let Some(buffer) = buffer {
+            if buffer.storage_kind() != BufferStorageKind::DenseF32
+                || buffer.spec().dtype() != DType::F32
+            {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused residual path {label} requires dense f32 storage, actual {:?}",
+                    buffer.storage_kind()
+                )));
+            }
+            if buffer.spec().storage_size() < width {
+                return Err(RuntimeError::Backend(format!(
+                    "metal fused residual path {label} is too small: need at least {width} f32 values, actual {}",
+                    buffer.spec().storage_size()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_post_norm_add_residual_request(
+    values: &MetalBuffer,
+    residual: &MetalBuffer,
+    post_norm: Option<&MetalBuffer>,
+    width: usize,
+) -> Result<(), RuntimeError> {
+    if width == 0 {
+        return Err(RuntimeError::Backend(String::from(
+            "metal fused post-norm residual add requires non-zero width",
+        )));
+    }
+    for (label, buffer) in [("values", values), ("residual", residual)] {
+        if buffer.storage_kind() != BufferStorageKind::DenseF32
+            || buffer.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(format!(
+                "metal fused post-norm residual add {label} requires dense f32 storage, actual {:?}",
+                buffer.storage_kind()
+            )));
+        }
+        if buffer.spec().storage_size() < width {
+            return Err(RuntimeError::Backend(format!(
+                "metal fused post-norm residual add {label} is too small: need at least {width} f32 values, actual {}",
+                buffer.spec().storage_size()
+            )));
+        }
+    }
+    if let Some(post_norm) = post_norm {
+        if post_norm.storage_kind() != BufferStorageKind::DenseF32
+            || post_norm.spec().dtype() != DType::F32
+        {
+            return Err(RuntimeError::Backend(format!(
+                "metal fused post-norm residual add post_norm requires dense f32 storage, actual {:?}",
+                post_norm.storage_kind()
+            )));
+        }
+        if post_norm.spec().storage_size() < width {
+            return Err(RuntimeError::Backend(format!(
+                "metal fused post-norm residual add post_norm is too small: need at least {width} f32 values, actual {}",
+                post_norm.spec().storage_size()
+            )));
+        }
     }
     Ok(())
 }
@@ -7722,15 +9159,15 @@ mod platform {
     use psionic_core::{DType, Device, DeviceKind, QuantizationMode};
     use psionic_runtime::{
         BufferHandle, DeviceDescriptor, DeviceMemoryBudget, HealthStatus, KernelCachePolicy,
-        KernelCacheReport, QuantizationExecution, QuantizationLoadPath, QuantizationSupport,
-        RuntimeError, RuntimeHealth,
+        KernelCacheReport, KvCacheEncodingFamily, QuantizationExecution, QuantizationLoadPath,
+        QuantizationSupport, RuntimeError, RuntimeHealth,
     };
 
     use super::{
         DeviceSupportTier, FLASH_ATTENTION_FEATURE_FLAG, FamilySupport, LEGACY_FAMILY_FLAG,
         MODERN_FAMILY_FLAG, MetalBuffer, MetalCommandStatus, MetalCommandWait,
         MetalDiscoveryReport, MetalKernelCache, MetalKvCacheMirror, MetalStorageMode,
-        classify_support, quantized_row_stride,
+        classify_support, ggml_q8_1_storage_bytes, quantized_row_stride,
     };
 
     #[derive(Clone)]
@@ -7743,15 +9180,19 @@ mod platform {
         add_inplace: ComputePipelineState,
         copy_f32_slice: ComputePipelineState,
         copy_f32_with_offset: ComputePipelineState,
+        copy_f32_to_f16_with_offset: ComputePipelineState,
         gelu_glu_f32: ComputePipelineState,
         scale_inplace: ComputePipelineState,
         matmul: ComputePipelineState,
         per_head_rms_norm_f32: ComputePipelineState,
         per_head_rms_norm_to_output_f32: ComputePipelineState,
+        residual_post_norm_and_rms_to_output_f32: ComputePipelineState,
+        post_norm_add_residual_f32: ComputePipelineState,
         per_head_rms_norm_unit_f32: ComputePipelineState,
         rope_neox_f32: ComputePipelineState,
         rope_neox_position_f32: ComputePipelineState,
         decode_attention_dense_f32: ComputePipelineState,
+        decode_attention_dense_f16: ComputePipelineState,
         argmax_f32: ComputePipelineState,
         argmax_candidates_u32: ComputePipelineState,
         quantized_matvec_argmax_q4_k: ComputePipelineState,
@@ -7762,8 +9203,10 @@ mod platform {
         quantized_matvec_argmax_mxfp4: ComputePipelineState,
         quantized_matvec_q5_0: ComputePipelineState,
         quantized_matvec_q4_k: ComputePipelineState,
+        quantized_matvec_q4_k_r2: ComputePipelineState,
         quantized_matvec_q5_k: ComputePipelineState,
         quantized_matvec_q6_k: ComputePipelineState,
+        quantized_matvec_q6_k_r2: ComputePipelineState,
         quantized_matvec_q8_0: ComputePipelineState,
         quantized_matvec_mxfp4: ComputePipelineState,
         grouped_quantized_matvec_q5_0: ComputePipelineState,
@@ -7774,6 +9217,19 @@ mod platform {
         expert_matvec_f32_ids_q4_k: ComputePipelineState,
         expert_matvec_f32_ids_q8_0: ComputePipelineState,
         expert_matvec_f32_ids_mxfp4: ComputePipelineState,
+        quantize_f32_to_q8_1: ComputePipelineState,
+        grouped_expert_gate_up_swiglu_q4_k: ComputePipelineState,
+        grouped_expert_gate_up_swiglu_q4_k_q8_1: ComputePipelineState,
+        moe_down_aggregate_f32_ids_q4_k: ComputePipelineState,
+        moe_down_aggregate_f32_ids_q5_0: ComputePipelineState,
+        moe_down_aggregate_f32_ids_q8_0: ComputePipelineState,
+        moe_down_aggregate_q8_1_ids_q5_0: ComputePipelineState,
+        moe_down_aggregate_q8_1_ids_q8_0: ComputePipelineState,
+        query_rms_rope_f32: ComputePipelineState,
+        qk_rms_rope_append_dense_kv_f32: ComputePipelineState,
+        qk_rms_rope_append_dense_kv_f16: ComputePipelineState,
+        qkv_rms_rope_append_dense_kv_f32: ComputePipelineState,
+        qkv_rms_rope_append_dense_kv_f16: ComputePipelineState,
         top_k_single_row_f32: ComputePipelineState,
         top_k_softmax_single_row_f32: ComputePipelineState,
         add_selected_expert_bias_f32: ComputePipelineState,
@@ -8147,6 +9603,52 @@ mod platform {
             Ok(())
         }
 
+        pub(super) fn encode_copy_f32_to_f16_with_offset(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            source: &PlatformBuffer,
+            source_byte_offset: usize,
+            destination: &PlatformBuffer,
+            destination_byte_offset: usize,
+            element_count: usize,
+            destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&source.raw), to_metal_size(source_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&destination.raw),
+                to_metal_size(destination_byte_offset)?,
+            );
+
+            let element_count = u32::try_from(element_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal copy_f32_to_f16 element count overflow"))
+            })?;
+            let destination_offset_elements =
+                u32::try_from(destination_offset_elements).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal copy_f32_to_f16 destination offset overflow",
+                    ))
+                })?;
+            encoder.set_bytes(2, 4, (&element_count as *const u32).cast());
+            encoder.set_bytes(3, 4, (&destination_offset_elements as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(
+                pipeline,
+                usize::try_from(element_count).map_err(|_| {
+                    RuntimeError::Backend(String::from(
+                        "metal copy_f32_to_f16 element count conversion overflow",
+                    ))
+                })?,
+            )?;
+            encoder.dispatch_threads(
+                MTLSize::new(u64::from(element_count), 1, 1),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
         pub(super) fn encode_gelu_glu_f32(
             &mut self,
             pipeline: &ComputePipelineState,
@@ -8369,6 +9871,104 @@ mod platform {
             Ok(())
         }
 
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_residual_post_norm_and_rms_to_output(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            residual: &PlatformBuffer,
+            residual_byte_offset: usize,
+            bias: Option<&PlatformBuffer>,
+            bias_byte_offset: usize,
+            post_norm: Option<&PlatformBuffer>,
+            post_norm_byte_offset: usize,
+            next_norm_weight: &PlatformBuffer,
+            next_norm_weight_byte_offset: usize,
+            next_norm_output: &PlatformBuffer,
+            next_norm_output_byte_offset: usize,
+            width: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+            encoder.set_buffer(1, Some(&residual.raw), to_metal_size(residual_byte_offset)?);
+            encoder.set_buffer(
+                2,
+                bias.map(|buffer| &*buffer.raw),
+                to_metal_size(bias_byte_offset)?,
+            );
+            encoder.set_buffer(
+                3,
+                post_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(post_norm_byte_offset)?,
+            );
+            encoder.set_buffer(
+                4,
+                Some(&next_norm_weight.raw),
+                to_metal_size(next_norm_weight_byte_offset)?,
+            );
+            encoder.set_buffer(
+                5,
+                Some(&next_norm_output.raw),
+                to_metal_size(next_norm_output_byte_offset)?,
+            );
+
+            let width = u32::try_from(width).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused residual width overflow"))
+            })?;
+            let has_bias = u32::from(bias.is_some());
+            let has_post_norm = u32::from(post_norm.is_some());
+            encoder.set_bytes(6, 4, (&width as *const u32).cast());
+            encoder.set_bytes(7, 4, (&epsilon as *const f32).cast());
+            encoder.set_bytes(8, 4, (&has_bias as *const u32).cast());
+            encoder.set_bytes(9, 4, (&has_post_norm as *const u32).cast());
+            encoder.dispatch_thread_groups(
+                MTLSize::new(1, 1, 1),
+                rms_norm_threadgroup_size(pipeline, width as usize)?,
+            );
+            Ok(())
+        }
+
+        pub(super) fn encode_post_norm_add_residual(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            values: &PlatformBuffer,
+            values_byte_offset: usize,
+            residual: &PlatformBuffer,
+            residual_byte_offset: usize,
+            post_norm: Option<&PlatformBuffer>,
+            post_norm_byte_offset: usize,
+            width: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&values.raw), to_metal_size(values_byte_offset)?);
+            encoder.set_buffer(1, Some(&residual.raw), to_metal_size(residual_byte_offset)?);
+            encoder.set_buffer(
+                2,
+                post_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(post_norm_byte_offset)?,
+            );
+
+            let width = u32::try_from(width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused post-norm residual add width overflow",
+                ))
+            })?;
+            let has_post_norm = u32::from(post_norm.is_some());
+            encoder.set_bytes(3, 4, (&width as *const u32).cast());
+            encoder.set_bytes(4, 4, (&epsilon as *const f32).cast());
+            encoder.set_bytes(5, 4, (&has_post_norm as *const u32).cast());
+            encoder.dispatch_thread_groups(
+                MTLSize::new(1, 1, 1),
+                rms_norm_threadgroup_size(pipeline, width as usize)?,
+            );
+            Ok(())
+        }
+
         pub(super) fn encode_per_head_rms_norm_unit(
             &mut self,
             pipeline: &ComputePipelineState,
@@ -8499,6 +10099,369 @@ mod platform {
             Ok(())
         }
 
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_query_rms_rope(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            query: &PlatformBuffer,
+            query_byte_offset: usize,
+            freq_factors: &PlatformBuffer,
+            freq_factors_byte_offset: usize,
+            query_bias: Option<&PlatformBuffer>,
+            query_bias_byte_offset: usize,
+            query_norm: Option<&PlatformBuffer>,
+            query_norm_byte_offset: usize,
+            head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&query.raw), to_metal_size(query_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&freq_factors.raw),
+                to_metal_size(freq_factors_byte_offset)?,
+            );
+            encoder.set_buffer(
+                2,
+                query_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(query_bias_byte_offset)?,
+            );
+            encoder.set_buffer(
+                3,
+                query_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(query_norm_byte_offset)?,
+            );
+
+            let head_count = u32::try_from(head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused query head count overflow",
+                ))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused query head dim overflow"))
+            })?;
+            let rotary_half = u32::try_from(rotary_half).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused query rotary half overflow",
+                ))
+            })?;
+            let position = u32::try_from(position).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused query position overflow"))
+            })?;
+            let has_query_bias = u32::from(query_bias.is_some());
+            let has_query_norm = u32::from(query_norm.is_some());
+
+            encoder.set_bytes(4, 4, (&head_count as *const u32).cast());
+            encoder.set_bytes(5, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(6, 4, (&rotary_half as *const u32).cast());
+            encoder.set_bytes(7, 4, (&position as *const u32).cast());
+            encoder.set_bytes(8, 4, (&theta_scale as *const f32).cast());
+            encoder.set_bytes(9, 4, (&freq_scale as *const f32).cast());
+            encoder.set_bytes(10, 4, (&corr_dims[0] as *const f32).cast());
+            encoder.set_bytes(11, 4, (&corr_dims[1] as *const f32).cast());
+            encoder.set_bytes(12, 4, (&ext_factor as *const f32).cast());
+            encoder.set_bytes(13, 4, (&yarn_mscale as *const f32).cast());
+            encoder.set_bytes(14, 4, (&epsilon as *const f32).cast());
+            encoder.set_bytes(15, 4, (&has_query_bias as *const u32).cast());
+            encoder.set_bytes(16, 4, (&has_query_norm as *const u32).cast());
+
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(head_count), 1, 1),
+                rms_norm_threadgroup_size(pipeline, head_dim as usize)?,
+            );
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qk_rms_rope_append_dense_kv(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            qk: &PlatformBuffer,
+            qk_byte_offset: usize,
+            value: &PlatformBuffer,
+            value_byte_offset: usize,
+            value_from_key: bool,
+            freq_factors: &PlatformBuffer,
+            freq_factors_byte_offset: usize,
+            query_bias: Option<&PlatformBuffer>,
+            query_bias_byte_offset: usize,
+            query_norm: Option<&PlatformBuffer>,
+            query_norm_byte_offset: usize,
+            key_bias: Option<&PlatformBuffer>,
+            key_bias_byte_offset: usize,
+            key_norm: Option<&PlatformBuffer>,
+            key_norm_byte_offset: usize,
+            value_bias: Option<&PlatformBuffer>,
+            value_bias_byte_offset: usize,
+            key_cache: &PlatformBuffer,
+            key_cache_byte_offset: usize,
+            value_cache: &PlatformBuffer,
+            value_cache_byte_offset: usize,
+            query_head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+            epsilon: f32,
+            cache_row_width: usize,
+            cache_write_offset: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&qk.raw), to_metal_size(qk_byte_offset)?);
+            encoder.set_buffer(1, Some(&value.raw), to_metal_size(value_byte_offset)?);
+            encoder.set_buffer(
+                2,
+                Some(&freq_factors.raw),
+                to_metal_size(freq_factors_byte_offset)?,
+            );
+            encoder.set_buffer(
+                3,
+                query_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(query_bias_byte_offset)?,
+            );
+            encoder.set_buffer(
+                4,
+                query_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(query_norm_byte_offset)?,
+            );
+            encoder.set_buffer(
+                5,
+                key_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(key_bias_byte_offset)?,
+            );
+            encoder.set_buffer(
+                6,
+                key_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(key_norm_byte_offset)?,
+            );
+            encoder.set_buffer(
+                7,
+                value_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(value_bias_byte_offset)?,
+            );
+            encoder.set_buffer(8, Some(&key_cache.raw), to_metal_size(key_cache_byte_offset)?);
+            encoder.set_buffer(
+                9,
+                Some(&value_cache.raw),
+                to_metal_size(value_cache_byte_offset)?,
+            );
+
+            let query_head_count = u32::try_from(query_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused qk query head count overflow",
+                ))
+            })?;
+            let kv_head_count = u32::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qk kv head count overflow"))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qk head dim overflow"))
+            })?;
+            let rotary_half = u32::try_from(rotary_half).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qk rotary half overflow"))
+            })?;
+            let position = u32::try_from(position).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qk position overflow"))
+            })?;
+            let cache_row_width = u32::try_from(cache_row_width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused qk cache row width overflow",
+                ))
+            })?;
+            let cache_write_offset = u32::try_from(cache_write_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused qk cache write offset overflow",
+                ))
+            })?;
+            let value_from_key = u32::from(value_from_key);
+            let has_query_bias = u32::from(query_bias.is_some());
+            let has_query_norm = u32::from(query_norm.is_some());
+            let has_key_bias = u32::from(key_bias.is_some());
+            let has_key_norm = u32::from(key_norm.is_some());
+            let has_value_bias = u32::from(value_bias.is_some());
+
+            encoder.set_bytes(10, 4, (&query_head_count as *const u32).cast());
+            encoder.set_bytes(11, 4, (&kv_head_count as *const u32).cast());
+            encoder.set_bytes(12, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(13, 4, (&rotary_half as *const u32).cast());
+            encoder.set_bytes(14, 4, (&position as *const u32).cast());
+            encoder.set_bytes(15, 4, (&theta_scale as *const f32).cast());
+            encoder.set_bytes(16, 4, (&freq_scale as *const f32).cast());
+            encoder.set_bytes(17, 4, (&corr_dims[0] as *const f32).cast());
+            encoder.set_bytes(18, 4, (&corr_dims[1] as *const f32).cast());
+            encoder.set_bytes(19, 4, (&ext_factor as *const f32).cast());
+            encoder.set_bytes(20, 4, (&yarn_mscale as *const f32).cast());
+            encoder.set_bytes(21, 4, (&epsilon as *const f32).cast());
+            encoder.set_bytes(22, 4, (&cache_row_width as *const u32).cast());
+            encoder.set_bytes(23, 4, (&cache_write_offset as *const u32).cast());
+            encoder.set_bytes(24, 4, (&value_from_key as *const u32).cast());
+            encoder.set_bytes(25, 4, (&has_query_bias as *const u32).cast());
+            encoder.set_bytes(26, 4, (&has_query_norm as *const u32).cast());
+            encoder.set_bytes(27, 4, (&has_key_bias as *const u32).cast());
+            encoder.set_bytes(28, 4, (&has_key_norm as *const u32).cast());
+            encoder.set_bytes(29, 4, (&has_value_bias as *const u32).cast());
+
+            let total_heads = u64::from(query_head_count).saturating_add(u64::from(kv_head_count));
+            encoder.dispatch_thread_groups(
+                MTLSize::new(total_heads, 1, 1),
+                rms_norm_threadgroup_size(pipeline, head_dim as usize)?,
+            );
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qkv_rms_rope_append_dense_kv(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            qkv: &PlatformBuffer,
+            qkv_byte_offset: usize,
+            freq_factors: &PlatformBuffer,
+            freq_factors_byte_offset: usize,
+            query_bias: Option<&PlatformBuffer>,
+            query_bias_byte_offset: usize,
+            query_norm: Option<&PlatformBuffer>,
+            query_norm_byte_offset: usize,
+            key_bias: Option<&PlatformBuffer>,
+            key_bias_byte_offset: usize,
+            key_norm: Option<&PlatformBuffer>,
+            key_norm_byte_offset: usize,
+            value_bias: Option<&PlatformBuffer>,
+            value_bias_byte_offset: usize,
+            key_cache: &PlatformBuffer,
+            key_cache_byte_offset: usize,
+            value_cache: &PlatformBuffer,
+            value_cache_byte_offset: usize,
+            query_head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+            epsilon: f32,
+            cache_row_width: usize,
+            cache_write_offset: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&qkv.raw), to_metal_size(qkv_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&freq_factors.raw),
+                to_metal_size(freq_factors_byte_offset)?,
+            );
+            encoder.set_buffer(
+                2,
+                query_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(query_bias_byte_offset)?,
+            );
+            encoder.set_buffer(
+                3,
+                query_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(query_norm_byte_offset)?,
+            );
+            encoder.set_buffer(
+                4,
+                key_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(key_bias_byte_offset)?,
+            );
+            encoder.set_buffer(
+                5,
+                key_norm.map(|buffer| &*buffer.raw),
+                to_metal_size(key_norm_byte_offset)?,
+            );
+            encoder.set_buffer(
+                6,
+                value_bias.map(|buffer| &*buffer.raw),
+                to_metal_size(value_bias_byte_offset)?,
+            );
+            encoder.set_buffer(7, Some(&key_cache.raw), to_metal_size(key_cache_byte_offset)?);
+            encoder.set_buffer(
+                8,
+                Some(&value_cache.raw),
+                to_metal_size(value_cache_byte_offset)?,
+            );
+
+            let query_head_count = u32::try_from(query_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused qkv query head count overflow",
+                ))
+            })?;
+            let kv_head_count = u32::try_from(kv_head_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qkv kv head count overflow"))
+            })?;
+            let head_dim = u32::try_from(head_dim).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qkv head dim overflow"))
+            })?;
+            let rotary_half = u32::try_from(rotary_half).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qkv rotary half overflow"))
+            })?;
+            let position = u32::try_from(position).map_err(|_| {
+                RuntimeError::Backend(String::from("metal fused qkv position overflow"))
+            })?;
+            let cache_row_width = u32::try_from(cache_row_width).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused qkv cache row width overflow",
+                ))
+            })?;
+            let cache_write_offset = u32::try_from(cache_write_offset).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal fused qkv cache write offset overflow",
+                ))
+            })?;
+            let has_query_bias = u32::from(query_bias.is_some());
+            let has_query_norm = u32::from(query_norm.is_some());
+            let has_key_bias = u32::from(key_bias.is_some());
+            let has_key_norm = u32::from(key_norm.is_some());
+            let has_value_bias = u32::from(value_bias.is_some());
+
+            encoder.set_bytes(9, 4, (&query_head_count as *const u32).cast());
+            encoder.set_bytes(10, 4, (&kv_head_count as *const u32).cast());
+            encoder.set_bytes(11, 4, (&head_dim as *const u32).cast());
+            encoder.set_bytes(12, 4, (&rotary_half as *const u32).cast());
+            encoder.set_bytes(13, 4, (&position as *const u32).cast());
+            encoder.set_bytes(14, 4, (&theta_scale as *const f32).cast());
+            encoder.set_bytes(15, 4, (&freq_scale as *const f32).cast());
+            encoder.set_bytes(16, 4, (&corr_dims[0] as *const f32).cast());
+            encoder.set_bytes(17, 4, (&corr_dims[1] as *const f32).cast());
+            encoder.set_bytes(18, 4, (&ext_factor as *const f32).cast());
+            encoder.set_bytes(19, 4, (&yarn_mscale as *const f32).cast());
+            encoder.set_bytes(20, 4, (&epsilon as *const f32).cast());
+            encoder.set_bytes(21, 4, (&cache_row_width as *const u32).cast());
+            encoder.set_bytes(22, 4, (&cache_write_offset as *const u32).cast());
+            encoder.set_bytes(23, 4, (&has_query_bias as *const u32).cast());
+            encoder.set_bytes(24, 4, (&has_query_norm as *const u32).cast());
+            encoder.set_bytes(25, 4, (&has_key_bias as *const u32).cast());
+            encoder.set_bytes(26, 4, (&has_key_norm as *const u32).cast());
+            encoder.set_bytes(27, 4, (&has_value_bias as *const u32).cast());
+
+            let total_heads = u64::from(query_head_count)
+                .saturating_add(u64::from(kv_head_count).saturating_mul(2));
+            encoder.dispatch_thread_groups(
+                MTLSize::new(total_heads, 1, 1),
+                rms_norm_threadgroup_size(pipeline, head_dim as usize)?,
+            );
+            Ok(())
+        }
+
         pub(super) fn encode_decode_attention_dense(
             &mut self,
             pipeline: &ComputePipelineState,
@@ -8620,6 +10583,41 @@ mod platform {
             Ok(())
         }
 
+        pub(super) fn encode_quantize_f32_to_q8_1(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            input: &PlatformBuffer,
+            rows: usize,
+            columns: usize,
+            output: &PlatformBuffer,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&input.raw), 0);
+            encoder.set_buffer(1, Some(&output.raw), 0);
+
+            let columns = u32::try_from(columns).map_err(|_| {
+                RuntimeError::Backend(String::from("metal q8_1 quantize columns overflow"))
+            })?;
+            let row_stride = u32::try_from(ggml_q8_1_storage_bytes(columns as usize)?).map_err(
+                |_| RuntimeError::Backend(String::from("metal q8_1 quantize row stride overflow")),
+            )?;
+            encoder.set_bytes(2, 4, (&columns as *const u32).cast());
+            encoder.set_bytes(3, 4, (&row_stride as *const u32).cast());
+
+            encoder.dispatch_thread_groups(
+                MTLSize::new(
+                    u64::from(columns / 32),
+                    u64::try_from(rows).map_err(|_| {
+                        RuntimeError::Backend(String::from("metal q8_1 quantize row count overflow"))
+                    })?,
+                    1,
+                ),
+                MTLSize::new(32, 1, 1),
+            );
+            Ok(())
+        }
+
         pub(super) fn encode_quantized_matvec(
             &mut self,
             pipeline: &ComputePipelineState,
@@ -8633,6 +10631,8 @@ mod platform {
             columns: usize,
             row_stride: usize,
             active_threads: u32,
+            rows_per_threadgroup: u32,
+            simdgroups_per_threadgroup: u32,
         ) -> Result<(), RuntimeError> {
             let encoder = self.compute_encoder();
             encoder.set_compute_pipeline_state(pipeline);
@@ -8658,8 +10658,13 @@ mod platform {
             encoder.set_bytes(6, 8, (&byte_offset as *const u64).cast());
             encoder.set_bytes(7, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = MTLSize::new(u64::from(active_threads), 1, 1);
-            encoder.dispatch_thread_groups(MTLSize::new(u64::from(rows), 1, 1), threadgroup_size);
+            let threadgroup_size =
+                quantized_row_threadgroup_size(active_threads, simdgroups_per_threadgroup)?;
+            let groups = rows.div_ceil(rows_per_threadgroup.max(1));
+            encoder.dispatch_thread_groups(
+                MTLSize::new(u64::from(groups), 1, 1),
+                threadgroup_size,
+            );
             Ok(())
         }
 
@@ -8726,6 +10731,7 @@ mod platform {
             columns: usize,
             row_stride: usize,
             selected_ids: &[i32],
+            active_threads: u32,
         ) -> Result<(), RuntimeError> {
             let total_rows = selected_ids.len().saturating_mul(rows_per_expert);
             let encoder = self.compute_encoder();
@@ -8759,8 +10765,9 @@ mod platform {
                     .saturating_mul(std::mem::size_of::<i32>()) as u64,
                 selected_ids.as_ptr().cast(),
             );
+            encoder.set_bytes(8, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            let threadgroup_size = quantized_row_threadgroup_size(active_threads, 1)?;
             encoder.dispatch_thread_groups(
                 MTLSize::new(
                     u64::try_from(total_rows).map_err(|_| {
@@ -8788,6 +10795,7 @@ mod platform {
             selected_ids: &PlatformBuffer,
             selected_ids_byte_offset: usize,
             selected_count: usize,
+            active_threads: u32,
         ) -> Result<(), RuntimeError> {
             let total_rows = selected_count.saturating_mul(rows_per_expert);
             let encoder = self.compute_encoder();
@@ -8819,8 +10827,9 @@ mod platform {
                 Some(&selected_ids.raw),
                 to_metal_size(selected_ids_byte_offset)?,
             );
+            encoder.set_bytes(8, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            let threadgroup_size = quantized_row_threadgroup_size(active_threads, 1)?;
             encoder.dispatch_thread_groups(
                 MTLSize::new(
                     u64::try_from(total_rows).map_err(|_| {
@@ -8846,6 +10855,7 @@ mod platform {
             columns: usize,
             row_stride: usize,
             selected_ids: &[i32],
+            active_threads: u32,
         ) -> Result<(), RuntimeError> {
             let total_rows = selected_ids.len().saturating_mul(rows_per_expert);
             let encoder = self.compute_encoder();
@@ -8883,8 +10893,9 @@ mod platform {
                     .saturating_mul(std::mem::size_of::<i32>()) as u64,
                 selected_ids.as_ptr().cast(),
             );
+            encoder.set_bytes(8, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            let threadgroup_size = quantized_row_threadgroup_size(active_threads, 1)?;
             encoder.dispatch_thread_groups(
                 MTLSize::new(
                     u64::try_from(total_rows).map_err(|_| {
@@ -8912,6 +10923,7 @@ mod platform {
             selected_ids: &PlatformBuffer,
             selected_ids_byte_offset: usize,
             selected_count: usize,
+            active_threads: u32,
         ) -> Result<(), RuntimeError> {
             let total_rows = selected_count.saturating_mul(rows_per_expert);
             let encoder = self.compute_encoder();
@@ -8947,8 +10959,9 @@ mod platform {
                 Some(&selected_ids.raw),
                 to_metal_size(selected_ids_byte_offset)?,
             );
+            encoder.set_bytes(8, 4, (&active_threads as *const u32).cast());
 
-            let threadgroup_size = quantized_row_threadgroup_size(pipeline)?;
+            let threadgroup_size = quantized_row_threadgroup_size(active_threads, 1)?;
             encoder.dispatch_thread_groups(
                 MTLSize::new(
                     u64::try_from(total_rows).map_err(|_| {
@@ -8956,6 +10969,341 @@ mod platform {
                             "metal expert_matvec_f32_ids row count conversion overflow",
                         ))
                     })?,
+                    1,
+                    1,
+                ),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_grouped_expert_gate_up_swiglu_buffer_ids(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            gate_weights: &PlatformBuffer,
+            up_weights: &PlatformBuffer,
+            input: &PlatformBuffer,
+            output: &PlatformBuffer,
+            gate_bias: Option<&PlatformBuffer>,
+            up_bias: Option<&PlatformBuffer>,
+            rows_per_expert: usize,
+            columns: usize,
+            gate_row_stride: usize,
+            up_row_stride: usize,
+            selected_ids: &PlatformBuffer,
+            selected_ids_byte_offset: usize,
+            selected_count: usize,
+            active_threads: u32,
+            rows_per_threadgroup: u32,
+            simdgroups_per_threadgroup: u32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&gate_weights.raw), 0);
+            encoder.set_buffer(1, Some(&up_weights.raw), 0);
+            encoder.set_buffer(2, Some(&input.raw), 0);
+            encoder.set_buffer(3, Some(&output.raw), 0);
+            encoder.set_buffer(4, gate_bias.map(|buffer| &*buffer.raw), 0);
+            encoder.set_buffer(5, up_bias.map(|buffer| &*buffer.raw), 0);
+            encoder.set_buffer(
+                6,
+                Some(&selected_ids.raw),
+                to_metal_size(selected_ids_byte_offset)?,
+            );
+
+            let rows_per_expert = u32::try_from(rows_per_expert).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up rows per expert overflow",
+                ))
+            })?;
+            let columns = u32::try_from(columns).map_err(|_| {
+                RuntimeError::Backend(String::from("metal grouped gate/up columns overflow"))
+            })?;
+            let gate_row_stride = u32::try_from(gate_row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up gate row stride overflow",
+                ))
+            })?;
+            let up_row_stride = u32::try_from(up_row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up up row stride overflow",
+                ))
+            })?;
+            let selected_count = u32::try_from(selected_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up selected count overflow",
+                ))
+            })?;
+            let has_gate_bias = u32::from(gate_bias.is_some());
+            let has_up_bias = u32::from(up_bias.is_some());
+            encoder.set_bytes(7, 4, (&rows_per_expert as *const u32).cast());
+            encoder.set_bytes(8, 4, (&columns as *const u32).cast());
+            encoder.set_bytes(9, 4, (&gate_row_stride as *const u32).cast());
+            encoder.set_bytes(10, 4, (&up_row_stride as *const u32).cast());
+            encoder.set_bytes(11, 4, (&selected_count as *const u32).cast());
+            encoder.set_bytes(12, 4, (&has_gate_bias as *const u32).cast());
+            encoder.set_bytes(13, 4, (&has_up_bias as *const u32).cast());
+            encoder.set_bytes(14, 4, (&active_threads as *const u32).cast());
+
+            let threadgroup_size =
+                quantized_row_threadgroup_size(active_threads, simdgroups_per_threadgroup)?;
+            encoder.dispatch_thread_groups(
+                MTLSize::new(
+                    u64::from(rows_per_expert.div_ceil(rows_per_threadgroup.max(1))),
+                    u64::from(selected_count),
+                    1,
+                ),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_grouped_expert_gate_up_swiglu_q8_1_buffer_ids(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            gate_weights: &PlatformBuffer,
+            up_weights: &PlatformBuffer,
+            input_q8_1: &PlatformBuffer,
+            output: &PlatformBuffer,
+            gate_bias: Option<&PlatformBuffer>,
+            up_bias: Option<&PlatformBuffer>,
+            rows_per_expert: usize,
+            columns: usize,
+            gate_row_stride: usize,
+            up_row_stride: usize,
+            selected_ids: &PlatformBuffer,
+            selected_ids_byte_offset: usize,
+            selected_count: usize,
+            active_threads: u32,
+            rows_per_threadgroup: u32,
+            simdgroups_per_threadgroup: u32,
+        ) -> Result<(), RuntimeError> {
+            let total_rows = selected_count.saturating_mul(rows_per_expert);
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&gate_weights.raw), 0);
+            encoder.set_buffer(1, Some(&up_weights.raw), 0);
+            encoder.set_buffer(2, Some(&input_q8_1.raw), 0);
+            encoder.set_buffer(3, Some(&output.raw), 0);
+            encoder.set_buffer(4, gate_bias.map(|buffer| &*buffer.raw), 0);
+            encoder.set_buffer(5, up_bias.map(|buffer| &*buffer.raw), 0);
+            encoder.set_buffer(
+                6,
+                Some(&selected_ids.raw),
+                to_metal_size(selected_ids_byte_offset)?,
+            );
+
+            let rows_per_expert = u32::try_from(rows_per_expert).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up q8_1 rows per expert overflow",
+                ))
+            })?;
+            let columns = u32::try_from(columns).map_err(|_| {
+                RuntimeError::Backend(String::from("metal grouped gate/up q8_1 columns overflow"))
+            })?;
+            let gate_row_stride = u32::try_from(gate_row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up q8_1 gate row stride overflow",
+                ))
+            })?;
+            let up_row_stride = u32::try_from(up_row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up q8_1 up row stride overflow",
+                ))
+            })?;
+            let selected_count = u32::try_from(selected_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal grouped gate/up q8_1 selected count overflow",
+                ))
+            })?;
+            let has_gate_bias = u32::from(gate_bias.is_some());
+            let has_up_bias = u32::from(up_bias.is_some());
+            encoder.set_bytes(7, 4, (&rows_per_expert as *const u32).cast());
+            encoder.set_bytes(8, 4, (&columns as *const u32).cast());
+            encoder.set_bytes(9, 4, (&gate_row_stride as *const u32).cast());
+            encoder.set_bytes(10, 4, (&up_row_stride as *const u32).cast());
+            encoder.set_bytes(11, 4, (&selected_count as *const u32).cast());
+            encoder.set_bytes(12, 4, (&has_gate_bias as *const u32).cast());
+            encoder.set_bytes(13, 4, (&has_up_bias as *const u32).cast());
+            encoder.set_bytes(14, 4, (&active_threads as *const u32).cast());
+
+            let threadgroup_size =
+                quantized_row_threadgroup_size(active_threads, simdgroups_per_threadgroup)?;
+            encoder.dispatch_thread_groups(
+                MTLSize::new(
+                    u64::try_from(total_rows.div_ceil(rows_per_threadgroup as usize)).map_err(|_| {
+                        RuntimeError::Backend(String::from(
+                            "metal grouped gate/up q8_1 row count conversion overflow",
+                        ))
+                    })?,
+                    1,
+                    1,
+                ),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_moe_down_aggregate_f32_ids_buffer(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            weights: &PlatformBuffer,
+            input: &PlatformBuffer,
+            selected_ids: &PlatformBuffer,
+            selected_ids_byte_offset: usize,
+            selected_weights: &PlatformBuffer,
+            selected_weights_byte_offset: usize,
+            expert_scales: &PlatformBuffer,
+            expert_scales_byte_offset: usize,
+            bias: Option<&PlatformBuffer>,
+            output: &PlatformBuffer,
+            rows_per_expert: usize,
+            columns: usize,
+            row_stride: usize,
+            selected_count: usize,
+            active_threads: u32,
+            rows_per_threadgroup: u32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&weights.raw), 0);
+            encoder.set_buffer(1, Some(&input.raw), 0);
+            encoder.set_buffer(
+                2,
+                Some(&selected_ids.raw),
+                to_metal_size(selected_ids_byte_offset)?,
+            );
+            encoder.set_buffer(
+                3,
+                Some(&selected_weights.raw),
+                to_metal_size(selected_weights_byte_offset)?,
+            );
+            encoder.set_buffer(
+                4,
+                Some(&expert_scales.raw),
+                to_metal_size(expert_scales_byte_offset)?,
+            );
+            encoder.set_buffer(5, bias.map(|buffer| &*buffer.raw), 0);
+            encoder.set_buffer(6, Some(&output.raw), 0);
+
+            let rows_per_expert = u32::try_from(rows_per_expert).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate rows per expert overflow",
+                ))
+            })?;
+            let columns = u32::try_from(columns).map_err(|_| {
+                RuntimeError::Backend(String::from("metal moe down aggregate columns overflow"))
+            })?;
+            let row_stride = u32::try_from(row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate row stride overflow",
+                ))
+            })?;
+            let selected_count = u32::try_from(selected_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate selected count overflow",
+                ))
+            })?;
+            let has_bias = u32::from(bias.is_some());
+            encoder.set_bytes(7, 4, (&rows_per_expert as *const u32).cast());
+            encoder.set_bytes(8, 4, (&columns as *const u32).cast());
+            encoder.set_bytes(9, 4, (&row_stride as *const u32).cast());
+            encoder.set_bytes(10, 4, (&selected_count as *const u32).cast());
+            encoder.set_bytes(11, 4, (&has_bias as *const u32).cast());
+            encoder.set_bytes(12, 4, (&active_threads as *const u32).cast());
+
+            let threadgroup_size = quantized_row_threadgroup_size(active_threads, 1)?;
+            encoder.dispatch_thread_groups(
+                MTLSize::new(
+                    u64::from(rows_per_expert.div_ceil(rows_per_threadgroup.max(1))),
+                    1,
+                    1,
+                ),
+                threadgroup_size,
+            );
+            Ok(())
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_moe_down_aggregate_q8_1_ids_buffer(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            weights: &PlatformBuffer,
+            input_q8_1: &PlatformBuffer,
+            selected_ids: &PlatformBuffer,
+            selected_ids_byte_offset: usize,
+            selected_weights: &PlatformBuffer,
+            selected_weights_byte_offset: usize,
+            expert_scales: &PlatformBuffer,
+            expert_scales_byte_offset: usize,
+            bias: Option<&PlatformBuffer>,
+            output: &PlatformBuffer,
+            rows_per_expert: usize,
+            columns: usize,
+            row_stride: usize,
+            selected_count: usize,
+            active_threads: u32,
+            rows_per_threadgroup: u32,
+            simdgroups_per_threadgroup: u32,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&weights.raw), 0);
+            encoder.set_buffer(1, Some(&input_q8_1.raw), 0);
+            encoder.set_buffer(
+                2,
+                Some(&selected_ids.raw),
+                to_metal_size(selected_ids_byte_offset)?,
+            );
+            encoder.set_buffer(
+                3,
+                Some(&selected_weights.raw),
+                to_metal_size(selected_weights_byte_offset)?,
+            );
+            encoder.set_buffer(
+                4,
+                Some(&expert_scales.raw),
+                to_metal_size(expert_scales_byte_offset)?,
+            );
+            encoder.set_buffer(5, bias.map(|buffer| &*buffer.raw), 0);
+            encoder.set_buffer(6, Some(&output.raw), 0);
+
+            let rows_per_expert = u32::try_from(rows_per_expert).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate q8_1 rows per expert overflow",
+                ))
+            })?;
+            let columns = u32::try_from(columns).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate q8_1 columns overflow",
+                ))
+            })?;
+            let row_stride = u32::try_from(row_stride).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate q8_1 row stride overflow",
+                ))
+            })?;
+            let selected_count = u32::try_from(selected_count).map_err(|_| {
+                RuntimeError::Backend(String::from(
+                    "metal moe down aggregate q8_1 selected count overflow",
+                ))
+            })?;
+            let has_bias = u32::from(bias.is_some());
+            encoder.set_bytes(7, 4, (&rows_per_expert as *const u32).cast());
+            encoder.set_bytes(8, 4, (&columns as *const u32).cast());
+            encoder.set_bytes(9, 4, (&row_stride as *const u32).cast());
+            encoder.set_bytes(10, 4, (&selected_count as *const u32).cast());
+            encoder.set_bytes(11, 4, (&has_bias as *const u32).cast());
+            encoder.set_bytes(12, 4, (&active_threads as *const u32).cast());
+
+            let threadgroup_size =
+                quantized_row_threadgroup_size(active_threads, simdgroups_per_threadgroup)?;
+            encoder.dispatch_thread_groups(
+                MTLSize::new(
+                    u64::from(rows_per_expert.div_ceil(rows_per_threadgroup.max(1))),
                     1,
                     1,
                 ),
@@ -9356,6 +11704,62 @@ mod platform {
             )
         }
 
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_residual_post_norm_and_rms_to_output(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            residual: &MetalBuffer,
+            bias: Option<&MetalBuffer>,
+            post_norm: Option<&MetalBuffer>,
+            next_norm_weight: &MetalBuffer,
+            next_norm_output: &MetalBuffer,
+            width: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.residual_post_norm_and_rms_to_output_f32;
+            submission.encode_residual_post_norm_and_rms_to_output(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                &residual.platform,
+                residual.byte_offset,
+                bias.map(|buffer| &buffer.platform),
+                bias.map_or(0, |buffer| buffer.byte_offset),
+                post_norm.map(|buffer| &buffer.platform),
+                post_norm.map_or(0, |buffer| buffer.byte_offset),
+                &next_norm_weight.platform,
+                next_norm_weight.byte_offset,
+                &next_norm_output.platform,
+                next_norm_output.byte_offset,
+                width,
+                epsilon,
+            )
+        }
+
+        pub(super) fn encode_post_norm_add_residual(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            values: &MetalBuffer,
+            residual: &MetalBuffer,
+            post_norm: Option<&MetalBuffer>,
+            width: usize,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.post_norm_add_residual_f32;
+            submission.encode_post_norm_add_residual(
+                pipeline,
+                &values.platform,
+                values.byte_offset,
+                &residual.platform,
+                residual.byte_offset,
+                post_norm.map(|buffer| &buffer.platform),
+                post_norm.map_or(0, |buffer| buffer.byte_offset),
+                width,
+                epsilon,
+            )
+        }
+
         pub(super) fn encode_per_head_rms_norm_unit(
             &mut self,
             submission: &mut PlatformSubmission,
@@ -9430,6 +11834,200 @@ mod platform {
             )
         }
 
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_query_rms_rope(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            query: &MetalBuffer,
+            query_bias: Option<&MetalBuffer>,
+            query_norm: Option<&MetalBuffer>,
+            freq_factors: &MetalBuffer,
+            head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+            epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.query_rms_rope_f32;
+            submission.encode_query_rms_rope(
+                pipeline,
+                &query.platform,
+                query.byte_offset,
+                &freq_factors.platform,
+                freq_factors.byte_offset,
+                query_bias.map(|buffer| &buffer.platform),
+                query_bias.map_or(0, |buffer| buffer.byte_offset),
+                query_norm.map(|buffer| &buffer.platform),
+                query_norm.map_or(0, |buffer| buffer.byte_offset),
+                head_count,
+                head_dim,
+                rotary_half,
+                position,
+                theta_scale,
+                freq_scale,
+                corr_dims,
+                ext_factor,
+                yarn_mscale,
+                epsilon,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qk_rms_rope_append_dense_kv(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            qk: &MetalBuffer,
+            value: &MetalBuffer,
+            value_from_key: bool,
+            query_bias: Option<&MetalBuffer>,
+            query_norm: Option<&MetalBuffer>,
+            key_bias: Option<&MetalBuffer>,
+            key_norm: Option<&MetalBuffer>,
+            value_bias: Option<&MetalBuffer>,
+            freq_factors: &MetalBuffer,
+            query_head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+            epsilon: f32,
+            cache: &MetalKvCacheMirror,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = match cache.kv_cache_encoding_policy().family {
+                KvCacheEncodingFamily::DenseF32 => &self.pipelines()?.qk_rms_rope_append_dense_kv_f32,
+                KvCacheEncodingFamily::DenseF16Mirror => {
+                    &self.pipelines()?.qk_rms_rope_append_dense_kv_f16
+                }
+                family => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal fused qk append does not support cache encoding family {family:?}",
+                    )));
+                }
+            };
+            let cache_write_offset = cache.len().saturating_mul(cache.width());
+            submission.encode_qk_rms_rope_append_dense_kv(
+                pipeline,
+                &qk.platform,
+                qk.byte_offset,
+                &value.platform,
+                value.byte_offset,
+                value_from_key,
+                &freq_factors.platform,
+                freq_factors.byte_offset,
+                query_bias.map(|buffer| &buffer.platform),
+                query_bias.map_or(0, |buffer| buffer.byte_offset),
+                query_norm.map(|buffer| &buffer.platform),
+                query_norm.map_or(0, |buffer| buffer.byte_offset),
+                key_bias.map(|buffer| &buffer.platform),
+                key_bias.map_or(0, |buffer| buffer.byte_offset),
+                key_norm.map(|buffer| &buffer.platform),
+                key_norm.map_or(0, |buffer| buffer.byte_offset),
+                value_bias.map(|buffer| &buffer.platform),
+                value_bias.map_or(0, |buffer| buffer.byte_offset),
+                &cache.key_buffer.platform,
+                cache.key_buffer.byte_offset,
+                &cache.value_buffer.platform,
+                cache.value_buffer.byte_offset,
+                query_head_count,
+                kv_head_count,
+                head_dim,
+                rotary_half,
+                position,
+                theta_scale,
+                freq_scale,
+                corr_dims,
+                ext_factor,
+                yarn_mscale,
+                epsilon,
+                cache.width(),
+                cache_write_offset,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qkv_rms_rope_append_dense_kv(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            qkv: &MetalBuffer,
+            query_bias: Option<&MetalBuffer>,
+            query_norm: Option<&MetalBuffer>,
+            key_bias: Option<&MetalBuffer>,
+            key_norm: Option<&MetalBuffer>,
+            value_bias: Option<&MetalBuffer>,
+            freq_factors: &MetalBuffer,
+            query_head_count: usize,
+            kv_head_count: usize,
+            head_dim: usize,
+            rotary_half: usize,
+            position: usize,
+            theta_scale: f32,
+            freq_scale: f32,
+            corr_dims: [f32; 2],
+            ext_factor: f32,
+            yarn_mscale: f32,
+            epsilon: f32,
+            cache: &MetalKvCacheMirror,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = match cache.kv_cache_encoding_policy().family {
+                KvCacheEncodingFamily::DenseF32 => {
+                    &self.pipelines()?.qkv_rms_rope_append_dense_kv_f32
+                }
+                KvCacheEncodingFamily::DenseF16Mirror => {
+                    &self.pipelines()?.qkv_rms_rope_append_dense_kv_f16
+                }
+                family => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal fused qkv append does not support cache encoding family {family:?}",
+                    )));
+                }
+            };
+            let cache_write_offset = cache.len().saturating_mul(cache.width());
+            submission.encode_qkv_rms_rope_append_dense_kv(
+                pipeline,
+                &qkv.platform,
+                qkv.byte_offset,
+                &freq_factors.platform,
+                freq_factors.byte_offset,
+                query_bias.map(|buffer| &buffer.platform),
+                query_bias.map_or(0, |buffer| buffer.byte_offset),
+                query_norm.map(|buffer| &buffer.platform),
+                query_norm.map_or(0, |buffer| buffer.byte_offset),
+                key_bias.map(|buffer| &buffer.platform),
+                key_bias.map_or(0, |buffer| buffer.byte_offset),
+                key_norm.map(|buffer| &buffer.platform),
+                key_norm.map_or(0, |buffer| buffer.byte_offset),
+                value_bias.map(|buffer| &buffer.platform),
+                value_bias.map_or(0, |buffer| buffer.byte_offset),
+                &cache.key_buffer.platform,
+                cache.key_buffer.byte_offset,
+                &cache.value_buffer.platform,
+                cache.value_buffer.byte_offset,
+                query_head_count,
+                kv_head_count,
+                head_dim,
+                rotary_half,
+                position,
+                theta_scale,
+                freq_scale,
+                corr_dims,
+                ext_factor,
+                yarn_mscale,
+                epsilon,
+                cache.width(),
+                cache_write_offset,
+            )
+        }
+
         pub(super) fn encode_copy_f32_with_offset(
             &mut self,
             submission: &mut PlatformSubmission,
@@ -9459,10 +12057,18 @@ mod platform {
             kv_head_count: usize,
             head_dim: usize,
             scale: f32,
-            output: &MetalBuffer,
-            active_simdgroups: usize,
+                output: &MetalBuffer,
+                active_simdgroups: usize,
         ) -> Result<(), RuntimeError> {
-            let pipeline = &self.pipelines()?.decode_attention_dense_f32;
+            let pipeline = match cache.kv_cache_encoding_policy().family {
+                KvCacheEncodingFamily::DenseF32 => &self.pipelines()?.decode_attention_dense_f32,
+                KvCacheEncodingFamily::DenseF16Mirror => &self.pipelines()?.decode_attention_dense_f16,
+                family => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal dense attention does not support cache encoding family {family:?}",
+                    )));
+                }
+            };
             submission.encode_decode_attention_dense(
                 pipeline,
                 &query.platform,
@@ -9479,6 +12085,26 @@ mod platform {
                 head_dim,
                 scale,
                 active_simdgroups,
+            )
+        }
+
+        pub(super) fn encode_copy_f32_to_f16_with_offset(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            source: &MetalBuffer,
+            destination: &MetalBuffer,
+            element_count: usize,
+            destination_offset_elements: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.copy_f32_to_f16_with_offset;
+            submission.encode_copy_f32_to_f16_with_offset(
+                pipeline,
+                &source.platform,
+                source.byte_offset,
+                &destination.platform,
+                destination.byte_offset,
+                element_count,
+                destination_offset_elements,
             )
         }
 
@@ -9627,13 +12253,27 @@ mod platform {
         ) -> Result<(), RuntimeError> {
             let row_stride = quantized_row_stride(mode, columns)?;
             let pipelines = self.pipelines()?;
-            let pipeline = match mode {
-                QuantizationMode::GgmlQ5_0 => &pipelines.quantized_matvec_q5_0,
-                QuantizationMode::GgmlQ4K => &pipelines.quantized_matvec_q4_k,
-                QuantizationMode::GgmlQ5K => &pipelines.quantized_matvec_q5_k,
-                QuantizationMode::GgmlQ6K => &pipelines.quantized_matvec_q6_k,
-                QuantizationMode::GgmlQ8_0 => &pipelines.quantized_matvec_q8_0,
-                QuantizationMode::GgmlMxfp4 => &pipelines.quantized_matvec_mxfp4,
+            let (pipeline, rows_per_threadgroup) = match mode {
+                QuantizationMode::GgmlQ5_0 => (
+                    &pipelines.quantized_matvec_q5_0,
+                    quantized_matvec_rows_per_threadgroup(mode),
+                ),
+                QuantizationMode::GgmlQ4K if rows >= 2 => (
+                    &pipelines.quantized_matvec_q4_k_r2,
+                    quantized_matvec_rows_per_threadgroup(mode),
+                ),
+                QuantizationMode::GgmlQ4K => (&pipelines.quantized_matvec_q4_k, 1),
+                QuantizationMode::GgmlQ5K => (&pipelines.quantized_matvec_q5_k, 1),
+                QuantizationMode::GgmlQ6K if rows >= 2 => (
+                    &pipelines.quantized_matvec_q6_k_r2,
+                    quantized_matvec_rows_per_threadgroup(mode),
+                ),
+                QuantizationMode::GgmlQ6K => (&pipelines.quantized_matvec_q6_k, 1),
+                QuantizationMode::GgmlQ8_0 => (
+                    &pipelines.quantized_matvec_q8_0,
+                    quantized_matvec_rows_per_threadgroup(mode),
+                ),
+                QuantizationMode::GgmlMxfp4 => (&pipelines.quantized_matvec_mxfp4, 1),
                 _ => {
                     return Err(RuntimeError::Backend(format!(
                         "metal quantized matvec does not support mode {mode:?}",
@@ -9641,6 +12281,7 @@ mod platform {
                 }
             };
             let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
+            let simdgroups_per_threadgroup = quantized_matvec_simdgroups_per_threadgroup(mode);
             submission.encode_quantized_matvec(
                 pipeline,
                 &weights.platform,
@@ -9653,6 +12294,8 @@ mod platform {
                 columns,
                 row_stride,
                 active_threads,
+                rows_per_threadgroup,
+                simdgroups_per_threadgroup,
             )
         }
 
@@ -9696,6 +12339,24 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_quantize_f32_to_q8_1(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            input: &MetalBuffer,
+            rows: usize,
+            columns: usize,
+            output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.quantize_f32_to_q8_1;
+            submission.encode_quantize_f32_to_q8_1(
+                pipeline,
+                &input.platform,
+                rows,
+                columns,
+                &output.platform,
+            )
+        }
+
         pub(super) fn encode_grouped_quantized_matvec(
             &mut self,
             submission: &mut PlatformSubmission,
@@ -9726,6 +12387,7 @@ mod platform {
                     )));
                 }
             };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
             submission.encode_grouped_quantized_matvec(
                 pipeline,
                 &weights.platform,
@@ -9735,6 +12397,7 @@ mod platform {
                 columns,
                 row_stride,
                 selected_ids,
+                active_threads,
             )
         }
 
@@ -9769,6 +12432,7 @@ mod platform {
                     )));
                 }
             };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
             submission.encode_grouped_quantized_matvec_buffer_ids(
                 pipeline,
                 &weights.platform,
@@ -9780,6 +12444,7 @@ mod platform {
                 &selected_ids.platform,
                 selected_ids.byte_offset,
                 selected_count,
+                active_threads,
             )
         }
 
@@ -9813,6 +12478,7 @@ mod platform {
                     )));
                 }
             };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
             submission.encode_expert_matvec_f32_ids(
                 pipeline,
                 &weights.platform,
@@ -9822,6 +12488,7 @@ mod platform {
                 columns,
                 row_stride,
                 selected_ids,
+                active_threads,
             )
         }
 
@@ -9856,6 +12523,7 @@ mod platform {
                     )));
                 }
             };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
             submission.encode_expert_matvec_f32_ids_buffer(
                 pipeline,
                 &weights.platform,
@@ -9867,6 +12535,257 @@ mod platform {
                 &selected_ids.platform,
                 selected_ids.byte_offset,
                 selected_count,
+                active_threads,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_grouped_expert_gate_up_swiglu_buffer_ids(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            gate_weights: &MetalBuffer,
+            gate_mode: QuantizationMode,
+            gate_row_stride: usize,
+            up_weights: &MetalBuffer,
+            up_mode: QuantizationMode,
+            up_row_stride: usize,
+            rows_per_expert: usize,
+            columns: usize,
+            gate_bias: Option<&MetalBuffer>,
+            up_bias: Option<&MetalBuffer>,
+            selected_ids: &MetalBuffer,
+            selected_count: usize,
+            input: &MetalBuffer,
+            output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let gate_expected_row_stride = quantized_row_stride(gate_mode, columns)?;
+            if gate_row_stride != gate_expected_row_stride {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up gate row stride mismatch: expected {gate_expected_row_stride}, actual {gate_row_stride}",
+                )));
+            }
+            let up_expected_row_stride = quantized_row_stride(up_mode, columns)?;
+            if up_row_stride != up_expected_row_stride {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up up row stride mismatch: expected {up_expected_row_stride}, actual {up_row_stride}",
+                )));
+            }
+            let pipelines = self.pipelines()?;
+            let pipeline = match (gate_mode, up_mode) {
+                (QuantizationMode::GgmlQ4K, QuantizationMode::GgmlQ4K) => {
+                    &pipelines.grouped_expert_gate_up_swiglu_q4_k
+                }
+                _ => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal grouped gate/up SwiGLU does not support gate={gate_mode:?} up={up_mode:?}",
+                    )));
+                }
+            };
+            let active_threads =
+                quantized_row_active_thread_count(pipeline, gate_mode, columns)?;
+            let simdgroups_per_threadgroup =
+                grouped_gate_up_simdgroups_per_threadgroup(gate_mode, up_mode);
+            let rows_per_threadgroup =
+                grouped_gate_up_rows_per_threadgroup(gate_mode, up_mode);
+            submission.encode_grouped_expert_gate_up_swiglu_buffer_ids(
+                pipeline,
+                &gate_weights.platform,
+                &up_weights.platform,
+                &input.platform,
+                &output.platform,
+                gate_bias.map(|buffer| &buffer.platform),
+                up_bias.map(|buffer| &buffer.platform),
+                rows_per_expert,
+                columns,
+                gate_row_stride,
+                up_row_stride,
+                &selected_ids.platform,
+                selected_ids.byte_offset,
+                selected_count,
+                active_threads,
+                rows_per_threadgroup,
+                simdgroups_per_threadgroup,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_grouped_expert_gate_up_swiglu_q8_1_buffer_ids(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            gate_weights: &MetalBuffer,
+            gate_mode: QuantizationMode,
+            gate_row_stride: usize,
+            up_weights: &MetalBuffer,
+            up_mode: QuantizationMode,
+            up_row_stride: usize,
+            rows_per_expert: usize,
+            columns: usize,
+            gate_bias: Option<&MetalBuffer>,
+            up_bias: Option<&MetalBuffer>,
+            selected_ids: &MetalBuffer,
+            selected_count: usize,
+            input_q8_1: &MetalBuffer,
+            output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let gate_expected_row_stride = quantized_row_stride(gate_mode, columns)?;
+            if gate_row_stride != gate_expected_row_stride {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up q8_1 gate row stride mismatch: expected {gate_expected_row_stride}, actual {gate_row_stride}",
+                )));
+            }
+            let up_expected_row_stride = quantized_row_stride(up_mode, columns)?;
+            if up_row_stride != up_expected_row_stride {
+                return Err(RuntimeError::Backend(format!(
+                    "metal grouped gate/up q8_1 up row stride mismatch: expected {up_expected_row_stride}, actual {up_row_stride}",
+                )));
+            }
+            let pipelines = self.pipelines()?;
+            let pipeline = match (gate_mode, up_mode) {
+                (QuantizationMode::GgmlQ4K, QuantizationMode::GgmlQ4K) => {
+                    &pipelines.grouped_expert_gate_up_swiglu_q4_k_q8_1
+                }
+                _ => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal grouped gate/up q8_1 SwiGLU does not support gate={gate_mode:?} up={up_mode:?}",
+                    )));
+                }
+            };
+            let active_threads =
+                quantized_row_active_thread_count(pipeline, gate_mode, columns)?;
+            let simdgroups_per_threadgroup =
+                grouped_gate_up_simdgroups_per_threadgroup(gate_mode, up_mode);
+            let rows_per_threadgroup =
+                grouped_gate_up_rows_per_threadgroup(gate_mode, up_mode);
+            submission.encode_grouped_expert_gate_up_swiglu_q8_1_buffer_ids(
+                pipeline,
+                &gate_weights.platform,
+                &up_weights.platform,
+                &input_q8_1.platform,
+                &output.platform,
+                gate_bias.map(|buffer| &buffer.platform),
+                up_bias.map(|buffer| &buffer.platform),
+                rows_per_expert,
+                columns,
+                gate_row_stride,
+                up_row_stride,
+                &selected_ids.platform,
+                selected_ids.byte_offset,
+                selected_count,
+                active_threads,
+                rows_per_threadgroup,
+                simdgroups_per_threadgroup,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_moe_down_aggregate_f32_ids_buffer(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            weights: &MetalBuffer,
+            mode: QuantizationMode,
+            row_stride: usize,
+            rows_per_expert: usize,
+            columns: usize,
+            input: &MetalBuffer,
+            selected_ids: &MetalBuffer,
+            selected_count: usize,
+            selected_weights: &MetalBuffer,
+            expert_scales: &MetalBuffer,
+            bias: Option<&MetalBuffer>,
+            output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let expected_row_stride = quantized_row_stride(mode, columns)?;
+            if row_stride != expected_row_stride {
+                return Err(RuntimeError::Backend(format!(
+                    "metal moe down aggregate row stride mismatch: expected {expected_row_stride}, actual {row_stride}",
+                )));
+            }
+            let pipelines = self.pipelines()?;
+            let pipeline = match mode {
+                QuantizationMode::GgmlQ4K => &pipelines.moe_down_aggregate_f32_ids_q4_k,
+                QuantizationMode::GgmlQ5_0 => &pipelines.moe_down_aggregate_f32_ids_q5_0,
+                QuantizationMode::GgmlQ8_0 => &pipelines.moe_down_aggregate_f32_ids_q8_0,
+                _ => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal moe down aggregate does not support mode {mode:?}",
+                    )));
+                }
+            };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
+            submission.encode_moe_down_aggregate_f32_ids_buffer(
+                pipeline,
+                &weights.platform,
+                &input.platform,
+                &selected_ids.platform,
+                selected_ids.byte_offset,
+                &selected_weights.platform,
+                selected_weights.byte_offset,
+                &expert_scales.platform,
+                expert_scales.byte_offset,
+                bias.map(|buffer| &buffer.platform),
+                &output.platform,
+                rows_per_expert,
+                columns,
+                row_stride,
+                selected_count,
+                active_threads,
+                moe_down_rows_per_threadgroup(mode),
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_moe_down_aggregate_q8_1_ids_buffer(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            weights: &MetalBuffer,
+            mode: QuantizationMode,
+            row_stride: usize,
+            rows_per_expert: usize,
+            columns: usize,
+            input_q8_1: &MetalBuffer,
+            selected_ids: &MetalBuffer,
+            selected_count: usize,
+            selected_weights: &MetalBuffer,
+            expert_scales: &MetalBuffer,
+            bias: Option<&MetalBuffer>,
+            output: &MetalBuffer,
+        ) -> Result<(), RuntimeError> {
+            let expected_row_stride = quantized_row_stride(mode, columns)?;
+            if row_stride != expected_row_stride {
+                return Err(RuntimeError::Backend(format!(
+                    "metal moe down aggregate q8_1 row stride mismatch: expected {expected_row_stride}, actual {row_stride}",
+                )));
+            }
+            let pipelines = self.pipelines()?;
+            let pipeline = match mode {
+                QuantizationMode::GgmlQ5_0 => &pipelines.moe_down_aggregate_q8_1_ids_q5_0,
+                QuantizationMode::GgmlQ8_0 => &pipelines.moe_down_aggregate_q8_1_ids_q8_0,
+                _ => {
+                    return Err(RuntimeError::Backend(format!(
+                        "metal moe down aggregate q8_1 does not support mode {mode:?}",
+                    )));
+                }
+            };
+            let active_threads = quantized_row_active_thread_count(pipeline, mode, columns)?;
+            submission.encode_moe_down_aggregate_q8_1_ids_buffer(
+                pipeline,
+                &weights.platform,
+                &input_q8_1.platform,
+                &selected_ids.platform,
+                selected_ids.byte_offset,
+                &selected_weights.platform,
+                selected_weights.byte_offset,
+                &expert_scales.platform,
+                expert_scales.byte_offset,
+                bias.map(|buffer| &buffer.platform),
+                &output.platform,
+                rows_per_expert,
+                columns,
+                row_stride,
+                selected_count,
+                active_threads,
+                moe_down_q8_1_rows_per_threadgroup(mode),
+                moe_down_q8_1_simdgroups_per_threadgroup(mode),
             )
         }
 
@@ -10214,6 +13133,13 @@ mod platform {
                     "missing Metal copy_f32_with_offset kernel: {error}"
                 ))
             })?;
+        let copy_f32_to_f16_with_offset = library
+            .get_function("psionic_copy_f32_to_f16_with_offset", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal copy_f32_to_f16_with_offset kernel: {error}"
+                ))
+            })?;
         let gelu_glu_f32 = library
             .get_function("psionic_gelu_glu_f32", None)
             .map_err(|error| {
@@ -10241,6 +13167,20 @@ mod platform {
                     "missing Metal per_head_rms_norm_to_output kernel: {error}"
                 ))
             })?;
+        let residual_post_norm_and_rms_to_output_f32 = library
+            .get_function("psionic_residual_post_norm_and_rms_to_output_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused residual post-norm and rms-to-output kernel: {error}"
+                ))
+            })?;
+        let post_norm_add_residual_f32 = library
+            .get_function("psionic_post_norm_add_residual_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused post-norm residual add kernel: {error}"
+                ))
+            })?;
         let per_head_rms_norm_unit_f32 = library
             .get_function("psionic_per_head_rms_norm_unit_f32", None)
             .map_err(|error| {
@@ -10258,11 +13198,53 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!("missing Metal rope_neox_position kernel: {error}"))
             })?;
+        let query_rms_rope_f32 = library
+            .get_function("psionic_query_rms_rope_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused query postprocess kernel: {error}"
+                ))
+            })?;
+        let qk_rms_rope_append_dense_kv_f32 = library
+            .get_function("psionic_qk_rms_rope_append_dense_kv_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused qk postprocess kernel: {error}"
+                ))
+            })?;
+        let qk_rms_rope_append_dense_kv_f16 = library
+            .get_function("psionic_qk_rms_rope_append_dense_kv_f16", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused qk postprocess f16 kernel: {error}"
+                ))
+            })?;
+        let qkv_rms_rope_append_dense_kv_f32 = library
+            .get_function("psionic_qkv_rms_rope_append_dense_kv_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused qkv postprocess kernel: {error}"
+                ))
+            })?;
+        let qkv_rms_rope_append_dense_kv_f16 = library
+            .get_function("psionic_qkv_rms_rope_append_dense_kv_f16", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal fused qkv postprocess f16 kernel: {error}"
+                ))
+            })?;
         let decode_attention_dense_f32 = library
             .get_function("psionic_decode_attention_dense_f32", None)
             .map_err(|error| {
                 RuntimeError::Backend(format!(
                     "missing Metal decode_attention_dense kernel: {error}"
+                ))
+            })?;
+        let decode_attention_dense_f16 = library
+            .get_function("psionic_decode_attention_dense_f16", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal decode_attention_dense_f16 kernel: {error}"
                 ))
             })?;
         let argmax_f32 = library
@@ -10355,6 +13337,13 @@ mod platform {
                     "missing Metal q4_k quantized matvec kernel: {error}"
                 ))
             })?;
+        let quantized_matvec_q4_k_r2 = library
+            .get_function("psionic_quantized_matvec_q4_k_r2", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q4_k r2 quantized matvec kernel: {error}"
+                ))
+            })?;
         let quantized_matvec_q5_0 = library
             .get_function("psionic_quantized_matvec_q5_0", None)
             .map_err(|error| {
@@ -10374,6 +13363,13 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!(
                     "missing Metal q6_k quantized matvec kernel: {error}"
+                ))
+            })?;
+        let quantized_matvec_q6_k_r2 = library
+            .get_function("psionic_quantized_matvec_q6_k_r2", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q6_k r2 quantized matvec kernel: {error}"
                 ))
             })?;
         let quantized_matvec_mxfp4 = library
@@ -10433,6 +13429,62 @@ mod platform {
                     "missing Metal mxfp4 expert_matvec_f32_ids kernel: {error}"
                 ))
             })?;
+        let quantize_f32_to_q8_1 = library
+            .get_function("psionic_quantize_f32_to_q8_1", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q8_1 quantize kernel: {error}"
+                ))
+            })?;
+        let grouped_expert_gate_up_swiglu_q4_k = library
+            .get_function("psionic_grouped_expert_gate_up_swiglu_q4_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q4_k grouped expert gate/up SwiGLU kernel: {error}"
+                ))
+            })?;
+        let grouped_expert_gate_up_swiglu_q4_k_q8_1 = library
+            .get_function("psionic_grouped_expert_gate_up_swiglu_q4_k_q8_1", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q4_k grouped expert gate/up SwiGLU q8_1 kernel: {error}"
+                ))
+            })?;
+        let moe_down_aggregate_f32_ids_q4_k = library
+            .get_function("psionic_moe_down_aggregate_f32_ids_q4_k", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q4_k moe down aggregate kernel: {error}"
+                ))
+            })?;
+        let moe_down_aggregate_f32_ids_q5_0 = library
+            .get_function("psionic_moe_down_aggregate_f32_ids_q5_0", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q5_0 moe down aggregate kernel: {error}"
+                ))
+            })?;
+        let moe_down_aggregate_f32_ids_q8_0 = library
+            .get_function("psionic_moe_down_aggregate_f32_ids_q8_0", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q8_0 moe down aggregate kernel: {error}"
+                ))
+            })?;
+        let moe_down_aggregate_q8_1_ids_q5_0 = library
+            .get_function("psionic_moe_down_aggregate_q8_1_ids_q5_0", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q5_0 moe down aggregate q8_1 kernel: {error}"
+                ))
+            })?;
+        let moe_down_aggregate_q8_1_ids_q8_0 = library
+            .get_function("psionic_moe_down_aggregate_q8_1_ids_q8_0", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!(
+                    "missing Metal q8_0 moe down aggregate q8_1 kernel: {error}"
+                ))
+            })?;
 
         Ok(DensePipelines {
             add: device
@@ -10459,6 +13511,13 @@ mod platform {
                 .map_err(|error| {
                     RuntimeError::Backend(format!(
                         "metal copy_f32_with_offset pipeline build failed: {error}"
+                    ))
+                })?,
+            copy_f32_to_f16_with_offset: device
+                .new_compute_pipeline_state_with_function(&copy_f32_to_f16_with_offset)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal copy_f32_to_f16_with_offset pipeline build failed: {error}"
                     ))
                 })?,
             gelu_glu_f32: device
@@ -10492,6 +13551,22 @@ mod platform {
                         "metal per_head_rms_norm_to_output pipeline build failed: {error}"
                     ))
                 })?,
+            residual_post_norm_and_rms_to_output_f32: device
+                .new_compute_pipeline_state_with_function(
+                    &residual_post_norm_and_rms_to_output_f32,
+                )
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused residual post-norm and rms-to-output pipeline build failed: {error}"
+                    ))
+                })?,
+            post_norm_add_residual_f32: device
+                .new_compute_pipeline_state_with_function(&post_norm_add_residual_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused post-norm residual add pipeline build failed: {error}"
+                    ))
+                })?,
             per_head_rms_norm_unit_f32: device
                 .new_compute_pipeline_state_with_function(&per_head_rms_norm_unit_f32)
                 .map_err(|error| {
@@ -10511,11 +13586,53 @@ mod platform {
                         "metal rope_neox_position pipeline build failed: {error}"
                     ))
                 })?,
+            query_rms_rope_f32: device
+                .new_compute_pipeline_state_with_function(&query_rms_rope_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused query postprocess pipeline build failed: {error}"
+                    ))
+                })?,
+            qk_rms_rope_append_dense_kv_f32: device
+                .new_compute_pipeline_state_with_function(&qk_rms_rope_append_dense_kv_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused qk postprocess pipeline build failed: {error}"
+                    ))
+                })?,
+            qk_rms_rope_append_dense_kv_f16: device
+                .new_compute_pipeline_state_with_function(&qk_rms_rope_append_dense_kv_f16)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused qk postprocess f16 pipeline build failed: {error}"
+                    ))
+                })?,
+            qkv_rms_rope_append_dense_kv_f32: device
+                .new_compute_pipeline_state_with_function(&qkv_rms_rope_append_dense_kv_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused qkv postprocess pipeline build failed: {error}"
+                    ))
+                })?,
+            qkv_rms_rope_append_dense_kv_f16: device
+                .new_compute_pipeline_state_with_function(&qkv_rms_rope_append_dense_kv_f16)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal fused qkv postprocess f16 pipeline build failed: {error}"
+                    ))
+                })?,
             decode_attention_dense_f32: device
                 .new_compute_pipeline_state_with_function(&decode_attention_dense_f32)
                 .map_err(|error| {
                     RuntimeError::Backend(format!(
                         "metal decode_attention_dense pipeline build failed: {error}"
+                    ))
+                })?,
+            decode_attention_dense_f16: device
+                .new_compute_pipeline_state_with_function(&decode_attention_dense_f16)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal decode_attention_dense_f16 pipeline build failed: {error}"
                     ))
                 })?,
             argmax_f32: device
@@ -10605,6 +13722,13 @@ mod platform {
                         "metal q4_k quantized matvec pipeline build failed: {error}"
                     ))
                 })?,
+            quantized_matvec_q4_k_r2: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_q4_k_r2)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q4_k r2 quantized matvec pipeline build failed: {error}"
+                    ))
+                })?,
             quantized_matvec_q5_0: device
                 .new_compute_pipeline_state_with_function(&quantized_matvec_q5_0)
                 .map_err(|error| {
@@ -10624,6 +13748,13 @@ mod platform {
                 .map_err(|error| {
                     RuntimeError::Backend(format!(
                         "metal q6_k quantized matvec pipeline build failed: {error}"
+                    ))
+                })?,
+            quantized_matvec_q6_k_r2: device
+                .new_compute_pipeline_state_with_function(&quantized_matvec_q6_k_r2)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q6_k r2 quantized matvec pipeline build failed: {error}"
                     ))
                 })?,
             quantized_matvec_q8_0: device
@@ -10696,6 +13827,62 @@ mod platform {
                         "metal mxfp4 expert_matvec_f32_ids pipeline build failed: {error}"
                     ))
                 })?,
+            quantize_f32_to_q8_1: device
+                .new_compute_pipeline_state_with_function(&quantize_f32_to_q8_1)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q8_1 quantize pipeline build failed: {error}"
+                    ))
+                })?,
+            grouped_expert_gate_up_swiglu_q4_k: device
+                .new_compute_pipeline_state_with_function(&grouped_expert_gate_up_swiglu_q4_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q4_k grouped expert gate/up SwiGLU pipeline build failed: {error}"
+                    ))
+                })?,
+            grouped_expert_gate_up_swiglu_q4_k_q8_1: device
+                .new_compute_pipeline_state_with_function(&grouped_expert_gate_up_swiglu_q4_k_q8_1)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q4_k grouped expert gate/up SwiGLU q8_1 pipeline build failed: {error}"
+                    ))
+                })?,
+            moe_down_aggregate_f32_ids_q4_k: device
+                .new_compute_pipeline_state_with_function(&moe_down_aggregate_f32_ids_q4_k)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q4_k moe down aggregate pipeline build failed: {error}"
+                    ))
+                })?,
+            moe_down_aggregate_f32_ids_q5_0: device
+                .new_compute_pipeline_state_with_function(&moe_down_aggregate_f32_ids_q5_0)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q5_0 moe down aggregate pipeline build failed: {error}"
+                    ))
+                })?,
+            moe_down_aggregate_f32_ids_q8_0: device
+                .new_compute_pipeline_state_with_function(&moe_down_aggregate_f32_ids_q8_0)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q8_0 moe down aggregate pipeline build failed: {error}"
+                    ))
+                })?,
+            moe_down_aggregate_q8_1_ids_q5_0: device
+                .new_compute_pipeline_state_with_function(&moe_down_aggregate_q8_1_ids_q5_0)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q5_0 moe down aggregate q8_1 pipeline build failed: {error}"
+                    ))
+                })?,
+            moe_down_aggregate_q8_1_ids_q8_0: device
+                .new_compute_pipeline_state_with_function(&moe_down_aggregate_q8_1_ids_q8_0)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!(
+                        "metal q8_0 moe down aggregate q8_1 pipeline build failed: {error}"
+                    ))
+                })?,
         })
     }
 
@@ -10710,6 +13897,61 @@ mod platform {
         Ok(MTLSize::new(width.max(1), 1, 1))
     }
 
+    const fn quantized_matvec_simdgroups_per_threadgroup(mode: QuantizationMode) -> u32 {
+        match mode {
+            QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0 => 4,
+            _ => 1,
+        }
+    }
+
+    const fn quantized_matvec_rows_per_simdgroup(mode: QuantizationMode) -> u32 {
+        match mode {
+            QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ6K => 2,
+            QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0 => 4,
+            _ => 1,
+        }
+    }
+
+    const fn quantized_matvec_rows_per_threadgroup(mode: QuantizationMode) -> u32 {
+        quantized_matvec_rows_per_simdgroup(mode)
+            * quantized_matvec_simdgroups_per_threadgroup(mode)
+    }
+
+    const fn grouped_gate_up_simdgroups_per_threadgroup(
+        gate_mode: QuantizationMode,
+        up_mode: QuantizationMode,
+    ) -> u32 {
+        match (gate_mode, up_mode) {
+            (QuantizationMode::GgmlQ4K, QuantizationMode::GgmlQ4K) => 4,
+            _ => 1,
+        }
+    }
+
+    const fn grouped_gate_up_rows_per_threadgroup(
+        gate_mode: QuantizationMode,
+        up_mode: QuantizationMode,
+    ) -> u32 {
+        2 * grouped_gate_up_simdgroups_per_threadgroup(gate_mode, up_mode)
+    }
+
+    const fn moe_down_q8_1_simdgroups_per_threadgroup(mode: QuantizationMode) -> u32 {
+        match mode {
+            QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0 => 4,
+            _ => 1,
+        }
+    }
+
+    const fn moe_down_q8_1_rows_per_threadgroup(mode: QuantizationMode) -> u32 {
+        4 * moe_down_q8_1_simdgroups_per_threadgroup(mode)
+    }
+
+    const fn moe_down_rows_per_threadgroup(mode: QuantizationMode) -> u32 {
+        match mode {
+            QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0 => 4,
+            _ => 1,
+        }
+    }
+
     fn quantized_row_active_thread_count(
         pipeline: &ComputePipelineState,
         mode: QuantizationMode,
@@ -10717,7 +13959,11 @@ mod platform {
     ) -> Result<u32, RuntimeError> {
         if matches!(
             mode,
-            QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ5K | QuantizationMode::GgmlQ6K
+            QuantizationMode::GgmlQ4K
+                | QuantizationMode::GgmlQ5_0
+                | QuantizationMode::GgmlQ5K
+                | QuantizationMode::GgmlQ6K
+                | QuantizationMode::GgmlQ8_0
         ) {
             return Ok(32);
         }
@@ -10750,17 +13996,22 @@ mod platform {
     }
 
     fn quantized_row_threadgroup_size(
-        pipeline: &ComputePipelineState,
+        active_threads: u32,
+        simdgroups_per_threadgroup: u32,
     ) -> Result<MTLSize, RuntimeError> {
-        let width = 8_u64
-            .min(pipeline.thread_execution_width())
-            .min(u64::from(pipeline.max_total_threads_per_threadgroup()));
-        if width == 0 {
+        if active_threads == 0 {
             return Err(RuntimeError::Backend(String::from(
                 "metal quantized kernel reported zero thread execution width",
             )));
         }
-        Ok(MTLSize::new(width, 1, 1))
+        let width = active_threads
+            .checked_mul(simdgroups_per_threadgroup.max(1))
+            .ok_or_else(|| {
+                RuntimeError::Backend(String::from(
+                    "metal quantized threadgroup width overflow",
+                ))
+            })?;
+        Ok(MTLSize::new(u64::from(width), 1, 1))
     }
 
     fn rms_norm_threadgroup_size(
@@ -10856,6 +14107,9 @@ mod platform {
 using namespace metal;
 
 constant uint PSIONIC_QUANTIZED_ROW_THREADS = 32;
+constant uint PSIONIC_Q4_K_SIMDGROUPS_PER_THREADGROUP = 4;
+constant uint PSIONIC_Q5_Q8_SIMDGROUPS_PER_THREADGROUP = 4;
+constant uint PSIONIC_MOE_DOWN_SIMDGROUPS_PER_THREADGROUP = 4;
 constant uint PSIONIC_ARGMAX_THREADS = 128;
 constant uint PSIONIC_QUANTIZED_ARGMAX_ROWS_PER_THREADGROUP = 8;
 constant uint PSIONIC_RMS_NORM_MAX_THREADS = 1024;
@@ -10928,6 +14182,19 @@ kernel void psionic_copy_f32_with_offset(
         return;
     }
     destination[destination_offset_elements + gid] = source[gid];
+}
+
+kernel void psionic_copy_f32_to_f16_with_offset(
+    const device float* source [[buffer(0)]],
+    device half* destination [[buffer(1)]],
+    constant uint& element_count [[buffer(2)]],
+    constant uint& destination_offset_elements [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= element_count) {
+        return;
+    }
+    destination[destination_offset_elements + gid] = half(source[gid]);
 }
 
 kernel void psionic_gelu_glu_f32(
@@ -11221,6 +14488,126 @@ kernel void psionic_per_head_rms_norm_to_output_f32(
     }
 }
 
+kernel void psionic_residual_post_norm_and_rms_to_output_f32(
+    device float* values [[buffer(0)]],
+    const device float* residual [[buffer(1)]],
+    const device float* bias [[buffer(2)]],
+    const device float* post_norm [[buffer(3)]],
+    const device float* next_norm_weight [[buffer(4)]],
+    device float* next_norm_output [[buffer(5)]],
+    constant uint& width [[buffer(6)]],
+    constant float& epsilon [[buffer(7)]],
+    constant uint& has_bias [[buffer(8)]],
+    constant uint& has_post_norm [[buffer(9)]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    if (width == 0) {
+        return;
+    }
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scale[1];
+
+    float sum = 0.0f;
+    for (uint index = tid; index < width; index += lsize) {
+        float value = values[index] + (has_bias != 0u ? bias[index] : 0.0f);
+        sum += value * value;
+    }
+    sum = simd_sum(sum);
+    if (lane == 0) {
+        partial[simd_gid] = sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scale[0] = has_post_norm != 0u
+                ? metal::precise::rsqrt((total / float(width)) + epsilon)
+                : 1.0f;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float post_scale = shared_scale[0];
+
+    float residual_sum = 0.0f;
+    for (uint index = tid; index < width; index += lsize) {
+        float value = values[index] + (has_bias != 0u ? bias[index] : 0.0f);
+        float weight = has_post_norm != 0u ? post_norm[index] : 1.0f;
+        float merged = value * post_scale * weight + residual[index];
+        values[index] = merged;
+        residual_sum += merged * merged;
+    }
+    residual_sum = simd_sum(residual_sum);
+    if (lane == 0) {
+        partial[simd_gid] = residual_sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scale[0] = metal::precise::rsqrt((total / float(width)) + epsilon);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float next_scale = shared_scale[0];
+    for (uint index = tid; index < width; index += lsize) {
+        next_norm_output[index] = values[index] * next_scale * next_norm_weight[index];
+    }
+}
+
+kernel void psionic_post_norm_add_residual_f32(
+    device float* values [[buffer(0)]],
+    const device float* residual [[buffer(1)]],
+    const device float* post_norm [[buffer(2)]],
+    constant uint& width [[buffer(3)]],
+    constant float& epsilon [[buffer(4)]],
+    constant uint& has_post_norm [[buffer(5)]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    if (width == 0) {
+        return;
+    }
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scale[1];
+
+    float sum = 0.0f;
+    for (uint index = tid; index < width; index += lsize) {
+        float value = values[index];
+        sum += value * value;
+    }
+    sum = simd_sum(sum);
+    if (lane == 0) {
+        partial[simd_gid] = sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scale[0] = has_post_norm != 0u
+                ? metal::precise::rsqrt((total / float(width)) + epsilon)
+                : 1.0f;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float scale = shared_scale[0];
+    for (uint index = tid; index < width; index += lsize) {
+        float weight = has_post_norm != 0u ? post_norm[index] : 1.0f;
+        values[index] = values[index] * scale * weight + residual[index];
+    }
+}
+
 kernel void psionic_per_head_rms_norm_unit_f32(
     device float* values [[buffer(0)]],
     constant uint& head_count [[buffer(1)]],
@@ -11340,6 +14727,869 @@ kernel void psionic_rope_neox_position_f32(
     values[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
 }
 
+kernel void psionic_query_rms_rope_f32(
+    device float* query [[buffer(0)]],
+    const device float* freq_factors [[buffer(1)]],
+    const device float* query_bias [[buffer(2)]],
+    const device float* query_norm [[buffer(3)]],
+    constant uint& head_count [[buffer(4)]],
+    constant uint& head_dim [[buffer(5)]],
+    constant uint& rotary_half [[buffer(6)]],
+    constant uint& position [[buffer(7)]],
+    constant float& theta_scale [[buffer(8)]],
+    constant float& freq_scale [[buffer(9)]],
+    constant float& corr_low [[buffer(10)]],
+    constant float& corr_high [[buffer(11)]],
+    constant float& ext_factor [[buffer(12)]],
+    constant float& yarn_mscale [[buffer(13)]],
+    constant float& epsilon [[buffer(14)]],
+    constant uint& has_query_bias [[buffer(15)]],
+    constant uint& has_query_norm [[buffer(16)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    uint head = tgpig.x;
+    if (head >= head_count || head_dim == 0) {
+        return;
+    }
+
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scale[1];
+    uint half_dim = head_dim / 2;
+    uint base = head * head_dim;
+
+    float sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float value = query[base + index] + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+        sum += value * value;
+    }
+    sum = simd_sum(sum);
+    if (lane == 0) {
+        partial[simd_gid] = sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scale[0] = has_query_norm != 0u
+                ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                : 1.0f;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float scale = shared_scale[0];
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float value = query[base + index] + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+        float weight = has_query_norm != 0u ? query_norm[index] : 1.0f;
+        query[base + index] = value * scale * weight;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint pair = tid; pair < rotary_half; pair += lsize) {
+        float x0 = query[base + pair];
+        float x1 = query[base + pair + half_dim];
+        float freq_factor = freq_factors[pair];
+        if (!(freq_factor > 0.0f)) {
+            freq_factor = 1.0f;
+        }
+        float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+        float theta_interp = freq_scale * theta_extrap;
+        float theta = theta_interp;
+        float mscale = 1.0f;
+        if (ext_factor != 0.0f) {
+            float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+            theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+            mscale = yarn_mscale;
+        }
+        float cos_theta = cos(theta) * mscale;
+        float sin_theta = sin(theta) * mscale;
+        query[base + pair] = x0 * cos_theta - x1 * sin_theta;
+        query[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+    }
+}
+
+kernel void psionic_qk_rms_rope_append_dense_kv_f32(
+    device float* qk [[buffer(0)]],
+    device float* value [[buffer(1)]],
+    const device float* freq_factors [[buffer(2)]],
+    const device float* query_bias [[buffer(3)]],
+    const device float* query_norm [[buffer(4)]],
+    const device float* key_bias [[buffer(5)]],
+    const device float* key_norm [[buffer(6)]],
+    const device float* value_bias [[buffer(7)]],
+    device float* key_cache [[buffer(8)]],
+    device float* value_cache [[buffer(9)]],
+    constant uint& query_head_count [[buffer(10)]],
+    constant uint& kv_head_count [[buffer(11)]],
+    constant uint& head_dim [[buffer(12)]],
+    constant uint& rotary_half [[buffer(13)]],
+    constant uint& position [[buffer(14)]],
+    constant float& theta_scale [[buffer(15)]],
+    constant float& freq_scale [[buffer(16)]],
+    constant float& corr_low [[buffer(17)]],
+    constant float& corr_high [[buffer(18)]],
+    constant float& ext_factor [[buffer(19)]],
+    constant float& yarn_mscale [[buffer(20)]],
+    constant float& epsilon [[buffer(21)]],
+    constant uint& cache_row_width [[buffer(22)]],
+    constant uint& cache_write_offset [[buffer(23)]],
+    constant uint& value_from_key [[buffer(24)]],
+    constant uint& has_query_bias [[buffer(25)]],
+    constant uint& has_query_norm [[buffer(26)]],
+    constant uint& has_key_bias [[buffer(27)]],
+    constant uint& has_key_norm [[buffer(28)]],
+    constant uint& has_value_bias [[buffer(29)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    uint total_groups = query_head_count + kv_head_count;
+    uint group = tgpig.x;
+    if (group >= total_groups || head_dim == 0 || cache_row_width < kv_head_count * head_dim) {
+        return;
+    }
+
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scales[2];
+    uint half_dim = head_dim / 2;
+    uint q_rows = query_head_count * head_dim;
+
+    if (group < query_head_count) {
+        uint head = group;
+        uint base = head * head_dim;
+        float sum = 0.0f;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float raw_value = qk[base + index];
+            float value = raw_value + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            sum += value * value;
+        }
+        sum = simd_sum(sum);
+        if (lane == 0) {
+            partial[simd_gid] = sum;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (simd_gid == 0) {
+            float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+            total = simd_sum(total);
+            if (lane == 0) {
+                shared_scales[0] = has_query_norm != 0u
+                    ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                    : 1.0f;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float scale = shared_scales[0];
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float raw_value = qk[base + index];
+            float value = raw_value + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            float weight = has_query_norm != 0u ? query_norm[index] : 1.0f;
+            qk[base + index] = value * scale * weight;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint pair = tid; pair < rotary_half; pair += lsize) {
+            float x0 = qk[base + pair];
+            float x1 = qk[base + pair + half_dim];
+            float freq_factor = freq_factors[pair];
+            if (!(freq_factor > 0.0f)) {
+                freq_factor = 1.0f;
+            }
+            float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+            float theta_interp = freq_scale * theta_extrap;
+            float theta = theta_interp;
+            float mscale = 1.0f;
+            if (ext_factor != 0.0f) {
+                float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+                theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+                mscale = yarn_mscale;
+            }
+            float cos_theta = cos(theta) * mscale;
+            float sin_theta = sin(theta) * mscale;
+            qk[base + pair] = x0 * cos_theta - x1 * sin_theta;
+            qk[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+        }
+        return;
+    }
+
+    uint kv_head = group - query_head_count;
+    uint key_base = q_rows + kv_head * head_dim;
+    uint value_base = kv_head * head_dim;
+
+    float key_sum = 0.0f;
+    float value_sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float raw_key = qk[key_base + index];
+        float raw_value = value_from_key != 0u ? raw_key : value[value_base + index];
+        float key_term = raw_key + (has_key_bias != 0u ? key_bias[value_base + index] : 0.0f);
+        float value_term =
+            raw_value + (has_value_bias != 0u ? value_bias[value_base + index] : 0.0f);
+        key_sum += key_term * key_term;
+        value_sum += value_term * value_term;
+    }
+    key_sum = simd_sum(key_sum);
+    value_sum = simd_sum(value_sum);
+    if (lane == 0) {
+        partial[simd_gid] = key_sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scales[0] = has_key_norm != 0u
+                ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                : 1.0f;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (lane == 0) {
+        partial[simd_gid] = value_sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scales[1] = metal::precise::rsqrt((total / float(head_dim)) + epsilon);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    float key_scale = shared_scales[0];
+    float value_scale = shared_scales[1];
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float raw_key = qk[key_base + index];
+        float raw_value = value_from_key != 0u ? raw_key : value[value_base + index];
+        float key_term = raw_key + (has_key_bias != 0u ? key_bias[value_base + index] : 0.0f);
+        float value_term =
+            raw_value + (has_value_bias != 0u ? value_bias[value_base + index] : 0.0f);
+        float weight = has_key_norm != 0u ? key_norm[index] : 1.0f;
+        qk[key_base + index] = key_term * key_scale * weight;
+        value[value_base + index] = value_term * value_scale;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint pair = tid; pair < rotary_half; pair += lsize) {
+        float x0 = qk[key_base + pair];
+        float x1 = qk[key_base + pair + half_dim];
+        float freq_factor = freq_factors[pair];
+        if (!(freq_factor > 0.0f)) {
+            freq_factor = 1.0f;
+        }
+        float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+        float theta_interp = freq_scale * theta_extrap;
+        float theta = theta_interp;
+        float mscale = 1.0f;
+        if (ext_factor != 0.0f) {
+            float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+            theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+            mscale = yarn_mscale;
+        }
+        float cos_theta = cos(theta) * mscale;
+        float sin_theta = sin(theta) * mscale;
+        qk[key_base + pair] = x0 * cos_theta - x1 * sin_theta;
+        qk[key_base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint cache_base = cache_write_offset + kv_head * head_dim;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        key_cache[cache_base + index] = qk[key_base + index];
+        value_cache[cache_base + index] = value[value_base + index];
+    }
+}
+
+kernel void psionic_qk_rms_rope_append_dense_kv_f16(
+    device float* qk [[buffer(0)]],
+    device float* value [[buffer(1)]],
+    const device float* freq_factors [[buffer(2)]],
+    const device float* query_bias [[buffer(3)]],
+    const device float* query_norm [[buffer(4)]],
+    const device float* key_bias [[buffer(5)]],
+    const device float* key_norm [[buffer(6)]],
+    const device float* value_bias [[buffer(7)]],
+    device half* key_cache [[buffer(8)]],
+    device half* value_cache [[buffer(9)]],
+    constant uint& query_head_count [[buffer(10)]],
+    constant uint& kv_head_count [[buffer(11)]],
+    constant uint& head_dim [[buffer(12)]],
+    constant uint& rotary_half [[buffer(13)]],
+    constant uint& position [[buffer(14)]],
+    constant float& theta_scale [[buffer(15)]],
+    constant float& freq_scale [[buffer(16)]],
+    constant float& corr_low [[buffer(17)]],
+    constant float& corr_high [[buffer(18)]],
+    constant float& ext_factor [[buffer(19)]],
+    constant float& yarn_mscale [[buffer(20)]],
+    constant float& epsilon [[buffer(21)]],
+    constant uint& cache_row_width [[buffer(22)]],
+    constant uint& cache_write_offset [[buffer(23)]],
+    constant uint& value_from_key [[buffer(24)]],
+    constant uint& has_query_bias [[buffer(25)]],
+    constant uint& has_query_norm [[buffer(26)]],
+    constant uint& has_key_bias [[buffer(27)]],
+    constant uint& has_key_norm [[buffer(28)]],
+    constant uint& has_value_bias [[buffer(29)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    uint total_groups = query_head_count + kv_head_count;
+    uint group = tgpig.x;
+    if (group >= total_groups || head_dim == 0 || cache_row_width < kv_head_count * head_dim) {
+        return;
+    }
+
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scales[2];
+    uint half_dim = head_dim / 2;
+    uint q_rows = query_head_count * head_dim;
+
+    if (group < query_head_count) {
+        uint head = group;
+        uint base = head * head_dim;
+        float sum = 0.0f;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float raw_value = qk[base + index];
+            float value = raw_value + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            sum += value * value;
+        }
+        sum = simd_sum(sum);
+        if (lane == 0) {
+            partial[simd_gid] = sum;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (simd_gid == 0) {
+            float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+            total = simd_sum(total);
+            if (lane == 0) {
+                shared_scales[0] = has_query_norm != 0u
+                    ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                    : 1.0f;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float scale = shared_scales[0];
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float raw_value = qk[base + index];
+            float value = raw_value + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            float weight = has_query_norm != 0u ? query_norm[index] : 1.0f;
+            qk[base + index] = value * scale * weight;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint pair = tid; pair < rotary_half; pair += lsize) {
+            float x0 = qk[base + pair];
+            float x1 = qk[base + pair + half_dim];
+            float freq_factor = freq_factors[pair];
+            if (!(freq_factor > 0.0f)) {
+                freq_factor = 1.0f;
+            }
+            float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+            float theta_interp = freq_scale * theta_extrap;
+            float theta = theta_interp;
+            float mscale = 1.0f;
+            if (ext_factor != 0.0f) {
+                float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+                theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+                mscale = yarn_mscale;
+            }
+            float cos_theta = cos(theta) * mscale;
+            float sin_theta = sin(theta) * mscale;
+            qk[base + pair] = x0 * cos_theta - x1 * sin_theta;
+            qk[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+        }
+        return;
+    }
+
+    uint kv_head = group - query_head_count;
+    uint key_base = q_rows + kv_head * head_dim;
+    uint value_base = kv_head * head_dim;
+
+    float key_sum = 0.0f;
+    float value_sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float raw_key = qk[key_base + index];
+        float raw_value = value_from_key != 0u ? raw_key : value[value_base + index];
+        float key_term = raw_key + (has_key_bias != 0u ? key_bias[value_base + index] : 0.0f);
+        float value_term =
+            raw_value + (has_value_bias != 0u ? value_bias[value_base + index] : 0.0f);
+        key_sum += key_term * key_term;
+        value_sum += value_term * value_term;
+    }
+    key_sum = simd_sum(key_sum);
+    value_sum = simd_sum(value_sum);
+    if (lane == 0) {
+        partial[simd_gid] = key_sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scales[0] = has_key_norm != 0u
+                ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                : 1.0f;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (lane == 0) {
+        partial[simd_gid] = value_sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scales[1] = metal::precise::rsqrt((total / float(head_dim)) + epsilon);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    float key_scale = shared_scales[0];
+    float value_scale = shared_scales[1];
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float raw_key = qk[key_base + index];
+        float raw_value = value_from_key != 0u ? raw_key : value[value_base + index];
+        float key_term = raw_key + (has_key_bias != 0u ? key_bias[value_base + index] : 0.0f);
+        float value_term =
+            raw_value + (has_value_bias != 0u ? value_bias[value_base + index] : 0.0f);
+        float weight = has_key_norm != 0u ? key_norm[index] : 1.0f;
+        qk[key_base + index] = key_term * key_scale * weight;
+        value[value_base + index] = value_term * value_scale;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint pair = tid; pair < rotary_half; pair += lsize) {
+        float x0 = qk[key_base + pair];
+        float x1 = qk[key_base + pair + half_dim];
+        float freq_factor = freq_factors[pair];
+        if (!(freq_factor > 0.0f)) {
+            freq_factor = 1.0f;
+        }
+        float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+        float theta_interp = freq_scale * theta_extrap;
+        float theta = theta_interp;
+        float mscale = 1.0f;
+        if (ext_factor != 0.0f) {
+            float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+            theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+            mscale = yarn_mscale;
+        }
+        float cos_theta = cos(theta) * mscale;
+        float sin_theta = sin(theta) * mscale;
+        qk[key_base + pair] = x0 * cos_theta - x1 * sin_theta;
+        qk[key_base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint cache_base = cache_write_offset + kv_head * head_dim;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        key_cache[cache_base + index] = half(qk[key_base + index]);
+        value_cache[cache_base + index] = half(value[value_base + index]);
+    }
+}
+
+kernel void psionic_qkv_rms_rope_append_dense_kv_f32(
+    device float* qkv [[buffer(0)]],
+    const device float* freq_factors [[buffer(1)]],
+    const device float* query_bias [[buffer(2)]],
+    const device float* query_norm [[buffer(3)]],
+    const device float* key_bias [[buffer(4)]],
+    const device float* key_norm [[buffer(5)]],
+    const device float* value_bias [[buffer(6)]],
+    device float* key_cache [[buffer(7)]],
+    device float* value_cache [[buffer(8)]],
+    constant uint& query_head_count [[buffer(9)]],
+    constant uint& kv_head_count [[buffer(10)]],
+    constant uint& head_dim [[buffer(11)]],
+    constant uint& rotary_half [[buffer(12)]],
+    constant uint& position [[buffer(13)]],
+    constant float& theta_scale [[buffer(14)]],
+    constant float& freq_scale [[buffer(15)]],
+    constant float& corr_low [[buffer(16)]],
+    constant float& corr_high [[buffer(17)]],
+    constant float& ext_factor [[buffer(18)]],
+    constant float& yarn_mscale [[buffer(19)]],
+    constant float& epsilon [[buffer(20)]],
+    constant uint& cache_row_width [[buffer(21)]],
+    constant uint& cache_write_offset [[buffer(22)]],
+    constant uint& has_query_bias [[buffer(23)]],
+    constant uint& has_query_norm [[buffer(24)]],
+    constant uint& has_key_bias [[buffer(25)]],
+    constant uint& has_key_norm [[buffer(26)]],
+    constant uint& has_value_bias [[buffer(27)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    uint total_groups = query_head_count + kv_head_count + kv_head_count;
+    uint group = tgpig.x;
+    if (group >= total_groups || head_dim == 0 || cache_row_width < kv_head_count * head_dim) {
+        return;
+    }
+
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scale[1];
+    uint half_dim = head_dim / 2;
+    uint q_rows = query_head_count * head_dim;
+    uint kv_rows = kv_head_count * head_dim;
+
+    if (group < query_head_count) {
+        uint head = group;
+        uint base = head * head_dim;
+        float sum = 0.0f;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index] + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            sum += value * value;
+        }
+        sum = simd_sum(sum);
+        if (lane == 0) {
+            partial[simd_gid] = sum;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (simd_gid == 0) {
+            float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+            total = simd_sum(total);
+            if (lane == 0) {
+                shared_scale[0] = has_query_norm != 0u
+                    ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                    : 1.0f;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float scale = shared_scale[0];
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index] + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            float weight = has_query_norm != 0u ? query_norm[index] : 1.0f;
+            qkv[base + index] = value * scale * weight;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint pair = tid; pair < rotary_half; pair += lsize) {
+            float x0 = qkv[base + pair];
+            float x1 = qkv[base + pair + half_dim];
+            float freq_factor = freq_factors[pair];
+            if (!(freq_factor > 0.0f)) {
+                freq_factor = 1.0f;
+            }
+            float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+            float theta_interp = freq_scale * theta_extrap;
+            float theta = theta_interp;
+            float mscale = 1.0f;
+            if (ext_factor != 0.0f) {
+                float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+                theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+                mscale = yarn_mscale;
+            }
+            float cos_theta = cos(theta) * mscale;
+            float sin_theta = sin(theta) * mscale;
+            qkv[base + pair] = x0 * cos_theta - x1 * sin_theta;
+            qkv[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+        }
+        return;
+    }
+
+    if (group < query_head_count + kv_head_count) {
+        uint kv_head = group - query_head_count;
+        uint base = q_rows + kv_head * head_dim;
+        float sum = 0.0f;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index] + (has_key_bias != 0u ? key_bias[kv_head * head_dim + index] : 0.0f);
+            sum += value * value;
+        }
+        sum = simd_sum(sum);
+        if (lane == 0) {
+            partial[simd_gid] = sum;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (simd_gid == 0) {
+            float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+            total = simd_sum(total);
+            if (lane == 0) {
+                shared_scale[0] = has_key_norm != 0u
+                    ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                    : 1.0f;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float scale = shared_scale[0];
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index] + (has_key_bias != 0u ? key_bias[kv_head * head_dim + index] : 0.0f);
+            float weight = has_key_norm != 0u ? key_norm[index] : 1.0f;
+            qkv[base + index] = value * scale * weight;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint pair = tid; pair < rotary_half; pair += lsize) {
+            float x0 = qkv[base + pair];
+            float x1 = qkv[base + pair + half_dim];
+            float freq_factor = freq_factors[pair];
+            if (!(freq_factor > 0.0f)) {
+                freq_factor = 1.0f;
+            }
+            float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+            float theta_interp = freq_scale * theta_extrap;
+            float theta = theta_interp;
+            float mscale = 1.0f;
+            if (ext_factor != 0.0f) {
+                float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+                theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+                mscale = yarn_mscale;
+            }
+            float cos_theta = cos(theta) * mscale;
+            float sin_theta = sin(theta) * mscale;
+            qkv[base + pair] = x0 * cos_theta - x1 * sin_theta;
+            qkv[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        uint cache_base = cache_write_offset + kv_head * head_dim;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            key_cache[cache_base + index] = qkv[base + index];
+        }
+        return;
+    }
+
+    uint value_head = group - query_head_count - kv_head_count;
+    uint base = q_rows + kv_rows + value_head * head_dim;
+    float sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float value = qkv[base + index] + (has_value_bias != 0u ? value_bias[value_head * head_dim + index] : 0.0f);
+        sum += value * value;
+    }
+    sum = simd_sum(sum);
+    if (lane == 0) {
+        partial[simd_gid] = sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scale[0] = metal::precise::rsqrt((total / float(head_dim)) + epsilon);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float scale = shared_scale[0];
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float value = qkv[base + index] + (has_value_bias != 0u ? value_bias[value_head * head_dim + index] : 0.0f);
+        qkv[base + index] = value * scale;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    uint cache_base = cache_write_offset + value_head * head_dim;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        value_cache[cache_base + index] = qkv[base + index];
+    }
+}
+
+kernel void psionic_qkv_rms_rope_append_dense_kv_f16(
+    device float* qkv [[buffer(0)]],
+    const device float* freq_factors [[buffer(1)]],
+    const device float* query_bias [[buffer(2)]],
+    const device float* query_norm [[buffer(3)]],
+    const device float* key_bias [[buffer(4)]],
+    const device float* key_norm [[buffer(5)]],
+    const device float* value_bias [[buffer(6)]],
+    device half* key_cache [[buffer(7)]],
+    device half* value_cache [[buffer(8)]],
+    constant uint& query_head_count [[buffer(9)]],
+    constant uint& kv_head_count [[buffer(10)]],
+    constant uint& head_dim [[buffer(11)]],
+    constant uint& rotary_half [[buffer(12)]],
+    constant uint& position [[buffer(13)]],
+    constant float& theta_scale [[buffer(14)]],
+    constant float& freq_scale [[buffer(15)]],
+    constant float& corr_low [[buffer(16)]],
+    constant float& corr_high [[buffer(17)]],
+    constant float& ext_factor [[buffer(18)]],
+    constant float& yarn_mscale [[buffer(19)]],
+    constant float& epsilon [[buffer(20)]],
+    constant uint& cache_row_width [[buffer(21)]],
+    constant uint& cache_write_offset [[buffer(22)]],
+    constant uint& has_query_bias [[buffer(23)]],
+    constant uint& has_query_norm [[buffer(24)]],
+    constant uint& has_key_bias [[buffer(25)]],
+    constant uint& has_key_norm [[buffer(26)]],
+    constant uint& has_value_bias [[buffer(27)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint3 lsize3 [[threads_per_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]]
+) {
+    uint total_groups = query_head_count + kv_head_count + kv_head_count;
+    uint group = tgpig.x;
+    if (group >= total_groups || head_dim == 0 || cache_row_width < kv_head_count * head_dim) {
+        return;
+    }
+
+    uint lsize = lsize3.x;
+    uint active_simdgroups = (lsize + 31) / 32;
+    threadgroup float partial[PSIONIC_RMS_NORM_MAX_SIMDGROUPS];
+    threadgroup float shared_scale[1];
+    uint half_dim = head_dim / 2;
+    uint q_rows = query_head_count * head_dim;
+    uint kv_rows = kv_head_count * head_dim;
+
+    if (group < query_head_count) {
+        uint base = group * head_dim;
+        float sum = 0.0f;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index] + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            sum += value * value;
+        }
+        sum = simd_sum(sum);
+        if (lane == 0) {
+            partial[simd_gid] = sum;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (simd_gid == 0) {
+            float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+            total = simd_sum(total);
+            if (lane == 0) {
+                shared_scale[0] = has_query_norm != 0u
+                    ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                    : 1.0f;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float scale = shared_scale[0];
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index] + (has_query_bias != 0u ? query_bias[base + index] : 0.0f);
+            float weight = has_query_norm != 0u ? query_norm[index] : 1.0f;
+            qkv[base + index] = value * scale * weight;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint pair = tid; pair < rotary_half; pair += lsize) {
+            float x0 = qkv[base + pair];
+            float x1 = qkv[base + pair + half_dim];
+            float freq_factor = freq_factors[pair];
+            if (!(freq_factor > 0.0f)) {
+                freq_factor = 1.0f;
+            }
+            float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+            float theta_interp = freq_scale * theta_extrap;
+            float theta = theta_interp;
+            float mscale = 1.0f;
+            if (ext_factor != 0.0f) {
+                float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+                theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+                mscale = yarn_mscale;
+            }
+            float cos_theta = cos(theta) * mscale;
+            float sin_theta = sin(theta) * mscale;
+            qkv[base + pair] = x0 * cos_theta - x1 * sin_theta;
+            qkv[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+        }
+        return;
+    }
+
+    if (group < query_head_count + kv_head_count) {
+        uint kv_head = group - query_head_count;
+        uint base = q_rows + kv_head * head_dim;
+        float sum = 0.0f;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index]
+                + (has_key_bias != 0u ? key_bias[kv_head * head_dim + index] : 0.0f);
+            sum += value * value;
+        }
+        sum = simd_sum(sum);
+        if (lane == 0) {
+            partial[simd_gid] = sum;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (simd_gid == 0) {
+            float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+            total = simd_sum(total);
+            if (lane == 0) {
+                shared_scale[0] = has_key_norm != 0u
+                    ? metal::precise::rsqrt((total / float(head_dim)) + epsilon)
+                    : 1.0f;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float scale = shared_scale[0];
+        for (uint index = tid; index < head_dim; index += lsize) {
+            float value = qkv[base + index]
+                + (has_key_bias != 0u ? key_bias[kv_head * head_dim + index] : 0.0f);
+            float weight = has_key_norm != 0u ? key_norm[index] : 1.0f;
+            qkv[base + index] = value * scale * weight;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint pair = tid; pair < rotary_half; pair += lsize) {
+            float x0 = qkv[base + pair];
+            float x1 = qkv[base + pair + half_dim];
+            float freq_factor = freq_factors[pair];
+            if (!(freq_factor > 0.0f)) {
+                freq_factor = 1.0f;
+            }
+            float theta_extrap = (float(position) * pow(theta_scale, float(pair))) / freq_factor;
+            float theta_interp = freq_scale * theta_extrap;
+            float theta = theta_interp;
+            float mscale = 1.0f;
+            if (ext_factor != 0.0f) {
+                float ramp = psionic_rope_yarn_ramp(corr_low, corr_high, pair * 2) * ext_factor;
+                theta = theta_interp * (1.0f - ramp) + theta_extrap * ramp;
+                mscale = yarn_mscale;
+            }
+            float cos_theta = cos(theta) * mscale;
+            float sin_theta = sin(theta) * mscale;
+            qkv[base + pair] = x0 * cos_theta - x1 * sin_theta;
+            qkv[base + pair + half_dim] = x0 * sin_theta + x1 * cos_theta;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        uint cache_base = cache_write_offset + kv_head * head_dim;
+        for (uint index = tid; index < head_dim; index += lsize) {
+            key_cache[cache_base + index] = half(qkv[base + index]);
+        }
+        return;
+    }
+
+    uint value_head = group - query_head_count - kv_head_count;
+    uint base = q_rows + kv_rows + value_head * head_dim;
+    float sum = 0.0f;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float value = qkv[base + index]
+            + (has_value_bias != 0u ? value_bias[value_head * head_dim + index] : 0.0f);
+        sum += value * value;
+    }
+    sum = simd_sum(sum);
+    if (lane == 0) {
+        partial[simd_gid] = sum;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (simd_gid == 0) {
+        float total = lane < active_simdgroups ? partial[lane] : 0.0f;
+        total = simd_sum(total);
+        if (lane == 0) {
+            shared_scale[0] = metal::precise::rsqrt((total / float(head_dim)) + epsilon);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float scale = shared_scale[0];
+    for (uint index = tid; index < head_dim; index += lsize) {
+        float value = qkv[base + index]
+            + (has_value_bias != 0u ? value_bias[value_head * head_dim + index] : 0.0f);
+        qkv[base + index] = value * scale;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    uint cache_base = cache_write_offset + value_head * head_dim;
+    for (uint index = tid; index < head_dim; index += lsize) {
+        value_cache[cache_base + index] = half(qkv[base + index]);
+    }
+}
+
 kernel void psionic_decode_attention_dense_f32(
     const device float* query [[buffer(0)]],
     const device float* keys [[buffer(1)]],
@@ -11414,6 +15664,130 @@ kernel void psionic_decode_attention_dense_f32(
             if (dim < head_dim) {
                 out_fragment[slot] =
                     out_fragment[slot] * factor + weight * values[token_base + dim];
+            }
+        }
+    }
+
+    if (lane == 0) {
+        partial_max[simd_gid] = max_logit;
+        partial_denom[simd_gid] = denom;
+    }
+    for (uint slot = 0; slot < values_per_thread; ++slot) {
+        partial_outputs[(simd_gid * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD + slot) *
+                PSIONIC_DECODE_THREADS +
+            lane] = out_fragment[slot];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    if (simd_gid == 0) {
+        float local_max = lane < active_simdgroups ? partial_max[lane] : -INFINITY;
+        float global_max = simd_max(local_max);
+        float factor =
+            lane < active_simdgroups ? fast::exp2(partial_max[lane] - global_max) : 0.0f;
+        float global_denom =
+            simd_sum((lane < active_simdgroups ? partial_denom[lane] : 0.0f) * factor);
+        if (lane < active_simdgroups) {
+            block_factors[lane] = factor;
+        }
+        if (lane == 0) {
+            global_denom_value = global_denom;
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    if (simd_gid == 0) {
+        float normalizer = global_denom_value > 0.0f ? (1.0f / global_denom_value) : 0.0f;
+        for (uint slot = 0; slot < values_per_thread; ++slot) {
+            uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+            if (dim < head_dim) {
+                float accumulated = 0.0f;
+                for (uint block = 0; block < active_simdgroups; ++block) {
+                    accumulated += partial_outputs
+                        [(block * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD + slot) *
+                                PSIONIC_DECODE_THREADS +
+                            lane] *
+                        block_factors[block];
+                }
+                output[query_base + dim] = accumulated * normalizer;
+            }
+        }
+    }
+}
+
+kernel void psionic_decode_attention_dense_f16(
+    const device float* query [[buffer(0)]],
+    const device half* keys [[buffer(1)]],
+    const device half* values [[buffer(2)]],
+    device float* output [[buffer(3)]],
+    constant uint& query_head_count [[buffer(4)]],
+    constant uint& kv_head_count [[buffer(5)]],
+    constant uint& token_count [[buffer(6)]],
+    constant uint& head_dim [[buffer(7)]],
+    constant float& scale [[buffer(8)]],
+    constant uint& active_simdgroups [[buffer(9)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint simd_gid [[simdgroup_index_in_threadgroup]],
+    uint lane [[thread_index_in_simdgroup]]
+) {
+    uint head = tgpig.x;
+    if (head >= query_head_count || head_dim > PSIONIC_DECODE_MAX_HEAD_DIM ||
+        active_simdgroups == 0 || active_simdgroups > PSIONIC_DECODE_MAX_SIMDGROUPS ||
+        simd_gid >= active_simdgroups) {
+        return;
+    }
+    uint values_per_thread = (head_dim + PSIONIC_DECODE_THREADS - 1) / PSIONIC_DECODE_THREADS;
+    if (values_per_thread > PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD) {
+        return;
+    }
+
+    uint group_size = max(query_head_count / max(kv_head_count, 1u), 1u);
+    uint kv_head = min(head / group_size, kv_head_count - 1);
+    uint query_base = head * head_dim;
+    uint cache_row_width = kv_head_count * head_dim;
+    uint cache_head_base = kv_head * head_dim;
+    float scale_log2e = scale * M_LOG2E_F;
+
+    float q_fragment[PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD];
+    float out_fragment[PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD];
+    threadgroup float partial_outputs
+        [PSIONIC_DECODE_MAX_SIMDGROUPS * PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD * PSIONIC_DECODE_THREADS];
+    threadgroup float partial_max[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    threadgroup float partial_denom[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    threadgroup float block_factors[PSIONIC_DECODE_MAX_SIMDGROUPS];
+    threadgroup float global_denom_value;
+    for (uint slot = 0; slot < PSIONIC_DECODE_MAX_HEAD_VALUES_PER_THREAD; ++slot) {
+        q_fragment[slot] = 0.0f;
+        out_fragment[slot] = 0.0f;
+    }
+    for (uint slot = 0; slot < values_per_thread; ++slot) {
+        uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+        if (dim < head_dim) {
+            q_fragment[slot] = query[query_base + dim];
+        }
+    }
+
+    float max_logit = -INFINITY;
+    float denom = 0.0f;
+    for (uint token = simd_gid; token < token_count; token += active_simdgroups) {
+        uint token_base = token * cache_row_width + cache_head_base;
+        float dot = 0.0f;
+        for (uint slot = 0; slot < values_per_thread; ++slot) {
+            uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+            if (dim < head_dim) {
+                dot += q_fragment[slot] * float(keys[token_base + dim]);
+            }
+        }
+        float logit = simd_sum(dot) * scale_log2e;
+        float next_max = max(max_logit, logit);
+        float factor = fast::exp2(max_logit - next_max);
+        float weight = fast::exp2(logit - next_max);
+        max_logit = next_max;
+        denom = denom * factor + weight;
+        for (uint slot = 0; slot < values_per_thread; ++slot) {
+            uint dim = lane + slot * PSIONIC_DECODE_THREADS;
+            if (dim < head_dim) {
+                out_fragment[slot] =
+                    out_fragment[slot] * factor + weight * float(values[token_base + dim]);
             }
         }
     }
@@ -11581,6 +15955,16 @@ inline float psionic_q8_0_block_dot(
     return sum * scale;
 }
 
+inline float psionic_q8_0_lane_dot(
+    const device uchar* block,
+    uint lane,
+    float input_value
+) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    return input_value * float(as_type<char>(block[2 + lane])) * scale;
+}
+
 inline float psionic_q5_0_block_dot(
     const device uchar* block,
     const device float* input
@@ -11602,6 +15986,268 @@ inline float psionic_q5_0_block_dot(
         sum += input[pair_index] * (low * scale);
         sum += input[pair_index + 16] * (high * scale);
     }
+    return sum;
+}
+
+inline float psionic_q5_0_lane_dot(
+    const device uchar* block,
+    uint lane,
+    float input_value
+) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    uint qh = uint(block[2]) |
+        (uint(block[3]) << 8) |
+        (uint(block[4]) << 16) |
+        (uint(block[5]) << 24);
+    const device uchar* quants = block + 6;
+    uint pair_index = lane & 15u;
+    uchar quant = quants[pair_index];
+    uchar lifted = lane < 16u
+        ? uchar(((qh >> pair_index) & 0x01u) << 4)
+        : uchar(((qh >> (pair_index + 16u)) & 0x01u) << 4);
+    int value = lane < 16u
+        ? int((quant & 0x0fu) | lifted) - 16
+        : int(((quant >> 4) & 0x0fu) | lifted) - 16;
+    return input_value * float(value) * scale;
+}
+
+inline float psionic_q5_0_half_block_dot(
+    const device uchar* block,
+    float sumy,
+    thread const float* yl,
+    short il
+) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    uint qh = uint(block[2]) |
+        (uint(block[3]) << 8) |
+        (uint(block[4]) << 16) |
+        (uint(block[5]) << 24);
+    const device ushort* qs = ((const device ushort*)(block + 6)) + il / 2;
+    float4 acc = float4(0.0f);
+
+    for (short i = 0; i < 8; i += 2) {
+        acc[0] += yl[i + 0] *
+            float((qs[i / 2] & 0x000F) | (((qh >> (uint(i) + uint(il))) << 4) & 0x00010u));
+        acc[1] += yl[i + 1] *
+            float((qs[i / 2] & 0x0F00) | (((qh >> (uint(i + 1) + uint(il))) << 12) & 0x01000u));
+        acc[2] += yl[i + 8] *
+            float((qs[i / 2] & 0x00F0) |
+                (((qh >> (uint(i) + uint(il) + 16u)) << 8) & 0x00100u));
+        acc[3] += yl[i + 9] *
+            float((qs[i / 2] & 0xF000) |
+                (((qh >> (uint(i + 1) + uint(il) + 16u)) << 16) & 0x10000u));
+    }
+
+    return scale * (sumy * -16.0f + acc[0] + acc[1] + acc[2] + acc[3]);
+}
+
+inline float psionic_q8_0_chunk_dot(
+    const device uchar* block,
+    thread const float* yl,
+    short il
+) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    const device char* quants = (const device char*)(block + 2) + il * 8;
+    float sum = 0.0f;
+    for (short i = 0; i < 8; ++i) {
+        sum += float(quants[i]) * yl[i];
+    }
+    return sum * scale;
+}
+
+inline float psionic_q8_1_block_scale(const device uchar* block) {
+    ushort scale_bits = ushort(block[0]) | (ushort(block[1]) << 8);
+    return float(as_type<half>(scale_bits));
+}
+
+inline float psionic_q8_1_block_sum(const device uchar* block) {
+    ushort sum_bits = ushort(block[2]) | (ushort(block[3]) << 8);
+    return float(as_type<half>(sum_bits));
+}
+
+inline uchar2 psionic_q4_k_scale_min(
+    uint index,
+    const device uchar* packed
+);
+
+inline float psionic_q8_0_block_dot_q8_1(
+    const device uchar* weight_block,
+    const device uchar* input_block
+) {
+    ushort weight_scale_bits =
+        ushort(weight_block[0]) | (ushort(weight_block[1]) << 8);
+    float weight_scale = float(as_type<half>(weight_scale_bits));
+    float input_scale = psionic_q8_1_block_scale(input_block);
+    const device char* weight_quants = (const device char*)(weight_block + 2);
+    const device char* input_quants = (const device char*)(input_block + 4);
+    float sum = 0.0f;
+    for (uint index = 0; index < 32; index += 4) {
+        float4 weight_values = float4(
+            float(weight_quants[index + 0]),
+            float(weight_quants[index + 1]),
+            float(weight_quants[index + 2]),
+            float(weight_quants[index + 3])
+        );
+        float4 input_values = float4(
+            float(input_quants[index + 0]),
+            float(input_quants[index + 1]),
+            float(input_quants[index + 2]),
+            float(input_quants[index + 3])
+        );
+        sum += dot(weight_values, input_values);
+    }
+    return sum * weight_scale * input_scale;
+}
+
+inline float psionic_q5_0_block_dot_q8_1(
+    const device uchar* weight_block,
+    const device uchar* input_block
+) {
+    ushort weight_scale_bits =
+        ushort(weight_block[0]) | (ushort(weight_block[1]) << 8);
+    float weight_scale = float(as_type<half>(weight_scale_bits));
+    float input_scale = psionic_q8_1_block_scale(input_block);
+    uint qh = uint(weight_block[2]) |
+        (uint(weight_block[3]) << 8) |
+        (uint(weight_block[4]) << 16) |
+        (uint(weight_block[5]) << 24);
+    const device uchar* weight_quants = weight_block + 6;
+    const device char* input_quants = (const device char*)(input_block + 4);
+    float sum = 0.0f;
+    for (uint pair_index = 0; pair_index < 16; pair_index += 4) {
+        uchar4 quant_values = uchar4(
+            weight_quants[pair_index + 0],
+            weight_quants[pair_index + 1],
+            weight_quants[pair_index + 2],
+            weight_quants[pair_index + 3]
+        );
+        float4 input_low = float4(
+            float(input_quants[pair_index + 0]),
+            float(input_quants[pair_index + 1]),
+            float(input_quants[pair_index + 2]),
+            float(input_quants[pair_index + 3])
+        );
+        float4 input_high = float4(
+            float(input_quants[pair_index + 16 + 0]),
+            float(input_quants[pair_index + 16 + 1]),
+            float(input_quants[pair_index + 16 + 2]),
+            float(input_quants[pair_index + 16 + 3])
+        );
+        float4 low_values = float4(
+            float(int((quant_values[0] & 0x0fu) |
+                uchar((((qh >> (pair_index + 0u)) << 4) & 0x10u))) - 16),
+            float(int((quant_values[1] & 0x0fu) |
+                uchar((((qh >> (pair_index + 1u)) << 4) & 0x10u))) - 16),
+            float(int((quant_values[2] & 0x0fu) |
+                uchar((((qh >> (pair_index + 2u)) << 4) & 0x10u))) - 16),
+            float(int((quant_values[3] & 0x0fu) |
+                uchar((((qh >> (pair_index + 3u)) << 4) & 0x10u))) - 16)
+        );
+        float4 high_values = float4(
+            float(int(((quant_values[0] >> 4) & 0x0fu) |
+                uchar(((qh >> (pair_index + 12u)) & 0x10u))) - 16),
+            float(int(((quant_values[1] >> 4) & 0x0fu) |
+                uchar(((qh >> (pair_index + 13u)) & 0x10u))) - 16),
+            float(int(((quant_values[2] >> 4) & 0x0fu) |
+                uchar(((qh >> (pair_index + 14u)) & 0x10u))) - 16),
+            float(int(((quant_values[3] >> 4) & 0x0fu) |
+                uchar(((qh >> (pair_index + 15u)) & 0x10u))) - 16)
+        );
+        sum += dot(low_values, input_low);
+        sum += dot(high_values, input_high);
+    }
+    return sum * weight_scale * input_scale;
+}
+
+inline float psionic_q4_k_block_dot_q8_1(
+    const device uchar* weight_block,
+    const device uchar* input_block
+) {
+    ushort scale_bits = ushort(weight_block[0]) | (ushort(weight_block[1]) << 8);
+    float scale = float(as_type<half>(scale_bits));
+    ushort min_bits = ushort(weight_block[2]) | (ushort(weight_block[3]) << 8);
+    float minimum = float(as_type<half>(min_bits));
+    const device uchar* scales = weight_block + 4;
+    const device uchar* quants = weight_block + 16;
+    float sum = 0.0f;
+    uint input_block_offset = 0;
+    uint scale_index = 0;
+
+    for (uint chunk = 0; chunk < 4; ++chunk) {
+        const device uchar* quant_chunk = quants + chunk * 32;
+
+        uchar2 low = psionic_q4_k_scale_min(scale_index, scales);
+        float low_scale = scale * float(low.x);
+        float low_min = minimum * float(low.y);
+        const device uchar* low_input_block = input_block + input_block_offset;
+        float low_input_scale = psionic_q8_1_block_scale(low_input_block);
+        float low_input_sum = psionic_q8_1_block_sum(low_input_block);
+        const device char* low_input_quants = (const device char*)(low_input_block + 4);
+        float low_quant_sum = 0.0f;
+        for (uint index = 0; index < 32; index += 4) {
+            float4 input_values = float4(
+                float(low_input_quants[index + 0]),
+                float(low_input_quants[index + 1]),
+                float(low_input_quants[index + 2]),
+                float(low_input_quants[index + 3])
+            );
+            uchar4 quant_values = uchar4(
+                quant_chunk[index + 0],
+                quant_chunk[index + 1],
+                quant_chunk[index + 2],
+                quant_chunk[index + 3]
+            );
+            float4 quant_low = float4(
+                float(quant_values[0] & 0x0f),
+                float(quant_values[1] & 0x0f),
+                float(quant_values[2] & 0x0f),
+                float(quant_values[3] & 0x0f)
+            );
+            low_quant_sum += dot(input_values, quant_low);
+        }
+        sum += low_input_scale * low_quant_sum * low_scale
+            - low_input_sum * low_min;
+        input_block_offset += 36;
+        scale_index += 1;
+
+        uchar2 high = psionic_q4_k_scale_min(scale_index, scales);
+        float high_scale = scale * float(high.x);
+        float high_min = minimum * float(high.y);
+        const device uchar* high_input_block = input_block + input_block_offset;
+        float high_input_scale = psionic_q8_1_block_scale(high_input_block);
+        float high_input_sum = psionic_q8_1_block_sum(high_input_block);
+        const device char* high_input_quants = (const device char*)(high_input_block + 4);
+        float high_quant_sum = 0.0f;
+        for (uint index = 0; index < 32; index += 4) {
+            float4 input_values = float4(
+                float(high_input_quants[index + 0]),
+                float(high_input_quants[index + 1]),
+                float(high_input_quants[index + 2]),
+                float(high_input_quants[index + 3])
+            );
+            uchar4 quant_values = uchar4(
+                quant_chunk[index + 0],
+                quant_chunk[index + 1],
+                quant_chunk[index + 2],
+                quant_chunk[index + 3]
+            );
+            float4 quant_high = float4(
+                float((quant_values[0] >> 4) & 0x0f),
+                float((quant_values[1] >> 4) & 0x0f),
+                float((quant_values[2] >> 4) & 0x0f),
+                float((quant_values[3] >> 4) & 0x0f)
+            );
+            high_quant_sum += dot(input_values, quant_high);
+        }
+        sum += high_input_scale * high_quant_sum * high_scale
+            - high_input_sum * high_min;
+        input_block_offset += 36;
+        scale_index += 1;
+    }
+
     return sum;
 }
 
@@ -11831,9 +16477,10 @@ kernel void psionic_quantized_matvec_q4_k(
     constant uint& row_stride [[buffer(5)]],
     constant ulong& byte_offset [[buffer(6)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
-    ushort lane [[thread_index_in_simdgroup]]
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
+    uint row = tgpig.x * PSIONIC_Q4_K_SIMDGROUPS_PER_THREADGROUP + uint(sgitg);
     if (row >= rows) {
         return;
     }
@@ -11917,6 +16564,123 @@ kernel void psionic_quantized_matvec_q4_k(
     }
 }
 
+kernel void psionic_quantized_matvec_q4_k_r2(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
+) {
+    uint first_row =
+        (tgpig.x * PSIONIC_Q4_K_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 2u;
+    if (first_row >= rows) {
+        return;
+    }
+    uint block_count = columns / 256;
+
+    const short ix = short(lane / 8);
+    const short it = short(lane % 8);
+    const short iq = short(it / 4);
+    const short ir = short(it % 4);
+
+    float sum0 = 0.0f;
+    float sum1 = 0.0f;
+    bool has_row1 = first_row + 1u < rows;
+
+    constexpr ushort kmask1 = 0x3f3f;
+    constexpr ushort kmask2 = 0x0f0f;
+    constexpr ushort kmask3 = 0xc0c0;
+
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 4) {
+        const device float* block_input = input + block_index * 256 + 64 * uint(iq) + 8 * uint(ir);
+
+        float yl[16];
+        float yh[16];
+        float4 sumy = float4(0.0f);
+
+        for (short i = 0; i < 8; ++i) {
+            yl[i + 0] = block_input[i + 0];
+            yl[i + 8] = block_input[i + 32];
+            yh[i + 0] = block_input[i + 128];
+            yh[i + 8] = block_input[i + 160];
+            sumy[0] += yl[i + 0];
+            sumy[1] += yl[i + 8];
+            sumy[2] += yh[i + 0];
+            sumy[3] += yh[i + 8];
+        }
+
+        for (uint local_row = 0; local_row < 2; ++local_row) {
+            uint row = first_row + local_row;
+            if (row >= rows) {
+                break;
+            }
+            const device uchar* row_weights =
+                weights + byte_offset + (ulong(row) * ulong(row_stride));
+            const device uchar* block = row_weights + (block_index * 144);
+            const device ushort* scales = (const device ushort*)(block + 4) + iq;
+            const device ushort* q1 = (const device ushort*)(block + 16) + 16 * iq + 4 * ir;
+            const device half* dh = (const device half*)block;
+
+            ushort sc16[4];
+            thread const uchar* sc8 = (thread const uchar*)sc16;
+            sc16[0] = scales[0] & kmask1;
+            sc16[1] = scales[2] & kmask1;
+            sc16[2] = ((scales[4] >> 0) & kmask2) | ((scales[0] & kmask3) >> 2);
+            sc16[3] = ((scales[4] >> 4) & kmask2) | ((scales[2] & kmask3) >> 2);
+
+            const device ushort* q2 = q1 + 32;
+            float4 acc1 = float4(0.0f);
+            float4 acc2 = float4(0.0f);
+
+            for (short i = 0; i < 4; ++i) {
+                acc1[0] += yl[2 * i + 0] * float(q1[i] & 0x000F);
+                acc1[1] += yl[2 * i + 1] * float(q1[i] & 0x0F00);
+                acc1[2] += yl[2 * i + 8] * float(q1[i] & 0x00F0);
+                acc1[3] += yl[2 * i + 9] * float(q1[i] & 0xF000);
+                acc2[0] += yh[2 * i + 0] * float(q2[i] & 0x000F);
+                acc2[1] += yh[2 * i + 1] * float(q2[i] & 0x0F00);
+                acc2[2] += yh[2 * i + 8] * float(q2[i] & 0x00F0);
+                acc2[3] += yh[2 * i + 9] * float(q2[i] & 0xF000);
+            }
+
+            float block_sum = float(dh[0]) * (
+                    (acc1[0] + (1.0f / 256.0f) * acc1[1]) * float(sc8[0]) +
+                    (acc1[2] + (1.0f / 256.0f) * acc1[3]) * float(sc8[1]) * (1.0f / 16.0f) +
+                    (acc2[0] + (1.0f / 256.0f) * acc2[1]) * float(sc8[4]) +
+                    (acc2[2] + (1.0f / 256.0f) * acc2[3]) * float(sc8[5]) * (1.0f / 16.0f)
+                ) -
+                float(dh[1]) * (
+                    sumy[0] * float(sc8[2]) +
+                    sumy[1] * float(sc8[3]) +
+                    sumy[2] * float(sc8[6]) +
+                    sumy[3] * float(sc8[7])
+                );
+
+            if (local_row == 0u) {
+                sum0 += block_sum;
+            } else {
+                sum1 += block_sum;
+            }
+        }
+    }
+
+    float total0 = simd_sum(sum0);
+    if (lane == 0) {
+        output[first_row] = total0;
+    }
+    if (has_row1) {
+        float total1 = simd_sum(sum1);
+        if (lane == 0) {
+            output[first_row + 1u] = total1;
+        }
+    }
+}
+
 inline uint psionic_ordered_float_key(float value) {
     uint bits = as_type<uint>(isfinite(value) ? value : -INFINITY);
     return (bits & 0x80000000u) != 0u ? ~bits : (bits | 0x80000000u);
@@ -11952,30 +16716,51 @@ kernel void psionic_quantized_matvec_q5_0(
     constant ulong& byte_offset [[buffer(6)]],
     constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
-    uint tid [[thread_index_in_threadgroup]]
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
-    if (row >= rows) {
+    uint first_row =
+        (tgpig.x * PSIONIC_Q5_Q8_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 4u;
+    if (first_row >= rows) {
         return;
     }
-    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
-    const device uchar* row_weights = weights + byte_offset + (ulong(row) * ulong(row_stride));
     uint block_count = columns / 32;
-    float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
-        const device uchar* block = row_weights + (block_index * 22u);
-        sum += psionic_q5_0_block_dot(block, input + block_index * 32);
-    }
-    partial[tid] = sum;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            partial[tid] += partial[tid + stride];
+    const short ix = short(lane / 2);
+    const short il = short(lane % 2) * 8;
+    float sums[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    const device float* yb = input + uint(ix) * 32u + uint(il);
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 16u) {
+        float yl[16];
+        float sumy[2] = {0.0f, 0.0f};
+        for (short i = 0; i < 8; i += 2) {
+            sumy[0] += yb[i + 0] + yb[i + 1];
+            yl[i + 0] = yb[i + 0];
+            yl[i + 1] = yb[i + 1] * (1.0f / 256.0f);
+            sumy[1] += yb[i + 16] + yb[i + 17];
+            yl[i + 8] = yb[i + 16] * (1.0f / 16.0f);
+            yl[i + 9] = yb[i + 17] * (1.0f / 4096.0f);
         }
-        threadgroup_barrier(mem_flags::mem_threadgroup);
+        float total_sumy = sumy[0] + sumy[1];
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row = first_row + local_row;
+            if (row >= rows) {
+                break;
+            }
+            ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
+            const device uchar* block = weights + row_base + ulong(block_index) * 22ul;
+            sums[local_row] += psionic_q5_0_half_block_dot(block, total_sumy, yl, il);
+        }
+        yb += 512;
     }
-    if (tid == 0) {
-        output[row] = partial[0];
+    for (uint local_row = 0; local_row < 4u; ++local_row) {
+        uint row = first_row + local_row;
+        if (row >= rows) {
+            break;
+        }
+        float total = simd_sum(sums[local_row]);
+        if (lane == 0) {
+            output[row] = total;
+        }
     }
 }
 
@@ -12253,6 +17038,108 @@ kernel void psionic_quantized_matvec_q6_k(
     }
 }
 
+kernel void psionic_quantized_matvec_q6_k_r2(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    device float* output [[buffer(2)]],
+    constant uint& rows [[buffer(3)]],
+    constant uint& columns [[buffer(4)]],
+    constant uint& row_stride [[buffer(5)]],
+    constant ulong& byte_offset [[buffer(6)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]]
+) {
+    uint first_row = tgpig.x * 2u;
+    if (first_row >= rows) {
+        return;
+    }
+    uint block_count = columns / 256;
+
+    const short tid = short(lane / 2);
+    const short ix = short(lane % 2);
+    const short ip = short(tid / 8);
+    const short il = short(tid % 8);
+    const short l0 = short(4 * il);
+    const short is = short(8 * ip + l0 / 16);
+    const short y_offset = short(128 * ip + l0);
+    const short q_offset_l = short(64 * ip + l0);
+    const short q_offset_h = short(32 * ip + l0);
+
+    float sum0 = 0.0f;
+    float sum1 = 0.0f;
+    bool has_row1 = first_row + 1u < rows;
+
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 2) {
+        const device float* block_input = input + block_index * 256 + y_offset;
+
+        float yl[16];
+        for (short l = 0; l < 4; ++l) {
+            yl[4 * l + 0] = block_input[l + 0];
+            yl[4 * l + 1] = block_input[l + 32];
+            yl[4 * l + 2] = block_input[l + 64];
+            yl[4 * l + 3] = block_input[l + 96];
+        }
+
+        for (uint local_row = 0; local_row < 2; ++local_row) {
+            uint row = first_row + local_row;
+            if (row >= rows) {
+                break;
+            }
+            const device uchar* row_weights =
+                weights + byte_offset + (ulong(row) * ulong(row_stride));
+            const device uchar* block = row_weights + (block_index * 210);
+            const device uchar* q1 = block + q_offset_l;
+            const device uchar* q2 = q1 + 32;
+            const device uchar* qh = block + 128 + q_offset_h;
+            const device uchar* scales = block + 192 + is;
+            ushort scale_bits = ushort(block[208]) | (ushort(block[209]) << 8);
+            float scale = float(as_type<half>(scale_bits));
+
+            float4 sums = float4(0.0f);
+            for (short l = 0; l < 4; ++l) {
+                float y0 = yl[4 * l + 0];
+                float y1 = yl[4 * l + 1];
+                float y2 = yl[4 * l + 2];
+                float y3 = yl[4 * l + 3];
+
+                int qv0 = int(q1[l] & 0x0f) | (int((qh[l] >> 0) & 0x03) << 4);
+                int qv1 = int(q2[l] & 0x0f) | (int((qh[l] >> 2) & 0x03) << 4);
+                int qv2 = int(q1[l] >> 4) | (int((qh[l] >> 4) & 0x03) << 4);
+                int qv3 = int(q2[l] >> 4) | (int((qh[l] >> 6) & 0x03) << 4);
+
+                sums[0] += y0 * float(qv0 - 32);
+                sums[1] += y1 * float(qv1 - 32);
+                sums[2] += y2 * float(qv2 - 32);
+                sums[3] += y3 * float(qv3 - 32);
+            }
+
+            float block_sum = scale * (
+                sums[0] * float(as_type<char>(scales[0])) +
+                sums[1] * float(as_type<char>(scales[2])) +
+                sums[2] * float(as_type<char>(scales[4])) +
+                sums[3] * float(as_type<char>(scales[6]))
+            );
+
+            if (local_row == 0u) {
+                sum0 += block_sum;
+            } else {
+                sum1 += block_sum;
+            }
+        }
+    }
+
+    float total0 = simd_sum(sum0);
+    if (lane == 0) {
+        output[first_row] = total0;
+    }
+    if (has_row1) {
+        float total1 = simd_sum(sum1);
+        if (lane == 0) {
+            output[first_row + 1u] = total1;
+        }
+    }
+}
+
 kernel void psionic_quantized_matvec_argmax_q6_k(
     const device uchar* weights [[buffer(0)]],
     const device float* input [[buffer(1)]],
@@ -12318,30 +17205,44 @@ kernel void psionic_quantized_matvec_q8_0(
     constant ulong& byte_offset [[buffer(6)]],
     constant uint& active_threads [[buffer(7)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
-    uint tid [[thread_index_in_threadgroup]]
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
 ) {
-    uint row = tgpig.x;
-    if (row >= rows) {
+    uint first_row =
+        (tgpig.x * PSIONIC_Q5_Q8_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 4u;
+    if (first_row >= rows) {
         return;
     }
-    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
-    ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
     uint block_count = columns / 32;
-    float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
-        const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
-        sum += psionic_q8_0_block_dot(block, input + block_index * 32);
-    }
-    partial[tid] = sum;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
-        if (tid < stride) {
-            partial[tid] += partial[tid + stride];
+    const short ix = short(lane / 4);
+    const short il = short(lane % 4);
+    float sums[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    const device float* yb = input + uint(ix) * 32u + uint(il) * 8u;
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 8u) {
+        float yl[8];
+        for (short i = 0; i < 8; ++i) {
+            yl[i] = yb[i];
         }
-        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row = first_row + local_row;
+            if (row >= rows) {
+                break;
+            }
+            ulong row_base = byte_offset + ulong(row) * ulong(row_stride);
+            const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
+            sums[local_row] += psionic_q8_0_chunk_dot(block, yl, il);
+        }
+        yb += 256;
     }
-    if (tid == 0) {
-        output[row] = partial[0];
+    for (uint local_row = 0; local_row < 4u; ++local_row) {
+        uint row = first_row + local_row;
+        if (row >= rows) {
+            break;
+        }
+        float total = simd_sum(sums[local_row]);
+        if (lane == 0) {
+            output[row] = total;
+        }
     }
 }
 
@@ -12501,6 +17402,7 @@ kernel void psionic_mul_mv_id_q8_0(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12522,13 +17424,13 @@ kernel void psionic_mul_mv_id_q8_0(
     ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert)) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
         sum += psionic_q8_0_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12548,6 +17450,7 @@ kernel void psionic_mul_mv_id_q4_k(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12569,13 +17472,13 @@ kernel void psionic_mul_mv_id_q4_k(
     ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert)) * ulong(row_stride);
     uint block_count = columns / 256;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 144ul;
         sum += psionic_q4_k_block_dot(block, input + block_index * 256);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12595,6 +17498,7 @@ kernel void psionic_mul_mv_id_q5_0(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12616,13 +17520,13 @@ kernel void psionic_mul_mv_id_q5_0(
     ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert)) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 22ul;
         sum += psionic_q5_0_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12642,6 +17546,7 @@ kernel void psionic_mul_mv_id_mxfp4(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12663,13 +17568,13 @@ kernel void psionic_mul_mv_id_mxfp4(
     ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert)) * ulong(row_stride);
     uint block_count = columns / 32;
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
         sum += psionic_mxfp4_block_dot(block, input + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12689,6 +17594,7 @@ kernel void psionic_expert_matvec_f32_ids_q4_k(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12711,13 +17617,13 @@ kernel void psionic_expert_matvec_f32_ids_q4_k(
     uint block_count = columns / 256;
     const device float* input_row = input + ulong(selected_index) * ulong(columns);
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 144ul;
         sum += psionic_q4_k_block_dot(block, input_row + block_index * 256);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12725,6 +17631,343 @@ kernel void psionic_expert_matvec_f32_ids_q4_k(
     }
     if (tid == 0) {
         output[row] = partial[0];
+    }
+}
+
+kernel void psionic_quantize_f32_to_q8_1(
+    const device float* input [[buffer(0)]],
+    device uchar* output [[buffer(1)]],
+    constant uint& columns [[buffer(2)]],
+    constant uint& row_stride [[buffer(3)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    threadgroup float partial_abs[32];
+    threadgroup float partial_sum[32];
+    threadgroup float shared_scale[1];
+    threadgroup float shared_sum[1];
+
+    uint block_index = tgpig.x;
+    uint row_index = tgpig.y;
+    uint element_index = block_index * 32u + tid;
+    float value = input[ulong(row_index) * ulong(columns) + ulong(element_index)];
+    partial_abs[tid] = fabs(value);
+    partial_sum[tid] = value;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (uint stride = 16u; stride > 0u; stride >>= 1u) {
+        if (tid < stride) {
+            partial_abs[tid] = max(partial_abs[tid], partial_abs[tid + stride]);
+            partial_sum[tid] += partial_sum[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (tid == 0) {
+        shared_sum[0] = partial_sum[0];
+        shared_scale[0] = partial_abs[0] == 0.0f ? 0.0f : partial_abs[0] / 127.0f;
+        ulong output_base = ulong(row_index) * ulong(row_stride) + ulong(block_index) * 36ul;
+        ushort scale_bits = as_type<ushort>(half(shared_scale[0]));
+        ushort sum_bits = as_type<ushort>(half(shared_sum[0]));
+        output[output_base + 0ul] = uchar(scale_bits & 0xffu);
+        output[output_base + 1ul] = uchar(scale_bits >> 8);
+        output[output_base + 2ul] = uchar(sum_bits & 0xffu);
+        output[output_base + 3ul] = uchar(sum_bits >> 8);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    float scale = shared_scale[0];
+    int quantized = scale == 0.0f ? 0 : int(round(clamp(value / scale, -127.0f, 127.0f)));
+    ulong output_base = ulong(row_index) * ulong(row_stride) + ulong(block_index) * 36ul;
+    output[output_base + 4ul + ulong(tid)] = as_type<uchar>(char(quantized));
+}
+
+kernel void psionic_grouped_expert_gate_up_swiglu_q4_k(
+    const device uchar* gate_weights [[buffer(0)]],
+    const device uchar* up_weights [[buffer(1)]],
+    const device float* input [[buffer(2)]],
+    device float* output [[buffer(3)]],
+    const device float* gate_bias [[buffer(4)]],
+    const device float* up_bias [[buffer(5)]],
+    const device int* selected_ids [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& gate_row_stride [[buffer(9)]],
+    constant uint& up_row_stride [[buffer(10)]],
+    constant uint& selected_count [[buffer(11)]],
+    constant uint& has_gate_bias [[buffer(12)]],
+    constant uint& has_up_bias [[buffer(13)]],
+    constant uint& active_threads [[buffer(14)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
+) {
+    uint selected_index = tgpig.y;
+    uint first_row_in_expert =
+        (tgpig.x * PSIONIC_Q4_K_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 2u;
+    if (selected_index >= selected_count || first_row_in_expert >= rows_per_expert) {
+        return;
+    }
+    int expert_id = selected_ids[selected_index];
+    if (expert_id < 0) {
+        if (lane == 0) {
+            uint output_row = selected_index * rows_per_expert + first_row_in_expert;
+            output[output_row] = 0.0f;
+            if (first_row_in_expert + 1u < rows_per_expert) {
+                output[output_row + 1u] = 0.0f;
+            }
+        }
+        return;
+    }
+    uint block_count = columns / 256;
+    const short ix = short(lane / 8);
+    const short it = short(lane % 8);
+    const short iq = short(it / 4);
+    const short ir = short(it % 4);
+    float gate_sum0 = 0.0f;
+    float gate_sum1 = 0.0f;
+    float up_sum0 = 0.0f;
+    float up_sum1 = 0.0f;
+
+    constexpr ushort kmask1 = 0x3f3f;
+    constexpr ushort kmask2 = 0x0f0f;
+    constexpr ushort kmask3 = 0xc0c0;
+
+    for (uint block_index = uint(ix); block_index < block_count; block_index += 4) {
+        const device float* block_input =
+            input + block_index * 256 + 64 * uint(iq) + 8 * uint(ir);
+
+        float yl[16];
+        float yh[16];
+        float4 sumy = float4(0.0f);
+
+        for (short i = 0; i < 8; ++i) {
+            yl[i + 0] = block_input[i + 0];
+            yl[i + 8] = block_input[i + 32];
+            yh[i + 0] = block_input[i + 128];
+            yh[i + 8] = block_input[i + 160];
+            sumy[0] += yl[i + 0];
+            sumy[1] += yl[i + 8];
+            sumy[2] += yh[i + 0];
+            sumy[3] += yh[i + 8];
+        }
+
+        for (uint local_row = 0; local_row < 2u; ++local_row) {
+            uint row_in_expert = first_row_in_expert + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            ulong expert_row = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+            const device uchar* gate_block =
+                gate_weights + expert_row * ulong(gate_row_stride) + ulong(block_index) * 144ul;
+            const device uchar* up_block =
+                up_weights + expert_row * ulong(up_row_stride) + ulong(block_index) * 144ul;
+
+            const device ushort* gate_scales = (const device ushort*)(gate_block + 4) + iq;
+            const device ushort* gate_q1 =
+                (const device ushort*)(gate_block + 16) + 16 * iq + 4 * ir;
+            const device half* gate_dh = (const device half*)gate_block;
+            const device ushort* up_scales = (const device ushort*)(up_block + 4) + iq;
+            const device ushort* up_q1 =
+                (const device ushort*)(up_block + 16) + 16 * iq + 4 * ir;
+            const device half* up_dh = (const device half*)up_block;
+
+            ushort gate_sc16[4];
+            thread const uchar* gate_sc8 = (thread const uchar*)gate_sc16;
+            gate_sc16[0] = gate_scales[0] & kmask1;
+            gate_sc16[1] = gate_scales[2] & kmask1;
+            gate_sc16[2] = ((gate_scales[4] >> 0) & kmask2) | ((gate_scales[0] & kmask3) >> 2);
+            gate_sc16[3] = ((gate_scales[4] >> 4) & kmask2) | ((gate_scales[2] & kmask3) >> 2);
+
+            ushort up_sc16[4];
+            thread const uchar* up_sc8 = (thread const uchar*)up_sc16;
+            up_sc16[0] = up_scales[0] & kmask1;
+            up_sc16[1] = up_scales[2] & kmask1;
+            up_sc16[2] = ((up_scales[4] >> 0) & kmask2) | ((up_scales[0] & kmask3) >> 2);
+            up_sc16[3] = ((up_scales[4] >> 4) & kmask2) | ((up_scales[2] & kmask3) >> 2);
+
+            const device ushort* gate_q2 = gate_q1 + 32;
+            const device ushort* up_q2 = up_q1 + 32;
+            float4 gate_acc1 = float4(0.0f);
+            float4 gate_acc2 = float4(0.0f);
+            float4 up_acc1 = float4(0.0f);
+            float4 up_acc2 = float4(0.0f);
+
+            for (short i = 0; i < 4; ++i) {
+                gate_acc1[0] += yl[2 * i + 0] * float(gate_q1[i] & 0x000F);
+                gate_acc1[1] += yl[2 * i + 1] * float(gate_q1[i] & 0x0F00);
+                gate_acc1[2] += yl[2 * i + 8] * float(gate_q1[i] & 0x00F0);
+                gate_acc1[3] += yl[2 * i + 9] * float(gate_q1[i] & 0xF000);
+                gate_acc2[0] += yh[2 * i + 0] * float(gate_q2[i] & 0x000F);
+                gate_acc2[1] += yh[2 * i + 1] * float(gate_q2[i] & 0x0F00);
+                gate_acc2[2] += yh[2 * i + 8] * float(gate_q2[i] & 0x00F0);
+                gate_acc2[3] += yh[2 * i + 9] * float(gate_q2[i] & 0xF000);
+
+                up_acc1[0] += yl[2 * i + 0] * float(up_q1[i] & 0x000F);
+                up_acc1[1] += yl[2 * i + 1] * float(up_q1[i] & 0x0F00);
+                up_acc1[2] += yl[2 * i + 8] * float(up_q1[i] & 0x00F0);
+                up_acc1[3] += yl[2 * i + 9] * float(up_q1[i] & 0xF000);
+                up_acc2[0] += yh[2 * i + 0] * float(up_q2[i] & 0x000F);
+                up_acc2[1] += yh[2 * i + 1] * float(up_q2[i] & 0x0F00);
+                up_acc2[2] += yh[2 * i + 8] * float(up_q2[i] & 0x00F0);
+                up_acc2[3] += yh[2 * i + 9] * float(up_q2[i] & 0xF000);
+            }
+
+            float gate_block_sum = float(gate_dh[0]) * (
+                    (gate_acc1[0] + (1.0f / 256.0f) * gate_acc1[1]) * float(gate_sc8[0]) +
+                    (gate_acc1[2] + (1.0f / 256.0f) * gate_acc1[3]) * float(gate_sc8[1]) * (1.0f / 16.0f) +
+                    (gate_acc2[0] + (1.0f / 256.0f) * gate_acc2[1]) * float(gate_sc8[4]) +
+                    (gate_acc2[2] + (1.0f / 256.0f) * gate_acc2[3]) * float(gate_sc8[5]) * (1.0f / 16.0f)
+                ) -
+                float(gate_dh[1]) * (
+                    sumy[0] * float(gate_sc8[2]) +
+                    sumy[1] * float(gate_sc8[3]) +
+                    sumy[2] * float(gate_sc8[6]) +
+                    sumy[3] * float(gate_sc8[7])
+                );
+            float up_block_sum = float(up_dh[0]) * (
+                    (up_acc1[0] + (1.0f / 256.0f) * up_acc1[1]) * float(up_sc8[0]) +
+                    (up_acc1[2] + (1.0f / 256.0f) * up_acc1[3]) * float(up_sc8[1]) * (1.0f / 16.0f) +
+                    (up_acc2[0] + (1.0f / 256.0f) * up_acc2[1]) * float(up_sc8[4]) +
+                    (up_acc2[2] + (1.0f / 256.0f) * up_acc2[3]) * float(up_sc8[5]) * (1.0f / 16.0f)
+                ) -
+                float(up_dh[1]) * (
+                    sumy[0] * float(up_sc8[2]) +
+                    sumy[1] * float(up_sc8[3]) +
+                    sumy[2] * float(up_sc8[6]) +
+                    sumy[3] * float(up_sc8[7])
+                );
+
+            if (local_row == 0u) {
+                gate_sum0 += gate_block_sum;
+                up_sum0 += up_block_sum;
+            } else {
+                gate_sum1 += gate_block_sum;
+                up_sum1 += up_block_sum;
+            }
+        }
+    }
+    float gate_total0 = simd_sum(gate_sum0);
+    float up_total0 = simd_sum(up_sum0);
+    float gate_total1 = simd_sum(gate_sum1);
+    float up_total1 = simd_sum(up_sum1);
+    if (lane == 0) {
+        uint output_row = selected_index * rows_per_expert + first_row_in_expert;
+        ulong bias_index0 = ulong(expert_id) * ulong(rows_per_expert) + ulong(first_row_in_expert);
+        float gate_value0 = gate_total0 + (has_gate_bias != 0u ? gate_bias[bias_index0] : 0.0f);
+        float up_value0 = up_total0 + (has_up_bias != 0u ? up_bias[bias_index0] : 0.0f);
+        float cubic0 = gate_value0 * gate_value0 * gate_value0;
+        float inner0 = 0.7978845608f * (gate_value0 + 0.044715f * cubic0);
+        float activated0 = 0.5f * gate_value0 * (1.0f + tanh(inner0));
+        output[output_row] = activated0 * up_value0;
+
+        if (first_row_in_expert + 1u < rows_per_expert) {
+            ulong bias_index1 =
+                ulong(expert_id) * ulong(rows_per_expert) + ulong(first_row_in_expert + 1u);
+            float gate_value1 =
+                gate_total1 + (has_gate_bias != 0u ? gate_bias[bias_index1] : 0.0f);
+            float up_value1 = up_total1 + (has_up_bias != 0u ? up_bias[bias_index1] : 0.0f);
+            float cubic1 = gate_value1 * gate_value1 * gate_value1;
+            float inner1 = 0.7978845608f * (gate_value1 + 0.044715f * cubic1);
+            float activated1 = 0.5f * gate_value1 * (1.0f + tanh(inner1));
+            output[output_row + 1u] = activated1 * up_value1;
+        }
+    }
+}
+
+kernel void psionic_grouped_expert_gate_up_swiglu_q4_k_q8_1(
+    const device uchar* gate_weights [[buffer(0)]],
+    const device uchar* up_weights [[buffer(1)]],
+    const device uchar* input_q8_1 [[buffer(2)]],
+    device float* output [[buffer(3)]],
+    const device float* gate_bias [[buffer(4)]],
+    const device float* up_bias [[buffer(5)]],
+    const device int* selected_ids [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& gate_row_stride [[buffer(9)]],
+    constant uint& up_row_stride [[buffer(10)]],
+    constant uint& selected_count [[buffer(11)]],
+    constant uint& has_gate_bias [[buffer(12)]],
+    constant uint& has_up_bias [[buffer(13)]],
+    constant uint& active_threads [[buffer(14)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
+) {
+    uint selected_index = tgpig.y;
+    uint first_row_in_expert =
+        (tgpig.x * PSIONIC_Q4_K_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 2u;
+    if (selected_index >= selected_count || first_row_in_expert >= rows_per_expert) {
+        return;
+    }
+    int expert_id = selected_ids[selected_index];
+    if (expert_id < 0) {
+        if (lane == 0) {
+            uint output_row = selected_index * rows_per_expert + first_row_in_expert;
+            output[output_row] = 0.0f;
+            if (first_row_in_expert + 1u < rows_per_expert) {
+                output[output_row + 1u] = 0.0f;
+            }
+        }
+        return;
+    }
+
+    uint block_count = columns / 256;
+    uint input_row_stride = (columns / 32u) * 36u;
+    const device uchar* input_row = input_q8_1 + ulong(selected_index) * ulong(input_row_stride);
+    float gate_sum0 = 0.0f;
+    float gate_sum1 = 0.0f;
+    float up_sum0 = 0.0f;
+    float up_sum1 = 0.0f;
+    for (uint block_index = uint(lane); block_index < block_count; block_index += active_threads) {
+        const device uchar* input_block = input_row + ulong(block_index) * 288ul;
+        for (uint local_row = 0; local_row < 2u; ++local_row) {
+            uint row_in_expert = first_row_in_expert + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            ulong expert_row = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+            const device uchar* gate_block =
+                gate_weights + expert_row * ulong(gate_row_stride) + ulong(block_index) * 144ul;
+            const device uchar* up_block =
+                up_weights + expert_row * ulong(up_row_stride) + ulong(block_index) * 144ul;
+            float gate_block_sum = psionic_q4_k_block_dot_q8_1(gate_block, input_block);
+            float up_block_sum = psionic_q4_k_block_dot_q8_1(up_block, input_block);
+            if (local_row == 0u) {
+                gate_sum0 += gate_block_sum;
+                up_sum0 += up_block_sum;
+            } else {
+                gate_sum1 += gate_block_sum;
+                up_sum1 += up_block_sum;
+            }
+        }
+    }
+    float gate_total0 = simd_sum(gate_sum0);
+    float up_total0 = simd_sum(up_sum0);
+    float gate_total1 = simd_sum(gate_sum1);
+    float up_total1 = simd_sum(up_sum1);
+    if (lane == 0) {
+        uint output_row = selected_index * rows_per_expert + first_row_in_expert;
+        ulong bias_index0 = ulong(expert_id) * ulong(rows_per_expert) + ulong(first_row_in_expert);
+        float gate_value0 = gate_total0 + (has_gate_bias != 0u ? gate_bias[bias_index0] : 0.0f);
+        float up_value0 = up_total0 + (has_up_bias != 0u ? up_bias[bias_index0] : 0.0f);
+        float cubic0 = gate_value0 * gate_value0 * gate_value0;
+        float inner0 = 0.7978845608f * (gate_value0 + 0.044715f * cubic0);
+        float activated0 = 0.5f * gate_value0 * (1.0f + tanh(inner0));
+        output[output_row] = activated0 * up_value0;
+
+        if (first_row_in_expert + 1u < rows_per_expert) {
+            ulong bias_index1 =
+                ulong(expert_id) * ulong(rows_per_expert) + ulong(first_row_in_expert + 1u);
+            float gate_value1 =
+                gate_total1 + (has_gate_bias != 0u ? gate_bias[bias_index1] : 0.0f);
+            float up_value1 = up_total1 + (has_up_bias != 0u ? up_bias[bias_index1] : 0.0f);
+            float cubic1 = gate_value1 * gate_value1 * gate_value1;
+            float inner1 = 0.7978845608f * (gate_value1 + 0.044715f * cubic1);
+            float activated1 = 0.5f * gate_value1 * (1.0f + tanh(inner1));
+            output[output_row + 1u] = activated1 * up_value1;
+        }
     }
 }
 
@@ -12737,6 +17980,7 @@ kernel void psionic_expert_matvec_f32_ids_q5_0(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12759,13 +18003,13 @@ kernel void psionic_expert_matvec_f32_ids_q5_0(
     uint block_count = columns / 32;
     const device float* input_row = input + ulong(selected_index) * ulong(columns);
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 22ul;
         sum += psionic_q5_0_block_dot(block, input_row + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12785,6 +18029,7 @@ kernel void psionic_expert_matvec_f32_ids_q8_0(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12807,13 +18052,13 @@ kernel void psionic_expert_matvec_f32_ids_q8_0(
     uint block_count = columns / 32;
     const device float* input_row = input + ulong(selected_index) * ulong(columns);
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
         sum += psionic_q8_0_block_dot(block, input_row + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12833,6 +18078,7 @@ kernel void psionic_expert_matvec_f32_ids_mxfp4(
     constant uint& row_stride [[buffer(5)]],
     constant uint& selected_count [[buffer(6)]],
     constant int* selected_ids [[buffer(7)]],
+    constant uint& active_threads [[buffer(8)]],
     uint3 tgpig [[threadgroup_position_in_grid]],
     uint tid [[thread_index_in_threadgroup]]
 ) {
@@ -12855,13 +18101,13 @@ kernel void psionic_expert_matvec_f32_ids_mxfp4(
     uint block_count = columns / 32;
     const device float* input_row = input + ulong(selected_index) * ulong(columns);
     float sum = 0.0f;
-    for (uint block_index = tid; block_index < block_count; block_index += PSIONIC_QUANTIZED_ROW_THREADS) {
+    for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
         const device uchar* block = weights + row_base + ulong(block_index) * 17ul;
         sum += psionic_mxfp4_block_dot(block, input_row + block_index * 32);
     }
     partial[tid] = sum;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    for (uint stride = PSIONIC_QUANTIZED_ROW_THREADS / 2; stride > 0; stride >>= 1) {
+    for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             partial[tid] += partial[tid + stride];
         }
@@ -12869,6 +18115,377 @@ kernel void psionic_expert_matvec_f32_ids_mxfp4(
     }
     if (tid == 0) {
         output[row] = partial[0];
+    }
+}
+
+kernel void psionic_moe_down_aggregate_f32_ids_q4_k(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    const device int* selected_ids [[buffer(2)]],
+    const device float* selected_weights [[buffer(3)]],
+    const device float* expert_scales [[buffer(4)]],
+    const device float* bias [[buffer(5)]],
+    device float* output [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& row_stride [[buffer(9)]],
+    constant uint& selected_count [[buffer(10)]],
+    constant uint& has_bias [[buffer(11)]],
+    constant uint& active_threads [[buffer(12)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    uint row_in_expert = tgpig.x;
+    if (row_in_expert >= rows_per_expert) {
+        return;
+    }
+    threadgroup float partial[PSIONIC_QUANTIZED_ROW_THREADS];
+    threadgroup float shared_sum[1];
+    if (tid == 0) {
+        shared_sum[0] = 0.0f;
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint block_count = columns / 256;
+    for (uint selected_index = 0; selected_index < selected_count; ++selected_index) {
+        int expert_id = selected_ids[selected_index];
+        float dot = 0.0f;
+        if (expert_id >= 0) {
+            ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert))
+                * ulong(row_stride);
+            const device float* input_row = input + ulong(selected_index) * ulong(columns);
+            for (uint block_index = tid; block_index < block_count; block_index += active_threads) {
+                const device uchar* block = weights + row_base + ulong(block_index) * 144ul;
+                dot += psionic_q4_k_block_dot(block, input_row + block_index * 256);
+            }
+        }
+        partial[tid] = dot;
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = active_threads / 2; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                partial[tid] += partial[tid + stride];
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid == 0 && expert_id >= 0) {
+            ulong bias_index = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+            float value = partial[0] + (has_bias != 0u ? bias[bias_index] : 0.0f);
+            shared_sum[0] += value * selected_weights[selected_index] * expert_scales[expert_id];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    if (tid == 0) {
+        output[row_in_expert] = shared_sum[0];
+    }
+}
+
+kernel void psionic_moe_down_aggregate_f32_ids_q5_0(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    const device int* selected_ids [[buffer(2)]],
+    const device float* selected_weights [[buffer(3)]],
+    const device float* expert_scales [[buffer(4)]],
+    const device float* bias [[buffer(5)]],
+    device float* output [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& row_stride [[buffer(9)]],
+    constant uint& selected_count [[buffer(10)]],
+    constant uint& has_bias [[buffer(11)]],
+    constant uint& active_threads [[buffer(12)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]]
+) {
+    uint first_row = tgpig.x * 4u;
+    if (first_row >= rows_per_expert) {
+        return;
+    }
+    uint block_count = columns / 32;
+    const short ix = short(lane / 2);
+    const short il = short(lane % 2) * 8;
+    float accumulated[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    for (uint selected_index = 0; selected_index < selected_count; ++selected_index) {
+        int expert_id = selected_ids[selected_index];
+        if (expert_id < 0) {
+            continue;
+        }
+        const device float* input_row = input + ulong(selected_index) * ulong(columns);
+        float dots[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        const device float* yb = input_row + uint(ix) * 32u + uint(il);
+        for (uint block_index = uint(ix); block_index < block_count; block_index += 16u) {
+            float yl[16];
+            float sumy[2] = {0.0f, 0.0f};
+            for (short i = 0; i < 8; i += 2) {
+                sumy[0] += yb[i + 0] + yb[i + 1];
+                yl[i + 0] = yb[i + 0];
+                yl[i + 1] = yb[i + 1] * (1.0f / 256.0f);
+                sumy[1] += yb[i + 16] + yb[i + 17];
+                yl[i + 8] = yb[i + 16] * (1.0f / 16.0f);
+                yl[i + 9] = yb[i + 17] * (1.0f / 4096.0f);
+            }
+            float total_sumy = sumy[0] + sumy[1];
+            for (uint local_row = 0; local_row < 4u; ++local_row) {
+                uint row_in_expert = first_row + local_row;
+                if (row_in_expert >= rows_per_expert) {
+                    break;
+                }
+                ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert))
+                    * ulong(row_stride);
+                const device uchar* block = weights + row_base + ulong(block_index) * 22ul;
+                dots[local_row] += psionic_q5_0_half_block_dot(block, total_sumy, yl, il);
+            }
+            yb += 512;
+        }
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            float total = simd_sum(dots[local_row]);
+            if (lane == 0) {
+                ulong bias_index = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+                float value = total + (has_bias != 0u ? bias[bias_index] : 0.0f);
+                accumulated[local_row] +=
+                    value * selected_weights[selected_index] * expert_scales[expert_id];
+            }
+        }
+    }
+    if (lane == 0) {
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            output[row_in_expert] = accumulated[local_row];
+        }
+    }
+}
+
+kernel void psionic_moe_down_aggregate_f32_ids_q8_0(
+    const device uchar* weights [[buffer(0)]],
+    const device float* input [[buffer(1)]],
+    const device int* selected_ids [[buffer(2)]],
+    const device float* selected_weights [[buffer(3)]],
+    const device float* expert_scales [[buffer(4)]],
+    const device float* bias [[buffer(5)]],
+    device float* output [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& row_stride [[buffer(9)]],
+    constant uint& selected_count [[buffer(10)]],
+    constant uint& has_bias [[buffer(11)]],
+    constant uint& active_threads [[buffer(12)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]]
+) {
+    uint first_row = tgpig.x * 4u;
+    if (first_row >= rows_per_expert) {
+        return;
+    }
+    uint block_count = columns / 32;
+    const short ix = short(lane / 4);
+    const short il = short(lane % 4);
+    float accumulated[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    for (uint selected_index = 0; selected_index < selected_count; ++selected_index) {
+        int expert_id = selected_ids[selected_index];
+        if (expert_id < 0) {
+            continue;
+        }
+        const device float* input_row = input + ulong(selected_index) * ulong(columns);
+        float dots[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        const device float* yb = input_row + uint(ix) * 32u + uint(il) * 8u;
+        for (uint block_index = uint(ix); block_index < block_count; block_index += 8u) {
+            float yl[8];
+            for (short i = 0; i < 8; ++i) {
+                yl[i] = yb[i];
+            }
+            for (uint local_row = 0; local_row < 4u; ++local_row) {
+                uint row_in_expert = first_row + local_row;
+                if (row_in_expert >= rows_per_expert) {
+                    break;
+                }
+                ulong row_base = (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert))
+                    * ulong(row_stride);
+                const device uchar* block = weights + row_base + ulong(block_index) * 34ul;
+                dots[local_row] += psionic_q8_0_chunk_dot(block, yl, il);
+            }
+            yb += 256;
+        }
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            float total = simd_sum(dots[local_row]);
+            if (lane == 0) {
+                ulong bias_index = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+                float value = total + (has_bias != 0u ? bias[bias_index] : 0.0f);
+                accumulated[local_row] +=
+                    value * selected_weights[selected_index] * expert_scales[expert_id];
+            }
+        }
+    }
+    if (lane == 0) {
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            output[row_in_expert] = accumulated[local_row];
+        }
+    }
+}
+
+kernel void psionic_moe_down_aggregate_q8_1_ids_q5_0(
+    const device uchar* weights [[buffer(0)]],
+    const device uchar* input_q8_1 [[buffer(1)]],
+    const device int* selected_ids [[buffer(2)]],
+    const device float* selected_weights [[buffer(3)]],
+    const device float* expert_scales [[buffer(4)]],
+    const device float* bias [[buffer(5)]],
+    device float* output [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& row_stride [[buffer(9)]],
+    constant uint& selected_count [[buffer(10)]],
+    constant uint& has_bias [[buffer(11)]],
+    constant uint& active_threads [[buffer(12)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
+) {
+    uint first_row =
+        (tgpig.x * PSIONIC_MOE_DOWN_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 4u;
+    if (first_row >= rows_per_expert) {
+        return;
+    }
+    float accumulated[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    uint block_count = columns / 32u;
+    uint input_row_stride = block_count * 36u;
+
+    for (uint selected_index = 0; selected_index < selected_count; ++selected_index) {
+        int expert_id = selected_ids[selected_index];
+        if (expert_id < 0) {
+            continue;
+        }
+        const device uchar* input_row =
+            input_q8_1 + ulong(selected_index) * ulong(input_row_stride);
+        float dots[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        for (uint block_index = uint(lane); block_index < block_count; block_index += active_threads) {
+            const device uchar* input_block = input_row + ulong(block_index) * 36ul;
+            for (uint local_row = 0; local_row < 4u; ++local_row) {
+                uint row_in_expert = first_row + local_row;
+                if (row_in_expert >= rows_per_expert) {
+                    break;
+                }
+                ulong row_base =
+                    (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert))
+                        * ulong(row_stride);
+                const device uchar* weight_block =
+                    weights + row_base + ulong(block_index) * 22ul;
+                dots[local_row] += psionic_q5_0_block_dot_q8_1(weight_block, input_block);
+            }
+        }
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            float total = simd_sum(dots[local_row]);
+            if (lane == 0) {
+                ulong bias_index = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+                float value = total + (has_bias != 0u ? bias[bias_index] : 0.0f);
+                accumulated[local_row] +=
+                    value * selected_weights[selected_index] * expert_scales[expert_id];
+            }
+        }
+    }
+
+    if (lane == 0) {
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            output[row_in_expert] = accumulated[local_row];
+        }
+    }
+}
+
+kernel void psionic_moe_down_aggregate_q8_1_ids_q8_0(
+    const device uchar* weights [[buffer(0)]],
+    const device uchar* input_q8_1 [[buffer(1)]],
+    const device int* selected_ids [[buffer(2)]],
+    const device float* selected_weights [[buffer(3)]],
+    const device float* expert_scales [[buffer(4)]],
+    const device float* bias [[buffer(5)]],
+    device float* output [[buffer(6)]],
+    constant uint& rows_per_expert [[buffer(7)]],
+    constant uint& columns [[buffer(8)]],
+    constant uint& row_stride [[buffer(9)]],
+    constant uint& selected_count [[buffer(10)]],
+    constant uint& has_bias [[buffer(11)]],
+    constant uint& active_threads [[buffer(12)]],
+    uint3 tgpig [[threadgroup_position_in_grid]],
+    ushort lane [[thread_index_in_simdgroup]],
+    ushort sgitg [[simdgroup_index_in_threadgroup]]
+) {
+    uint first_row =
+        (tgpig.x * PSIONIC_MOE_DOWN_SIMDGROUPS_PER_THREADGROUP + uint(sgitg)) * 4u;
+    if (first_row >= rows_per_expert) {
+        return;
+    }
+    float accumulated[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    uint block_count = columns / 32u;
+    uint input_row_stride = block_count * 36u;
+
+    for (uint selected_index = 0; selected_index < selected_count; ++selected_index) {
+        int expert_id = selected_ids[selected_index];
+        if (expert_id < 0) {
+            continue;
+        }
+        const device uchar* input_row =
+            input_q8_1 + ulong(selected_index) * ulong(input_row_stride);
+        float dots[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        for (uint block_index = uint(lane); block_index < block_count; block_index += active_threads) {
+            const device uchar* input_block = input_row + ulong(block_index) * 36ul;
+            for (uint local_row = 0; local_row < 4u; ++local_row) {
+                uint row_in_expert = first_row + local_row;
+                if (row_in_expert >= rows_per_expert) {
+                    break;
+                }
+                ulong row_base =
+                    (ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert))
+                        * ulong(row_stride);
+                const device uchar* weight_block =
+                    weights + row_base + ulong(block_index) * 34ul;
+                dots[local_row] += psionic_q8_0_block_dot_q8_1(weight_block, input_block);
+            }
+        }
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            float total = simd_sum(dots[local_row]);
+            if (lane == 0) {
+                ulong bias_index = ulong(expert_id) * ulong(rows_per_expert) + ulong(row_in_expert);
+                float value = total + (has_bias != 0u ? bias[bias_index] : 0.0f);
+                accumulated[local_row] +=
+                    value * selected_weights[selected_index] * expert_scales[expert_id];
+            }
+        }
+    }
+
+    if (lane == 0) {
+        for (uint local_row = 0; local_row < 4u; ++local_row) {
+            uint row_in_expert = first_row + local_row;
+            if (row_in_expert >= rows_per_expert) {
+                break;
+            }
+            output[row_in_expert] = accumulated[local_row];
+        }
     }
 }
 ";
@@ -13004,6 +18621,7 @@ mod platform {
             _columns: usize,
             _row_stride: usize,
             _selected_ids: &[i32],
+            _active_threads: u32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -13020,6 +18638,57 @@ mod platform {
             _columns: usize,
             _row_stride: usize,
             _selected_ids: &[i32],
+            _active_threads: u32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_grouped_expert_gate_up_swiglu_buffer_ids(
+            &mut self,
+            _pipeline: &(),
+            _gate_weights: &PlatformBuffer,
+            _up_weights: &PlatformBuffer,
+            _input: &PlatformBuffer,
+            _output: &PlatformBuffer,
+            _gate_bias: Option<&PlatformBuffer>,
+            _up_bias: Option<&PlatformBuffer>,
+            _rows_per_expert: usize,
+            _columns: usize,
+            _gate_row_stride: usize,
+            _up_row_stride: usize,
+            _selected_ids: &PlatformBuffer,
+            _selected_ids_byte_offset: usize,
+            _selected_count: usize,
+            _active_threads: u32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_moe_down_aggregate_f32_ids_buffer(
+            &mut self,
+            _pipeline: &(),
+            _weights: &PlatformBuffer,
+            _input: &PlatformBuffer,
+            _selected_ids: &PlatformBuffer,
+            _selected_ids_byte_offset: usize,
+            _selected_weights: &PlatformBuffer,
+            _selected_weights_byte_offset: usize,
+            _expert_scales: &PlatformBuffer,
+            _expert_scales_byte_offset: usize,
+            _bias: Option<&PlatformBuffer>,
+            _output: &PlatformBuffer,
+            _rows_per_expert: usize,
+            _columns: usize,
+            _row_stride: usize,
+            _selected_count: usize,
+            _active_threads: u32,
+            _rows_per_threadgroup: u32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -13105,6 +18774,47 @@ mod platform {
             )))
         }
 
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_residual_post_norm_and_rms_to_output(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _values_byte_offset: usize,
+            _residual: &PlatformBuffer,
+            _residual_byte_offset: usize,
+            _bias: Option<&PlatformBuffer>,
+            _bias_byte_offset: usize,
+            _post_norm: Option<&PlatformBuffer>,
+            _post_norm_byte_offset: usize,
+            _next_norm_weight: &PlatformBuffer,
+            _next_norm_weight_byte_offset: usize,
+            _next_norm_output: &PlatformBuffer,
+            _next_norm_output_byte_offset: usize,
+            _width: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_post_norm_add_residual(
+            &mut self,
+            _pipeline: &(),
+            _values: &PlatformBuffer,
+            _values_byte_offset: usize,
+            _residual: &PlatformBuffer,
+            _residual_byte_offset: usize,
+            _post_norm: Option<&PlatformBuffer>,
+            _post_norm_byte_offset: usize,
+            _width: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_per_head_rms_norm_unit(
             &mut self,
             _pipeline: &(),
@@ -13147,6 +18857,119 @@ mod platform {
             _corr_dims: [f32; 2],
             _ext_factor: f32,
             _yarn_mscale: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_query_rms_rope(
+            &mut self,
+            _pipeline: &(),
+            _query: &PlatformBuffer,
+            _query_byte_offset: usize,
+            _freq_factors: &PlatformBuffer,
+            _freq_factors_byte_offset: usize,
+            _query_bias: Option<&PlatformBuffer>,
+            _query_bias_byte_offset: usize,
+            _query_norm: Option<&PlatformBuffer>,
+            _query_norm_byte_offset: usize,
+            _head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qk_rms_rope_append_dense_kv(
+            &mut self,
+            _pipeline: &(),
+            _qk: &PlatformBuffer,
+            _qk_byte_offset: usize,
+            _value: &PlatformBuffer,
+            _value_byte_offset: usize,
+            _value_from_key: bool,
+            _freq_factors: &PlatformBuffer,
+            _freq_factors_byte_offset: usize,
+            _query_bias: Option<&PlatformBuffer>,
+            _query_bias_byte_offset: usize,
+            _query_norm: Option<&PlatformBuffer>,
+            _query_norm_byte_offset: usize,
+            _key_bias: Option<&PlatformBuffer>,
+            _key_bias_byte_offset: usize,
+            _key_norm: Option<&PlatformBuffer>,
+            _key_norm_byte_offset: usize,
+            _value_bias: Option<&PlatformBuffer>,
+            _value_bias_byte_offset: usize,
+            _key_cache: &PlatformBuffer,
+            _key_cache_byte_offset: usize,
+            _value_cache: &PlatformBuffer,
+            _value_cache_byte_offset: usize,
+            _query_head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+            _epsilon: f32,
+            _cache_row_width: usize,
+            _cache_write_offset: usize,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qkv_rms_rope_append_dense_kv(
+            &mut self,
+            _pipeline: &(),
+            _qkv: &PlatformBuffer,
+            _qkv_byte_offset: usize,
+            _freq_factors: &PlatformBuffer,
+            _freq_factors_byte_offset: usize,
+            _query_bias: Option<&PlatformBuffer>,
+            _query_bias_byte_offset: usize,
+            _query_norm: Option<&PlatformBuffer>,
+            _query_norm_byte_offset: usize,
+            _key_bias: Option<&PlatformBuffer>,
+            _key_bias_byte_offset: usize,
+            _key_norm: Option<&PlatformBuffer>,
+            _key_norm_byte_offset: usize,
+            _value_bias: Option<&PlatformBuffer>,
+            _value_bias_byte_offset: usize,
+            _key_cache: &PlatformBuffer,
+            _key_cache_byte_offset: usize,
+            _value_cache: &PlatformBuffer,
+            _value_cache_byte_offset: usize,
+            _query_head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+            _epsilon: f32,
+            _cache_row_width: usize,
+            _cache_write_offset: usize,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -13314,6 +19137,38 @@ mod platform {
             )))
         }
 
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_residual_post_norm_and_rms_to_output(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _residual: &MetalBuffer,
+            _bias: Option<&MetalBuffer>,
+            _post_norm: Option<&MetalBuffer>,
+            _next_norm_weight: &MetalBuffer,
+            _next_norm_output: &MetalBuffer,
+            _width: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        pub(super) fn encode_post_norm_add_residual(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _values: &MetalBuffer,
+            _residual: &MetalBuffer,
+            _post_norm: Option<&MetalBuffer>,
+            _width: usize,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
         pub(super) fn encode_per_head_rms_norm_unit(
             &mut self,
             _submission: &mut PlatformSubmission,
@@ -13356,6 +19211,90 @@ mod platform {
             _corr_dims: [f32; 2],
             _ext_factor: f32,
             _yarn_mscale: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_query_rms_rope(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _query: &MetalBuffer,
+            _query_bias: Option<&MetalBuffer>,
+            _query_norm: Option<&MetalBuffer>,
+            _freq_factors: &MetalBuffer,
+            _head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+            _epsilon: f32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qk_rms_rope_append_dense_kv(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _qk: &MetalBuffer,
+            _value: &MetalBuffer,
+            _value_from_key: bool,
+            _query_bias: Option<&MetalBuffer>,
+            _query_norm: Option<&MetalBuffer>,
+            _key_bias: Option<&MetalBuffer>,
+            _key_norm: Option<&MetalBuffer>,
+            _value_bias: Option<&MetalBuffer>,
+            _freq_factors: &MetalBuffer,
+            _query_head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+            _epsilon: f32,
+            _cache: &MetalKvCacheMirror,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_qkv_rms_rope_append_dense_kv(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _qkv: &MetalBuffer,
+            _query_bias: Option<&MetalBuffer>,
+            _query_norm: Option<&MetalBuffer>,
+            _key_bias: Option<&MetalBuffer>,
+            _key_norm: Option<&MetalBuffer>,
+            _value_bias: Option<&MetalBuffer>,
+            _freq_factors: &MetalBuffer,
+            _query_head_count: usize,
+            _kv_head_count: usize,
+            _head_dim: usize,
+            _rotary_half: usize,
+            _position: usize,
+            _theta_scale: f32,
+            _freq_scale: f32,
+            _corr_dims: [f32; 2],
+            _ext_factor: f32,
+            _yarn_mscale: f32,
+            _epsilon: f32,
+            _cache: &MetalKvCacheMirror,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -13474,6 +19413,7 @@ mod platform {
             _selected_ids: &[i32],
             _input: &MetalBuffer,
             _output: &MetalBuffer,
+            _active_threads: u32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -13491,6 +19431,56 @@ mod platform {
             _selected_ids: &[i32],
             _input: &MetalBuffer,
             _output: &MetalBuffer,
+            _active_threads: u32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_grouped_expert_gate_up_swiglu_buffer_ids(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _gate_weights: &MetalBuffer,
+            _gate_mode: QuantizationMode,
+            _gate_row_stride: usize,
+            _up_weights: &MetalBuffer,
+            _up_mode: QuantizationMode,
+            _up_row_stride: usize,
+            _rows_per_expert: usize,
+            _columns: usize,
+            _gate_bias: Option<&MetalBuffer>,
+            _up_bias: Option<&MetalBuffer>,
+            _selected_ids: &MetalBuffer,
+            _selected_count: usize,
+            _input: &MetalBuffer,
+            _output: &MetalBuffer,
+            _active_threads: u32,
+        ) -> Result<(), RuntimeError> {
+            Err(RuntimeError::Backend(String::from(
+                "metal backend is only available on macOS",
+            )))
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        pub(super) fn encode_moe_down_aggregate_f32_ids_buffer(
+            &mut self,
+            _submission: &mut PlatformSubmission,
+            _weights: &MetalBuffer,
+            _mode: QuantizationMode,
+            _row_stride: usize,
+            _rows_per_expert: usize,
+            _columns: usize,
+            _input: &MetalBuffer,
+            _selected_ids: &MetalBuffer,
+            _selected_count: usize,
+            _selected_weights: &MetalBuffer,
+            _expert_scales: &MetalBuffer,
+            _bias: Option<&MetalBuffer>,
+            _output: &MetalBuffer,
+            _active_threads: u32,
+            _rows_per_threadgroup: u32,
         ) -> Result<(), RuntimeError> {
             Err(RuntimeError::Backend(String::from(
                 "metal backend is only available on macOS",
@@ -13681,6 +19671,16 @@ mod tests {
         bytes
     }
 
+    fn assert_f32_slices_close(actual: &[f32], expected: &[f32], tolerance: f32) {
+        assert_eq!(actual.len(), expected.len());
+        for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
+            assert!(
+                (actual - expected).abs() <= tolerance,
+                "value mismatch at index {index}: actual={actual} expected={expected} tolerance={tolerance}"
+            );
+        }
+    }
+
     fn sample_q4_k_row(scale: f32, minimum: f32, offset: u8) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(144);
         bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
@@ -13692,6 +19692,26 @@ mod tests {
             let low = index & 0x0f;
             let high = (15_u8).wrapping_sub(index & 0x0f) & 0x0f;
             bytes.push(low | (high << 4));
+        }
+        bytes
+    }
+
+    fn sample_q4_k_row_blocks(
+        scale: f32,
+        minimum: f32,
+        offset: u8,
+        block_count: usize,
+    ) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(144usize.saturating_mul(block_count));
+        for block_index in 0..block_count {
+            bytes.extend_from_slice(
+                sample_q4_k_row(
+                    scale + block_index as f32 * 0.03125,
+                    minimum + block_index as f32 * 0.015625,
+                    offset.wrapping_add((block_index as u8).wrapping_mul(17)),
+                )
+                .as_slice(),
+            );
         }
         bytes
     }
@@ -13767,6 +19787,12 @@ mod tests {
     fn sample_reference_vector_256() -> Vec<f32> {
         (0..256)
             .map(|index| (index as f32 + 1.0) * 0.03125)
+            .collect()
+    }
+
+    fn sample_reference_vector_256_blocks(block_count: usize) -> Vec<f32> {
+        (0..block_count.saturating_mul(256))
+            .map(|index| ((index % 256) as f32 + 1.0) * 0.03125 + (index / 256) as f32 * 0.0625)
             .collect()
     }
 
@@ -13847,6 +19873,69 @@ mod tests {
                         .map(|(left, right)| left * right)
                         .sum(),
                 );
+            }
+        }
+        Ok(output)
+    }
+
+    fn expected_moe_down_aggregate_outputs(
+        mode: QuantizationMode,
+        row_stride: usize,
+        rows_per_expert: usize,
+        selected_ids: &[i32],
+        selected_weights: &[f32],
+        expert_scales: &[f32],
+        inputs: &[f32],
+        columns: usize,
+        bytes: &[u8],
+        bias: Option<&[f32]>,
+    ) -> Result<Vec<f32>, RuntimeError> {
+        if selected_ids.len() != selected_weights.len() {
+            return Err(RuntimeError::Backend(format!(
+                "selected weight count mismatch: ids={} weights={}",
+                selected_ids.len(),
+                selected_weights.len()
+            )));
+        }
+        if inputs.len() != selected_ids.len().saturating_mul(columns) {
+            return Err(RuntimeError::Backend(format!(
+                "moe down aggregate input length mismatch: expected {}, actual {}",
+                selected_ids.len().saturating_mul(columns),
+                inputs.len()
+            )));
+        }
+
+        let mut output = vec![0.0; rows_per_expert];
+        for ((&selected_id, &selected_weight), input_row) in selected_ids
+            .iter()
+            .zip(selected_weights.iter())
+            .zip(inputs.chunks_exact(columns))
+        {
+            let expert_index = usize::try_from(selected_id).map_err(|_| {
+                RuntimeError::Backend(format!("negative selected expert id {selected_id}"))
+            })?;
+            let expert_scale = expert_scales.get(expert_index).copied().unwrap_or(1.0);
+            for row in 0..rows_per_expert {
+                let row_index = expert_index
+                    .saturating_mul(rows_per_expert)
+                    .saturating_add(row);
+                let start = row_index.saturating_mul(row_stride);
+                let end = start.saturating_add(row_stride);
+                let mut decoded = Vec::with_capacity(columns);
+                psionic_backend_cpu::decode_quantized_row_into(
+                    mode,
+                    &bytes[start..end],
+                    &mut decoded,
+                )?;
+                let mut value = input_row
+                    .iter()
+                    .zip(decoded.iter())
+                    .map(|(left, right)| left * right)
+                    .sum::<f32>();
+                if let Some(bias) = bias {
+                    value += bias.get(row_index).copied().unwrap_or(0.0);
+                }
+                output[row] += value * selected_weight * expert_scale;
             }
         }
         Ok(output)
@@ -14247,7 +20336,7 @@ mod tests {
     #[test]
     fn metal_backend_allocates_and_submits_copy_on_supported_hardware()
     -> Result<(), psionic_runtime::RuntimeError> {
-        use super::{MetalCommandStatus, MetalCommandWait};
+        use super::MetalCommandStatus;
 
         let mut backend = MetalBackend::new();
         let Some(selected) = backend.selected_device().cloned() else {
@@ -14263,10 +20352,855 @@ mod tests {
         let mut submission = backend.begin_submission("buffer_copy")?;
         submission.copy_buffer(&source, &destination)?;
         submission.synchronize_buffer(&destination)?;
-        let report = submission.commit(MetalCommandWait::Completed)?;
+        let report = submission.commit(super::MetalCommandWait::Completed)?;
         assert_eq!(report.status, MetalCommandStatus::Completed);
         assert_eq!(report.encoded_operations, 1);
         assert_eq!(destination.read_f32()?, vec![1.0, 2.0, 3.0, 4.0]);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_query_rms_rope_matches_split_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        use super::MetalCommandWait;
+
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let head_count = 2;
+        let head_dim = 4;
+        let rotary_half = 2;
+        let position = 3;
+        let theta_scale = 1.5;
+        let freq_scale = 0.875;
+        let corr_dims = [1.0, 6.0];
+        let ext_factor = 0.25;
+        let yarn_mscale = 1.125;
+        let epsilon = 1.0e-5;
+
+        let query_values = vec![1.0, -0.5, 0.25, 0.75, -1.25, 0.5, 0.875, -0.625];
+        let query_len = query_values.len();
+        let query_bias_values = vec![0.05, -0.1, 0.0, 0.15, -0.2, 0.1, 0.05, -0.05];
+        let query_norm_values = vec![1.0, 0.75, 1.25, 0.9];
+        let freq_values = vec![1.0, 0.5];
+
+        let query = backend.input_buffer(Shape::new(vec![query_len]), query_values)?;
+        let query_reference =
+            backend.input_buffer(Shape::new(vec![query_len]), query.read_f32()?)?;
+        let query_bias =
+            backend.input_buffer(Shape::new(vec![query_bias_values.len()]), query_bias_values)?;
+        let query_norm =
+            backend.input_buffer(Shape::new(vec![query_norm_values.len()]), query_norm_values)?;
+        let freq_factors = backend.input_buffer(Shape::new(vec![freq_values.len()]), freq_values)?;
+
+        let mut fused_submission = backend.begin_submission("query_rms_rope_fused")?;
+        backend.encode_query_rms_rope_submission(
+            &mut fused_submission,
+            &query,
+            Some(&query_bias),
+            Some(&query_norm),
+            &freq_factors,
+            head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+        )?;
+        fused_submission.commit(MetalCommandWait::Completed)?;
+
+        let mut reference_submission = backend.begin_submission("query_rms_rope_reference")?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_bias,
+            head_count.saturating_mul(head_dim),
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_norm,
+            head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &query_reference,
+            &freq_factors,
+            head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        reference_submission.commit(MetalCommandWait::Completed)?;
+
+        let fused = query.read_f32()?;
+        let reference = query_reference.read_f32()?;
+        assert_f32_slices_close(fused.as_slice(), reference.as_slice(), 1.0e-5);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_qkv_rms_rope_append_dense_kv_matches_split_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        use super::MetalCommandWait;
+
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let query_head_count: usize = 2;
+        let kv_head_count: usize = 1;
+        let head_dim: usize = 4;
+        let rotary_half: usize = 2;
+        let position = 2;
+        let theta_scale = 1.4;
+        let freq_scale = 0.9;
+        let corr_dims = [1.0, 5.0];
+        let ext_factor = 0.2;
+        let yarn_mscale = 1.1;
+        let epsilon = 1.0e-5;
+        let q_rows: usize = query_head_count * head_dim;
+        let kv_rows: usize = kv_head_count * head_dim;
+        let width: usize = kv_head_count * head_dim;
+
+        let qkv_values = vec![
+            1.0, -0.5, 0.25, 0.75, -1.25, 0.5, 0.875, -0.625, 0.6, -0.3, 0.4, 0.2, 0.1, -0.2,
+            0.3, -0.4,
+        ];
+        let query_bias_values = vec![0.05, -0.1, 0.0, 0.15, -0.2, 0.1, 0.05, -0.05];
+        let query_norm_values = vec![1.0, 0.75, 1.25, 0.9];
+        let key_bias_values = vec![0.2, -0.1, 0.05, 0.0];
+        let key_norm_values = vec![0.8, 1.1, 0.95, 1.05];
+        let value_bias_values = vec![-0.05, 0.15, -0.1, 0.2];
+        let freq_values = vec![1.0, 0.5];
+
+        let qkv = backend.input_buffer(Shape::new(vec![qkv_values.len()]), qkv_values.clone())?;
+        let qkv_reference =
+            backend.input_buffer(Shape::new(vec![qkv_values.len()]), qkv_values.clone())?;
+        let query_bias =
+            backend.input_buffer(Shape::new(vec![query_bias_values.len()]), query_bias_values)?;
+        let query_norm =
+            backend.input_buffer(Shape::new(vec![query_norm_values.len()]), query_norm_values)?;
+        let key_bias =
+            backend.input_buffer(Shape::new(vec![key_bias_values.len()]), key_bias_values)?;
+        let key_norm =
+            backend.input_buffer(Shape::new(vec![key_norm_values.len()]), key_norm_values)?;
+        let value_bias =
+            backend.input_buffer(Shape::new(vec![value_bias_values.len()]), value_bias_values)?;
+        let freq_factors = backend.input_buffer(Shape::new(vec![freq_values.len()]), freq_values)?;
+
+        let kv_policy = sample_dense_kv_policy(width, 8);
+        let mut fused_cache = super::MetalKvCacheMirror::from_host_rows(
+            &mut backend,
+            width,
+            8,
+            0,
+            &[],
+            &[],
+            1,
+            kv_policy.clone(),
+        )?;
+        let mut reference_cache = super::MetalKvCacheMirror::from_host_rows(
+            &mut backend,
+            width,
+            8,
+            0,
+            &[],
+            &[],
+            1,
+            kv_policy,
+        )?;
+
+        let mut fused_submission = backend.begin_submission("qkv_rms_rope_fused")?;
+        backend.encode_qkv_rms_rope_append_dense_kv_submission(
+            &mut fused_submission,
+            &qkv,
+            Some(&query_bias),
+            Some(&query_norm),
+            Some(&key_bias),
+            Some(&key_norm),
+            Some(&value_bias),
+            &freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+            &mut fused_cache,
+        )?;
+        fused_submission.commit(MetalCommandWait::Completed)?;
+
+        let query_reference = qkv_reference.dense_f32_view(0, q_rows)?;
+        let key_reference = qkv_reference.dense_f32_view(q_rows, kv_rows)?;
+        let value_reference = qkv_reference.dense_f32_view(q_rows.saturating_add(kv_rows), kv_rows)?;
+        let mut reference_submission = backend.begin_submission("qkv_rms_rope_reference")?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_bias,
+            q_rows,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_norm,
+            query_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &query_reference,
+            &freq_factors,
+            query_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &key_reference,
+            &key_bias,
+            kv_rows,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &key_reference,
+            &key_norm,
+            kv_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &key_reference,
+            &freq_factors,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &value_reference,
+            &value_bias,
+            kv_rows,
+        )?;
+        backend.encode_per_head_rms_norm_unit_submission(
+            &mut reference_submission,
+            &value_reference,
+            kv_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_append_dense_kv_submission(
+            &mut reference_submission,
+            &mut reference_cache,
+            &key_reference,
+            &value_reference,
+        )?;
+        reference_submission.commit(MetalCommandWait::Completed)?;
+
+        let fused_values = qkv.read_f32()?;
+        let reference_values = qkv_reference.read_f32()?;
+        assert_f32_slices_close(fused_values.as_slice(), reference_values.as_slice(), 1.0e-5);
+
+        let (fused_key, fused_value) = fused_cache.read_entry(0)?;
+        let (reference_key, reference_value) = reference_cache.read_entry(0)?;
+        assert_f32_slices_close(fused_key.as_slice(), reference_key.as_slice(), 1.0e-5);
+        assert_f32_slices_close(
+            fused_value.as_slice(),
+            reference_value.as_slice(),
+            1.0e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn metal_backend_qk_rms_rope_append_dense_kv_matches_split_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        use super::MetalCommandWait;
+
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let query_head_count: usize = 2;
+        let kv_head_count: usize = 1;
+        let head_dim: usize = 4;
+        let rotary_half: usize = 2;
+        let position = 2;
+        let theta_scale = 1.4;
+        let freq_scale = 0.9;
+        let corr_dims = [1.0, 5.0];
+        let ext_factor = 0.2;
+        let yarn_mscale = 1.1;
+        let epsilon = 1.0e-5;
+        let q_rows: usize = query_head_count * head_dim;
+        let kv_rows: usize = kv_head_count * head_dim;
+        let width: usize = kv_head_count * head_dim;
+
+        let qk_values = vec![
+            1.0, -0.5, 0.25, 0.75, -1.25, 0.5, 0.875, -0.625, 0.6, -0.3, 0.4, 0.2,
+        ];
+        let value_values = vec![0.1, -0.2, 0.3, -0.4];
+        let query_bias_values = vec![0.05, -0.1, 0.0, 0.15, -0.2, 0.1, 0.05, -0.05];
+        let query_norm_values = vec![1.0, 0.75, 1.25, 0.9];
+        let key_bias_values = vec![0.2, -0.1, 0.05, 0.0];
+        let key_norm_values = vec![0.8, 1.1, 0.95, 1.05];
+        let value_bias_values = vec![-0.05, 0.15, -0.1, 0.2];
+        let freq_values = vec![1.0, 0.5];
+
+        let qk = backend.input_buffer(Shape::new(vec![qk_values.len()]), qk_values.clone())?;
+        let qk_reference =
+            backend.input_buffer(Shape::new(vec![qk_values.len()]), qk_values.clone())?;
+        let value =
+            backend.input_buffer(Shape::new(vec![value_values.len()]), value_values.clone())?;
+        let value_reference =
+            backend.input_buffer(Shape::new(vec![value_values.len()]), value_values.clone())?;
+        let query_bias =
+            backend.input_buffer(Shape::new(vec![query_bias_values.len()]), query_bias_values)?;
+        let query_norm =
+            backend.input_buffer(Shape::new(vec![query_norm_values.len()]), query_norm_values)?;
+        let key_bias =
+            backend.input_buffer(Shape::new(vec![key_bias_values.len()]), key_bias_values)?;
+        let key_norm =
+            backend.input_buffer(Shape::new(vec![key_norm_values.len()]), key_norm_values)?;
+        let value_bias =
+            backend.input_buffer(Shape::new(vec![value_bias_values.len()]), value_bias_values)?;
+        let freq_factors = backend.input_buffer(Shape::new(vec![freq_values.len()]), freq_values)?;
+
+        let kv_policy = sample_dense_kv_policy(width, 8);
+        let mut fused_cache = super::MetalKvCacheMirror::from_host_rows(
+            &mut backend,
+            width,
+            8,
+            0,
+            &[],
+            &[],
+            1,
+            kv_policy.clone(),
+        )?;
+        let mut reference_cache = super::MetalKvCacheMirror::from_host_rows(
+            &mut backend,
+            width,
+            8,
+            0,
+            &[],
+            &[],
+            1,
+            kv_policy,
+        )?;
+
+        let mut fused_submission = backend.begin_submission("qk_rms_rope_fused")?;
+        backend.encode_qk_rms_rope_append_dense_kv_submission(
+            &mut fused_submission,
+            &qk,
+            &value,
+            false,
+            Some(&query_bias),
+            Some(&query_norm),
+            Some(&key_bias),
+            Some(&key_norm),
+            Some(&value_bias),
+            &freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+            &mut fused_cache,
+        )?;
+        fused_submission.commit(MetalCommandWait::Completed)?;
+
+        let query_reference = qk_reference.dense_f32_view(0, q_rows)?;
+        let key_reference = qk_reference.dense_f32_view(q_rows, kv_rows)?;
+        let mut reference_submission = backend.begin_submission("qk_rms_rope_reference")?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_bias,
+            q_rows,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_norm,
+            query_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &query_reference,
+            &freq_factors,
+            query_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &key_reference,
+            &key_bias,
+            kv_rows,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &key_reference,
+            &key_norm,
+            kv_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &key_reference,
+            &freq_factors,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &value_reference,
+            &value_bias,
+            kv_rows,
+        )?;
+        backend.encode_per_head_rms_norm_unit_submission(
+            &mut reference_submission,
+            &value_reference,
+            kv_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_append_dense_kv_submission(
+            &mut reference_submission,
+            &mut reference_cache,
+            &key_reference,
+            &value_reference,
+        )?;
+        reference_submission.commit(MetalCommandWait::Completed)?;
+
+        assert_f32_slices_close(qk.read_f32()?.as_slice(), qk_reference.read_f32()?.as_slice(), 1.0e-5);
+        assert_f32_slices_close(
+            value.read_f32()?.as_slice(),
+            value_reference.read_f32()?.as_slice(),
+            1.0e-5,
+        );
+
+        let (fused_key, fused_value) = fused_cache.read_entry(0)?;
+        let (reference_key, reference_value) = reference_cache.read_entry(0)?;
+        assert_f32_slices_close(fused_key.as_slice(), reference_key.as_slice(), 1.0e-5);
+        assert_f32_slices_close(
+            fused_value.as_slice(),
+            reference_value.as_slice(),
+            1.0e-5,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn metal_backend_qk_rms_rope_append_dense_kv_value_from_key_matches_split_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        use super::MetalCommandWait;
+
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let query_head_count: usize = 2;
+        let kv_head_count: usize = 1;
+        let head_dim: usize = 4;
+        let rotary_half: usize = 2;
+        let position = 2;
+        let theta_scale = 1.4;
+        let freq_scale = 0.9;
+        let corr_dims = [1.0, 5.0];
+        let ext_factor = 0.2;
+        let yarn_mscale = 1.1;
+        let epsilon = 1.0e-5;
+        let q_rows: usize = query_head_count * head_dim;
+        let kv_rows: usize = kv_head_count * head_dim;
+        let width: usize = kv_head_count * head_dim;
+
+        let qk_values = vec![
+            1.0, -0.5, 0.25, 0.75, -1.25, 0.5, 0.875, -0.625, 0.6, -0.3, 0.4, 0.2,
+        ];
+        let query_bias_values = vec![0.05, -0.1, 0.0, 0.15, -0.2, 0.1, 0.05, -0.05];
+        let query_norm_values = vec![1.0, 0.75, 1.25, 0.9];
+        let key_bias_values = vec![0.2, -0.1, 0.05, 0.0];
+        let key_norm_values = vec![0.8, 1.1, 0.95, 1.05];
+        let value_bias_values = vec![-0.05, 0.15, -0.1, 0.2];
+        let freq_values = vec![1.0, 0.5];
+        let value_seed = qk_values[q_rows..q_rows.saturating_add(kv_rows)].to_vec();
+
+        let qk = backend.input_buffer(Shape::new(vec![qk_values.len()]), qk_values.clone())?;
+        let qk_reference =
+            backend.input_buffer(Shape::new(vec![qk_values.len()]), qk_values.clone())?;
+        let value = backend.zeros_buffer(Shape::new(vec![kv_rows]))?;
+        let value_reference =
+            backend.input_buffer(Shape::new(vec![value_seed.len()]), value_seed)?;
+        let query_bias =
+            backend.input_buffer(Shape::new(vec![query_bias_values.len()]), query_bias_values)?;
+        let query_norm =
+            backend.input_buffer(Shape::new(vec![query_norm_values.len()]), query_norm_values)?;
+        let key_bias =
+            backend.input_buffer(Shape::new(vec![key_bias_values.len()]), key_bias_values)?;
+        let key_norm =
+            backend.input_buffer(Shape::new(vec![key_norm_values.len()]), key_norm_values)?;
+        let value_bias =
+            backend.input_buffer(Shape::new(vec![value_bias_values.len()]), value_bias_values)?;
+        let freq_factors = backend.input_buffer(Shape::new(vec![freq_values.len()]), freq_values)?;
+
+        let kv_policy = sample_dense_kv_policy(width, 8);
+        let mut fused_cache = super::MetalKvCacheMirror::from_host_rows(
+            &mut backend,
+            width,
+            8,
+            0,
+            &[],
+            &[],
+            1,
+            kv_policy.clone(),
+        )?;
+        let mut reference_cache = super::MetalKvCacheMirror::from_host_rows(
+            &mut backend,
+            width,
+            8,
+            0,
+            &[],
+            &[],
+            1,
+            kv_policy,
+        )?;
+
+        let mut fused_submission = backend.begin_submission("qk_rms_rope_value_from_key_fused")?;
+        backend.encode_qk_rms_rope_append_dense_kv_submission(
+            &mut fused_submission,
+            &qk,
+            &value,
+            true,
+            Some(&query_bias),
+            Some(&query_norm),
+            Some(&key_bias),
+            Some(&key_norm),
+            Some(&value_bias),
+            &freq_factors,
+            query_head_count,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+            epsilon,
+            &mut fused_cache,
+        )?;
+        fused_submission.commit(MetalCommandWait::Completed)?;
+
+        let query_reference = qk_reference.dense_f32_view(0, q_rows)?;
+        let key_reference = qk_reference.dense_f32_view(q_rows, kv_rows)?;
+        let mut reference_submission =
+            backend.begin_submission("qk_rms_rope_value_from_key_reference")?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_bias,
+            q_rows,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &query_reference,
+            &query_norm,
+            query_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &query_reference,
+            &freq_factors,
+            query_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &key_reference,
+            &key_bias,
+            kv_rows,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &key_reference,
+            &key_norm,
+            kv_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_rope_neox_position_submission(
+            &mut reference_submission,
+            &key_reference,
+            &freq_factors,
+            kv_head_count,
+            head_dim,
+            rotary_half,
+            position,
+            theta_scale,
+            freq_scale,
+            corr_dims,
+            ext_factor,
+            yarn_mscale,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &value_reference,
+            &value_bias,
+            kv_rows,
+        )?;
+        backend.encode_per_head_rms_norm_unit_submission(
+            &mut reference_submission,
+            &value_reference,
+            kv_head_count,
+            head_dim,
+            epsilon,
+        )?;
+        backend.encode_append_dense_kv_submission(
+            &mut reference_submission,
+            &mut reference_cache,
+            &key_reference,
+            &value_reference,
+        )?;
+        reference_submission.commit(MetalCommandWait::Completed)?;
+
+        assert_f32_slices_close(qk.read_f32()?.as_slice(), qk_reference.read_f32()?.as_slice(), 1.0e-5);
+        assert_f32_slices_close(
+            value.read_f32()?.as_slice(),
+            value_reference.read_f32()?.as_slice(),
+            1.0e-5,
+        );
+
+        let (fused_key, fused_value) = fused_cache.read_entry(0)?;
+        let (reference_key, reference_value) = reference_cache.read_entry(0)?;
+        assert_f32_slices_close(fused_key.as_slice(), reference_key.as_slice(), 1.0e-5);
+        assert_f32_slices_close(
+            fused_value.as_slice(),
+            reference_value.as_slice(),
+            1.0e-5,
+        );
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_residual_post_norm_and_rms_to_output_matches_split_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        use super::MetalCommandWait;
+
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let width = 8;
+        let epsilon = 1.0e-5;
+        let values = vec![0.5, -0.25, 1.0, -1.5, 0.75, -0.5, 1.25, -0.75];
+        let residual = vec![-0.1, 0.2, -0.3, 0.4, -0.5, 0.6, -0.7, 0.8];
+        let bias = vec![0.05, -0.1, 0.15, -0.2, 0.1, -0.05, 0.2, -0.15];
+        let post_norm = vec![1.0, 0.9, 1.1, 0.95, 1.05, 0.85, 1.15, 0.8];
+        let next_norm_weight = vec![0.8, 1.0, 1.2, 0.9, 1.1, 0.95, 1.05, 0.85];
+
+        let fused_values = backend.input_buffer(Shape::new(vec![width]), values.clone())?;
+        let fused_output = backend.zeros_buffer(Shape::new(vec![width]))?;
+        let reference_values = backend.input_buffer(Shape::new(vec![width]), values)?;
+        let reference_output = backend.zeros_buffer(Shape::new(vec![width]))?;
+        let residual = backend.input_buffer(Shape::new(vec![width]), residual)?;
+        let bias = backend.input_buffer(Shape::new(vec![width]), bias)?;
+        let post_norm = backend.input_buffer(Shape::new(vec![width]), post_norm)?;
+        let next_norm_weight =
+            backend.input_buffer(Shape::new(vec![width]), next_norm_weight)?;
+
+        let mut fused_submission = backend.begin_submission("residual_post_norm_fused")?;
+        backend.encode_residual_post_norm_and_rms_to_output_submission(
+            &mut fused_submission,
+            &fused_values,
+            &residual,
+            Some(&bias),
+            Some(&post_norm),
+            &next_norm_weight,
+            &fused_output,
+            width,
+            epsilon,
+        )?;
+        fused_submission.commit(MetalCommandWait::Completed)?;
+
+        let mut reference_submission = backend.begin_submission("residual_post_norm_reference")?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &reference_values,
+            &bias,
+            width,
+        )?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &reference_values,
+            &post_norm,
+            1,
+            width,
+            epsilon,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &reference_values,
+            &residual,
+            width,
+        )?;
+        backend.encode_per_head_rms_norm_to_output_submission(
+            &mut reference_submission,
+            &reference_values,
+            &next_norm_weight,
+            &reference_output,
+            1,
+            width,
+            epsilon,
+        )?;
+        reference_submission.commit(MetalCommandWait::Completed)?;
+
+        assert_f32_slices_close(
+            fused_values.read_f32()?.as_slice(),
+            reference_values.read_f32()?.as_slice(),
+            1.0e-5,
+        );
+        assert_f32_slices_close(
+            fused_output.read_f32()?.as_slice(),
+            reference_output.read_f32()?.as_slice(),
+            1.0e-5,
+        );
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_post_norm_add_residual_matches_split_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        use super::MetalCommandWait;
+
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let width = 8;
+        let epsilon = 1.0e-5;
+        let values = vec![0.25, -0.75, 1.25, -0.5, 0.6, -0.4, 1.1, -0.9];
+        let residual = vec![0.2, 0.1, -0.3, -0.2, 0.4, 0.3, -0.5, -0.4];
+        let post_norm = vec![1.0, 0.95, 1.05, 0.9, 1.1, 0.85, 1.15, 0.8];
+
+        let fused_values = backend.input_buffer(Shape::new(vec![width]), values.clone())?;
+        let reference_values = backend.input_buffer(Shape::new(vec![width]), values)?;
+        let residual = backend.input_buffer(Shape::new(vec![width]), residual)?;
+        let post_norm = backend.input_buffer(Shape::new(vec![width]), post_norm)?;
+
+        let mut fused_submission = backend.begin_submission("post_norm_add_residual_fused")?;
+        backend.encode_post_norm_add_residual_submission(
+            &mut fused_submission,
+            &fused_values,
+            &residual,
+            Some(&post_norm),
+            width,
+            epsilon,
+        )?;
+        fused_submission.commit(MetalCommandWait::Completed)?;
+
+        let mut reference_submission = backend.begin_submission("post_norm_add_residual_reference")?;
+        backend.encode_per_head_rms_norm_submission(
+            &mut reference_submission,
+            &reference_values,
+            &post_norm,
+            1,
+            width,
+            epsilon,
+        )?;
+        backend.encode_add_inplace_submission(
+            &mut reference_submission,
+            &reference_values,
+            &residual,
+            width,
+        )?;
+        reference_submission.commit(MetalCommandWait::Completed)?;
+
+        assert_f32_slices_close(
+            fused_values.read_f32()?.as_slice(),
+            reference_values.read_f32()?.as_slice(),
+            1.0e-5,
+        );
         Ok(())
     }
 
@@ -15203,19 +22137,20 @@ mod tests {
 
         let rows_per_expert = 2;
         let expert_count = 3;
-        let columns = 256;
-        let row_stride = 144;
+        let q4_k_block_count = 10;
+        let columns = 256 * q4_k_block_count;
+        let row_stride = 144 * q4_k_block_count;
         let selected_ids = vec![2_i32, 0_i32];
         let weights = [
-            sample_q4_k_row(0.5, 0.125, 3),
-            sample_q4_k_row(0.75, 0.25, 9),
-            sample_q4_k_row(0.625, 0.1875, 5),
-            sample_q4_k_row(0.875, 0.3125, 11),
-            sample_q4_k_row(1.0, 0.4375, 7),
-            sample_q4_k_row(0.5625, 0.0625, 13),
+            sample_q4_k_row_blocks(0.5, 0.125, 3, q4_k_block_count),
+            sample_q4_k_row_blocks(0.75, 0.25, 9, q4_k_block_count),
+            sample_q4_k_row_blocks(0.625, 0.1875, 5, q4_k_block_count),
+            sample_q4_k_row_blocks(0.875, 0.3125, 11, q4_k_block_count),
+            sample_q4_k_row_blocks(1.0, 0.4375, 7, q4_k_block_count),
+            sample_q4_k_row_blocks(0.5625, 0.0625, 13, q4_k_block_count),
         ]
         .concat();
-        let input = sample_reference_vector_256();
+        let input = sample_reference_vector_256_blocks(q4_k_block_count);
 
         let weight_buffer = backend.quantized_buffer(
             Shape::new(vec![expert_count * rows_per_expert, columns]),
@@ -15251,10 +22186,7 @@ mod tests {
             input.as_slice(),
             weights.as_slice(),
         )?;
-        assert_eq!(result.values.len(), expected.len());
-        for (actual, expected) in result.values.iter().zip(expected.iter()) {
-            assert!((actual - expected).abs() <= 1.0e-2);
-        }
+        assert_f32_slices_close(result.values.as_slice(), expected.as_slice(), 2.0);
         Ok(())
     }
 
@@ -15458,19 +22390,24 @@ mod tests {
 
         let rows_per_expert = 2;
         let expert_count = 3;
-        let columns = 256;
-        let row_stride = 144;
+        let q4_k_block_count = 10;
+        let columns = 256 * q4_k_block_count;
+        let row_stride = 144 * q4_k_block_count;
         let selected_ids = vec![2_i32, 0_i32];
         let weights = [
-            sample_q4_k_row(0.5, 0.125, 3),
-            sample_q4_k_row(0.75, 0.25, 9),
-            sample_q4_k_row(0.625, 0.1875, 5),
-            sample_q4_k_row(0.875, 0.3125, 11),
-            sample_q4_k_row(1.0, 0.4375, 7),
-            sample_q4_k_row(0.5625, 0.0625, 13),
+            sample_q4_k_row_blocks(0.5, 0.125, 3, q4_k_block_count),
+            sample_q4_k_row_blocks(0.75, 0.25, 9, q4_k_block_count),
+            sample_q4_k_row_blocks(0.625, 0.1875, 5, q4_k_block_count),
+            sample_q4_k_row_blocks(0.875, 0.3125, 11, q4_k_block_count),
+            sample_q4_k_row_blocks(1.0, 0.4375, 7, q4_k_block_count),
+            sample_q4_k_row_blocks(0.5625, 0.0625, 13, q4_k_block_count),
         ]
         .concat();
-        let inputs = [sample_reference_vector_256(), vec![0.5; columns]].concat();
+        let inputs = [
+            sample_reference_vector_256_blocks(q4_k_block_count),
+            vec![0.5; columns],
+        ]
+        .concat();
 
         let weight_buffer = backend.quantized_buffer(
             Shape::new(vec![expert_count * rows_per_expert, columns]),
@@ -15510,10 +22447,7 @@ mod tests {
             columns,
             weights.as_slice(),
         )?;
-        assert_eq!(result.values.len(), expected.len());
-        for (actual, expected) in result.values.iter().zip(expected.iter()) {
-            assert!((actual - expected).abs() <= 1.0e-2);
-        }
+        assert_f32_slices_close(result.values.as_slice(), expected.as_slice(), 2.0);
         Ok(())
     }
 
@@ -15714,6 +22648,180 @@ mod tests {
             weights.as_slice(),
         )?;
         assert_eq!(result.values, expected);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_moe_down_aggregate_matches_q5_0_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let rows_per_expert = 2;
+        let expert_count = 3;
+        let columns = 32;
+        let row_stride = 22;
+        let selected_ids = vec![2_i32, 0_i32];
+        let selected_weights = vec![0.25_f32, 0.75_f32];
+        let expert_scales = vec![1.5_f32, 0.5_f32, 0.25_f32];
+        let bias = vec![0.1_f32, -0.2_f32, 0.3_f32, -0.4_f32, 0.5_f32, -0.6_f32];
+        let weights = [
+            sample_q5_0_row(0.25, 1),
+            sample_q5_0_row(0.5, 3),
+            sample_q5_0_row(0.125, 5),
+            sample_q5_0_row(0.375, 7),
+            sample_q5_0_row(0.625, 9),
+            sample_q5_0_row(0.75, 11),
+        ]
+        .concat();
+        let inputs = [sample_reference_vector(), vec![0.5; columns]].concat();
+
+        let weight_buffer = backend.quantized_buffer(
+            Shape::new(vec![expert_count * rows_per_expert, columns]),
+            QuantizationMode::GgmlQ5_0,
+            weights.clone(),
+        )?;
+        let input_buffer =
+            backend.input_buffer(Shape::new(vec![selected_ids.len(), columns]), inputs.clone())?;
+        let mut selected_ids_buffer = backend.zeros_i32_buffer(Shape::new(vec![selected_ids.len()]))?;
+        selected_ids_buffer.write_bytes(
+            &selected_ids
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<_>>(),
+        )?;
+        let selected_weights_buffer =
+            backend.input_buffer(Shape::new(vec![selected_weights.len()]), selected_weights.clone())?;
+        let expert_scales_buffer =
+            backend.input_buffer(Shape::new(vec![expert_scales.len()]), expert_scales.clone())?;
+        let bias_buffer = backend.input_buffer(Shape::new(vec![bias.len()]), bias.clone())?;
+        let output_buffer = backend.zeros_buffer(Shape::new(vec![rows_per_expert]))?;
+
+        let mut submission = backend.begin_submission("moe_down_aggregate_q5_0")?;
+        backend.encode_moe_down_aggregate_f32_id_buffer_submission(
+            &mut submission,
+            &weight_buffer,
+            QuantizationMode::GgmlQ5_0,
+            row_stride,
+            rows_per_expert,
+            columns,
+            &input_buffer,
+            &selected_ids_buffer,
+            selected_ids.len(),
+            &selected_weights_buffer,
+            &expert_scales_buffer,
+            Some(&bias_buffer),
+            &output_buffer,
+        )?;
+        submission.synchronize_buffer(&output_buffer)?;
+        let report = submission.commit(super::MetalCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 1);
+
+        let actual = output_buffer.read_f32()?;
+        let expected = expected_moe_down_aggregate_outputs(
+            QuantizationMode::GgmlQ5_0,
+            row_stride,
+            rows_per_expert,
+            selected_ids.as_slice(),
+            selected_weights.as_slice(),
+            expert_scales.as_slice(),
+            inputs.as_slice(),
+            columns,
+            weights.as_slice(),
+            Some(bias.as_slice()),
+        )?;
+        assert_f32_slices_close(actual.as_slice(), expected.as_slice(), 1.0e-4);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_moe_down_aggregate_matches_q8_0_reference_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let rows_per_expert = 2;
+        let expert_count = 3;
+        let columns = 32;
+        let row_stride = 34;
+        let selected_ids = vec![1_i32, 2_i32];
+        let selected_weights = vec![0.6_f32, 0.4_f32];
+        let expert_scales = vec![0.75_f32, 1.25_f32, 0.5_f32];
+        let bias = vec![0.2_f32, -0.1_f32, 0.0_f32, 0.3_f32, -0.4_f32, 0.5_f32];
+        let weights = [
+            sample_q8_0_row(0.25, 1),
+            sample_q8_0_row(0.5, -1),
+            sample_q8_0_row(0.125, -1),
+            sample_q8_0_row(0.375, 1),
+            sample_q8_0_row(0.625, 1),
+            sample_q8_0_row(0.75, -1),
+        ]
+        .concat();
+        let inputs = [sample_reference_vector(), vec![0.25; columns]].concat();
+
+        let weight_buffer = backend.quantized_buffer(
+            Shape::new(vec![expert_count * rows_per_expert, columns]),
+            QuantizationMode::GgmlQ8_0,
+            weights.clone(),
+        )?;
+        let input_buffer =
+            backend.input_buffer(Shape::new(vec![selected_ids.len(), columns]), inputs.clone())?;
+        let mut selected_ids_buffer = backend.zeros_i32_buffer(Shape::new(vec![selected_ids.len()]))?;
+        selected_ids_buffer.write_bytes(
+            &selected_ids
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<_>>(),
+        )?;
+        let selected_weights_buffer =
+            backend.input_buffer(Shape::new(vec![selected_weights.len()]), selected_weights.clone())?;
+        let expert_scales_buffer =
+            backend.input_buffer(Shape::new(vec![expert_scales.len()]), expert_scales.clone())?;
+        let bias_buffer = backend.input_buffer(Shape::new(vec![bias.len()]), bias.clone())?;
+        let output_buffer = backend.zeros_buffer(Shape::new(vec![rows_per_expert]))?;
+
+        let mut submission = backend.begin_submission("moe_down_aggregate_q8_0")?;
+        backend.encode_moe_down_aggregate_f32_id_buffer_submission(
+            &mut submission,
+            &weight_buffer,
+            QuantizationMode::GgmlQ8_0,
+            row_stride,
+            rows_per_expert,
+            columns,
+            &input_buffer,
+            &selected_ids_buffer,
+            selected_ids.len(),
+            &selected_weights_buffer,
+            &expert_scales_buffer,
+            Some(&bias_buffer),
+            &output_buffer,
+        )?;
+        submission.synchronize_buffer(&output_buffer)?;
+        let report = submission.commit(super::MetalCommandWait::Completed)?;
+        assert_eq!(report.encoded_operations, 1);
+
+        let actual = output_buffer.read_f32()?;
+        let expected = expected_moe_down_aggregate_outputs(
+            QuantizationMode::GgmlQ8_0,
+            row_stride,
+            rows_per_expert,
+            selected_ids.as_slice(),
+            selected_weights.as_slice(),
+            expert_scales.as_slice(),
+            inputs.as_slice(),
+            columns,
+            weights.as_slice(),
+            Some(bias.as_slice()),
+        )?;
+        assert_f32_slices_close(actual.as_slice(), expected.as_slice(), 1.0e-5);
         Ok(())
     }
 

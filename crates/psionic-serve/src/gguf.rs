@@ -3074,6 +3074,9 @@ impl CudaPackedGateUpExpertMatrix {
 }
 
 fn supports_native_metal_sparse_expert(mode: QuantizationMode) -> bool {
+    if gemma4_force_host_sparse_ffn() {
+        return false;
+    }
     matches!(
         mode,
         QuantizationMode::GgmlQ4K
@@ -3317,6 +3320,7 @@ struct MetalGemma4LayerStepPlan {
     rope_yarn_mscale: f32,
     per_layer_multiplier_buffer: Option<MetalBuffer>,
     qkv_buffer: Option<MetalBuffer>,
+    qk_buffer: Option<MetalBuffer>,
     hidden_input_buffer: MetalBuffer,
     query_buffer: MetalBuffer,
     key_buffer: Option<MetalBuffer>,
@@ -3333,14 +3337,19 @@ struct MetalGemma4StepPlan {
     hidden_buffer: MetalBuffer,
     residual_buffer: MetalBuffer,
     norm_buffer: MetalBuffer,
+    ffn_dense_selected_ids_buffer: MetalBuffer,
+    ffn_dense_selected_weights_buffer: MetalBuffer,
+    ffn_dense_expert_scales_buffer: MetalBuffer,
     moe_router_input_buffer: Option<MetalBuffer>,
     moe_expert_input_buffer: Option<MetalBuffer>,
     moe_router_logits_buffer: Option<MetalBuffer>,
     moe_selected_ids_buffer: Option<MetalBuffer>,
     moe_selected_weights_buffer: Option<MetalBuffer>,
+    moe_expert_input_q8_1_buffer: Option<MetalBuffer>,
     moe_gate_buffer: Option<MetalBuffer>,
     moe_up_buffer: Option<MetalBuffer>,
     moe_activated_buffer: Option<MetalBuffer>,
+    moe_activated_q8_1_buffer: Option<MetalBuffer>,
     moe_projected_buffer: Option<MetalBuffer>,
     moe_output_buffer: Option<MetalBuffer>,
     per_layer_inputs_token_buffer: Option<MetalBuffer>,
@@ -3670,6 +3679,18 @@ fn run_metal_gemma4_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             cache.append_token_without_kv(*token)?;
+            if gemma4_force_host_kv_sync() && cache.len() > materialized_host_tokens {
+                host_kv_materialization_events = host_kv_materialization_events.saturating_add(1);
+                host_kv_materialization_tokens = host_kv_materialization_tokens
+                    .saturating_add(cache.len().saturating_sub(materialized_host_tokens));
+                materialize_metal_cache_entries_from_layer_caches(
+                    &mut cache,
+                    &loaded_model.inner,
+                    layer_caches.as_slice(),
+                    materialized_host_tokens,
+                )?;
+                materialized_host_tokens = cache.len();
+            }
             if produce_prompt_logits {
                 pending_logits_selection_metrics = step.logits_selection_metrics.clone();
                 match prompt_logits_output_mode {
@@ -3800,6 +3821,18 @@ fn run_metal_gemma4_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             cache.append_token_without_kv(next_token)?;
+            if gemma4_force_host_kv_sync() && cache.len() > materialized_host_tokens {
+                host_kv_materialization_events = host_kv_materialization_events.saturating_add(1);
+                host_kv_materialization_tokens = host_kv_materialization_tokens
+                    .saturating_add(cache.len().saturating_sub(materialized_host_tokens));
+                materialize_metal_cache_entries_from_layer_caches(
+                    &mut cache,
+                    &loaded_model.inner,
+                    layer_caches.as_slice(),
+                    materialized_host_tokens,
+                )?;
+                materialized_host_tokens = cache.len();
+            }
             pending_logits_selection_metrics = step.logits_selection_metrics.clone();
             if use_greedy_selected_token {
                 last_selected_token = step.selected_token;
@@ -4175,6 +4208,11 @@ impl MetalGemma4GenerationModel {
                 .iter()
                 .filter(|layer| layer.attention_qkv_weight.is_some())
                 .count();
+            let fused_qk_layers = inner
+                .layers
+                .iter()
+                .filter(|layer| layer.attention_qk_weight.is_some())
+                .count();
             let fused_gate_up_layers = inner
                 .layers
                 .iter()
@@ -4226,10 +4264,11 @@ impl MetalGemma4GenerationModel {
                 },
             };
             eprintln!(
-                "psionic.gemma4.metal.load model={} layers={} fused_qkv_layers={} fused_gate_up_layers={} native_attention_layers={} native_ffn_layers={} per_layer_model_proj={}",
+                "psionic.gemma4.metal.load model={} layers={} fused_qkv_layers={} fused_qk_layers={} fused_gate_up_layers={} native_attention_layers={} native_ffn_layers={} per_layer_model_proj={}",
                 descriptor.model.model_id,
                 inner.layers.len(),
                 fused_qkv_layers,
+                fused_qk_layers,
                 fused_gate_up_layers,
                 native_attention_layers,
                 native_ffn_layers,
@@ -4642,7 +4681,21 @@ impl MetalGemma4ModelInner {
                     .map(|weight| backend.zeros_buffer(Shape::new(vec![weight.rows()])))
                     .transpose()
                     .map_err(ReferenceTextGenerationError::Runtime)?;
+                let qk_buffer = if qkv_buffer.is_none() {
+                    layer
+                        .attention_qk_weight
+                        .as_ref()
+                        .map(|weight| backend.zeros_buffer(Shape::new(vec![weight.rows()])))
+                        .transpose()
+                        .map_err(ReferenceTextGenerationError::Runtime)?
+                } else {
+                    None
+                };
                 let query_buffer = if let Some(buffer) = qkv_buffer.as_ref() {
+                    buffer
+                        .dense_f32_view(0, q_rows)
+                        .map_err(ReferenceTextGenerationError::Runtime)?
+                } else if let Some(buffer) = qk_buffer.as_ref() {
                     buffer
                         .dense_f32_view(0, q_rows)
                         .map_err(ReferenceTextGenerationError::Runtime)?
@@ -4653,6 +4706,12 @@ impl MetalGemma4ModelInner {
                 };
                 let key_buffer = if layer.attention_geometry.has_kv() {
                     if let Some(buffer) = qkv_buffer.as_ref() {
+                        Some(
+                            buffer
+                                .dense_f32_view(q_rows, kv_rows)
+                                .map_err(ReferenceTextGenerationError::Runtime)?,
+                        )
+                    } else if let Some(buffer) = qk_buffer.as_ref() {
                         Some(
                             buffer
                                 .dense_f32_view(q_rows, kv_rows)
@@ -4724,6 +4783,7 @@ impl MetalGemma4ModelInner {
                         _ => None,
                     },
                     qkv_buffer,
+                    qk_buffer,
                     hidden_input_buffer: backend
                         .zeros_buffer(Shape::new(vec![hidden_size]))
                         .map_err(ReferenceTextGenerationError::Runtime)?,
@@ -4764,6 +4824,15 @@ impl MetalGemma4ModelInner {
                 .zeros_buffer(Shape::new(vec![max_ffn_width]))
                 .map_err(ReferenceTextGenerationError::Runtime)?
         };
+        let max_sparse_expert_q8_1_row_bytes =
+            if max_sparse_expert_width > 0 && max_sparse_expert_width % 32 == 0 {
+                Some(
+                    psionic_backend_metal::ggml_q8_1_storage_bytes(max_sparse_expert_width)
+                        .map_err(ReferenceTextGenerationError::Runtime)?,
+                )
+            } else {
+                None
+            };
         Ok(MetalGemma4StepPlan {
             layer_plans,
             hidden_buffer: backend
@@ -4774,6 +4843,15 @@ impl MetalGemma4ModelInner {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             norm_buffer: backend
                 .zeros_buffer(Shape::new(vec![hidden_size]))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            ffn_dense_selected_ids_buffer: backend
+                .zeros_i32_buffer(Shape::new(vec![1]))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            ffn_dense_selected_weights_buffer: backend
+                .input_buffer(Shape::new(vec![1]), vec![1.0_f32])
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            ffn_dense_expert_scales_buffer: backend
+                .input_buffer(Shape::new(vec![1]), vec![1.0_f32])
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             moe_router_input_buffer: (max_sparse_router_rows > 0)
                 .then(|| backend.zeros_buffer(Shape::new(vec![hidden_size])))
@@ -4793,6 +4871,10 @@ impl MetalGemma4ModelInner {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             moe_selected_weights_buffer: (max_sparse_router_rows > 0)
                 .then(|| backend.zeros_buffer(Shape::new(vec![active_expert_count])))
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_expert_input_q8_1_buffer: max_sparse_expert_q8_1_row_bytes
+                .map(|row_bytes| backend.zeros_i8_buffer(Shape::new(vec![row_bytes])))
                 .transpose()
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             moe_gate_buffer: (max_sparse_expert_width > 0)
@@ -4815,6 +4897,14 @@ impl MetalGemma4ModelInner {
                 .then(|| {
                     backend.zeros_buffer(Shape::new(vec![
                         active_expert_count.saturating_mul(max_sparse_expert_width),
+                    ]))
+                })
+                .transpose()
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            moe_activated_q8_1_buffer: max_sparse_expert_q8_1_row_bytes
+                .map(|row_bytes| {
+                    backend.zeros_i8_buffer(Shape::new(vec![
+                        active_expert_count.saturating_mul(row_bytes),
                     ]))
                 })
                 .transpose()
@@ -5258,6 +5348,116 @@ impl MetalGemma4ModelInner {
                             qkv_buffer,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
+                    backend
+                        .encode_qkv_rms_rope_append_dense_kv_submission(
+                            &mut submission,
+                            qkv_buffer,
+                            layer
+                                .attention_query_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_query_norm
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_key_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_key_norm
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_value_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            &layer_plan.rope_freq_factors_buffer,
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            layer_plan.rope_rotary_half,
+                            position,
+                            layer_plan.rope_theta_scale,
+                            layer_plan.rope_freq_scale,
+                            layer_plan.rope_corr_dims,
+                            layer_plan.rope_ext_factor,
+                            layer_plan.rope_yarn_mscale,
+                            self.family_metadata.rms_norm_epsilon,
+                            layer_cache,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                } else if let (Some(qk_weight), Some(qk_buffer)) = (
+                    layer.attention_qk_weight.as_ref(),
+                    layer_plan.qk_buffer.as_ref(),
+                ) {
+                    backend
+                        .encode_quantized_matvec_submission(
+                            &mut submission,
+                            qk_weight.native_weights()?,
+                            0,
+                            qk_weight.mode,
+                            qk_weight.rows,
+                            qk_weight.columns,
+                            &step_plan.norm_buffer,
+                            qk_buffer,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                    if !layer.attention_value_from_key_weight {
+                        backend
+                            .encode_quantized_matvec_submission(
+                                &mut submission,
+                                layer.attention_value_weight.native_weights()?,
+                                0,
+                                layer.attention_value_weight.mode,
+                                layer.attention_value_weight.rows,
+                                layer.attention_value_weight.columns,
+                                &step_plan.norm_buffer,
+                                value_buffer,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
+                    backend
+                        .encode_qk_rms_rope_append_dense_kv_submission(
+                            &mut submission,
+                            qk_buffer,
+                            value_buffer,
+                            layer.attention_value_from_key_weight,
+                            layer
+                                .attention_query_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_query_norm
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_key_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_key_norm
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_value_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            &layer_plan.rope_freq_factors_buffer,
+                            layer.attention_geometry.head_count,
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            layer_plan.rope_rotary_half,
+                            position,
+                            layer_plan.rope_theta_scale,
+                            layer_plan.rope_freq_scale,
+                            layer_plan.rope_corr_dims,
+                            layer_plan.rope_ext_factor,
+                            layer_plan.rope_yarn_mscale,
+                            self.family_metadata.rms_norm_epsilon,
+                            layer_cache,
+                        )
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
                 } else {
                     backend
                         .encode_quantized_matvec_submission(
@@ -5295,110 +5495,97 @@ impl MetalGemma4ModelInner {
                             value_buffer,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
-                if let Some(bias) = layer.attention_query_bias.as_ref() {
                     backend
-                        .encode_add_inplace_submission(
+                        .encode_query_rms_rope_submission(
                             &mut submission,
                             &layer_plan.query_buffer,
-                            bias.device(),
-                            layer.attention_query_weight.rows,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
-                if let Some(norm) = layer.attention_query_norm.as_ref() {
-                    backend
-                        .encode_per_head_rms_norm_submission(
-                            &mut submission,
-                            &layer_plan.query_buffer,
-                            norm.device(),
+                            layer
+                                .attention_query_bias
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            layer
+                                .attention_query_norm
+                                .as_ref()
+                                .map(MetalStaticVector::device),
+                            &layer_plan.rope_freq_factors_buffer,
                             layer.attention_geometry.head_count,
                             layer.attention_geometry.head_dim,
+                            layer_plan.rope_rotary_half,
+                            position,
+                            layer_plan.rope_theta_scale,
+                            layer_plan.rope_freq_scale,
+                            layer_plan.rope_corr_dims,
+                            layer_plan.rope_ext_factor,
+                            layer_plan.rope_yarn_mscale,
                             self.family_metadata.rms_norm_epsilon,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
-                backend
-                    .encode_rope_neox_position_submission(
-                        &mut submission,
-                        &layer_plan.query_buffer,
-                        &layer_plan.rope_freq_factors_buffer,
-                        layer.attention_geometry.head_count,
-                        layer.attention_geometry.head_dim,
-                        layer_plan.rope_rotary_half,
-                        position,
-                        layer_plan.rope_theta_scale,
-                        layer_plan.rope_freq_scale,
-                        layer_plan.rope_corr_dims,
-                        layer_plan.rope_ext_factor,
-                        layer_plan.rope_yarn_mscale,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                if let Some(bias) = layer.attention_key_bias.as_ref() {
+                    if let Some(bias) = layer.attention_key_bias.as_ref() {
+                        backend
+                            .encode_add_inplace_submission(
+                                &mut submission,
+                                key_buffer,
+                                bias.device(),
+                                layer.attention_key_weight.rows,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
+                    if let Some(norm) = layer.attention_key_norm.as_ref() {
+                        backend
+                            .encode_per_head_rms_norm_submission(
+                                &mut submission,
+                                key_buffer,
+                                norm.device(),
+                                layer.attention_geometry.kv_head_count,
+                                layer.attention_geometry.head_dim,
+                                self.family_metadata.rms_norm_epsilon,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
                     backend
-                        .encode_add_inplace_submission(
+                        .encode_rope_neox_position_submission(
                             &mut submission,
                             key_buffer,
-                            bias.device(),
-                            layer.attention_key_weight.rows,
+                            &layer_plan.rope_freq_factors_buffer,
+                            layer.attention_geometry.kv_head_count,
+                            layer.attention_geometry.head_dim,
+                            layer_plan.rope_rotary_half,
+                            position,
+                            layer_plan.rope_theta_scale,
+                            layer_plan.rope_freq_scale,
+                            layer_plan.rope_corr_dims,
+                            layer_plan.rope_ext_factor,
+                            layer_plan.rope_yarn_mscale,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
-                if let Some(norm) = layer.attention_key_norm.as_ref() {
+                    if let Some(bias) = layer.attention_value_bias.as_ref() {
+                        backend
+                            .encode_add_inplace_submission(
+                                &mut submission,
+                                value_buffer,
+                                bias.device(),
+                                layer.attention_value_weight.rows,
+                            )
+                            .map_err(ReferenceTextGenerationError::Runtime)?;
+                    }
                     backend
-                        .encode_per_head_rms_norm_submission(
+                        .encode_per_head_rms_norm_unit_submission(
                             &mut submission,
-                            key_buffer,
-                            norm.device(),
+                            value_buffer,
                             layer.attention_geometry.kv_head_count,
                             layer.attention_geometry.head_dim,
                             self.family_metadata.rms_norm_epsilon,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
-                backend
-                    .encode_rope_neox_position_submission(
-                        &mut submission,
-                        key_buffer,
-                        &layer_plan.rope_freq_factors_buffer,
-                        layer.attention_geometry.kv_head_count,
-                        layer.attention_geometry.head_dim,
-                        layer_plan.rope_rotary_half,
-                        position,
-                        layer_plan.rope_theta_scale,
-                        layer_plan.rope_freq_scale,
-                        layer_plan.rope_corr_dims,
-                        layer_plan.rope_ext_factor,
-                        layer_plan.rope_yarn_mscale,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                if let Some(bias) = layer.attention_value_bias.as_ref() {
                     backend
-                        .encode_add_inplace_submission(
+                        .encode_append_dense_kv_submission(
                             &mut submission,
+                            layer_cache,
+                            key_buffer,
                             value_buffer,
-                            bias.device(),
-                            layer.attention_value_weight.rows,
                         )
                         .map_err(ReferenceTextGenerationError::Runtime)?;
                 }
-                backend
-                    .encode_per_head_rms_norm_unit_submission(
-                        &mut submission,
-                        value_buffer,
-                        layer.attention_geometry.kv_head_count,
-                        layer.attention_geometry.head_dim,
-                        self.family_metadata.rms_norm_epsilon,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-                backend
-                    .encode_append_dense_kv_submission(
-                        &mut submission,
-                        layer_cache,
-                        key_buffer,
-                        value_buffer,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
                 backend
                     .encode_decode_attention_dense_submission(
                         &mut submission,
@@ -5442,32 +5629,18 @@ impl MetalGemma4ModelInner {
                         &layer_plan.query_buffer,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
-                if let Some(bias) = layer.attention_query_bias.as_ref() {
-                    backend
-                        .encode_add_inplace_submission(
-                            &mut submission,
-                            &layer_plan.query_buffer,
-                            bias.device(),
-                            layer.attention_query_weight.rows,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
-                if let Some(norm) = layer.attention_query_norm.as_ref() {
-                    backend
-                        .encode_per_head_rms_norm_submission(
-                            &mut submission,
-                            &layer_plan.query_buffer,
-                            norm.device(),
-                            layer.attention_geometry.head_count,
-                            layer.attention_geometry.head_dim,
-                            self.family_metadata.rms_norm_epsilon,
-                        )
-                        .map_err(ReferenceTextGenerationError::Runtime)?;
-                }
                 backend
-                    .encode_rope_neox_position_submission(
+                    .encode_query_rms_rope_submission(
                         &mut submission,
                         &layer_plan.query_buffer,
+                        layer
+                            .attention_query_bias
+                            .as_ref()
+                            .map(MetalStaticVector::device),
+                        layer
+                            .attention_query_norm
+                            .as_ref()
+                            .map(MetalStaticVector::device),
                         &layer_plan.rope_freq_factors_buffer,
                         layer.attention_geometry.head_count,
                         layer.attention_geometry.head_dim,
@@ -5478,6 +5651,7 @@ impl MetalGemma4ModelInner {
                         layer_plan.rope_corr_dims,
                         layer_plan.rope_ext_factor,
                         layer_plan.rope_yarn_mscale,
+                        self.family_metadata.rms_norm_epsilon,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 backend
@@ -5506,44 +5680,18 @@ impl MetalGemma4ModelInner {
                     &step_plan.residual_buffer,
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
-            if let Some(bias) = layer.attention_output_bias.as_ref() {
-                backend
-                    .encode_add_inplace_submission(
-                        &mut submission,
-                        &step_plan.residual_buffer,
-                        bias.device(),
-                        hidden_size,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-            }
-            if let Some(norm) = layer.attention_post_norm.as_ref() {
-                backend
-                    .encode_per_head_rms_norm_submission(
-                        &mut submission,
-                        &step_plan.residual_buffer,
-                        norm.device(),
-                        1,
-                        hidden_size,
-                        self.family_metadata.rms_norm_epsilon,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-            }
             backend
-                .encode_add_inplace_submission(
+                .encode_residual_post_norm_and_rms_to_output_submission(
                     &mut submission,
                     &step_plan.residual_buffer,
                     &step_plan.hidden_buffer,
-                    hidden_size,
-                )
-                .map_err(ReferenceTextGenerationError::Runtime)?;
-
-            backend
-                .encode_per_head_rms_norm_to_output_submission(
-                    &mut submission,
-                    &step_plan.residual_buffer,
+                    layer
+                        .attention_output_bias
+                        .as_ref()
+                        .map(MetalStaticVector::device),
+                    layer.attention_post_norm.as_ref().map(MetalStaticVector::device),
                     layer.feed_forward_norm.device(),
                     &step_plan.norm_buffer,
-                    1,
                     hidden_size,
                     self.family_metadata.rms_norm_epsilon,
                 )
@@ -5660,24 +5808,14 @@ impl MetalGemma4ModelInner {
                     + dense_up_weight.byte_length()
                     + dense_down_weight.byte_length()) as u64
             };
-            if let Some(norm) = layer.feed_forward_post_norm.as_ref() {
-                backend
-                    .encode_per_head_rms_norm_submission(
-                        &mut submission,
-                        &step_plan.hidden_buffer,
-                        norm.device(),
-                        1,
-                        hidden_size,
-                        self.family_metadata.rms_norm_epsilon,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
-            }
             backend
-                .encode_add_inplace_submission(
+                .encode_post_norm_add_residual_submission(
                     &mut submission,
                     &step_plan.hidden_buffer,
                     &step_plan.residual_buffer,
+                    layer.feed_forward_post_norm.as_ref().map(MetalStaticVector::device),
                     hidden_size,
+                    self.family_metadata.rms_norm_epsilon,
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
 
@@ -5688,7 +5826,6 @@ impl MetalGemma4ModelInner {
                 Some(multiplier_buffer),
                 Some(per_layer_gate_buffer),
                 Some(per_layer_activated_buffer),
-                Some(per_layer_projected_buffer),
             ) = (
                 layer.per_layer_input_gate.as_ref(),
                 layer.per_layer_proj.as_ref(),
@@ -5696,7 +5833,6 @@ impl MetalGemma4ModelInner {
                 layer_plan.per_layer_multiplier_buffer.as_ref(),
                 step_plan.per_layer_gate_buffer.as_ref(),
                 step_plan.per_layer_activated_buffer.as_ref(),
-                step_plan.per_layer_projected_buffer.as_ref(),
             ) {
                 backend
                     .encode_quantized_matvec_submission(
@@ -5728,27 +5864,20 @@ impl MetalGemma4ModelInner {
                         proj.rows,
                         proj.columns,
                         per_layer_activated_buffer,
-                        per_layer_projected_buffer,
+                        &step_plan.residual_buffer,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 backend
-                    .encode_per_head_rms_norm_submission(
+                    .encode_post_norm_add_residual_submission(
                         &mut submission,
-                        per_layer_projected_buffer,
-                        post_norm.device(),
-                        1,
+                        &step_plan.residual_buffer,
+                        &step_plan.hidden_buffer,
+                        Some(post_norm.device()),
                         hidden_size,
                         self.family_metadata.rms_norm_epsilon,
                     )
                     .map_err(ReferenceTextGenerationError::Runtime)?;
-                backend
-                    .encode_add_inplace_submission(
-                        &mut submission,
-                        &step_plan.hidden_buffer,
-                        per_layer_projected_buffer,
-                        hidden_size,
-                    )
-                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                std::mem::swap(&mut step_plan.hidden_buffer, &mut step_plan.residual_buffer);
                 bytes_moved = bytes_moved
                     .saturating_add(input_gate.byte_length() as u64)
                     .saturating_add(proj.byte_length() as u64);
@@ -5765,15 +5894,24 @@ impl MetalGemma4ModelInner {
                     .map_err(ReferenceTextGenerationError::Runtime)?;
             }
 
+            let attention_bytes = if let Some(qkv_weight) = layer.attention_qkv_weight.as_ref() {
+                qkv_weight.byte_length() as u64
+            } else if let Some(qk_weight) = layer.attention_qk_weight.as_ref() {
+                (qk_weight.byte_length()
+                    + if layer.attention_value_from_key_weight {
+                        0
+                    } else {
+                        layer.attention_value_weight.byte_length()
+                    }) as u64
+            } else {
+                (layer.attention_query_weight.byte_length()
+                    + layer.attention_key_weight.byte_length()
+                    + layer.attention_value_weight.byte_length()) as u64
+            };
             bytes_moved = bytes_moved
-                .saturating_add(layer.attention_query_weight.byte_length() as u64)
+                .saturating_add(attention_bytes)
                 .saturating_add(layer.attention_output_weight.byte_length() as u64)
                 .saturating_add(ffn_bytes_moved);
-            if layer.attention_geometry.has_kv() {
-                bytes_moved = bytes_moved
-                    .saturating_add(layer.attention_key_weight.byte_length() as u64)
-                    .saturating_add(layer.attention_value_weight.byte_length() as u64);
-            }
         }
 
         let mut logits = Vec::new();
@@ -6090,9 +6228,19 @@ impl MetalGemma4ModelInner {
         }
         if self.layers[start_layer..end_layer].iter().all(|layer| {
             backend.supports_dense_decode_attention(layer.attention_geometry.head_dim)
-                && layer.attention_query_weight.is_native()
-                && layer.attention_key_weight.is_native()
-                && layer.attention_value_weight.is_native()
+                && (layer
+                    .attention_qkv_weight
+                    .as_ref()
+                    .map(MetalQuantizedProjectionMatrix::is_native)
+                    .unwrap_or(false)
+                    || layer
+                        .attention_qk_weight
+                        .as_ref()
+                        .map(MetalQuantizedProjectionMatrix::is_native)
+                        .unwrap_or(false)
+                    || (layer.attention_query_weight.is_native()
+                        && layer.attention_key_weight.is_native()
+                        && layer.attention_value_weight.is_native()))
                 && layer.attention_output_weight.is_native()
                 && layer
                     .feed_forward_gate_weight
@@ -7603,12 +7751,14 @@ struct MetalGemma4Layer {
     attention_norm: MetalStaticVector,
     attention_query_weight: MetalQuantizedProjectionMatrix,
     attention_qkv_weight: Option<MetalQuantizedProjectionMatrix>,
+    attention_qk_weight: Option<MetalQuantizedProjectionMatrix>,
     attention_query_bias: Option<MetalStaticVector>,
     attention_query_norm: Option<MetalStaticVector>,
     attention_key_weight: MetalQuantizedProjectionMatrix,
     attention_key_bias: Option<MetalStaticVector>,
     attention_key_norm: Option<MetalStaticVector>,
     attention_value_weight: MetalQuantizedProjectionMatrix,
+    attention_value_from_key_weight: bool,
     attention_value_bias: Option<MetalStaticVector>,
     attention_output_weight: MetalQuantizedProjectionMatrix,
     attention_output_bias: Option<MetalStaticVector>,
@@ -7742,6 +7892,7 @@ impl MetalGemma4Layer {
         } else {
             gemma4_expected_kv_width(descriptor, family_metadata, layer_index, head_dim)
         };
+        let attention_value_from_key_weight = layout.attention_value_weight.is_none();
         let attention_value_weight = if let Some(name) = layout.attention_value_weight.as_deref() {
             MetalQuantizedProjectionMatrix::load(backend, artifact, name)?
         } else if family_metadata.family == GgufDecoderFamily::Gemma4 {
@@ -7779,6 +7930,28 @@ impl MetalGemma4Layer {
             } else {
                 None
             };
+        let attention_qk_weight = if attention_qkv_weight.is_none() {
+            layout
+                .attention_key_weight
+                .as_deref()
+                .map(|key_weight_name| {
+                    MetalQuantizedProjectionMatrix::load_fused(
+                        backend,
+                        artifact,
+                        &[
+                            required_tensor_name(
+                                layout.attention_query_weight.as_deref(),
+                                "attention_query_weight",
+                            )?,
+                            key_weight_name,
+                        ],
+                    )
+                })
+                .transpose()?
+                .flatten()
+        } else {
+            None
+        };
         let attention_geometry = dense_attention_geometry(
             descriptor,
             family_metadata,
@@ -7845,15 +8018,15 @@ impl MetalGemma4Layer {
             .as_deref()
             .map(|name| MetalQuantizedExpertMatrix::load(backend, artifact, name))
             .transpose()?;
-        let feed_forward_gate_up_experts_weight_native = if feed_forward_up_experts_weight.is_none()
-        {
-            feed_forward_gate_experts_weight
-                .as_ref()
-                .map(|fused| MetalPackedGateUpExpertMatrix::from_fused(backend, fused))
-                .transpose()?
-        } else {
-            None
-        };
+        let feed_forward_gate_up_experts_weight_native =
+            if feed_forward_up_experts_weight.is_none() && !gemma4_force_host_sparse_ffn() {
+                feed_forward_gate_experts_weight
+                    .as_ref()
+                    .map(|fused| MetalPackedGateUpExpertMatrix::from_fused(backend, fused))
+                    .transpose()?
+            } else {
+                None
+            };
         let feed_forward_gate_experts_bias = layout
             .feed_forward_gate_experts_bias
             .as_deref()
@@ -7950,6 +8123,7 @@ impl MetalGemma4Layer {
             )?,
             attention_query_weight,
             attention_qkv_weight,
+            attention_qk_weight,
             attention_query_bias: load_optional_metal_static_vector(
                 backend,
                 artifact,
@@ -7972,6 +8146,7 @@ impl MetalGemma4Layer {
                 layout.attention_key_norm.as_deref(),
             )?,
             attention_value_weight,
+            attention_value_from_key_weight,
             attention_value_bias: load_optional_metal_static_vector(
                 backend,
                 artifact,
@@ -8954,6 +9129,8 @@ fn encode_gemma4_metal_sparse_ffn_submission(
             "metal sparse decode step-plan is missing the sparse activation buffer",
         )))
     })?;
+    let expert_input_q8_1_buffer = step_plan.moe_expert_input_q8_1_buffer.as_ref();
+    let activated_q8_1_buffer = step_plan.moe_activated_q8_1_buffer.as_ref();
     let projected_buffer = step_plan.moe_projected_buffer.as_ref().ok_or_else(|| {
         ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
             "metal sparse decode step-plan is missing the sparse projected buffer",
@@ -9059,69 +9236,173 @@ fn encode_gemma4_metal_sparse_ffn_submission(
                 "missing gemma4 dense feed_forward_down_weight in local metal sparse decode path",
             )))
         })?;
-        if let (Some(gate_up_weight), Some(gate_up_buffer)) = (
-            layer.feed_forward_gate_up_weight.as_ref(),
-            step_plan.ffn_gate_up_buffer.as_ref(),
-        ) {
+        let dense_input_q8_1_buffer = step_plan.moe_expert_input_q8_1_buffer.as_ref();
+        let dense_activated_q8_1_buffer = step_plan.moe_activated_q8_1_buffer.as_ref();
+        let dense_gate_row_stride = dense_gate_weight
+            .native_weights()?
+            .byte_len()
+            .checked_div(dense_gate_weight.rows)
+            .ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "dense gate q8_1 row-stride division by zero",
+                )))
+            })?;
+        let dense_up_row_stride = dense_up_weight
+            .native_weights()?
+            .byte_len()
+            .checked_div(dense_up_weight.rows)
+            .ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "dense up q8_1 row-stride division by zero",
+                )))
+            })?;
+        let dense_down_row_stride = dense_down_weight
+            .native_weights()?
+            .byte_len()
+            .checked_div(dense_down_weight.rows)
+            .ok_or_else(|| {
+                ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(String::from(
+                    "dense down q8_1 row-stride division by zero",
+                )))
+            })?;
+        let dense_q8_1_ffn_supported = !gemma4_disable_q8_1_sparse_ffn()
+            && dense_gate_weight.mode == QuantizationMode::GgmlQ4K
+            && dense_up_weight.mode == QuantizationMode::GgmlQ4K
+            && matches!(
+                dense_down_weight.mode,
+                QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0
+            )
+            && hidden_size % 32 == 0
+            && dense_gate_weight.rows % 32 == 0
+            && dense_gate_weight.columns == hidden_size
+            && dense_up_weight.columns == hidden_size
+            && dense_down_weight.columns == dense_gate_weight.rows
+            && dense_input_q8_1_buffer.is_some()
+            && dense_activated_q8_1_buffer.is_some();
+        if dense_q8_1_ffn_supported {
+            let dense_input_q8_1_buffer =
+                dense_input_q8_1_buffer.expect("dense q8_1 input buffer present");
+            let dense_activated_q8_1_buffer =
+                dense_activated_q8_1_buffer.expect("dense q8_1 activation buffer present");
             backend
-                .encode_quantized_matvec_submission(
+                .encode_quantize_f32_to_q8_1_submission(
                     submission,
-                    gate_up_weight.native_weights()?,
-                    0,
-                    gate_up_weight.mode,
-                    gate_up_weight.rows,
-                    gate_up_weight.columns,
                     &step_plan.norm_buffer,
-                    gate_up_buffer,
+                    1,
+                    hidden_size,
+                    dense_input_q8_1_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            backend
+                .encode_grouped_expert_gate_up_swiglu_q8_1_id_buffer_submission(
+                    submission,
+                    dense_gate_weight.native_weights()?,
+                    dense_gate_weight.mode,
+                    dense_gate_row_stride,
+                    dense_up_weight.native_weights()?,
+                    dense_up_weight.mode,
+                    dense_up_row_stride,
+                    dense_gate_weight.rows,
+                    hidden_size,
+                    None,
+                    None,
+                    &step_plan.ffn_dense_selected_ids_buffer,
+                    1,
+                    dense_input_q8_1_buffer,
+                    &step_plan.ffn_activated_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            backend
+                .encode_quantize_f32_to_q8_1_submission(
+                    submission,
+                    &step_plan.ffn_activated_buffer,
+                    1,
+                    dense_gate_weight.rows,
+                    dense_activated_q8_1_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+            backend
+                .encode_moe_down_aggregate_q8_1_id_buffer_submission(
+                    submission,
+                    dense_down_weight.native_weights()?,
+                    dense_down_weight.mode,
+                    dense_down_row_stride,
+                    dense_down_weight.rows,
+                    dense_down_weight.columns,
+                    dense_activated_q8_1_buffer,
+                    &step_plan.ffn_dense_selected_ids_buffer,
+                    1,
+                    &step_plan.ffn_dense_selected_weights_buffer,
+                    &step_plan.ffn_dense_expert_scales_buffer,
+                    None,
+                    &step_plan.hidden_buffer,
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
         } else {
+            if let (Some(gate_up_weight), Some(gate_up_buffer)) = (
+                layer.feed_forward_gate_up_weight.as_ref(),
+                step_plan.ffn_gate_up_buffer.as_ref(),
+            ) {
+                backend
+                    .encode_quantized_matvec_submission(
+                        submission,
+                        gate_up_weight.native_weights()?,
+                        0,
+                        gate_up_weight.mode,
+                        gate_up_weight.rows,
+                        gate_up_weight.columns,
+                        &step_plan.norm_buffer,
+                        gate_up_buffer,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+            } else {
+                backend
+                    .encode_quantized_matvec_submission(
+                        submission,
+                        dense_gate_weight.native_weights()?,
+                        0,
+                        dense_gate_weight.mode,
+                        dense_gate_weight.rows,
+                        dense_gate_weight.columns,
+                        &step_plan.norm_buffer,
+                        &step_plan.ffn_gate_buffer,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                backend
+                    .encode_quantized_matvec_submission(
+                        submission,
+                        dense_up_weight.native_weights()?,
+                        0,
+                        dense_up_weight.mode,
+                        dense_up_weight.rows,
+                        dense_up_weight.columns,
+                        &step_plan.norm_buffer,
+                        &step_plan.ffn_up_buffer,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+            }
             backend
-                .encode_quantized_matvec_submission(
+                .encode_gelu_glu_submission(
                     submission,
-                    dense_gate_weight.native_weights()?,
-                    0,
-                    dense_gate_weight.mode,
-                    dense_gate_weight.rows,
-                    dense_gate_weight.columns,
-                    &step_plan.norm_buffer,
                     &step_plan.ffn_gate_buffer,
+                    &step_plan.ffn_up_buffer,
+                    &step_plan.ffn_activated_buffer,
+                    dense_gate_weight.rows,
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
             backend
                 .encode_quantized_matvec_submission(
                     submission,
-                    dense_up_weight.native_weights()?,
+                    dense_down_weight.native_weights()?,
                     0,
-                    dense_up_weight.mode,
-                    dense_up_weight.rows,
-                    dense_up_weight.columns,
-                    &step_plan.norm_buffer,
-                    &step_plan.ffn_up_buffer,
+                    dense_down_weight.mode,
+                    dense_down_weight.rows,
+                    dense_down_weight.columns,
+                    &step_plan.ffn_activated_buffer,
+                    &step_plan.hidden_buffer,
                 )
                 .map_err(ReferenceTextGenerationError::Runtime)?;
         }
-        backend
-            .encode_gelu_glu_submission(
-                submission,
-                &step_plan.ffn_gate_buffer,
-                &step_plan.ffn_up_buffer,
-                &step_plan.ffn_activated_buffer,
-                dense_gate_weight.rows,
-            )
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-        backend
-            .encode_quantized_matvec_submission(
-                submission,
-                dense_down_weight.native_weights()?,
-                0,
-                dense_down_weight.mode,
-                dense_down_weight.rows,
-                dense_down_weight.columns,
-                &step_plan.ffn_activated_buffer,
-                &step_plan.hidden_buffer,
-            )
-            .map_err(ReferenceTextGenerationError::Runtime)?;
         if let Some(norm) = layer.feed_forward_post_norm_1_native.as_ref() {
             backend
                 .encode_per_head_rms_norm_submission(
@@ -9228,106 +9509,243 @@ fn encode_gemma4_metal_sparse_ffn_submission(
             selected_weights_buffer,
         )
         .map_err(ReferenceTextGenerationError::Runtime)?;
-
-    backend
-        .encode_grouped_quantized_matvec_id_buffer_submission(
-            submission,
-            gate_weights,
-            gate_mode,
-            gate_row_stride,
-            gate_rows,
-            gate_columns,
-            selected_ids_buffer,
-            active_expert_count,
-            expert_input,
-            gate_buffer,
+    let fused_gate_up_q4_k = gate_mode == QuantizationMode::GgmlQ4K
+        && up_mode == QuantizationMode::GgmlQ4K
+        && gate_row_stride == up_row_stride;
+    let q8_1_sparse_ffn_supported = fused_gate_up_q4_k
+        && !gemma4_disable_q8_1_sparse_ffn()
+        && matches!(
+            down_experts.host.mode,
+            QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0
         )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-    if let Some(bias) = layer.feed_forward_gate_experts_bias_native.as_ref() {
+        && gate_columns % 32 == 0
+        && gate_rows % 32 == 0
+        && expert_input_q8_1_buffer.is_some()
+        && activated_q8_1_buffer.is_some();
+    if q8_1_sparse_ffn_supported {
+        let expert_input_q8_1_buffer =
+            expert_input_q8_1_buffer.expect("q8_1 sparse gate/up input buffer present");
+        let activated_q8_1_buffer =
+            activated_q8_1_buffer.expect("q8_1 sparse activation buffer present");
         backend
-            .encode_add_selected_expert_bias_submission(
+            .encode_quantize_f32_to_q8_1_submission(
                 submission,
-                gate_buffer,
-                bias.device(),
+                expert_input,
+                1,
+                gate_columns,
+                expert_input_q8_1_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_grouped_expert_gate_up_swiglu_q8_1_id_buffer_submission(
+                submission,
+                gate_weights,
+                gate_mode,
+                gate_row_stride,
+                up_weights,
+                up_mode,
+                up_row_stride,
+                gate_rows,
+                gate_columns,
+                layer
+                    .feed_forward_gate_experts_bias_native
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .feed_forward_up_experts_bias_native
+                    .as_ref()
+                    .map(MetalStaticVector::device),
                 selected_ids_buffer,
+                active_expert_count,
+                expert_input_q8_1_buffer,
+                activated_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_quantize_f32_to_q8_1_submission(
+                submission,
+                activated_buffer,
                 active_expert_count,
                 gate_rows,
+                activated_q8_1_buffer,
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
-    backend
-        .encode_grouped_quantized_matvec_id_buffer_submission(
-            submission,
-            up_weights,
-            up_mode,
-            up_row_stride,
-            up_rows,
-            up_columns,
-            selected_ids_buffer,
-            active_expert_count,
-            expert_input,
-            up_buffer,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-    if let Some(bias) = layer.feed_forward_up_experts_bias_native.as_ref() {
+    } else if fused_gate_up_q4_k {
         backend
-            .encode_add_selected_expert_bias_submission(
+            .encode_grouped_expert_gate_up_swiglu_id_buffer_submission(
                 submission,
-                up_buffer,
-                bias.device(),
+                gate_weights,
+                gate_mode,
+                gate_row_stride,
+                up_weights,
+                up_mode,
+                up_row_stride,
+                gate_rows,
+                gate_columns,
+                layer
+                    .feed_forward_gate_experts_bias_native
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .feed_forward_up_experts_bias_native
+                    .as_ref()
+                    .map(MetalStaticVector::device),
                 selected_ids_buffer,
                 active_expert_count,
+                expert_input,
+                activated_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    } else {
+        backend
+            .encode_grouped_quantized_matvec_id_buffer_submission(
+                submission,
+                gate_weights,
+                gate_mode,
+                gate_row_stride,
+                gate_rows,
+                gate_columns,
+                selected_ids_buffer,
+                active_expert_count,
+                expert_input,
+                gate_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(bias) = layer.feed_forward_gate_experts_bias_native.as_ref() {
+            backend
+                .encode_add_selected_expert_bias_submission(
+                    submission,
+                    gate_buffer,
+                    bias.device(),
+                    selected_ids_buffer,
+                    active_expert_count,
+                    gate_rows,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        backend
+            .encode_grouped_quantized_matvec_id_buffer_submission(
+                submission,
+                up_weights,
+                up_mode,
+                up_row_stride,
                 up_rows,
+                up_columns,
+                selected_ids_buffer,
+                active_expert_count,
+                expert_input,
+                up_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(bias) = layer.feed_forward_up_experts_bias_native.as_ref() {
+            backend
+                .encode_add_selected_expert_bias_submission(
+                    submission,
+                    up_buffer,
+                    bias.device(),
+                    selected_ids_buffer,
+                    active_expert_count,
+                    up_rows,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        backend
+            .encode_gelu_glu_submission(
+                submission,
+                gate_buffer,
+                up_buffer,
+                activated_buffer,
+                active_expert_count.saturating_mul(gate_rows),
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
     }
-    backend
-        .encode_gelu_glu_submission(
-            submission,
-            gate_buffer,
-            up_buffer,
-            activated_buffer,
-            active_expert_count.saturating_mul(gate_rows),
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-    backend
-        .encode_expert_matvec_f32_id_buffer_submission(
-            submission,
-            down_experts.native_weights()?,
-            down_experts.host.mode,
-            down_experts.host.row_byte_len,
-            down_experts.host.rows,
-            down_experts.host.columns,
-            selected_ids_buffer,
-            active_expert_count,
-            activated_buffer,
-            projected_buffer,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-    if let Some(bias) = layer.feed_forward_down_experts_bias_native.as_ref() {
+    if q8_1_sparse_ffn_supported {
+        let activated_q8_1_buffer =
+            activated_q8_1_buffer.expect("q8_1 sparse activation buffer present");
         backend
-            .encode_add_selected_expert_bias_submission(
+            .encode_moe_down_aggregate_q8_1_id_buffer_submission(
+                submission,
+                down_experts.native_weights()?,
+                down_experts.host.mode,
+                down_experts.host.row_byte_len,
+                down_experts.host.rows,
+                down_experts.host.columns,
+                activated_q8_1_buffer,
+                selected_ids_buffer,
+                active_expert_count,
+                selected_weights_buffer,
+                expert_scales.device(),
+                layer
+                    .feed_forward_down_experts_bias_native
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                moe_output_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    } else if matches!(
+        down_experts.host.mode,
+        QuantizationMode::GgmlQ4K | QuantizationMode::GgmlQ5_0 | QuantizationMode::GgmlQ8_0
+    ) {
+        backend
+            .encode_moe_down_aggregate_f32_id_buffer_submission(
+                submission,
+                down_experts.native_weights()?,
+                down_experts.host.mode,
+                down_experts.host.row_byte_len,
+                down_experts.host.rows,
+                down_experts.host.columns,
+                activated_buffer,
+                selected_ids_buffer,
+                active_expert_count,
+                selected_weights_buffer,
+                expert_scales.device(),
+                layer
+                    .feed_forward_down_experts_bias_native
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                moe_output_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    } else {
+        backend
+            .encode_expert_matvec_f32_id_buffer_submission(
+                submission,
+                down_experts.native_weights()?,
+                down_experts.host.mode,
+                down_experts.host.row_byte_len,
+                down_experts.host.rows,
+                down_experts.host.columns,
+                selected_ids_buffer,
+                active_expert_count,
+                activated_buffer,
+                projected_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if let Some(bias) = layer.feed_forward_down_experts_bias_native.as_ref() {
+            backend
+                .encode_add_selected_expert_bias_submission(
+                    submission,
+                    projected_buffer,
+                    bias.device(),
+                    selected_ids_buffer,
+                    active_expert_count,
+                    down_experts.host.rows,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        backend
+            .encode_aggregate_selected_expert_rows_submission(
                 submission,
                 projected_buffer,
-                bias.device(),
                 selected_ids_buffer,
+                selected_weights_buffer,
+                expert_scales.device(),
+                moe_output_buffer,
                 active_expert_count,
                 down_experts.host.rows,
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
     }
-    backend
-        .encode_aggregate_selected_expert_rows_submission(
-            submission,
-            projected_buffer,
-            selected_ids_buffer,
-            selected_weights_buffer,
-            expert_scales.device(),
-            moe_output_buffer,
-            active_expert_count,
-            down_experts.host.rows,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
     if let Some(norm) = layer.feed_forward_post_norm_2_native.as_ref() {
         backend
             .encode_per_head_rms_norm_submission(
@@ -9383,9 +9801,21 @@ fn metal_gemma4_device_attention_with_kv(
     if !backend.supports_dense_decode_attention(layer.attention_geometry.head_dim) {
         return Ok(None);
     }
-    if !layer.attention_query_weight.is_native()
-        || !layer.attention_key_weight.is_native()
-        || !layer.attention_value_weight.is_native()
+    let has_native_qkv = layer
+        .attention_qkv_weight
+        .as_ref()
+        .map(MetalQuantizedProjectionMatrix::is_native)
+        .unwrap_or(false);
+    let has_native_qk = layer
+        .attention_qk_weight
+        .as_ref()
+        .map(MetalQuantizedProjectionMatrix::is_native)
+        .unwrap_or(false);
+    if !(has_native_qkv
+        || has_native_qk
+        || (layer.attention_query_weight.is_native()
+            && layer.attention_key_weight.is_native()
+            && layer.attention_value_weight.is_native()))
         || !layer.attention_output_weight.is_native()
     {
         return Ok(None);
@@ -9405,144 +9835,258 @@ fn metal_gemma4_device_attention_with_kv(
     let mut submission = backend
         .begin_submission(format!("psionic.gemma4.metal.attn.layer{layer_index}"))
         .map_err(ReferenceTextGenerationError::Runtime)?;
-    backend
-        .encode_quantized_matvec_submission(
-            &mut submission,
-            layer.attention_query_weight.native_weights()?,
-            0,
-            layer.attention_query_weight.mode,
-            layer.attention_query_weight.rows,
-            layer.attention_query_weight.columns,
-            &layer_step_plan.hidden_input_buffer,
-            &layer_step_plan.query_buffer,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-    backend
-        .encode_quantized_matvec_submission(
-            &mut submission,
-            layer.attention_key_weight.native_weights()?,
-            0,
-            layer.attention_key_weight.mode,
-            layer.attention_key_weight.rows,
-            layer.attention_key_weight.columns,
-            &layer_step_plan.hidden_input_buffer,
-            key_buffer,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-    backend
-        .encode_quantized_matvec_submission(
-            &mut submission,
-            layer.attention_value_weight.native_weights()?,
-            0,
-            layer.attention_value_weight.mode,
-            layer.attention_value_weight.rows,
-            layer.attention_value_weight.columns,
-            &layer_step_plan.hidden_input_buffer,
-            value_buffer,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-
-    if let Some(bias) = layer.attention_query_bias.as_ref() {
+    if let (Some(qkv_weight), Some(qkv_buffer)) = (
+        layer.attention_qkv_weight.as_ref(),
+        layer_step_plan.qkv_buffer.as_ref(),
+    ) {
         backend
-            .encode_add_inplace_submission(
+            .encode_quantized_matvec_submission(
                 &mut submission,
-                &layer_step_plan.query_buffer,
-                bias.device(),
-                layer.attention_query_weight.rows,
+                qkv_weight.native_weights()?,
+                0,
+                qkv_weight.mode,
+                qkv_weight.rows,
+                qkv_weight.columns,
+                &layer_step_plan.hidden_input_buffer,
+                qkv_buffer,
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
-    if let Some(norm) = layer.attention_query_norm.as_ref() {
         backend
-            .encode_per_head_rms_norm_submission(
+            .encode_qkv_rms_rope_append_dense_kv_submission(
+                &mut submission,
+                qkv_buffer,
+                layer
+                    .attention_query_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_query_norm
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_key_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_key_norm
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_value_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                &layer_step_plan.rope_freq_factors_buffer,
+                layer.attention_geometry.head_count,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                layer_step_plan.rope_rotary_half,
+                position,
+                layer_step_plan.rope_theta_scale,
+                layer_step_plan.rope_freq_scale,
+                layer_step_plan.rope_corr_dims,
+                layer_step_plan.rope_ext_factor,
+                layer_step_plan.rope_yarn_mscale,
+                family_metadata.rms_norm_epsilon,
+                layer_cache,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    } else if let (Some(qk_weight), Some(qk_buffer)) = (
+        layer.attention_qk_weight.as_ref(),
+        layer_step_plan.qk_buffer.as_ref(),
+    ) {
+        backend
+            .encode_quantized_matvec_submission(
+                &mut submission,
+                qk_weight.native_weights()?,
+                0,
+                qk_weight.mode,
+                qk_weight.rows,
+                qk_weight.columns,
+                &layer_step_plan.hidden_input_buffer,
+                qk_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        if !layer.attention_value_from_key_weight {
+            backend
+                .encode_quantized_matvec_submission(
+                    &mut submission,
+                    layer.attention_value_weight.native_weights()?,
+                    0,
+                    layer.attention_value_weight.mode,
+                    layer.attention_value_weight.rows,
+                    layer.attention_value_weight.columns,
+                    &layer_step_plan.hidden_input_buffer,
+                    value_buffer,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        backend
+            .encode_qk_rms_rope_append_dense_kv_submission(
+                &mut submission,
+                qk_buffer,
+                value_buffer,
+                layer.attention_value_from_key_weight,
+                layer
+                    .attention_query_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_query_norm
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_key_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_key_norm
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_value_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                &layer_step_plan.rope_freq_factors_buffer,
+                layer.attention_geometry.head_count,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                layer_step_plan.rope_rotary_half,
+                position,
+                layer_step_plan.rope_theta_scale,
+                layer_step_plan.rope_freq_scale,
+                layer_step_plan.rope_corr_dims,
+                layer_step_plan.rope_ext_factor,
+                layer_step_plan.rope_yarn_mscale,
+                family_metadata.rms_norm_epsilon,
+                layer_cache,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+    } else {
+        backend
+            .encode_quantized_matvec_submission(
+                &mut submission,
+                layer.attention_query_weight.native_weights()?,
+                0,
+                layer.attention_query_weight.mode,
+                layer.attention_query_weight.rows,
+                layer.attention_query_weight.columns,
+                &layer_step_plan.hidden_input_buffer,
+                &layer_step_plan.query_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_quantized_matvec_submission(
+                &mut submission,
+                layer.attention_key_weight.native_weights()?,
+                0,
+                layer.attention_key_weight.mode,
+                layer.attention_key_weight.rows,
+                layer.attention_key_weight.columns,
+                &layer_step_plan.hidden_input_buffer,
+                key_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_quantized_matvec_submission(
+                &mut submission,
+                layer.attention_value_weight.native_weights()?,
+                0,
+                layer.attention_value_weight.mode,
+                layer.attention_value_weight.rows,
+                layer.attention_value_weight.columns,
+                &layer_step_plan.hidden_input_buffer,
+                value_buffer,
+            )
+            .map_err(ReferenceTextGenerationError::Runtime)?;
+        backend
+            .encode_query_rms_rope_submission(
                 &mut submission,
                 &layer_step_plan.query_buffer,
-                norm.device(),
+                layer
+                    .attention_query_bias
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                layer
+                    .attention_query_norm
+                    .as_ref()
+                    .map(MetalStaticVector::device),
+                &layer_step_plan.rope_freq_factors_buffer,
                 layer.attention_geometry.head_count,
                 layer.attention_geometry.head_dim,
+                layer_step_plan.rope_rotary_half,
+                position,
+                layer_step_plan.rope_theta_scale,
+                layer_step_plan.rope_freq_scale,
+                layer_step_plan.rope_corr_dims,
+                layer_step_plan.rope_ext_factor,
+                layer_step_plan.rope_yarn_mscale,
                 family_metadata.rms_norm_epsilon,
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
-    backend
-        .encode_rope_neox_position_submission(
-            &mut submission,
-            &layer_step_plan.query_buffer,
-            &layer_step_plan.rope_freq_factors_buffer,
-            layer.attention_geometry.head_count,
-            layer.attention_geometry.head_dim,
-            layer_step_plan.rope_rotary_half,
-            position,
-            layer_step_plan.rope_theta_scale,
-            layer_step_plan.rope_freq_scale,
-            layer_step_plan.rope_corr_dims,
-            layer_step_plan.rope_ext_factor,
-            layer_step_plan.rope_yarn_mscale,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
 
-    if let Some(bias) = layer.attention_key_bias.as_ref() {
+        if let Some(bias) = layer.attention_key_bias.as_ref() {
+            backend
+                .encode_add_inplace_submission(
+                    &mut submission,
+                    key_buffer,
+                    bias.device(),
+                    layer.attention_key_weight.rows,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
+        if let Some(norm) = layer.attention_key_norm.as_ref() {
+            backend
+                .encode_per_head_rms_norm_submission(
+                    &mut submission,
+                    key_buffer,
+                    norm.device(),
+                    layer.attention_geometry.kv_head_count,
+                    layer.attention_geometry.head_dim,
+                    family_metadata.rms_norm_epsilon,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
         backend
-            .encode_add_inplace_submission(
+            .encode_rope_neox_position_submission(
                 &mut submission,
                 key_buffer,
-                bias.device(),
-                layer.attention_key_weight.rows,
+                &layer_step_plan.rope_freq_factors_buffer,
+                layer.attention_geometry.kv_head_count,
+                layer.attention_geometry.head_dim,
+                layer_step_plan.rope_rotary_half,
+                position,
+                layer_step_plan.rope_theta_scale,
+                layer_step_plan.rope_freq_scale,
+                layer_step_plan.rope_corr_dims,
+                layer_step_plan.rope_ext_factor,
+                layer_step_plan.rope_yarn_mscale,
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
-    if let Some(norm) = layer.attention_key_norm.as_ref() {
+
+        if let Some(bias) = layer.attention_value_bias.as_ref() {
+            backend
+                .encode_add_inplace_submission(
+                    &mut submission,
+                    value_buffer,
+                    bias.device(),
+                    layer.attention_value_weight.rows,
+                )
+                .map_err(ReferenceTextGenerationError::Runtime)?;
+        }
         backend
-            .encode_per_head_rms_norm_submission(
+            .encode_per_head_rms_norm_unit_submission(
                 &mut submission,
-                key_buffer,
-                norm.device(),
+                value_buffer,
                 layer.attention_geometry.kv_head_count,
                 layer.attention_geometry.head_dim,
                 family_metadata.rms_norm_epsilon,
             )
             .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
-    backend
-        .encode_rope_neox_position_submission(
-            &mut submission,
-            key_buffer,
-            &layer_step_plan.rope_freq_factors_buffer,
-            layer.attention_geometry.kv_head_count,
-            layer.attention_geometry.head_dim,
-            layer_step_plan.rope_rotary_half,
-            position,
-            layer_step_plan.rope_theta_scale,
-            layer_step_plan.rope_freq_scale,
-            layer_step_plan.rope_corr_dims,
-            layer_step_plan.rope_ext_factor,
-            layer_step_plan.rope_yarn_mscale,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
 
-    if let Some(bias) = layer.attention_value_bias.as_ref() {
         backend
-            .encode_add_inplace_submission(
-                &mut submission,
-                value_buffer,
-                bias.device(),
-                layer.attention_value_weight.rows,
-            )
+            .encode_append_dense_kv_submission(&mut submission, layer_cache, key_buffer, value_buffer)
             .map_err(ReferenceTextGenerationError::Runtime)?;
     }
-    backend
-        .encode_per_head_rms_norm_unit_submission(
-            &mut submission,
-            value_buffer,
-            layer.attention_geometry.kv_head_count,
-            layer.attention_geometry.head_dim,
-            family_metadata.rms_norm_epsilon,
-        )
-        .map_err(ReferenceTextGenerationError::Runtime)?;
-
-    backend
-        .encode_append_dense_kv_submission(&mut submission, layer_cache, key_buffer, value_buffer)
-        .map_err(ReferenceTextGenerationError::Runtime)?;
     backend
         .encode_decode_attention_dense_submission(
             &mut submission,
@@ -9599,16 +10143,28 @@ fn metal_gemma4_device_attention_with_kv(
             &mut layer_step_plan.live_value_values,
         )
         .map_err(ReferenceTextGenerationError::Runtime)?;
+    let attention_projection_bytes = if let Some(qkv_weight) = layer.attention_qkv_weight.as_ref() {
+        qkv_weight.byte_length()
+    } else if let Some(qk_weight) = layer.attention_qk_weight.as_ref() {
+        qk_weight.byte_length()
+            + if layer.attention_value_from_key_weight {
+                0
+            } else {
+                layer.attention_value_weight.byte_length()
+            }
+    } else {
+        layer.attention_query_weight.byte_length()
+            + layer.attention_key_weight.byte_length()
+            + layer.attention_value_weight.byte_length()
+    };
 
     Ok(Some(MetalDeviceAttentionStep {
         projected_output: layer_step_plan.projected_output_values.clone(),
         key_values: Some(layer_step_plan.live_key_values.clone()),
         value_values: Some(layer_step_plan.live_value_values.clone()),
         kernel_count: report.encoded_operations,
-        bytes_moved: (layer.attention_query_weight.byte_length()
-            + layer.attention_key_weight.byte_length()
-            + layer.attention_value_weight.byte_length()
-            + layer.attention_output_weight.byte_length()) as u64,
+        bytes_moved: (attention_projection_bytes + layer.attention_output_weight.byte_length())
+            as u64,
     }))
 }
 
@@ -9651,32 +10207,18 @@ fn metal_gemma4_device_attention_reuse(
             &layer_step_plan.query_buffer,
         )
         .map_err(ReferenceTextGenerationError::Runtime)?;
-    if let Some(bias) = layer.attention_query_bias.as_ref() {
-        backend
-            .encode_add_inplace_submission(
-                &mut submission,
-                &layer_step_plan.query_buffer,
-                bias.device(),
-                layer.attention_query_weight.rows,
-            )
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
-    if let Some(norm) = layer.attention_query_norm.as_ref() {
-        backend
-            .encode_per_head_rms_norm_submission(
-                &mut submission,
-                &layer_step_plan.query_buffer,
-                norm.device(),
-                layer.attention_geometry.head_count,
-                layer.attention_geometry.head_dim,
-                family_metadata.rms_norm_epsilon,
-            )
-            .map_err(ReferenceTextGenerationError::Runtime)?;
-    }
     backend
-        .encode_rope_neox_position_submission(
+        .encode_query_rms_rope_submission(
             &mut submission,
             &layer_step_plan.query_buffer,
+            layer
+                .attention_query_bias
+                .as_ref()
+                .map(MetalStaticVector::device),
+            layer
+                .attention_query_norm
+                .as_ref()
+                .map(MetalStaticVector::device),
             &layer_step_plan.rope_freq_factors_buffer,
             layer.attention_geometry.head_count,
             layer.attention_geometry.head_dim,
@@ -9687,6 +10229,7 @@ fn metal_gemma4_device_attention_reuse(
             layer_step_plan.rope_corr_dims,
             layer_step_plan.rope_ext_factor,
             layer_step_plan.rope_yarn_mscale,
+            family_metadata.rms_norm_epsilon,
         )
         .map_err(ReferenceTextGenerationError::Runtime)?;
     backend
@@ -17010,6 +17553,18 @@ fn apply_rope_neox(
 
 fn gemma4_disable_per_layer_inputs() -> bool {
     std::env::var_os("PSIONIC_GEMMA4_DISABLE_PER_LAYER_INPUTS").is_some()
+}
+
+fn gemma4_force_host_sparse_ffn() -> bool {
+    std::env::var_os("PSIONIC_GEMMA4_FORCE_HOST_SPARSE_FFN").is_some()
+}
+
+fn gemma4_disable_q8_1_sparse_ffn() -> bool {
+    std::env::var_os("PSIONIC_GEMMA4_DISABLE_Q8_1_SPARSE_FFN").is_some()
+}
+
+fn gemma4_force_host_kv_sync() -> bool {
+    std::env::var_os("PSIONIC_GEMMA4_FORCE_HOST_KV_SYNC").is_some()
 }
 
 fn gemma4_disable_rope_freq_factors() -> bool {
