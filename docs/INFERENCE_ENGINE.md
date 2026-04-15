@@ -144,6 +144,8 @@ into one generic engine claim.
     `113.79` on `llama.cpp`, so the gate currently fails for competitive
     throughput rather than sparse-receipt dishonesty; the canonical audit is
     `docs/audits/2026-04-15-gemma4-26b-competitive-benchmark-gate-audit.md`
+    and the full architecture-gap audit is
+    `docs/audits/2026-04-15-gemma4-26b-why-psionic-still-loses-to-ollama-and-llama-cpp.md`
   - current boundary = that pass fixes the local fallback cliff but does not
     yet close parity with `ollama` or `llama.cpp`, and the sparse 26B local
     lane still returns malformed text on the shared benchmark prompt
