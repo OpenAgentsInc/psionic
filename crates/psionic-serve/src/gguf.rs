@@ -18,8 +18,9 @@ use psionic_adapters::{
 use psionic_backend_cpu::{decode_quantized_row_into, quantized_row_byte_len, quantized_row_dot};
 use psionic_backend_cuda::{CudaBackend, CudaBuffer};
 use psionic_backend_metal::{
-    MetalBackend, MetalBuffer, MetalKvCacheMirror, MetalLogitsOutputMode,
-    MetalQuantizedMatvecRequest,
+    METAL_SINGLE_ROW_TOP_K_MAX, MetalBackend, MetalBuffer, MetalKvCacheMirror,
+    MetalLogitsOutputMode, MetalLogitsSelectionMetrics, MetalQuantizedMatvecRequest,
+    MetalTopKResult,
 };
 use psionic_catalog::{BlobIntegrityPolicy, LocalBlobOpenOptions};
 use psionic_core::{QuantizationMode, Shape};
@@ -3347,6 +3348,8 @@ struct MetalGemma4StepPlan {
     logits_buffer: MetalBuffer,
     argmax_candidates_buffer: MetalBuffer,
     selected_token_buffer: MetalBuffer,
+    top_k_indices_buffer: MetalBuffer,
+    top_k_values_buffer: MetalBuffer,
 }
 
 fn build_gemma4_metal_layer_caches_from_host_cache(
@@ -3547,6 +3550,7 @@ fn run_metal_gemma4_generation_request(
         )?;
         let mut prompt_logits = Vec::new();
         let mut last_logits = Vec::new();
+        let mut last_candidates: Option<MetalTopKResult> = None;
         let mut cache = if shared_prefix_eligible {
             let lookup = super::controlled_prefix_lookup(
                 shared_prefixes,
@@ -3604,18 +3608,34 @@ fn run_metal_gemma4_generation_request(
         )?;
         let mut step_plan = loaded_model.inner.build_decode_step_plan(backend)?;
         let logits_output_mode = metal_gemma4_decode_logits_output_mode(request);
-        let prompt_logits_output_mode = if shared_prefix_eligible {
-            MetalLogitsOutputMode::RawLogits
-        } else {
-            logits_output_mode
-        };
+        let prompt_logits_output_mode =
+            if shared_prefix_eligible && logits_output_mode == MetalLogitsOutputMode::RawLogits {
+                MetalLogitsOutputMode::RawLogits
+            } else {
+                logits_output_mode
+            };
         let use_greedy_selected_token = logits_output_mode == MetalLogitsOutputMode::GreedyToken;
+        let top_k_candidates = match logits_output_mode {
+            MetalLogitsOutputMode::TopKCandidates(top_k) => Some(top_k),
+            _ => None,
+        };
         let mut last_selected_token = None;
         let mut kernel_count = 0usize;
         let mut bytes_moved = 0u64;
+        let mut decode_output_metrics: Option<crate::Gemma4MetalDecodeOutputMetrics> = None;
+        let mut pending_logits_selection_metrics = None;
+        let mut host_kv_materialization_events = 0usize;
+        let mut host_kv_materialization_tokens = 0usize;
         let mut materialized_host_tokens = cache.len();
         if use_greedy_selected_token && !last_logits.is_empty() {
             last_selected_token = super::select_argmax_token(last_logits.as_slice()).map(TokenId);
+        } else if let Some(top_k) = top_k_candidates
+            && !last_logits.is_empty()
+        {
+            last_candidates = Some(metal_top_k_candidates_from_logits(
+                last_logits.as_slice(),
+                top_k,
+            ));
         }
 
         for (relative_prompt_index, token) in prompt_tokens.as_slice()[prefix_tokens_reused..]
@@ -3644,26 +3664,41 @@ fn run_metal_gemma4_generation_request(
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             cache.append_token_without_kv(*token)?;
             if produce_prompt_logits {
-                if use_greedy_selected_token {
-                    if step.logits.is_empty() {
+                pending_logits_selection_metrics = step.logits_selection_metrics.clone();
+                match prompt_logits_output_mode {
+                    MetalLogitsOutputMode::GreedyToken => {
                         last_selected_token = step.selected_token;
-                    } else {
+                    }
+                    MetalLogitsOutputMode::TopKCandidates(_) => {
+                        last_candidates = step.candidates;
+                    }
+                    MetalLogitsOutputMode::RawLogits => {
                         last_logits = step.logits;
                         prompt_logits.push(last_logits.clone());
-                        last_selected_token =
-                            super::select_argmax_token(last_logits.as_slice()).map(TokenId);
+                        if use_greedy_selected_token {
+                            last_selected_token =
+                                super::select_argmax_token(last_logits.as_slice()).map(TokenId);
+                        } else if let Some(top_k) = top_k_candidates {
+                            last_candidates = Some(metal_top_k_candidates_from_logits(
+                                last_logits.as_slice(),
+                                top_k,
+                            ));
+                        }
                     }
-                } else {
-                    last_logits = step.logits;
-                    prompt_logits.push(last_logits.clone());
                 }
             }
         }
 
-        if shared_prefix_eligible
+        let record_prompt_cache = shared_prefix_eligible
+            && prefix_tokens_reused != prompt_tokens.len()
+            && !prompt_logits.is_empty();
+        if record_prompt_cache
             && prefix_tokens_reused != prompt_tokens.len()
             && cache.len() > materialized_host_tokens
         {
+            host_kv_materialization_events = host_kv_materialization_events.saturating_add(1);
+            host_kv_materialization_tokens = host_kv_materialization_tokens
+                .saturating_add(cache.len().saturating_sub(materialized_host_tokens));
             materialize_metal_cache_entries_from_layer_caches(
                 &mut cache,
                 &loaded_model.inner,
@@ -3674,8 +3709,7 @@ fn run_metal_gemma4_generation_request(
         }
 
         let prefill_handoff_state = gemma4_metal_layer_cache_state(layer_caches.as_slice());
-        let prompt_cache = (shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len())
-            .then(|| cache.clone());
+        let prompt_cache = record_prompt_cache.then(|| cache.clone());
         let prompt_eval_duration_ns = super::elapsed_ns(prompt_eval_start);
         let mut sampler = super::GenerationSampler::new(&request.options)?;
         let structured_output_report = sampler.structured_output_report();
@@ -3698,6 +3732,24 @@ fn run_metal_gemma4_generation_request(
                         ),
                     ))
                 })?
+            } else if let Some(_top_k) = top_k_candidates {
+                let candidates = last_candidates.as_ref().ok_or_else(|| {
+                    ReferenceTextGenerationError::Runtime(crate::RuntimeError::Backend(
+                        String::from(
+                            "metal gemma4 bounded candidate decode did not produce candidates",
+                        ),
+                    ))
+                })?;
+                match sampler.select_next_token_from_presorted_candidates(
+                    candidates.indices.as_slice(),
+                    candidates.values.as_slice(),
+                    loaded_model.descriptor().config.vocab_size,
+                )? {
+                    super::GenerationSelection::Token(token) => token,
+                    super::GenerationSelection::Terminate => {
+                        break super::TerminationReason::EndOfSequence;
+                    }
+                }
             } else {
                 match sampler.select_next_token(
                     loaded_model.tokenizer(),
@@ -3715,6 +3767,12 @@ fn run_metal_gemma4_generation_request(
                 break super::TerminationReason::EndOfSequence;
             }
 
+            if let Some(selection) = pending_logits_selection_metrics.take() {
+                accumulate_gemma4_metal_decode_output_metrics(
+                    &mut decode_output_metrics,
+                    &selection,
+                );
+            }
             generated_tokens.push(next_token);
             let step = loaded_model.inner.forward_step_with_layer_caches(
                 backend,
@@ -3735,10 +3793,18 @@ fn run_metal_gemma4_generation_request(
             kernel_count = kernel_count.saturating_add(step.kernel_count);
             bytes_moved = bytes_moved.saturating_add(step.bytes_moved);
             cache.append_token_without_kv(next_token)?;
+            pending_logits_selection_metrics = step.logits_selection_metrics.clone();
             if use_greedy_selected_token {
                 last_selected_token = step.selected_token;
+                last_candidates = None;
+                last_logits.clear();
+            } else if top_k_candidates.is_some() {
+                last_candidates = step.candidates;
+                last_selected_token = step.selected_token;
+                last_logits.clear();
             } else {
                 last_logits = step.logits;
+                last_candidates = None;
             }
             let emitted_at = Instant::now();
             if first_token_emitted_at.is_none() {
@@ -3757,7 +3823,7 @@ fn run_metal_gemma4_generation_request(
             }
         };
 
-        if shared_prefix_eligible && prefix_tokens_reused != prompt_tokens.len() {
+        if record_prompt_cache {
             if let Some(prompt_cache) = prompt_cache.as_ref() {
                 let recorded_identity = shared_prefixes.record(
                     compatibility,
@@ -3774,6 +3840,9 @@ fn run_metal_gemma4_generation_request(
         let generated = TokenSequence::new(generated_tokens);
         if let Some(session_id) = &request.session_id {
             if cache.len() > materialized_host_tokens {
+                host_kv_materialization_events = host_kv_materialization_events.saturating_add(1);
+                host_kv_materialization_tokens = host_kv_materialization_tokens
+                    .saturating_add(cache.len().saturating_sub(materialized_host_tokens));
                 materialize_metal_cache_entries_from_layer_caches(
                     &mut cache,
                     &loaded_model.inner,
@@ -3810,6 +3879,12 @@ fn run_metal_gemma4_generation_request(
         );
         let prefill_decode_handoff = super::local_prefill_decode_handoff(&prefill_handoff_state);
         let kv_residency = super::host_only_kv_residency(cache.policy(), cache.state());
+        if host_kv_materialization_events > 0 || host_kv_materialization_tokens > 0 {
+            let decode_metrics = decode_output_metrics
+                .get_or_insert_with(crate::Gemma4MetalDecodeOutputMetrics::default);
+            decode_metrics.host_kv_materialization_events = host_kv_materialization_events;
+            decode_metrics.host_kv_materialization_tokens = host_kv_materialization_tokens;
+        }
         let metrics = crate::GenerationMetrics {
             total_duration_ns: Some(total_duration_ns),
             load_duration_ns: Some(match load_state {
@@ -3830,6 +3905,7 @@ fn run_metal_gemma4_generation_request(
             )),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: decode_output_metrics.filter(|value| !value.is_zero()),
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -4241,11 +4317,67 @@ fn metal_gemma4_can_use_greedy_selected_token(request: &GenerationRequest) -> bo
             || request.options.sampling_policy().effective_temperature() <= 1e-6)
 }
 
+fn metal_gemma4_can_use_bounded_top_k_output(request: &GenerationRequest) -> bool {
+    request.adapter_serving.is_none()
+        && request.options.structured_output.is_none()
+        && request.options.repeat_penalty.is_none()
+        && request.options.presence_penalty.is_none()
+        && request.options.frequency_penalty.is_none()
+}
+
 fn metal_gemma4_decode_logits_output_mode(request: &GenerationRequest) -> MetalLogitsOutputMode {
     if metal_gemma4_can_use_greedy_selected_token(request) {
-        MetalLogitsOutputMode::GreedyToken
-    } else {
-        MetalLogitsOutputMode::RawLogits
+        return MetalLogitsOutputMode::GreedyToken;
+    }
+    if metal_gemma4_can_use_bounded_top_k_output(request)
+        && let Some(top_k) = request.options.sampling_policy().effective_top_k()
+        && top_k > 1
+        && top_k <= METAL_SINGLE_ROW_TOP_K_MAX
+    {
+        return MetalLogitsOutputMode::TopKCandidates(top_k);
+    }
+    MetalLogitsOutputMode::RawLogits
+}
+
+fn gemma4_metal_logits_output_mode(
+    output_mode: MetalLogitsOutputMode,
+) -> crate::Gemma4MetalDecodeOutputMode {
+    match output_mode {
+        MetalLogitsOutputMode::GreedyToken => crate::Gemma4MetalDecodeOutputMode::GreedyToken,
+        MetalLogitsOutputMode::TopKCandidates(top_k) => {
+            crate::Gemma4MetalDecodeOutputMode::TopKCandidates { top_k }
+        }
+        MetalLogitsOutputMode::RawLogits => crate::Gemma4MetalDecodeOutputMode::RawLogits,
+    }
+}
+
+fn accumulate_gemma4_metal_decode_output_metrics(
+    metrics: &mut Option<crate::Gemma4MetalDecodeOutputMetrics>,
+    selection: &MetalLogitsSelectionMetrics,
+) {
+    let entry = metrics.get_or_insert_with(crate::Gemma4MetalDecodeOutputMetrics::default);
+    entry.step_count = entry.step_count.saturating_add(1);
+    entry.readback_bytes = entry
+        .readback_bytes
+        .saturating_add(selection.readback_bytes);
+    entry.raw_logits_materialized |= selection.raw_logits_materialized;
+    entry
+        .output_modes
+        .push(gemma4_metal_logits_output_mode(selection.output_mode));
+    entry.output_modes.sort();
+    entry.output_modes.dedup();
+}
+
+fn metal_top_k_candidates_from_logits(logits: &[f32], top_k: usize) -> MetalTopKResult {
+    let selected = top_k_indices(logits, top_k.max(1));
+    MetalTopKResult {
+        row_count: 1,
+        top_k: selected.len(),
+        indices: selected
+            .iter()
+            .map(|&index| u32::try_from(index).unwrap_or(u32::MAX))
+            .collect(),
+        values: selected.iter().map(|&index| logits[index]).collect(),
     }
 }
 
@@ -4713,6 +4845,12 @@ impl MetalGemma4ModelInner {
                 .map_err(ReferenceTextGenerationError::Runtime)?,
             selected_token_buffer: backend
                 .zeros_i32_buffer(Shape::new(vec![2]))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            top_k_indices_buffer: backend
+                .zeros_i32_buffer(Shape::new(vec![METAL_SINGLE_ROW_TOP_K_MAX]))
+                .map_err(ReferenceTextGenerationError::Runtime)?,
+            top_k_values_buffer: backend
+                .zeros_buffer(Shape::new(vec![METAL_SINGLE_ROW_TOP_K_MAX]))
                 .map_err(ReferenceTextGenerationError::Runtime)?,
         })
     }
@@ -5619,7 +5757,9 @@ impl MetalGemma4ModelInner {
         }
 
         let mut logits = Vec::new();
+        let mut candidates = None;
         let mut selected_token = None;
+        let mut logits_selection_metrics = None;
         match (produce_logits, logits_output_mode) {
             (false, _) => {}
             (true, MetalLogitsOutputMode::GreedyToken) => {
@@ -5663,6 +5803,11 @@ impl MetalGemma4ModelInner {
                     .synchronize_buffer(&step_plan.selected_token_buffer)
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                logits_selection_metrics = Some(MetalLogitsSelectionMetrics {
+                    output_mode: MetalLogitsOutputMode::GreedyToken,
+                    readback_bytes: std::mem::size_of::<u32>() as u64,
+                    raw_logits_materialized: false,
+                });
             }
             (true, MetalLogitsOutputMode::RawLogits) => {
                 backend
@@ -5697,13 +5842,66 @@ impl MetalGemma4ModelInner {
                     .synchronize_buffer(&step_plan.logits_buffer)
                     .map_err(ReferenceTextGenerationError::Runtime)?;
                 bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                logits_selection_metrics = Some(MetalLogitsSelectionMetrics {
+                    output_mode: MetalLogitsOutputMode::RawLogits,
+                    readback_bytes: self.output.rows.saturating_mul(std::mem::size_of::<f32>())
+                        as u64,
+                    raw_logits_materialized: true,
+                });
             }
-            (true, MetalLogitsOutputMode::TopKCandidates(_)) => {
-                return Err(ReferenceTextGenerationError::Runtime(
-                    crate::RuntimeError::Backend(String::from(
-                        "metal gemma4 top-k logits output mode is not yet wired into the local device-resident generation loop",
-                    )),
-                ));
+            (true, MetalLogitsOutputMode::TopKCandidates(top_k)) => {
+                backend
+                    .encode_per_head_rms_norm_to_output_submission(
+                        &mut submission,
+                        &step_plan.hidden_buffer,
+                        self.output_norm.device(),
+                        &step_plan.norm_buffer,
+                        1,
+                        hidden_size,
+                        self.family_metadata.rms_norm_epsilon,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                if materialize_stage_outputs {
+                    submission
+                        .synchronize_buffer(&step_plan.norm_buffer)
+                        .map_err(ReferenceTextGenerationError::Runtime)?;
+                }
+                backend
+                    .encode_quantized_matvec_submission(
+                        &mut submission,
+                        self.output.native_weights()?,
+                        0,
+                        self.output.mode,
+                        self.output.rows,
+                        self.output.columns,
+                        &step_plan.norm_buffer,
+                        &step_plan.logits_buffer,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                backend
+                    .encode_top_k_single_row_submission(
+                        &mut submission,
+                        &step_plan.logits_buffer,
+                        self.output.rows,
+                        top_k,
+                        &step_plan.top_k_indices_buffer,
+                        &step_plan.top_k_values_buffer,
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                submission
+                    .synchronize_buffer(&step_plan.top_k_indices_buffer)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                submission
+                    .synchronize_buffer(&step_plan.top_k_values_buffer)
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                logits_selection_metrics = Some(MetalLogitsSelectionMetrics {
+                    output_mode: MetalLogitsOutputMode::TopKCandidates(top_k),
+                    readback_bytes: top_k
+                        .saturating_mul(std::mem::size_of::<u32>() + std::mem::size_of::<f32>())
+                        as u64,
+                    raw_logits_materialized: false,
+                });
             }
         }
         if materialize_stage_outputs {
@@ -5754,7 +5952,20 @@ impl MetalGemma4ModelInner {
                         self.family_metadata.final_logit_softcapping,
                     );
                 }
-                MetalLogitsOutputMode::TopKCandidates(_) => {}
+                MetalLogitsOutputMode::TopKCandidates(top_k) => {
+                    let mut top_k_candidates = psionic_backend_metal::read_top_k_result(
+                        &step_plan.top_k_indices_buffer,
+                        &step_plan.top_k_values_buffer,
+                        top_k,
+                        "metal gemma4 top-k candidates",
+                    )
+                    .map_err(ReferenceTextGenerationError::Runtime)?;
+                    apply_final_logit_softcapping_in_place(
+                        top_k_candidates.values.as_mut_slice(),
+                        self.family_metadata.final_logit_softcapping,
+                    );
+                    candidates = Some(top_k_candidates);
+                }
             }
         }
         if materialize_stage_outputs {
@@ -5803,7 +6014,9 @@ impl MetalGemma4ModelInner {
             key: cache_key.unwrap_or_default(),
             value: cache_value.unwrap_or_default(),
             logits,
+            candidates,
             selected_token,
+            logits_selection_metrics,
             hidden,
             lm_head_hidden,
             kernel_count: report.encoded_operations,
@@ -6626,53 +6839,100 @@ impl MetalGemma4ModelInner {
             }
         }
 
-        let (logits, selected_token, lm_head_hidden) = if produce_logits {
-            let final_hidden = rms_norm(
-                hidden.as_slice(),
-                self.output_norm.as_slice(),
-                self.family_metadata.rms_norm_epsilon,
-            );
-            match logits_output_mode {
-                MetalLogitsOutputMode::GreedyToken => {
-                    let selection = self.output.select_logits_output(
-                        backend,
-                        final_hidden.as_slice(),
-                        logits_output_mode,
-                    )?;
-                    bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
-                    kernel_count = kernel_count.saturating_add(1);
-                    let token = selection.selected_tokens.first().copied().ok_or_else(|| {
-                        ReferenceTextGenerationError::MissingOutput("metal gemma4 greedy token")
-                    })?;
-                    (Vec::new(), Some(TokenId(token)), Some(final_hidden))
+        let (logits, candidates, selected_token, logits_selection_metrics, lm_head_hidden) =
+            if produce_logits {
+                let final_hidden = rms_norm(
+                    hidden.as_slice(),
+                    self.output_norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+                match logits_output_mode {
+                    MetalLogitsOutputMode::GreedyToken => {
+                        let selection = self.output.select_logits_output(
+                            backend,
+                            final_hidden.as_slice(),
+                            logits_output_mode,
+                        )?;
+                        bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                        kernel_count = kernel_count.saturating_add(1);
+                        let token =
+                            selection.selected_tokens.first().copied().ok_or_else(|| {
+                                ReferenceTextGenerationError::MissingOutput(
+                                    "metal gemma4 greedy token",
+                                )
+                            })?;
+                        (
+                            Vec::new(),
+                            None,
+                            Some(TokenId(token)),
+                            Some(selection.metrics),
+                            Some(final_hidden),
+                        )
+                    }
+                    MetalLogitsOutputMode::RawLogits => {
+                        let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
+                        apply_final_logit_softcapping_in_place(
+                            logits.values.as_mut_slice(),
+                            self.family_metadata.final_logit_softcapping,
+                        );
+                        bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
+                        kernel_count = kernel_count.saturating_add(logits.kernel_count);
+                        (
+                            logits.values,
+                            None,
+                            None,
+                            Some(MetalLogitsSelectionMetrics {
+                                output_mode: MetalLogitsOutputMode::RawLogits,
+                                readback_bytes: self
+                                    .output
+                                    .rows
+                                    .saturating_mul(std::mem::size_of::<f32>())
+                                    as u64,
+                                raw_logits_materialized: true,
+                            }),
+                            Some(final_hidden),
+                        )
+                    }
+                    MetalLogitsOutputMode::TopKCandidates(_) => {
+                        let mut selection = self.output.select_logits_output(
+                            backend,
+                            final_hidden.as_slice(),
+                            logits_output_mode,
+                        )?;
+                        if let Some(top_k_candidates) = selection.candidates.as_mut() {
+                            apply_final_logit_softcapping_in_place(
+                                top_k_candidates.values.as_mut_slice(),
+                                self.family_metadata.final_logit_softcapping,
+                            );
+                        }
+                        bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                        kernel_count = kernel_count.saturating_add(1);
+                        let token =
+                            selection.selected_tokens.first().copied().ok_or_else(|| {
+                                ReferenceTextGenerationError::MissingOutput(
+                                    "metal gemma4 top-k token",
+                                )
+                            })?;
+                        (
+                            Vec::new(),
+                            selection.candidates,
+                            Some(TokenId(token)),
+                            Some(selection.metrics),
+                            Some(final_hidden),
+                        )
+                    }
                 }
-                MetalLogitsOutputMode::RawLogits => {
-                    let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
-                    apply_final_logit_softcapping_in_place(
-                        logits.values.as_mut_slice(),
-                        self.family_metadata.final_logit_softcapping,
-                    );
-                    bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
-                    kernel_count = kernel_count.saturating_add(logits.kernel_count);
-                    (logits.values, None, Some(final_hidden))
-                }
-                MetalLogitsOutputMode::TopKCandidates(_) => {
-                    return Err(ReferenceTextGenerationError::Runtime(
-                        crate::RuntimeError::Backend(String::from(
-                            "metal gemma4 top-k logits output mode is not yet wired into the custom generation loop",
-                        )),
-                    ));
-                }
-            }
-        } else {
-            (Vec::new(), None, None)
-        };
+            } else {
+                (Vec::new(), None, None, None, None)
+            };
 
         Ok(MetalGemma4StageStep {
             key: cache_key,
             value: cache_value,
             logits,
+            candidates,
             selected_token,
+            logits_selection_metrics,
             hidden,
             lm_head_hidden,
             kernel_count,
@@ -7215,53 +7475,100 @@ impl MetalGemma4ModelInner {
             }
         }
 
-        let (logits, selected_token, lm_head_hidden) = if produce_logits {
-            let final_hidden = rms_norm(
-                hidden.as_slice(),
-                self.output_norm.as_slice(),
-                self.family_metadata.rms_norm_epsilon,
-            );
-            match logits_output_mode {
-                MetalLogitsOutputMode::GreedyToken => {
-                    let selection = self.output.select_logits_output(
-                        backend,
-                        final_hidden.as_slice(),
-                        logits_output_mode,
-                    )?;
-                    bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
-                    kernel_count = kernel_count.saturating_add(1);
-                    let token = selection.selected_tokens.first().copied().ok_or_else(|| {
-                        ReferenceTextGenerationError::MissingOutput("metal gemma4 greedy token")
-                    })?;
-                    (Vec::new(), Some(TokenId(token)), Some(final_hidden))
+        let (logits, candidates, selected_token, logits_selection_metrics, lm_head_hidden) =
+            if produce_logits {
+                let final_hidden = rms_norm(
+                    hidden.as_slice(),
+                    self.output_norm.as_slice(),
+                    self.family_metadata.rms_norm_epsilon,
+                );
+                match logits_output_mode {
+                    MetalLogitsOutputMode::GreedyToken => {
+                        let selection = self.output.select_logits_output(
+                            backend,
+                            final_hidden.as_slice(),
+                            logits_output_mode,
+                        )?;
+                        bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                        kernel_count = kernel_count.saturating_add(1);
+                        let token =
+                            selection.selected_tokens.first().copied().ok_or_else(|| {
+                                ReferenceTextGenerationError::MissingOutput(
+                                    "metal gemma4 greedy token",
+                                )
+                            })?;
+                        (
+                            Vec::new(),
+                            None,
+                            Some(TokenId(token)),
+                            Some(selection.metrics),
+                            Some(final_hidden),
+                        )
+                    }
+                    MetalLogitsOutputMode::RawLogits => {
+                        let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
+                        apply_final_logit_softcapping_in_place(
+                            logits.values.as_mut_slice(),
+                            self.family_metadata.final_logit_softcapping,
+                        );
+                        bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
+                        kernel_count = kernel_count.saturating_add(logits.kernel_count);
+                        (
+                            logits.values,
+                            None,
+                            None,
+                            Some(MetalLogitsSelectionMetrics {
+                                output_mode: MetalLogitsOutputMode::RawLogits,
+                                readback_bytes: self
+                                    .output
+                                    .rows
+                                    .saturating_mul(std::mem::size_of::<f32>())
+                                    as u64,
+                                raw_logits_materialized: true,
+                            }),
+                            Some(final_hidden),
+                        )
+                    }
+                    MetalLogitsOutputMode::TopKCandidates(_) => {
+                        let mut selection = self.output.select_logits_output(
+                            backend,
+                            final_hidden.as_slice(),
+                            logits_output_mode,
+                        )?;
+                        if let Some(top_k_candidates) = selection.candidates.as_mut() {
+                            apply_final_logit_softcapping_in_place(
+                                top_k_candidates.values.as_mut_slice(),
+                                self.family_metadata.final_logit_softcapping,
+                            );
+                        }
+                        bytes_moved = bytes_moved.saturating_add(self.output.byte_length() as u64);
+                        kernel_count = kernel_count.saturating_add(1);
+                        let token =
+                            selection.selected_tokens.first().copied().ok_or_else(|| {
+                                ReferenceTextGenerationError::MissingOutput(
+                                    "metal gemma4 top-k token",
+                                )
+                            })?;
+                        (
+                            Vec::new(),
+                            selection.candidates,
+                            Some(TokenId(token)),
+                            Some(selection.metrics),
+                            Some(final_hidden),
+                        )
+                    }
                 }
-                MetalLogitsOutputMode::RawLogits => {
-                    let mut logits = self.output.matvec(backend, final_hidden.as_slice())?;
-                    apply_final_logit_softcapping_in_place(
-                        logits.values.as_mut_slice(),
-                        self.family_metadata.final_logit_softcapping,
-                    );
-                    bytes_moved = bytes_moved.saturating_add(logits.bytes_moved);
-                    kernel_count = kernel_count.saturating_add(logits.kernel_count);
-                    (logits.values, None, Some(final_hidden))
-                }
-                MetalLogitsOutputMode::TopKCandidates(_) => {
-                    return Err(ReferenceTextGenerationError::Runtime(
-                        crate::RuntimeError::Backend(String::from(
-                            "metal gemma4 top-k logits output mode is not yet wired into the generic generation loop",
-                        )),
-                    ));
-                }
-            }
-        } else {
-            (Vec::new(), None, None)
-        };
+            } else {
+                (Vec::new(), None, None, None, None)
+            };
 
         Ok(MetalGemma4StageStep {
             key: cache_key,
             value: cache_value,
             logits,
+            candidates,
             selected_token,
+            logits_selection_metrics,
             hidden,
             lm_head_hidden,
             kernel_count,
@@ -9383,7 +9690,9 @@ struct MetalGemma4StageStep {
     key: Vec<f32>,
     value: Vec<f32>,
     logits: Vec<f32>,
+    candidates: Option<MetalTopKResult>,
     selected_token: Option<TokenId>,
+    logits_selection_metrics: Option<MetalLogitsSelectionMetrics>,
     hidden: Vec<f32>,
     lm_head_hidden: Option<Vec<f32>>,
     kernel_count: usize,
@@ -10737,6 +11046,7 @@ fn run_distributed_gemma4_generation_request(
             )),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -11228,6 +11538,7 @@ fn run_cuda_gemma4_generation_request(
             kv_cache_encoding: None,
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -14488,6 +14799,7 @@ fn build_qwen35_proxy_generation_response(
         kv_cache_encoding: None,
         prefix_tokens_reused: None,
         termination_detail: None,
+        gemma4_metal_decode: None,
         gpt_oss_perf: None,
         qwen35_cuda_decode: None,
     };
@@ -16720,8 +17032,8 @@ impl GenerationEventStream for CompletedGenerationStream {
 mod tests {
     use super::{
         CpuGgufServiceKind, CpuGgufTextGenerationService, DistributedGemma4RemoteStepRequest,
-        DistributedGemma4RemoteStepResponse, PromotedGemmaRevisionEntry,
-        PromotedGemmaRevisionState, attend_impl, axpy,
+        DistributedGemma4RemoteStepResponse, MetalGemma4TextGenerationService,
+        PromotedGemmaRevisionEntry, PromotedGemmaRevisionState, attend_impl, axpy,
         decode_distributed_gemma4_remote_step_request,
         decode_distributed_gemma4_remote_step_response, dot,
         encode_distributed_gemma4_remote_step_request,
@@ -16738,13 +17050,14 @@ mod tests {
         AdapterArtifactFormat, AdapterArtifactIdentity, AdapterArtifactKind, AdapterResidencyMode,
         AdapterTargetFamily,
     };
+    use psionic_backend_metal::MetalBackend;
     use psionic_core::{DType, Device, QuantizationMode, Shape, TensorSpec};
     use psionic_data::{TokenizerDigest, TokenizerFamily};
     use psionic_models::{
         DecoderModelDescriptor, GgufDecoderAdapterLoader, GgufDecoderFamily, GgufMetadataValue,
         GgufTensorType, TokenId, TokenSequence,
     };
-    use psionic_runtime::LocalServingIsolationPolicy;
+    use psionic_runtime::{DeviceDiscovery, LocalServingIsolationPolicy};
     use psionic_train::{
         FixedBudgetTrainingRun, GEMMA_E4B_CUDA_ADAPTER_CHECKPOINT_SCHEMA_VERSION,
         GEMMA_E4B_CUDA_ADAPTER_TARGET_SET_ID, GEMMA_E4B_FINETUNING_MVP_TRAINING_FAMILY_ID,
@@ -17106,6 +17419,109 @@ mod tests {
             4,
             "hello",
         )
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_gemma4_service_reports_greedy_decode_readback_metrics_without_host_kv_materialization()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let metal_backend = MetalBackend::new();
+        let Some(_selected) = metal_backend.selected_device().cloned() else {
+            assert_ne!(
+                metal_backend.health().status,
+                psionic_runtime::HealthStatus::Ready
+            );
+            return Ok(());
+        };
+
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_gemma4_metal_metrics.gguf");
+        write_test_gguf(
+            &path,
+            quantized_gemma4_metal_metadata("tiny psionic gemma4 metal metrics").as_slice(),
+            quantized_gemma4_metal_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let mut service = MetalGemma4TextGenerationService::from_gguf_path(&path)?;
+        let descriptor = service.model_descriptor().clone();
+        let response = service.generate(&GenerationRequest::new_text(
+            String::from("gguf-gemma4-metal-metrics-greedy"),
+            descriptor,
+            None,
+            "hello",
+            GenerationOptions::greedy(1),
+        ))?;
+
+        let metrics = response
+            .metrics
+            .gemma4_metal_decode
+            .as_ref()
+            .expect("gemma4 metal decode metrics");
+        assert_eq!(response.output.text, "world");
+        assert_eq!(metrics.step_count, 1);
+        assert_eq!(
+            metrics.output_modes,
+            vec![crate::Gemma4MetalDecodeOutputMode::GreedyToken]
+        );
+        assert_eq!(metrics.readback_bytes, std::mem::size_of::<u32>() as u64);
+        assert!(!metrics.raw_logits_materialized);
+        assert_eq!(metrics.host_kv_materialization_events, 0);
+        assert_eq!(metrics.host_kv_materialization_tokens, 0);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_gemma4_service_reports_bounded_top_k_decode_readback_metrics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let metal_backend = MetalBackend::new();
+        let Some(_selected) = metal_backend.selected_device().cloned() else {
+            assert_ne!(
+                metal_backend.health().status,
+                psionic_runtime::HealthStatus::Ready
+            );
+            return Ok(());
+        };
+
+        let temp = tempdir()?;
+        let path = temp.path().join("tiny_gemma4_metal_top_k_metrics.gguf");
+        write_test_gguf(
+            &path,
+            quantized_gemma4_metal_metadata("tiny psionic gemma4 metal top-k metrics").as_slice(),
+            quantized_gemma4_metal_decoder_tensors(false, 3, 4).as_slice(),
+        )?;
+
+        let mut service = MetalGemma4TextGenerationService::from_gguf_path(&path)?;
+        let descriptor = service.model_descriptor().clone();
+        let mut options = GenerationOptions::sample(1);
+        options.temperature = Some(0.8);
+        options.top_k = Some(2);
+        let response = service.generate(&GenerationRequest::new_text(
+            String::from("gguf-gemma4-metal-metrics-top-k"),
+            descriptor,
+            None,
+            "hello",
+            options,
+        ))?;
+
+        let metrics = response
+            .metrics
+            .gemma4_metal_decode
+            .as_ref()
+            .expect("gemma4 metal decode metrics");
+        assert_eq!(metrics.step_count, 1);
+        assert_eq!(
+            metrics.output_modes,
+            vec![crate::Gemma4MetalDecodeOutputMode::TopKCandidates { top_k: 2 }]
+        );
+        assert_eq!(
+            metrics.readback_bytes,
+            (2 * (std::mem::size_of::<u32>() + std::mem::size_of::<f32>())) as u64
+        );
+        assert!(!metrics.raw_logits_materialized);
+        assert_eq!(metrics.host_kv_materialization_events, 0);
+        assert_eq!(metrics.host_kv_materialization_tokens, 0);
+        Ok(())
     }
 
     #[test]
@@ -18040,6 +18456,57 @@ mod tests {
         metadata
     }
 
+    fn quantized_gemma4_metal_metadata(name: &str) -> Vec<(String, GgufMetadataValue)> {
+        let mut metadata = vec![
+            (
+                String::from("general.architecture"),
+                GgufMetadataValue::String(String::from("gemma4")),
+            ),
+            (
+                String::from("general.name"),
+                GgufMetadataValue::String(name.to_string()),
+            ),
+            (
+                String::from("gemma4.context_length"),
+                GgufMetadataValue::U32(32),
+            ),
+            (
+                String::from("gemma4.embedding_length"),
+                GgufMetadataValue::U32(32),
+            ),
+            (
+                String::from("gemma4.feed_forward_length"),
+                GgufMetadataValue::U32(32),
+            ),
+            (
+                String::from("gemma4.block_count"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("gemma4.attention.head_count"),
+                GgufMetadataValue::U32(4),
+            ),
+            (
+                String::from("gemma4.attention.head_count_kv"),
+                GgufMetadataValue::U32(1),
+            ),
+            (
+                String::from("gemma4.attention.layer_norm_rms_epsilon"),
+                GgufMetadataValue::F32(1e-5),
+            ),
+            (
+                String::from("gemma4.rope.freq_base"),
+                GgufMetadataValue::F32(10_000.0),
+            ),
+            (
+                String::from("tokenizer.ggml.pre"),
+                GgufMetadataValue::String(String::from("gemma4")),
+            ),
+        ];
+        metadata.extend(sentencepiece_tokenizer_metadata_entries());
+        metadata
+    }
+
     fn qwen35_chat_template() -> &'static str {
         include_str!("../../psionic-models/src/testdata/qwen35_chat_template.jinja")
             .trim_end_matches('\n')
@@ -18441,6 +18908,41 @@ mod tests {
         tensors
     }
 
+    fn quantized_gemma4_metal_decoder_tensors(
+        include_qkv_bias: bool,
+        hello_token_index: usize,
+        world_token_index: usize,
+    ) -> Vec<TestGgufTensor> {
+        let mut tensors = vec![
+            dense_tensor(
+                "token_embd.weight",
+                vec![6, 32],
+                token_embedding_values_with_width(hello_token_index, 32),
+            ),
+            dense_tensor("output_norm.weight", vec![32], vec![1.0; 32]),
+            quantized_q8_0_tensor_from_f32(
+                "output.weight",
+                vec![6, 32],
+                output_values_with_width(world_token_index, 32),
+            ),
+            dense_tensor("blk.0.attn_norm.weight", vec![32], vec![1.0; 32]),
+            quantized_q8_0_tensor("blk.0.attn_q.weight", vec![32, 32]),
+            quantized_q8_0_tensor("blk.0.attn_k.weight", vec![8, 32]),
+            quantized_q8_0_tensor("blk.0.attn_v.weight", vec![8, 32]),
+            quantized_q8_0_tensor("blk.0.attn_output.weight", vec![32, 32]),
+            quantized_q8_0_tensor("blk.0.ffn_gate.weight", vec![32, 32]),
+            quantized_q8_0_tensor("blk.0.ffn_down.weight", vec![32, 32]),
+            quantized_q8_0_tensor("blk.0.ffn_up.weight", vec![32, 32]),
+            dense_tensor("blk.0.ffn_norm.weight", vec![32], vec![1.0; 32]),
+        ];
+        if include_qkv_bias {
+            tensors.push(dense_tensor("blk.0.attn_q.bias", vec![32], vec![0.0; 32]));
+            tensors.push(dense_tensor("blk.0.attn_k.bias", vec![8], vec![0.0; 8]));
+            tensors.push(dense_tensor("blk.0.attn_v.bias", vec![8], vec![0.0; 8]));
+        }
+        tensors
+    }
+
     fn qwen35_decoder_tensors() -> Vec<TestGgufTensor> {
         vec![
             dense_tensor("token_embd.weight", vec![10, 32], {
@@ -18480,6 +18982,18 @@ mod tests {
         values
     }
 
+    fn token_embedding_values_with_width(hello_token_index: usize, width: usize) -> Vec<f32> {
+        let mut values = vec![0.0; 6 * width];
+        values[hello_token_index.saturating_mul(width)] = 2.0;
+        values
+    }
+
+    fn output_values_with_width(world_token_index: usize, width: usize) -> Vec<f32> {
+        let mut values = vec![0.0; 6 * width];
+        values[world_token_index.saturating_mul(width)] = 1.0;
+        values
+    }
+
     fn dense_tensor(name: &str, shape: Vec<usize>, values: Vec<f32>) -> TestGgufTensor {
         TestGgufTensor::new(
             name,
@@ -18492,6 +19006,105 @@ mod tests {
     fn dense_f32_tensor(name: &str, shape: Vec<usize>) -> TestGgufTensor {
         let element_count = shape.iter().product::<usize>();
         dense_tensor(name, shape, vec![0.0; element_count])
+    }
+
+    fn quantized_q8_0_tensor(name: &str, shape: Vec<usize>) -> TestGgufTensor {
+        let row_count = shape
+            .iter()
+            .take(shape.len().saturating_sub(1))
+            .product::<usize>();
+        TestGgufTensor::new(
+            name,
+            shape,
+            GgufTensorType::Q8_0,
+            repeated_q8_0_bytes(row_count),
+        )
+    }
+
+    fn quantized_q8_0_tensor_from_f32(
+        name: &str,
+        shape: Vec<usize>,
+        values: Vec<f32>,
+    ) -> TestGgufTensor {
+        let column_count = *shape.last().expect("quantized tensor must have width");
+        assert_eq!(values.len(), shape.iter().product::<usize>());
+        assert_eq!(column_count % 32, 0);
+        let mut bytes = Vec::new();
+        for row in values.chunks_exact(column_count) {
+            for block in row.chunks_exact(32) {
+                bytes.extend(encode_q8_0_block(block));
+            }
+        }
+        TestGgufTensor::new(name, shape, GgufTensorType::Q8_0, bytes)
+    }
+
+    fn repeated_q8_0_bytes(row_count: usize) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(row_count * 34);
+        for _ in 0..row_count {
+            bytes.extend([0x00, 0x3c]);
+            bytes.extend([0_u8; 32]);
+        }
+        bytes
+    }
+
+    fn encode_q8_0_block(values: &[f32]) -> Vec<u8> {
+        assert_eq!(values.len(), 32);
+        let scale = values.iter().copied().map(f32::abs).fold(0.0_f32, f32::max) / 127.0;
+        let scale = if scale == 0.0 { 1.0 } else { scale };
+        let mut bytes = Vec::with_capacity(34);
+        bytes.extend_from_slice(&f32_to_f16_bits(scale).to_le_bytes());
+        for value in values {
+            let quantized = (value / scale).round().clamp(-128.0, 127.0) as i8;
+            bytes.push(quantized.to_le_bytes()[0]);
+        }
+        bytes
+    }
+
+    fn f32_to_f16_bits(value: f32) -> u16 {
+        let bits = value.to_bits();
+        let sign = ((bits >> 31) as u16) << 15;
+        let exponent = ((bits >> 23) & 0xff) as i32;
+        let mantissa = bits & 0x7f_ffff;
+        if exponent == 0xff {
+            let nan_payload = if mantissa == 0 { 0 } else { 0x0200 };
+            return sign | 0x7c00 | nan_payload;
+        }
+        let half_exponent = exponent - 127 + 15;
+        if half_exponent >= 0x1f {
+            return sign | 0x7c00;
+        }
+        if half_exponent <= 0 {
+            if half_exponent < -10 {
+                return sign;
+            }
+            let mantissa_with_hidden = mantissa | 0x80_0000;
+            let shift = (14 - half_exponent) as u32;
+            let mut half_mantissa = (mantissa_with_hidden >> shift) as u16;
+            let round_bit = 1_u32 << (shift.saturating_sub(1));
+            let remainder_mask = round_bit.saturating_sub(1);
+            let round_remainder = mantissa_with_hidden & remainder_mask;
+            let round = (mantissa_with_hidden & round_bit) != 0
+                && (round_remainder != 0 || (half_mantissa & 1) != 0);
+            if round {
+                half_mantissa = half_mantissa.wrapping_add(1);
+            }
+            return sign | half_mantissa;
+        }
+        let mut half_mantissa = (mantissa >> 13) as u16;
+        let round = (mantissa & 0x1fff) > 0x1000
+            || ((mantissa & 0x1fff) == 0x1000 && (half_mantissa & 1) != 0);
+        let mut half_exponent_u16 = half_exponent as u16;
+        if round {
+            half_mantissa = half_mantissa.wrapping_add(1);
+            if half_mantissa == 0x0400 {
+                half_mantissa = 0;
+                half_exponent_u16 = half_exponent_u16.wrapping_add(1);
+                if half_exponent_u16 >= 0x1f {
+                    return sign | 0x7c00;
+                }
+            }
+        }
+        sign | (half_exponent_u16 << 10) | half_mantissa
     }
 
     struct ScopedEnvVar {
@@ -18658,6 +19271,7 @@ mod tests {
     fn gguf_tensor_type_code(tensor_type: GgufTensorType) -> u32 {
         match tensor_type {
             GgufTensorType::F32 => 0,
+            GgufTensorType::Q8_0 => 8,
             other => panic!("unsupported synthetic gguf tensor type: {other:?}"),
         }
     }

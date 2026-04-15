@@ -75,6 +75,7 @@ const METAL_TEXT_GENERATION_KERNEL_CACHE_MAX_CACHED_BYTES: u64 = 64 * 1024 * 102
 const METAL_TEXT_GENERATION_MIN_AVAILABLE_BYTES: u64 = 128 * 1024 * 1024;
 const GGML_Q8_1_BLOCK_ELEMENTS: usize = 32;
 const GGML_Q8_1_BLOCK_BYTES: usize = 36;
+pub const METAL_SINGLE_ROW_TOP_K_MAX: usize = 32;
 
 fn metal_decode_env_simdgroups() -> Option<usize> {
     static OVERRIDE: OnceLock<Option<usize>> = OnceLock::new();
@@ -111,6 +112,7 @@ pub const TEXT_GENERATION_SUPPORTED_OPS: &[&str] = &[
     "backend_extension:scaled_dot_product_attention",
     "argmax_f32",
     "top_k_f32",
+    "top_k_single_row_f32",
     "mul_mv_id_q5_0",
     "mul_mv_id_q4_k",
     "mul_mv_id_q8_0",
@@ -1738,7 +1740,16 @@ impl MetalBackend {
                 })
             }
             MetalLogitsOutputMode::TopKCandidates(top_k) => {
-                let candidates = self.top_k_f32(input, row_count, column_count, top_k)?;
+                let candidates = if row_count == 1 && top_k <= METAL_SINGLE_ROW_TOP_K_MAX {
+                    let Some(backend) = self.selected_backend_mut() else {
+                        return Err(RuntimeError::Backend(String::from(
+                            "metal backend unavailable: no selected execution device",
+                        )));
+                    };
+                    backend.run_top_k_single_row_f32(input, column_count, top_k)?
+                } else {
+                    self.top_k_f32(input, row_count, column_count, top_k)?
+                };
                 let selected_tokens = candidates
                     .indices
                     .chunks_exact(candidates.top_k.max(1))
@@ -2284,6 +2295,40 @@ impl MetalBackend {
             m,
             k,
             n,
+        )?;
+        submission.encoded_operations += 1;
+        Ok(())
+    }
+
+    /// Encodes one single-row top-k selection that preserves raw logits.
+    pub fn encode_top_k_single_row_submission(
+        &mut self,
+        submission: &mut MetalSubmission,
+        input: &MetalBuffer,
+        column_count: usize,
+        top_k: usize,
+        selected_ids: &MetalBuffer,
+        selected_values: &MetalBuffer,
+    ) -> Result<(), RuntimeError> {
+        validate_top_k_single_row_request(
+            input,
+            column_count,
+            top_k,
+            selected_ids,
+            selected_values,
+        )?;
+        let Some(backend) = self.selected_backend_mut() else {
+            return Err(RuntimeError::Backend(String::from(
+                "metal backend unavailable: no selected execution device",
+            )));
+        };
+        backend.platform.encode_top_k_single_row_f32(
+            &mut submission.platform,
+            input,
+            selected_ids,
+            selected_values,
+            column_count,
+            top_k,
         )?;
         submission.encoded_operations += 1;
         Ok(())
@@ -4770,6 +4815,23 @@ impl AvailableMetalBackend {
                     DType::F32,
                     device.clone(),
                 ))?;
+                let use_device_top_k = top_k <= METAL_SINGLE_ROW_TOP_K_MAX;
+                let selected_ids = use_device_top_k.then(|| {
+                    self.allocate_for_overwrite(&TensorSpec::new(
+                        Shape::new(vec![top_k]),
+                        DType::I32,
+                        device.clone(),
+                    ))
+                });
+                let selected_values = use_device_top_k.then(|| {
+                    self.allocate_for_overwrite(&TensorSpec::new(
+                        Shape::new(vec![top_k]),
+                        DType::F32,
+                        device.clone(),
+                    ))
+                });
+                let selected_ids = selected_ids.transpose()?;
+                let selected_values = selected_values.transpose()?;
                 let mut submission = MetalSubmission {
                     encoded_operations: 0,
                     synchronized_buffers: 0,
@@ -4788,14 +4850,44 @@ impl AvailableMetalBackend {
                     &output,
                 )?;
                 submission.encoded_operations += 1;
-                if self
+                if let (Some(selected_ids), Some(selected_values)) =
+                    (selected_ids.as_ref(), selected_values.as_ref())
+                {
+                    self.platform.encode_top_k_single_row_f32(
+                        &mut submission.platform,
+                        &output,
+                        selected_ids,
+                        selected_values,
+                        rows,
+                        top_k,
+                    )?;
+                    submission.encoded_operations += 1;
+                    if self
+                        .platform
+                        .synchronize_output(&mut submission.platform, selected_ids)?
+                    {
+                        submission.synchronized_buffers += 1;
+                    }
+                    if self
+                        .platform
+                        .synchronize_output(&mut submission.platform, selected_values)?
+                    {
+                        submission.synchronized_buffers += 1;
+                    }
+                } else if self
                     .platform
                     .synchronize_output(&mut submission.platform, &output)?
                 {
                     submission.synchronized_buffers += 1;
                 }
                 submission.commit(MetalCommandWait::Completed)?;
-                let candidates = top_k_dense_rows(&output, 1, rows, top_k, "metal top_k")?;
+                let candidates = if let (Some(selected_ids), Some(selected_values)) =
+                    (selected_ids.as_ref(), selected_values.as_ref())
+                {
+                    read_top_k_result(selected_ids, selected_values, top_k, "metal top_k")?
+                } else {
+                    top_k_dense_rows(&output, 1, rows, top_k, "metal top_k")?
+                };
                 let selected_tokens = candidates
                     .indices
                     .chunks_exact(candidates.top_k.max(1))
@@ -4817,6 +4909,12 @@ impl AvailableMetalBackend {
                     self.pool.recycle(buffer);
                 }
                 self.pool.recycle(output);
+                if let Some(buffer) = selected_ids {
+                    self.pool.recycle(buffer);
+                }
+                if let Some(buffer) = selected_values {
+                    self.pool.recycle(buffer);
+                }
                 Ok(MetalLogitsSelectionResult {
                     selected_tokens,
                     candidates: Some(candidates),
@@ -4921,6 +5019,64 @@ impl AvailableMetalBackend {
         let indices = read_argmax_indices_from_f32_buffer(&output, row_count, "metal argmax")?;
         self.pool.recycle(output);
         Ok(indices)
+    }
+
+    fn run_top_k_single_row_f32(
+        &mut self,
+        input: &MetalBuffer,
+        column_count: usize,
+        top_k: usize,
+    ) -> Result<MetalTopKResult, RuntimeError> {
+        let selected_ids = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![top_k]),
+            DType::I32,
+            self.descriptor.device.clone(),
+        ))?;
+        let selected_values = self.allocate_for_overwrite(&TensorSpec::new(
+            Shape::new(vec![top_k]),
+            DType::F32,
+            self.descriptor.device.clone(),
+        ))?;
+        validate_top_k_single_row_request(
+            input,
+            column_count,
+            top_k,
+            &selected_ids,
+            &selected_values,
+        )?;
+        let mut submission = MetalSubmission {
+            encoded_operations: 0,
+            synchronized_buffers: 0,
+            platform: self
+                .platform
+                .begin_submission(String::from("psionic.top_k_single_row"))?,
+        };
+        self.platform.encode_top_k_single_row_f32(
+            &mut submission.platform,
+            input,
+            &selected_ids,
+            &selected_values,
+            column_count,
+            top_k,
+        )?;
+        submission.encoded_operations += 1;
+        if self
+            .platform
+            .synchronize_output(&mut submission.platform, &selected_ids)?
+        {
+            submission.synchronized_buffers += 1;
+        }
+        if self
+            .platform
+            .synchronize_output(&mut submission.platform, &selected_values)?
+        {
+            submission.synchronized_buffers += 1;
+        }
+        submission.commit(MetalCommandWait::Completed)?;
+        let result = read_top_k_result(&selected_ids, &selected_values, top_k, "metal top_k")?;
+        self.pool.recycle(selected_ids);
+        self.pool.recycle(selected_values);
+        Ok(result)
     }
 
     fn run_grouped_quantized_matvec(
@@ -5895,6 +6051,68 @@ pub fn read_argmax_candidate_index(input: &MetalBuffer, label: &str) -> Result<u
     })?);
     let _ = first;
     Ok(second)
+}
+
+/// Reads one single-row top-k result from Metal `i32[top_k]` / `f32[top_k]` buffers.
+pub fn read_top_k_result(
+    selected_ids: &MetalBuffer,
+    selected_values: &MetalBuffer,
+    top_k: usize,
+    label: &str,
+) -> Result<MetalTopKResult, RuntimeError> {
+    if selected_ids.spec().dtype() != DType::I32 || selected_ids.spec().storage_size() < top_k {
+        return Err(RuntimeError::Backend(format!(
+            "{label} requires an i32[{top_k}] id buffer, actual {:?} with {} elements",
+            selected_ids.spec().dtype(),
+            selected_ids.spec().storage_size()
+        )));
+    }
+    if selected_values.spec().dtype() != DType::F32 || selected_values.spec().storage_size() < top_k
+    {
+        return Err(RuntimeError::Backend(format!(
+            "{label} requires an f32[{top_k}] value buffer, actual {:?} with {} elements",
+            selected_values.spec().dtype(),
+            selected_values.spec().storage_size()
+        )));
+    }
+    let index_bytes = selected_ids.read_bytes()?;
+    let values = selected_values.read_f32()?;
+    let available_indices = index_bytes.len() / std::mem::size_of::<i32>();
+    if available_indices < top_k || values.len() < top_k {
+        return Err(RuntimeError::Backend(format!(
+            "{label} top-k buffer size mismatch: need {top_k}, actual ids={} values={}",
+            available_indices,
+            values.len()
+        )));
+    }
+    let mut parsed_indices = Vec::with_capacity(top_k);
+    let mut parsed_values = Vec::with_capacity(top_k);
+    for slot in 0..top_k {
+        let byte_offset = slot.saturating_mul(std::mem::size_of::<i32>());
+        let index = i32::from_ne_bytes(
+            index_bytes[byte_offset..byte_offset + std::mem::size_of::<i32>()]
+                .try_into()
+                .map_err(|_| {
+                    RuntimeError::Backend(format!(
+                        "{label} top-k id buffer was truncated at slot {slot}",
+                    ))
+                })?,
+        );
+        let value = values[slot];
+        if index < 0 {
+            return Err(RuntimeError::Backend(format!(
+                "{label} produced invalid top-k index {index}",
+            )));
+        }
+        parsed_indices.push(index as u32);
+        parsed_values.push(value);
+    }
+    Ok(MetalTopKResult {
+        row_count: 1,
+        top_k,
+        indices: parsed_indices,
+        values: parsed_values,
+    })
 }
 
 fn top_k_dense_rows(
@@ -6907,37 +7125,71 @@ fn validate_top_k_softmax_single_row_request(
     selected_ids: &MetalBuffer,
     selected_weights: &MetalBuffer,
 ) -> Result<(), RuntimeError> {
+    validate_top_k_single_row_request_impl(
+        input,
+        column_count,
+        top_k,
+        selected_ids,
+        selected_weights,
+        "metal top-k softmax",
+    )
+}
+
+fn validate_top_k_single_row_request(
+    input: &MetalBuffer,
+    column_count: usize,
+    top_k: usize,
+    selected_ids: &MetalBuffer,
+    selected_values: &MetalBuffer,
+) -> Result<(), RuntimeError> {
+    validate_top_k_single_row_request_impl(
+        input,
+        column_count,
+        top_k,
+        selected_ids,
+        selected_values,
+        "metal top-k",
+    )
+}
+
+fn validate_top_k_single_row_request_impl(
+    input: &MetalBuffer,
+    column_count: usize,
+    top_k: usize,
+    selected_ids: &MetalBuffer,
+    selected_values: &MetalBuffer,
+    label: &str,
+) -> Result<(), RuntimeError> {
     if input.storage_kind() != BufferStorageKind::DenseF32 || input.spec().dtype() != DType::F32 {
         return Err(RuntimeError::Backend(format!(
-            "metal top-k softmax input requires dense f32 storage, actual {:?}",
+            "{label} input requires dense f32 storage, actual {:?}",
             input.storage_kind()
         )));
     }
     if input.spec().storage_size() < column_count {
         return Err(RuntimeError::Backend(format!(
-            "metal top-k softmax input width mismatch: required at least {column_count}, actual {}",
+            "{label} input width mismatch: required at least {column_count}, actual {}",
             input.spec().storage_size()
         )));
     }
-    if top_k == 0 || top_k > 32 {
+    if top_k == 0 || top_k > METAL_SINGLE_ROW_TOP_K_MAX {
         return Err(RuntimeError::Backend(format!(
-            "metal top-k softmax supports 1..=32 selections, actual {top_k}",
+            "{label} supports 1..={METAL_SINGLE_ROW_TOP_K_MAX} selections, actual {top_k}",
         )));
     }
     if selected_ids.spec().dtype() != DType::I32 || selected_ids.spec().storage_size() < top_k {
         return Err(RuntimeError::Backend(format!(
-            "metal top-k softmax selected-id buffer is too small: need {top_k} i32 values, actual {:?} with {} elements",
+            "{label} selected-id buffer is too small: need {top_k} i32 values, actual {:?} with {} elements",
             selected_ids.spec().dtype(),
             selected_ids.spec().storage_size()
         )));
     }
-    if selected_weights.spec().dtype() != DType::F32
-        || selected_weights.spec().storage_size() < top_k
+    if selected_values.spec().dtype() != DType::F32 || selected_values.spec().storage_size() < top_k
     {
         return Err(RuntimeError::Backend(format!(
-            "metal top-k softmax selected-weight buffer is too small: need {top_k} f32 values, actual {:?} with {} elements",
-            selected_weights.spec().dtype(),
-            selected_weights.spec().storage_size()
+            "{label} selected-value buffer is too small: need {top_k} f32 values, actual {:?} with {} elements",
+            selected_values.spec().dtype(),
+            selected_values.spec().storage_size()
         )));
     }
     Ok(())
@@ -7522,6 +7774,7 @@ mod platform {
         expert_matvec_f32_ids_q4_k: ComputePipelineState,
         expert_matvec_f32_ids_q8_0: ComputePipelineState,
         expert_matvec_f32_ids_mxfp4: ComputePipelineState,
+        top_k_single_row_f32: ComputePipelineState,
         top_k_softmax_single_row_f32: ComputePipelineState,
         add_selected_expert_bias_f32: ComputePipelineState,
         aggregate_selected_expert_rows_f32: ComputePipelineState,
@@ -7928,6 +8181,45 @@ mod platform {
                 MTLSize::new(u64::from(element_count), 1, 1),
                 threadgroup_size,
             );
+            Ok(())
+        }
+
+        pub(super) fn encode_top_k_single_row_f32(
+            &mut self,
+            pipeline: &ComputePipelineState,
+            input: &PlatformBuffer,
+            input_byte_offset: usize,
+            selected_ids: &PlatformBuffer,
+            selected_ids_byte_offset: usize,
+            selected_values: &PlatformBuffer,
+            selected_values_byte_offset: usize,
+            column_count: usize,
+            top_k: usize,
+        ) -> Result<(), RuntimeError> {
+            let encoder = self.compute_encoder();
+            encoder.set_compute_pipeline_state(pipeline);
+            encoder.set_buffer(0, Some(&input.raw), to_metal_size(input_byte_offset)?);
+            encoder.set_buffer(
+                1,
+                Some(&selected_ids.raw),
+                to_metal_size(selected_ids_byte_offset)?,
+            );
+            encoder.set_buffer(
+                2,
+                Some(&selected_values.raw),
+                to_metal_size(selected_values_byte_offset)?,
+            );
+
+            let column_count = u32::try_from(column_count).map_err(|_| {
+                RuntimeError::Backend(String::from("metal top-k column count overflow"))
+            })?;
+            let top_k = u32::try_from(top_k)
+                .map_err(|_| RuntimeError::Backend(String::from("metal top-k overflow")))?;
+            encoder.set_bytes(3, 4, (&column_count as *const u32).cast());
+            encoder.set_bytes(4, 4, (&top_k as *const u32).cast());
+
+            let threadgroup_size = compute_threadgroup_size(pipeline, 1)?;
+            encoder.dispatch_thread_groups(MTLSize::new(1, 1, 1), threadgroup_size);
             Ok(())
         }
 
@@ -9276,6 +9568,29 @@ mod platform {
             )
         }
 
+        pub(super) fn encode_top_k_single_row_f32(
+            &mut self,
+            submission: &mut PlatformSubmission,
+            input: &MetalBuffer,
+            selected_ids: &MetalBuffer,
+            selected_values: &MetalBuffer,
+            column_count: usize,
+            top_k: usize,
+        ) -> Result<(), RuntimeError> {
+            let pipeline = &self.pipelines()?.top_k_single_row_f32;
+            submission.encode_top_k_single_row_f32(
+                pipeline,
+                &input.platform,
+                input.byte_offset,
+                &selected_ids.platform,
+                selected_ids.byte_offset,
+                &selected_values.platform,
+                selected_values.byte_offset,
+                column_count,
+                top_k,
+            )
+        }
+
         pub(super) fn encode_top_k_softmax_single_row_f32(
             &mut self,
             submission: &mut PlatformSubmission,
@@ -9960,6 +10275,11 @@ mod platform {
             .map_err(|error| {
                 RuntimeError::Backend(format!("missing Metal argmax candidates kernel: {error}"))
             })?;
+        let top_k_single_row_f32 = library
+            .get_function("psionic_top_k_single_row_f32", None)
+            .map_err(|error| {
+                RuntimeError::Backend(format!("missing Metal top-k kernel: {error}"))
+            })?;
         let top_k_softmax_single_row_f32 = library
             .get_function("psionic_top_k_softmax_single_row_f32", None)
             .map_err(|error| {
@@ -10209,6 +10529,11 @@ mod platform {
                     RuntimeError::Backend(format!(
                         "metal argmax candidates pipeline build failed: {error}"
                     ))
+                })?,
+            top_k_single_row_f32: device
+                .new_compute_pipeline_state_with_function(&top_k_single_row_f32)
+                .map_err(|error| {
+                    RuntimeError::Backend(format!("metal top-k pipeline build failed: {error}"))
                 })?,
             top_k_softmax_single_row_f32: device
                 .new_compute_pipeline_state_with_function(&top_k_softmax_single_row_f32)
@@ -10621,6 +10946,56 @@ kernel void psionic_gelu_glu_f32(
     float inner = 0.7978845608f * (gate_value + 0.044715f * cubic);
     float activated = 0.5f * gate_value * (1.0f + tanh(inner));
     output[gid] = activated * up[gid];
+}
+
+kernel void psionic_top_k_single_row_f32(
+    const device float* input [[buffer(0)]],
+    device int* selected_ids [[buffer(1)]],
+    device float* selected_values [[buffer(2)]],
+    constant uint& column_count [[buffer(3)]],
+    constant uint& top_k [[buffer(4)]],
+    uint tid [[thread_index_in_threadgroup]]
+) {
+    if (tid != 0) {
+        return;
+    }
+    uint effective_k = min(min(top_k, column_count), PSIONIC_TOP_K_MAX);
+    float best_values[PSIONIC_TOP_K_MAX];
+    int best_indices[PSIONIC_TOP_K_MAX];
+    for (uint index = 0; index < effective_k; ++index) {
+        best_values[index] = -INFINITY;
+        best_indices[index] = -1;
+    }
+    for (uint column = 0; column < column_count; ++column) {
+        float value = input[column];
+        uint insert_at = effective_k;
+        for (uint slot = 0; slot < effective_k; ++slot) {
+            bool better = value > best_values[slot]
+                || (value == best_values[slot]
+                    && (best_indices[slot] < 0 || int(column) < best_indices[slot]));
+            if (better) {
+                insert_at = slot;
+                break;
+            }
+        }
+        if (insert_at == effective_k) {
+            continue;
+        }
+        for (uint slot = effective_k; slot > insert_at + 1; --slot) {
+            best_values[slot - 1] = best_values[slot - 2];
+            best_indices[slot - 1] = best_indices[slot - 2];
+        }
+        best_values[insert_at] = value;
+        best_indices[insert_at] = int(column);
+    }
+    for (uint slot = 0; slot < effective_k; ++slot) {
+        selected_ids[slot] = best_indices[slot];
+        selected_values[slot] = best_values[slot];
+    }
+    for (uint slot = effective_k; slot < top_k; ++slot) {
+        selected_ids[slot] = -1;
+        selected_values[slot] = -INFINITY;
+    }
 }
 
 kernel void psionic_top_k_softmax_single_row_f32(
@@ -13620,6 +13995,7 @@ mod tests {
                 "backend_extension:scaled_dot_product_attention",
                 "argmax_f32",
                 "top_k_f32",
+                "top_k_single_row_f32",
                 "mul_mv_id_q5_0",
                 "mul_mv_id_q4_k",
                 "mul_mv_id_q8_0",
@@ -14326,6 +14702,47 @@ mod tests {
             super::MetalLogitsOutputMode::TopKCandidates(2)
         );
         assert_eq!(selection.metrics.readback_bytes, 32);
+        assert_eq!(selection.metrics.raw_logits_materialized, false);
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn metal_backend_single_row_top_k_selection_returns_raw_logits_on_supported_hardware()
+    -> Result<(), RuntimeError> {
+        let mut backend = MetalBackend::new();
+        let Some(_selected) = backend.selected_device().cloned() else {
+            assert_ne!(backend.health().status, HealthStatus::Ready);
+            return Ok(());
+        };
+
+        let logits = backend.input_buffer(Shape::new(vec![1, 4]), vec![1.0, -2.0, 4.25, 3.0])?;
+        let selection = backend.select_logits_output_f32(
+            &logits,
+            1,
+            4,
+            super::MetalLogitsOutputMode::TopKCandidates(2),
+        )?;
+        assert_eq!(selection.selected_tokens, vec![2]);
+        assert_eq!(
+            selection
+                .candidates
+                .as_ref()
+                .map(|value| value.indices.clone()),
+            Some(vec![2, 3])
+        );
+        assert_eq!(
+            selection
+                .candidates
+                .as_ref()
+                .map(|value| value.values.clone()),
+            Some(vec![4.25, 3.0])
+        );
+        assert_eq!(
+            selection.metrics.output_mode,
+            super::MetalLogitsOutputMode::TopKCandidates(2)
+        );
+        assert_eq!(selection.metrics.readback_bytes, 16);
         assert_eq!(selection.metrics.raw_logits_materialized, false);
         Ok(())
     }

@@ -126,9 +126,12 @@ into one generic engine claim.
   - current Metal single-node closure = the native local Metal path now keeps
     all `30 / 30` FFN layers on device for the real
     `gemma-4-26B-A4B-it-Q4_K_M.gguf` artifact, including fused `Q4_K` sparse
-    gate/up experts and `Q5_0` dense plus sparse down projections; the
+    gate/up experts and `Q5_0` dense plus sparse down projections; the first
     retained `2026-04-14` benchmark receipt moved from about `5.14 tok/s` to
-    about `24.22 tok/s` on the same host and prompt
+    about `24.22 tok/s`, and the follow-on device-resident decode pass moved
+    the same retained prompt again to about `29.58 tok/s` while keeping greedy
+    readback bounded to `4 B/token` and timed-request host KV materialization
+    at `0`
   - current boundary = that pass fixes the local fallback cliff but does not
     yet close parity with `ollama` or `llama.cpp`, and the sparse 26B local
     lane still returns malformed text on the shared benchmark prompt

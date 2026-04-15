@@ -458,6 +458,7 @@ struct BenchReport {
     mean_total_s: f64,
     mean_ttft_s: Option<f64>,
     mean_decode_tok_s: Option<f64>,
+    mean_gemma4_metal_decode_readback_bytes_per_token: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -470,6 +471,11 @@ struct BenchRunReport {
     decode_s: Option<f64>,
     ttft_s: Option<f64>,
     decode_tok_s: Option<f64>,
+    gemma4_metal_decode_output_modes: Option<Vec<String>>,
+    gemma4_metal_decode_readback_bytes: Option<u64>,
+    gemma4_metal_decode_readback_bytes_per_token: Option<f64>,
+    gemma4_metal_host_kv_materialization_events: Option<usize>,
+    gemma4_metal_host_kv_materialization_tokens: Option<usize>,
     termination: String,
     output_text: String,
 }
@@ -811,6 +817,38 @@ async fn run_sparse_benchmark(config: &BenchConfig) -> Result<BenchReport, Strin
                 .as_ref()
                 .and_then(|metrics| metrics.eval_duration_ns)
                 .and_then(|decode_ns| tokens_per_second(output_tokens, decode_ns)),
+            gemma4_metal_decode_output_modes: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
+                .map(|metrics| {
+                    metrics
+                        .output_modes
+                        .iter()
+                        .map(gemma4_metal_decode_mode_label)
+                        .collect()
+                }),
+            gemma4_metal_decode_readback_bytes: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
+                .map(|metrics| metrics.readback_bytes),
+            gemma4_metal_decode_readback_bytes_per_token: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
+                .and_then(|metrics| {
+                    if metrics.step_count == 0 {
+                        None
+                    } else {
+                        Some(metrics.readback_bytes as f64 / metrics.step_count as f64)
+                    }
+                }),
+            gemma4_metal_host_kv_materialization_events: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
+                .map(|metrics| metrics.host_kv_materialization_events),
+            gemma4_metal_host_kv_materialization_tokens: metrics
+                .as_ref()
+                .and_then(|metrics| metrics.gemma4_metal_decode.as_ref())
+                .map(|metrics| metrics.host_kv_materialization_tokens),
             termination,
             output_text,
         });
@@ -847,6 +885,10 @@ fn finish_report(
     let mean_total_s = mean(runs.iter().map(|run| run.total_s));
     let mean_ttft_s = mean_option(runs.iter().map(|run| run.ttft_s));
     let mean_decode_tok_s = mean_option(runs.iter().map(|run| run.decode_tok_s));
+    let mean_gemma4_metal_decode_readback_bytes_per_token = mean_option(
+        runs.iter()
+            .map(|run| run.gemma4_metal_decode_readback_bytes_per_token),
+    );
     BenchReport {
         schema_version: 1,
         report_kind: String::from("psionic_gemma4_bench"),
@@ -868,6 +910,7 @@ fn finish_report(
         mean_total_s,
         mean_ttft_s,
         mean_decode_tok_s,
+        mean_gemma4_metal_decode_readback_bytes_per_token,
     }
 }
 
@@ -876,6 +919,7 @@ fn run_report_from_generation(
     response: &GenerationResponse,
     total_s: f64,
 ) -> BenchRunReport {
+    let gemma4_metal_decode = response.metrics.gemma4_metal_decode.as_ref();
     BenchRunReport {
         run_index: run_index + 1,
         output_tokens: response.usage.output_tokens,
@@ -894,8 +938,38 @@ fn run_report_from_generation(
             .metrics
             .eval_duration_ns
             .and_then(|decode_ns| tokens_per_second(response.usage.output_tokens, decode_ns)),
+        gemma4_metal_decode_output_modes: gemma4_metal_decode.map(|metrics| {
+            metrics
+                .output_modes
+                .iter()
+                .map(gemma4_metal_decode_mode_label)
+                .collect()
+        }),
+        gemma4_metal_decode_readback_bytes: gemma4_metal_decode
+            .map(|metrics| metrics.readback_bytes),
+        gemma4_metal_decode_readback_bytes_per_token: gemma4_metal_decode.and_then(|metrics| {
+            if metrics.step_count == 0 {
+                None
+            } else {
+                Some(metrics.readback_bytes as f64 / metrics.step_count as f64)
+            }
+        }),
+        gemma4_metal_host_kv_materialization_events: gemma4_metal_decode
+            .map(|metrics| metrics.host_kv_materialization_events),
+        gemma4_metal_host_kv_materialization_tokens: gemma4_metal_decode
+            .map(|metrics| metrics.host_kv_materialization_tokens),
         termination: termination_label(response.termination).to_string(),
         output_text: response.output.text.clone(),
+    }
+}
+
+fn gemma4_metal_decode_mode_label(mode: &psionic_serve::Gemma4MetalDecodeOutputMode) -> String {
+    match mode {
+        psionic_serve::Gemma4MetalDecodeOutputMode::GreedyToken => String::from("greedy_token"),
+        psionic_serve::Gemma4MetalDecodeOutputMode::TopKCandidates { top_k } => {
+            format!("top_k_candidates:{top_k}")
+        }
+        psionic_serve::Gemma4MetalDecodeOutputMode::RawLogits => String::from("raw_logits"),
     }
 }
 
@@ -971,9 +1045,13 @@ fn render_human_report(report: &BenchReport) -> String {
             .decode_tok_s
             .map(|value| format!("{value:.2} tok/s"))
             .unwrap_or_else(|| String::from("n/a"));
+        let readback = run
+            .gemma4_metal_decode_readback_bytes_per_token
+            .map(|value| format!("{value:.1} B/token"))
+            .unwrap_or_else(|| String::from("n/a"));
         lines.push(format!(
-            "run {}: total {:.3}s ttft {} tok/s {} output_tokens {} termination {}",
-            run.run_index, run.total_s, ttft, tok_s, run.output_tokens, run.termination
+            "run {}: total {:.3}s ttft {} tok/s {} readback {} output_tokens {} termination {}",
+            run.run_index, run.total_s, ttft, tok_s, readback, run.output_tokens, run.termination
         ));
     }
     lines.push(String::new());
@@ -983,6 +1061,9 @@ fn render_human_report(report: &BenchReport) -> String {
     }
     if let Some(mean_decode_tok_s) = report.mean_decode_tok_s {
         lines.push(format!("mean tok/s: {:.2}", mean_decode_tok_s));
+    }
+    if let Some(mean_readback) = report.mean_gemma4_metal_decode_readback_bytes_per_token {
+        lines.push(format!("mean readback: {:.1} B/token", mean_readback));
     }
     lines.join("\n")
 }

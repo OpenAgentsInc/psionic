@@ -1569,6 +1569,9 @@ pub struct GenerationMetrics {
     /// Explicit termination detail when the runtime can distinguish EOS from a stop-sequence hit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub termination_detail: Option<GenerationTerminationDetail>,
+    /// Metal decode-output evidence for the realized Gemma4 request.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gemma4_metal_decode: Option<Gemma4MetalDecodeOutputMetrics>,
     /// Native qwen35 CUDA decode-output evidence for the realized request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub qwen35_cuda_decode: Option<Qwen35CudaDecodeOutputMetrics>,
@@ -1917,6 +1920,49 @@ impl GptOssMetalDecodeLogitsMetrics {
             && self.output_modes.is_empty()
             && self.readback_bytes == 0
             && !self.raw_logits_materialized
+    }
+}
+
+/// Metal decode-output mode used by Gemma4 request steps.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Gemma4MetalDecodeOutputMode {
+    /// The decode step returned only the greedy token id.
+    GreedyToken,
+    /// The decode step returned a bounded top-k candidate set.
+    TopKCandidates { top_k: usize },
+    /// The decode step materialized the dense raw logits vector.
+    RawLogits,
+}
+
+/// Request-level decode-output evidence for native Gemma4 Metal requests.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Gemma4MetalDecodeOutputMetrics {
+    /// Number of output-producing steps that recorded decode-output evidence.
+    pub step_count: usize,
+    /// Unique output modes observed across those steps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub output_modes: Vec<Gemma4MetalDecodeOutputMode>,
+    /// Total bytes read back to the host for decode-output selection.
+    pub readback_bytes: u64,
+    /// Whether any step materialized dense raw logits on the host.
+    pub raw_logits_materialized: bool,
+    /// Number of explicit host KV materialization events outside the decode selection path.
+    #[serde(default, skip_serializing_if = "is_zero_usize")]
+    pub host_kv_materialization_events: usize,
+    /// Number of token rows materialized through those host KV events.
+    #[serde(default, skip_serializing_if = "is_zero_usize")]
+    pub host_kv_materialization_tokens: usize,
+}
+
+impl Gemma4MetalDecodeOutputMetrics {
+    pub(crate) fn is_zero(&self) -> bool {
+        self.step_count == 0
+            && self.output_modes.is_empty()
+            && self.readback_bytes == 0
+            && !self.raw_logits_materialized
+            && self.host_kv_materialization_events == 0
+            && self.host_kv_materialization_tokens == 0
     }
 }
 
@@ -2492,6 +2538,7 @@ impl GenerationMetrics {
             kv_cache_encoding: None,
             prefix_tokens_reused: None,
             termination_detail: None,
+            gemma4_metal_decode: None,
             gpt_oss_perf: None,
             qwen35_cuda_decode: None,
         }
@@ -2513,6 +2560,7 @@ impl GenerationMetrics {
             && self.kv_cache_encoding.is_none()
             && self.prefix_tokens_reused.is_none()
             && self.termination_detail.is_none()
+            && self.gemma4_metal_decode.is_none()
             && self.gpt_oss_perf.is_none()
     }
 }
@@ -6606,6 +6654,7 @@ impl<'a> PromotedParameterGolfGenerationStream<'a> {
             )),
             prefix_tokens_reused: Some(0),
             termination_detail: None,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -8270,6 +8319,7 @@ where
             )),
             prefix_tokens_reused: Some(self.prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: self.gpt_oss_perf.filter(|perf| !perf.is_zero()),
         };
@@ -9197,6 +9247,7 @@ where
             )),
             prefix_tokens_reused: Some(self.prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: None,
         };
@@ -9874,6 +9925,7 @@ where
             )),
             prefix_tokens_reused: Some(prefix_tokens_reused),
             termination_detail: None,
+            gemma4_metal_decode: None,
             qwen35_cuda_decode: None,
             gpt_oss_perf: gpt_oss_perf.filter(|perf| !perf.is_zero()),
         };
