@@ -630,6 +630,11 @@ contribution-family path expectations intact while removing the old SCP/manual
 replay staging requirement. Missing cache entries stay explicit
 `ArtifactIncomplete` or `CheckpointMissing` refusals with resolver-cache
 guidance instead of ambiguous local-path failures. Validator replay now also
+rebases stale absolute artifact paths that still point at the contributor's old
+home directory into the current validator run root before replay validation.
+For checkpoint-family receipts and manifests that are expected to be portable
+across nodes, it then consults the local retained checkpoint artifact paths
+instead of failing on the original dead path. Validator replay now also
 retains one deterministic
 `validator_quality_drift_signal.json` plus one paired
 `validator_rollback_signal.json` under each validator root. Those signal

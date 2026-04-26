@@ -3,21 +3,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR, PsionicTrainCheckpointSurface,
+    load_psionic_train_grouped_stage_execution_summary, load_psionic_train_grouped_stage_transport,
+    maybe_record_psionic_train_weak_device_validation_replay_proof,
+    persist_psionic_train_grouped_stage_replay_evidence,
+    psionic_train_resolved_artifact_cache_candidates, PsionicTrainCheckpointSurface,
     PsionicTrainContributionArtifact, PsionicTrainContributionArtifactManifest,
     PsionicTrainContributionReceipt, PsionicTrainGroupedReplicaEvidenceError,
     PsionicTrainGroupedReplicaStageExecutionSummary, PsionicTrainGroupedReplicaStageReplayEvidence,
     PsionicTrainInvocationManifest, PsionicTrainOutcomeKind, PsionicTrainWorkClass,
-    TrainingExecutionValidatorDisposition, load_psionic_train_grouped_stage_execution_summary,
-    load_psionic_train_grouped_stage_transport,
-    maybe_record_psionic_train_weak_device_validation_replay_proof,
-    persist_psionic_train_grouped_stage_replay_evidence,
-    psionic_train_resolved_artifact_cache_candidates,
+    TrainingExecutionValidatorDisposition, PSIONIC_TRAIN_RESOLVED_ARTIFACT_CACHE_RELATIVE_DIR,
 };
 
 pub const PSIONIC_TRAIN_VALIDATOR_SCORE_ARTIFACT_SCHEMA_VERSION: &str =
@@ -1238,6 +1237,20 @@ fn materialize_validator_artifact_binding(
                 Err(error) => last_validation_error = Some(error),
             }
         }
+        if let Some(rebased_path) =
+            rebase_validator_artifact_path(desired_path.as_path(), run_root)
+        {
+            let rebased_display = rebased_path.display().to_string();
+            if !attempted_paths.contains(&rebased_display) {
+                attempted_paths.push(rebased_display);
+            }
+            if rebased_path.is_file() {
+                match validate_artifact_binding_candidate(binding, rebased_path.as_path(), field) {
+                    Ok(()) => return Ok(rebased_path),
+                    Err(error) => last_validation_error = Some(error),
+                }
+            }
+        }
     }
 
     let mut valid_cache_candidate = None;
@@ -1261,13 +1274,34 @@ fn materialize_validator_artifact_binding(
         }
     }
 
+    for candidate in validator_local_checkpoint_artifact_candidates(run_root, binding, field) {
+        let candidate_display = candidate.display().to_string();
+        if !attempted_paths.contains(&candidate_display) {
+            attempted_paths.push(candidate_display);
+        }
+        if !candidate.is_file() {
+            continue;
+        }
+        match validate_artifact_binding_candidate(binding, candidate.as_path(), field) {
+            Ok(()) => {
+                valid_cache_candidate = Some(candidate);
+                break;
+            }
+            Err(error) => last_validation_error = Some(error),
+        }
+    }
+
     if let Some(desired_path) = desired_path {
         if let Some(cache_candidate) = valid_cache_candidate {
-            if cache_candidate != desired_path {
+            if cache_candidate == desired_path {
+                return Ok(desired_path);
+            }
+            if desired_path.starts_with(run_root) {
                 copy_validator_artifact(cache_candidate.as_path(), desired_path.as_path())?;
                 validate_artifact_binding_candidate(binding, desired_path.as_path(), field)?;
+                return Ok(desired_path);
             }
-            return Ok(desired_path);
+            return Ok(cache_candidate);
         }
     } else if let Some(cache_candidate) = valid_cache_candidate {
         return Ok(cache_candidate);
@@ -1282,6 +1316,135 @@ fn materialize_validator_artifact_binding(
         field,
         attempted_paths,
     ))
+}
+
+fn rebase_validator_artifact_path(desired_path: &Path, run_root: &Path) -> Option<PathBuf> {
+    let desired = desired_path.to_str()?;
+    let run_id = run_root.file_name()?.to_str()?;
+    let marker = format!("/training/runs/{run_id}/");
+    let (_, suffix) = desired.split_once(marker.as_str())?;
+    Some(run_root.join(suffix))
+}
+
+fn validator_local_checkpoint_artifact_candidates(
+    run_root: &Path,
+    binding: &crate::PsionicTrainArtifactBinding,
+    field: &str,
+) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let checkpoint_surface_path = run_root.join("status/checkpoint_surface.json");
+    if let Ok(surface) = load_validator_checkpoint_surface(checkpoint_surface_path.as_path()) {
+        let artifact_id = binding.artifact_ref.artifact_id.as_str();
+        if field.contains("checkpoint_pointer") || artifact_id.contains("checkpoint_pointer") {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.checkpoint_pointer_path.as_deref(),
+            );
+            push_validator_candidate(
+                &mut candidates,
+                run_root.join("checkpoints/latest_accepted_checkpoint_pointer.json"),
+            );
+        }
+        if field.contains("checkpoint_manifest") || artifact_id.contains("checkpoint_manifest") {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.checkpoint_manifest_path.as_deref(),
+            );
+            push_validator_candidate(
+                &mut candidates,
+                run_root.join("checkpoints/step-0/checkpoint_manifest.json"),
+            );
+            let checkpoints_manifest_dir = run_root.join("checkpoints/manifests");
+            if let Ok(entries) = fs::read_dir(checkpoints_manifest_dir) {
+                for entry in entries.flatten() {
+                    push_validator_candidate(&mut candidates, entry.path());
+                }
+            }
+        }
+        if field.contains("checkpoint_backup_receipt")
+            || artifact_id.contains("checkpoint_backup_receipt")
+        {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.checkpoint_backup_receipt_path.as_deref(),
+            );
+        }
+        if field.contains("checkpoint_backup_pointer")
+            || artifact_id.contains("checkpoint_backup_pointer")
+        {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.checkpoint_backup_pointer_path.as_deref(),
+            );
+        }
+        if field.contains("checkpoint_backup_manifest")
+            || artifact_id.contains("checkpoint_backup_manifest")
+        {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.checkpoint_backup_manifest_path.as_deref(),
+            );
+        }
+        if field.contains("recovery_receipt")
+            || artifact_id.contains("auto_resume")
+            || artifact_id.contains("grouped_stage_recovery")
+        {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.auto_resume_receipt_path.as_deref(),
+            );
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.grouped_stage_recovery_receipt_path.as_deref(),
+            );
+        }
+        if field.contains("checkpoint_handoff_receipt")
+            || artifact_id.contains("checkpoint_handoff_receipt")
+        {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.peer_checkpoint_handoff_receipt_path.as_deref(),
+            );
+        }
+        if field.contains("checkpoint_failure_drill")
+            || artifact_id.contains("checkpoint_failure_drill")
+        {
+            push_optional_validator_candidate(
+                &mut candidates,
+                surface.artifacts.checkpoint_failure_drill_path.as_deref(),
+            );
+        }
+    }
+    candidates
+}
+
+fn load_validator_checkpoint_surface(
+    path: &Path,
+) -> Result<PsionicTrainCheckpointSurface, PsionicTrainValidatorReplayError> {
+    let bytes = fs::read(path).map_err(|error| PsionicTrainValidatorReplayError::Read {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    serde_json::from_slice(bytes.as_slice()).map_err(|error| {
+        PsionicTrainValidatorReplayError::ArtifactIncomplete {
+            detail: format!(
+                "validator local checkpoint surface `{}` failed to parse: {error}",
+                path.display()
+            ),
+        }
+    })
+}
+
+fn push_optional_validator_candidate(candidates: &mut Vec<PathBuf>, candidate: Option<&str>) {
+    if let Some(candidate) = candidate {
+        push_validator_candidate(candidates, PathBuf::from(candidate));
+    }
+}
+
+fn push_validator_candidate(candidates: &mut Vec<PathBuf>, candidate: PathBuf) {
+    if !candidates.contains(&candidate) {
+        candidates.push(candidate);
+    }
 }
 
 fn validate_artifact_binding_candidate(
@@ -1615,24 +1778,17 @@ mod tests {
     };
 
     use super::{
-        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION, PsionicTrainValidatorHook,
+        build_validator_quality_drift_signal, build_validator_rollback_signal,
+        classify_validator_result, execute_psionic_train_validator_replay,
+        materialize_validator_artifact_binding, stable_digest, PsionicTrainValidatorHook,
         PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorReplayReasonCode,
         PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorScoreReceipt,
-        TrainingExecutionValidatorDisposition, build_validator_quality_drift_signal,
-        build_validator_rollback_signal, classify_validator_result,
-        execute_psionic_train_validator_replay, stable_digest,
+        TrainingExecutionValidatorDisposition,
+        PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION,
     };
     use crate::{
-        PSION_APPLE_WINDOWED_TRAINING_LANE_ID, PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
-        PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
-        PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
-        PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
-        PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
-        PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
-        PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
-        PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION,
-        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
-        PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+        build_psionic_train_artifact_binding_from_path,
+        load_psionic_train_grouped_stage_replay_evidence, persist_psionic_train_window_artifacts,
         PsionicTrainAdmissionIdentity, PsionicTrainArtifactBinding, PsionicTrainAuthorityOwner,
         PsionicTrainCapabilityProjection, PsionicTrainCheckpointArtifactPaths,
         PsionicTrainCheckpointSurface, PsionicTrainContributionArtifact,
@@ -1642,8 +1798,17 @@ mod tests {
         PsionicTrainOutcomeKind, PsionicTrainRole, PsionicTrainRuntimeAttestation,
         PsionicTrainWeakDevicePublicCountClass, PsionicTrainWeakDeviceValidationReplayProof,
         PsionicTrainWindowArtifactInputRefs, PsionicTrainWorkClass,
-        build_psionic_train_artifact_binding_from_path,
-        load_psionic_train_grouped_stage_replay_evidence, persist_psionic_train_window_artifacts,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_BACKEND_FAMILY,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_ENVIRONMENT_REF,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_RELEASE_ID,
+        PSIONIC_TRAIN_ACTUAL_PRETRAINING_TOPOLOGY_CLASS,
+        PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_ENVIRONMENT_REF,
+        PSIONIC_TRAIN_APPLE_WINDOWED_TRAINING_RELEASE_ID,
+        PSIONIC_TRAIN_CHECKPOINT_SURFACE_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CONTRIBUTION_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+        PSIONIC_TRAIN_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
+        PSIONIC_TRAIN_INVOCATION_MANIFEST_SCHEMA_VERSION, PSIONIC_TRAIN_RUNTIME_SURFACE_ID,
+        PSION_APPLE_WINDOWED_TRAINING_LANE_ID,
     };
 
     fn temp_root(label: &str) -> PathBuf {
@@ -2190,12 +2355,10 @@ mod tests {
             execution.score_receipt.challenged_work_class,
             PsionicTrainWorkClass::GroupedReplicaStageExecution
         );
-        assert!(
-            execution
-                .score_receipt
-                .verified_hooks
-                .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity)
-        );
+        assert!(execution
+            .score_receipt
+            .verified_hooks
+            .contains(&PsionicTrainValidatorHook::GroupedStageIntegrity));
         let contribution_receipt: PsionicTrainContributionReceipt = serde_json::from_slice(
             &fs::read(&window_artifacts.contribution_receipt_path)
                 .expect("contribution receipt should read"),
@@ -2217,12 +2380,10 @@ mod tests {
             replay_evidence.grouped_stage_assignment.stage_id,
             "stage-01"
         );
-        assert!(
-            replay_evidence
-                .reason_codes
-                .iter()
-                .any(|reason_code| reason_code == "grouped_stage_evidence_verified")
-        );
+        assert!(replay_evidence
+            .reason_codes
+            .iter()
+            .any(|reason_code| reason_code == "grouped_stage_evidence_verified"));
         assert_eq!(
             execution
                 .score_receipt
@@ -2239,12 +2400,92 @@ mod tests {
                 .as_deref(),
             Some(replay_evidence_path)
         );
-        assert!(
-            execution
-                .artifacts
-                .weak_device_validation_replay_proof_path
-                .is_none()
+        assert!(execution
+            .artifacts
+            .weak_device_validation_replay_proof_path
+            .is_none());
+    }
+
+    #[test]
+    fn validator_replay_falls_back_to_local_checkpoint_surface_artifacts() {
+        let run_root = temp_root("validator-local-checkpoint-surface");
+        let checkpoint_manifest_path =
+            run_root.join("checkpoints/manifests/checkpoint_manifest_step-000004.json");
+        fs::create_dir_all(
+            checkpoint_manifest_path
+                .parent()
+                .expect("checkpoint manifest parent should exist"),
+        )
+        .expect("checkpoint manifest dir should create");
+        fs::write(
+            &checkpoint_manifest_path,
+            br#"{"schema_version":"psionic.train.checkpoint_manifest.v1","step":4}"#,
+        )
+        .expect("checkpoint manifest should write");
+
+        let mut surface =
+            checkpoint_surface(Some("accepted"), Some("succeeded"), None, Some(false), None);
+        surface.run_root = run_root.display().to_string();
+        surface.artifacts.checkpoint_manifest_path =
+            Some(checkpoint_manifest_path.display().to_string());
+        write_json(
+            run_root.join("status/checkpoint_surface.json").as_path(),
+            &surface,
         );
+
+        let mut binding = build_psionic_train_artifact_binding_from_path(
+            "checkpoint_manifest",
+            checkpoint_manifest_path.as_path(),
+        )
+        .expect("checkpoint manifest binding should build");
+        binding.materialized_path = Some(String::from(
+            "/Users/sasquatchorwell/.openagents/pylon/training/runs/run-x/windows/window-y/contributions/contribution-z/retained_artifacts/checkpoint_manifest/stale-checkpoint_manifest_step-000004.json",
+        ));
+
+        let resolved = materialize_validator_artifact_binding(
+            &binding,
+            &run_root,
+            "contribution_artifact_manifest.artifacts[checkpoint_manifest]",
+        )
+        .expect("validator replay should resolve local checkpoint manifest");
+        assert_eq!(resolved, checkpoint_manifest_path);
+    }
+
+    #[test]
+    fn validator_replay_rebases_stale_absolute_paths_into_local_run_root() {
+        let run_root =
+            temp_root("run.cs336.a1.validator-replay-rebases-stale-absolute-paths");
+        let rebased_path = run_root.join(
+            "windows/window-0001/contributions/contribution-0001/retained_artifacts/current_status/current_run_status.json",
+        );
+        fs::create_dir_all(
+            rebased_path
+                .parent()
+                .expect("rebased artifact parent should exist"),
+        )
+        .expect("rebased artifact parent should create");
+        fs::write(&rebased_path, br#"{"status":"ok"}"#)
+            .expect("rebased artifact should write");
+
+        let mut binding =
+            build_psionic_train_artifact_binding_from_path("current_status", rebased_path.as_path())
+                .expect("current status binding should build");
+        let stale_path = format!(
+            "/Users/sasquatchorwell/.openagents/pylon/training/runs/{}/windows/window-0001/contributions/contribution-0001/retained_artifacts/current_status/current_run_status.json",
+            run_root
+                .file_name()
+                .expect("run root should have file name")
+                .to_string_lossy(),
+        );
+        binding.materialized_path = Some(stale_path);
+
+        let resolved = materialize_validator_artifact_binding(
+            &binding,
+            &run_root,
+            "contribution_artifact_manifest.artifacts[current_status]",
+        )
+        .expect("validator replay should rebase stale absolute paths into the local run root");
+        assert_eq!(resolved, rebased_path);
     }
 
     #[test]
