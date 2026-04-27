@@ -47,6 +47,10 @@ doing real assigned compute under one run id.
   `fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step2_v1.json`
   and
   `fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step4_v1.json`
+- local-update artifact manifest:
+  `fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json`
+- local-update contribution receipt:
+  `fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json`
 - local-update generator:
   `crates/psionic-train/examples/a1_minimal_distributed_lm_local_update_fixture.rs`
 - local-update checker:
@@ -123,11 +127,43 @@ Current retained proof values:
   `sha256:2ccbf7ea2a89e8403212e2985c6d0a158568bfafe5141eed8a0214864092d7c1`
 - report digest:
   `sha256:f643547ad6002ea4028b9cf3f0993f02679cf974eb02ac002606e40a8a3ceec8`
+- artifact manifest digest:
+  `sha256:dedf62d211a2ba66ca45642016350dceb718af4fe655a575b6ba0619b0effba3`
+- contribution receipt digest:
+  `sha256:319e1fb5de6671fe9718d18ea74a4dca442867959e0427a983c657ad02767b91`
 
 This is intentionally a narrow first production backward path. It proves a real
 local update for the tiny shared LM lane, but it is LM-head-only and does not
 claim full Transformer backward coverage for attention, MLP, embeddings, or
 normalization parameters.
+
+## Local-Update Receipt
+
+The retained local-update proof now writes a lane-specific contribution receipt
+and artifact manifest. They bind the facts OpenAgents needs to produce a
+`ComputeAdapterContributionOutcome` without parsing logs:
+
+- `training_run_id`, `stage_id`, `window_id`, `assignment_id`, `contribution_id`
+- `worker_id`, `node_pubkey`, and `contributor_node_id`
+- tokenizer, tokenized-dataset, validation-set, input-shard, and token-range
+  digests
+- base checkpoint ref and digest
+- local step count, consumed token count, training loss, and validation loss
+- output checkpoint ref and digest, output delta ref and digest, object digest,
+  manifest digest, and local-update report digest
+- validator disposition, validator verdict binding, aggregation eligibility,
+  aggregation weight, and closeout binding
+
+The fixture receipt is deliberately `validator_disposition: replay_required`,
+`aggregation_eligibility: eligible`, and `accepted_for_aggregation: false`.
+That means the local update is model-progress eligible, but it does not
+pre-claim Nexus acceptance. Nexus closeout truth must accept the receipt before
+OpenAgents may set `accepted_for_aggregation` or count the worker as a
+model-progress participant.
+
+Materialized file paths are carried only as manifest location hints. The stable
+artifact-manifest digest clears those paths before hashing, so the logical
+artifact identity remains stable across machines.
 
 ## Contribution Semantics
 

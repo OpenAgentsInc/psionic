@@ -24,18 +24,38 @@ pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPORT_SCHEMA_VERSION: &str =
     "psion.a1_minimal_distributed_lm.local_update_report.v1";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CHECKPOINT_SCHEMA_VERSION: &str =
     "psion.a1_minimal_distributed_lm.local_update_checkpoint.v1";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_SCHEMA_VERSION: &str =
+    "psion.a1_minimal_distributed_lm.local_update_artifact_manifest.v1";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_RECEIPT_SCHEMA_VERSION: &str =
+    "psion.a1_minimal_distributed_lm.contribution_receipt.v1";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPORT_FIXTURE_PATH: &str =
     "fixtures/psion/a1_minimal_distributed_lm/local_update_report_v1.json";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CHECKPOINT_STEP2_FIXTURE_PATH: &str =
     "fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step2_v1.json";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CHECKPOINT_STEP4_FIXTURE_PATH: &str =
     "fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step4_v1.json";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_FIXTURE_PATH: &str =
+    "fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_RECEIPT_FIXTURE_PATH: &str =
+    "fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_RUN_ID: &str =
     "a1_minimal_distributed_lm_001.local_update_fixture";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WINDOW_ID: &str =
+    "window.a1_minimal_distributed_lm_001.local_update.fixture";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_STAGE_ID: &str =
+    "stage.a1_minimal_distributed_lm_001.local_update";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ASSIGNMENT_ID: &str =
     "a1_minimal_distributed_lm_001.local_update.assignment.fixture";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WORKER_ID: &str =
     "psionic.local_update.fixture.worker";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_NODE_PUBKEY: &str =
+    "pylon-node-pubkey.fixture.a1_minimal_distributed_lm";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_ID: &str =
+    "contribution.a1_minimal_distributed_lm_001.local_update.fixture";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTOR_SET_REVISION_ID: &str =
+    "contributors.a1_minimal_distributed_lm_001.fixture.revision.000001";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WORK_CLASS: &str = "local_update_training";
+pub const A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPLICA_TYPE: &str = "single_worker_local_update";
 
 #[derive(Debug, Error)]
 pub enum A1MinimalDistributedLmLocalUpdateError {
@@ -252,6 +272,128 @@ pub struct A1MinimalDistributedLmLocalUpdateReport {
     pub claim_boundary: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmInputShardRef {
+    pub shard_id: String,
+    pub split_name: String,
+    pub storage_ref: String,
+    pub source_shard_digest: String,
+    pub tokenized_dataset_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmInputTokenRange {
+    pub start_token: u64,
+    pub end_token_exclusive: u64,
+    pub context_length: u64,
+    pub window_start_positions: Vec<u64>,
+    pub covered_token_count: u64,
+    pub consumed_token_count: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmLocalUpdateArtifactEntry {
+    pub artifact_kind: String,
+    pub artifact_role: String,
+    pub logical_ref: String,
+    pub digest: String,
+    pub byte_count: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmMaterializedArtifactPath {
+    pub artifact_kind: String,
+    pub path: String,
+    pub byte_count: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmLocalUpdateArtifactManifest {
+    pub schema_version: String,
+    pub lane_id: String,
+    pub run_id: String,
+    pub window_id: String,
+    pub stage_id: String,
+    pub assignment_id: String,
+    pub contribution_id: String,
+    pub worker_id: String,
+    pub node_pubkey: String,
+    pub contributor_node_id: String,
+    pub work_class: String,
+    pub replica_type: String,
+    pub tokenizer_digest: String,
+    pub tokenized_dataset_digest: String,
+    pub validation_set_digest: String,
+    pub input_shard: A1MinimalDistributedLmInputShardRef,
+    pub input_token_range: A1MinimalDistributedLmInputTokenRange,
+    pub base_checkpoint_ref: String,
+    pub base_checkpoint_digest: String,
+    pub output_checkpoint_ref: String,
+    pub output_checkpoint_digest: String,
+    pub output_delta_ref: String,
+    pub output_delta_digest: String,
+    pub local_update_report_digest: String,
+    pub artifact_count: usize,
+    pub artifacts: Vec<A1MinimalDistributedLmLocalUpdateArtifactEntry>,
+    #[serde(default)]
+    pub materialized_paths: Vec<A1MinimalDistributedLmMaterializedArtifactPath>,
+    pub artifact_manifest_digest: String,
+    pub claim_boundary: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmLocalUpdateContributionReceipt {
+    pub schema_version: String,
+    pub lane_id: String,
+    pub run_id: String,
+    pub training_run_id: String,
+    pub stage_id: String,
+    pub window_id: String,
+    pub contributor_set_revision_id: String,
+    pub assignment_id: String,
+    pub contribution_id: String,
+    pub worker_id: String,
+    pub node_pubkey: String,
+    pub contributor_node_id: String,
+    pub validator_policy_ref: String,
+    pub work_class: String,
+    pub replica_type: String,
+    pub tokenizer_digest: String,
+    pub tokenized_dataset_digest: String,
+    pub validation_set_digest: String,
+    pub input_shard: A1MinimalDistributedLmInputShardRef,
+    pub input_token_range: A1MinimalDistributedLmInputTokenRange,
+    pub base_checkpoint_ref: String,
+    pub base_checkpoint_digest: String,
+    pub local_step_count: u64,
+    pub consumed_token_count: u64,
+    pub loss_before: f32,
+    pub loss_after: f32,
+    pub validation_loss_before: f32,
+    pub validation_loss_after: f32,
+    pub output_checkpoint_ref: String,
+    pub output_checkpoint_digest: String,
+    pub output_delta_ref: String,
+    pub output_delta_digest: String,
+    pub object_digest: String,
+    pub manifest_digest: String,
+    pub artifact_manifest_digest: String,
+    pub local_update_report_digest: String,
+    pub validator_disposition: String,
+    pub validator_verdict_binding: String,
+    pub validation_reason_codes: Vec<String>,
+    pub aggregation_eligibility: String,
+    pub accepted_for_aggregation: bool,
+    pub aggregation_weight_basis: String,
+    pub aggregation_weight_value: u64,
+    pub aggregation_weight_bps: u32,
+    pub model_progress_eligible: bool,
+    pub closeout_authority: String,
+    pub closeout_verdict_binding: String,
+    pub contribution_digest: String,
+    pub claim_boundary: String,
+}
+
 impl A1MinimalDistributedLmLocalUpdateReport {
     #[must_use]
     pub fn stable_digest(&self) -> String {
@@ -350,6 +492,403 @@ impl A1MinimalDistributedLmLocalUpdateReport {
     }
 }
 
+impl A1MinimalDistributedLmLocalUpdateArtifactManifest {
+    #[must_use]
+    pub fn stable_artifact_manifest_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.artifact_manifest_digest.clear();
+        clone.materialized_paths.clear();
+        sha256_uri_digest(
+            b"psion_a1_minimal_distributed_lm_local_update_artifact_manifest|",
+            &clone,
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        if self.schema_version
+            != A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_SCHEMA_VERSION
+        {
+            return invalid_local_update(format!(
+                "artifact manifest schema_version must stay `{}`",
+                A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_SCHEMA_VERSION
+            ));
+        }
+        validate_lane_identity(self.lane_id.as_str())?;
+        ensure_nonempty(self.run_id.as_str(), "artifact_manifest.run_id")?;
+        ensure_nonempty(self.window_id.as_str(), "artifact_manifest.window_id")?;
+        ensure_nonempty(self.stage_id.as_str(), "artifact_manifest.stage_id")?;
+        ensure_nonempty(
+            self.assignment_id.as_str(),
+            "artifact_manifest.assignment_id",
+        )?;
+        ensure_nonempty(
+            self.contribution_id.as_str(),
+            "artifact_manifest.contribution_id",
+        )?;
+        ensure_nonempty(self.worker_id.as_str(), "artifact_manifest.worker_id")?;
+        ensure_nonempty(self.node_pubkey.as_str(), "artifact_manifest.node_pubkey")?;
+        ensure_nonempty(
+            self.contributor_node_id.as_str(),
+            "artifact_manifest.contributor_node_id",
+        )?;
+        ensure_local_update_identity(
+            self.work_class.as_str(),
+            self.replica_type.as_str(),
+            "artifact_manifest",
+        )?;
+        ensure_sha256_uri(
+            self.tokenizer_digest.as_str(),
+            "artifact_manifest.tokenizer_digest",
+        )?;
+        ensure_sha256_uri(
+            self.tokenized_dataset_digest.as_str(),
+            "artifact_manifest.tokenized_dataset_digest",
+        )?;
+        ensure_sha256_uri(
+            self.validation_set_digest.as_str(),
+            "artifact_manifest.validation_set_digest",
+        )?;
+        self.input_shard.validate("artifact_manifest.input_shard")?;
+        self.input_token_range
+            .validate("artifact_manifest.input_token_range")?;
+        ensure_nonempty(
+            self.base_checkpoint_ref.as_str(),
+            "artifact_manifest.base_checkpoint_ref",
+        )?;
+        ensure_sha256_uri(
+            self.base_checkpoint_digest.as_str(),
+            "artifact_manifest.base_checkpoint_digest",
+        )?;
+        ensure_nonempty(
+            self.output_checkpoint_ref.as_str(),
+            "artifact_manifest.output_checkpoint_ref",
+        )?;
+        ensure_sha256_uri(
+            self.output_checkpoint_digest.as_str(),
+            "artifact_manifest.output_checkpoint_digest",
+        )?;
+        ensure_nonempty(
+            self.output_delta_ref.as_str(),
+            "artifact_manifest.output_delta_ref",
+        )?;
+        ensure_sha256_uri(
+            self.output_delta_digest.as_str(),
+            "artifact_manifest.output_delta_digest",
+        )?;
+        ensure_sha256_uri(
+            self.local_update_report_digest.as_str(),
+            "artifact_manifest.local_update_report_digest",
+        )?;
+        if self.artifact_count == 0 || self.artifact_count != self.artifacts.len() {
+            return invalid_local_update(String::from(
+                "artifact manifest count must match nonempty artifact list",
+            ));
+        }
+        for required in [
+            "local_update_report",
+            "checkpoint_step2",
+            "checkpoint_step4",
+            "lm_head_delta",
+        ] {
+            if !self
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.artifact_kind == required)
+            {
+                return invalid_local_update(format!(
+                    "artifact manifest missing required artifact `{required}`"
+                ));
+            }
+        }
+        for artifact in &self.artifacts {
+            artifact.validate()?;
+        }
+        for path in &self.materialized_paths {
+            path.validate()?;
+        }
+        ensure_sha256_uri(
+            self.artifact_manifest_digest.as_str(),
+            "artifact_manifest.artifact_manifest_digest",
+        )?;
+        if self.artifact_manifest_digest != self.stable_artifact_manifest_digest() {
+            return invalid_local_update(String::from("artifact manifest digest drifted"));
+        }
+        if !self
+            .claim_boundary
+            .contains("materialized paths are excluded from logical digests")
+        {
+            return invalid_local_update(String::from(
+                "artifact manifest must state the materialized-path digest boundary",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl A1MinimalDistributedLmLocalUpdateContributionReceipt {
+    #[must_use]
+    pub fn stable_contribution_digest(&self) -> String {
+        let mut clone = self.clone();
+        clone.contribution_digest.clear();
+        sha256_uri_digest(
+            b"psion_a1_minimal_distributed_lm_local_update_contribution_receipt|",
+            &clone,
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        if self.schema_version
+            != A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_RECEIPT_SCHEMA_VERSION
+        {
+            return invalid_local_update(format!(
+                "contribution receipt schema_version must stay `{}`",
+                A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_RECEIPT_SCHEMA_VERSION
+            ));
+        }
+        validate_lane_identity(self.lane_id.as_str())?;
+        ensure_nonempty(self.run_id.as_str(), "contribution_receipt.run_id")?;
+        if self.training_run_id != self.run_id {
+            return invalid_local_update(String::from(
+                "contribution receipt training_run_id must match run_id",
+            ));
+        }
+        ensure_nonempty(self.stage_id.as_str(), "contribution_receipt.stage_id")?;
+        ensure_nonempty(self.window_id.as_str(), "contribution_receipt.window_id")?;
+        ensure_nonempty(
+            self.contributor_set_revision_id.as_str(),
+            "contribution_receipt.contributor_set_revision_id",
+        )?;
+        ensure_nonempty(
+            self.assignment_id.as_str(),
+            "contribution_receipt.assignment_id",
+        )?;
+        ensure_nonempty(
+            self.contribution_id.as_str(),
+            "contribution_receipt.contribution_id",
+        )?;
+        ensure_nonempty(self.worker_id.as_str(), "contribution_receipt.worker_id")?;
+        ensure_nonempty(
+            self.node_pubkey.as_str(),
+            "contribution_receipt.node_pubkey",
+        )?;
+        ensure_nonempty(
+            self.contributor_node_id.as_str(),
+            "contribution_receipt.contributor_node_id",
+        )?;
+        ensure_nonempty(
+            self.validator_policy_ref.as_str(),
+            "contribution_receipt.validator_policy_ref",
+        )?;
+        ensure_local_update_identity(
+            self.work_class.as_str(),
+            self.replica_type.as_str(),
+            "contribution_receipt",
+        )?;
+        ensure_sha256_uri(
+            self.tokenizer_digest.as_str(),
+            "contribution_receipt.tokenizer_digest",
+        )?;
+        ensure_sha256_uri(
+            self.tokenized_dataset_digest.as_str(),
+            "contribution_receipt.tokenized_dataset_digest",
+        )?;
+        ensure_sha256_uri(
+            self.validation_set_digest.as_str(),
+            "contribution_receipt.validation_set_digest",
+        )?;
+        self.input_shard
+            .validate("contribution_receipt.input_shard")?;
+        self.input_token_range
+            .validate("contribution_receipt.input_token_range")?;
+        ensure_nonempty(
+            self.base_checkpoint_ref.as_str(),
+            "contribution_receipt.base_checkpoint_ref",
+        )?;
+        ensure_sha256_uri(
+            self.base_checkpoint_digest.as_str(),
+            "contribution_receipt.base_checkpoint_digest",
+        )?;
+        if self.local_step_count == 0 || self.consumed_token_count == 0 {
+            return invalid_local_update(String::from(
+                "contribution receipt local_step_count and consumed_token_count must be nonzero",
+            ));
+        }
+        ensure_finite(self.loss_before, "contribution_receipt.loss_before")?;
+        ensure_finite(self.loss_after, "contribution_receipt.loss_after")?;
+        ensure_finite(
+            self.validation_loss_before,
+            "contribution_receipt.validation_loss_before",
+        )?;
+        ensure_finite(
+            self.validation_loss_after,
+            "contribution_receipt.validation_loss_after",
+        )?;
+        ensure_nonempty(
+            self.output_checkpoint_ref.as_str(),
+            "contribution_receipt.output_checkpoint_ref",
+        )?;
+        ensure_sha256_uri(
+            self.output_checkpoint_digest.as_str(),
+            "contribution_receipt.output_checkpoint_digest",
+        )?;
+        ensure_nonempty(
+            self.output_delta_ref.as_str(),
+            "contribution_receipt.output_delta_ref",
+        )?;
+        ensure_sha256_uri(
+            self.output_delta_digest.as_str(),
+            "contribution_receipt.output_delta_digest",
+        )?;
+        ensure_sha256_uri(
+            self.object_digest.as_str(),
+            "contribution_receipt.object_digest",
+        )?;
+        ensure_sha256_uri(
+            self.manifest_digest.as_str(),
+            "contribution_receipt.manifest_digest",
+        )?;
+        ensure_sha256_uri(
+            self.artifact_manifest_digest.as_str(),
+            "contribution_receipt.artifact_manifest_digest",
+        )?;
+        ensure_sha256_uri(
+            self.local_update_report_digest.as_str(),
+            "contribution_receipt.local_update_report_digest",
+        )?;
+        if self.object_digest != self.output_checkpoint_digest {
+            return invalid_local_update(String::from(
+                "contribution receipt object_digest must bind the output checkpoint digest",
+            ));
+        }
+        if self.manifest_digest != self.artifact_manifest_digest {
+            return invalid_local_update(String::from(
+                "contribution receipt manifest_digest must match artifact_manifest_digest",
+            ));
+        }
+        if self.validator_disposition != "replay_required" {
+            return invalid_local_update(String::from(
+                "fixture contribution receipt must remain validator-replay-required",
+            ));
+        }
+        if self.validator_verdict_binding != "pending_validator_replay" {
+            return invalid_local_update(String::from(
+                "fixture contribution receipt must bind the pending validator replay verdict",
+            ));
+        }
+        if self.aggregation_eligibility != "eligible" {
+            return invalid_local_update(String::from(
+                "local-update receipt must remain aggregation eligible after acceptance",
+            ));
+        }
+        if self.accepted_for_aggregation {
+            return invalid_local_update(String::from(
+                "fixture contribution receipt must not pre-claim Nexus acceptance",
+            ));
+        }
+        if self.aggregation_weight_basis != "tokens"
+            || self.aggregation_weight_value != self.consumed_token_count
+            || self.aggregation_weight_bps != 10_000
+        {
+            return invalid_local_update(String::from(
+                "contribution receipt aggregation weight fields drifted",
+            ));
+        }
+        if !self.model_progress_eligible {
+            return invalid_local_update(String::from(
+                "local-update receipt must remain model-progress eligible",
+            ));
+        }
+        ensure_nonempty(
+            self.closeout_authority.as_str(),
+            "contribution_receipt.closeout_authority",
+        )?;
+        if self.closeout_verdict_binding != "pending_nexus_closeout" {
+            return invalid_local_update(String::from(
+                "fixture contribution receipt must bind pending Nexus closeout",
+            ));
+        }
+        ensure_sha256_uri(
+            self.contribution_digest.as_str(),
+            "contribution_receipt.contribution_digest",
+        )?;
+        if self.contribution_digest != self.stable_contribution_digest() {
+            return invalid_local_update(String::from("contribution receipt digest drifted"));
+        }
+        if !self
+            .claim_boundary
+            .contains("does not pre-claim Nexus acceptance")
+        {
+            return invalid_local_update(String::from(
+                "contribution receipt must state the closeout claim boundary",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl A1MinimalDistributedLmInputShardRef {
+    fn validate(&self, field: &str) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        ensure_nonempty(self.shard_id.as_str(), format!("{field}.shard_id").as_str())?;
+        ensure_nonempty(
+            self.split_name.as_str(),
+            format!("{field}.split_name").as_str(),
+        )?;
+        ensure_nonempty(
+            self.storage_ref.as_str(),
+            format!("{field}.storage_ref").as_str(),
+        )?;
+        ensure_sha256_uri(
+            self.source_shard_digest.as_str(),
+            format!("{field}.source_shard_digest").as_str(),
+        )?;
+        ensure_sha256_uri(
+            self.tokenized_dataset_digest.as_str(),
+            format!("{field}.tokenized_dataset_digest").as_str(),
+        )?;
+        Ok(())
+    }
+}
+
+impl A1MinimalDistributedLmInputTokenRange {
+    fn validate(&self, field: &str) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        if self.end_token_exclusive <= self.start_token {
+            return invalid_local_update(format!("{field} end must exceed start"));
+        }
+        if self.context_length == 0
+            || self.covered_token_count == 0
+            || self.consumed_token_count == 0
+            || self.window_start_positions.is_empty()
+        {
+            return invalid_local_update(format!("{field} token counters must be nonzero"));
+        }
+        if self.covered_token_count != self.end_token_exclusive - self.start_token {
+            return invalid_local_update(format!("{field} covered_token_count drifted"));
+        }
+        Ok(())
+    }
+}
+
+impl A1MinimalDistributedLmLocalUpdateArtifactEntry {
+    fn validate(&self) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        ensure_nonempty(self.artifact_kind.as_str(), "artifact_entry.artifact_kind")?;
+        ensure_nonempty(self.artifact_role.as_str(), "artifact_entry.artifact_role")?;
+        ensure_nonempty(self.logical_ref.as_str(), "artifact_entry.logical_ref")?;
+        ensure_sha256_uri(self.digest.as_str(), "artifact_entry.digest")?;
+        Ok(())
+    }
+}
+
+impl A1MinimalDistributedLmMaterializedArtifactPath {
+    fn validate(&self) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        ensure_nonempty(
+            self.artifact_kind.as_str(),
+            "materialized_artifact_path.artifact_kind",
+        )?;
+        ensure_nonempty(self.path.as_str(), "materialized_artifact_path.path")?;
+        Ok(())
+    }
+}
+
 pub fn write_a1_minimal_distributed_lm_local_update_fixture(
     output_root: impl AsRef<Path>,
 ) -> Result<A1MinimalDistributedLmLocalUpdateReport, A1MinimalDistributedLmLocalUpdateError> {
@@ -410,8 +949,11 @@ pub fn run_and_write_a1_minimal_distributed_lm_local_update(
         checkpoint_step4,
     )?;
 
-    let mut uninterrupted =
-        A1MinimalDistributedLmLocalUpdateTrainer::fresh(config.clone(), contract.clone(), bundle)?;
+    let mut uninterrupted = A1MinimalDistributedLmLocalUpdateTrainer::fresh(
+        config.clone(),
+        contract.clone(),
+        bundle.clone(),
+    )?;
     let _ = uninterrupted.run_steps(config.local_step_count)?;
 
     let mut steps = pre_checkpoint_steps;
@@ -432,10 +974,10 @@ pub fn run_and_write_a1_minimal_distributed_lm_local_update(
         run_id: config.run_id,
         assignment_id: config.assignment_id,
         worker_id: config.worker_id,
-        tokenizer_digest: contract.tokenizer_artifact_digest,
-        tokenized_dataset_digest: contract.tokenized_dataset_digest,
-        validation_set_digest: contract.validation_set_digest,
-        base_checkpoint_ref: contract.checkpoint_family.base_checkpoint_ref,
+        tokenizer_digest: contract.tokenizer_artifact_digest.clone(),
+        tokenized_dataset_digest: contract.tokenized_dataset_digest.clone(),
+        validation_set_digest: contract.validation_set_digest.clone(),
+        base_checkpoint_ref: contract.checkpoint_family.base_checkpoint_ref.clone(),
         backward_path_kind: String::from("analytic_lm_head_cross_entropy_backward_v1"),
         finite_difference_used: false,
         trained_parameter_paths: vec![String::from("lm_head.weight")],
@@ -470,6 +1012,23 @@ pub fn run_and_write_a1_minimal_distributed_lm_local_update(
         A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPORT_FIXTURE_PATH,
         &report,
     )?;
+    let artifact_manifest =
+        build_a1_minimal_distributed_lm_local_update_artifact_manifest(&report, &bundle)?;
+    write_local_update_artifact_manifest(
+        output_root,
+        A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_FIXTURE_PATH,
+        &artifact_manifest,
+    )?;
+    let contribution_receipt = build_a1_minimal_distributed_lm_contribution_receipt(
+        &report,
+        &artifact_manifest,
+        &contract,
+    )?;
+    write_local_update_contribution_receipt(
+        output_root,
+        A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_RECEIPT_FIXTURE_PATH,
+        &contribution_receipt,
+    )?;
     Ok(report)
 }
 
@@ -486,6 +1045,228 @@ pub fn load_a1_minimal_distributed_lm_local_update_checkpoint(
     let checkpoint: A1MinimalDistributedLmLocalUpdateCheckpoint = serde_json::from_slice(&bytes)?;
     checkpoint.validate()?;
     Ok(checkpoint)
+}
+
+pub fn load_a1_minimal_distributed_lm_local_update_artifact_manifest(
+    manifest_path: impl AsRef<Path>,
+) -> Result<A1MinimalDistributedLmLocalUpdateArtifactManifest, A1MinimalDistributedLmLocalUpdateError>
+{
+    let manifest_path = manifest_path.as_ref();
+    let bytes =
+        fs::read(manifest_path).map_err(|error| A1MinimalDistributedLmLocalUpdateError::Read {
+            path: manifest_path.display().to_string(),
+            error,
+        })?;
+    let manifest: A1MinimalDistributedLmLocalUpdateArtifactManifest =
+        serde_json::from_slice(&bytes)?;
+    manifest.validate()?;
+    Ok(manifest)
+}
+
+pub fn load_a1_minimal_distributed_lm_local_update_contribution_receipt(
+    receipt_path: impl AsRef<Path>,
+) -> Result<
+    A1MinimalDistributedLmLocalUpdateContributionReceipt,
+    A1MinimalDistributedLmLocalUpdateError,
+> {
+    let receipt_path = receipt_path.as_ref();
+    let bytes =
+        fs::read(receipt_path).map_err(|error| A1MinimalDistributedLmLocalUpdateError::Read {
+            path: receipt_path.display().to_string(),
+            error,
+        })?;
+    let receipt: A1MinimalDistributedLmLocalUpdateContributionReceipt =
+        serde_json::from_slice(&bytes)?;
+    receipt.validate()?;
+    Ok(receipt)
+}
+
+pub fn build_a1_minimal_distributed_lm_local_update_artifact_manifest(
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+    bundle: &A1MinimalDistributedLmTokenizerDatasetBundle,
+) -> Result<A1MinimalDistributedLmLocalUpdateArtifactManifest, A1MinimalDistributedLmLocalUpdateError>
+{
+    report.validate()?;
+    bundle.validate()?;
+    let input_shard = input_shard_ref(bundle, report)?;
+    let input_token_range = input_token_range(report)?;
+    let base_checkpoint_digest = first_step_base_checkpoint_digest(report)?;
+    let output_checkpoint_ref = output_checkpoint_ref(report);
+    let output_delta_logical_ref = output_delta_ref(report);
+    let mut manifest = A1MinimalDistributedLmLocalUpdateArtifactManifest {
+        schema_version: String::from(
+            A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_SCHEMA_VERSION,
+        ),
+        lane_id: report.lane_id.clone(),
+        run_id: report.run_id.clone(),
+        window_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WINDOW_ID),
+        stage_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_STAGE_ID),
+        assignment_id: report.assignment_id.clone(),
+        contribution_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_ID),
+        worker_id: report.worker_id.clone(),
+        node_pubkey: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_NODE_PUBKEY),
+        contributor_node_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_NODE_PUBKEY),
+        work_class: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WORK_CLASS),
+        replica_type: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPLICA_TYPE),
+        tokenizer_digest: report.tokenizer_digest.clone(),
+        tokenized_dataset_digest: report.tokenized_dataset_digest.clone(),
+        validation_set_digest: report.validation_set_digest.clone(),
+        input_shard,
+        input_token_range,
+        base_checkpoint_ref: report.base_checkpoint_ref.clone(),
+        base_checkpoint_digest,
+        output_checkpoint_ref,
+        output_checkpoint_digest: report.checkpoint_step4.checkpoint_digest.clone(),
+        output_delta_ref: output_delta_logical_ref.clone(),
+        output_delta_digest: report.delta_digest.clone(),
+        local_update_report_digest: report.report_digest.clone(),
+        artifact_count: 0,
+        artifacts: vec![
+            A1MinimalDistributedLmLocalUpdateArtifactEntry {
+                artifact_kind: String::from("local_update_report"),
+                artifact_role: String::from("proof_report"),
+                logical_ref: format!(
+                    "artifact://{}/{}",
+                    report.run_id, "local_update_report_v1"
+                ),
+                digest: report.report_digest.clone(),
+                byte_count: None,
+            },
+            A1MinimalDistributedLmLocalUpdateArtifactEntry {
+                artifact_kind: String::from("checkpoint_step2"),
+                artifact_role: String::from("resume_checkpoint"),
+                logical_ref: checkpoint_ref(report, report.checkpoint_step2.optimizer_step),
+                digest: report.checkpoint_step2.checkpoint_digest.clone(),
+                byte_count: Some(report.checkpoint_step2.checkpoint_byte_count),
+            },
+            A1MinimalDistributedLmLocalUpdateArtifactEntry {
+                artifact_kind: String::from("checkpoint_step4"),
+                artifact_role: String::from("output_checkpoint"),
+                logical_ref: checkpoint_ref(report, report.checkpoint_step4.optimizer_step),
+                digest: report.checkpoint_step4.checkpoint_digest.clone(),
+                byte_count: Some(report.checkpoint_step4.checkpoint_byte_count),
+            },
+            A1MinimalDistributedLmLocalUpdateArtifactEntry {
+                artifact_kind: String::from("lm_head_delta"),
+                artifact_role: String::from("output_delta"),
+                logical_ref: output_delta_logical_ref,
+                digest: report.delta_digest.clone(),
+                byte_count: None,
+            },
+        ],
+        materialized_paths: vec![
+            A1MinimalDistributedLmMaterializedArtifactPath {
+                artifact_kind: String::from("local_update_report"),
+                path: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPORT_FIXTURE_PATH),
+                byte_count: None,
+            },
+            A1MinimalDistributedLmMaterializedArtifactPath {
+                artifact_kind: String::from("checkpoint_step2"),
+                path: report.checkpoint_step2.checkpoint_path.clone(),
+                byte_count: Some(report.checkpoint_step2.checkpoint_byte_count),
+            },
+            A1MinimalDistributedLmMaterializedArtifactPath {
+                artifact_kind: String::from("checkpoint_step4"),
+                path: report.checkpoint_step4.checkpoint_path.clone(),
+                byte_count: Some(report.checkpoint_step4.checkpoint_byte_count),
+            },
+        ],
+        artifact_manifest_digest: String::new(),
+        claim_boundary: String::from(
+            "This manifest binds logical local-update artifacts for a1_minimal_distributed_lm_001. The materialized paths are excluded from logical digests so the same contribution can be replayed on another machine.",
+        ),
+    };
+    manifest.artifact_count = manifest.artifacts.len();
+    manifest.artifact_manifest_digest = manifest.stable_artifact_manifest_digest();
+    manifest.validate()?;
+    Ok(manifest)
+}
+
+pub fn build_a1_minimal_distributed_lm_contribution_receipt(
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+    artifact_manifest: &A1MinimalDistributedLmLocalUpdateArtifactManifest,
+    contract: &A1MinimalDistributedLmLaneContract,
+) -> Result<
+    A1MinimalDistributedLmLocalUpdateContributionReceipt,
+    A1MinimalDistributedLmLocalUpdateError,
+> {
+    report.validate()?;
+    artifact_manifest.validate()?;
+    contract
+        .validate()
+        .map_err(|error| A1MinimalDistributedLmLocalUpdateError::Invalid {
+            detail: format!("lane contract invalid: {error}"),
+        })?;
+    if artifact_manifest.run_id != report.run_id
+        || artifact_manifest.assignment_id != report.assignment_id
+        || artifact_manifest.worker_id != report.worker_id
+        || artifact_manifest.output_checkpoint_digest != report.checkpoint_step4.checkpoint_digest
+        || artifact_manifest.output_delta_digest != report.delta_digest
+    {
+        return invalid_local_update(String::from(
+            "artifact manifest identity does not match local-update report",
+        ));
+    }
+    let mut receipt = A1MinimalDistributedLmLocalUpdateContributionReceipt {
+        schema_version: String::from(
+            A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_RECEIPT_SCHEMA_VERSION,
+        ),
+        lane_id: report.lane_id.clone(),
+        run_id: report.run_id.clone(),
+        training_run_id: report.run_id.clone(),
+        stage_id: artifact_manifest.stage_id.clone(),
+        window_id: artifact_manifest.window_id.clone(),
+        contributor_set_revision_id: String::from(
+            A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTOR_SET_REVISION_ID,
+        ),
+        assignment_id: report.assignment_id.clone(),
+        contribution_id: artifact_manifest.contribution_id.clone(),
+        worker_id: report.worker_id.clone(),
+        node_pubkey: artifact_manifest.node_pubkey.clone(),
+        contributor_node_id: artifact_manifest.contributor_node_id.clone(),
+        validator_policy_ref: contract.validator_acceptance_policy.policy_id.clone(),
+        work_class: artifact_manifest.work_class.clone(),
+        replica_type: artifact_manifest.replica_type.clone(),
+        tokenizer_digest: report.tokenizer_digest.clone(),
+        tokenized_dataset_digest: report.tokenized_dataset_digest.clone(),
+        validation_set_digest: report.validation_set_digest.clone(),
+        input_shard: artifact_manifest.input_shard.clone(),
+        input_token_range: artifact_manifest.input_token_range.clone(),
+        base_checkpoint_ref: report.base_checkpoint_ref.clone(),
+        base_checkpoint_digest: artifact_manifest.base_checkpoint_digest.clone(),
+        local_step_count: report.local_step_count,
+        consumed_token_count: report.consumed_token_count,
+        loss_before: report.loss_before,
+        loss_after: report.loss_after,
+        validation_loss_before: report.validation_loss_before,
+        validation_loss_after: report.validation_loss_after,
+        output_checkpoint_ref: artifact_manifest.output_checkpoint_ref.clone(),
+        output_checkpoint_digest: artifact_manifest.output_checkpoint_digest.clone(),
+        output_delta_ref: artifact_manifest.output_delta_ref.clone(),
+        output_delta_digest: artifact_manifest.output_delta_digest.clone(),
+        object_digest: artifact_manifest.output_checkpoint_digest.clone(),
+        manifest_digest: artifact_manifest.artifact_manifest_digest.clone(),
+        artifact_manifest_digest: artifact_manifest.artifact_manifest_digest.clone(),
+        local_update_report_digest: report.report_digest.clone(),
+        validator_disposition: String::from("replay_required"),
+        validator_verdict_binding: String::from("pending_validator_replay"),
+        validation_reason_codes: vec![String::from("validator_replay_pending")],
+        aggregation_eligibility: String::from("eligible"),
+        accepted_for_aggregation: false,
+        aggregation_weight_basis: String::from("tokens"),
+        aggregation_weight_value: report.consumed_token_count,
+        aggregation_weight_bps: 10_000,
+        model_progress_eligible: true,
+        closeout_authority: contract.closeout_and_promotion.closeout_authority.clone(),
+        closeout_verdict_binding: String::from("pending_nexus_closeout"),
+        contribution_digest: String::new(),
+        claim_boundary: String::from(
+            "This receipt is model-progress eligible local-update work but does not pre-claim Nexus acceptance. Nexus closeout truth must set accepted_for_aggregation before the work can count as a model-progress participant.",
+        ),
+    };
+    receipt.contribution_digest = receipt.stable_contribution_digest();
+    receipt.validate()?;
+    Ok(receipt)
 }
 
 #[derive(Clone)]
@@ -922,6 +1703,143 @@ fn write_local_update_report(
     })
 }
 
+fn write_local_update_artifact_manifest(
+    output_root: &Path,
+    relative_path: &str,
+    manifest: &A1MinimalDistributedLmLocalUpdateArtifactManifest,
+) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+    manifest.validate()?;
+    write_local_update_json(output_root, relative_path, manifest)
+}
+
+fn write_local_update_contribution_receipt(
+    output_root: &Path,
+    relative_path: &str,
+    receipt: &A1MinimalDistributedLmLocalUpdateContributionReceipt,
+) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+    receipt.validate()?;
+    write_local_update_json(output_root, relative_path, receipt)
+}
+
+fn write_local_update_json<T: Serialize>(
+    output_root: &Path,
+    relative_path: &str,
+    value: &T,
+) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+    let output_path = output_root.join(relative_path);
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            A1MinimalDistributedLmLocalUpdateError::CreateDir {
+                path: parent.display().to_string(),
+                error,
+            }
+        })?;
+    }
+    let mut bytes = serde_json::to_vec_pretty(value)?;
+    bytes.push(b'\n');
+    fs::write(output_path.as_path(), bytes).map_err(|error| {
+        A1MinimalDistributedLmLocalUpdateError::Write {
+            path: output_path.display().to_string(),
+            error,
+        }
+    })
+}
+
+fn input_shard_ref(
+    bundle: &A1MinimalDistributedLmTokenizerDatasetBundle,
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+) -> Result<A1MinimalDistributedLmInputShardRef, A1MinimalDistributedLmLocalUpdateError> {
+    let shard = bundle.training_shards.first().ok_or_else(|| {
+        A1MinimalDistributedLmLocalUpdateError::Invalid {
+            detail: String::from("tokenizer/dataset bundle has no training shard"),
+        }
+    })?;
+    if shard.tokenizer_digest != report.tokenizer_digest
+        || bundle.training_dataset_digest != report.tokenized_dataset_digest
+    {
+        return invalid_local_update(String::from(
+            "tokenizer/dataset bundle identity does not match local-update report",
+        ));
+    }
+    Ok(A1MinimalDistributedLmInputShardRef {
+        shard_id: shard.shard_id.clone(),
+        split_name: shard.split_name.clone(),
+        storage_ref: shard.storage_ref.clone(),
+        source_shard_digest: shard.source_shard_digest.clone(),
+        tokenized_dataset_digest: bundle.training_dataset_digest.clone(),
+    })
+}
+
+fn input_token_range(
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+) -> Result<A1MinimalDistributedLmInputTokenRange, A1MinimalDistributedLmLocalUpdateError> {
+    let context_length = report
+        .steps
+        .first()
+        .and_then(|step| step.train_batch_start_positions.first())
+        .map(|_| report.consumed_token_count / report.local_step_count)
+        .ok_or_else(|| A1MinimalDistributedLmLocalUpdateError::Invalid {
+            detail: String::from("local-update report has no step start positions"),
+        })?;
+    if context_length == 0 {
+        return invalid_local_update(String::from(
+            "local-update report emitted zero context length",
+        ));
+    }
+    let mut starts = Vec::new();
+    for step in &report.steps {
+        for start in &step.train_batch_start_positions {
+            starts.push(*start as u64);
+        }
+    }
+    starts.sort_unstable();
+    let start_token =
+        starts
+            .first()
+            .copied()
+            .ok_or_else(|| A1MinimalDistributedLmLocalUpdateError::Invalid {
+                detail: String::from("local-update report has no token starts"),
+            })?;
+    let max_start = starts.last().copied().unwrap_or(start_token);
+    let end_token_exclusive = max_start + context_length + 1;
+    Ok(A1MinimalDistributedLmInputTokenRange {
+        start_token,
+        end_token_exclusive,
+        context_length,
+        window_start_positions: starts,
+        covered_token_count: end_token_exclusive - start_token,
+        consumed_token_count: report.consumed_token_count,
+    })
+}
+
+fn first_step_base_checkpoint_digest(
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+) -> Result<String, A1MinimalDistributedLmLocalUpdateError> {
+    let first =
+        report
+            .steps
+            .first()
+            .ok_or_else(|| A1MinimalDistributedLmLocalUpdateError::Invalid {
+                detail: String::from("local-update report has no steps"),
+            })?;
+    sha256_uri_from_digest(
+        first.model_state_digest_before.as_str(),
+        "first step model_state_digest_before",
+    )
+}
+
+fn checkpoint_ref(report: &A1MinimalDistributedLmLocalUpdateReport, step: u64) -> String {
+    format!("checkpoint://{}/step-{step:06}", report.run_id)
+}
+
+fn output_checkpoint_ref(report: &A1MinimalDistributedLmLocalUpdateReport) -> String {
+    checkpoint_ref(report, report.local_step_count)
+}
+
+fn output_delta_ref(report: &A1MinimalDistributedLmLocalUpdateReport) -> String {
+    format!("delta://{}/lm_head.weight", report.run_id)
+}
+
 fn scalar_from_nn_tensor(tensor: &NnTensor) -> Result<f32, A1MinimalDistributedLmLocalUpdateError> {
     let values = tensor.as_f32_slice()?;
     if values.len() != 1 {
@@ -1021,6 +1939,20 @@ fn ensure_finite(value: f32, field: &str) -> Result<(), A1MinimalDistributedLmLo
     Ok(())
 }
 
+fn ensure_local_update_identity(
+    work_class: &str,
+    replica_type: &str,
+    field: &str,
+) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+    if work_class != A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WORK_CLASS {
+        return invalid_local_update(format!("{field} work_class drifted"));
+    }
+    if replica_type != A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPLICA_TYPE {
+        return invalid_local_update(format!("{field} replica_type drifted"));
+    }
+    Ok(())
+}
+
 fn ensure_sha256_uri(
     value: &str,
     field: &str,
@@ -1035,6 +1967,22 @@ fn ensure_sha256_uri(
         ));
     }
     Ok(())
+}
+
+fn sha256_uri_from_digest(
+    value: &str,
+    field: &str,
+) -> Result<String, A1MinimalDistributedLmLocalUpdateError> {
+    if value.starts_with("sha256:") {
+        ensure_sha256_uri(value, field)?;
+        return Ok(String::from(value));
+    }
+    if value.len() == 64 && value.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Ok(format!("sha256:{value}"));
+    }
+    invalid_local_update(format!(
+        "field `{field}` must contain either sha256:<hex> or 64-hex sha256 digest"
+    ))
 }
 
 fn invalid_local_update<T>(detail: String) -> Result<T, A1MinimalDistributedLmLocalUpdateError> {
@@ -1055,9 +2003,12 @@ fn sha256_uri_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {
 mod tests {
     use super::{
         load_a1_minimal_distributed_lm_local_update_checkpoint,
+        load_a1_minimal_distributed_lm_local_update_contribution_receipt,
         write_a1_minimal_distributed_lm_local_update_fixture,
-        A1MinimalDistributedLmLocalUpdateCheckpoint, A1MinimalDistributedLmLocalUpdateError,
-        A1MinimalDistributedLmLocalUpdateReport,
+        A1MinimalDistributedLmLocalUpdateArtifactManifest,
+        A1MinimalDistributedLmLocalUpdateCheckpoint,
+        A1MinimalDistributedLmLocalUpdateContributionReceipt,
+        A1MinimalDistributedLmLocalUpdateError, A1MinimalDistributedLmLocalUpdateReport,
     };
     use tempfile::tempdir;
 
@@ -1075,6 +2026,20 @@ mod tests {
         .expect("A1 minimal distributed LM local update checkpoint fixture should parse")
     }
 
+    fn fixture_artifact_manifest() -> A1MinimalDistributedLmLocalUpdateArtifactManifest {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json"
+        ))
+        .expect("A1 minimal distributed LM local update artifact manifest fixture should parse")
+    }
+
+    fn fixture_contribution_receipt() -> A1MinimalDistributedLmLocalUpdateContributionReceipt {
+        serde_json::from_str(include_str!(
+            "../../../fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json"
+        ))
+        .expect("A1 minimal distributed LM local update contribution receipt fixture should parse")
+    }
+
     #[test]
     fn a1_minimal_distributed_lm_local_update_fixture_validates() {
         fixture_report()
@@ -1083,6 +2048,12 @@ mod tests {
         fixture_checkpoint_step4()
             .validate()
             .expect("local update checkpoint fixture should validate");
+        fixture_artifact_manifest()
+            .validate()
+            .expect("local update artifact manifest fixture should validate");
+        fixture_contribution_receipt()
+            .validate()
+            .expect("local update contribution receipt fixture should validate");
     }
 
     #[test]
@@ -1123,7 +2094,73 @@ mod tests {
             .join("fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step4_v1.json");
         let loaded = load_a1_minimal_distributed_lm_local_update_checkpoint(checkpoint_path)?;
         assert_eq!(loaded, fixture_checkpoint_step4());
+        let manifest_path = root.path().join(
+            "fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json",
+        );
+        let loaded_manifest =
+            super::load_a1_minimal_distributed_lm_local_update_artifact_manifest(manifest_path)?;
+        assert_eq!(loaded_manifest, fixture_artifact_manifest());
+        let receipt_path = root.path().join(
+            "fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json",
+        );
+        let loaded_receipt =
+            load_a1_minimal_distributed_lm_local_update_contribution_receipt(receipt_path)?;
+        assert_eq!(loaded_receipt, fixture_contribution_receipt());
         Ok(())
+    }
+
+    #[test]
+    fn a1_minimal_distributed_lm_contribution_receipt_maps_to_openagents_outcome_fields() {
+        let report = fixture_report();
+        let receipt = fixture_contribution_receipt();
+        assert_eq!(receipt.training_run_id, report.run_id);
+        assert_eq!(receipt.run_id, report.run_id);
+        assert_eq!(receipt.assignment_id, report.assignment_id);
+        assert_eq!(receipt.worker_id, report.worker_id);
+        assert_eq!(receipt.tokenizer_digest, report.tokenizer_digest);
+        assert_eq!(
+            receipt.tokenized_dataset_digest,
+            report.tokenized_dataset_digest
+        );
+        assert_eq!(receipt.base_checkpoint_ref, report.base_checkpoint_ref);
+        assert_eq!(receipt.local_step_count, report.local_step_count);
+        assert_eq!(receipt.consumed_token_count, report.consumed_token_count);
+        assert_eq!(receipt.loss_before, report.loss_before);
+        assert_eq!(receipt.loss_after, report.loss_after);
+        assert_eq!(
+            receipt.object_digest,
+            report.checkpoint_step4.checkpoint_digest
+        );
+        assert_eq!(receipt.output_delta_digest, report.delta_digest);
+        assert_eq!(receipt.validator_disposition, "replay_required");
+        assert_eq!(
+            receipt.validator_verdict_binding,
+            "pending_validator_replay"
+        );
+        assert_eq!(receipt.aggregation_eligibility, "eligible");
+        assert!(!receipt.accepted_for_aggregation);
+        assert_eq!(receipt.aggregation_weight_basis, "tokens");
+        assert_eq!(
+            receipt.aggregation_weight_value,
+            report.consumed_token_count
+        );
+        assert_eq!(receipt.aggregation_weight_bps, 10_000);
+        assert!(receipt.model_progress_eligible);
+        assert_eq!(receipt.closeout_verdict_binding, "pending_nexus_closeout");
+    }
+
+    #[test]
+    fn a1_minimal_distributed_lm_manifest_digest_ignores_materialized_paths() {
+        let mut manifest = fixture_artifact_manifest();
+        let original_digest = manifest.stable_artifact_manifest_digest();
+        manifest
+            .materialized_paths
+            .push(super::A1MinimalDistributedLmMaterializedArtifactPath {
+                artifact_kind: String::from("checkpoint_step4"),
+                path: String::from("/tmp/relocated/a1/checkpoint_step4.json"),
+                byte_count: Some(123),
+            });
+        assert_eq!(manifest.stable_artifact_manifest_digest(), original_digest);
     }
 
     #[test]

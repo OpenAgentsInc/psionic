@@ -208,6 +208,19 @@ global gradient clipping and AdamW, persisting optimizer plus deterministic
 cursor state, and proving exact resume against an uninterrupted four-step run.
 It is explicitly LM-head-only and does not claim full Transformer backward
 coverage.
+The same retained proof now writes a lane-specific artifact manifest at
+`fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json`
+and a contribution receipt at
+`fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json`.
+Those artifacts bind the OpenAgents outcome fields Nexus needs for closeout:
+training run, stage, window, assignment, worker and node identity, tokenizer and
+dataset digests, input shard and token range, base checkpoint ref and digest,
+step and token counts, loss before/after, output checkpoint and delta digests,
+validator disposition, aggregation eligibility, and aggregation weight. The
+fixture remains `replay_required` and `accepted_for_aggregation: false`; it is
+model-progress eligible only after validator replay and Nexus closeout accept
+the work. Materialized paths are excluded from the logical artifact-manifest
+digest.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator
