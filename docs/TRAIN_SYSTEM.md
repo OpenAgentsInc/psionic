@@ -356,6 +356,20 @@ optimizer step, fp32/fp16 compute-dtype parity, and optimizer pre-step state
 digests. It still does not claim transport-backed FSDP execution, distributed
 throughput, or actual-lane cluster qualification.
 
+The repo now also owns the ninth bounded full-port A2 reference-lane tranche in
+`crates/psionic-train/src/cs336_a2_fsdp_full_params_receipt.rs`, the fixture
+generator
+`crates/psionic-train/examples/psion_cs336_a2_fsdp_full_params_receipt.rs`, and
+the retained fixture
+`fixtures/training/cs336_a2_fsdp_full_params_receipt_v1.json`. That surface
+maps the current Stanford `fsdp_gather_full_params` adapter name to a bounded
+host-reference full-state reconstruction receipt. It records every
+ToyFSDPModel trainable parameter name, sharded Embedding/Linear all-gather
+evidence, replicated parameter return-as-is handling, per-step state-dict
+digests, and fp32/fp16 comparisons against a deterministic non-parallel
+baseline. It still does not claim transport-backed FSDP execution, distributed
+throughput, or actual-lane cluster qualification.
+
 The current coverage bar for Stanford CS336 A2 now lives in
 `crates/psionic-train/src/cs336_a2_full_port_conformance.rs`, the fixture
 generator
@@ -367,9 +381,9 @@ surface no longer claims full current A2 parity. It maps the current
 `get_ddp` and `ddp_on_after_backward` names to bounded host-reference DDP
 receipts, keeps the older bucketed DDP receipt as retained systems evidence,
 maps `get_fsdp` to the bounded wrapper lifecycle receipt, maps
-`fsdp_on_after_backward` to a bounded after-backward receipt, and marks the
-remaining FSDP full-parameter gather surface as tracked missing work in
-[#958](https://github.com/OpenAgentsInc/psionic/issues/958). The claim boundary
+`fsdp_on_after_backward` to a bounded after-backward receipt, and maps
+`fsdp_gather_full_params` to a bounded full-state reconstruction receipt. No
+current adapter row remains `missing_tracked`, but the claim boundary
 still stops short of actual-lane distributed throughput, operator closure, and
 transport-backed DDP/FSDP execution, and A2 remains non-blocking for
 `a1_minimal_distributed_lm_001`.

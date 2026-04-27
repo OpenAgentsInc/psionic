@@ -1,0 +1,1136 @@
+{
+  "schema_version": "psion.cs336_a2.fsdp_full_params_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "wrapper_receipt_path": "fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json",
+  "after_backward_receipt_path": "fixtures/training/cs336_a2_fsdp_after_backward_receipt_v1.json",
+  "stanford_adapter_name": "fsdp_gather_full_params",
+  "config": {
+    "world_size": 2,
+    "adapter_name": "fsdp_gather_full_params",
+    "compute_dtype_cases": [
+      "fp32",
+      "fp16"
+    ],
+    "training_steps": 3
+  },
+  "expected_parameter_names": [
+    "embedding.weight",
+    "norm1.weight",
+    "linear1.weight",
+    "norm2.weight",
+    "linear2.weight",
+    "lm_head.weight"
+  ],
+  "compute_cases": [
+    {
+      "compute_dtype": "fp32",
+      "tolerance": 0.0,
+      "step_receipts": [
+        {
+          "step": 0,
+          "parameter_receipts": [
+            {
+              "parameter_path": "embedding.weight",
+              "parameter_family": "embedding",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:146885dc58bc5691c65c1c94d76cf72373dfddd96c9591e41c2da9417a4edc58"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:4322d5924172566924391238924278477dbfde1271edb5968d3097182c3b0be4"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:5bfdf9bc7aabeec138c0b1b27f8775abdbe99a90e9241045d29bb753f98c592d",
+              "non_parallel_baseline_digest": "sha256:5bfdf9bc7aabeec138c0b1b27f8775abdbe99a90e9241045d29bb753f98c592d",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "norm1.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                64
+              ],
+              "element_count": 64,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:17156b86d19097ea133b11e1f6d1919b7d4a3d33bb1406fbac037b6961bee91d",
+              "non_parallel_baseline_digest": "sha256:17156b86d19097ea133b11e1f6d1919b7d4a3d33bb1406fbac037b6961bee91d",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "linear1.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                128,
+                64
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:bbef86b6f735a76902cdd0f6cacb5e653de9eb0613a9957018aabccf934328fc"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 64,
+                  "end_row": 128,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:d002cfa2112cbf7d876cc842d2f6a47434b523072760bfee7242ff09b1f44116"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:4eff65663647ba40a1fb4d2eb8b06277db2cce5b4dd4963cc4f940ff64a03f63",
+              "non_parallel_baseline_digest": "sha256:4eff65663647ba40a1fb4d2eb8b06277db2cce5b4dd4963cc4f940ff64a03f63",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "norm2.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                128
+              ],
+              "element_count": 128,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:0793e30815e5806333a8d5d0f79d0745ea5c5a1d3e43022868a11428591d9357",
+              "non_parallel_baseline_digest": "sha256:0793e30815e5806333a8d5d0f79d0745ea5c5a1d3e43022868a11428591d9357",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "linear2.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                64,
+                128
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 32,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:7ed67945c45ccd79e6fcba31991c6beb3006b6a4f5f86f4ef5e3390a5bf4c1c2"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 32,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:82db46f2c3c857a4093182bdca2e98b59c745fee2c8fc5c8ef23c44e2f01281c"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:dd7d9c41b1f6e6722ed3f4ebb34feaf3d3b91977664fbcdd29da4ae369c07989",
+              "non_parallel_baseline_digest": "sha256:dd7d9c41b1f6e6722ed3f4ebb34feaf3d3b91977664fbcdd29da4ae369c07989",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:3b4725f4db7346c61f0f623aa7efccc26f033c081d639d9679842c0799815e68"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:dd4882104e51fdadf4ac335b169ce659c9d2986a13fad7721071284d793fe3c1"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:35f465448b2fec5989d32501754ada4e59b88da568fd7f578f6dbe6b5bea8654",
+              "non_parallel_baseline_digest": "sha256:35f465448b2fec5989d32501754ada4e59b88da568fd7f578f6dbe6b5bea8654",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            }
+          ],
+          "state_dict_parameter_count": 6,
+          "gathered_state_dict_digest": "sha256:e40a30e20b25762a250718e8f287a8893650f91d499b05e78a756ac409d980b0",
+          "non_parallel_state_dict_digest": "sha256:e40a30e20b25762a250718e8f287a8893650f91d499b05e78a756ac409d980b0",
+          "matches_non_parallel_baseline": true,
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "step": 1,
+          "parameter_receipts": [
+            {
+              "parameter_path": "embedding.weight",
+              "parameter_family": "embedding",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:38d6eba2190023df9104d55bfd3fbb9f8bc6adf6ea15a988ee2f4d978f28dedf"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:b6bd74a7e5a8cddc3748336af2e732eb8f421978b30c48c2d4f3a57088d8e95f"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:b429589aad176450ca943b8b9ca26c08b0788181696918bd9c124023329879aa",
+              "non_parallel_baseline_digest": "sha256:b429589aad176450ca943b8b9ca26c08b0788181696918bd9c124023329879aa",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "norm1.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                64
+              ],
+              "element_count": 64,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:7743da01d718d74539e8d8561e8fd7bc2693347c4972c884a38a473ddbd375fb",
+              "non_parallel_baseline_digest": "sha256:7743da01d718d74539e8d8561e8fd7bc2693347c4972c884a38a473ddbd375fb",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "linear1.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                128,
+                64
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:1189a7cc27b912dc3a11b70d4bc63efe218278472f3d0ffbb954c92e3221dc08"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 64,
+                  "end_row": 128,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:1eda66f6bc8776b6dd2decf6d472f739ddf1a2ec34bac73ff816c94256e43204"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:5cb171b782e9de22a440f0fad70f8eb544e9d0f2575147e417da4007a2e0b015",
+              "non_parallel_baseline_digest": "sha256:5cb171b782e9de22a440f0fad70f8eb544e9d0f2575147e417da4007a2e0b015",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "norm2.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                128
+              ],
+              "element_count": 128,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:f006320c388699983a14b2fa56f1aa8cd6d3a9f699e74752a7d6899562dd187e",
+              "non_parallel_baseline_digest": "sha256:f006320c388699983a14b2fa56f1aa8cd6d3a9f699e74752a7d6899562dd187e",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "linear2.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                64,
+                128
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 32,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:626b20daac87ca4d7b008de7f9b910a11573b1a9e9c75b20fb10aa5613992609"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 32,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:a92b090cb2577f55771722cde67cb9e8d0893b2fe75ddc64028ada42db333ab5"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:8697de4b379967e0ea12768d7cd03f7abf9764b7d0554ff93aa5ff8a7ba8274d",
+              "non_parallel_baseline_digest": "sha256:8697de4b379967e0ea12768d7cd03f7abf9764b7d0554ff93aa5ff8a7ba8274d",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:221afb5cd8cfb87f31360296a91df773783c21d92cf02576a533346da7a3cd3c"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:4277b52ad9624a694f15111f0227c1e17f9f63299de440c9656b454d4626799a"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:58016f531df26f9f4915fbe33919684d241ce38c3c8b4ca9ac5ae4166c3b6d54",
+              "non_parallel_baseline_digest": "sha256:58016f531df26f9f4915fbe33919684d241ce38c3c8b4ca9ac5ae4166c3b6d54",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            }
+          ],
+          "state_dict_parameter_count": 6,
+          "gathered_state_dict_digest": "sha256:ea08f519ba4ed68f2698fa6ce19600c876e714e19088915b72a5d95bab74d4c4",
+          "non_parallel_state_dict_digest": "sha256:ea08f519ba4ed68f2698fa6ce19600c876e714e19088915b72a5d95bab74d4c4",
+          "matches_non_parallel_baseline": true,
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "step": 2,
+          "parameter_receipts": [
+            {
+              "parameter_path": "embedding.weight",
+              "parameter_family": "embedding",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:43ec573fd27f43c4b118021f0b23ff0c9dbb614cdecace9c85a4a46be8a17ef1"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:d940569320ff28108e9655312ac3c35d0e0945a69c2709db4f4d04736935c857"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:4cae2c3289ee99a2f1294b76d1f4fc5cb9dcd7d6cbf237fa153628c0500620c3",
+              "non_parallel_baseline_digest": "sha256:4cae2c3289ee99a2f1294b76d1f4fc5cb9dcd7d6cbf237fa153628c0500620c3",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "norm1.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                64
+              ],
+              "element_count": 64,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:eda6647c658f56950624fcc21c735ce08289e128b407782d2a70963fc89b3e87",
+              "non_parallel_baseline_digest": "sha256:eda6647c658f56950624fcc21c735ce08289e128b407782d2a70963fc89b3e87",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "linear1.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                128,
+                64
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:6ca4a7eb5bbe7cf72ff8ae5b54ad5b0346d444bbc814f4134e96f34d51036f2d"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 64,
+                  "end_row": 128,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:052479fa5228712d564fca20d45b4a835b13beaf463851cb271d4d017b0575ad"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:66a4816e7e6752371e8b48be530b5b78d90c6cc6c21563e10721613e153687dc",
+              "non_parallel_baseline_digest": "sha256:66a4816e7e6752371e8b48be530b5b78d90c6cc6c21563e10721613e153687dc",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "norm2.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                128
+              ],
+              "element_count": 128,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:8b196d85429de846096780946ff482e65a73294cef72bac9471470b681a311fc",
+              "non_parallel_baseline_digest": "sha256:8b196d85429de846096780946ff482e65a73294cef72bac9471470b681a311fc",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "linear2.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                64,
+                128
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 32,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:288cdcdecc3953eb9407954814755fb4fc9abfecef584f41ede88c7043664081"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 32,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:d95ee67f17809b6a1fac61a859844b3ac04ad3faddc4d5e6aa4fbd78c33c71af"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:a4d968c4e8aa72be0a4181ae3c857c06d04d590bec8ed5509f31bec318ea33b5",
+              "non_parallel_baseline_digest": "sha256:a4d968c4e8aa72be0a4181ae3c857c06d04d590bec8ed5509f31bec318ea33b5",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:6164130e0057dc4f041dec51122a75a2bd445b47984121a7b109dccdfc898fc2"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:d83887f3c435ba5e77da63a0f55d69b74763583680fc4b4d899ab4ab6a6f542f"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:cb38e50cc86c2728bf35f23694c6a8efd68847193ea166cf86428bce75d57e40",
+              "non_parallel_baseline_digest": "sha256:cb38e50cc86c2728bf35f23694c6a8efd68847193ea166cf86428bce75d57e40",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0
+            }
+          ],
+          "state_dict_parameter_count": 6,
+          "gathered_state_dict_digest": "sha256:2a18c46acc4b0d7b7cd9fc89b42d38c7ae84b8d3e9d2cad527d30a2e9455796b",
+          "non_parallel_state_dict_digest": "sha256:2a18c46acc4b0d7b7cd9fc89b42d38c7ae84b8d3e9d2cad527d30a2e9455796b",
+          "matches_non_parallel_baseline": true,
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        }
+      ],
+      "all_steps_match_non_parallel_baseline": true,
+      "max_abs_delta_vs_non_parallel_baseline": 0.0
+    },
+    {
+      "compute_dtype": "fp16",
+      "tolerance": 0.0001,
+      "step_receipts": [
+        {
+          "step": 0,
+          "parameter_receipts": [
+            {
+              "parameter_path": "embedding.weight",
+              "parameter_family": "embedding",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:52ded1da16f8318073779a78a9ddd2590af52fed08982b053af8d45d81ea8701"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:86c3b4b15150c7f19284eed9d568f07d7a4cf5e8e89a2fe6d05c1c108c2edfe0"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:2a5420e2b5ca10d9c1628f7a6773694fb3c9a6bd9731da93dcd903ec0647778c",
+              "non_parallel_baseline_digest": "sha256:2a5420e2b5ca10d9c1628f7a6773694fb3c9a6bd9731da93dcd903ec0647778c",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "norm1.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                64
+              ],
+              "element_count": 64,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:9bd1a25eab29fc47c6196a30a049f25305b0abef7938c47d869cfbfffb34fcee",
+              "non_parallel_baseline_digest": "sha256:9bd1a25eab29fc47c6196a30a049f25305b0abef7938c47d869cfbfffb34fcee",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "linear1.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                128,
+                64
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:b0706c306dcc167ef24f4efa92402b0555148e51fcc25e85c61167ea601c1db8"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 64,
+                  "end_row": 128,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:bfbd6929e5f1649843de3eae90d0ceec8806b7d1037b26af7b86a72be654892f"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:232c28855b059658183d51956e6e8e2283a08436438e2d289b0cda8b1b90ba9d",
+              "non_parallel_baseline_digest": "sha256:232c28855b059658183d51956e6e8e2283a08436438e2d289b0cda8b1b90ba9d",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "norm2.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                128
+              ],
+              "element_count": 128,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:51af8440f186baf1bbf3f860f2d2db07e11cdcd2471945ce1265bcc77627bbb0",
+              "non_parallel_baseline_digest": "sha256:51af8440f186baf1bbf3f860f2d2db07e11cdcd2471945ce1265bcc77627bbb0",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "linear2.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                64,
+                128
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 32,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:21a34124d9491533e4f6d5251f958a0df391ce2c0d2a4258395cf03a6abdf3a0"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 32,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:4109c0a08358ff7fb137fc476a2f35a27585cb50f8e1ac990e416b04e103d9d5"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:78c261678aa0b9880c48a06a87bd6cbb9adce5d76a140942eb4be74ec972894c",
+              "non_parallel_baseline_digest": "sha256:78c261678aa0b9880c48a06a87bd6cbb9adce5d76a140942eb4be74ec972894c",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:e96437bb0998903b3172a3c4badae2a343cc7cd13ef6edc918249f63db5275cc"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:c4254c230c9576ecf7fc91a0481ce3cdfc818434f4eda19fed407be51ae30d19"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:cfeeff18f99a1f844ed958b3c189eeead830ca652925775ec513c6d055d06096",
+              "non_parallel_baseline_digest": "sha256:cfeeff18f99a1f844ed958b3c189eeead830ca652925775ec513c6d055d06096",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            }
+          ],
+          "state_dict_parameter_count": 6,
+          "gathered_state_dict_digest": "sha256:8e90f51011f8107dc5ff882c99a80bc3c4d3793af93686880688a03e6b79893d",
+          "non_parallel_state_dict_digest": "sha256:8e90f51011f8107dc5ff882c99a80bc3c4d3793af93686880688a03e6b79893d",
+          "matches_non_parallel_baseline": true,
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "step": 1,
+          "parameter_receipts": [
+            {
+              "parameter_path": "embedding.weight",
+              "parameter_family": "embedding",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:722d38442345ad425cd0ed499fb6e405a818e7abbe2d0037e6e7e441b30a9961"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:0adad0930a196a4639377fc6abbdeb289f0d5fdee62b7b770048f46c89e4dade"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:23b062987c85354a3466b0e4f272f402705a3479865c8dcbf2da8b3428e191e7",
+              "non_parallel_baseline_digest": "sha256:23b062987c85354a3466b0e4f272f402705a3479865c8dcbf2da8b3428e191e7",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "norm1.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                64
+              ],
+              "element_count": 64,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:374cb7e39c822aa27c6292ce486e74a24eeb7c9d8a5d1843691815cfcfd901c5",
+              "non_parallel_baseline_digest": "sha256:374cb7e39c822aa27c6292ce486e74a24eeb7c9d8a5d1843691815cfcfd901c5",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "linear1.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                128,
+                64
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:78eb7aa0d1dcf8e19d50e8297c764022a928a99c67cf565ef0a93cf38682de3e"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 64,
+                  "end_row": 128,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:f6f10f1c0cceb0f0fb180d41bb1be862e515ba5370ecb115451b3fbb7ddf93ed"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:ca5f45062143901654734125a49cda3a693c5fcbaab672fba889ae4660a5646c",
+              "non_parallel_baseline_digest": "sha256:ca5f45062143901654734125a49cda3a693c5fcbaab672fba889ae4660a5646c",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "norm2.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                128
+              ],
+              "element_count": 128,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:8ab38305f190ae4d8926a170bc14aa291898237eca0c693bf53cca566259f235",
+              "non_parallel_baseline_digest": "sha256:8ab38305f190ae4d8926a170bc14aa291898237eca0c693bf53cca566259f235",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "linear2.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                64,
+                128
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 32,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:8f85b1594bec20dad1b9220d760c1a7f21398047201676c13084049d96636c19"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 32,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:d1ae1e8be8a2639852a02d97a81bd5a8d42195b570088e88b428c19015150e3c"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:596c8bd856dd03c4e08c45033c443e8999b432d856b69ae809c26023968b970d",
+              "non_parallel_baseline_digest": "sha256:596c8bd856dd03c4e08c45033c443e8999b432d856b69ae809c26023968b970d",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:3e44676c9be310f985f6dcc77503518e70dc44cdb668711a05e335d4df4d5e75"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:5749b7a67b76c1d32e91c7681726cfa098be2f99a930efe81b9583a56cd35098"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:d68a234742c21459010f7b8c60dffc0972fa8340817927c636528af6e41e18eb",
+              "non_parallel_baseline_digest": "sha256:d68a234742c21459010f7b8c60dffc0972fa8340817927c636528af6e41e18eb",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            }
+          ],
+          "state_dict_parameter_count": 6,
+          "gathered_state_dict_digest": "sha256:036d7eaeaf15113dc6d08a8bf72d63e78f3644cf327607f7b5532f2eae7ed23c",
+          "non_parallel_state_dict_digest": "sha256:036d7eaeaf15113dc6d08a8bf72d63e78f3644cf327607f7b5532f2eae7ed23c",
+          "matches_non_parallel_baseline": true,
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "step": 2,
+          "parameter_receipts": [
+            {
+              "parameter_path": "embedding.weight",
+              "parameter_family": "embedding",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:f3c8dafa4ebf9e13f60adaa2843a19c1864910f9e8816028999b4b725447714a"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:4787f41fb6b2bf3ba8b5d8dc3c0102b6addbc3fbbabd9fb842c199f4ff351c46"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:56aa43f04006f6d60efc62a0c85a2c963afa2a44048c9b832bfef073a01f92de",
+              "non_parallel_baseline_digest": "sha256:56aa43f04006f6d60efc62a0c85a2c963afa2a44048c9b832bfef073a01f92de",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "norm1.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                64
+              ],
+              "element_count": 64,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:db52a7ddc241fc5fdd86b6942c61cd27a5d4f1d72fc6f7722be618495b770c8c",
+              "non_parallel_baseline_digest": "sha256:db52a7ddc241fc5fdd86b6942c61cd27a5d4f1d72fc6f7722be618495b770c8c",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "linear1.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                128,
+                64
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:b96056e16a713162ac93516c83e01097a16b745479321cf8e567b262637e42d2"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 64,
+                  "end_row": 128,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:ae83164ee7fbf9e146766097404c73c3842f091ffa0bf58c1dc3058c4349b209"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:cfd0091a2a9d174e92a714f034d93eea33eef2ed478546a3b129efb3d6db236e",
+              "non_parallel_baseline_digest": "sha256:cfd0091a2a9d174e92a714f034d93eea33eef2ed478546a3b129efb3d6db236e",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "norm2.weight",
+              "parameter_family": "replicated",
+              "source_kind": "replicated_returned_as_is",
+              "shape": [
+                128
+              ],
+              "element_count": 128,
+              "shard_axis": null,
+              "rank_shards": [],
+              "replicated_source_ranks": [
+                0,
+                1
+              ],
+              "replicated_parameter_returned_as_is": true,
+              "gathered_full_parameter_digest": "sha256:aeb090317e0047a47d5c41ae1866cecad08a211a393ccdd0e9028b0da6f23dcc",
+              "non_parallel_baseline_digest": "sha256:aeb090317e0047a47d5c41ae1866cecad08a211a393ccdd0e9028b0da6f23dcc",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "linear2.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                64,
+                128
+              ],
+              "element_count": 8192,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 32,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:687d2630faeb09c1e33e90dca31f1085e1b47cd7da2d9484f250c513a9493740"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 32,
+                  "end_row": 64,
+                  "element_count": 4096,
+                  "shard_digest": "sha256:0976395b69fcf35a67268d083c1b9cd10ba9db457436b06799adfa4d5e355159"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:0dda877ee7c6837b59eb66b8ef125f984355c14461e0eee93d647637603892f9",
+              "non_parallel_baseline_digest": "sha256:0dda877ee7c6837b59eb66b8ef125f984355c14461e0eee93d647637603892f9",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            },
+            {
+              "parameter_path": "lm_head.weight",
+              "parameter_family": "linear",
+              "source_kind": "row_sharded_all_gather",
+              "shape": [
+                100,
+                64
+              ],
+              "element_count": 6400,
+              "shard_axis": 0,
+              "rank_shards": [
+                {
+                  "rank": 0,
+                  "start_row": 0,
+                  "end_row": 50,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:5a90bbc9dbc55a4bd764de6f557149ba5b8570c5edecac4bb51af8e5e035a966"
+                },
+                {
+                  "rank": 1,
+                  "start_row": 50,
+                  "end_row": 100,
+                  "element_count": 3200,
+                  "shard_digest": "sha256:41086f2d4217d83f24daab3bd2f72c49c232a999965a3f2ffe52865dfaf05703"
+                }
+              ],
+              "replicated_source_ranks": [],
+              "replicated_parameter_returned_as_is": false,
+              "gathered_full_parameter_digest": "sha256:0f6d7e1fe3d50182975aa8f1e0ea11b48ef054d9bff5ba7393af54d3d432bb36",
+              "non_parallel_baseline_digest": "sha256:0f6d7e1fe3d50182975aa8f1e0ea11b48ef054d9bff5ba7393af54d3d432bb36",
+              "matches_non_parallel_baseline": true,
+              "max_abs_delta_vs_non_parallel_baseline": 0.0001
+            }
+          ],
+          "state_dict_parameter_count": 6,
+          "gathered_state_dict_digest": "sha256:91fb72ef24f029fb7f6a43cfd6e2f1b55fba35d2cc9f09f46c8b57bb7ddf836a",
+          "non_parallel_state_dict_digest": "sha256:91fb72ef24f029fb7f6a43cfd6e2f1b55fba35d2cc9f09f46c8b57bb7ddf836a",
+          "matches_non_parallel_baseline": true,
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        }
+      ],
+      "all_steps_match_non_parallel_baseline": true,
+      "max_abs_delta_vs_non_parallel_baseline": 0.0001
+    }
+  ],
+  "all_cases_match_non_parallel_baseline": true,
+  "claim_boundary": "This receipt proves the bounded CS336 A2 fsdp_gather_full_params surface inside psionic. It records host-owned two-rank full state-dict reconstruction for each ToyFSDPModel parameter after three bounded training steps, distinguishes sharded Linear/Embedding tensors from replicated RMSNorm-style tensors, and retains fp32/fp16 comparisons against a deterministic non-parallel baseline. It does not claim transport-backed FSDP execution, real collectives, or distributed throughput."
+}

@@ -242,6 +242,34 @@ That FSDP after-backward tranche now provides:
 - one honest boundary note that this is host-owned reference evidence, not
   transport-backed FSDP execution
 
+The ninth bounded A2 tranche now owns:
+
+- one bounded `fsdp_gather_full_params` receipt for the current Spring 2026 FSDP
+  adapter surface
+- one retained full state-dict reconstruction proof after each of the three
+  bounded FSDP training steps used by the current Stanford test
+- one retained proof that sharded Embedding and Linear tensors are reconstructed
+  from per-rank row shards
+- one retained proof that replicated RMSNorm-style parameters are returned as-is
+- one retained fp32/fp16 comparison surface against a deterministic non-parallel
+  baseline
+
+Primary landing surfaces:
+
+- `crates/psionic-train/src/cs336_a2_fsdp_full_params_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_fsdp_full_params_receipt.rs`
+- `fixtures/training/cs336_a2_fsdp_full_params_receipt_v1.json`
+
+That FSDP full-parameter tranche now provides:
+
+- every trainable ToyFSDPModel parameter name expected by the current
+  `fsdp_gather_full_params` adapter test
+- explicit per-rank shard digests for sharded parameters
+- explicit replicated source-rank handling for replicated parameters
+- per-step gathered state-dict and non-parallel baseline comparison digests
+- one honest boundary note that this is host-owned reference evidence, not
+  transport-backed FSDP execution
+
 ## Current Adapter Surface Realignment
 
 The current Stanford A2 adapter surface in
@@ -262,11 +290,10 @@ The previous Psionic matrix used stale DDP-specific names:
 `ddp_bucketed_on_train_batch_start`. Those retained receipts still matter as
 bounded systems evidence, but they are no longer current Stanford adapter rows.
 
-Current FSDP parity is only partially implemented. The remaining missing
-surface is tracked in:
-
-- [#958](https://github.com/OpenAgentsInc/psionic/issues/958):
-  `fsdp_gather_full_params` full-parameter gather conformance fixture
+Current FSDP adapter-row coverage is implemented only as bounded reference
+evidence. No current Stanford FSDP adapter row remains `missing_tracked`, but
+the lane still does not claim transport-backed FSDP execution or distributed
+throughput.
 
 This A2 realignment is not a prerequisite for `a1_minimal_distributed_lm_001`.
 
@@ -296,15 +323,18 @@ This lane now honestly claims:
   sharded-gradient reduce-scatter evidence, replicated-gradient all-reduce
   equality, fp32 master-gradient restoration, and fp32/fp16 parity before
   optimizer step
+- `psionic` owns a bounded `fsdp_gather_full_params` receipt with retained
+  full state-dict reconstruction, sharded parameter all-gather evidence,
+  replicated parameter return-as-is handling, and fp32/fp16 baseline comparison
+  digests
 - `psionic` now has one checked-in current A2 coverage matrix and one retained
-  conformance report that explicitly marks the remaining FSDP full-parameter
-  gather surface as tracked missing work
+  conformance report with no current adapter row left in `missing_tracked`
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 
 It does not yet claim:
 
 - admitted actual-lane throughput or distributed-cluster qualification
-- current FSDP parity
+- transport-backed current FSDP parity
 - full current Stanford A2 adapter parity
 - transport-backed DDP/FSDP execution
