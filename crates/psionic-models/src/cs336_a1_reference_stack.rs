@@ -432,6 +432,15 @@ impl Cs336A1TransformerLm {
         token_shape: Shape,
         token_ids: &[usize],
     ) -> Result<NnTensor, Cs336A1ReferenceError> {
+        let final_hidden = self.final_hidden_for_tokens(token_shape, token_ids)?;
+        self.logits_from_final_hidden(&final_hidden)
+    }
+
+    pub fn final_hidden_for_tokens(
+        &self,
+        token_shape: Shape,
+        token_ids: &[usize],
+    ) -> Result<NnTensor, Cs336A1ReferenceError> {
         let dims = token_shape.dims();
         if dims.len() < 2 {
             return Err(Cs336A1ReferenceError::InvalidConfiguration {
@@ -483,12 +492,28 @@ impl Cs336A1TransformerLm {
             };
             hidden = block.forward(&hidden, Some(positions.as_slice()))?;
         }
-        let final_hidden = cs336_a1_rms_norm(
+        cs336_a1_rms_norm(
             &hidden,
             self.config.d_model,
             self.rms_norm_eps,
             module_parameter_f32(&self.module, "ln_final.weight", &[self.config.d_model])?,
-        )?;
+        )
+    }
+
+    pub fn logits_from_final_hidden(
+        &self,
+        final_hidden: &NnTensor,
+    ) -> Result<NnTensor, Cs336A1ReferenceError> {
+        let dims = final_hidden.dims();
+        if dims.is_empty() || dims[dims.len() - 1] != self.config.d_model {
+            return Err(Cs336A1ReferenceError::InvalidConfiguration {
+                context: "transformer_lm",
+                detail: format!(
+                    "expected final hidden trailing width {}, found {:?}",
+                    self.config.d_model, dims
+                ),
+            });
+        }
         let lm_head = module_parameter_f32(
             &self.module,
             "lm_head.weight",

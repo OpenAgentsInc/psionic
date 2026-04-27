@@ -2,15 +2,15 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use psionic_core::{Shape, TensorData};
 use psionic_data::{
-    Cs336A1BytePairEncodingArtifacts, train_cs336_a1_byte_pair_encoding_from_path,
-    train_cs336_a1_byte_pair_encoding_from_text,
+    train_cs336_a1_byte_pair_encoding_from_path, train_cs336_a1_byte_pair_encoding_from_text,
+    Cs336A1BytePairEncodingArtifacts,
 };
 use psionic_models::{
     Cs336A1BytePairTokenizer, Cs336A1ReferenceConfig, Cs336A1TransformerLm, TokenizerBoundary,
 };
 use psionic_nn::{
-    LayerError, LossReduction, ModuleStateDict, ModuleStateEntry, ModuleStateEntryKind,
-    ModuleStateLoadMode, ModuleStateView, NnTensor, NnTrainingError, cross_entropy_loss,
+    cross_entropy_loss, LayerError, LossReduction, ModuleStateDict, ModuleStateEntry,
+    ModuleStateEntryKind, ModuleStateLoadMode, ModuleStateView, NnTensor, NnTrainingError,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -595,7 +595,7 @@ impl Cs336A1ReferenceTrainer {
             config.rope_theta,
             config.rms_norm_eps,
         )?;
-        initialize_reference_model(&mut model)?;
+        initialize_cs336_a1_reference_model(&mut model)?;
         Ok(Self {
             config,
             tokenizer_artifacts,
@@ -898,7 +898,7 @@ fn tokenizer_from_artifacts(
     )?)
 }
 
-fn initialize_reference_model(
+pub fn initialize_cs336_a1_reference_model(
     model: &mut Cs336A1TransformerLm,
 ) -> Result<(), Cs336A1ReferenceTrainingError> {
     let mut state_dict = model.state_dict();
@@ -1031,10 +1031,10 @@ fn normalize_dim(rank: usize, dim: isize) -> Result<usize, Cs336A1ReferenceTrain
 #[cfg(test)]
 mod tests {
     use super::{
-        Cs336A1ReferenceTrainer, Cs336A1ReferenceTrainingConfig, cs336_a1_adamw_config,
-        cs336_a1_cross_entropy, cs336_a1_get_batch, cs336_a1_get_lr_cosine_schedule,
-        cs336_a1_gradient_clipping, cs336_a1_softmax, load_cs336_a1_reference_checkpoint,
-        write_cs336_a1_reference_tiny_training_bundle,
+        cs336_a1_adamw_config, cs336_a1_cross_entropy, cs336_a1_get_batch,
+        cs336_a1_get_lr_cosine_schedule, cs336_a1_gradient_clipping, cs336_a1_softmax,
+        load_cs336_a1_reference_checkpoint, write_cs336_a1_reference_tiny_training_bundle,
+        Cs336A1ReferenceTrainer, Cs336A1ReferenceTrainingConfig,
     };
     use psionic_core::{DType, Device, Shape, TensorData, TensorSpec};
     use psionic_nn::{
@@ -1144,8 +1144,8 @@ mod tests {
     }
 
     #[test]
-    fn tiny_reference_training_descends_and_resume_matches_uninterrupted()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn tiny_reference_training_descends_and_resume_matches_uninterrupted(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let corpus = "the cat sat on the mat.\nthe cat saw the mat.\n";
         let config = Cs336A1ReferenceTrainingConfig::tiny();
         let mut trainer = Cs336A1ReferenceTrainer::from_corpus_text(corpus, config.clone())?;
@@ -1158,12 +1158,10 @@ mod tests {
         let resumed_reports = resumed.run_steps(2)?;
         let mut uninterrupted = Cs336A1ReferenceTrainer::from_corpus_text(corpus, config)?;
         let uninterrupted_reports = uninterrupted.run_steps(4)?;
-        assert!(
-            first_reports
-                .iter()
-                .chain(resumed_reports.iter())
-                .any(|report| report.loss_after < initial_loss)
-        );
+        assert!(first_reports
+            .iter()
+            .chain(resumed_reports.iter())
+            .any(|report| report.loss_after < initial_loss));
         assert_eq!(
             resumed.model_state_digest(),
             uninterrupted.model_state_digest()
@@ -1178,8 +1176,8 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_round_trip_preserves_iteration_and_state_digests()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn checkpoint_round_trip_preserves_iteration_and_state_digests(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let corpus = "the cat sat on the mat.\nthe cat saw the mat.\n";
         let mut trainer = Cs336A1ReferenceTrainer::from_corpus_text(
             corpus,

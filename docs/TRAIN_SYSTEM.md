@@ -193,6 +193,21 @@ bundle uses the existing CS336 A1 BPE trainer and tokenizer runtime to freeze
 one 272-token tokenizer, one tokenized training shard, one validation shard,
 source shard digests, token counts, and validation replay samples without
 widening the lane into distributed BPE or OpenWebText-scale training.
+The lane now also owns its first production local-update proof in
+`crates/psionic-train/src/a1_minimal_distributed_lm_local_update.rs`, the
+generator
+`crates/psionic-train/examples/a1_minimal_distributed_lm_local_update_fixture.rs`,
+the retained proof
+`fixtures/psion/a1_minimal_distributed_lm/local_update_report_v1.json`, the
+step-2 and step-4 retained checkpoints under
+`fixtures/psion/a1_minimal_distributed_lm/`, and the checker
+`scripts/check-a1-minimal-distributed-lm-local-update.sh`. That proof removes
+finite-difference gradients from this lane by running A1 Transformer forward
+hidden states through an analytic LM-head cross-entropy backward path, applying
+global gradient clipping and AdamW, persisting optimizer plus deterministic
+cursor state, and proving exact resume against an uninterrupted four-step run.
+It is explicitly LM-head-only and does not claim full Transformer backward
+coverage.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator

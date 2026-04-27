@@ -41,6 +41,16 @@ doing real assigned compute under one run id.
   `crates/psionic-train/examples/a1_minimal_distributed_lm_tokenizer_dataset_bundle_fixture.rs`
 - tokenizer/dataset checker:
   `scripts/check-a1-minimal-distributed-lm-tokenizer-dataset-bundle.sh`
+- local-update proof:
+  `fixtures/psion/a1_minimal_distributed_lm/local_update_report_v1.json`
+- local-update checkpoints:
+  `fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step2_v1.json`
+  and
+  `fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step4_v1.json`
+- local-update generator:
+  `crates/psionic-train/examples/a1_minimal_distributed_lm_local_update_fixture.rs`
+- local-update checker:
+  `scripts/check-a1-minimal-distributed-lm-local-update.sh`
 
 The contract is typed in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs` and validates
@@ -87,6 +97,37 @@ The bundle records corpus source, source shard digests, tokenizer digest,
 training and validation shard manifests, token counts, replay samples, and a
 bundle digest. Validation replay samples decode back to the raw validation text
 through the admitted tokenizer.
+
+## Production Local Update
+
+The first production local-update proof is typed in
+`crates/psionic-train/src/a1_minimal_distributed_lm_local_update.rs`.
+
+It runs the fixed bundle through the A1 Transformer forward path, materializes
+final hidden states, computes an analytic cross-entropy backward pass for
+`lm_head.weight`, applies global gradient clipping plus AdamW, and writes
+checkpoint state with optimizer state and deterministic cursor state. It does
+not use finite-difference gradients.
+
+Current retained proof values:
+
+- backward path: `analytic_lm_head_cross_entropy_backward_v1`
+- finite-difference used: `false`
+- trained parameters: `lm_head.weight`
+- local steps: `4`
+- consumed tokens: `8`
+- training loss: `5.613701 -> 5.565771`
+- validation loss: `5.6042047 -> 5.559738`
+- resume exactness: `true`
+- delta digest:
+  `sha256:2ccbf7ea2a89e8403212e2985c6d0a158568bfafe5141eed8a0214864092d7c1`
+- report digest:
+  `sha256:f643547ad6002ea4028b9cf3f0993f02679cf974eb02ac002606e40a8a3ceec8`
+
+This is intentionally a narrow first production backward path. It proves a real
+local update for the tiny shared LM lane, but it is LM-head-only and does not
+claim full Transformer backward coverage for attention, MLP, embeddings, or
+normalization parameters.
 
 ## Contribution Semantics
 
