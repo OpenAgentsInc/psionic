@@ -1,0 +1,130 @@
+{
+  "schema_version": "psion.a1_minimal_distributed_lm.operator_rehearsal_report.v1",
+  "lane_id": "a1_minimal_distributed_lm_001",
+  "report_id": "a1_minimal_distributed_lm_001.operator_rehearsal.2026-04-27.local_m5",
+  "generated_on": "2026-04-27",
+  "source_commit": "2b0ca6e970b8d0ee2e853330d1d35a239be068b8",
+  "retained_run_root": "fixtures/psion/a1_minimal_distributed_lm",
+  "operator_host": {
+    "hostname": "Christophers-MacBook-Pro-2.local",
+    "os": "Darwin Christophers-MacBook-Pro-2.local 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:33:50 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T6050 arm64",
+    "cpu": "Apple M5 Max",
+    "role": "single-node runner and local retained verifier"
+  },
+  "verification_commands": [
+    "scripts/check-a1-minimal-distributed-lm-lane-contract.sh",
+    "scripts/check-a1-minimal-distributed-lm-tokenizer-dataset-bundle.sh",
+    "scripts/check-a1-minimal-distributed-lm-local-update.sh",
+    "scripts/check-a1-minimal-distributed-lm-trusted-aggregation.sh",
+    "scripts/check-a1-minimal-distributed-lm-support-artifacts.sh",
+    "scripts/check-a1-minimal-distributed-lm-rehearsal-report.sh"
+  ],
+  "single_node_rehearsal": {
+    "status": "retained_verified",
+    "run_id": "a1_minimal_distributed_lm_001.local_update_fixture",
+    "host_execution": "local_operator_host",
+    "command": "scripts/check-a1-minimal-distributed-lm-local-update.sh",
+    "report_path": "fixtures/psion/a1_minimal_distributed_lm/local_update_report_v1.json",
+    "checkpoint_path": "fixtures/psion/a1_minimal_distributed_lm/local_update_checkpoint_step4_v1.json",
+    "artifact_manifest_path": "fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json",
+    "contribution_receipt_path": "fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json",
+    "assignment_id": "a1_minimal_distributed_lm_001.local_update.assignment.fixture",
+    "worker_id": "psionic.local_update.fixture.worker",
+    "local_step_count": 4,
+    "consumed_token_count": 8,
+    "training_loss_before": 5.613701,
+    "training_loss_after": 5.565771,
+    "validation_loss_before": 5.6042047,
+    "validation_loss_after": 5.559738,
+    "checkpoint_step4_digest": "sha256:51b5dbdf4e5d5b75cf8293fac62f4f2287575b2eedca70e529a56409ee568919",
+    "delta_digest": "sha256:2ccbf7ea2a89e8403212e2985c6d0a158568bfafe5141eed8a0214864092d7c1",
+    "report_digest": "sha256:f643547ad6002ea4028b9cf3f0993f02679cf974eb02ac002606e40a8a3ceec8",
+    "validator_disposition": "replay_required",
+    "accepted_for_aggregation": false,
+    "model_progress_participant_count": 0,
+    "claim_boundary": "The single-node rehearsal proves the retained local-update path and checkpoint/validation-loss evidence. It does not pre-claim Nexus acceptance or model-progress participant credit."
+  },
+  "trusted_aggregation_rehearsal": {
+    "status": "retained_verified",
+    "run_id": "a1_minimal_distributed_lm_001.trusted_aggregation_fixture",
+    "host_execution": "deterministic local trusted aggregation fixture with two distinct logical Pylon workers and one operator aggregation role",
+    "physical_multi_host_status": "not_produced_from_this_session",
+    "command": "scripts/check-a1-minimal-distributed-lm-trusted-aggregation.sh",
+    "report_path": "fixtures/psion/a1_minimal_distributed_lm/trusted_aggregation_report_v1.json",
+    "aggregate_checkpoint_path": "fixtures/psion/a1_minimal_distributed_lm/aggregate_checkpoint_v1.json",
+    "promotion_receipt_path": "fixtures/psion/a1_minimal_distributed_lm/promotion_receipt_v1.json",
+    "accepted_contribution_count": 2,
+    "model_progress_participant_count": 2,
+    "total_aggregation_weight": 16,
+    "validation_loss_before": 5.6042047,
+    "validation_loss_after": 5.562639,
+    "aggregated_delta_digest": "sha256:856619da177eb5a276435e3f3ad38882eec016afa680c440dc83d793c2c23700",
+    "output_checkpoint_digest": "sha256:234460c819f2d4cf56918e774a2e23f2a65562bb925e359e2735ad0980070e8d",
+    "promoted_checkpoint_ref": "checkpoint://a1_minimal_distributed_lm_001.trusted_aggregation_fixture/promoted/step-000004",
+    "promotion_receipt_digest": "sha256:e7750512afe59d5980d561619d17ab1281b430155fa0011b3580e0a152fddb44",
+    "aggregate_report_digest": "sha256:2886b04948c2ddb312644854b001a37c127a7a1aa880459a215bd1ff97b1c704",
+    "host_roles": [
+      {
+        "role": "local_update_worker_0001",
+        "worker_id": "psionic.trusted_aggregation.fixture.worker.0001",
+        "node_pubkey": "pylon-node-pubkey.fixture.a1_minimal_distributed_lm.0001",
+        "assignment_id": "a1_minimal_distributed_lm_001.trusted_aggregation.assignment.0001",
+        "contribution_id": "contribution.a1_minimal_distributed_lm_001.trusted_aggregation.0001",
+        "consumed_token_count": 8,
+        "output_checkpoint_digest": "sha256:519a97c3f576f96dc6d5404669e71447ad0da7a818d819fca645f717056bad2e",
+        "output_delta_digest": "sha256:2ccbf7ea2a89e8403212e2985c6d0a158568bfafe5141eed8a0214864092d7c1",
+        "source_contribution_digest": "sha256:49cc5c17953261d37192740e2bcff064f0c4801666ff3625efaed72a0982defb",
+        "accepted_for_aggregation": true
+      },
+      {
+        "role": "local_update_worker_0002",
+        "worker_id": "psionic.trusted_aggregation.fixture.worker.0002",
+        "node_pubkey": "pylon-node-pubkey.fixture.a1_minimal_distributed_lm.0002",
+        "assignment_id": "a1_minimal_distributed_lm_001.trusted_aggregation.assignment.0002",
+        "contribution_id": "contribution.a1_minimal_distributed_lm_001.trusted_aggregation.0002",
+        "consumed_token_count": 8,
+        "output_checkpoint_digest": "sha256:b6c04da743d37b30b03e61b5853ab4fbca9bf85ffc82d414668e8b0ff8aae3fc",
+        "output_delta_digest": "sha256:6ee39608f2da9f34638844309c537ce6f58146b20a0d3c22b1a59ed52dd22045",
+        "source_contribution_digest": "sha256:b9e386ed6d73392abca296acb82c40bd1cb93c854451fb9fb94e4896f7703494",
+        "accepted_for_aggregation": true
+      },
+      {
+        "role": "trusted_aggregator_validator",
+        "worker_id": "psionic.operator.local_m5",
+        "host": "Christophers-MacBook-Pro-2.local",
+        "accepted_aggregate_id": "aggregate.a1_minimal_distributed_lm_001.trusted_fixture.000001",
+        "promotion_verdict": "promoted"
+      }
+    ],
+    "claim_boundary": "This retained aggregation rehearsal proves trusted local-update aggregation and promotion semantics for two logical Pylon workers. It is not a physical tri-host proof, public Pylon fanout, or permissionless public model-progress acceptance."
+  },
+  "physical_host_access_probe": {
+    "status": "blocked_from_this_session",
+    "tailscale_status_result": "failed to connect to local tailscaled from this execution context",
+    "ssh_probe_results": [
+      {
+        "target": "archlinux",
+        "result": "dns_unresolved"
+      },
+      {
+        "target": "100.108.56.85",
+        "result": "port_22_timed_out"
+      },
+      {
+        "target": "100.97.233.57",
+        "result": "port_22_timed_out"
+      },
+      {
+        "target": "100.72.151.98",
+        "result": "port_22_timed_out"
+      }
+    ],
+    "required_to_close_physical_multi_host_gap": [
+      "rerun local-update fixture on at least two reachable trusted hosts or retain equivalent host-local receipts",
+      "copy the host-local receipts and logs into the operator run root",
+      "rerun trusted aggregation from those retained host receipts",
+      "record host identities without secrets and update this report's physical_multi_host_status"
+    ]
+  },
+  "claim_boundary": "This report retains the local operator rehearsal evidence available on 2026-04-27. It proves deterministic single-node local update plus trusted aggregation fixtures, but it does not prove a live physical tri-host rehearsal, public Pylon fanout, Nexus closeout, or any participant-count record."
+}

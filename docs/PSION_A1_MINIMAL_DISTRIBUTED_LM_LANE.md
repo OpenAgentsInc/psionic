@@ -71,6 +71,10 @@ doing real assigned compute under one run id.
   `crates/psionic-train/examples/a1_minimal_distributed_lm_support_artifact_catalog_fixture.rs`
 - support artifact catalog checker:
   `scripts/check-a1-minimal-distributed-lm-support-artifacts.sh`
+- operator rehearsal report:
+  `fixtures/psion/a1_minimal_distributed_lm/operator_rehearsal_report_v1.json`
+- operator rehearsal checker:
+  `scripts/check-a1-minimal-distributed-lm-rehearsal-report.sh`
 
 The contract is typed in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs` and validates
@@ -246,6 +250,45 @@ are participant-eligible after accepted Nexus closeout, but none count as
 model-progress participant work by default and none may increment
 `training_model_progress_contributors` unless later converted into accepted
 local-update aggregate input.
+
+## Retained Operator Rehearsal
+
+The lane now carries a retained operator rehearsal report at
+`fixtures/psion/a1_minimal_distributed_lm/operator_rehearsal_report_v1.json`.
+It binds the local single-node proof, trusted aggregation proof, aggregate
+checkpoint, and promotion receipt into one operator-readable run root.
+
+Current retained rehearsal values:
+
+- operator host:
+  `Christophers-MacBook-Pro-2.local`, Darwin `25.4.0`, Apple M5 Max
+- single-node run id:
+  `a1_minimal_distributed_lm_001.local_update_fixture`
+- single-node checkpoint digest:
+  `sha256:51b5dbdf4e5d5b75cf8293fac62f4f2287575b2eedca70e529a56409ee568919`
+- single-node validation loss:
+  `5.6042047 -> 5.559738`
+- trusted aggregation run id:
+  `a1_minimal_distributed_lm_001.trusted_aggregation_fixture`
+- accepted local-update receipts in the trusted aggregate: `2`
+- trusted aggregation model-progress participants: `2`
+- trusted aggregation promoted checkpoint:
+  `checkpoint://a1_minimal_distributed_lm_001.trusted_aggregation_fixture/promoted/step-000004`
+- trusted aggregation validation loss:
+  `5.6042047 -> 5.562639`
+
+The rehearsal report also records the physical host-access boundary. In this
+session `tailscale status` could not reach the local daemon, MagicDNS for
+`archlinux` did not resolve, and direct SSH to the known Tailnet IPs timed out.
+Therefore the retained report proves deterministic local operator rehearsal
+and trusted logical-worker aggregation, but it does not claim a live physical
+tri-host rehearsal, public Pylon fanout, Nexus closeout, or a participant-count
+record.
+
+To close that physical multi-host gap, rerun the local-update fixture on at
+least two reachable trusted hosts or retain equivalent host-local receipts,
+copy the receipts and logs into the operator run root, and rerun trusted
+aggregation from those retained host receipts.
 
 ## Contribution Semantics
 
