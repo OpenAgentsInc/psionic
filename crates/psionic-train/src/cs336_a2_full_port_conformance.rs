@@ -8,7 +8,8 @@ use crate::{
     CS336_A2_DDP_INDIVIDUAL_PARAMETERS_RECEIPT_FIXTURE_PATH,
     CS336_A2_FLASHATTENTION_FUSED_CUDA_RECEIPT_FIXTURE_PATH,
     CS336_A2_FLASHATTENTION_REFERENCE_RECEIPT_FIXTURE_PATH,
-    CS336_A2_FSDP_WRAPPER_RECEIPT_FIXTURE_PATH, CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH,
+    CS336_A2_FSDP_AFTER_BACKWARD_RECEIPT_FIXTURE_PATH, CS336_A2_FSDP_WRAPPER_RECEIPT_FIXTURE_PATH,
+    CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH,
 };
 
 pub const CS336_A2_FULL_PORT_CONFORMANCE_REPORT_SCHEMA_VERSION: &str =
@@ -30,6 +31,8 @@ const DDP_INDIVIDUAL_SOURCE_PATH: &str =
     "crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs";
 const SHARDED_OPTIMIZER_SOURCE_PATH: &str =
     "crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs";
+const FSDP_AFTER_BACKWARD_SOURCE_PATH: &str =
+    "crates/psionic-train/src/cs336_a2_fsdp_after_backward_receipt.rs";
 const FSDP_WRAPPER_SOURCE_PATH: &str = "crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs";
 
 const EXPECTED_STANFORD_ADAPTERS: [&str; 8] = [
@@ -43,8 +46,6 @@ const EXPECTED_STANFORD_ADAPTERS: [&str; 8] = [
     "get_sharded_optimizer",
 ];
 
-const FSDP_AFTER_BACKWARD_FOLLOW_UP_ISSUE_URL: &str =
-    "https://github.com/OpenAgentsInc/psionic/issues/957";
 const FSDP_GATHER_FULL_PARAMS_FOLLOW_UP_ISSUE_URL: &str =
     "https://github.com/OpenAgentsInc/psionic/issues/958";
 
@@ -114,6 +115,7 @@ pub fn build_cs336_a2_full_port_conformance_report(
             String::from(CS336_A2_DDP_BUCKETED_RECEIPT_FIXTURE_PATH),
             String::from(CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH),
             String::from(CS336_A2_FSDP_WRAPPER_RECEIPT_FIXTURE_PATH),
+            String::from(CS336_A2_FSDP_AFTER_BACKWARD_RECEIPT_FIXTURE_PATH),
         ],
         row_count: rows.len(),
         green_row_count: rows
@@ -125,7 +127,7 @@ pub fn build_cs336_a2_full_port_conformance_report(
             .all(|row| row.status == "green_bounded_reference"),
         rows,
         claim_boundary: String::from(
-            "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, get_fsdp now has a bounded host-reference wrapper lifecycle receipt, and the current FSDP after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001.",
+            "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, get_fsdp now has a bounded host-reference wrapper lifecycle receipt, fsdp_on_after_backward now has bounded reduce-scatter and mixed-precision parity evidence, and the current FSDP full-parameter gather surface remains a tracked gap. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001.",
         ),
     };
     validate_report(&report)?;
@@ -386,11 +388,21 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
         row(
             "fsdp_on_after_backward",
             "fsdp",
-            "missing_tracked",
+            "partial_bounded_reference",
+            vec![FSDP_AFTER_BACKWARD_SOURCE_PATH],
+            vec![
+                source_proof(
+                    FSDP_AFTER_BACKWARD_SOURCE_PATH,
+                    "build_cs336_a2_fsdp_after_backward_receipt",
+                    "Owned bounded after-backward receipt for the fsdp_on_after_backward adapter surface.",
+                ),
+                json_proof(
+                    CS336_A2_FSDP_AFTER_BACKWARD_RECEIPT_FIXTURE_PATH,
+                    "Retained proof for sharded-gradient reduce-scatter, replicated-gradient all-reduce equivalence, fp32 master-gradient restoration, and fp32/fp16 bounded parity before optimizer.step.",
+                ),
+            ],
             vec![],
-            vec![],
-            vec![FSDP_AFTER_BACKWARD_FOLLOW_UP_ISSUE_URL],
-            "The current fsdp_on_after_backward adapter requires reduce-scatter or equivalent gradient synchronization, fp32 master-gradient restoration, replicated-gradient equivalence, and fp32/fp16 parity. Psionic tracks this as a missing current A2 surface.",
+            "The current fsdp_on_after_backward adapter is mapped to a bounded host-reference receipt over the ToyFSDPModel parameter families. It proves reduce-scatter-equivalent synchronization for sharded Linear/Embedding gradients, replicated-gradient equality for non-FSDP parameters, fp32 master-gradient restoration before optimizer.step, and fp32/fp16 parity against a deterministic non-parallel baseline. It does not claim transport-backed FSDP execution.",
         ),
         row(
             "fsdp_gather_full_params",
@@ -503,6 +515,16 @@ mod tests {
             .iter()
             .any(|row| row.stanford_adapter_name == "get_fsdp"
                 && row.status == "partial_bounded_reference"));
+        assert!(report
+            .rows
+            .iter()
+            .any(|row| row.stanford_adapter_name == "fsdp_on_after_backward"
+                && row.status == "partial_bounded_reference"));
+        assert!(report
+            .rows
+            .iter()
+            .any(|row| row.stanford_adapter_name == "fsdp_gather_full_params"
+                && row.status == "missing_tracked"));
         assert!(report
             .rows
             .iter()

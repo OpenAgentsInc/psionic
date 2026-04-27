@@ -342,6 +342,20 @@ compute-dtype admission, and deterministic gathered-state reconstruction. It
 still does not claim transport-backed FSDP execution, distributed throughput, or
 actual-lane cluster qualification.
 
+The repo now also owns the eighth bounded full-port A2 reference-lane tranche
+in `crates/psionic-train/src/cs336_a2_fsdp_after_backward_receipt.rs`, the
+fixture generator
+`crates/psionic-train/examples/psion_cs336_a2_fsdp_after_backward_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_fsdp_after_backward_receipt_v1.json`. That surface
+maps the current Stanford `fsdp_on_after_backward` adapter name to a bounded
+host-reference after-backward receipt. It records reduce-scatter-equivalent
+synchronization for sharded Embedding and Linear gradients, all-reduce equality
+for replicated non-FSDP gradients, fp32 master-gradient restoration before
+optimizer step, fp32/fp16 compute-dtype parity, and optimizer pre-step state
+digests. It still does not claim transport-backed FSDP execution, distributed
+throughput, or actual-lane cluster qualification.
+
 The current coverage bar for Stanford CS336 A2 now lives in
 `crates/psionic-train/src/cs336_a2_full_port_conformance.rs`, the fixture
 generator
@@ -352,9 +366,9 @@ retained report
 surface no longer claims full current A2 parity. It maps the current
 `get_ddp` and `ddp_on_after_backward` names to bounded host-reference DDP
 receipts, keeps the older bucketed DDP receipt as retained systems evidence,
-maps `get_fsdp` to the bounded wrapper lifecycle receipt, and marks the current
-remaining FSDP surfaces as tracked missing work in
-[#957](https://github.com/OpenAgentsInc/psionic/issues/957) and
+maps `get_fsdp` to the bounded wrapper lifecycle receipt, maps
+`fsdp_on_after_backward` to a bounded after-backward receipt, and marks the
+remaining FSDP full-parameter gather surface as tracked missing work in
 [#958](https://github.com/OpenAgentsInc/psionic/issues/958). The claim boundary
 still stops short of actual-lane distributed throughput, operator closure, and
 transport-backed DDP/FSDP execution, and A2 remains non-blocking for

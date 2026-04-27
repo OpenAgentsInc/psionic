@@ -216,6 +216,32 @@ That FSDP wrapper tranche now provides:
 - one honest boundary note that this is host-owned reference evidence, not
   transport-backed FSDP execution
 
+The eighth bounded A2 tranche now owns:
+
+- one bounded `fsdp_on_after_backward` receipt for the current Spring 2026 FSDP
+  adapter surface
+- one retained two-rank proof of reduce-scatter-equivalent synchronization for
+  sharded Embedding and Linear gradients
+- one retained proof that replicated non-FSDP gradients are all-reduced to
+  identical fp32 master gradients before optimizer step
+- one retained fp32/fp16 compute-dtype parity surface against a deterministic
+  non-parallel baseline
+
+Primary landing surfaces:
+
+- `crates/psionic-train/src/cs336_a2_fsdp_after_backward_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_fsdp_after_backward_receipt.rs`
+- `fixtures/training/cs336_a2_fsdp_after_backward_receipt_v1.json`
+
+That FSDP after-backward tranche now provides:
+
+- explicit per-parameter input gradient digests for each bounded rank
+- explicit reduce-scatter output digests for sharded parameters
+- explicit replicated-gradient all-reduce equality for non-FSDP parameters
+- one optimizer pre-step state digest per compute dtype
+- one honest boundary note that this is host-owned reference evidence, not
+  transport-backed FSDP execution
+
 ## Current Adapter Surface Realignment
 
 The current Stanford A2 adapter surface in
@@ -236,11 +262,9 @@ The previous Psionic matrix used stale DDP-specific names:
 `ddp_bucketed_on_train_batch_start`. Those retained receipts still matter as
 bounded systems evidence, but they are no longer current Stanford adapter rows.
 
-Current FSDP parity is only partially implemented. The missing surfaces are
-tracked in:
+Current FSDP parity is only partially implemented. The remaining missing
+surface is tracked in:
 
-- [#957](https://github.com/OpenAgentsInc/psionic/issues/957):
-  `fsdp_on_after_backward` reduce-scatter and mixed-precision parity
 - [#958](https://github.com/OpenAgentsInc/psionic/issues/958):
   `fsdp_gather_full_params` full-parameter gather conformance fixture
 
@@ -268,8 +292,13 @@ This lane now honestly claims:
 - `psionic` owns a bounded `get_fsdp` wrapper lifecycle receipt with retained
   Linear/Embedding shard layout, all-gather planning, fp32 master restoration,
   fp16 compute-dtype admission, and full-state reconstruction evidence
+- `psionic` owns a bounded `fsdp_on_after_backward` receipt with retained
+  sharded-gradient reduce-scatter evidence, replicated-gradient all-reduce
+  equality, fp32 master-gradient restoration, and fp32/fp16 parity before
+  optimizer step
 - `psionic` now has one checked-in current A2 coverage matrix and one retained
-  conformance report that explicitly marks current FSDP as tracked missing work
+  conformance report that explicitly marks the remaining FSDP full-parameter
+  gather surface as tracked missing work
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
 

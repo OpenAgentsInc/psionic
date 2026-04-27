@@ -1,0 +1,325 @@
+{
+  "schema_version": "psion.cs336_a2.fsdp_after_backward_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "wrapper_receipt_path": "fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json",
+  "stanford_adapter_name": "fsdp_on_after_backward",
+  "config": {
+    "world_size": 2,
+    "adapter_name": "fsdp_on_after_backward",
+    "compute_dtype_cases": [
+      "fp32",
+      "fp16"
+    ],
+    "gradient_reduction": "mean"
+  },
+  "compute_cases": [
+    {
+      "compute_dtype": "fp32",
+      "gradient_syncs": [
+        {
+          "parameter_path": "embedding.weight",
+          "parameter_family": "embedding",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            100,
+            64
+          ],
+          "master_parameter_element_count": 6400,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:63d97fae2b6c530733f4704f37e81f119a8faf3b8700a388494d3a1c5a805301",
+            "1": "sha256:e0ba51fef653d330b4eb54190b86669783e9f939b701891d5c586e1e49cd6ec1"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:81c34cc0ffdd34f558a587d19bcd3a2f99758acdfeae68dadbc4f0fa59661eb4",
+            "1": "sha256:c998c3c280c6b5f34f3ee85dd2496a4e4059407a917ef4317a937d17095464c8"
+          },
+          "reduce_scatter_input_element_count": 6400,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:39165b6eb5e21744c09b9f38df2466919b8662c5802919a0deb0e1a51b44bc41",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "parameter_path": "norm1.weight",
+          "parameter_family": "replicated",
+          "sync_kind": "all_reduce_replicated_mean",
+          "master_parameter_shape": [
+            64
+          ],
+          "master_parameter_element_count": 64,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:f3b8ab8f4d66233ec719c61ae6751814f2bd7194bc6d063a3cf0a9e1468fa626",
+            "1": "sha256:92019040f341b087e63ca0768318f17a83b66e64cea0d292de0f18e4a315d9a4"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:f1dffbdfa1ae76f64ec47364456f6a9cf77dc1f2c8fe8d12685192237995d9e4",
+            "1": "sha256:f1dffbdfa1ae76f64ec47364456f6a9cf77dc1f2c8fe8d12685192237995d9e4"
+          },
+          "reduce_scatter_input_element_count": null,
+          "replicated_gradient_identical_across_ranks": true,
+          "baseline_gradient_digest": "sha256:f1dffbdfa1ae76f64ec47364456f6a9cf77dc1f2c8fe8d12685192237995d9e4",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "parameter_path": "linear1.weight",
+          "parameter_family": "linear",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            128,
+            64
+          ],
+          "master_parameter_element_count": 8192,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:c7e7594742c01d7691a203ec93d34222c87e56feef9a2a34491f0e2908574893",
+            "1": "sha256:6ff2b7e53edb68b8d2c4300514acbb1215527a9cb0e12f903e1bd143b8ccc8bc"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:ecaa1f8c88cd611024e4eb1e68ddb1bcf09c8794632532e38d6dcfb21cb6e423",
+            "1": "sha256:3f4de08dd238c18bcf39e713ca714d466fbe40ac652f9f3f241345a725777e4d"
+          },
+          "reduce_scatter_input_element_count": 8192,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:504df8956ac49f3eef12a6c47f7f86dd536398f7da3954ced138b77c267db54b",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "parameter_path": "norm2.weight",
+          "parameter_family": "replicated",
+          "sync_kind": "all_reduce_replicated_mean",
+          "master_parameter_shape": [
+            128
+          ],
+          "master_parameter_element_count": 128,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:d9973b3bb1c72b53f182aa29327a5dfff743c350354b4938305dabd35a9bcdfb",
+            "1": "sha256:809f82284cf5d594de2af7d71be370831e44d04881043dbb1fc40f2bf692c7ea"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:36521640f5cdfe1d70a522549af06fc2b3acfcdedb1d31f5325f471e18a8d010",
+            "1": "sha256:36521640f5cdfe1d70a522549af06fc2b3acfcdedb1d31f5325f471e18a8d010"
+          },
+          "reduce_scatter_input_element_count": null,
+          "replicated_gradient_identical_across_ranks": true,
+          "baseline_gradient_digest": "sha256:36521640f5cdfe1d70a522549af06fc2b3acfcdedb1d31f5325f471e18a8d010",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "parameter_path": "linear2.weight",
+          "parameter_family": "linear",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            64,
+            128
+          ],
+          "master_parameter_element_count": 8192,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:6768c89b012da0e72f1f4cc19264a91bc77023fdbfbab0611d36534268d5258e",
+            "1": "sha256:aa1acdfe91433521e8426b5b37370bf3441b9e8f0ec9ca3f8183914c9246a297"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:23081c77d0666ad5b6a43b678d069ba4ebfef2536325fac1ba074d2342a9ad98",
+            "1": "sha256:936dc3c9cd2b7dc56e5bafab00ceb693f3365e0df54bc3045480d284ea597782"
+          },
+          "reduce_scatter_input_element_count": 8192,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:631d16a323a441f4c414da7f3062dcae014f08bc23e9c49bdf343aa2edae090b",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        },
+        {
+          "parameter_path": "lm_head.weight",
+          "parameter_family": "linear",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            100,
+            64
+          ],
+          "master_parameter_element_count": 6400,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:3ebe5542df53beea5a678721adbd824e6f64affa08009f0cd9628ba216b3ad79",
+            "1": "sha256:de4a2c72472829fb409a39a9b3473a9efaf893459bb146945a82f4d18b5c77a4"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:9f4b9acd57005ac5abe2467753b036ef6a98c4d9d5758929c7f4a0b546c25419",
+            "1": "sha256:e6c2ce7387926cd0b2bd7292054043b20fc8ce362fe23403ded16add53deea09"
+          },
+          "reduce_scatter_input_element_count": 6400,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:3b9574c7741c63eea50e2ada6c9a8775f61c9f97851bc94bc5d735391c3ebf88",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0
+        }
+      ],
+      "gradients_restored_to_fp32_master_dtype": true,
+      "replicated_gradients_match_across_ranks": true,
+      "sharded_gradients_reduce_scattered": true,
+      "optimizer_pre_step_state_digest": "sha256:4a861e896596e6cf415e8aea7c9af2c825539b914b84263b87a3152d6f6f7fef",
+      "max_abs_delta_vs_non_parallel_baseline": 0.0,
+      "matches_non_parallel_baseline": true
+    },
+    {
+      "compute_dtype": "fp16",
+      "gradient_syncs": [
+        {
+          "parameter_path": "embedding.weight",
+          "parameter_family": "embedding",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            100,
+            64
+          ],
+          "master_parameter_element_count": 6400,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:719ebf2cf86dca6341a482f4684a92438d9889c5fe8f8b0e0e26e8251e73fe7e",
+            "1": "sha256:40c66faef7775df79bc6f50debb31dd3b4514a5be8c01310b9b9c6b66d1ce257"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:f7bcf418fc5b034a606d8918109d6d934ff0b06a87a3b7d606f4ce20096a1f53",
+            "1": "sha256:dacabc9f5960d54991e789b09e43c7c6ac033f812fc62f3c31a8b7e9bf4daee8"
+          },
+          "reduce_scatter_input_element_count": 6400,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:6b335d170e7195b5a6aba579004a206feec162567fdcb7a0f2a382f3c3eec7b1",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "parameter_path": "norm1.weight",
+          "parameter_family": "replicated",
+          "sync_kind": "all_reduce_replicated_mean",
+          "master_parameter_shape": [
+            64
+          ],
+          "master_parameter_element_count": 64,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:c9f3250090eec357910fbbb630268b9c58db6d9b1e19fa76c415a96d131ec03e",
+            "1": "sha256:ce1c991ca64297d9319fde7211288c1f47e64146c63fec5d327755a0ec9ad5fc"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:8ebe6ef13b41b21b0c0b1e98c07c7ce09c3df6ee8d18c4b5c21a99a621fc39c6",
+            "1": "sha256:8ebe6ef13b41b21b0c0b1e98c07c7ce09c3df6ee8d18c4b5c21a99a621fc39c6"
+          },
+          "reduce_scatter_input_element_count": null,
+          "replicated_gradient_identical_across_ranks": true,
+          "baseline_gradient_digest": "sha256:8ebe6ef13b41b21b0c0b1e98c07c7ce09c3df6ee8d18c4b5c21a99a621fc39c6",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "parameter_path": "linear1.weight",
+          "parameter_family": "linear",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            128,
+            64
+          ],
+          "master_parameter_element_count": 8192,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:dc248aa9ca9adfd740aa27ab9fc3f99a9a007e2d41dc48912739348486c45113",
+            "1": "sha256:3ee156a330c20a5337bc18af59f401edf731cad58d315535818853ab54bc49e8"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:be08c33130934a395ac604372f63f73573202d1d5879cd3c2ab011de797666f0",
+            "1": "sha256:e63485573382b1c3afd4482428b04fd72976793ab7178e5e47b6df974fea3e63"
+          },
+          "reduce_scatter_input_element_count": 8192,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:b19166c9058c767091aea205a0ae46c184fc254de46f5431d66620bf36dd31c5",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "parameter_path": "norm2.weight",
+          "parameter_family": "replicated",
+          "sync_kind": "all_reduce_replicated_mean",
+          "master_parameter_shape": [
+            128
+          ],
+          "master_parameter_element_count": 128,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:7f361484a2b265792ec7e6f8057f4cb74d78da0336cf3ec20c0eabf80de3f8a6",
+            "1": "sha256:4c17276d022fb5c43be5a3965f95edc9ef8517da49a05a40279eb7be4a4aad1c"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:3f1006f12ce8f57ad13083ae582b4bfe9765eca0b0bb1ca997fe1027293c8fc0",
+            "1": "sha256:3f1006f12ce8f57ad13083ae582b4bfe9765eca0b0bb1ca997fe1027293c8fc0"
+          },
+          "reduce_scatter_input_element_count": null,
+          "replicated_gradient_identical_across_ranks": true,
+          "baseline_gradient_digest": "sha256:3f1006f12ce8f57ad13083ae582b4bfe9765eca0b0bb1ca997fe1027293c8fc0",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "parameter_path": "linear2.weight",
+          "parameter_family": "linear",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            64,
+            128
+          ],
+          "master_parameter_element_count": 8192,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:e0d904590f1b0497c9351f46f06b6d5d73763675f8310e260915bc91e56af30e",
+            "1": "sha256:99c068455702637cc09d93a1796816bb0d527ac9f9ca76962618d12e67587954"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:af8524bc1fe83a19a6fcac35d8d9a5346ce79ec5762c491737cdc3e428323955",
+            "1": "sha256:95afad4bc2b3ae504f03b113408be712df40b7c31fc1cb5dc91bba70383c80ff"
+          },
+          "reduce_scatter_input_element_count": 8192,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:533554a3be7e743fd3cf58a38e455af8f7bca278db6a656a16c16d43ddf13d7f",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        },
+        {
+          "parameter_path": "lm_head.weight",
+          "parameter_family": "linear",
+          "sync_kind": "reduce_scatter_sharded_mean",
+          "master_parameter_shape": [
+            100,
+            64
+          ],
+          "master_parameter_element_count": 6400,
+          "output_gradient_dtype": "fp32",
+          "output_gradient_shape_matches_master_parameter": true,
+          "rank_input_gradient_digests": {
+            "0": "sha256:b22dd36bad1a476079e43f72e1e473de1a5d5d8b3b7f4566ecb907bb14968ffd",
+            "1": "sha256:02f7d0d62aa1dbaca278953a5e457457e8d6b05c3248324ddf258cc376f8bd56"
+          },
+          "rank_output_gradient_digests": {
+            "0": "sha256:d0742d51537759920c8cdedb1893008005ba4d41cdde31ba71830453f2a2bc8b",
+            "1": "sha256:6fb3aa5b88e0becb5a8977d9af4a76c5d4cd68df862ef85e288c84f26c7499e7"
+          },
+          "reduce_scatter_input_element_count": 6400,
+          "replicated_gradient_identical_across_ranks": false,
+          "baseline_gradient_digest": "sha256:f377cc874e5701c1b0edb7e05e1ad31c9c2de3671f9d6cc4498c363595e6936d",
+          "max_abs_delta_vs_non_parallel_baseline": 0.0001
+        }
+      ],
+      "gradients_restored_to_fp32_master_dtype": true,
+      "replicated_gradients_match_across_ranks": true,
+      "sharded_gradients_reduce_scattered": true,
+      "optimizer_pre_step_state_digest": "sha256:dc0429aa400efdc8d6d76e7dcf55885b2df88973e4f0ed6a69f3a4ac6b879c52",
+      "max_abs_delta_vs_non_parallel_baseline": 0.0001,
+      "matches_non_parallel_baseline": true
+    }
+  ],
+  "all_cases_match_non_parallel_baseline": true,
+  "claim_boundary": "This receipt proves the bounded CS336 A2 fsdp_on_after_backward lifecycle inside psionic. It records host-owned two-rank reduce-scatter for sharded Linear/Embedding gradients, all-reduce equivalence for replicated gradients, fp32 master-gradient restoration before optimizer.step, and fp32/fp16 bounded parity against a deterministic non-parallel baseline. It does not claim transport-backed FSDP execution or distributed throughput."
+}

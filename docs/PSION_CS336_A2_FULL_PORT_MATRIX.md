@@ -4,8 +4,9 @@
 > fully green. As of 2026-04-27 the bounded `psionic` reference lane covers
 > FlashAttention and sharded-optimizer surfaces, maps the current DDP adapter
 > names to older bounded DDP receipts, implements bounded `get_fsdp` wrapper
-> lifecycle evidence, and tracks the remaining FSDP after-backward and
-> full-parameter gather surfaces as explicit follow-up work.
+> lifecycle evidence, implements bounded `fsdp_on_after_backward`
+> reduce-scatter evidence, and tracks the remaining FSDP full-parameter gather
+> surface as explicit follow-up work.
 
 This matrix is the hard truth bar for discussing Stanford CS336 A2 coverage in
 `psionic`. It is not currently a full-parity claim.
@@ -38,6 +39,7 @@ Retained proof bundles:
 - `fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json`
 - `fixtures/training/cs336_a2_sharded_optimizer_receipt_v1.json`
 - `fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json`
+- `fixtures/training/cs336_a2_fsdp_after_backward_receipt_v1.json`
 
 Reference-lane doc:
 
@@ -58,7 +60,7 @@ Claim boundary:
 | `get_ddp` | `distributed` | `crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs` | `build_cs336_a2_ddp_individual_parameters_receipt` plus retained two-rank DDP receipt | `partial_bounded_reference`: maps current name to the older individual-parameter receipt, without async overlap or transport-backed collectives |
 | `ddp_on_after_backward` | `distributed` | `crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs` | retained `parameter_syncs` surface plus two-rank DDP receipt | `partial_bounded_reference`: proves bounded post-backward sync, not true async overlap |
 | `get_fsdp` | `fsdp` | `crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs` | `build_cs336_a2_fsdp_wrapper_receipt` plus retained wrapper lifecycle fixture | `partial_bounded_reference`: proves bounded Linear/Embedding sharding, all-gather planning, fp32 master restoration, fp16 compute-dtype admission, and model-state reconstruction, not transport-backed FSDP |
-| `fsdp_on_after_backward` | `fsdp` | tracked gap | [#957](https://github.com/OpenAgentsInc/psionic/issues/957) | `missing_tracked` |
+| `fsdp_on_after_backward` | `fsdp` | `crates/psionic-train/src/cs336_a2_fsdp_after_backward_receipt.rs` | `build_cs336_a2_fsdp_after_backward_receipt` plus retained after-backward fixture | `partial_bounded_reference`: proves bounded sharded-gradient reduce-scatter, replicated-gradient all-reduce equivalence, fp32 master-gradient restoration, and fp32/fp16 parity before optimizer step, not transport-backed FSDP |
 | `fsdp_gather_full_params` | `fsdp` | tracked gap | [#958](https://github.com/OpenAgentsInc/psionic/issues/958) | `missing_tracked` |
 | `get_sharded_optimizer` | `optimizer` | `crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs` | `build_cs336_a2_sharded_optimizer_receipt` plus retained sharded-optimizer receipt | `green_bounded_reference` |
 
