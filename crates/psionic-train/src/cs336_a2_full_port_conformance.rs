@@ -28,20 +28,26 @@ const FLASHATTENTION_FUSED_SOURCE_PATH: &str =
 const FLASHATTENTION_FUSED_IMPL_PATH: &str = "crates/psionic-backend-cuda/src/lib.rs";
 const DDP_INDIVIDUAL_SOURCE_PATH: &str =
     "crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs";
-const DDP_BUCKETED_SOURCE_PATH: &str = "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs";
 const SHARDED_OPTIMIZER_SOURCE_PATH: &str =
     "crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs";
 
 const EXPECTED_STANFORD_ADAPTERS: [&str; 8] = [
     "get_flashattention_autograd_function_pytorch",
     "get_flashattention_autograd_function_triton",
-    "get_ddp_individual_parameters",
-    "ddp_individual_parameters_on_after_backward",
-    "get_ddp_bucketed",
-    "ddp_bucketed_on_after_backward",
-    "ddp_bucketed_on_train_batch_start",
+    "get_ddp",
+    "ddp_on_after_backward",
+    "get_fsdp",
+    "fsdp_on_after_backward",
+    "fsdp_gather_full_params",
     "get_sharded_optimizer",
 ];
+
+const FSDP_WRAPPER_FOLLOW_UP_ISSUE_URL: &str =
+    "https://github.com/OpenAgentsInc/psionic/issues/956";
+const FSDP_AFTER_BACKWARD_FOLLOW_UP_ISSUE_URL: &str =
+    "https://github.com/OpenAgentsInc/psionic/issues/957";
+const FSDP_GATHER_FULL_PARAMS_FOLLOW_UP_ISSUE_URL: &str =
+    "https://github.com/OpenAgentsInc/psionic/issues/958";
 
 #[derive(Debug, Error)]
 pub enum Cs336A2FullPortConformanceError {
@@ -72,6 +78,7 @@ pub struct Cs336A2ConformanceRow {
     pub status: String,
     pub implementation_surfaces: Vec<String>,
     pub proof_surfaces: Vec<Cs336A2ConformanceProofSurface>,
+    pub follow_up_issue_urls: Vec<String>,
     pub detail: String,
 }
 
@@ -109,11 +116,16 @@ pub fn build_cs336_a2_full_port_conformance_report(
             String::from(CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH),
         ],
         row_count: rows.len(),
-        green_row_count: rows.iter().filter(|row| row.status == "green").count(),
-        fully_green: rows.iter().all(|row| row.status == "green"),
+        green_row_count: rows
+            .iter()
+            .filter(|row| row.status == "green_bounded_reference")
+            .count(),
+        fully_green: rows
+            .iter()
+            .all(|row| row.status == "green_bounded_reference"),
         rows,
         claim_boundary: String::from(
-            "This report closes Stanford CS336 Assignment 2 only as a bounded psionic reference lane. It proves every Stanford A2 adapter family is mapped to owned Rust surfaces plus checked-in profiling, attention, DDP, and sharded-optimizer proof bundles. It does not promote the bounded systems lane into the actual Psion pretraining operator lane, and it does not claim admitted distributed throughput or transport-backed cluster execution.",
+            "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, and the current FSDP wrapper, after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001.",
         ),
     };
     validate_report(&report)?;
@@ -162,18 +174,13 @@ fn validate_report(
     let green_row_count = report
         .rows
         .iter()
-        .filter(|row| row.status == "green")
+        .filter(|row| row.status == "green_bounded_reference")
         .count();
     if report.green_row_count != green_row_count {
         return Err(Cs336A2FullPortConformanceError::InvalidReport(format!(
             "green_row_count {} does not match computed count {green_row_count}",
             report.green_row_count
         )));
-    }
-    if !report.fully_green || report.green_row_count != report.row_count {
-        return Err(Cs336A2FullPortConformanceError::InvalidReport(
-            "full-port report is not fully green".into(),
-        ));
     }
     let adapter_set = report
         .rows
@@ -189,6 +196,11 @@ fn validate_report(
             expected, adapter_set
         )));
     }
+    if report.fully_green {
+        return Err(Cs336A2FullPortConformanceError::InvalidReport(
+            "current A2 report must not claim fully_green while FSDP rows are tracked gaps".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -196,11 +208,24 @@ fn validate_row(
     repo_root: &Path,
     row: &Cs336A2ConformanceRow,
 ) -> Result<(), Cs336A2FullPortConformanceError> {
-    if row.status != "green" {
+    let admitted_status = matches!(
+        row.status.as_str(),
+        "green_bounded_reference" | "partial_bounded_reference" | "missing_tracked"
+    );
+    if !admitted_status {
         return Err(Cs336A2FullPortConformanceError::InvalidReport(format!(
-            "row `{}` is not green",
-            row.stanford_adapter_name
+            "row `{}` has unsupported status `{}`",
+            row.stanford_adapter_name, row.status
         )));
+    }
+    if row.status == "missing_tracked" {
+        if row.follow_up_issue_urls.is_empty() {
+            return Err(Cs336A2FullPortConformanceError::InvalidReport(format!(
+                "missing row `{}` must cite at least one follow-up issue",
+                row.stanford_adapter_name
+            )));
+        }
+        return Ok(());
     }
     if row.implementation_surfaces.is_empty() {
         return Err(Cs336A2FullPortConformanceError::InvalidReport(format!(
@@ -263,6 +288,7 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
         row(
             "get_flashattention_autograd_function_pytorch",
             "attention",
+            "green_bounded_reference",
             vec![
                 FLASHATTENTION_REFERENCE_IMPL_PATH,
                 FLASHATTENTION_REFERENCE_SOURCE_PATH,
@@ -278,11 +304,13 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
                     "Retained parity and memory-surface receipt for the reference path.",
                 ),
             ],
+            vec![],
             "The PyTorch-only FlashAttention adapter is closed by the owned tiled forward/backward reference implementation plus the retained parity receipt.",
         ),
         row(
             "get_flashattention_autograd_function_triton",
             "attention",
+            "partial_bounded_reference",
             vec![FLASHATTENTION_FUSED_IMPL_PATH, FLASHATTENTION_FUSED_SOURCE_PATH],
             vec![
                 source_proof(
@@ -295,11 +323,13 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
                     "Retained admitted-path or explicit-refusal receipt for the fused CUDA lane.",
                 ),
             ],
-            "The Triton-class FlashAttention adapter is closed by the owned fused CUDA receipt family, with explicit refusal posture on non-CUDA hosts.",
+            vec![],
+            "The Triton-class FlashAttention adapter is mapped to the owned fused CUDA receipt family, with explicit refusal posture on non-CUDA hosts. This is a bounded fused-backend analogue, not a claim that Psionic ships the Stanford Triton kernel surface.",
         ),
         row(
-            "get_ddp_individual_parameters",
+            "get_ddp",
             "distributed",
+            "partial_bounded_reference",
             vec![DDP_INDIVIDUAL_SOURCE_PATH],
             vec![
                 source_proof(
@@ -312,11 +342,13 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
                     "Retained two-rank parity receipt for the bounded individual-parameter DDP lane.",
                 ),
             ],
-            "The individual-parameter DDP adapter is mapped to the owned two-rank receipt lane above the A1 trainer.",
+            vec![],
+            "The current get_ddp adapter is mapped to the owned two-rank individual-parameter receipt lane above the A1 trainer. It proves bounded broadcast and per-parameter averaging, but not asynchronous overlap or transport-backed collectives.",
         ),
         row(
-            "ddp_individual_parameters_on_after_backward",
+            "ddp_on_after_backward",
             "distributed",
+            "partial_bounded_reference",
             vec![DDP_INDIVIDUAL_SOURCE_PATH],
             vec![
                 source_proof(
@@ -329,62 +361,40 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
                     "Retained proof that the bounded after-backward sync path stays aligned with the non-parallel baseline.",
                 ),
             ],
-            "The individual-parameter after-backward hook is closed by retained per-parameter sync receipts and bounded parity proof.",
+            vec![],
+            "The current DDP after-backward hook is mapped to retained per-parameter sync receipts and bounded parity proof. It does not yet claim true async gradient communication overlap.",
         ),
         row(
-            "get_ddp_bucketed",
-            "distributed",
-            vec![DDP_BUCKETED_SOURCE_PATH],
-            vec![
-                source_proof(
-                    DDP_BUCKETED_SOURCE_PATH,
-                    "build_cs336_a2_ddp_bucketed_receipt",
-                    "Owned bounded constructor surface for the bucketed DDP lane.",
-                ),
-                json_proof(
-                    CS336_A2_DDP_BUCKETED_RECEIPT_FIXTURE_PATH,
-                    "Retained two-rank bucket-plan and parity receipt for the bounded bucketed DDP lane.",
-                ),
-            ],
-            "The bucketed DDP adapter is mapped to the owned bucket-planning and parity receipt lane above the A1 trainer.",
+            "get_fsdp",
+            "fsdp",
+            "missing_tracked",
+            vec![],
+            vec![],
+            vec![FSDP_WRAPPER_FOLLOW_UP_ISSUE_URL],
+            "The current get_fsdp adapter requires sharded Linear/Embedding weights, all-gather for forward/backward, fp32 master weights, optional fp16 compute, and two-rank parity. Psionic tracks this as a missing current A2 surface.",
         ),
         row(
-            "ddp_bucketed_on_after_backward",
-            "distributed",
-            vec![DDP_BUCKETED_SOURCE_PATH],
-            vec![
-                source_proof(
-                    DDP_BUCKETED_SOURCE_PATH,
-                    "build_after_backward_receipt",
-                    "The after-backward hook is represented by deterministic bucket completion receipts.",
-                ),
-                json_proof(
-                    CS336_A2_DDP_BUCKETED_RECEIPT_FIXTURE_PATH,
-                    "Retained proof that after-backward bucket synchronization stays aligned with the non-parallel baseline.",
-                ),
-            ],
-            "The bucketed after-backward hook is closed by retained bucket completion receipts and bounded parity proof.",
+            "fsdp_on_after_backward",
+            "fsdp",
+            "missing_tracked",
+            vec![],
+            vec![],
+            vec![FSDP_AFTER_BACKWARD_FOLLOW_UP_ISSUE_URL],
+            "The current fsdp_on_after_backward adapter requires reduce-scatter or equivalent gradient synchronization, fp32 master-gradient restoration, replicated-gradient equivalence, and fp32/fp16 parity. Psionic tracks this as a missing current A2 surface.",
         ),
         row(
-            "ddp_bucketed_on_train_batch_start",
-            "distributed",
-            vec![DDP_BUCKETED_SOURCE_PATH],
-            vec![
-                source_proof(
-                    DDP_BUCKETED_SOURCE_PATH,
-                    "build_train_batch_start_receipt",
-                    "The train-batch-start hook is represented by explicit pending-bucket reset receipts.",
-                ),
-                json_proof(
-                    CS336_A2_DDP_BUCKETED_RECEIPT_FIXTURE_PATH,
-                    "Retained proof that the bounded bucket reset surface exists for every step.",
-                ),
-            ],
-            "The bucketed train-batch-start hook is closed by retained reset receipts tied to the bounded bucket-plan lane.",
+            "fsdp_gather_full_params",
+            "fsdp",
+            "missing_tracked",
+            vec![],
+            vec![],
+            vec![FSDP_GATHER_FULL_PARAMS_FOLLOW_UP_ISSUE_URL],
+            "The current fsdp_gather_full_params adapter must reconstruct full parameter tensors from shards and return replicated parameters as-is after every step. Psionic tracks this as a missing current A2 surface.",
         ),
         row(
             "get_sharded_optimizer",
             "optimizer",
+            "green_bounded_reference",
             vec![SHARDED_OPTIMIZER_SOURCE_PATH],
             vec![
                 source_proof(
@@ -397,6 +407,7 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
                     "Retained proof that disjoint optimizer-state ownership reconstructs the non-sharded baseline after each bounded step.",
                 ),
             ],
+            vec![],
             "The sharded optimizer adapter is mapped to the owned bounded ZeRO-stage-1-style receipt lane with retained checkpoint-state reconstruction proof.",
         ),
     ]
@@ -405,19 +416,22 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
 fn row(
     stanford_adapter_name: &str,
     category: &str,
+    status: &str,
     implementation_surfaces: Vec<&str>,
     proof_surfaces: Vec<Cs336A2ConformanceProofSurface>,
+    follow_up_issue_urls: Vec<&str>,
     detail: &str,
 ) -> Cs336A2ConformanceRow {
     Cs336A2ConformanceRow {
         stanford_adapter_name: String::from(stanford_adapter_name),
         category: String::from(category),
-        status: String::from("green"),
+        status: String::from(status),
         implementation_surfaces: implementation_surfaces
             .into_iter()
             .map(String::from)
             .collect(),
         proof_surfaces,
+        follow_up_issue_urls: follow_up_issue_urls.into_iter().map(String::from).collect(),
         detail: String::from(detail),
     }
 }
@@ -454,14 +468,15 @@ mod tests {
     };
 
     #[test]
-    fn a2_full_port_report_is_fully_green() -> Result<(), Box<dyn std::error::Error>> {
+    fn a2_full_port_report_tracks_current_adapter_surface() -> Result<(), Box<dyn std::error::Error>>
+    {
         let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .ancestors()
             .nth(2)
             .ok_or("missing repo root")?;
         let report = build_cs336_a2_full_port_conformance_report(repo_root)?;
-        assert!(report.fully_green);
         assert_eq!(report.row_count, 8);
+        assert!(!report.fully_green);
         Ok(())
     }
 
@@ -476,7 +491,12 @@ mod tests {
         assert!(report
             .rows
             .iter()
-            .any(|row| row.stanford_adapter_name == "get_sharded_optimizer"));
+            .any(|row| row.stanford_adapter_name == "get_fsdp" && row.status == "missing_tracked"));
+        assert!(report
+            .rows
+            .iter()
+            .any(|row| row.stanford_adapter_name == "get_ddp"
+                && row.status == "partial_bounded_reference"));
         Ok(())
     }
 

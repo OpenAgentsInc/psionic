@@ -329,17 +329,23 @@ matches the non-sharded baseline after each bounded step. It still does not
 claim transport-backed ZeRO execution, partition-exchange collectives, or
 actual-lane checkpoint sharding.
 
-The hard completion bar for saying “full Stanford CS336 A2 port” now lives in
+The current coverage bar for Stanford CS336 A2 now lives in
 `crates/psionic-train/src/cs336_a2_full_port_conformance.rs`, the fixture
 generator
 `crates/psionic-train/examples/psion_cs336_a2_full_port_conformance_report.rs`,
 the checked-in matrix `docs/PSION_CS336_A2_FULL_PORT_MATRIX.md`, and the
 retained report
 `fixtures/training/cs336_a2_full_port_conformance_report_v1.json`. That
-surface makes the bounded status explicit: every Stanford A2 adapter family is
-mapped to an owned Rust surface plus a checked-in proof row, while the claim
-boundary still stops short of actual-lane distributed throughput or operator
-closure.
+surface no longer claims full current A2 parity. It maps the current
+`get_ddp` and `ddp_on_after_backward` names to bounded host-reference DDP
+receipts, keeps the older bucketed DDP receipt as retained systems evidence,
+and marks the current FSDP surfaces as tracked missing work in
+[#956](https://github.com/OpenAgentsInc/psionic/issues/956),
+[#957](https://github.com/OpenAgentsInc/psionic/issues/957), and
+[#958](https://github.com/OpenAgentsInc/psionic/issues/958). The claim boundary
+still stops short of actual-lane distributed throughput, operator closure, and
+transport-backed DDP/FSDP execution, and A2 remains non-blocking for
+`a1_minimal_distributed_lm_001`.
 
 The repo now also owns the canonical actual-lane data bundle in
 `crates/psionic-train/src/psion_actual_pretraining_data_bundle.rs`, the

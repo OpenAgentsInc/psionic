@@ -11,13 +11,13 @@
     "fixtures/training/cs336_a2_sharded_optimizer_receipt_v1.json"
   ],
   "row_count": 8,
-  "green_row_count": 8,
-  "fully_green": true,
+  "green_row_count": 2,
+  "fully_green": false,
   "rows": [
     {
       "stanford_adapter_name": "get_flashattention_autograd_function_pytorch",
       "category": "attention",
-      "status": "green",
+      "status": "green_bounded_reference",
       "implementation_surfaces": [
         "crates/psionic-models/src/cs336_a2_flashattention_reference.rs",
         "crates/psionic-train/src/cs336_a2_flashattention_reference_receipt.rs"
@@ -36,12 +36,13 @@
           "detail": "Retained parity and memory-surface receipt for the reference path."
         }
       ],
+      "follow_up_issue_urls": [],
       "detail": "The PyTorch-only FlashAttention adapter is closed by the owned tiled forward/backward reference implementation plus the retained parity receipt."
     },
     {
       "stanford_adapter_name": "get_flashattention_autograd_function_triton",
       "category": "attention",
-      "status": "green",
+      "status": "partial_bounded_reference",
       "implementation_surfaces": [
         "crates/psionic-backend-cuda/src/lib.rs",
         "crates/psionic-train/src/cs336_a2_flashattention_fused_cuda_receipt.rs"
@@ -60,12 +61,13 @@
           "detail": "Retained admitted-path or explicit-refusal receipt for the fused CUDA lane."
         }
       ],
-      "detail": "The Triton-class FlashAttention adapter is closed by the owned fused CUDA receipt family, with explicit refusal posture on non-CUDA hosts."
+      "follow_up_issue_urls": [],
+      "detail": "The Triton-class FlashAttention adapter is mapped to the owned fused CUDA receipt family, with explicit refusal posture on non-CUDA hosts. This is a bounded fused-backend analogue, not a claim that Psionic ships the Stanford Triton kernel surface."
     },
     {
-      "stanford_adapter_name": "get_ddp_individual_parameters",
+      "stanford_adapter_name": "get_ddp",
       "category": "distributed",
-      "status": "green",
+      "status": "partial_bounded_reference",
       "implementation_surfaces": [
         "crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs"
       ],
@@ -83,12 +85,13 @@
           "detail": "Retained two-rank parity receipt for the bounded individual-parameter DDP lane."
         }
       ],
-      "detail": "The individual-parameter DDP adapter is mapped to the owned two-rank receipt lane above the A1 trainer."
+      "follow_up_issue_urls": [],
+      "detail": "The current get_ddp adapter is mapped to the owned two-rank individual-parameter receipt lane above the A1 trainer. It proves bounded broadcast and per-parameter averaging, but not asynchronous overlap or transport-backed collectives."
     },
     {
-      "stanford_adapter_name": "ddp_individual_parameters_on_after_backward",
+      "stanford_adapter_name": "ddp_on_after_backward",
       "category": "distributed",
-      "status": "green",
+      "status": "partial_bounded_reference",
       "implementation_surfaces": [
         "crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs"
       ],
@@ -106,81 +109,46 @@
           "detail": "Retained proof that the bounded after-backward sync path stays aligned with the non-parallel baseline."
         }
       ],
-      "detail": "The individual-parameter after-backward hook is closed by retained per-parameter sync receipts and bounded parity proof."
+      "follow_up_issue_urls": [],
+      "detail": "The current DDP after-backward hook is mapped to retained per-parameter sync receipts and bounded parity proof. It does not yet claim true async gradient communication overlap."
     },
     {
-      "stanford_adapter_name": "get_ddp_bucketed",
-      "category": "distributed",
-      "status": "green",
-      "implementation_surfaces": [
-        "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs"
+      "stanford_adapter_name": "get_fsdp",
+      "category": "fsdp",
+      "status": "missing_tracked",
+      "implementation_surfaces": [],
+      "proof_surfaces": [],
+      "follow_up_issue_urls": [
+        "https://github.com/OpenAgentsInc/psionic/issues/956"
       ],
-      "proof_surfaces": [
-        {
-          "proof_kind": "source_selector",
-          "repo_relative_path": "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs",
-          "selector": "build_cs336_a2_ddp_bucketed_receipt",
-          "detail": "Owned bounded constructor surface for the bucketed DDP lane."
-        },
-        {
-          "proof_kind": "retained_fixture",
-          "repo_relative_path": "fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json",
-          "selector": null,
-          "detail": "Retained two-rank bucket-plan and parity receipt for the bounded bucketed DDP lane."
-        }
-      ],
-      "detail": "The bucketed DDP adapter is mapped to the owned bucket-planning and parity receipt lane above the A1 trainer."
+      "detail": "The current get_fsdp adapter requires sharded Linear/Embedding weights, all-gather for forward/backward, fp32 master weights, optional fp16 compute, and two-rank parity. Psionic tracks this as a missing current A2 surface."
     },
     {
-      "stanford_adapter_name": "ddp_bucketed_on_after_backward",
-      "category": "distributed",
-      "status": "green",
-      "implementation_surfaces": [
-        "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs"
+      "stanford_adapter_name": "fsdp_on_after_backward",
+      "category": "fsdp",
+      "status": "missing_tracked",
+      "implementation_surfaces": [],
+      "proof_surfaces": [],
+      "follow_up_issue_urls": [
+        "https://github.com/OpenAgentsInc/psionic/issues/957"
       ],
-      "proof_surfaces": [
-        {
-          "proof_kind": "source_selector",
-          "repo_relative_path": "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs",
-          "selector": "build_after_backward_receipt",
-          "detail": "The after-backward hook is represented by deterministic bucket completion receipts."
-        },
-        {
-          "proof_kind": "retained_fixture",
-          "repo_relative_path": "fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json",
-          "selector": null,
-          "detail": "Retained proof that after-backward bucket synchronization stays aligned with the non-parallel baseline."
-        }
-      ],
-      "detail": "The bucketed after-backward hook is closed by retained bucket completion receipts and bounded parity proof."
+      "detail": "The current fsdp_on_after_backward adapter requires reduce-scatter or equivalent gradient synchronization, fp32 master-gradient restoration, replicated-gradient equivalence, and fp32/fp16 parity. Psionic tracks this as a missing current A2 surface."
     },
     {
-      "stanford_adapter_name": "ddp_bucketed_on_train_batch_start",
-      "category": "distributed",
-      "status": "green",
-      "implementation_surfaces": [
-        "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs"
+      "stanford_adapter_name": "fsdp_gather_full_params",
+      "category": "fsdp",
+      "status": "missing_tracked",
+      "implementation_surfaces": [],
+      "proof_surfaces": [],
+      "follow_up_issue_urls": [
+        "https://github.com/OpenAgentsInc/psionic/issues/958"
       ],
-      "proof_surfaces": [
-        {
-          "proof_kind": "source_selector",
-          "repo_relative_path": "crates/psionic-train/src/cs336_a2_ddp_bucketed_receipt.rs",
-          "selector": "build_train_batch_start_receipt",
-          "detail": "The train-batch-start hook is represented by explicit pending-bucket reset receipts."
-        },
-        {
-          "proof_kind": "retained_fixture",
-          "repo_relative_path": "fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json",
-          "selector": null,
-          "detail": "Retained proof that the bounded bucket reset surface exists for every step."
-        }
-      ],
-      "detail": "The bucketed train-batch-start hook is closed by retained reset receipts tied to the bounded bucket-plan lane."
+      "detail": "The current fsdp_gather_full_params adapter must reconstruct full parameter tensors from shards and return replicated parameters as-is after every step. Psionic tracks this as a missing current A2 surface."
     },
     {
       "stanford_adapter_name": "get_sharded_optimizer",
       "category": "optimizer",
-      "status": "green",
+      "status": "green_bounded_reference",
       "implementation_surfaces": [
         "crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs"
       ],
@@ -198,8 +166,9 @@
           "detail": "Retained proof that disjoint optimizer-state ownership reconstructs the non-sharded baseline after each bounded step."
         }
       ],
+      "follow_up_issue_urls": [],
       "detail": "The sharded optimizer adapter is mapped to the owned bounded ZeRO-stage-1-style receipt lane with retained checkpoint-state reconstruction proof."
     }
   ],
-  "claim_boundary": "This report closes Stanford CS336 Assignment 2 only as a bounded psionic reference lane. It proves every Stanford A2 adapter family is mapped to owned Rust surfaces plus checked-in profiling, attention, DDP, and sharded-optimizer proof bundles. It does not promote the bounded systems lane into the actual Psion pretraining operator lane, and it does not claim admitted distributed throughput or transport-backed cluster execution."
+  "claim_boundary": "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, and the current FSDP wrapper, after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001."
 }

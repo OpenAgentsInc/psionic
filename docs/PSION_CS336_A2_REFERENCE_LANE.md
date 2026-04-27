@@ -1,12 +1,14 @@
 # Psion CS336 A2 Reference Lane
 
-> Status: full Stanford CS336 Assignment 2 adapter coverage is complete in the
-> bounded `psionic` reference lane as of 2026-04-03.
+> Status: current Stanford CS336 Assignment 2 adapter coverage is partial in
+> the bounded `psionic` reference lane as of 2026-04-27. The earlier full-green
+> claim was tied to stale adapter names and is no longer valid for the current
+> Spring 2026 FSDP surface.
 
 This document records the owned `psionic` surfaces for the bounded Stanford
 CS336 Assignment 2 port program.
 
-Canonical completion bar:
+Canonical coverage bar:
 
 - `docs/PSION_CS336_A2_FULL_PORT_MATRIX.md`
 - `fixtures/training/cs336_a2_full_port_conformance_report_v1.json`
@@ -15,8 +17,8 @@ It exists so the repo can distinguish between:
 
 - the older actual-lane systems bundle that ports A2 ideas into the real Psion
   operator lane, and
-- the newer bounded full-port reference lane work that aims to cover all of A2
-  directly inside `psionic`.
+- the newer bounded reference lane work that aims to cover A2 directly inside
+  `psionic`, while keeping current gaps explicit.
 
 ## What Has Landed So Far
 
@@ -185,6 +187,37 @@ That sharded-optimizer tranche now provides:
   execution and does not claim transport-backed partition exchange or actual
   cluster-scale checkpoint sharding
 
+## Current Adapter Surface Realignment
+
+The current Stanford A2 adapter surface in
+`competition/cs336/repos/assignment2-systems/tests/adapters.py` exposes:
+
+- `get_flashattention_autograd_function_pytorch`
+- `get_flashattention_autograd_function_triton`
+- `get_ddp`
+- `ddp_on_after_backward`
+- `get_fsdp`
+- `fsdp_on_after_backward`
+- `fsdp_gather_full_params`
+- `get_sharded_optimizer`
+
+The previous Psionic matrix used stale DDP-specific names:
+`get_ddp_individual_parameters`, `ddp_individual_parameters_on_after_backward`,
+`get_ddp_bucketed`, `ddp_bucketed_on_after_backward`, and
+`ddp_bucketed_on_train_batch_start`. Those retained receipts still matter as
+bounded systems evidence, but they are no longer current Stanford adapter rows.
+
+Current FSDP parity is not implemented. The missing surfaces are tracked in:
+
+- [#956](https://github.com/OpenAgentsInc/psionic/issues/956):
+  `get_fsdp` wrapper and sharded parameter lifecycle
+- [#957](https://github.com/OpenAgentsInc/psionic/issues/957):
+  `fsdp_on_after_backward` reduce-scatter and mixed-precision parity
+- [#958](https://github.com/OpenAgentsInc/psionic/issues/958):
+  `fsdp_gather_full_params` full-parameter gather conformance fixture
+
+This A2 realignment is not a prerequisite for `a1_minimal_distributed_lm_001`.
+
 ## Current Claim Boundary
 
 This lane now honestly claims:
@@ -194,21 +227,24 @@ This lane now honestly claims:
 - `psionic` owns a bounded FlashAttention2-style reference implementation with
   retained parity evidence against the naive baseline
 - `psionic` owns a bounded fused CUDA attention receipt family with explicit
-  refusal posture on non-CUDA hosts
-- `psionic` owns a bounded individual-parameter DDP proof lane with retained
-  two-rank synchronization evidence against the non-parallel baseline
-- `psionic` owns a bounded bucketed DDP proof lane with retained bucket
-  planning, start-of-step, and after-backward coordination evidence
+  refusal posture on non-CUDA hosts, but this is a fused-backend analogue rather
+  than the Stanford Triton kernel surface
+- `psionic` owns bounded individual-parameter DDP proof evidence that maps to
+  current `get_ddp` and `ddp_on_after_backward` only as a partial bounded
+  reference, without async overlap or transport-backed collectives
+- `psionic` owns a bounded bucketed DDP proof lane as retained systems evidence,
+  but it is no longer a current Stanford adapter row
 - `psionic` owns a bounded sharded-optimizer proof lane with retained
   optimizer-state ownership, owner-step, rebroadcast, and checkpoint-state
   reconstruction evidence against the non-sharded baseline
-- `psionic` now has one checked-in full A2 completion matrix and one retained
-  conformance report, so “full Stanford A2 port” means a concrete in-repo bar
-  instead of a moving doc note
+- `psionic` now has one checked-in current A2 coverage matrix and one retained
+  conformance report that explicitly marks current FSDP as tracked missing work
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather
   than to a detached synthetic benchmark toy
-- later A2 tranches now have one retained receipt family to plug into
 
 It does not yet claim:
 
 - admitted actual-lane throughput or distributed-cluster qualification
+- current FSDP parity
+- full current Stanford A2 adapter parity
+- transport-backed DDP/FSDP execution
