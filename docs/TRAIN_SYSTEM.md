@@ -180,6 +180,19 @@ lane. It freezes the tokenizer, tokenized dataset, validation set, tiny model,
 optimizer, scheduler, checkpoint family, aggregation rule, receipt schema,
 validator acceptance policy, and Nexus closeout semantics that OpenAgents needs
 before assigning many Pylons to one small real LM run.
+The same lane now also owns its dedicated tokenizer/dataset bundle in
+`crates/psionic-train/src/a1_minimal_distributed_lm_tokenizer_dataset_bundle.rs`,
+the generator
+`crates/psionic-train/examples/a1_minimal_distributed_lm_tokenizer_dataset_bundle_fixture.rs`,
+the committed bundle
+`fixtures/psion/tokenized/a1_minimal_distributed_lm_tokenizer_dataset_bundle_v1.json`,
+the synthetic corpus fixture
+`fixtures/training/a1_minimal_distributed_lm_corpus.txt`, and the checker
+`scripts/check-a1-minimal-distributed-lm-tokenizer-dataset-bundle.sh`. That
+bundle uses the existing CS336 A1 BPE trainer and tokenizer runtime to freeze
+one 272-token tokenizer, one tokenized training shard, one validation shard,
+source shard digests, token counts, and validation replay samples without
+widening the lane into distributed BPE or OpenWebText-scale training.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator

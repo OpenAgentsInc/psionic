@@ -35,6 +35,12 @@ doing real assigned compute under one run id.
   `crates/psionic-train/examples/a1_minimal_distributed_lm_lane_contract_fixture.rs`
 - checker:
   `scripts/check-a1-minimal-distributed-lm-lane-contract.sh`
+- tokenizer/dataset bundle:
+  `fixtures/psion/tokenized/a1_minimal_distributed_lm_tokenizer_dataset_bundle_v1.json`
+- tokenizer/dataset generator:
+  `crates/psionic-train/examples/a1_minimal_distributed_lm_tokenizer_dataset_bundle_fixture.rs`
+- tokenizer/dataset checker:
+  `scripts/check-a1-minimal-distributed-lm-tokenizer-dataset-bundle.sh`
 
 The contract is typed in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs` and validates
@@ -58,10 +64,29 @@ run:
 - validator acceptance policy
 - Nexus closeout and checkpoint-promotion semantics
 
-The first fixture intentionally uses the tiny CS336 A1 reference tokenizer and
-tokenized dataset digests as anchors. Issue #949 is expected to replace those
-with a dedicated frozen tokenizer and tokenized dataset bundle for this lane,
-without changing the lane identity.
+The fixture now points at the dedicated frozen tokenizer and tokenized dataset
+bundle typed in
+`crates/psionic-train/src/a1_minimal_distributed_lm_tokenizer_dataset_bundle.rs`.
+That bundle uses the existing CS336 A1 byte-level BPE trainer and tokenizer
+runtime, but it does not attempt distributed BPE merge training. The committed
+corpus fixture is synthetic Psionic text at
+`fixtures/training/a1_minimal_distributed_lm_corpus.txt`.
+
+Current frozen bundle values:
+
+- tokenizer digest:
+  `sha256:e32b619b67029aba5de26391f9a5f4a32801220ca690ae2c89d565e61069cf63`
+- tokenized training dataset digest:
+  `sha256:f0b92dc6301fc72e05a4ead6d85a4b5706e51267c116ecd72025a90c43a37905`
+- validation set digest:
+  `sha256:6c1c6ca83a2d8eca6cb133f3ec719e822f134452723e72e5201407b28cd3d228`
+- tokenizer requested vocab size: `272`
+- token counts: `201` training tokens and `92` validation tokens
+
+The bundle records corpus source, source shard digests, tokenizer digest,
+training and validation shard manifests, token counts, replay samples, and a
+bundle digest. Validation replay samples decode back to the raw validation text
+through the admitted tokenizer.
 
 ## Contribution Semantics
 

@@ -4,7 +4,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::PSION_CS336_A1_DEMO_LANE_ID;
+use crate::{
+    canonical_a1_minimal_distributed_lm_tokenized_dataset_digest,
+    canonical_a1_minimal_distributed_lm_tokenizer_digest,
+    canonical_a1_minimal_distributed_lm_tokenizer_vocab_size,
+    canonical_a1_minimal_distributed_lm_validation_set_digest, PSION_CS336_A1_DEMO_LANE_ID,
+};
 
 pub const A1_MINIMAL_DISTRIBUTED_LM_LANE_CONTRACT_SCHEMA_VERSION: &str =
     "psion.a1_minimal_distributed_lm.lane_contract.v1";
@@ -15,10 +20,6 @@ pub const A1_MINIMAL_DISTRIBUTED_LM_ENVIRONMENT_REF: &str =
     "psionic.environment.a1_minimal_distributed_lm.tiny_lm.operator@v1";
 pub const A1_MINIMAL_DISTRIBUTED_LM_LANE_CONTRACT_FIXTURE_PATH: &str =
     "fixtures/training/a1_minimal_distributed_lm_lane_contract_v1.json";
-pub const A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZER_DIGEST: &str =
-    "sha256:89b9069a2909795bab00156e29f79423560668c2e39f33df790cc33b1e209b89";
-pub const A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZED_DATASET_DIGEST: &str =
-    "sha256:84b82c97c91568da9dcf60bc290970c1e09a1439332b0a42cfe11f17ba693fd0";
 
 #[derive(Debug, Error)]
 pub enum A1MinimalDistributedLmLaneContractError {
@@ -181,15 +182,13 @@ impl A1MinimalDistributedLmLaneContract {
             "tokenized_dataset_digest",
         )?;
         ensure_sha256_uri(self.validation_set_digest.as_str(), "validation_set_digest")?;
-        if self.tokenizer_artifact_digest != A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZER_DIGEST {
+        if self.tokenizer_artifact_digest != expected_tokenizer_digest()? {
             return invalid_contract(String::from("tokenizer_artifact_digest drifted"));
         }
-        if self.tokenized_dataset_digest
-            != A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZED_DATASET_DIGEST
-        {
+        if self.tokenized_dataset_digest != expected_tokenized_dataset_digest()? {
             return invalid_contract(String::from("tokenized_dataset_digest drifted"));
         }
-        if self.validation_set_digest != canonical_validation_set_digest() {
+        if self.validation_set_digest != expected_validation_set_digest()? {
             return invalid_contract(String::from("validation_set_digest drifted"));
         }
         ensure_sha256_uri(self.contract_digest.as_str(), "contract_digest")?;
@@ -238,6 +237,11 @@ impl A1MinimalDistributedLmModelConfig {
         if self.rope_theta <= 0.0 || self.rms_norm_eps <= 0.0 {
             return invalid_contract(String::from(
                 "model config numeric tolerances must be positive",
+            ));
+        }
+        if self.vocab_size != expected_tokenizer_vocab_size()? {
+            return invalid_contract(String::from(
+                "model vocab_size must match the frozen tokenizer bundle",
             ));
         }
         Ok(())
@@ -454,16 +458,16 @@ pub fn canonical_a1_minimal_distributed_lm_lane_contract() -> A1MinimalDistribut
         release_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_RELEASE_ID),
         environment_ref: String::from(A1_MINIMAL_DISTRIBUTED_LM_ENVIRONMENT_REF),
         run_id_family: String::from("a1_minimal_distributed_lm_001"),
-        tokenizer_artifact_digest: String::from(
-            A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZER_DIGEST,
-        ),
-        tokenized_dataset_digest: String::from(
-            A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZED_DATASET_DIGEST,
-        ),
-        validation_set_digest: canonical_validation_set_digest(),
+        tokenizer_artifact_digest: expected_tokenizer_digest()
+            .expect("canonical A1 minimal distributed LM tokenizer digest should resolve"),
+        tokenized_dataset_digest: expected_tokenized_dataset_digest()
+            .expect("canonical A1 minimal distributed LM tokenized dataset digest should resolve"),
+        validation_set_digest: expected_validation_set_digest()
+            .expect("canonical A1 minimal distributed LM validation digest should resolve"),
         model_config: A1MinimalDistributedLmModelConfig {
             architecture: String::from("tiny_transformer_lm"),
-            vocab_size: 256,
+            vocab_size: expected_tokenizer_vocab_size()
+                .expect("canonical A1 minimal distributed LM tokenizer vocab size should resolve"),
             context_length: 2,
             d_model: 2,
             num_layers: 1,
@@ -606,16 +610,28 @@ pub fn write_a1_minimal_distributed_lm_lane_contract(
     })
 }
 
-fn canonical_validation_set_digest() -> String {
-    sha256_uri_digest(
-        b"psion_a1_minimal_distributed_lm_validation_set|",
-        &(
-            A1_MINIMAL_DISTRIBUTED_LM_REFERENCE_TOKENIZED_DATASET_DIGEST,
-            "validation_batch_count=1",
-            "context_length=2",
-            "validation_window=heldout_tail",
-        ),
-    )
+fn expected_tokenizer_digest() -> Result<String, A1MinimalDistributedLmLaneContractError> {
+    canonical_a1_minimal_distributed_lm_tokenizer_digest().map_err(canonical_bundle_error)
+}
+
+fn expected_tokenized_dataset_digest() -> Result<String, A1MinimalDistributedLmLaneContractError> {
+    canonical_a1_minimal_distributed_lm_tokenized_dataset_digest().map_err(canonical_bundle_error)
+}
+
+fn expected_validation_set_digest() -> Result<String, A1MinimalDistributedLmLaneContractError> {
+    canonical_a1_minimal_distributed_lm_validation_set_digest().map_err(canonical_bundle_error)
+}
+
+fn expected_tokenizer_vocab_size() -> Result<u32, A1MinimalDistributedLmLaneContractError> {
+    canonical_a1_minimal_distributed_lm_tokenizer_vocab_size().map_err(canonical_bundle_error)
+}
+
+fn canonical_bundle_error(
+    error: impl std::fmt::Display,
+) -> A1MinimalDistributedLmLaneContractError {
+    A1MinimalDistributedLmLaneContractError::InvalidContract {
+        detail: format!("canonical tokenizer/dataset bundle invalid: {error}"),
+    }
 }
 
 fn sha256_uri_digest<T: Serialize>(prefix: &[u8], value: &T) -> String {

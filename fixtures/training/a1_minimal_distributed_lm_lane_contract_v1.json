@@ -4,12 +4,12 @@
   "release_id": "psionic-train.a1_minimal_distributed_lm.release.v1",
   "environment_ref": "psionic.environment.a1_minimal_distributed_lm.tiny_lm.operator@v1",
   "run_id_family": "a1_minimal_distributed_lm_001",
-  "tokenizer_artifact_digest": "sha256:89b9069a2909795bab00156e29f79423560668c2e39f33df790cc33b1e209b89",
-  "tokenized_dataset_digest": "sha256:84b82c97c91568da9dcf60bc290970c1e09a1439332b0a42cfe11f17ba693fd0",
-  "validation_set_digest": "sha256:4cc226bd69019f17cd157a219f475633f7b2ccfef0759c2edaddc11553742237",
+  "tokenizer_artifact_digest": "sha256:e32b619b67029aba5de26391f9a5f4a32801220ca690ae2c89d565e61069cf63",
+  "tokenized_dataset_digest": "sha256:f0b92dc6301fc72e05a4ead6d85a4b5706e51267c116ecd72025a90c43a37905",
+  "validation_set_digest": "sha256:6c1c6ca83a2d8eca6cb133f3ec719e822f134452723e72e5201407b28cd3d228",
   "model_config": {
     "architecture": "tiny_transformer_lm",
-    "vocab_size": 256,
+    "vocab_size": 272,
     "context_length": 2,
     "d_model": 2,
     "num_layers": 1,
@@ -106,5 +106,5 @@
     "promotion_semantics": "Nexus may count accepted support/verifier work as participants, but only accepted local-update artifacts that enter the promoted aggregate checkpoint count as model-progress participants."
   },
   "claim_boundary": "This lane is a fixed tiny LM contract for distributed local-update and verifier/support work. It is not OpenWebText leaderboard parity, not broad pretraining, not a model-size claim, and not the existing bounded four-step CS336 A1 demo lane.",
-  "contract_digest": "sha256:508ffed49d4a8a9e9c26c6be4baeceab032b2783ed824916ee377f600101f043"
+  "contract_digest": "sha256:5f498e5228db02dacffaa0dc87b79253599ba4036e6e03e8bc129571281619e1"
 }

@@ -21,6 +21,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 mod a1_minimal_distributed_lm_lane;
+mod a1_minimal_distributed_lm_tokenizer_dataset_bundle;
 mod adapter_aggregation;
 mod adapter_artifact_storage;
 mod adapter_cluster;
@@ -335,6 +336,7 @@ mod worker_protocol;
 mod xtrain_explorer_artifacts;
 
 pub use a1_minimal_distributed_lm_lane::*;
+pub use a1_minimal_distributed_lm_tokenizer_dataset_bundle::*;
 pub use adapter_aggregation::*;
 pub use adapter_artifact_storage::*;
 pub use adapter_cluster::*;
