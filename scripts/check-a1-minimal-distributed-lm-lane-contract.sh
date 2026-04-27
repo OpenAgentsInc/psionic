@@ -53,6 +53,18 @@ expected_fields = {
 if not expected_fields.issubset(required_fields):
     fail("contribution receipt schema lost required OpenAgents fields")
 
+support_classes = set(committed["contribution_receipt_schema"]["support_work_classes"])
+expected_support_classes = {
+    "tokenized_shard_validation",
+    "validation_replay",
+    "checkpoint_verification",
+    "eval_batch",
+    "artifact_rematerialization",
+    "independent_scored_training_window",
+}
+if support_classes != expected_support_classes:
+    fail(f"support work class set drifted: {sorted(support_classes)}")
+
 summary = {
     "verdict": "verified",
     "lane_id": committed["lane_id"],

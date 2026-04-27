@@ -234,6 +234,21 @@ retained proof exposes `accepted_aggregate_id`, `aggregated_delta_digest`,
 `output_checkpoint_pointer`, and `promoted_checkpoint_ref` for OpenAgents
 checkpoint-lineage surfaces. It is trusted aggregation only; permissionless
 public model-progress acceptance remains outside this fixture.
+The same lane now also defines verifier-first support artifact families in
+`crates/psionic-train/src/a1_minimal_distributed_lm_support_artifacts.rs` with
+the retained catalog
+`fixtures/psion/a1_minimal_distributed_lm/support_artifact_catalog_v1.json` and
+checker `scripts/check-a1-minimal-distributed-lm-support-artifacts.sh`. The
+catalog covers tokenized shard validation, validation replay, checkpoint
+verification, eval batch, artifact rematerialization, and independent scored
+training-window work. Each retained example receipt carries explicit inputs,
+outputs, digest refs, validator disposition, validator verdict binding, and
+Nexus closeout binding so validators can accept or reject support work without
+reading logs. These families can count as participants only through
+`training_accepted_contributors`; they do not count as model-progress
+participants by default and must not increment
+`training_model_progress_contributors` unless later converted into accepted
+local-update aggregate input.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator

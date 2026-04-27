@@ -65,6 +65,12 @@ doing real assigned compute under one run id.
   `scripts/check-a1-minimal-distributed-lm-local-update.sh`
 - trusted aggregation checker:
   `scripts/check-a1-minimal-distributed-lm-trusted-aggregation.sh`
+- support artifact catalog:
+  `fixtures/psion/a1_minimal_distributed_lm/support_artifact_catalog_v1.json`
+- support artifact catalog generator:
+  `crates/psionic-train/examples/a1_minimal_distributed_lm_support_artifact_catalog_fixture.rs`
+- support artifact catalog checker:
+  `scripts/check-a1-minimal-distributed-lm-support-artifacts.sh`
 
 The contract is typed in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs` and validates
@@ -205,6 +211,41 @@ Current retained aggregate values:
 This is still trusted aggregation, not permissionless public model-progress
 acceptance. The retained tests reject mismatched tokenizer and stale-window
 inputs fail-closed before promotion.
+
+## Verifier-First Support Artifacts
+
+The lane now carries a typed support-artifact catalog in
+`crates/psionic-train/src/a1_minimal_distributed_lm_support_artifacts.rs`.
+It defines six accepted-work families for public Pylons that can do real
+compute before they are trusted to advance the canonical model:
+
+- `tokenized_shard_validation`
+- `validation_replay`
+- `checkpoint_verification`
+- `eval_batch`
+- `artifact_rematerialization`
+- `independent_scored_training_window`
+
+The retained catalog contains one accepted example receipt for each family and
+records explicit inputs, outputs, digest refs, validator disposition, validator
+verdict binding, and Nexus closeout binding. Validators can accept or reject
+these artifacts from the typed receipt surface without reading logs.
+
+Current retained catalog values:
+
+- support family count: `6`
+- retained example receipts: `6`
+- participant counter source: `training_accepted_contributors`
+- model-progress counter source: `training_model_progress_contributors`
+- catalog digest:
+  `sha256:d258457e3f7a73576ee0ad1f6638850825305312f3543df212875aaae90a8b63`
+
+Tokenizer, tokenized-dataset, validation-set, and checkpoint refs are required
+only on the support families where they apply. All retained support receipts
+are participant-eligible after accepted Nexus closeout, but none count as
+model-progress participant work by default and none may increment
+`training_model_progress_contributors` unless later converted into accepted
+local-update aggregate input.
 
 ## Contribution Semantics
 

@@ -73,10 +73,12 @@
       "local_update_training"
     ],
     "support_work_classes": [
+      "tokenized_shard_validation",
       "validation_replay",
       "checkpoint_verification",
       "eval_batch",
-      "artifact_rematerialization"
+      "artifact_rematerialization",
+      "independent_scored_training_window"
     ]
   },
   "validator_acceptance_policy": {
@@ -106,5 +108,5 @@
     "promotion_semantics": "Nexus may count accepted support/verifier work as participants, but only accepted local-update artifacts that enter the promoted aggregate checkpoint count as model-progress participants."
   },
   "claim_boundary": "This lane is a fixed tiny LM contract for distributed local-update and verifier/support work. It is not OpenWebText leaderboard parity, not broad pretraining, not a model-size claim, and not the existing bounded four-step CS336 A1 demo lane.",
-  "contract_digest": "sha256:5f498e5228db02dacffaa0dc87b79253599ba4036e6e03e8bc129571281619e1"
+  "contract_digest": "sha256:ae920336184dbd9af4703f99d5a767d5807590b855ed4c729ab94862efcf245a"
 }

@@ -545,10 +545,12 @@ pub fn canonical_a1_minimal_distributed_lm_lane_contract() -> A1MinimalDistribut
             ],
             model_progress_work_classes: vec![String::from("local_update_training")],
             support_work_classes: vec![
+                String::from("tokenized_shard_validation"),
                 String::from("validation_replay"),
                 String::from("checkpoint_verification"),
                 String::from("eval_batch"),
                 String::from("artifact_rematerialization"),
+                String::from("independent_scored_training_window"),
             ],
         },
         validator_acceptance_policy: A1MinimalDistributedLmValidatorAcceptancePolicy {

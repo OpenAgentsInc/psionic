@@ -22,6 +22,7 @@ use thiserror::Error;
 
 mod a1_minimal_distributed_lm_lane;
 mod a1_minimal_distributed_lm_local_update;
+mod a1_minimal_distributed_lm_support_artifacts;
 mod a1_minimal_distributed_lm_tokenizer_dataset_bundle;
 mod a1_minimal_distributed_lm_trusted_aggregation;
 mod adapter_aggregation;
@@ -339,6 +340,7 @@ mod xtrain_explorer_artifacts;
 
 pub use a1_minimal_distributed_lm_lane::*;
 pub use a1_minimal_distributed_lm_local_update::*;
+pub use a1_minimal_distributed_lm_support_artifacts::*;
 pub use a1_minimal_distributed_lm_tokenizer_dataset_bundle::*;
 pub use a1_minimal_distributed_lm_trusted_aggregation::*;
 pub use adapter_aggregation::*;
