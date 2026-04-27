@@ -41,6 +41,7 @@ promotion decision that refuses held-out regressions or failed operator review.
 - Forge-facing eval pack publication: [docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md](docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)
+- A1 minimal distributed LM lane: [docs/PSION_A1_MINIMAL_DISTRIBUTED_LM_LANE.md](docs/PSION_A1_MINIMAL_DISTRIBUTED_LM_LANE.md)
 - Repo-local library roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 - Psion learned-model program: [docs/PSION_PROGRAM_MAP.md](docs/PSION_PROGRAM_MAP.md)
 - Psion actual-pretraining operator runbook: [docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md](docs/PSION_ACTUAL_PRETRAINING_RUNBOOK.md)

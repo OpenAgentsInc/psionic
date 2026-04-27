@@ -36,6 +36,12 @@ The lane is intentionally fixed to:
 - a four-step training budget
 - one accepted checkpoint labeled `bounded_step_000004`
 
+The A1-derived minimal distributed LM lane now lives separately at
+`docs/PSION_A1_MINIMAL_DISTRIBUTED_LM_LANE.md` with lane id
+`a1_minimal_distributed_lm_001`. That lane is the first contract for a shared
+small LM run with local-update aggregation and Pylon/Nexus participant
+accounting. It must not reuse this demo lane identity.
+
 ## Canonical Machine Contract
 
 The current packaged demo lane is explicitly a CPU reference lane.
@@ -158,3 +164,4 @@ It does not claim:
 - broader-pretraining scale
 - production autograd or distributed training closure
 - that this lane replaces `psion_actual_pretraining_v1`
+- that this lane is the distributed `a1_minimal_distributed_lm_001` run

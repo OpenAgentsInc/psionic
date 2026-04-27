@@ -166,6 +166,21 @@ fresh bounded run wrote the retained status packets, generic checkpoint
 surface, accepted checkpoint, and closeout bundle before calling the lane
 demo-ready.
 
+The repo now also owns the first contract for the A1-derived minimal
+distributed LM lane in
+`crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs`, the focused doc
+`docs/PSION_A1_MINIMAL_DISTRIBUTED_LM_LANE.md`, the fixture generator
+`crates/psionic-train/examples/a1_minimal_distributed_lm_lane_contract_fixture.rs`,
+the retained fixture
+`fixtures/training/a1_minimal_distributed_lm_lane_contract_v1.json`, and the
+checker `scripts/check-a1-minimal-distributed-lm-lane-contract.sh`. That lane
+is explicitly `a1_minimal_distributed_lm_001`, not the bounded
+`psion_cs336_a1_demo_v1` lane and not the broader `psion_actual_pretraining_v1`
+lane. It freezes the tokenizer, tokenized dataset, validation set, tiny model,
+optimizer, scheduler, checkpoint family, aggregation rule, receipt schema,
+validator acceptance policy, and Nexus closeout semantics that OpenAgents needs
+before assigning many Pylons to one small real LM run.
+
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator
 `crates/psionic-train/examples/psion_cs336_a2_baseline_profile_bundle.rs`, the

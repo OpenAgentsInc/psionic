@@ -103,6 +103,15 @@ training config, and checkpoint family, but it exists to make one honest
 the broader reference-lane completion claim here or the actual pretraining
 lane.
 
+The first A1-derived minimal distributed LM contract now lives separately in
+`docs/PSION_A1_MINIMAL_DISTRIBUTED_LM_LANE.md` with lane id
+`a1_minimal_distributed_lm_001`. That lane starts from A1 mechanics but freezes
+a different purpose: many Pylons doing real assigned compute for one tiny shared
+LM run, with local-update aggregation, validator acceptance, Nexus closeout,
+participant truth, and model-progress participant truth. It is not the bounded
+full-port reference lane and does not widen this document into OpenWebText
+leaderboard parity or broad pretraining.
+
 The canonical completion matrix lives in
 `docs/PSION_CS336_A1_FULL_PORT_MATRIX.md`, and the retained machine-readable
 report lives in
