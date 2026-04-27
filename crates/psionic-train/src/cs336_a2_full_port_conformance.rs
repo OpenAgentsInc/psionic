@@ -8,7 +8,7 @@ use crate::{
     CS336_A2_DDP_INDIVIDUAL_PARAMETERS_RECEIPT_FIXTURE_PATH,
     CS336_A2_FLASHATTENTION_FUSED_CUDA_RECEIPT_FIXTURE_PATH,
     CS336_A2_FLASHATTENTION_REFERENCE_RECEIPT_FIXTURE_PATH,
-    CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH,
+    CS336_A2_FSDP_WRAPPER_RECEIPT_FIXTURE_PATH, CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH,
 };
 
 pub const CS336_A2_FULL_PORT_CONFORMANCE_REPORT_SCHEMA_VERSION: &str =
@@ -30,6 +30,7 @@ const DDP_INDIVIDUAL_SOURCE_PATH: &str =
     "crates/psionic-train/src/cs336_a2_ddp_individual_parameters_receipt.rs";
 const SHARDED_OPTIMIZER_SOURCE_PATH: &str =
     "crates/psionic-train/src/cs336_a2_sharded_optimizer_receipt.rs";
+const FSDP_WRAPPER_SOURCE_PATH: &str = "crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs";
 
 const EXPECTED_STANFORD_ADAPTERS: [&str; 8] = [
     "get_flashattention_autograd_function_pytorch",
@@ -42,8 +43,6 @@ const EXPECTED_STANFORD_ADAPTERS: [&str; 8] = [
     "get_sharded_optimizer",
 ];
 
-const FSDP_WRAPPER_FOLLOW_UP_ISSUE_URL: &str =
-    "https://github.com/OpenAgentsInc/psionic/issues/956";
 const FSDP_AFTER_BACKWARD_FOLLOW_UP_ISSUE_URL: &str =
     "https://github.com/OpenAgentsInc/psionic/issues/957";
 const FSDP_GATHER_FULL_PARAMS_FOLLOW_UP_ISSUE_URL: &str =
@@ -114,6 +113,7 @@ pub fn build_cs336_a2_full_port_conformance_report(
             String::from(CS336_A2_DDP_INDIVIDUAL_PARAMETERS_RECEIPT_FIXTURE_PATH),
             String::from(CS336_A2_DDP_BUCKETED_RECEIPT_FIXTURE_PATH),
             String::from(CS336_A2_SHARDED_OPTIMIZER_RECEIPT_FIXTURE_PATH),
+            String::from(CS336_A2_FSDP_WRAPPER_RECEIPT_FIXTURE_PATH),
         ],
         row_count: rows.len(),
         green_row_count: rows
@@ -125,7 +125,7 @@ pub fn build_cs336_a2_full_port_conformance_report(
             .all(|row| row.status == "green_bounded_reference"),
         rows,
         claim_boundary: String::from(
-            "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, and the current FSDP wrapper, after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001.",
+            "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, get_fsdp now has a bounded host-reference wrapper lifecycle receipt, and the current FSDP after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001.",
         ),
     };
     validate_report(&report)?;
@@ -367,11 +367,21 @@ fn expected_rows() -> Vec<Cs336A2ConformanceRow> {
         row(
             "get_fsdp",
             "fsdp",
-            "missing_tracked",
+            "partial_bounded_reference",
+            vec![FSDP_WRAPPER_SOURCE_PATH],
+            vec![
+                source_proof(
+                    FSDP_WRAPPER_SOURCE_PATH,
+                    "build_cs336_a2_fsdp_wrapper_receipt",
+                    "Owned bounded constructor and parameter-lifecycle receipt for the get_fsdp adapter surface.",
+                ),
+                json_proof(
+                    CS336_A2_FSDP_WRAPPER_RECEIPT_FIXTURE_PATH,
+                    "Retained proof that Linear and Embedding parameters are sharded while replicated parameters remain explicit.",
+                ),
+            ],
             vec![],
-            vec![],
-            vec![FSDP_WRAPPER_FOLLOW_UP_ISSUE_URL],
-            "The current get_fsdp adapter requires sharded Linear/Embedding weights, all-gather for forward/backward, fp32 master weights, optional fp16 compute, and two-rank parity. Psionic tracks this as a missing current A2 surface.",
+            "The current get_fsdp adapter is mapped to a bounded host-reference wrapper receipt over the ToyFSDPModel parameter families. It proves sharded Linear/Embedding layout, pre-forward and pre-backward all-gather planning, fp32 master restoration, fp16 compute-dtype admission, and full-state reconstruction. It does not claim transport-backed FSDP execution.",
         ),
         row(
             "fsdp_on_after_backward",
@@ -491,7 +501,8 @@ mod tests {
         assert!(report
             .rows
             .iter()
-            .any(|row| row.stanford_adapter_name == "get_fsdp" && row.status == "missing_tracked"));
+            .any(|row| row.stanford_adapter_name == "get_fsdp"
+                && row.status == "partial_bounded_reference"));
         assert!(report
             .rows
             .iter()

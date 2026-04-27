@@ -1,0 +1,228 @@
+{
+  "schema_version": "psion.cs336_a2.fsdp_wrapper_receipt.v1",
+  "reference_lane_doc_path": "docs/PSION_CS336_A2_REFERENCE_LANE.md",
+  "stanford_adapter_name": "get_fsdp",
+  "config": {
+    "world_size": 2,
+    "adapter_name": "get_fsdp",
+    "toy_model_family": "ToyFSDPModel(vocab_size=100,d_model=64,d_ff=128)",
+    "compute_dtype_cases": [
+      "fp32",
+      "fp16"
+    ]
+  },
+  "sharded_parameter_count": 4,
+  "replicated_parameter_count": 2,
+  "parameter_lifecycles": [
+    {
+      "parameter_path": "embedding.weight",
+      "parameter_family": "embedding",
+      "shape": [
+        100,
+        64
+      ],
+      "full_element_count": 6400,
+      "master_dtype": "fp32",
+      "sharding_kind": "row_sharded",
+      "shard_axis": 0,
+      "shard_ranges": [
+        {
+          "rank": 0,
+          "start_row": 0,
+          "end_row": 50,
+          "element_count": 3200,
+          "shard_digest": "sha256:58ed6335d9d6e8761e256cfd871f09b8346be2bdd8ed2b70f424418494227343"
+        },
+        {
+          "rank": 1,
+          "start_row": 50,
+          "end_row": 100,
+          "element_count": 3200,
+          "shard_digest": "sha256:af90117ebed823831ba66ff151b317a237a62fbed469d65bfd6edc30089e39b7"
+        }
+      ],
+      "replicated_on_ranks": [],
+      "all_gather_before_forward": true,
+      "all_gather_before_backward": true,
+      "fp32_master_restored_after_forward": true,
+      "fp32_master_restored_after_backward": true,
+      "compute_dtype_cases": [
+        "fp32",
+        "fp16"
+      ],
+      "full_parameter_digest": "sha256:db3b208c3679abe73e8b0c193631af31678641c1d5b00501b9cddaed66fe8093"
+    },
+    {
+      "parameter_path": "norm1.weight",
+      "parameter_family": "replicated",
+      "shape": [
+        64
+      ],
+      "full_element_count": 64,
+      "master_dtype": "fp32",
+      "sharding_kind": "replicated",
+      "shard_axis": null,
+      "shard_ranges": [],
+      "replicated_on_ranks": [
+        0,
+        1
+      ],
+      "all_gather_before_forward": false,
+      "all_gather_before_backward": false,
+      "fp32_master_restored_after_forward": true,
+      "fp32_master_restored_after_backward": true,
+      "compute_dtype_cases": [
+        "fp32",
+        "fp16"
+      ],
+      "full_parameter_digest": "sha256:70ff258a5d8fc0d34751425556ca4f06e43ecdf5630e0750f4b22e29c8b1556b"
+    },
+    {
+      "parameter_path": "linear1.weight",
+      "parameter_family": "linear",
+      "shape": [
+        128,
+        64
+      ],
+      "full_element_count": 8192,
+      "master_dtype": "fp32",
+      "sharding_kind": "row_sharded",
+      "shard_axis": 0,
+      "shard_ranges": [
+        {
+          "rank": 0,
+          "start_row": 0,
+          "end_row": 64,
+          "element_count": 4096,
+          "shard_digest": "sha256:96241dfc212d5c2ef35a5d164b75b208691460b869dfaae9d3f65a7b7b4b697b"
+        },
+        {
+          "rank": 1,
+          "start_row": 64,
+          "end_row": 128,
+          "element_count": 4096,
+          "shard_digest": "sha256:a620f58b4424f4b011bd0f15d3e11beb3576c22034276dae739ca3b8e8315b08"
+        }
+      ],
+      "replicated_on_ranks": [],
+      "all_gather_before_forward": true,
+      "all_gather_before_backward": true,
+      "fp32_master_restored_after_forward": true,
+      "fp32_master_restored_after_backward": true,
+      "compute_dtype_cases": [
+        "fp32",
+        "fp16"
+      ],
+      "full_parameter_digest": "sha256:7b29f5e8e53c7b4bf637136977c6b808b7c5d5f00b4ceb157f1af31e31f3f9bc"
+    },
+    {
+      "parameter_path": "norm2.weight",
+      "parameter_family": "replicated",
+      "shape": [
+        128
+      ],
+      "full_element_count": 128,
+      "master_dtype": "fp32",
+      "sharding_kind": "replicated",
+      "shard_axis": null,
+      "shard_ranges": [],
+      "replicated_on_ranks": [
+        0,
+        1
+      ],
+      "all_gather_before_forward": false,
+      "all_gather_before_backward": false,
+      "fp32_master_restored_after_forward": true,
+      "fp32_master_restored_after_backward": true,
+      "compute_dtype_cases": [
+        "fp32",
+        "fp16"
+      ],
+      "full_parameter_digest": "sha256:d7dc746d3a73a1582625c6f06045e429fc02467a90af2205d33b90fdde25ee6d"
+    },
+    {
+      "parameter_path": "linear2.weight",
+      "parameter_family": "linear",
+      "shape": [
+        64,
+        128
+      ],
+      "full_element_count": 8192,
+      "master_dtype": "fp32",
+      "sharding_kind": "row_sharded",
+      "shard_axis": 0,
+      "shard_ranges": [
+        {
+          "rank": 0,
+          "start_row": 0,
+          "end_row": 32,
+          "element_count": 4096,
+          "shard_digest": "sha256:928708f2c6798b16d75966c09dce204e01e10561d0938183024911828d3fb7d6"
+        },
+        {
+          "rank": 1,
+          "start_row": 32,
+          "end_row": 64,
+          "element_count": 4096,
+          "shard_digest": "sha256:ef85350af2cc1af4c67c043d8b02460930176892c3a1bb0713ab0d5c1df271a3"
+        }
+      ],
+      "replicated_on_ranks": [],
+      "all_gather_before_forward": true,
+      "all_gather_before_backward": true,
+      "fp32_master_restored_after_forward": true,
+      "fp32_master_restored_after_backward": true,
+      "compute_dtype_cases": [
+        "fp32",
+        "fp16"
+      ],
+      "full_parameter_digest": "sha256:e336ded0e7a1d909ee4535f1fbe234a250b3dad2e88c1a492948e1dd8a40b686"
+    },
+    {
+      "parameter_path": "lm_head.weight",
+      "parameter_family": "linear",
+      "shape": [
+        100,
+        64
+      ],
+      "full_element_count": 6400,
+      "master_dtype": "fp32",
+      "sharding_kind": "row_sharded",
+      "shard_axis": 0,
+      "shard_ranges": [
+        {
+          "rank": 0,
+          "start_row": 0,
+          "end_row": 50,
+          "element_count": 3200,
+          "shard_digest": "sha256:ee983364c6cee8ac92312db42a0382f1e210bef7d6b0ea50a19453d76f3e6621"
+        },
+        {
+          "rank": 1,
+          "start_row": 50,
+          "end_row": 100,
+          "element_count": 3200,
+          "shard_digest": "sha256:a55db586976ee3bf4d5e15fe65794dcd4739cf6a75cc51d574322b4b8891661e"
+        }
+      ],
+      "replicated_on_ranks": [],
+      "all_gather_before_forward": true,
+      "all_gather_before_backward": true,
+      "fp32_master_restored_after_forward": true,
+      "fp32_master_restored_after_backward": true,
+      "compute_dtype_cases": [
+        "fp32",
+        "fp16"
+      ],
+      "full_parameter_digest": "sha256:68f85dd8eb0572296185826f1598b958c251d44c2dbf60266732b86faac79e17"
+    }
+  ],
+  "per_rank_sharded_element_counts": {
+    "0": 14592,
+    "1": 14592
+  },
+  "gathered_state_digest": "sha256:df1bb2ed7d2b4d000cacc70bae6a772f60880a18a6f0a5ed51b7c7297eb0305a",
+  "model_state_reconstruction_matches_baseline": true,
+  "fp16_compute_dtype_supported_in_reference": true,
+  "claim_boundary": "This receipt proves the bounded CS336 A2 get_fsdp wrapper lifecycle inside psionic. It models the current ToyFSDPModel Linear and Embedding weight sharding, pre-forward and pre-backward all-gather, fp32 master weight restoration, fp16 compute-dtype admission, and full-state reconstruction over deterministic host-owned reference tensors. It does not claim transport-backed FSDP execution, distributed throughput, or cluster qualification."
+}

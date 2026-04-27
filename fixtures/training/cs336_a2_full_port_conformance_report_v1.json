@@ -8,7 +8,8 @@
     "fixtures/training/cs336_a2_flashattention_fused_cuda_receipt_v1.json",
     "fixtures/training/cs336_a2_ddp_individual_parameters_receipt_v1.json",
     "fixtures/training/cs336_a2_ddp_bucketed_receipt_v1.json",
-    "fixtures/training/cs336_a2_sharded_optimizer_receipt_v1.json"
+    "fixtures/training/cs336_a2_sharded_optimizer_receipt_v1.json",
+    "fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json"
   ],
   "row_count": 8,
   "green_row_count": 2,
@@ -115,13 +116,26 @@
     {
       "stanford_adapter_name": "get_fsdp",
       "category": "fsdp",
-      "status": "missing_tracked",
-      "implementation_surfaces": [],
-      "proof_surfaces": [],
-      "follow_up_issue_urls": [
-        "https://github.com/OpenAgentsInc/psionic/issues/956"
+      "status": "partial_bounded_reference",
+      "implementation_surfaces": [
+        "crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs"
       ],
-      "detail": "The current get_fsdp adapter requires sharded Linear/Embedding weights, all-gather for forward/backward, fp32 master weights, optional fp16 compute, and two-rank parity. Psionic tracks this as a missing current A2 surface."
+      "proof_surfaces": [
+        {
+          "proof_kind": "source_selector",
+          "repo_relative_path": "crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs",
+          "selector": "build_cs336_a2_fsdp_wrapper_receipt",
+          "detail": "Owned bounded constructor and parameter-lifecycle receipt for the get_fsdp adapter surface."
+        },
+        {
+          "proof_kind": "retained_fixture",
+          "repo_relative_path": "fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json",
+          "selector": null,
+          "detail": "Retained proof that Linear and Embedding parameters are sharded while replicated parameters remain explicit."
+        }
+      ],
+      "follow_up_issue_urls": [],
+      "detail": "The current get_fsdp adapter is mapped to a bounded host-reference wrapper receipt over the ToyFSDPModel parameter families. It proves sharded Linear/Embedding layout, pre-forward and pre-backward all-gather planning, fp32 master restoration, fp16 compute-dtype admission, and full-state reconstruction. It does not claim transport-backed FSDP execution."
     },
     {
       "stanford_adapter_name": "fsdp_on_after_backward",
@@ -170,5 +184,5 @@
       "detail": "The sharded optimizer adapter is mapped to the owned bounded ZeRO-stage-1-style receipt lane with retained checkpoint-state reconstruction proof."
     }
   ],
-  "claim_boundary": "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, and the current FSDP wrapper, after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001."
+  "claim_boundary": "This report tracks the current Spring 2026 Stanford CS336 Assignment 2 adapter surface as a bounded psionic reference lane. It no longer claims full current A2 parity: FlashAttention and sharded-optimizer surfaces have retained bounded proofs, DDP is mapped to bounded host-reference receipts under the current get_ddp/ddp_on_after_backward names, get_fsdp now has a bounded host-reference wrapper lifecycle receipt, and the current FSDP after-backward reduce-scatter, mixed-precision parity, and full-parameter gather surfaces remain tracked gaps. This does not promote the bounded systems lane into the actual Psion pretraining operator lane, does not claim admitted distributed throughput or transport-backed cluster execution, and is not a prerequisite for a1_minimal_distributed_lm_001."
 }

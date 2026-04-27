@@ -187,6 +187,35 @@ That sharded-optimizer tranche now provides:
   execution and does not claim transport-backed partition exchange or actual
   cluster-scale checkpoint sharding
 
+The seventh bounded A2 tranche now owns:
+
+- one bounded `get_fsdp` wrapper lifecycle receipt for the current Spring 2026
+  FSDP adapter surface
+- one explicit ToyFSDPModel parameter-family layout covering Embedding,
+  Linear, and replicated non-FSDP parameters
+- one retained proof that Linear and Embedding weights are row-sharded across
+  two reference ranks, all-gathered before forward/backward compute, and
+  restored to fp32 master weights after compute
+- one retained fp32/fp16 compute-dtype admission surface for the wrapper
+  lifecycle
+
+Primary landing surfaces:
+
+- `crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs`
+- `crates/psionic-train/examples/psion_cs336_a2_fsdp_wrapper_receipt.rs`
+- `fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json`
+
+That FSDP wrapper tranche now provides:
+
+- one owned bounded constructor/lifecycle surface for `get_fsdp`
+- explicit per-rank shard ranges and shard digests for Embedding and Linear
+  weights
+- explicit replicated parameter handling for RMSNorm-style weights
+- one deterministic gathered-state digest proving full model-state
+  reconstruction from retained shard metadata
+- one honest boundary note that this is host-owned reference evidence, not
+  transport-backed FSDP execution
+
 ## Current Adapter Surface Realignment
 
 The current Stanford A2 adapter surface in
@@ -207,10 +236,9 @@ The previous Psionic matrix used stale DDP-specific names:
 `ddp_bucketed_on_train_batch_start`. Those retained receipts still matter as
 bounded systems evidence, but they are no longer current Stanford adapter rows.
 
-Current FSDP parity is not implemented. The missing surfaces are tracked in:
+Current FSDP parity is only partially implemented. The missing surfaces are
+tracked in:
 
-- [#956](https://github.com/OpenAgentsInc/psionic/issues/956):
-  `get_fsdp` wrapper and sharded parameter lifecycle
 - [#957](https://github.com/OpenAgentsInc/psionic/issues/957):
   `fsdp_on_after_backward` reduce-scatter and mixed-precision parity
 - [#958](https://github.com/OpenAgentsInc/psionic/issues/958):
@@ -237,6 +265,9 @@ This lane now honestly claims:
 - `psionic` owns a bounded sharded-optimizer proof lane with retained
   optimizer-state ownership, owner-step, rebroadcast, and checkpoint-state
   reconstruction evidence against the non-sharded baseline
+- `psionic` owns a bounded `get_fsdp` wrapper lifecycle receipt with retained
+  Linear/Embedding shard layout, all-gather planning, fp32 master restoration,
+  fp16 compute-dtype admission, and full-state reconstruction evidence
 - `psionic` now has one checked-in current A2 coverage matrix and one retained
   conformance report that explicitly marks current FSDP as tracked missing work
 - the bounded A2 lane is anchored to the existing A1 tiny reference lane rather

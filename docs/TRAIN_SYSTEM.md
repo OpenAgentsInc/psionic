@@ -329,6 +329,19 @@ matches the non-sharded baseline after each bounded step. It still does not
 claim transport-backed ZeRO execution, partition-exchange collectives, or
 actual-lane checkpoint sharding.
 
+The repo now also owns the seventh bounded full-port A2 reference-lane tranche
+in `crates/psionic-train/src/cs336_a2_fsdp_wrapper_receipt.rs`, the fixture
+generator `crates/psionic-train/examples/psion_cs336_a2_fsdp_wrapper_receipt.rs`,
+and the retained fixture
+`fixtures/training/cs336_a2_fsdp_wrapper_receipt_v1.json`. That surface maps
+the current Stanford `get_fsdp` adapter name to a bounded host-reference
+wrapper lifecycle receipt. It records ToyFSDPModel Embedding and Linear
+row-sharded parameter layouts, replicated RMSNorm-style parameters, pre-forward
+and pre-backward all-gather planning, fp32 master weight restoration, fp16
+compute-dtype admission, and deterministic gathered-state reconstruction. It
+still does not claim transport-backed FSDP execution, distributed throughput, or
+actual-lane cluster qualification.
+
 The current coverage bar for Stanford CS336 A2 now lives in
 `crates/psionic-train/src/cs336_a2_full_port_conformance.rs`, the fixture
 generator
@@ -339,9 +352,9 @@ retained report
 surface no longer claims full current A2 parity. It maps the current
 `get_ddp` and `ddp_on_after_backward` names to bounded host-reference DDP
 receipts, keeps the older bucketed DDP receipt as retained systems evidence,
-and marks the current FSDP surfaces as tracked missing work in
-[#956](https://github.com/OpenAgentsInc/psionic/issues/956),
-[#957](https://github.com/OpenAgentsInc/psionic/issues/957), and
+maps `get_fsdp` to the bounded wrapper lifecycle receipt, and marks the current
+remaining FSDP surfaces as tracked missing work in
+[#957](https://github.com/OpenAgentsInc/psionic/issues/957) and
 [#958](https://github.com/OpenAgentsInc/psionic/issues/958). The claim boundary
 still stops short of actual-lane distributed throughput, operator closure, and
 transport-backed DDP/FSDP execution, and A2 remains non-blocking for
