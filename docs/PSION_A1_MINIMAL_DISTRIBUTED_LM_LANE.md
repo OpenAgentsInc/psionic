@@ -51,10 +51,20 @@ doing real assigned compute under one run id.
   `fixtures/psion/a1_minimal_distributed_lm/local_update_artifact_manifest_v1.json`
 - local-update contribution receipt:
   `fixtures/psion/a1_minimal_distributed_lm/local_update_contribution_receipt_v1.json`
+- trusted aggregation report:
+  `fixtures/psion/a1_minimal_distributed_lm/trusted_aggregation_report_v1.json`
+- aggregate checkpoint:
+  `fixtures/psion/a1_minimal_distributed_lm/aggregate_checkpoint_v1.json`
+- promotion receipt:
+  `fixtures/psion/a1_minimal_distributed_lm/promotion_receipt_v1.json`
 - local-update generator:
   `crates/psionic-train/examples/a1_minimal_distributed_lm_local_update_fixture.rs`
+- trusted aggregation generator:
+  `crates/psionic-train/examples/a1_minimal_distributed_lm_trusted_aggregation_fixture.rs`
 - local-update checker:
   `scripts/check-a1-minimal-distributed-lm-local-update.sh`
+- trusted aggregation checker:
+  `scripts/check-a1-minimal-distributed-lm-trusted-aggregation.sh`
 
 The contract is typed in
 `crates/psionic-train/src/a1_minimal_distributed_lm_lane.rs` and validates
@@ -164,6 +174,37 @@ model-progress participant.
 Materialized file paths are carried only as manifest location hints. The stable
 artifact-manifest digest clears those paths before hashing, so the logical
 artifact identity remains stable across machines.
+
+## Trusted Aggregation
+
+The first trusted aggregate fixture consumes two accepted local-update
+contributions from the same base checkpoint and aggregate window. The two
+updates use distinct assignment, worker, node, and contribution ids and consume
+different deterministic token windows: `[0, 1, 2, 3]` and `[4, 5, 6, 7]`.
+
+Current retained aggregate values:
+
+- accepted aggregate id:
+  `aggregate.a1_minimal_distributed_lm_001.trusted_fixture.000001`
+- accepted local updates: `2`
+- model-progress participants: `2`
+- total aggregation weight: `16` tokens
+- aggregation rule: `trusted_weighted_delta_average_v1`
+- aggregated delta digest:
+  `sha256:856619da177eb5a276435e3f3ad38882eec016afa680c440dc83d793c2c23700`
+- output checkpoint digest:
+  `sha256:234460c819f2d4cf56918e774a2e23f2a65562bb925e359e2735ad0980070e8d`
+- promoted checkpoint ref:
+  `checkpoint://a1_minimal_distributed_lm_001.trusted_aggregation_fixture/promoted/step-000004`
+- validation loss: `5.6042047 -> 5.562639`
+- promotion receipt digest:
+  `sha256:e7750512afe59d5980d561619d17ab1281b430155fa0011b3580e0a152fddb44`
+- aggregation report digest:
+  `sha256:2886b04948c2ddb312644854b001a37c127a7a1aa880459a215bd1ff97b1c704`
+
+This is still trusted aggregation, not permissionless public model-progress
+acceptance. The retained tests reject mismatched tokenizer and stale-window
+inputs fail-closed before promotion.
 
 ## Contribution Semantics
 

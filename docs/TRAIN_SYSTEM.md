@@ -221,6 +221,19 @@ fixture remains `replay_required` and `accepted_for_aggregation: false`; it is
 model-progress eligible only after validator replay and Nexus closeout accept
 the work. Materialized paths are excluded from the logical artifact-manifest
 digest.
+The first trusted aggregation path for the same lane is retained in
+`crates/psionic-train/src/a1_minimal_distributed_lm_trusted_aggregation.rs`.
+It generates two distinct accepted local-update contributions from the same base
+checkpoint and aggregate window, verifies tokenizer, dataset, validation-set,
+base-checkpoint, model-config, optimizer-config, scheduler-config, and window
+compatibility, aggregates LM-head deltas by consumed-token weight, writes
+`fixtures/psion/a1_minimal_distributed_lm/aggregate_checkpoint_v1.json`, and
+promotes it through
+`fixtures/psion/a1_minimal_distributed_lm/promotion_receipt_v1.json`. The
+retained proof exposes `accepted_aggregate_id`, `aggregated_delta_digest`,
+`output_checkpoint_pointer`, and `promoted_checkpoint_ref` for OpenAgents
+checkpoint-lineage surfaces. It is trusted aggregation only; permissionless
+public model-progress acceptance remains outside this fixture.
 
 The repo now also owns the first bounded full-port A2 reference-lane tranche in
 `crates/psionic-train/src/cs336_a2_profiling.rs`, the fixture generator

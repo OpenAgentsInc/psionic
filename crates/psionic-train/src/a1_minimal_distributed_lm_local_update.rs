@@ -90,18 +90,41 @@ pub enum A1MinimalDistributedLmLocalUpdateError {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct A1MinimalDistributedLmLocalUpdateConfig {
     pub run_id: String,
+    pub window_id: String,
+    pub stage_id: String,
     pub assignment_id: String,
     pub worker_id: String,
+    pub node_pubkey: String,
+    pub contribution_id: String,
+    pub contributor_set_revision_id: String,
+    pub start_deterministic_cursor: u64,
     pub local_step_count: u64,
     pub checkpoint_after_steps: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct A1MinimalDistributedLmLocalUpdateContributionIdentity {
+    pub window_id: String,
+    pub stage_id: String,
+    pub node_pubkey: String,
+    pub contribution_id: String,
+    pub contributor_set_revision_id: String,
 }
 
 impl Default for A1MinimalDistributedLmLocalUpdateConfig {
     fn default() -> Self {
         Self {
             run_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_RUN_ID),
+            window_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WINDOW_ID),
+            stage_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_STAGE_ID),
             assignment_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ASSIGNMENT_ID),
             worker_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WORKER_ID),
+            node_pubkey: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_NODE_PUBKEY),
+            contribution_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_ID),
+            contributor_set_revision_id: String::from(
+                A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTOR_SET_REVISION_ID,
+            ),
+            start_deterministic_cursor: 0,
             local_step_count: 4,
             checkpoint_after_steps: 2,
         }
@@ -111,11 +134,22 @@ impl Default for A1MinimalDistributedLmLocalUpdateConfig {
 impl A1MinimalDistributedLmLocalUpdateConfig {
     fn validate(&self) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
         ensure_nonempty(self.run_id.as_str(), "local_update_config.run_id")?;
+        ensure_nonempty(self.window_id.as_str(), "local_update_config.window_id")?;
+        ensure_nonempty(self.stage_id.as_str(), "local_update_config.stage_id")?;
         ensure_nonempty(
             self.assignment_id.as_str(),
             "local_update_config.assignment_id",
         )?;
         ensure_nonempty(self.worker_id.as_str(), "local_update_config.worker_id")?;
+        ensure_nonempty(self.node_pubkey.as_str(), "local_update_config.node_pubkey")?;
+        ensure_nonempty(
+            self.contribution_id.as_str(),
+            "local_update_config.contribution_id",
+        )?;
+        ensure_nonempty(
+            self.contributor_set_revision_id.as_str(),
+            "local_update_config.contributor_set_revision_id",
+        )?;
         if self.local_step_count == 0 {
             return invalid_local_update(String::from("local_step_count must be nonzero"));
         }
@@ -125,6 +159,43 @@ impl A1MinimalDistributedLmLocalUpdateConfig {
                 "checkpoint_after_steps must be inside the local update window",
             ));
         }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn contribution_identity(&self) -> A1MinimalDistributedLmLocalUpdateContributionIdentity {
+        A1MinimalDistributedLmLocalUpdateContributionIdentity {
+            window_id: self.window_id.clone(),
+            stage_id: self.stage_id.clone(),
+            node_pubkey: self.node_pubkey.clone(),
+            contribution_id: self.contribution_id.clone(),
+            contributor_set_revision_id: self.contributor_set_revision_id.clone(),
+        }
+    }
+}
+
+impl Default for A1MinimalDistributedLmLocalUpdateContributionIdentity {
+    fn default() -> Self {
+        A1MinimalDistributedLmLocalUpdateConfig::default().contribution_identity()
+    }
+}
+
+impl A1MinimalDistributedLmLocalUpdateContributionIdentity {
+    fn validate(&self) -> Result<(), A1MinimalDistributedLmLocalUpdateError> {
+        ensure_nonempty(self.window_id.as_str(), "contribution_identity.window_id")?;
+        ensure_nonempty(self.stage_id.as_str(), "contribution_identity.stage_id")?;
+        ensure_nonempty(
+            self.node_pubkey.as_str(),
+            "contribution_identity.node_pubkey",
+        )?;
+        ensure_nonempty(
+            self.contribution_id.as_str(),
+            "contribution_identity.contribution_id",
+        )?;
+        ensure_nonempty(
+            self.contributor_set_revision_id.as_str(),
+            "contribution_identity.contributor_set_revision_id",
+        )?;
         Ok(())
     }
 }
@@ -968,12 +1039,13 @@ pub fn run_and_write_a1_minimal_distributed_lm_local_update(
         .iter()
         .map(|step| step.consumed_token_count)
         .sum::<u64>();
+    let contribution_identity = config.contribution_identity();
     let mut report = A1MinimalDistributedLmLocalUpdateReport {
         schema_version: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPORT_SCHEMA_VERSION),
         lane_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LANE_ID),
-        run_id: config.run_id,
-        assignment_id: config.assignment_id,
-        worker_id: config.worker_id,
+        run_id: config.run_id.clone(),
+        assignment_id: config.assignment_id.clone(),
+        worker_id: config.worker_id.clone(),
         tokenizer_digest: contract.tokenizer_artifact_digest.clone(),
         tokenized_dataset_digest: contract.tokenized_dataset_digest.clone(),
         validation_set_digest: contract.validation_set_digest.clone(),
@@ -1013,16 +1085,21 @@ pub fn run_and_write_a1_minimal_distributed_lm_local_update(
         &report,
     )?;
     let artifact_manifest =
-        build_a1_minimal_distributed_lm_local_update_artifact_manifest(&report, &bundle)?;
+        build_a1_minimal_distributed_lm_local_update_artifact_manifest_with_identity(
+            &report,
+            &bundle,
+            &contribution_identity,
+        )?;
     write_local_update_artifact_manifest(
         output_root,
         A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_ARTIFACT_MANIFEST_FIXTURE_PATH,
         &artifact_manifest,
     )?;
-    let contribution_receipt = build_a1_minimal_distributed_lm_contribution_receipt(
+    let contribution_receipt = build_a1_minimal_distributed_lm_contribution_receipt_with_identity(
         &report,
         &artifact_manifest,
         &contract,
+        &contribution_identity,
     )?;
     write_local_update_contribution_receipt(
         output_root,
@@ -1086,8 +1163,22 @@ pub fn build_a1_minimal_distributed_lm_local_update_artifact_manifest(
     bundle: &A1MinimalDistributedLmTokenizerDatasetBundle,
 ) -> Result<A1MinimalDistributedLmLocalUpdateArtifactManifest, A1MinimalDistributedLmLocalUpdateError>
 {
+    build_a1_minimal_distributed_lm_local_update_artifact_manifest_with_identity(
+        report,
+        bundle,
+        &A1MinimalDistributedLmLocalUpdateContributionIdentity::default(),
+    )
+}
+
+pub fn build_a1_minimal_distributed_lm_local_update_artifact_manifest_with_identity(
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+    bundle: &A1MinimalDistributedLmTokenizerDatasetBundle,
+    identity: &A1MinimalDistributedLmLocalUpdateContributionIdentity,
+) -> Result<A1MinimalDistributedLmLocalUpdateArtifactManifest, A1MinimalDistributedLmLocalUpdateError>
+{
     report.validate()?;
     bundle.validate()?;
+    identity.validate()?;
     let input_shard = input_shard_ref(bundle, report)?;
     let input_token_range = input_token_range(report)?;
     let base_checkpoint_digest = first_step_base_checkpoint_digest(report)?;
@@ -1099,13 +1190,13 @@ pub fn build_a1_minimal_distributed_lm_local_update_artifact_manifest(
         ),
         lane_id: report.lane_id.clone(),
         run_id: report.run_id.clone(),
-        window_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WINDOW_ID),
-        stage_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_STAGE_ID),
+        window_id: identity.window_id.clone(),
+        stage_id: identity.stage_id.clone(),
         assignment_id: report.assignment_id.clone(),
-        contribution_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTION_ID),
+        contribution_id: identity.contribution_id.clone(),
         worker_id: report.worker_id.clone(),
-        node_pubkey: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_NODE_PUBKEY),
-        contributor_node_id: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_NODE_PUBKEY),
+        node_pubkey: identity.node_pubkey.clone(),
+        contributor_node_id: identity.node_pubkey.clone(),
         work_class: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_WORK_CLASS),
         replica_type: String::from(A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_REPLICA_TYPE),
         tokenizer_digest: report.tokenizer_digest.clone(),
@@ -1190,8 +1281,26 @@ pub fn build_a1_minimal_distributed_lm_contribution_receipt(
     A1MinimalDistributedLmLocalUpdateContributionReceipt,
     A1MinimalDistributedLmLocalUpdateError,
 > {
+    build_a1_minimal_distributed_lm_contribution_receipt_with_identity(
+        report,
+        artifact_manifest,
+        contract,
+        &A1MinimalDistributedLmLocalUpdateContributionIdentity::default(),
+    )
+}
+
+pub fn build_a1_minimal_distributed_lm_contribution_receipt_with_identity(
+    report: &A1MinimalDistributedLmLocalUpdateReport,
+    artifact_manifest: &A1MinimalDistributedLmLocalUpdateArtifactManifest,
+    contract: &A1MinimalDistributedLmLaneContract,
+    identity: &A1MinimalDistributedLmLocalUpdateContributionIdentity,
+) -> Result<
+    A1MinimalDistributedLmLocalUpdateContributionReceipt,
+    A1MinimalDistributedLmLocalUpdateError,
+> {
     report.validate()?;
     artifact_manifest.validate()?;
+    identity.validate()?;
     contract
         .validate()
         .map_err(|error| A1MinimalDistributedLmLocalUpdateError::Invalid {
@@ -1216,9 +1325,7 @@ pub fn build_a1_minimal_distributed_lm_contribution_receipt(
         training_run_id: report.run_id.clone(),
         stage_id: artifact_manifest.stage_id.clone(),
         window_id: artifact_manifest.window_id.clone(),
-        contributor_set_revision_id: String::from(
-            A1_MINIMAL_DISTRIBUTED_LM_LOCAL_UPDATE_CONTRIBUTOR_SET_REVISION_ID,
-        ),
+        contributor_set_revision_id: identity.contributor_set_revision_id.clone(),
         assignment_id: report.assignment_id.clone(),
         contribution_id: artifact_manifest.contribution_id.clone(),
         worker_id: report.worker_id.clone(),
@@ -1292,6 +1399,7 @@ impl A1MinimalDistributedLmLocalUpdateTrainer {
         let (training_tokens, validation_tokens) = tokens_from_bundle(&bundle)?;
         let mut model = new_model_from_contract(&contract)?;
         initialize_cs336_a1_reference_model(&mut model)?;
+        let deterministic_cursor = config.start_deterministic_cursor;
         Ok(Self {
             config,
             contract,
@@ -1300,7 +1408,7 @@ impl A1MinimalDistributedLmLocalUpdateTrainer {
             model,
             optimizer_states: BTreeMap::new(),
             optimizer_step: 0,
-            deterministic_cursor: 0,
+            deterministic_cursor,
             consumed_token_count: 0,
             loss_history: Vec::new(),
         })
