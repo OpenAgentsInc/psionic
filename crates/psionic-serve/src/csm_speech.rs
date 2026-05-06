@@ -14,14 +14,14 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CSM_CPU_EXECUTION_ENGINE, CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID, CsmCapabilityRefusal,
-    CsmContextWindowPolicy, CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError,
-    CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiDecoder, CsmModelArtifactDescriptor,
-    CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture, CsmSamplingStrategy,
-    CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan, csm_default_config_candidates,
-    csm_default_mimi_weight_candidates, csm_default_model_weight_candidates,
-    csm_python_parity_fixture, csm_reference_audio_encoding_refusal,
-    csm_voice_profile_governance_manifest,
+    CSM_CPU_EXECUTION_ENGINE, CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID, CSM_WATERMARK_OPERATOR_DOGFOOD,
+    CsmCapabilityRefusal, CsmContextWindowPolicy, CsmCpuGenerationRequest, CsmCpuGenerator,
+    CsmFrontendError, CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiDecoder,
+    CsmModelArtifactDescriptor, CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture,
+    CsmSamplingStrategy, CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan,
+    csm_default_config_candidates, csm_default_mimi_weight_candidates,
+    csm_default_model_weight_candidates, csm_python_parity_fixture,
+    csm_reference_audio_encoding_refusal, csm_voice_profile_governance_manifest,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -581,11 +581,11 @@ fn codec_capabilities() -> CsmCodecCapabilityPublication {
 
 fn safety_capabilities() -> CsmSafetyCapabilityPublication {
     CsmSafetyCapabilityPublication {
-        watermarking: "unsupported_fail_closed",
+        watermarking: CSM_WATERMARK_OPERATOR_DOGFOOD,
         watermarking_refusal: CsmCapabilityRefusal {
             code: "csm_watermarking_unavailable".to_string(),
-            reason: "CSM speech watermarking is not implemented in the Rust serving path; CSM output remains blocked for production Lyra cutover".to_string(),
-            required_phase: "voice_profile_governance_and_watermarking".to_string(),
+            reason: "CSM speech watermarking is not implemented in the Rust serving path; output is admitted only for OpenAgents-operated Lyra dogfood and remains unavailable for arbitrary public voice cloning".to_string(),
+            required_phase: "private_watermark_or_equivalent_voice_safety_control_before_public_voice_clone".to_string(),
         },
     }
 }
@@ -1527,7 +1527,7 @@ mod tests {
         );
         assert_eq!(
             payload["safety_capabilities"]["watermarking"],
-            serde_json::json!("unsupported_fail_closed")
+            serde_json::json!(CSM_WATERMARK_OPERATOR_DOGFOOD)
         );
         assert_eq!(
             payload["safety_capabilities"]["watermarking_refusal"]["code"],
@@ -1541,8 +1541,9 @@ mod tests {
                         && profile["source_prompt_profile_id"]
                             == serde_json::json!("conversational_a")
                         && profile["approval_status"]
-                            == serde_json::json!("approved_internal_placeholder")
-                        && profile["watermarking"] == serde_json::json!("unsupported_fail_closed")
+                            == serde_json::json!("approved_openagents_operated_dogfood")
+                        && profile["watermarking"]
+                            == serde_json::json!(CSM_WATERMARK_OPERATOR_DOGFOOD)
                 }))
         );
         assert_eq!(
@@ -1640,7 +1641,7 @@ mod tests {
                 .headers()
                 .get("x-psionic-csm-watermarking")
                 .and_then(|value| value.to_str().ok()),
-            Some("unsupported_fail_closed")
+            Some(CSM_WATERMARK_OPERATOR_DOGFOOD)
         );
         assert!(
             response

@@ -6,7 +6,7 @@ This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 6:
+The current implementation state is phase 7:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -36,9 +36,9 @@ The current implementation state is phase 6:
   machine-readable schema at
   `fixtures/csm/voice_profiles/lyra_voice_profiles.schema.json`.
 - The first governed profile is `lyra/default_female_v1`. It maps to the
-  committed source prompt `conversational_a`, is admitted only for local and
-  internal Lyra development, and is not a public voice-cloning or production
-  consent grant.
+  committed source prompt `conversational_a`, is admitted for
+  OpenAgents-operated Lyra production dogfood, and is not a public
+  voice-cloning or arbitrary reference-audio consent grant.
 - `psionic-serve` exposes a Rust-only CSM speech API surface through
   `psionic-csm-speech-server`.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
@@ -158,9 +158,10 @@ descriptor containing:
   runtime reference-audio encoding refused with
   `rust_mimi_encode_not_implemented`
 - safety capability truth: watermarking is published as
-  `unsupported_fail_closed` with `csm_watermarking_unavailable`, so CSM output
-  is blocked for production Lyra cutover until voice governance and watermark
-  policy are implemented
+  `unsupported_operator_accepted_limited_dogfood` with
+  `csm_watermarking_unavailable`, so CSM output is admitted only for
+  OpenAgents-operated Lyra dogfood and remains unavailable for arbitrary
+  public voice cloning
 - runtime truth: `ready`/`unavailable`, warm-load latency, backend,
   residency, artifact availability, and accelerated-backend refusal truth
 
@@ -184,21 +185,65 @@ curl -D /tmp/psionic-csm-stream.headers \
   -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"lyra/default_female_v1","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
 ```
 
+## Cloud Run Deployment
+
+The repeatable production deployment entrypoint is:
+
+```bash
+scripts/deploy-csm-speech-cloud-run.sh
+```
+
+Default deployment settings:
+
+- project: `openagents-lyra`
+- region: `us-central1`
+- service: `psionic-csm-speech`
+- image:
+  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:<git-sha>`
+- service account:
+  `psionic-csm-speech@openagents-lyra.iam.gserviceaccount.com`
+- private artifact bucket:
+  `openagents-lyra-psionic-csm-artifacts`
+- Cloud Run shape: 8 CPU, 32 GiB memory, min 1, max 1, concurrency 1,
+  CPU always allocated
+- artifact mount:
+  `gs://openagents-lyra-psionic-csm-artifacts` mounted read-only at
+  `/root/.cache/huggingface`
+- runtime env:
+  `HF_HOME=/root/.cache/huggingface`,
+  `PSIONIC_CSM_RUNTIME=true`,
+  `PSIONIC_CSM_BACKEND=cpu`, and
+  `PSIONIC_CSM_MODEL_ID=sesame/csm-1b`
+
+The script stages only the minimal gated Hugging Face cache objects required by
+the Rust server:
+
+- CSM config and model blobs for `sesame/csm-1b`
+- Llama tokenizer snapshot file for `meta-llama/Llama-3.2-1B`
+- Mimi safetensors blob for `kyutai/moshiko-pytorch-bf16`
+
+No Hugging Face token, provider key, Python virtualenv, Python CSM repo, or raw
+prompt audio is uploaded by this deploy path. The script finishes only after
+`/health` reports `runtime.state=ready` and a production
+`POST /v1/audio/speech` smoke returns a non-empty WAV.
+
 ## Voice Profile Governance
 
 The served voice-profile contract is now:
 
 - public served id: `lyra/default_female_v1`
 - source prompt profile: `conversational_a`
-- approval status: `approved_internal_placeholder`
-- runtime admission: `admitted_internal_development`
-- allowed surfaces: `psionic_local_development` and `lyra_internal_development`
-- disallowed surfaces: `lyra_production`, `public_user_voice_clone`, and
+- approval status: `approved_openagents_operated_dogfood`
+- runtime admission:
+  `admitted_openagents_operated_lyra_production_dogfood`
+- allowed surfaces: `psionic_local_development`,
+  `lyra_internal_development`, and `lyra_production_dogfood`
+- disallowed surfaces: `public_user_voice_clone` and
   `arbitrary_reference_audio_upload`
 - source provenance:
   `committed_csm_parity_fixture_prompt_conversational_a`
 - consent posture:
-  `internal_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload`
+  `openagents_operated_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload`
 
 The route refuses unknown or ungoverned profile ids with
 `voice_profile_unavailable`. This is intentional: prompt fixtures are not
@@ -208,12 +253,14 @@ use the governed Lyra profile id.
 Arbitrary voice cloning and reference-audio upload are out of scope until a
 consent system exists. The current Rust Mimi encode capability remains refused
 with `rust_mimi_encode_not_implemented`, and CSM watermarking remains
-`unsupported_fail_closed` with `csm_watermarking_unavailable`.
+`unsupported_operator_accepted_limited_dogfood` with
+`csm_watermarking_unavailable`.
 
-Public demo watermark keys are not production safety controls. Production
-Lyra cutover remains blocked until Psionic has a private watermark or
-equivalent voice-safety control and the governed profile moves beyond internal
-placeholder status.
+Public demo watermark keys are not production safety controls. OpenAgents has
+accepted this profile only for its own bounded Lyra production dogfood. Public
+voice cloning, arbitrary reference-audio upload, and broader user-selectable
+CSM voices remain blocked until Psionic has a private watermark or equivalent
+voice-safety control.
 
 ## Rust Frontend Contract
 
@@ -408,10 +455,9 @@ The phase sequence lives in GitHub under `OpenAgentsInc/psionic#959`.
 
 Next work:
 
-1. Integrate Lyra through the Psionic TTS provider boundary after generation
-   returns real audio bytes.
+1. Keep Lyra production dogfood on the Psionic TTS provider boundary and record
+   provider route, latency, and refusal evidence on each release.
 2. Add Metal/CUDA acceleration and true frame-by-frame low-latency decode when
    CSM quality and voice governance justify product cutover work.
-
-Cartesia remains Lyra's production TTS provider until CSM has measured quality,
-latency, approved voice-profile governance, and watermark posture.
+3. Add private watermark or equivalent voice-safety controls before any public
+   voice-cloning or arbitrary reference-audio feature.

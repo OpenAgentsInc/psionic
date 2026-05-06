@@ -62,6 +62,13 @@ pub const CSM_CPU_EXECUTION_ENGINE: &str = "rust_candle_csm_cpu";
 pub const CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION: &str = "psionic.csm.voice_profiles.v1";
 /// First governed Lyra CSM voice profile.
 pub const CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID: &str = "lyra/default_female_v1";
+/// Internal development admission for governed CSM voice profiles.
+pub const CSM_RUNTIME_ADMISSION_INTERNAL_DEVELOPMENT: &str = "admitted_internal_development";
+/// Operator-approved production dogfood admission for governed CSM voice profiles.
+pub const CSM_RUNTIME_ADMISSION_OPERATOR_LYRA_DOGFOOD: &str =
+    "admitted_openagents_operated_lyra_production_dogfood";
+/// Watermark status used when output is admitted for bounded operator dogfood only.
+pub const CSM_WATERMARK_OPERATOR_DOGFOOD: &str = "unsupported_operator_accepted_limited_dogfood";
 const CSM_VOICE_PROFILE_GOVERNANCE_JSON: &str =
     include_str!("../../../fixtures/csm/voice_profiles/lyra_voice_profiles.v1.json");
 
@@ -491,7 +498,11 @@ impl CsmVoiceProfileGovernanceDescriptor {
                 ),
             });
         }
-        if self.runtime_admission != "admitted_internal_development" {
+        if !matches!(
+            self.runtime_admission.as_str(),
+            CSM_RUNTIME_ADMISSION_INTERNAL_DEVELOPMENT
+                | CSM_RUNTIME_ADMISSION_OPERATOR_LYRA_DOGFOOD
+        ) {
             return Err(CsmFrontendError::DescriptorContract {
                 message: format!(
                     "governed voice profile {} is not admitted for this runtime",
@@ -507,10 +518,13 @@ impl CsmVoiceProfileGovernanceDescriptor {
                 ),
             });
         }
-        if self.watermark_policy.status != "unsupported_fail_closed" {
+        if !matches!(
+            self.watermark_policy.status.as_str(),
+            "unsupported_fail_closed" | CSM_WATERMARK_OPERATOR_DOGFOOD
+        ) {
             return Err(CsmFrontendError::DescriptorContract {
                 message: format!(
-                    "governed voice profile {} must publish fail-closed watermark posture",
+                    "governed voice profile {} must publish bounded watermark posture",
                     self.profile_id
                 ),
             });
@@ -521,7 +535,11 @@ impl CsmVoiceProfileGovernanceDescriptor {
     /// True when the profile is admitted for the Rust CSM server.
     #[must_use]
     pub fn is_runtime_admitted(&self) -> bool {
-        self.runtime_admission == "admitted_internal_development"
+        matches!(
+            self.runtime_admission.as_str(),
+            CSM_RUNTIME_ADMISSION_INTERNAL_DEVELOPMENT
+                | CSM_RUNTIME_ADMISSION_OPERATOR_LYRA_DOGFOOD
+        )
     }
 }
 
@@ -2171,8 +2189,20 @@ mod tests {
             .expect("default Lyra voice profile");
         assert!(profile.is_runtime_admitted());
         assert_eq!(profile.source_prompt_profile_id, "conversational_a");
-        assert_eq!(profile.approval_status, "approved_internal_placeholder");
-        assert_eq!(profile.watermark_policy.status, "unsupported_fail_closed");
+        assert_eq!(
+            profile.approval_status,
+            "approved_openagents_operated_dogfood"
+        );
+        assert_eq!(
+            profile.watermark_policy.status,
+            CSM_WATERMARK_OPERATOR_DOGFOOD
+        );
+        assert!(
+            profile
+                .allowed_product_surfaces
+                .iter()
+                .any(|surface| surface == "lyra_production_dogfood")
+        );
         assert!(
             profile
                 .disallowed_product_surfaces

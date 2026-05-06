@@ -3,18 +3,18 @@
   "generated_at": "2026-05-06T00:00:00Z",
   "model_id": "sesame/csm-1b",
   "watermark_policy": {
-    "status": "unsupported_fail_closed",
+    "status": "unsupported_operator_accepted_limited_dogfood",
     "refusal_code": "csm_watermarking_unavailable",
-    "required_phase": "private_watermark_or_equivalent_voice_safety_control",
+    "required_phase": "private_watermark_or_equivalent_voice_safety_control_before_public_voice_clone",
     "public_demo_key_status": "not_a_production_safety_control",
-    "production_cutover": "blocked_until_private_watermark_or_equivalent_control"
+    "production_cutover": "admitted_for_openagents_operated_lyra_dogfood_only"
   },
   "profiles": [
     {
       "profile_id": "lyra/default_female_v1",
       "display_name": "Lyra default female v1",
-      "approval_status": "approved_internal_placeholder",
-      "runtime_admission": "admitted_internal_development",
+      "approval_status": "approved_openagents_operated_dogfood",
+      "runtime_admission": "admitted_openagents_operated_lyra_production_dogfood",
       "source_prompt_profile_id": "conversational_a",
       "speaker": 0,
       "prompt_transcript_sha256": "sha256:8e4b68dcd2d4d0a2948e76d5ecab53093c8b042f4f1f45168ce1a498656f4f9e",
@@ -31,24 +31,24 @@
         "prompt_codebooks": "precomputed_digest_and_prefix_only_until_full_codebooks_or_rust_encode"
       },
       "source_provenance": "committed_csm_parity_fixture_prompt_conversational_a",
-      "consent_posture": "internal_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload",
+      "consent_posture": "openagents_operated_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload",
       "allowed_product_surfaces": [
         "psionic_local_development",
-        "lyra_internal_development"
+        "lyra_internal_development",
+        "lyra_production_dogfood"
       ],
       "disallowed_product_surfaces": [
-        "lyra_production",
         "public_user_voice_clone",
         "arbitrary_reference_audio_upload"
       ],
       "retention_policy": "prompt_audio_not_committed_full_prompt_codebooks_not_committed_digest_only",
       "redaction_policy": "no_huggingface_token_no_provider_key_no_raw_user_voice_upload",
       "watermark_policy": {
-        "status": "unsupported_fail_closed",
+        "status": "unsupported_operator_accepted_limited_dogfood",
         "refusal_code": "csm_watermarking_unavailable",
-        "required_phase": "private_watermark_or_equivalent_voice_safety_control",
+        "required_phase": "private_watermark_or_equivalent_voice_safety_control_before_public_voice_clone",
         "public_demo_key_status": "not_a_production_safety_control",
-        "production_cutover": "blocked_until_private_watermark_or_equivalent_control"
+        "production_cutover": "admitted_for_openagents_operated_lyra_dogfood_only"
       }
     }
   ]

@@ -47,7 +47,10 @@
       ],
       "properties": {
         "status": {
-          "enum": ["unsupported_fail_closed"]
+          "enum": [
+            "unsupported_fail_closed",
+            "unsupported_operator_accepted_limited_dogfood"
+          ]
         },
         "refusal_code": {
           "type": "string"
@@ -59,7 +62,10 @@
           "enum": ["not_a_production_safety_control"]
         },
         "production_cutover": {
-          "enum": ["blocked_until_private_watermark_or_equivalent_control"]
+          "enum": [
+            "blocked_until_private_watermark_or_equivalent_control",
+            "admitted_for_openagents_operated_lyra_dogfood_only"
+          ]
         }
       }
     },
@@ -96,10 +102,16 @@
           "type": "string"
         },
         "approval_status": {
-          "enum": ["approved_internal_placeholder"]
+          "enum": [
+            "approved_internal_placeholder",
+            "approved_openagents_operated_dogfood"
+          ]
         },
         "runtime_admission": {
-          "enum": ["admitted_internal_development"]
+          "enum": [
+            "admitted_internal_development",
+            "admitted_openagents_operated_lyra_production_dogfood"
+          ]
         },
         "source_prompt_profile_id": {
           "type": "string"
