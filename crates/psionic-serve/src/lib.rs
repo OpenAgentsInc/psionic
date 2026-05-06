@@ -18,6 +18,7 @@
 
 mod attnres;
 mod conformance;
+mod csm_speech;
 mod gguf;
 mod gpt_oss;
 mod openai_http;
@@ -76,6 +77,7 @@ use std::{
 
 pub use attnres::*;
 pub use conformance::*;
+pub use csm_speech::*;
 pub use gguf::*;
 pub use gpt_oss::*;
 pub use openai_http::*;
