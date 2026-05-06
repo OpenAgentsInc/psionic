@@ -44,20 +44,23 @@ into one generic engine claim.
 
 - `CSM` has one new speech-generation lane in `partial` status. The current
   landed surface is a Python-reference parity corpus, a Rust CSM
-  tokenizer/framing/artifact-descriptor frontend, Rust CPU CSM codebook
-  generation, a Rust Mimi decode and PCM16-WAV helper path, approved
-  prompt-codebook descriptors, and a Rust-only `psionic-csm-speech-server`
-  API surface. The server does not call Python, does not embed the local CSM
-  repo, and does not use the Python Moshi package. CSM generation runs
+  tokenizer/framing/artifact-descriptor frontend, governed Lyra voice-profile
+  admission, Rust CPU CSM codebook generation, a Rust Mimi decode and PCM16-WAV
+  helper path, approved prompt-codebook descriptors, and a Rust-only
+  `psionic-csm-speech-server` API surface. The server does not call Python,
+  does not embed the local CSM repo, and does not use the Python Moshi package.
+  CSM generation runs
   in-process in Rust through Candle Transformers inside `psionic-models`; the
   HTTP server now warm-loads the Rust tokenizer, CSM model, and Mimi decoder
   when gated artifacts are present locally, serves one-shot browser-playable
   WAV responses, and supports buffered `multipart/mixed` stream responses with
   ordered `audio/wav` chunks plus terminal metadata. The current admitted live
   backend is warm CPU with `accelerated_backend = unavailable_fail_closed`.
-  Unsupported backends, missing artifacts, prompt-profile context use, arbitrary
-  reference-audio encoding, and unavailable watermarking fail closed. The Rust
-  Mimi decode path uses the Rust
+  Served voice ids must be governed profile ids such as
+  `lyra/default_female_v1`; raw fixture prompt ids are refused. Unsupported
+  backends, missing artifacts, prompt-profile context use, arbitrary
+  reference-audio encoding, ungoverned voice ids, and unavailable watermarking
+  fail closed. The Rust Mimi decode path uses the Rust
   `moshi` crate in-process and publishes `rust_moshi_mimi_cpu` capability
   truth. The canonical doc is
   `docs/CSM_AUDIO_RUNTIME.md`; the committed fixture is

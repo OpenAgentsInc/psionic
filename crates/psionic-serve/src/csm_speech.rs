@@ -14,13 +14,14 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CSM_CPU_EXECUTION_ENGINE, CsmCapabilityRefusal, CsmContextWindowPolicy,
-    CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError, CsmGenerationWindow,
-    CsmLlamaTextTokenizer, CsmMimiDecoder, CsmModelArtifactDescriptor, CsmModelConfig,
-    CsmPromptSegment, CsmPythonParityFixture, CsmSamplingStrategy, csm_build_prompt_frame_plan,
-    csm_default_config_candidates, csm_default_mimi_weight_candidates,
-    csm_default_model_weight_candidates, csm_python_parity_fixture,
-    csm_reference_audio_encoding_refusal,
+    CSM_CPU_EXECUTION_ENGINE, CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID, CsmCapabilityRefusal,
+    CsmContextWindowPolicy, CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError,
+    CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiDecoder, CsmModelArtifactDescriptor,
+    CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture, CsmSamplingStrategy,
+    CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan, csm_default_config_candidates,
+    csm_default_mimi_weight_candidates, csm_default_model_weight_candidates,
+    csm_python_parity_fixture, csm_reference_audio_encoding_refusal,
+    csm_voice_profile_governance_manifest,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -106,6 +107,7 @@ struct CsmSpeechState {
     model_id: String,
     fixture: CsmPythonParityFixture,
     descriptor: CsmModelArtifactDescriptor,
+    governance: CsmVoiceProfileGovernanceManifest,
     runtime: Mutex<CsmSpeechRuntimeSlot>,
 }
 
@@ -117,12 +119,25 @@ impl CsmSpeechServer {
         let descriptor = CsmModelArtifactDescriptor::from_fixture(&fixture).map_err(|error| {
             CsmSpeechServerError::Config(format!("failed to build CSM descriptor: {error}"))
         })?;
+        let governance = csm_voice_profile_governance_manifest().map_err(|error| {
+            CsmSpeechServerError::Config(format!(
+                "failed to load CSM voice-profile governance manifest: {error}"
+            ))
+        })?;
+        governance
+            .validate_against_descriptor(&descriptor)
+            .map_err(|error| {
+                CsmSpeechServerError::Config(format!(
+                    "failed to validate CSM voice-profile governance manifest: {error}"
+                ))
+            })?;
         let runtime = CsmSpeechRuntimeSlot::load(&config, &fixture, &descriptor);
         Ok(Self {
             state: Arc::new(CsmSpeechState {
                 model_id: config.model_id,
                 fixture,
                 descriptor,
+                governance,
                 runtime: Mutex::new(runtime),
             }),
         })
@@ -401,11 +416,23 @@ struct CsmSpeechModelCard {
 #[derive(Clone, Debug, Serialize)]
 struct CsmVoiceProfilePublication {
     id: String,
+    display_name: String,
+    approval_status: String,
+    runtime_admission: String,
+    source_prompt_profile_id: String,
     speaker: u32,
     source: &'static str,
+    prompt_transcript_sha256: String,
     prompt_audio_sha256: String,
     mimi_tokens_sha256: Option<String>,
     prompt_codebooks: Option<CsmPromptCodebookPublication>,
+    consent_posture: String,
+    allowed_product_surfaces: Vec<String>,
+    disallowed_product_surfaces: Vec<String>,
+    retention_policy: String,
+    redaction_policy: String,
+    watermarking: String,
+    watermarking_refusal_code: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -468,27 +495,48 @@ struct CsmSpeechRefusalPublication {
     pending_phases: Vec<&'static str>,
 }
 
-fn voice_profiles(descriptor: &CsmModelArtifactDescriptor) -> Vec<CsmVoiceProfilePublication> {
-    descriptor
-        .voice_profiles
+fn voice_profiles(
+    governance: &CsmVoiceProfileGovernanceManifest,
+    descriptor: &CsmModelArtifactDescriptor,
+) -> Vec<CsmVoiceProfilePublication> {
+    governance
+        .profiles
         .iter()
-        .map(|profile| CsmVoiceProfilePublication {
-            id: profile.profile_id.clone(),
-            speaker: profile.speaker,
-            source: "committed_parity_fixture",
-            prompt_audio_sha256: profile.prompt_audio_sha256.clone(),
-            mimi_tokens_sha256: profile.mimi_tokens_sha256.clone(),
-            prompt_codebooks: profile.prompt_codebooks.as_ref().map(|codebooks| {
-                CsmPromptCodebookPublication {
-                    source: codebooks.source.clone(),
-                    sample_rate_hz: codebooks.sample_rate_hz,
-                    codebook_count: codebooks.codebook_count,
-                    frame_count: codebooks.frame_count,
-                    prefix_frame_count: codebooks.prefix_frame_count,
-                    prefix_codebook_count: codebooks.prefix_codebook_count,
-                    tokens_sha256: codebooks.tokens_sha256.clone(),
-                }
-            }),
+        .filter_map(|profile| {
+            let source = descriptor
+                .voice_profiles
+                .iter()
+                .find(|candidate| candidate.profile_id == profile.source_prompt_profile_id)?;
+            Some(CsmVoiceProfilePublication {
+                id: profile.profile_id.clone(),
+                display_name: profile.display_name.clone(),
+                approval_status: profile.approval_status.clone(),
+                runtime_admission: profile.runtime_admission.clone(),
+                source_prompt_profile_id: profile.source_prompt_profile_id.clone(),
+                speaker: profile.speaker,
+                source: "committed_voice_governance_manifest",
+                prompt_transcript_sha256: profile.prompt_transcript_sha256.clone(),
+                prompt_audio_sha256: profile.prompt_audio_sha256.clone(),
+                mimi_tokens_sha256: profile.prompt_codebook_tokens_sha256.clone(),
+                prompt_codebooks: source.prompt_codebooks.as_ref().map(|codebooks| {
+                    CsmPromptCodebookPublication {
+                        source: codebooks.source.clone(),
+                        sample_rate_hz: codebooks.sample_rate_hz,
+                        codebook_count: codebooks.codebook_count,
+                        frame_count: codebooks.frame_count,
+                        prefix_frame_count: codebooks.prefix_frame_count,
+                        prefix_codebook_count: codebooks.prefix_codebook_count,
+                        tokens_sha256: codebooks.tokens_sha256.clone(),
+                    }
+                }),
+                consent_posture: profile.consent_posture.clone(),
+                allowed_product_surfaces: profile.allowed_product_surfaces.clone(),
+                disallowed_product_surfaces: profile.disallowed_product_surfaces.clone(),
+                retention_policy: profile.retention_policy.clone(),
+                redaction_policy: profile.redaction_policy.clone(),
+                watermarking: profile.watermark_policy.status.clone(),
+                watermarking_refusal_code: profile.watermark_policy.refusal_code.clone(),
+            })
         })
         .collect()
 }
@@ -571,7 +619,7 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
         supported_endpoints: vec![CSM_SPEECH_ROUTE_OPENAI, CSM_SPEECH_ROUTE_PSIONIC],
         supported_response_formats: vec![CSM_SPEECH_RESPONSE_FORMAT_WAV],
-        voice_profiles: voice_profiles(&state.descriptor),
+        voice_profiles: voice_profiles(&state.governance, &state.descriptor),
         artifact_digests: artifact_digests(&state.descriptor),
         artifact_descriptor: artifact_descriptor(&state.descriptor),
         runtime: runtime.clone(),
@@ -595,7 +643,7 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
             psionic_served_backend: CSM_SPEECH_SERVED_BACKEND,
             psionic_execution_mode: CSM_SPEECH_EXECUTION_MODE,
             psionic_execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
-            psionic_voice_profiles: voice_profiles(&state.descriptor),
+            psionic_voice_profiles: voice_profiles(&state.governance, &state.descriptor),
             psionic_artifact_digests: artifact_digests(&state.descriptor),
             psionic_artifact_descriptor: artifact_descriptor(&state.descriptor),
             psionic_runtime: runtime.clone(),
@@ -640,6 +688,9 @@ struct ValidatedCsmSpeechRequest {
     model: String,
     input: String,
     voice_profile_id: String,
+    source_prompt_profile_id: String,
+    voice_approval_status: String,
+    watermarking: String,
     speaker: u32,
     stream: bool,
     max_audio_length_ms: u64,
@@ -678,15 +729,39 @@ impl ValidatedCsmSpeechRequest {
         let voice_profile_id = request
             .voice_profile_id
             .or(request.voice)
-            .unwrap_or_else(|| String::from("conversational_a"));
-        let Some(prompt) = state
-            .fixture
-            .prompts
-            .iter()
-            .find(|prompt| prompt.profile_id == voice_profile_id)
-        else {
+            .unwrap_or_else(|| String::from(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID));
+        let Some(governed_profile) = state.governance.find_profile(&voice_profile_id) else {
             return Err(CsmSpeechHttpError::missing_voice_profile());
         };
+        if !governed_profile.is_runtime_admitted() {
+            return Err(CsmSpeechHttpError::unapproved_voice_profile());
+        }
+        let Some(prompt) = state.fixture.prompts.iter().find(|prompt| {
+            prompt.profile_id == governed_profile.source_prompt_profile_id
+                && prompt.speaker == governed_profile.speaker
+        }) else {
+            return Err(CsmSpeechHttpError::runtime_unavailable(
+                "voice_profile_source_unavailable",
+                "governed CSM voice profile references a missing source prompt",
+            ));
+        };
+        let Some(source_descriptor) = state
+            .descriptor
+            .voice_profiles
+            .iter()
+            .find(|profile| profile.profile_id == governed_profile.source_prompt_profile_id)
+        else {
+            return Err(CsmSpeechHttpError::runtime_unavailable(
+                "voice_profile_descriptor_unavailable",
+                "governed CSM voice profile references a missing descriptor",
+            ));
+        };
+        if source_descriptor.prompt_audio_sha256 != governed_profile.prompt_audio_sha256 {
+            return Err(CsmSpeechHttpError::runtime_unavailable(
+                "voice_profile_digest_mismatch",
+                "governed CSM voice profile digest does not match descriptor",
+            ));
+        }
         let params = request.psionic_csm.unwrap_or_default();
         validate_params(&params)?;
         let max_audio_length_ms = params
@@ -702,6 +777,9 @@ impl ValidatedCsmSpeechRequest {
             model,
             input: request.input,
             voice_profile_id,
+            source_prompt_profile_id: governed_profile.source_prompt_profile_id.clone(),
+            voice_approval_status: governed_profile.approval_status.clone(),
+            watermarking: governed_profile.watermark_policy.status.clone(),
             speaker: prompt.speaker,
             stream,
             max_audio_length_ms,
@@ -1133,6 +1211,21 @@ fn insert_csm_execution_headers(
     );
     insert_header(
         headers,
+        "x-psionic-csm-source-prompt-profile-id",
+        request.source_prompt_profile_id.as_str(),
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-voice-approval-status",
+        request.voice_approval_status.as_str(),
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-watermarking",
+        request.watermarking.as_str(),
+    );
+    insert_header(
+        headers,
         "x-psionic-artifact-csm-config-digest",
         state.descriptor.digests.csm_config_digest.as_str(),
     );
@@ -1211,6 +1304,15 @@ impl CsmSpeechHttpError {
         }
     }
 
+    fn unapproved_voice_profile() -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message: "requested CSM voice profile is not approved for this runtime".to_string(),
+            kind: "invalid_request_error",
+            code: "voice_profile_unapproved",
+        }
+    }
+
     fn model_unavailable() -> Self {
         Self {
             status: StatusCode::NOT_FOUND,
@@ -1285,7 +1387,7 @@ mod tests {
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
                         "model": CSM_SPEECH_MODEL_ID,
                         "input": "hello from psionic",
-                        "voice_profile_id": "conversational_a",
+                        "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
                         "response_format": "wav",
                         "psionic_csm": {
                             "temperature": 0.1,
@@ -1308,6 +1410,13 @@ mod tests {
             response
                 .headers()
                 .get("x-psionic-csm-voice-profile-id")
+                .and_then(|value| value.to_str().ok()),
+            Some(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-psionic-csm-source-prompt-profile-id")
                 .and_then(|value| value.to_str().ok()),
             Some("conversational_a")
         );
@@ -1335,6 +1444,34 @@ mod tests {
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
                         "input": "hello",
                         "voice_profile_id": "missing"
+                    }))?))?,
+            )
+            .await?;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), usize::MAX).await?;
+        let payload: serde_json::Value = serde_json::from_slice(&body)?;
+        assert_eq!(
+            payload["error"]["code"],
+            serde_json::json!("voice_profile_unavailable")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn csm_speech_route_refuses_raw_source_prompt_profile()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let server = CsmSpeechServer::from_config(disabled_runtime_config())?;
+        let response = server
+            .router()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(CSM_SPEECH_ROUTE_PSIONIC)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(serde_json::to_vec(&serde_json::json!({
+                        "input": "hello",
+                        "voice_profile_id": "conversational_a"
                     }))?))?,
             )
             .await?;
@@ -1399,9 +1536,14 @@ mod tests {
         assert!(
             payload["voice_profiles"]
                 .as_array()
-                .is_some_and(|profiles| profiles
-                    .iter()
-                    .any(|profile| { profile["id"] == serde_json::json!("conversational_a") }))
+                .is_some_and(|profiles| profiles.iter().any(|profile| {
+                    profile["id"] == serde_json::json!(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+                        && profile["source_prompt_profile_id"]
+                            == serde_json::json!("conversational_a")
+                        && profile["approval_status"]
+                            == serde_json::json!("approved_internal_placeholder")
+                        && profile["watermarking"] == serde_json::json!("unsupported_fail_closed")
+                }))
         );
         assert_eq!(
             payload["voice_profiles"][0]["prompt_codebooks"]["codebook_count"],
@@ -1432,6 +1574,10 @@ mod tests {
             .expect("endpoints");
         assert!(endpoints.contains(&serde_json::json!(CSM_SPEECH_ROUTE_OPENAI)));
         assert!(endpoints.contains(&serde_json::json!(CSM_SPEECH_ROUTE_PSIONIC)));
+        assert_eq!(
+            payload["data"][0]["psionic_voice_profiles"][0]["id"],
+            serde_json::json!(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+        );
         assert_eq!(
             payload["data"][0]["psionic_safety_capabilities"]["watermarking_refusal"]["code"],
             serde_json::json!("csm_watermarking_unavailable")
@@ -1464,7 +1610,7 @@ mod tests {
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
                         "model": CSM_SPEECH_MODEL_ID,
                         "input": "hello from psionic",
-                        "voice_profile_id": "conversational_a",
+                        "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
                         "response_format": "wav",
                         "psionic_csm": {
                             "max_audio_length_ms": 160,
@@ -1489,6 +1635,13 @@ mod tests {
                 .and_then(|value| value.to_str().ok()),
             Some(CSM_SPEECH_RESIDENCY_MODE)
         );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-psionic-csm-watermarking")
+                .and_then(|value| value.to_str().ok()),
+            Some("unsupported_fail_closed")
+        );
         assert!(
             response
                 .headers()
@@ -1507,7 +1660,7 @@ mod tests {
         let terminal = CsmSpeechStreamTerminalMetadata {
             event: "terminal",
             model: CSM_SPEECH_MODEL_ID.to_string(),
-            voice_profile_id: "conversational_a".to_string(),
+            voice_profile_id: CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID.to_string(),
             backend: CSM_SPEECH_SERVED_BACKEND,
             execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
             residency: CSM_SPEECH_RESIDENCY_MODE,

@@ -6,7 +6,7 @@ This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 5:
+The current implementation state is phase 6:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -31,6 +31,14 @@ The current implementation state is phase 5:
   the generated frames through Rust Mimi into WAV-ready PCM.
 - Approved voice profiles publish precomputed prompt-codebook descriptors with
   provenance, sample rate, codebook count, frame counts, and token digests.
+- Psionic has a committed voice-profile governance manifest at
+  `fixtures/csm/voice_profiles/lyra_voice_profiles.v1.json` and a
+  machine-readable schema at
+  `fixtures/csm/voice_profiles/lyra_voice_profiles.schema.json`.
+- The first governed profile is `lyra/default_female_v1`. It maps to the
+  committed source prompt `conversational_a`, is admitted only for local and
+  internal Lyra development, and is not a public voice-cloning or production
+  consent grant.
 - `psionic-serve` exposes a Rust-only CSM speech API surface through
   `psionic-csm-speech-server`.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
@@ -105,6 +113,11 @@ The request shape accepts:
 - `psionic_csm.max_audio_length_ms`, currently `80..=2000` on warm CPU
 - `psionic_csm.context_policy`, currently `none` for served requests
 
+If no voice is provided, the server defaults to `lyra/default_female_v1`.
+Requests for raw fixture prompt ids such as `conversational_a` or
+`conversational_b` are refused because served requests must use governed Lyra
+profile ids.
+
 The route is intentionally not backed by Python. If any gated local artifact is
 missing, incompatible, disabled, or requested on an unsupported backend, a
 valid speech request returns a structured fail-closed refusal with a specific
@@ -158,7 +171,7 @@ curl -D /tmp/psionic-csm-wav.headers \
   -o /tmp/psionic-csm.wav \
   -X POST http://127.0.0.1:8081/v1/audio/speech \
   -H 'Content-Type: application/json' \
-  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"conversational_a","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"lyra/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
 ```
 
 Buffered multipart stream request:
@@ -168,8 +181,39 @@ curl -D /tmp/psionic-csm-stream.headers \
   -o /tmp/psionic-csm.multipart \
   -X POST http://127.0.0.1:8081/v1/audio/speech \
   -H 'Content-Type: application/json' \
-  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"conversational_a","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"lyra/default_female_v1","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
 ```
+
+## Voice Profile Governance
+
+The served voice-profile contract is now:
+
+- public served id: `lyra/default_female_v1`
+- source prompt profile: `conversational_a`
+- approval status: `approved_internal_placeholder`
+- runtime admission: `admitted_internal_development`
+- allowed surfaces: `psionic_local_development` and `lyra_internal_development`
+- disallowed surfaces: `lyra_production`, `public_user_voice_clone`, and
+  `arbitrary_reference_audio_upload`
+- source provenance:
+  `committed_csm_parity_fixture_prompt_conversational_a`
+- consent posture:
+  `internal_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload`
+
+The route refuses unknown or ungoverned profile ids with
+`voice_profile_unavailable`. This is intentional: prompt fixtures are not
+served voice ids. A source prompt can feed a governed profile, but callers must
+use the governed Lyra profile id.
+
+Arbitrary voice cloning and reference-audio upload are out of scope until a
+consent system exists. The current Rust Mimi encode capability remains refused
+with `rust_mimi_encode_not_implemented`, and CSM watermarking remains
+`unsupported_fail_closed` with `csm_watermarking_unavailable`.
+
+Public demo watermark keys are not production safety controls. Production
+Lyra cutover remains blocked until Psionic has a private watermark or
+equivalent voice-safety control and the governed profile moves beyond internal
+placeholder status.
 
 ## Rust Frontend Contract
 
@@ -216,8 +260,8 @@ CSM weights and produce audio frames entirely in Rust. The HTTP server now
 keeps that CPU path warm and serves short WAV responses plus buffered multipart
 chunks. It is still correctness-first rather than production-latency-ready.
 Metal/CUDA acceleration, true frame-by-frame audio streaming, prompt-codebook
-context use, voice-governance policy, and watermark posture remain separate
-cutover gates.
+context use, production voice consent, and production watermark posture remain
+separate cutover gates.
 
 Exact replay of the committed Python generation fixture remains unavailable
 because the fixture stores only compact prompt-codebook prefixes, not the full
@@ -282,6 +326,7 @@ The fixture binds:
 The retained local smoke report is:
 
 - `fixtures/csm/reports/csm_warm_cpu_serving_smoke_2026-05-06.json`
+- `fixtures/csm/reports/csm_voice_governance_smoke_2026-05-06.json`
 
 It records a warm CPU server on `127.0.0.1:18083` with:
 
@@ -295,6 +340,15 @@ It records a warm CPU server on `127.0.0.1:18083` with:
 - generated CSM frame count: `2`
 - one-shot full-generation latency: `2702 ms`
 - stream full-generation latency: `2677 ms`
+
+The voice-governance smoke records:
+
+- `/health` publishing `lyra/default_female_v1`
+- source prompt mapping: `conversational_a`
+- raw `conversational_a` speech requests refused with
+  `voice_profile_unavailable`
+- governed `lyra/default_female_v1` speech request returning `200 audio/wav`
+- headers publishing approval status and fail-closed watermarking posture
 
 ## Validation
 
@@ -344,6 +398,7 @@ The frontend tests additionally check:
 - warm CSM speech serving when the matching local artifacts are available
 - buffered multipart stream framing with ordered binary WAV chunks and terminal
   metadata
+- governed Lyra voice-profile admission and raw fixture prompt refusal
 - explicit fixture-gap truth for exact deterministic prompted replay
 - explicit refusal truth for runtime reference-audio encoding
 
@@ -353,10 +408,9 @@ The phase sequence lives in GitHub under `OpenAgentsInc/psionic#959`.
 
 Next work:
 
-1. Define approved Lyra voice-profile governance and watermark policy.
-2. Integrate Lyra through the Psionic TTS provider boundary after generation
+1. Integrate Lyra through the Psionic TTS provider boundary after generation
    returns real audio bytes.
-3. Add Metal/CUDA acceleration and true frame-by-frame low-latency decode when
+2. Add Metal/CUDA acceleration and true frame-by-frame low-latency decode when
    CSM quality and voice governance justify product cutover work.
 
 Cartesia remains Lyra's production TTS provider until CSM has measured quality,

@@ -1,0 +1,51 @@
+{
+  "schema_version": "psionic.csm.voice_governance_smoke.v1",
+  "captured_at": "2026-05-06T05:34:00Z",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 18084,
+    "model": "sesame/csm-1b",
+    "served_backend": "cpu",
+    "execution_mode": "native",
+    "execution_engine": "rust_candle_csm_cpu",
+    "residency": "warm_cpu"
+  },
+  "health": {
+    "http_status": 200,
+    "status": "ok",
+    "runtime_state": "ready",
+    "published_voice_profile_id": "lyra/default_female_v1",
+    "source_prompt_profile_id": "conversational_a",
+    "approval_status": "approved_internal_placeholder",
+    "runtime_admission": "admitted_internal_development",
+    "watermarking": "unsupported_fail_closed"
+  },
+  "raw_fixture_prompt_refusal": {
+    "request_voice_profile_id": "conversational_a",
+    "http_status": 400,
+    "content_type": "application/json",
+    "error_code": "voice_profile_unavailable",
+    "reason": "raw source prompt ids are not served voice ids"
+  },
+  "governed_profile_wav": {
+    "request_voice_profile_id": "lyra/default_female_v1",
+    "http_status": 200,
+    "content_type": "audio/wav",
+    "size_bytes": 7724,
+    "file_probe": "RIFF/WAVE PCM16 mono 24000 Hz",
+    "source_prompt_profile_id_header": "conversational_a",
+    "approval_status_header": "approved_internal_placeholder",
+    "watermarking_header": "unsupported_fail_closed",
+    "full_generation_latency_ms": 2658,
+    "wav_pcm16_digest": "sha256:e42aa82334922f71d0d87111fc66d6e3ba3a6439a8dd357d1f17338ef7b63b10"
+  },
+  "claim_boundary": {
+    "python_runtime_used": false,
+    "python_worker_used": false,
+    "arbitrary_reference_audio_upload": "refused",
+    "raw_fixture_prompt_ids": "refused",
+    "production_voice_consent": "not_claimed",
+    "public_demo_watermark_key": "not_a_production_safety_control",
+    "watermarking": "unsupported_fail_closed"
+  }
+}

@@ -58,6 +58,12 @@ pub const CSM_MIMI_WEIGHT: &str = "tokenizer-e351c8d8-checkpoint125.safetensors"
 pub const CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE: &str = "rust_mimi_encode_not_implemented";
 /// First Rust CPU CSM generation engine label.
 pub const CSM_CPU_EXECUTION_ENGINE: &str = "rust_candle_csm_cpu";
+/// Machine-readable Lyra voice-profile governance schema.
+pub const CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION: &str = "psionic.csm.voice_profiles.v1";
+/// First governed Lyra CSM voice profile.
+pub const CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID: &str = "lyra/default_female_v1";
+const CSM_VOICE_PROFILE_GOVERNANCE_JSON: &str =
+    include_str!("../../../fixtures/csm/voice_profiles/lyra_voice_profiles.v1.json");
 
 /// CSM frontend, descriptor, and prompt-building errors.
 #[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,6 +276,285 @@ pub struct CsmVoiceProfileCodebookDescriptor {
     pub prefix_codebook_count: usize,
     /// Full codebook tensor digest.
     pub tokens_sha256: String,
+}
+
+/// Machine-readable CSM voice governance manifest for served Lyra profiles.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmVoiceProfileGovernanceManifest {
+    /// Manifest schema version.
+    pub schema_version: String,
+    /// Manifest capture timestamp.
+    pub generated_at: String,
+    /// Psionic model id governed by this manifest.
+    pub model_id: String,
+    /// Global watermark posture.
+    pub watermark_policy: CsmWatermarkGovernancePolicy,
+    /// Governed profiles.
+    pub profiles: Vec<CsmVoiceProfileGovernanceDescriptor>,
+}
+
+impl CsmVoiceProfileGovernanceManifest {
+    /// Parses the committed governance manifest.
+    pub fn from_committed_manifest() -> Result<Self, CsmFrontendError> {
+        let manifest: Self =
+            serde_json::from_str(CSM_VOICE_PROFILE_GOVERNANCE_JSON).map_err(|error| {
+                CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "failed to parse CSM voice-profile governance manifest: {error}"
+                    ),
+                }
+            })?;
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    /// Validates manifest-level invariants that do not require model fixtures.
+    pub fn validate(&self) -> Result<(), CsmFrontendError> {
+        if self.schema_version != CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: format!(
+                    "unsupported CSM voice governance schema {}",
+                    self.schema_version
+                ),
+            });
+        }
+        if self.model_id != CSM_MODEL_ID {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: format!(
+                    "voice governance model id {} does not match {}",
+                    self.model_id, CSM_MODEL_ID
+                ),
+            });
+        }
+        if self.profiles.is_empty() {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: "voice governance manifest has no profiles".to_string(),
+            });
+        }
+        for profile in &self.profiles {
+            profile.validate()?;
+        }
+        Ok(())
+    }
+
+    /// Validates that governed profile references match the model descriptor.
+    pub fn validate_against_descriptor(
+        &self,
+        descriptor: &CsmModelArtifactDescriptor,
+    ) -> Result<(), CsmFrontendError> {
+        self.validate()?;
+        for profile in &self.profiles {
+            let Some(source) = descriptor
+                .voice_profiles
+                .iter()
+                .find(|candidate| candidate.profile_id == profile.source_prompt_profile_id)
+            else {
+                return Err(CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "governed voice profile {} references missing source prompt {}",
+                        profile.profile_id, profile.source_prompt_profile_id
+                    ),
+                });
+            };
+            if profile.speaker != source.speaker {
+                return Err(CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "governed voice profile {} speaker {} does not match source speaker {}",
+                        profile.profile_id, profile.speaker, source.speaker
+                    ),
+                });
+            }
+            if profile.prompt_audio_sha256 != source.prompt_audio_sha256 {
+                return Err(CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "governed voice profile {} prompt audio digest does not match source prompt",
+                        profile.profile_id
+                    ),
+                });
+            }
+            let transcript_digest = sha256_digest(source.text.as_bytes());
+            if profile.prompt_transcript_sha256 != transcript_digest {
+                return Err(CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "governed voice profile {} prompt transcript digest does not match source prompt",
+                        profile.profile_id
+                    ),
+                });
+            }
+            if profile.prompt_codebook_tokens_sha256 != source.mimi_tokens_sha256 {
+                return Err(CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "governed voice profile {} prompt codebook digest does not match source prompt",
+                        profile.profile_id
+                    ),
+                });
+            }
+            if profile.csm_config_digest != descriptor.digests.csm_config_digest
+                || profile.csm_model_digest != descriptor.digests.csm_model_digest
+                || profile.llama_tokenizer_digest != descriptor.digests.llama_tokenizer_digest
+                || profile.mimi_weight_digest != descriptor.digests.mimi_weight_digest
+            {
+                return Err(CsmFrontendError::DescriptorContract {
+                    message: format!(
+                        "governed voice profile {} artifact digests do not match descriptor",
+                        profile.profile_id
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds a governed profile by public Lyra profile id.
+    #[must_use]
+    pub fn find_profile(&self, profile_id: &str) -> Option<&CsmVoiceProfileGovernanceDescriptor> {
+        self.profiles
+            .iter()
+            .find(|profile| profile.profile_id == profile_id)
+    }
+}
+
+/// Global CSM watermark posture.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmWatermarkGovernancePolicy {
+    /// Current implementation status.
+    pub status: String,
+    /// Stable refusal code when watermarking is required.
+    pub refusal_code: String,
+    /// Required future phase.
+    pub required_phase: String,
+    /// Whether any public demo key is production safety.
+    pub public_demo_key_status: String,
+    /// Production cutover posture.
+    pub production_cutover: String,
+}
+
+/// Governed Lyra-facing voice profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmVoiceProfileGovernanceDescriptor {
+    /// Public Lyra voice profile id.
+    pub profile_id: String,
+    /// Human-readable name.
+    pub display_name: String,
+    /// Approval status for this placeholder.
+    pub approval_status: String,
+    /// Runtime admission status.
+    pub runtime_admission: String,
+    /// Source prompt profile in the parity fixture.
+    pub source_prompt_profile_id: String,
+    /// Numeric CSM speaker id.
+    pub speaker: u32,
+    /// Prompt transcript digest.
+    pub prompt_transcript_sha256: String,
+    /// Prompt audio digest.
+    pub prompt_audio_sha256: String,
+    /// Prompt codebook tensor digest when available.
+    pub prompt_codebook_tokens_sha256: Option<String>,
+    /// CSM config digest.
+    pub csm_config_digest: String,
+    /// CSM model weight digest.
+    pub csm_model_digest: String,
+    /// Llama tokenizer digest.
+    pub llama_tokenizer_digest: String,
+    /// Mimi weight digest.
+    pub mimi_weight_digest: String,
+    /// Model/codec compatibility contract.
+    pub compatibility: CsmVoiceProfileCompatibility,
+    /// Source provenance posture.
+    pub source_provenance: String,
+    /// Consent posture.
+    pub consent_posture: String,
+    /// Product surfaces where this profile is admitted.
+    pub allowed_product_surfaces: Vec<String>,
+    /// Explicitly disallowed surfaces.
+    pub disallowed_product_surfaces: Vec<String>,
+    /// Prompt asset retention policy.
+    pub retention_policy: String,
+    /// Prompt asset redaction policy.
+    pub redaction_policy: String,
+    /// Per-profile watermark posture.
+    pub watermark_policy: CsmVoiceProfileWatermarkPolicy,
+}
+
+impl CsmVoiceProfileGovernanceDescriptor {
+    fn validate(&self) -> Result<(), CsmFrontendError> {
+        if self.profile_id.trim().is_empty() {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: "governed CSM voice profile id is empty".to_string(),
+            });
+        }
+        if self.source_prompt_profile_id.trim().is_empty() {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: format!(
+                    "governed voice profile {} has no source prompt",
+                    self.profile_id
+                ),
+            });
+        }
+        if self.runtime_admission != "admitted_internal_development" {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: format!(
+                    "governed voice profile {} is not admitted for this runtime",
+                    self.profile_id
+                ),
+            });
+        }
+        if self.allowed_product_surfaces.is_empty() {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: format!(
+                    "governed voice profile {} has no allowed product surfaces",
+                    self.profile_id
+                ),
+            });
+        }
+        if self.watermark_policy.status != "unsupported_fail_closed" {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: format!(
+                    "governed voice profile {} must publish fail-closed watermark posture",
+                    self.profile_id
+                ),
+            });
+        }
+        Ok(())
+    }
+
+    /// True when the profile is admitted for the Rust CSM server.
+    #[must_use]
+    pub fn is_runtime_admitted(&self) -> bool {
+        self.runtime_admission == "admitted_internal_development"
+    }
+}
+
+/// Model/codec compatibility contract for a governed profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmVoiceProfileCompatibility {
+    /// CSM model id.
+    pub csm_model_id: String,
+    /// CSM frame contract version.
+    pub frame_contract: String,
+    /// Mimi compatibility version.
+    pub mimi: String,
+    /// Prompt-codebook support status.
+    pub prompt_codebooks: String,
+}
+
+/// Per-profile watermark posture.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmVoiceProfileWatermarkPolicy {
+    /// Current implementation status.
+    pub status: String,
+    /// Stable refusal code when watermarking is required.
+    pub refusal_code: String,
+    /// Required future phase.
+    pub required_phase: String,
+    /// Public-demo-key posture.
+    pub public_demo_key_status: String,
+}
+
+/// Loads and validates the committed CSM voice governance manifest.
+pub fn csm_voice_profile_governance_manifest()
+-> Result<CsmVoiceProfileGovernanceManifest, CsmFrontendError> {
+    CsmVoiceProfileGovernanceManifest::from_committed_manifest()
 }
 
 /// CSM model descriptor exported without loading neural weights.
@@ -1859,6 +2144,56 @@ mod tests {
         assert_eq!(
             descriptor.digests.csm_model_digest,
             "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf"
+        );
+    }
+
+    #[test]
+    fn csm_voice_profile_governance_manifest_admits_lyra_default_female() {
+        let fixture = csm_python_parity_fixture().expect("fixture should parse");
+        let descriptor =
+            CsmModelArtifactDescriptor::from_fixture(&fixture).expect("descriptor should build");
+        let manifest =
+            csm_voice_profile_governance_manifest().expect("governance manifest should parse");
+        manifest
+            .validate_against_descriptor(&descriptor)
+            .expect("governance should match descriptor");
+
+        assert_eq!(
+            manifest.schema_version,
+            CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            manifest.watermark_policy.public_demo_key_status,
+            "not_a_production_safety_control"
+        );
+        let profile = manifest
+            .find_profile(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+            .expect("default Lyra voice profile");
+        assert!(profile.is_runtime_admitted());
+        assert_eq!(profile.source_prompt_profile_id, "conversational_a");
+        assert_eq!(profile.approval_status, "approved_internal_placeholder");
+        assert_eq!(profile.watermark_policy.status, "unsupported_fail_closed");
+        assert!(
+            profile
+                .disallowed_product_surfaces
+                .iter()
+                .any(|surface| surface == "arbitrary_reference_audio_upload")
+        );
+    }
+
+    #[test]
+    fn csm_voice_profile_schema_is_machine_readable() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../fixtures/csm/voice_profiles/lyra_voice_profiles.schema.json"
+        ))
+        .expect("voice profile schema should parse");
+        assert_eq!(
+            schema["properties"]["schema_version"]["const"],
+            CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION
+        );
+        assert_eq!(
+            schema["$defs"]["profile"]["properties"]["runtime_admission"]["enum"][0],
+            "admitted_internal_development"
         );
     }
 
