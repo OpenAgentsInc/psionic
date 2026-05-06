@@ -111,7 +111,12 @@ copy_artifact_if_missing() {
 
   echo "staging artifact: ${uri}"
   if command -v gsutil >/dev/null 2>&1; then
-    gsutil -m cp "$source_path" "$uri"
+    gsutil \
+      -o "GSUtil:parallel_composite_upload_threshold=150M" \
+      -o "GSUtil:parallel_composite_upload_component_size=150M" \
+      -o "GSUtil:parallel_process_count=8" \
+      -o "GSUtil:parallel_thread_count=8" \
+      -m cp "$source_path" "$uri"
   else
     gcloud storage cp "$source_path" "$uri" --project "$PROJECT_ID"
   fi
