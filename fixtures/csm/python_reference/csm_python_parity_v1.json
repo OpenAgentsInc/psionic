@@ -1,0 +1,116 @@
+{
+  "schema": "psionic.csm.python_parity.v1",
+  "created_at": "2026-05-06T00:00:00Z",
+  "source_repo": "/Users/christopherdavid/code/csm",
+  "reference_command": "NO_TORCH_COMPILE=1 .venv/bin/python run_csm.py",
+  "model": {
+    "csm_repo": "sesame/csm-1b",
+    "llama_tokenizer_repo": "meta-llama/Llama-3.2-1B",
+    "mimi_repo": "kyutai/moshiko-pytorch-bf16",
+    "mimi_weight": "tokenizer-e351c8d8-checkpoint125.safetensors",
+    "csm_config_digest": "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf",
+    "csm_model_digest": "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70",
+    "llama_tokenizer_digest": "sha256:cc2e013b7545f183ef03e079a3c91c6f364fa37e4068c512d7dd843e59024535",
+    "mimi_weight_digest": "sha256:09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50"
+  },
+  "prompts": [
+    {
+      "profile_id": "conversational_a",
+      "speaker": 0,
+      "text": "like revising for an exam I'd have to try and like keep up the momentum because I'd start really early I'd be like okay I'm gonna start revising now and then like you're revising for ages and then I just like start losing steam I didn't do that for the exam we had recently to be fair that was a more of a last minute scenario but like yeah I'm trying to like yeah I noticed this yesterday that like Mondays I sort of start the day with this not like a panic but like a",
+      "audio_path_kind": "huggingface_cache",
+      "audio_sha256": "sha256:356648c1bc6c1da7883004557e9b21a2ef7d01682d8b9d02d6dcb950b348b04f",
+      "audio": {
+        "sample_rate_hz": 44100,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "frame_count": 1323000,
+        "duration_ms": 30000
+      }
+    },
+    {
+      "profile_id": "conversational_b",
+      "speaker": 1,
+      "text": "like a super Mario level. Like it's very like high detail. And like, once you get into the park, it just like, everything looks like a computer game and they have all these, like, you know, if, if there's like a, you know, like in a Mario game, they will have like a question block. And if you like, you know, punch it, a coin will come out. So like everyone, when they come into the park, they get like this little bracelet and then you can go punching question blocks around.",
+      "audio_path_kind": "huggingface_cache",
+      "audio_sha256": "sha256:c247153011385d33aaeed193adfec562c32182e2facd30cc8cd0b3e820e94afb",
+      "audio": {
+        "sample_rate_hz": 44100,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "frame_count": 1323000,
+        "duration_ms": 30000
+      }
+    }
+  ],
+  "tokenizer_examples": [
+    {
+      "speaker": 0,
+      "text": "Hey how are you doing?",
+      "encoded_token_ids": [128000, 58, 15, 60, 19182, 1268, 527, 499, 3815, 30, 128001],
+      "frame_shape": [11, 33],
+      "first_frame_tokens": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128000],
+      "first_frame_mask": [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true]
+    },
+    {
+      "speaker": 1,
+      "text": "Pretty good, pretty good. How about you?",
+      "encoded_token_ids": [128000, 58, 16, 60, 53040, 1695, 11, 5128, 1695, 13, 2650, 922, 499, 30, 128001],
+      "frame_shape": [15, 33],
+      "first_frame_tokens": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128000],
+      "first_frame_mask": [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true]
+    }
+  ],
+  "mimi_codebook_prefixes": [
+    {
+      "profile_id": "conversational_a",
+      "sample_rate_hz": 24000,
+      "codebook_count": 32,
+      "frame_count": 375,
+      "prefix_frame_count": 8,
+      "prefix_by_codebook": [
+        [1952, 359, 526, 1127, 1417, 371, 728, 819],
+        [425, 1597, 2043, 1671, 889, 1823, 98, 852],
+        [1966, 1325, 1867, 476, 1414, 1756, 2006, 1313],
+        [567, 426, 689, 1303, 862, 560, 89, 1275]
+      ],
+      "prefix_codebook_count": 4,
+      "tokens_sha256": "sha256:30c8683dbb8552c199bff785e48b85cbb3f47b066038e634bf2b62e329bf3614"
+    },
+    {
+      "profile_id": "conversational_b",
+      "sample_rate_hz": 24000,
+      "codebook_count": 32,
+      "frame_count": 375,
+      "prefix_frame_count": 8,
+      "prefix_by_codebook": [
+        [1049, 919, 599, 510, 1273, 950, 1295, 1764],
+        [1597, 130, 449, 663, 1243, 518, 212, 707],
+        [323, 2, 953, 710, 1264, 1368, 256, 145],
+        [1276, 56, 1509, 1671, 1519, 305, 1036, 1567]
+      ],
+      "prefix_codebook_count": 4,
+      "tokens_sha256": "sha256:cb05358f772107811fb6b9d999c3abe912cd5c4bc76a06bb266d112d72f20a04"
+    }
+  ],
+  "deterministic_generation_case": {
+    "status": "available",
+    "sampling": "greedy_argmax_topk1",
+    "context_segments": 1,
+    "requested_text": "Hey how are you doing?",
+    "speaker": 0,
+    "max_audio_length_ms": 10000,
+    "prompt_frame_count": 498,
+    "generated_prefix_frame_count": 3,
+    "frames": [
+      [420, 2013, 731, 1627, 1132, 287, 1643, 1747, 336, 705, 593, 782, 688, 1932, 1341, 354, 385, 492, 359, 1858, 1764, 1214, 696, 1407, 1871, 1918, 1950, 760, 415, 316, 244, 434],
+      [915, 1920, 54, 679, 1529, 1444, 1142, 1525, 1606, 1502, 1703, 559, 21, 623, 222, 1742, 1563, 407, 156, 1441, 746, 1121, 182, 603, 1997, 1284, 157, 772, 1779, 1058, 2030, 539],
+      [1575, 2033, 1242, 491, 1693, 1355, 528, 1075, 1272, 334, 1752, 1929, 746, 1113, 1033, 57, 839, 2035, 410, 1979, 1543, 524, 710, 1073, 314, 1376, 904, 819, 1420, 1206, 1669, 1860]
+    ],
+    "frames_sha256": "sha256:6d006f86aa37962ab4fb37477ce2cdeafcc4095641ad8a6dc1816a36f2825a9d"
+  },
+  "secret_redaction": [
+    "no_huggingface_token_recorded",
+    "no_provider_secret_recorded"
+  ]
+}

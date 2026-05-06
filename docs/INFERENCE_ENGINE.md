@@ -42,6 +42,12 @@ into one generic engine claim.
 
 ## Current Bounded Lanes
 
+- `CSM` has one new speech-generation lane in `partial` status. The current
+  landed surface is a Python-reference parity corpus, not serving. The
+  canonical doc is `docs/CSM_AUDIO_RUNTIME.md`; the committed fixture is
+  `fixtures/csm/python_reference/csm_python_parity_v1.json`, and
+  `psionic-models` validates it. The Python CSM repo remains a parity source,
+  not production runtime.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.

@@ -52,6 +52,8 @@ promotion decision that refuses held-out regressions or failed operator review.
 - Inference and local serving
   - local GPT-OSS server and benchmark harness
   - generic OpenAI-compatible server surfaces
+  - CSM speech-generation lane for Lyra, currently at the Python-reference
+    parity-fixture stage
   - hardware validation and backend truth
   - bounded non-`GptOss` lanes including `qwen35`, the published dense
     `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` single-node text lane plus
@@ -73,7 +75,7 @@ promotion decision that refuses held-out regressions or failed operator review.
     machines, or running as a sparse distributed expert row without `gpt_oss`
     specific heuristics
   - start with [docs/GPT_OSS_LOCAL_SERVING.md](docs/GPT_OSS_LOCAL_SERVING.md)
-  - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md)
+  - supporting docs: [docs/NON_GPT_OSS_QWEN35_PILOT.md](docs/NON_GPT_OSS_QWEN35_PILOT.md), [docs/NON_GPT_OSS_GEMMA4_PILOT.md](docs/NON_GPT_OSS_GEMMA4_PILOT.md), [docs/CSM_AUDIO_RUNTIME.md](docs/CSM_AUDIO_RUNTIME.md)
 - Hermes agent backend
   - use Psionic as a real Hermes backend over the OpenAI-compatible
     `chat.completions` path
