@@ -27,7 +27,7 @@ pub const CSM_SPEECH_ROUTE_PSIONIC: &str = "/psionic/csm/speech";
 pub const CSM_SPEECH_RESPONSE_FORMAT_WAV: &str = "wav";
 pub const CSM_SPEECH_SERVED_BACKEND: &str = "cpu";
 pub const CSM_SPEECH_EXECUTION_MODE: &str = "native";
-pub const CSM_SPEECH_EXECUTION_ENGINE: &str = "rust_csm_pending";
+pub const CSM_SPEECH_EXECUTION_ENGINE: &str = "rust_csm_serving_pending";
 
 #[derive(Clone, Debug)]
 pub struct CsmSpeechServerConfig {
@@ -232,9 +232,9 @@ struct CsmSpeechRefusalPublication {
 
 fn pending_execution_refusal() -> CsmSpeechRefusalPublication {
     CsmSpeechRefusalPublication {
-        code: "rust_csm_generation_not_implemented",
-        reason: "Rust CSM model safetensors binding and generation loop are still pending; Rust tokenizer/framing and Mimi decode have landed",
-        pending_phases: vec!["rust_csm_generation_loop"],
+        code: "rust_csm_serving_not_implemented",
+        reason: "Rust CSM CPU generation exists in psionic-models; this speech server still needs warm model residency and request execution before audio bytes can be served",
+        pending_phases: vec!["rust_csm_serving_residency", "streaming_audio_chunks"],
     }
 }
 
@@ -595,9 +595,9 @@ impl CsmSpeechHttpError {
     const fn rust_generation_not_implemented() -> Self {
         Self {
             status: StatusCode::SERVICE_UNAVAILABLE,
-            message: "Rust CSM generation is not implemented yet; CSM model safetensors binding and the generation loop are required before audio bytes can be served",
+            message: "Rust CSM CPU generation exists in psionic-models, but this speech server does not yet keep the model resident or execute requests",
             kind: "backend_unavailable",
-            code: "rust_csm_generation_not_implemented",
+            code: "rust_csm_serving_not_implemented",
         }
     }
 }
@@ -636,7 +636,7 @@ mod tests {
     use tower::util::ServiceExt;
 
     #[tokio::test]
-    async fn csm_speech_route_refuses_until_rust_generation_lands()
+    async fn csm_speech_route_refuses_until_rust_serving_lands()
     -> Result<(), Box<dyn std::error::Error>> {
         let server = CsmSpeechServer::from_config(CsmSpeechServerConfig::default())?;
         let response = server
@@ -679,7 +679,7 @@ mod tests {
         let payload: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(
             payload["error"]["code"],
-            serde_json::json!("rust_csm_generation_not_implemented")
+            serde_json::json!("rust_csm_serving_not_implemented")
         );
         assert!(!String::from_utf8(body.to_vec())?.contains("/Users/"));
         Ok(())
@@ -733,7 +733,7 @@ mod tests {
         assert_eq!(payload["execution_engine"], CSM_SPEECH_EXECUTION_ENGINE);
         assert_eq!(
             payload["execution_refusal"]["code"],
-            serde_json::json!("rust_csm_generation_not_implemented")
+            serde_json::json!("rust_csm_serving_not_implemented")
         );
         assert_eq!(
             payload["artifact_descriptor"]["frame_contract"]["frame_lanes"],

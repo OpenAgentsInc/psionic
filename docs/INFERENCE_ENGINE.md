@@ -44,13 +44,15 @@ into one generic engine claim.
 
 - `CSM` has one new speech-generation lane in `partial` status. The current
   landed surface is a Python-reference parity corpus, a Rust CSM
-  tokenizer/framing/artifact-descriptor frontend, a Rust Mimi decode and
-  PCM16-WAV helper path, approved prompt-codebook descriptors, and a Rust-only
-  `psionic-csm-speech-server` API/refusal surface. The server does not call
-  Python, does not embed the local CSM repo, and does not use the Python Moshi
-  package. It currently refuses generation with
-  `rust_csm_generation_not_implemented` until the Rust CSM model safetensors
-  binding and generation loop land. The Rust Mimi decode path uses the Rust
+  tokenizer/framing/artifact-descriptor frontend, Rust CPU CSM codebook
+  generation, a Rust Mimi decode and PCM16-WAV helper path, approved
+  prompt-codebook descriptors, and a Rust-only `psionic-csm-speech-server`
+  API/refusal surface. The server does not call Python, does not embed the
+  local CSM repo, and does not use the Python Moshi package. CSM generation now
+  runs in-process in Rust through Candle Transformers inside `psionic-models`.
+  The HTTP server still refuses live speech requests with
+  `rust_csm_serving_not_implemented` until warm model residency, request
+  execution, and streaming chunks land. The Rust Mimi decode path uses the Rust
   `moshi` crate in-process and publishes `rust_moshi_mimi_cpu` capability
   truth. The canonical doc is
   `docs/CSM_AUDIO_RUNTIME.md`; the committed fixture is

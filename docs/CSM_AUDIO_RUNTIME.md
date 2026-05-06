@@ -6,7 +6,7 @@ This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 3:
+The current implementation state is phase 4:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -24,6 +24,11 @@ The current implementation state is phase 3:
   `moshi` crate: it loads Kyutai Mimi safetensors, validates weight digests,
   accepts 32-codebook RVQ frames, strips trailing all-zero EOS frames, decodes
   to 24 kHz mono samples, and writes browser-playable PCM16 WAV bytes.
+- `psionic-models` now owns the first Rust CPU CSM generation path through an
+  in-process Rust Candle CSM model: it loads `sesame/csm-1b` safetensors,
+  validates model/config digests, accepts Rust-built prompt frames, generates
+  32-codebook audio frames, records deterministic frame digests, and can decode
+  the generated frames through Rust Mimi into WAV-ready PCM.
 - Approved voice profiles publish precomputed prompt-codebook descriptors with
   provenance, sample rate, codebook count, frame counts, and token digests.
 - `psionic-serve` exposes a Rust-only CSM speech API surface through
@@ -31,8 +36,8 @@ The current implementation state is phase 3:
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
   `POST /psionic/csm/speech`.
 - The speech request route currently validates request shape and then refuses
-  with `rust_csm_generation_not_implemented` until the Rust CSM model
-  safetensors binding and generation loop land.
+  with `rust_csm_serving_not_implemented` until the server keeps the Rust CSM
+  model resident and executes requests.
 - The local Python repo at `/Users/christopherdavid/code/csm` remains a
   reference harness and parity source only. It is not a production Psionic
   runtime, it is not embedded in Lyra, and it is not called by the Psionic
@@ -85,13 +90,15 @@ The request shape accepts:
 - `psionic_csm.max_audio_length_ms`
 - `psionic_csm.context_policy`
 
-The route is intentionally not backed by Python. Until the Rust model path is
-implemented, a valid speech request returns a structured `503` refusal with:
+The route is intentionally not backed by Python. The Rust model path exists in
+`psionic-models`, but this HTTP server is not wired to warm and execute the
+model yet. Until that lands, a valid speech request returns a structured `503`
+refusal with:
 
-- `code = rust_csm_generation_not_implemented`
+- `code = rust_csm_serving_not_implemented`
 - `served_backend = cpu`
 - `execution_mode = native`
-- `execution_engine = rust_csm_pending`
+- `execution_engine = rust_csm_serving_pending`
 
 The response also includes execution and artifact headers such as
 `x-psionic-model-id`, `x-psionic-execution-engine`,
@@ -126,11 +133,43 @@ It provides:
 - `csm_build_prompt_frame_plan(...)`
 - `CsmModelConfig::from_json_str(...)`
 - `CsmModelArtifactDescriptor::from_fixture(...)`
+- `CsmCpuGenerator::from_safetensors_file(...)`
+- `CsmCpuGenerator::generate_codebook_frames(...)`
+- `CsmCpuGenerator::generate_and_decode(...)`
+- `csm_codebook_frames_digest(...)`
 
 Tokenizer loading is native Rust through the `tokenizers` crate. The served
-path does not start Python and does not call the local reference repo. When the
-matching gated Llama tokenizer JSON is present in the local Hugging Face cache,
-the focused test compares Rust token IDs with the frozen Python fixture.
+path does not start Python and does not call the local reference repo. CSM
+generation is native Rust through Candle Transformers inside `psionic-models`;
+the code does not shell to Python or use a Python worker. When the matching
+gated Llama tokenizer JSON, CSM config, CSM model weights, and Mimi weights are
+present in the local Hugging Face cache, the focused test runs text-only Rust
+CSM generation and Rust Mimi decode end to end.
+
+## Rust CPU Generation
+
+The first CSM generation engine is:
+
+- backend: `cpu`
+- execution engine: `rust_candle_csm_cpu`
+- model: `sesame/csm-1b`
+- sampler: greedy argmax or seeded top-k
+- input: `CsmPromptFramePlan`
+- output: 32-lane codebook frames plus stable SHA-256 digest
+- decode path: `rust_moshi_mimi_cpu`
+
+The path is intentionally bounded. It proves that Psionic can load the gated
+CSM weights and produce audio frames entirely in Rust. It does not yet make the
+HTTP speech server production-ready. Phase 5 must add warm model residency,
+request execution, stream chunks, timeout/backpressure policy, and startup
+capability publication before Lyra can call this as a live TTS provider.
+
+Exact replay of the committed Python generation fixture remains unavailable
+because the fixture stores only compact prompt-codebook prefixes, not the full
+prompt codebook tensor needed to reconstruct the original prompted context.
+Psionic publishes this as an explicit fixture gap rather than pretending parity
+coverage exists. Exact prompted replay needs either full committed prompt
+codebooks or a Rust Mimi encode path.
 
 ## Rust Mimi Decode
 
@@ -170,6 +209,12 @@ The fixture binds:
 - Llama tokenizer repo: `meta-llama/Llama-3.2-1B`
 - Mimi repo: `kyutai/moshiko-pytorch-bf16`
 - Mimi weight: `tokenizer-e351c8d8-checkpoint125.safetensors`
+- CSM config digest:
+  `sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70`
+- CSM model digest:
+  `sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf`
+- Llama tokenizer digest:
+  `sha256:79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4`
 - prompt profiles: `conversational_a`, `conversational_b`
 - source prompt WAVs: 44.1 kHz mono, 30 seconds each
 - CSM runtime sample rate: 24 kHz
@@ -220,6 +265,9 @@ The frontend tests additionally check:
 - Mimi codebook decode when the matching local Mimi safetensors file is
   available
 - deterministic PCM/WAV digest stability for the local decoded fixture
+- Rust CPU CSM generation and Rust Mimi decode when the matching local CSM,
+  Llama-tokenizer, and Mimi artifacts are available
+- explicit fixture-gap truth for exact deterministic prompted replay
 - explicit refusal truth for runtime reference-audio encoding
 
 ## Next Phases
@@ -228,8 +276,9 @@ The phase sequence lives in GitHub under `OpenAgentsInc/psionic#959`.
 
 Next work:
 
-1. Implement CPU CSM generation with parity tests.
-2. Add accelerated serving, residency/refusal truth, and streaming chunks.
+1. Add production serving posture, warm CSM residency, request execution,
+   refusal truth, and streaming chunks.
+2. Define approved Lyra voice-profile governance and watermark policy.
 3. Integrate Lyra through the Psionic TTS provider boundary after generation
    returns real audio bytes.
 

@@ -5,7 +5,7 @@ use std::{
 };
 
 use psionic_observe::{TokioRuntimeTelemetryConfig, build_main_runtime};
-use psionic_serve::{CsmSpeechServer, CsmSpeechServerConfig};
+use psionic_serve::{CSM_SPEECH_EXECUTION_ENGINE, CsmSpeechServer, CsmSpeechServerConfig};
 use tokio::net::TcpListener;
 
 fn main() -> ExitCode {
@@ -37,11 +37,12 @@ async fn run() -> Result<(), String> {
     let mut stdout = io::stdout();
     let _ = writeln!(
         stdout,
-        "psionic csm speech server listening on http://{} model={} execution_engine=rust_csm_pending",
+        "psionic csm speech server listening on http://{} model={} execution_engine={}",
         listener
             .local_addr()
             .map_err(|error| format!("failed to query listener address: {error}"))?,
         config.model_id,
+        CSM_SPEECH_EXECUTION_ENGINE,
     );
     server
         .serve(listener)

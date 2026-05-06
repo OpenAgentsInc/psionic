@@ -328,6 +328,18 @@ mod tests {
     fn csm_python_parity_fixture_freezes_expected_reference_values() {
         let fixture = csm_python_parity_fixture().expect("fixture should parse");
 
+        assert_eq!(
+            fixture.model.csm_config_digest,
+            "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70"
+        );
+        assert_eq!(
+            fixture.model.csm_model_digest,
+            "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf"
+        );
+        assert_eq!(
+            fixture.model.llama_tokenizer_digest,
+            "sha256:79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4"
+        );
         assert_eq!(fixture.prompts.len(), 2);
         assert_eq!(
             fixture.prompts[0].audio_sha256,

@@ -3,8 +3,13 @@
 use std::{
     env, fmt, fs,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
+use candle_transformers::{
+    generation::{LogitsProcessor, Sampling},
+    models::csm as candle_csm,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -51,6 +56,8 @@ pub const CSM_MIMI_REPO: &str = "kyutai/moshiko-pytorch-bf16";
 pub const CSM_MIMI_WEIGHT: &str = "tokenizer-e351c8d8-checkpoint125.safetensors";
 /// Explicit refusal code for runtime reference-audio encoding.
 pub const CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE: &str = "rust_mimi_encode_not_implemented";
+/// First Rust CPU CSM generation engine label.
+pub const CSM_CPU_EXECUTION_ENGINE: &str = "rust_candle_csm_cpu";
 
 /// CSM frontend, descriptor, and prompt-building errors.
 #[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,6 +138,30 @@ pub enum CsmFrontendError {
     /// Runtime reference-audio encode is not implemented.
     #[error("runtime reference-audio encoding is unsupported: {message}")]
     ReferenceAudioEncodingUnsupported {
+        /// Error detail.
+        message: String,
+    },
+    /// CSM model loading failed.
+    #[error("failed to load Rust CSM model: {message}")]
+    CsmModelLoad {
+        /// Error detail.
+        message: String,
+    },
+    /// CSM generation failed.
+    #[error("failed to generate CSM codebooks in Rust: {message}")]
+    CsmGeneration {
+        /// Error detail.
+        message: String,
+    },
+    /// Sampling mode is unsupported by the current Rust path.
+    #[error("unsupported CSM sampling mode: {message}")]
+    UnsupportedSampling {
+        /// Error detail.
+        message: String,
+    },
+    /// The committed fixture lacks enough prompt data for exact replay.
+    #[error("CSM fixture replay unavailable: {message}")]
+    FixtureReplayUnavailable {
         /// Error detail.
         message: String,
     },
@@ -372,12 +403,36 @@ impl CsmModelConfig {
 
     /// Parses and validates a CSM config JSON file.
     pub fn from_json_file(path: impl AsRef<Path>) -> Result<Self, CsmFrontendError> {
+        Ok(Self::from_json_file_with_digest(path, None)?.0)
+    }
+
+    /// Parses a CSM config JSON file, validates its digest, and validates the
+    /// config against the CSM contract.
+    pub fn from_json_file_with_digest(
+        path: impl AsRef<Path>,
+        expected_sha256: Option<&str>,
+    ) -> Result<(Self, String), CsmFrontendError> {
         let path = path.as_ref();
-        let json = fs::read_to_string(path).map_err(|error| CsmFrontendError::ArtifactRead {
+        let bytes = fs::read(path).map_err(|error| CsmFrontendError::ArtifactRead {
             artifact: path.display().to_string(),
             message: error.to_string(),
         })?;
-        Self::from_json_str(&json)
+        let actual = sha256_digest(&bytes);
+        if let Some(expected) = expected_sha256
+            && actual != expected
+        {
+            return Err(CsmFrontendError::ArtifactDigestMismatch {
+                artifact: "csm_config".to_string(),
+                expected: expected.to_string(),
+                actual,
+            });
+        }
+        let config: Self =
+            serde_json::from_slice(&bytes).map_err(|error| CsmFrontendError::ConfigParse {
+                message: error.to_string(),
+            })?;
+        config.validate()?;
+        Ok((config, actual))
     }
 
     /// Validates the config against the CSM 33-lane contract.
@@ -429,6 +484,18 @@ impl CsmModelConfig {
             });
         }
         Ok(())
+    }
+
+    /// Builds the Candle CSM config used by the first Rust CPU generation path.
+    #[must_use]
+    pub fn to_candle_config(&self) -> candle_csm::Config {
+        candle_csm::Config {
+            audio_num_codebooks: self.audio_num_codebooks,
+            audio_vocab_size: self.audio_vocab_size,
+            backbone_flavor: candle_csm::Flavor::Llama1B,
+            decoder_flavor: candle_csm::Flavor::Llama100M,
+            text_vocab_size: self.text_vocab_size,
+        }
     }
 }
 
@@ -879,6 +946,317 @@ pub fn csm_wav_pcm16_digest(clip: &CsmAudioClip) -> Result<String, CsmFrontendEr
     Ok(sha256_digest(&clip.to_wav_pcm16()?))
 }
 
+/// Rust CPU CSM sampling mode.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum CsmSamplingStrategy {
+    /// Deterministic argmax at every codebook head.
+    Greedy,
+    /// Fixed-seed top-k sampling.
+    TopK {
+        /// Top-k candidate count.
+        top_k: usize,
+        /// Sampling temperature.
+        temperature: f64,
+        /// RNG seed.
+        seed: u64,
+    },
+}
+
+impl CsmSamplingStrategy {
+    fn logits_processor(&self) -> Result<LogitsProcessor, CsmFrontendError> {
+        match *self {
+            Self::Greedy => Ok(LogitsProcessor::from_sampling(0, Sampling::ArgMax)),
+            Self::TopK {
+                top_k,
+                temperature,
+                seed,
+            } => {
+                if top_k == 0 {
+                    return Err(CsmFrontendError::UnsupportedSampling {
+                        message: "top_k must be greater than zero".to_string(),
+                    });
+                }
+                if !temperature.is_finite() || temperature <= 0.0 {
+                    return Err(CsmFrontendError::UnsupportedSampling {
+                        message: "temperature must be finite and positive".to_string(),
+                    });
+                }
+                Ok(LogitsProcessor::from_sampling(
+                    seed,
+                    Sampling::TopK {
+                        k: top_k,
+                        temperature,
+                    },
+                ))
+            }
+        }
+    }
+}
+
+/// Rust CPU CSM generation request.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsmCpuGenerationRequest {
+    /// Prompt frames produced by the Rust CSM frontend.
+    pub prompt: CsmPromptFramePlan,
+    /// Sampling strategy.
+    pub sampling: CsmSamplingStrategy,
+}
+
+/// Rust CPU CSM generation evidence.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsmCpuGenerationReport {
+    /// Generated codebook frames.
+    pub codebook_frames: Vec<[u32; CSM_AUDIO_CODEBOOK_LANES]>,
+    /// Stable digest over generated codebook frames.
+    pub frames_sha256: String,
+    /// Number of generated non-EOS frames.
+    pub generated_frame_count: usize,
+    /// Whether generation stopped on all-zero EOS.
+    pub hit_eos: bool,
+    /// Prompt frame count.
+    pub prompt_frame_count: usize,
+    /// Max generation frame budget.
+    pub max_generation_len: usize,
+    /// Backend label.
+    pub backend: String,
+    /// Execution engine label.
+    pub execution_engine: String,
+    /// CSM config digest.
+    pub csm_config_digest: String,
+    /// CSM model weight digest.
+    pub csm_model_digest: String,
+    /// Wall-clock generation latency in milliseconds.
+    pub latency_ms: u128,
+}
+
+/// Rust CPU CSM one-shot generation plus Mimi decode evidence.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsmCpuSpeechSynthesisReport {
+    /// Generated codebooks.
+    pub generation: CsmCpuGenerationReport,
+    /// Mimi decode report.
+    pub decode: CsmMimiDecodeReport,
+}
+
+/// Rust CPU CSM generator backed by Candle's Rust CSM module.
+pub struct CsmCpuGenerator {
+    model: candle_csm::Model,
+    config_digest: String,
+    model_digest: String,
+}
+
+impl fmt::Debug for CsmCpuGenerator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CsmCpuGenerator")
+            .field("config_digest", &self.config_digest)
+            .field("model_digest", &self.model_digest)
+            .field("execution_engine", &CSM_CPU_EXECUTION_ENGINE)
+            .finish_non_exhaustive()
+    }
+}
+
+impl CsmCpuGenerator {
+    /// Loads the CSM safetensors file into the Rust CPU generator.
+    pub fn from_safetensors_file(
+        config: &CsmModelConfig,
+        config_digest: impl Into<String>,
+        path: impl AsRef<Path>,
+        expected_model_sha256: Option<&str>,
+    ) -> Result<Self, CsmFrontendError> {
+        config.validate()?;
+        let path = path.as_ref();
+        let bytes = fs::read(path).map_err(|error| CsmFrontendError::ArtifactRead {
+            artifact: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+        let model_digest = sha256_digest(&bytes);
+        if let Some(expected) = expected_model_sha256
+            && model_digest != expected
+        {
+            return Err(CsmFrontendError::ArtifactDigestMismatch {
+                artifact: "csm_model".to_string(),
+                expected: expected.to_string(),
+                actual: model_digest,
+            });
+        }
+        let weights = [path];
+        let vb = unsafe {
+            moshi::candle_nn::VarBuilder::from_mmaped_safetensors(
+                &weights,
+                moshi::candle::DType::F32,
+                &moshi::candle::Device::Cpu,
+            )
+        }
+        .map_err(|error| CsmFrontendError::CsmModelLoad {
+            message: error.to_string(),
+        })?;
+        let model = candle_csm::Model::new(&config.to_candle_config(), vb).map_err(|error| {
+            CsmFrontendError::CsmModelLoad {
+                message: error.to_string(),
+            }
+        })?;
+        Ok(Self {
+            model,
+            config_digest: config_digest.into(),
+            model_digest,
+        })
+    }
+
+    /// Returns the CSM model weight digest.
+    #[must_use]
+    pub fn model_digest(&self) -> &str {
+        &self.model_digest
+    }
+
+    /// Generates CSM codebook frames from a prepared prompt plan.
+    pub fn generate_codebook_frames(
+        &mut self,
+        request: &CsmCpuGenerationRequest,
+    ) -> Result<CsmCpuGenerationReport, CsmFrontendError> {
+        let started = Instant::now();
+        self.model.clear_kv_cache();
+        let mut lp = request.sampling.logits_processor()?;
+        let prompt_frame_count = request.prompt.frames.len();
+        if prompt_frame_count == 0 {
+            return Err(CsmFrontendError::CsmGeneration {
+                message: "prompt must contain at least one frame".to_string(),
+            });
+        }
+        let (mut tokens, mut tokens_mask) =
+            csm_frame_block_to_candle_tensors(&request.prompt.frames)?;
+        let mut input_pos = 0usize;
+        let mut generated = Vec::with_capacity(request.prompt.max_generation_len);
+        let mut hit_eos = false;
+
+        for _ in 0..request.prompt.max_generation_len {
+            let sample = self
+                .model
+                .generate_frame(&tokens, &tokens_mask, input_pos, &mut lp)
+                .map_err(|error| CsmFrontendError::CsmGeneration {
+                    message: error.to_string(),
+                })?;
+            let frame = csm_vec_to_codebook_frame(sample)?;
+            input_pos += tokens
+                .dim(1)
+                .map_err(|error| CsmFrontendError::CsmGeneration {
+                    message: error.to_string(),
+                })?;
+            if frame
+                .iter()
+                .all(|token| *token == CSM_CODEBOOK_EOS_TOKEN_ID)
+            {
+                hit_eos = true;
+                break;
+            }
+            generated.push(frame);
+            let (next_tokens, next_mask) = self
+                .model
+                .audio_tokens_and_mask(frame.to_vec())
+                .map_err(|error| CsmFrontendError::CsmGeneration {
+                    message: error.to_string(),
+                })?;
+            tokens = next_tokens;
+            tokens_mask = next_mask;
+        }
+
+        let frames_sha256 = csm_codebook_frames_digest(&generated);
+        let generated_frame_count = generated.len();
+        Ok(CsmCpuGenerationReport {
+            codebook_frames: generated,
+            frames_sha256,
+            generated_frame_count,
+            hit_eos,
+            prompt_frame_count,
+            max_generation_len: request.prompt.max_generation_len,
+            backend: "cpu".to_string(),
+            execution_engine: CSM_CPU_EXECUTION_ENGINE.to_string(),
+            csm_config_digest: self.config_digest.clone(),
+            csm_model_digest: self.model_digest.clone(),
+            latency_ms: started.elapsed().as_millis(),
+        })
+    }
+
+    /// Generates codebooks and decodes them through Rust Mimi into WAV-ready PCM.
+    pub fn generate_and_decode(
+        &mut self,
+        request: &CsmCpuGenerationRequest,
+        mimi: &mut CsmMimiDecoder,
+    ) -> Result<CsmCpuSpeechSynthesisReport, CsmFrontendError> {
+        let generation = self.generate_codebook_frames(request)?;
+        let decode = mimi.decode_codebook_frames(&generation.codebook_frames)?;
+        Ok(CsmCpuSpeechSynthesisReport { generation, decode })
+    }
+}
+
+fn csm_frame_block_to_candle_tensors(
+    block: &CsmFrameBlock,
+) -> Result<(moshi::candle::Tensor, moshi::candle::Tensor), CsmFrontendError> {
+    let frame_count = block.len();
+    if frame_count == 0 {
+        return Err(CsmFrontendError::CsmGeneration {
+            message: "cannot build model tensors for an empty frame block".to_string(),
+        });
+    }
+    let mut tokens = Vec::with_capacity(frame_count * CSM_FRAME_LANES);
+    let mut mask = Vec::with_capacity(frame_count * CSM_FRAME_LANES);
+    for frame in &block.frames {
+        if frame.tokens.len() != CSM_FRAME_LANES || frame.mask.len() != CSM_FRAME_LANES {
+            return Err(CsmFrontendError::DescriptorContract {
+                message: "CSM frame has invalid lane width".to_string(),
+            });
+        }
+        tokens.extend_from_slice(&frame.tokens);
+        mask.extend(frame.mask.iter().map(|enabled| u8::from(*enabled)));
+    }
+    let tokens = moshi::candle::Tensor::from_vec(
+        tokens,
+        (1, frame_count, CSM_FRAME_LANES),
+        &moshi::candle::Device::Cpu,
+    )
+    .map_err(|error| CsmFrontendError::CsmGeneration {
+        message: error.to_string(),
+    })?;
+    let mask = moshi::candle::Tensor::from_vec(
+        mask,
+        (1, frame_count, CSM_FRAME_LANES),
+        &moshi::candle::Device::Cpu,
+    )
+    .map_err(|error| CsmFrontendError::CsmGeneration {
+        message: error.to_string(),
+    })?;
+    Ok((tokens, mask))
+}
+
+fn csm_vec_to_codebook_frame(
+    sample: Vec<u32>,
+) -> Result<[u32; CSM_AUDIO_CODEBOOK_LANES], CsmFrontendError> {
+    let boxed: Box<[u32]> = sample.into_boxed_slice();
+    let boxed: Box<[u32; CSM_AUDIO_CODEBOOK_LANES]> =
+        boxed
+            .try_into()
+            .map_err(|boxed: Box<[u32]>| CsmFrontendError::CsmGeneration {
+                message: format!(
+                    "generated frame has {} codebooks, expected {}",
+                    boxed.len(),
+                    CSM_AUDIO_CODEBOOK_LANES
+                ),
+            })?;
+    Ok(*boxed)
+}
+
+/// Returns a stable digest over frame-major codebook tokens.
+#[must_use]
+pub fn csm_codebook_frames_digest(frames: &[[u32; CSM_AUDIO_CODEBOOK_LANES]]) -> String {
+    let mut hasher = Sha256::new();
+    for frame in frames {
+        for token in frame {
+            hasher.update(token.to_le_bytes());
+        }
+    }
+    format!("sha256:{:x}", hasher.finalize())
+}
+
 /// Decode report for one Rust Mimi run.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CsmMimiDecodeReport {
@@ -1082,9 +1460,34 @@ pub fn csm_generation_case_codebook_frames(
         .collect()
 }
 
-/// Returns local HF cache candidates for the Mimi safetensors weight.
-#[must_use]
-pub fn csm_default_mimi_weight_candidates(expected_sha256: Option<&str>) -> Vec<PathBuf> {
+/// Verifies whether the committed deterministic generation fixture has enough
+/// prompt codebooks for exact replay through the Rust generator.
+pub fn csm_deterministic_fixture_replay_ready(
+    fixture: &CsmPythonParityFixture,
+) -> Result<(), CsmFrontendError> {
+    let case = &fixture.deterministic_generation_case;
+    if case.status != "available" {
+        return Err(CsmFrontendError::FixtureReplayUnavailable {
+            message: "deterministic generation case is not available".to_string(),
+        });
+    }
+    let Some(prefix) = fixture.mimi_codebook_prefixes.first() else {
+        return Err(CsmFrontendError::FixtureReplayUnavailable {
+            message: "fixture has no prompt-codebook descriptor".to_string(),
+        });
+    };
+    if prefix.prefix_frame_count < prefix.frame_count {
+        return Err(CsmFrontendError::FixtureReplayUnavailable {
+            message: format!(
+                "fixture keeps only {} of {} prompt codebook frames; exact replay requires full prompt codebooks or Rust Mimi encode",
+                prefix.prefix_frame_count, prefix.frame_count
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn csm_hf_cache_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(hf_home) = env::var("HF_HOME") {
         roots.push(PathBuf::from(hf_home).join("hub"));
@@ -1097,9 +1500,70 @@ pub fn csm_default_mimi_weight_candidates(expected_sha256: Option<&str>) -> Vec<
                 .join("hub"),
         );
     }
+    roots
+}
 
+/// Returns local HF cache candidates for the CSM model safetensors weight.
+#[must_use]
+pub fn csm_default_model_weight_candidates(expected_sha256: Option<&str>) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
-    for root in roots {
+    for root in csm_hf_cache_roots() {
+        let repo = root.join("models--sesame--csm-1b");
+        if let Some(hex) = expected_sha256.and_then(|digest| digest.strip_prefix("sha256:")) {
+            let blob = repo.join("blobs").join(hex);
+            if blob.is_file() {
+                candidates.push(blob);
+            }
+        }
+        let snapshots = repo.join("snapshots");
+        let Ok(entries) = fs::read_dir(snapshots) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let candidate = entry.path().join("model.safetensors");
+            if candidate.is_file() {
+                candidates.push(candidate);
+            }
+        }
+    }
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+/// Returns local HF cache candidates for the CSM config JSON.
+#[must_use]
+pub fn csm_default_config_candidates(expected_sha256: Option<&str>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    for root in csm_hf_cache_roots() {
+        let repo = root.join("models--sesame--csm-1b");
+        if let Some(hex) = expected_sha256.and_then(|digest| digest.strip_prefix("sha256:")) {
+            let blob = repo.join("blobs").join(hex);
+            if blob.is_file() {
+                candidates.push(blob);
+            }
+        }
+        let snapshots = repo.join("snapshots");
+        let Ok(entries) = fs::read_dir(snapshots) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let candidate = entry.path().join("config.json");
+            if candidate.is_file() {
+                candidates.push(candidate);
+            }
+        }
+    }
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+/// Returns local HF cache candidates for the Mimi safetensors weight.
+#[must_use]
+pub fn csm_default_mimi_weight_candidates(expected_sha256: Option<&str>) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    for root in csm_hf_cache_roots() {
         let repo = root.join("models--kyutai--moshiko-pytorch-bf16");
         if let Some(hex) = expected_sha256.and_then(|digest| digest.strip_prefix("sha256:")) {
             let blob = repo.join("blobs").join(hex);
@@ -1388,6 +1852,14 @@ mod tests {
                     && profile.mimi_tokens_sha256.is_some()
                     && profile.prompt_codebooks.is_some())
         );
+        assert_eq!(
+            descriptor.digests.csm_config_digest,
+            "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70"
+        );
+        assert_eq!(
+            descriptor.digests.csm_model_digest,
+            "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf"
+        );
     }
 
     #[test]
@@ -1397,6 +1869,30 @@ mod tests {
         assert_eq!(config.model_type, "csm");
         assert_eq!(config.max_position_embeddings, CSM_MAX_SEQ_LEN);
         assert_eq!(config.codec_config.sampling_rate, CSM_SAMPLE_RATE_HZ);
+    }
+
+    #[test]
+    fn csm_config_file_digest_validation_fails_closed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.json");
+        fs::write(&path, CONFIG_JSON).expect("write config");
+        let digest = sha256_digest(CONFIG_JSON.as_bytes());
+
+        let (config, actual) =
+            CsmModelConfig::from_json_file_with_digest(&path, Some(&digest)).expect("config");
+        let mismatch =
+            CsmModelConfig::from_json_file_with_digest(&path, Some("sha256:bad")).unwrap_err();
+
+        assert_eq!(config.model_type, "csm");
+        assert_eq!(actual, digest);
+        assert!(matches!(
+            mismatch,
+            CsmFrontendError::ArtifactDigestMismatch {
+                artifact,
+                expected,
+                ..
+            } if artifact == "csm_config" && expected == "sha256:bad"
+        ));
     }
 
     #[test]
@@ -1477,6 +1973,30 @@ mod tests {
         );
         assert_eq!(frames[0][0], 420);
         assert_eq!(frames[0][CSM_AUDIO_CODEBOOK_LANES - 1], 434);
+    }
+
+    #[test]
+    fn csm_deterministic_fixture_replay_gap_is_explicit() {
+        let fixture = csm_python_parity_fixture().expect("fixture should parse");
+
+        let result = csm_deterministic_fixture_replay_ready(&fixture);
+
+        assert!(matches!(
+            result,
+            Err(CsmFrontendError::FixtureReplayUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn csm_codebook_frame_digest_is_stable() {
+        let fixture = csm_python_parity_fixture().expect("fixture should parse");
+        let frames = csm_generation_case_codebook_frames(&fixture.deterministic_generation_case)
+            .expect("generation case frames");
+
+        assert_eq!(
+            csm_codebook_frames_digest(&frames),
+            "sha256:9231cf36b3e869ca4a025ef0db3e5cddae67b5441d99925b6a2b9af3a1bc683e"
+        );
     }
 
     #[test]
@@ -1670,5 +2190,97 @@ mod tests {
             report.wav_pcm16_digest,
             "sha256:8a23a6965b90c0faf627f3eb203c45c8fafc4200c7d8e96231660c4cd931e0cd"
         );
+    }
+
+    #[test]
+    fn csm_cpu_generates_and_decodes_text_only_when_cache_is_present() {
+        let fixture = csm_python_parity_fixture().expect("fixture should parse");
+        let tokenizer = match CsmLlamaTextTokenizer::from_default_hf_cache(Some(
+            &fixture.model.llama_tokenizer_digest,
+        )) {
+            Ok(tokenizer) => tokenizer,
+            Err(error) => {
+                eprintln!("skipping local CSM CPU generation test: tokenizer unavailable: {error}");
+                return;
+            }
+        };
+        let config_path =
+            match csm_default_config_candidates(Some(&fixture.model.csm_config_digest))
+                .into_iter()
+                .next()
+            {
+                Some(path) => path,
+                None => {
+                    eprintln!("skipping local CSM CPU generation test: config unavailable");
+                    return;
+                }
+            };
+        let model_path =
+            match csm_default_model_weight_candidates(Some(&fixture.model.csm_model_digest))
+                .into_iter()
+                .next()
+            {
+                Some(path) => path,
+                None => {
+                    eprintln!("skipping local CSM CPU generation test: model weights unavailable");
+                    return;
+                }
+            };
+        let mimi_path =
+            match csm_default_mimi_weight_candidates(Some(&fixture.model.mimi_weight_digest))
+                .into_iter()
+                .next()
+            {
+                Some(path) => path,
+                None => {
+                    eprintln!("skipping local CSM CPU generation test: Mimi weights unavailable");
+                    return;
+                }
+            };
+        let (config, config_digest) = CsmModelConfig::from_json_file_with_digest(
+            &config_path,
+            Some(&fixture.model.csm_config_digest),
+        )
+        .expect("CSM config");
+        let mut generator = CsmCpuGenerator::from_safetensors_file(
+            &config,
+            config_digest,
+            &model_path,
+            Some(&fixture.model.csm_model_digest),
+        )
+        .expect("Rust CSM model");
+        let mut mimi = CsmMimiDecoder::from_safetensors_file(
+            &mimi_path,
+            Some(&fixture.model.mimi_weight_digest),
+        )
+        .expect("Rust Mimi model");
+        let target =
+            CsmPromptSegment::encode_text_only(&tokenizer, 0, "Hello from Lyra.").expect("target");
+        let plan = csm_build_prompt_frame_plan(
+            &[],
+            &target,
+            CsmGenerationWindow::new(160),
+            CsmContextWindowPolicy::Reject,
+        )
+        .expect("prompt plan");
+
+        let report = generator
+            .generate_and_decode(
+                &CsmCpuGenerationRequest {
+                    prompt: plan,
+                    sampling: CsmSamplingStrategy::Greedy,
+                },
+                &mut mimi,
+            )
+            .expect("Rust CPU CSM generation and Mimi decode");
+
+        assert_eq!(report.generation.backend, "cpu");
+        assert_eq!(report.generation.execution_engine, CSM_CPU_EXECUTION_ENGINE);
+        assert!(!report.generation.codebook_frames.is_empty());
+        assert!(report.generation.generated_frame_count <= 2);
+        assert_eq!(report.decode.clip.sample_rate_hz, CSM_SAMPLE_RATE_HZ);
+        assert_eq!(report.decode.clip.channels, 1);
+        assert!(!report.decode.clip.samples.is_empty());
+        assert!(report.decode.wav_pcm16_digest.starts_with("sha256:"));
     }
 }

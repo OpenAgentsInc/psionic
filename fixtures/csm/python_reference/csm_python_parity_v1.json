@@ -8,9 +8,9 @@
     "llama_tokenizer_repo": "meta-llama/Llama-3.2-1B",
     "mimi_repo": "kyutai/moshiko-pytorch-bf16",
     "mimi_weight": "tokenizer-e351c8d8-checkpoint125.safetensors",
-    "csm_config_digest": "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf",
-    "csm_model_digest": "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70",
-    "llama_tokenizer_digest": "sha256:cc2e013b7545f183ef03e079a3c91c6f364fa37e4068c512d7dd843e59024535",
+    "csm_config_digest": "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70",
+    "csm_model_digest": "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf",
+    "llama_tokenizer_digest": "sha256:79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
     "mimi_weight_digest": "sha256:09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50"
   },
   "prompts": [

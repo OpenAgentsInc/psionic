@@ -4823,6 +4823,7 @@ dependencies = [
 name = "psionic-models"
 version = "0.1.1"
 dependencies = [
+ "candle-transformers",
  "fancy-regex 0.16.2",
  "half",
  "hex",
