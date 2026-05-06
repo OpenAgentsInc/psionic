@@ -110,7 +110,11 @@ copy_artifact_if_missing() {
   fi
 
   echo "staging artifact: ${uri}"
-  gcloud storage cp "$source_path" "$uri" --project "$PROJECT_ID"
+  if command -v gsutil >/dev/null 2>&1; then
+    gsutil -m cp "$source_path" "$uri"
+  else
+    gcloud storage cp "$source_path" "$uri" --project "$PROJECT_ID"
+  fi
 }
 
 ensure_artifact_repo() {
