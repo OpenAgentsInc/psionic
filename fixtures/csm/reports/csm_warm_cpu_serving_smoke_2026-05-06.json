@@ -1,0 +1,68 @@
+{
+  "schema_version": "psionic.csm.warm_cpu_serving_smoke.v1",
+  "captured_at": "2026-05-06T04:32:34Z",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 18083,
+    "model": "sesame/csm-1b",
+    "served_backend": "cpu",
+    "execution_mode": "native",
+    "execution_engine": "rust_candle_csm_cpu",
+    "residency": "warm_cpu",
+    "accelerated_backend": "unavailable_fail_closed",
+    "startup_load_latency_ms": 12650
+  },
+  "artifacts": {
+    "csm_config_digest": "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70",
+    "csm_model_digest": "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf",
+    "llama_tokenizer_digest": "sha256:79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+    "mimi_weight_digest": "sha256:09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50"
+  },
+  "request": {
+    "route": "/v1/audio/speech",
+    "model": "sesame/csm-1b",
+    "input": "hello from psionic",
+    "voice_profile_id": "conversational_a",
+    "response_format": "wav",
+    "max_audio_length_ms": 160,
+    "context_policy": "none"
+  },
+  "one_shot_wav": {
+    "http_status": 200,
+    "content_type": "audio/wav",
+    "size_bytes": 7724,
+    "file_probe": "RIFF/WAVE PCM16 mono 24000 Hz",
+    "generated_frame_count": 2,
+    "prompt_frame_count": 9,
+    "hit_eos": false,
+    "frames_sha256": "sha256:b8e6667babcd5c82b48d6ee692fd55a3f6c1957242eb44344209201bc3ef5a68",
+    "wav_pcm16_digest": "sha256:65eb11b6c0ee0e1564f302249dc98c6a2f137db2e0c441700e3aef83ba3223be",
+    "first_audio_latency_ms": 2702,
+    "full_generation_latency_ms": 2702,
+    "output_duration_ms": 160,
+    "stream_chunk_count_header": 1
+  },
+  "multipart_stream": {
+    "http_status": 200,
+    "content_type": "multipart/mixed; boundary=psionic-csm-stream",
+    "size_bytes": 8581,
+    "generated_frame_count": 2,
+    "prompt_frame_count": 9,
+    "hit_eos": false,
+    "frames_sha256": "sha256:b8e6667babcd5c82b48d6ee692fd55a3f6c1957242eb44344209201bc3ef5a68",
+    "wav_pcm16_digest": "sha256:65eb11b6c0ee0e1564f302249dc98c6a2f137db2e0c441700e3aef83ba3223be",
+    "first_audio_latency_ms": 2677,
+    "full_generation_latency_ms": 2677,
+    "output_duration_ms": 160,
+    "chunk_count": 1,
+    "terminal_metadata_present": true,
+    "binary_audio_chunk_present": true
+  },
+  "claim_boundary": {
+    "python_runtime_used": false,
+    "arbitrary_reference_audio_encode": "refused",
+    "prompt_profile_context": "refused_until_full_codebooks_or_rust_mimi_encode",
+    "metal_cuda_acceleration": "not_claimed",
+    "streaming_mode": "buffered_multipart_not_frame_by_frame"
+  }
+}

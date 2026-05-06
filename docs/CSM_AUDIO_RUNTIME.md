@@ -6,7 +6,7 @@ This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 4:
+The current implementation state is phase 5:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -35,9 +35,15 @@ The current implementation state is phase 4:
   `psionic-csm-speech-server`.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
   `POST /psionic/csm/speech`.
-- The speech request route currently validates request shape and then refuses
-  with `rust_csm_serving_not_implemented` until the server keeps the Rust CSM
-  model resident and executes requests.
+- On hosts with the gated artifacts in the local Hugging Face cache, the server
+  warm-loads the Rust tokenizer, CSM model, and Mimi decoder at startup and can
+  answer repeated short `wav` speech requests.
+- `stream=true` returns a buffered `multipart/mixed` response with ordered
+  `audio/wav` chunks and terminal JSON metadata. This is not frame-by-frame
+  low-latency decode yet; it is the first Lyra-compatible chunked transport.
+- Metal/CUDA CSM acceleration is not claimed. The server publishes
+  `accelerated_backend = unavailable_fail_closed` while the admitted live
+  backend is warm CPU.
 - The local Python repo at `/Users/christopherdavid/code/csm` remains a
   reference harness and parity source only. It is not a production Psionic
   runtime, it is not embedded in Lyra, and it is not called by the Psionic
@@ -71,6 +77,15 @@ Start the current Rust CSM speech server with:
 cargo run -p psionic-serve --bin psionic-csm-speech-server -- --host 127.0.0.1 --port 8081
 ```
 
+Useful environment controls:
+
+- `PSIONIC_CSM_RUNTIME=disabled` starts the API in fail-closed publication mode
+  without loading gated artifacts.
+- `PSIONIC_CSM_BACKEND=cpu` is the only admitted live backend today. Other
+  values fail closed with `unsupported_backend`.
+- `PSIONIC_CSM_HOST`, `PSIONIC_CSM_PORT`, and `PSIONIC_CSM_MODEL_ID` mirror the
+  command-line host, port, and model controls.
+
 The current endpoints are:
 
 - `GET /health`
@@ -84,25 +99,37 @@ The request shape accepts:
 - `input`
 - `voice` or `voice_profile_id`
 - `response_format`, currently only `wav`
-- `stream`, currently refused
+- `stream`, returning buffered multipart audio chunks when `true`
 - `psionic_csm.temperature`
 - `psionic_csm.top_k`
-- `psionic_csm.max_audio_length_ms`
-- `psionic_csm.context_policy`
+- `psionic_csm.max_audio_length_ms`, currently `80..=2000` on warm CPU
+- `psionic_csm.context_policy`, currently `none` for served requests
 
-The route is intentionally not backed by Python. The Rust model path exists in
-`psionic-models`, but this HTTP server is not wired to warm and execute the
-model yet. Until that lands, a valid speech request returns a structured `503`
-refusal with:
+The route is intentionally not backed by Python. If any gated local artifact is
+missing, incompatible, disabled, or requested on an unsupported backend, a
+valid speech request returns a structured fail-closed refusal with a specific
+code such as:
 
-- `code = rust_csm_serving_not_implemented`
+- `runtime_disabled`
+- `llama_tokenizer_unavailable`
+- `csm_config_unavailable`
+- `csm_model_unavailable`
+- `mimi_model_unavailable`
+- `unsupported_backend`
+
+Ready responses publish:
+
 - `served_backend = cpu`
 - `execution_mode = native`
-- `execution_engine = rust_csm_serving_pending`
+- `execution_engine = rust_candle_csm_cpu`
+- `residency = warm_cpu`
 
 The response also includes execution and artifact headers such as
 `x-psionic-model-id`, `x-psionic-execution-engine`,
-`x-psionic-csm-voice-profile-id`, and CSM artifact digest headers.
+`x-psionic-csm-voice-profile-id`, CSM artifact digest headers,
+`x-psionic-first-audio-latency-ms`,
+`x-psionic-full-generation-latency-ms`, `x-psionic-output-duration-ms`,
+`x-psionic-csm-frames-sha256`, and `x-psionic-csm-wav-pcm16-digest`.
 
 The `/health` and `/v1/models` surfaces now also publish a Rust-built artifact
 descriptor containing:
@@ -117,6 +144,32 @@ descriptor containing:
 - codec capability truth: Mimi decode implemented by `rust_moshi_mimi_cpu`,
   runtime reference-audio encoding refused with
   `rust_mimi_encode_not_implemented`
+- safety capability truth: watermarking is published as
+  `unsupported_fail_closed` with `csm_watermarking_unavailable`, so CSM output
+  is blocked for production Lyra cutover until voice governance and watermark
+  policy are implemented
+- runtime truth: `ready`/`unavailable`, warm-load latency, backend,
+  residency, artifact availability, and accelerated-backend refusal truth
+
+One-shot local request:
+
+```bash
+curl -D /tmp/psionic-csm-wav.headers \
+  -o /tmp/psionic-csm.wav \
+  -X POST http://127.0.0.1:8081/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"conversational_a","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+```
+
+Buffered multipart stream request:
+
+```bash
+curl -D /tmp/psionic-csm-stream.headers \
+  -o /tmp/psionic-csm.multipart \
+  -X POST http://127.0.0.1:8081/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"conversational_a","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+```
 
 ## Rust Frontend Contract
 
@@ -159,10 +212,12 @@ The first CSM generation engine is:
 - decode path: `rust_moshi_mimi_cpu`
 
 The path is intentionally bounded. It proves that Psionic can load the gated
-CSM weights and produce audio frames entirely in Rust. It does not yet make the
-HTTP speech server production-ready. Phase 5 must add warm model residency,
-request execution, stream chunks, timeout/backpressure policy, and startup
-capability publication before Lyra can call this as a live TTS provider.
+CSM weights and produce audio frames entirely in Rust. The HTTP server now
+keeps that CPU path warm and serves short WAV responses plus buffered multipart
+chunks. It is still correctness-first rather than production-latency-ready.
+Metal/CUDA acceleration, true frame-by-frame audio streaming, prompt-codebook
+context use, voice-governance policy, and watermark posture remain separate
+cutover gates.
 
 Exact replay of the committed Python generation fixture remains unavailable
 because the fixture stores only compact prompt-codebook prefixes, not the full
@@ -222,6 +277,25 @@ The fixture binds:
 - CSM audio codebook count: 32
 - deterministic generation prefix sampling: `greedy_argmax_topk1`
 
+## Retained Serving Smoke
+
+The retained local smoke report is:
+
+- `fixtures/csm/reports/csm_warm_cpu_serving_smoke_2026-05-06.json`
+
+It records a warm CPU server on `127.0.0.1:18083` with:
+
+- health `status = ok`
+- `runtime.residency = warm_cpu`
+- one-shot `POST /v1/audio/speech` returning `200` and `audio/wav`
+- playable WAV output: RIFF/WAVE, PCM16 mono, 24 kHz
+- buffered multipart stream returning `200` and
+  `multipart/mixed; boundary=psionic-csm-stream`
+- output duration: `160 ms`
+- generated CSM frame count: `2`
+- one-shot full-generation latency: `2702 ms`
+- stream full-generation latency: `2677 ms`
+
 ## Validation
 
 Run the focused fixture validation with:
@@ -267,6 +341,9 @@ The frontend tests additionally check:
 - deterministic PCM/WAV digest stability for the local decoded fixture
 - Rust CPU CSM generation and Rust Mimi decode when the matching local CSM,
   Llama-tokenizer, and Mimi artifacts are available
+- warm CSM speech serving when the matching local artifacts are available
+- buffered multipart stream framing with ordered binary WAV chunks and terminal
+  metadata
 - explicit fixture-gap truth for exact deterministic prompted replay
 - explicit refusal truth for runtime reference-audio encoding
 
@@ -276,11 +353,11 @@ The phase sequence lives in GitHub under `OpenAgentsInc/psionic#959`.
 
 Next work:
 
-1. Add production serving posture, warm CSM residency, request execution,
-   refusal truth, and streaming chunks.
-2. Define approved Lyra voice-profile governance and watermark policy.
-3. Integrate Lyra through the Psionic TTS provider boundary after generation
+1. Define approved Lyra voice-profile governance and watermark policy.
+2. Integrate Lyra through the Psionic TTS provider boundary after generation
    returns real audio bytes.
+3. Add Metal/CUDA acceleration and true frame-by-frame low-latency decode when
+   CSM quality and voice governance justify product cutover work.
 
 Cartesia remains Lyra's production TTS provider until CSM has measured quality,
 latency, approved voice-profile governance, and watermark posture.

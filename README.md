@@ -52,12 +52,12 @@ promotion decision that refuses held-out regressions or failed operator review.
 - Inference and local serving
   - local GPT-OSS server and benchmark harness
   - generic OpenAI-compatible server surfaces
-  - CSM speech-generation lane for Lyra, currently at the Rust-only API,
-    frontend, CPU generation, and codec stage with committed parity fixtures
-    plus Rust tokenizer, prompt-framing, config, artifact-descriptor, Rust CPU
-    CSM generation, Rust Mimi decode, PCM16-WAV, and approved prompt-codebook
-    contracts; Python remains offline reference fixture input only, not runtime
-    substrate
+  - CSM speech-generation lane for Lyra, currently at the Rust-only warm CPU
+    serving stage with committed parity fixtures plus Rust tokenizer,
+    prompt-framing, config, artifact-descriptor, Rust CPU CSM generation, Rust
+    Mimi decode, PCM16-WAV, buffered multipart chunks, and approved
+    prompt-codebook descriptor contracts; Python remains offline reference
+    fixture input only, not runtime substrate
   - hardware validation and backend truth
   - bounded non-`GptOss` lanes including `qwen35`, the published dense
     `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` single-node text lane plus
