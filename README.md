@@ -54,7 +54,9 @@ promotion decision that refuses held-out regressions or failed operator review.
   - generic OpenAI-compatible server surfaces
   - CSM speech-generation lane for Lyra, currently at the Rust-only API and
     refusal-truth stage with committed parity fixtures plus Rust tokenizer,
-    prompt-framing, config, and artifact-descriptor contracts
+    prompt-framing, config, artifact-descriptor, Rust Mimi decode, PCM16-WAV,
+    and approved prompt-codebook contracts; Python remains offline reference
+    fixture input only, not runtime substrate
   - hardware validation and backend truth
   - bounded non-`GptOss` lanes including `qwen35`, the published dense
     `gemma4:e4b` CUDA lane, the sparse `gemma4:26b` single-node text lane plus

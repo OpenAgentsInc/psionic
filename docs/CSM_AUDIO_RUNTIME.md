@@ -6,7 +6,7 @@ This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 2:
+The current implementation state is phase 3:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -20,17 +20,26 @@ The current implementation state is phase 2:
   text encoding, BOS/EOS template installation, 33-lane text/audio frame
   construction, prompt-window validation, segment-boundary context truncation,
   CSM `config.json` parsing, and artifact/voice-profile descriptors.
+- `psionic-models` now owns the first Rust Mimi decode path through the Rust
+  `moshi` crate: it loads Kyutai Mimi safetensors, validates weight digests,
+  accepts 32-codebook RVQ frames, strips trailing all-zero EOS frames, decodes
+  to 24 kHz mono samples, and writes browser-playable PCM16 WAV bytes.
+- Approved voice profiles publish precomputed prompt-codebook descriptors with
+  provenance, sample rate, codebook count, frame counts, and token digests.
 - `psionic-serve` exposes a Rust-only CSM speech API surface through
   `psionic-csm-speech-server`.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
   `POST /psionic/csm/speech`.
 - The speech request route currently validates request shape and then refuses
-  with `rust_csm_generation_not_implemented` until the Rust Mimi, safetensors,
-  and generation phases land.
+  with `rust_csm_generation_not_implemented` until the Rust CSM model
+  safetensors binding and generation loop land.
 - The local Python repo at `/Users/christopherdavid/code/csm` remains a
   reference harness and parity source only. It is not a production Psionic
   runtime, it is not embedded in Lyra, and it is not called by the Psionic
   service path.
+- There is no Python worker in this path. Psionic does not shell to Python,
+  proxy to the local CSM repo, embed Python, or depend on the Python Moshi
+  package at runtime.
 
 ## Fixture Source
 
@@ -95,8 +104,12 @@ descriptor containing:
 - Mimi weight filename
 - config, model, tokenizer, and Mimi weight digests
 - admitted prompt voice profiles
+- admitted prompt-codebook descriptor digests for approved profiles
 - frame contract: 33 lanes, 32 audio lanes, text lane 32, max sequence length
   2048, 80 ms generation frames, 24 kHz runtime audio
+- codec capability truth: Mimi decode implemented by `rust_moshi_mimi_cpu`,
+  runtime reference-audio encoding refused with
+  `rust_mimi_encode_not_implemented`
 
 ## Rust Frontend Contract
 
@@ -118,6 +131,36 @@ Tokenizer loading is native Rust through the `tokenizers` crate. The served
 path does not start Python and does not call the local reference repo. When the
 matching gated Llama tokenizer JSON is present in the local Hugging Face cache,
 the focused test compares Rust token IDs with the frozen Python fixture.
+
+## Rust Mimi Decode
+
+The Rust Mimi decoder lives in `crates/psionic-models/src/csm.rs`.
+
+It provides:
+
+- `CsmMimiDecoder::from_safetensors_file(...)`
+- `CsmMimiDecoder::decode_codebook_frames(...)`
+- `csm_generation_case_codebook_frames(...)`
+- `CsmAudioClip::to_wav_pcm16()`
+- `csm_wav_pcm16_digest(...)`
+- `csm_reference_audio_encoding_refusal()`
+
+The first decode implementation uses the Rust `moshi` crate in-process on CPU.
+That is allowed because it is Rust Psionic code, not the Python CSM repo and
+not the Python Moshi package. The local deterministic fixture currently decodes
+to:
+
+- clip digest:
+  `sha256:30350d2c6648102458e2eedb3c2388894b162452de6fbce931f1058f95d9c509`
+- PCM16 WAV digest:
+  `sha256:8a23a6965b90c0faf627f3eb203c45c8fafc4200c7d8e96231660c4cd931e0cd`
+
+Runtime reference-audio encoding is intentionally unsupported until a Rust
+encode path lands. Requests or flows that require encoding arbitrary uploaded
+reference audio must fail closed with
+`rust_mimi_encode_not_implemented`. The admitted shortcut for now is an
+approved profile whose prompt codebooks were precomputed offline and committed
+as descriptor digests.
 
 ## Current Fixture Contents
 
@@ -174,6 +217,10 @@ The frontend tests additionally check:
 - max-context refusal
 - segment-boundary context truncation
 - real tokenizer parity when the matching local HF tokenizer JSON is available
+- Mimi codebook decode when the matching local Mimi safetensors file is
+  available
+- deterministic PCM/WAV digest stability for the local decoded fixture
+- explicit refusal truth for runtime reference-audio encoding
 
 ## Next Phases
 
@@ -181,9 +228,10 @@ The phase sequence lives in GitHub under `OpenAgentsInc/psionic#959`.
 
 Next work:
 
-1. Implement Mimi decode and approved voice-profile codebook support.
-2. Implement CPU CSM generation with parity tests.
-3. Add accelerated serving, residency/refusal truth, and streaming chunks.
+1. Implement CPU CSM generation with parity tests.
+2. Add accelerated serving, residency/refusal truth, and streaming chunks.
+3. Integrate Lyra through the Psionic TTS provider boundary after generation
+   returns real audio bytes.
 
 Cartesia remains Lyra's production TTS provider until CSM has measured quality,
 latency, approved voice-profile governance, and watermark posture.

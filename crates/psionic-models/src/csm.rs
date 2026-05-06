@@ -11,8 +11,8 @@ use thiserror::Error;
 use tokenizers::{Tokenizer, processors::template::TemplateProcessing};
 
 use crate::{
-    CsmAudioMetadata, CsmMimiCodebookPrefix, CsmParityPrompt, CsmPythonParityFixture,
-    validate_csm_python_parity_fixture,
+    CsmAudioMetadata, CsmDeterministicGenerationCase, CsmMimiCodebookPrefix, CsmParityPrompt,
+    CsmPythonParityFixture, validate_csm_python_parity_fixture,
 };
 
 /// Psionic-owned CSM model id.
@@ -45,6 +45,12 @@ pub const CSM_LLAMA_BOS_TOKEN: &str = "<|begin_of_text|>";
 pub const CSM_LLAMA_EOS_TOKEN: &str = "<|end_of_text|>";
 /// Llama tokenizer repo used by CSM.
 pub const CSM_LLAMA_TOKENIZER_REPO: &str = "meta-llama/Llama-3.2-1B";
+/// Mimi repo used by the CSM codec path.
+pub const CSM_MIMI_REPO: &str = "kyutai/moshiko-pytorch-bf16";
+/// Mimi safetensors file used by the CSM codec path.
+pub const CSM_MIMI_WEIGHT: &str = "tokenizer-e351c8d8-checkpoint125.safetensors";
+/// Explicit refusal code for runtime reference-audio encoding.
+pub const CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE: &str = "rust_mimi_encode_not_implemented";
 
 /// CSM frontend, descriptor, and prompt-building errors.
 #[derive(Clone, Debug, Error, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,6 +107,30 @@ pub enum CsmFrontendError {
     /// Audio codebooks are malformed.
     #[error("invalid CSM audio codebooks: {message}")]
     AudioCodebooks {
+        /// Error detail.
+        message: String,
+    },
+    /// Mimi model loading failed.
+    #[error("failed to load Rust Mimi decoder: {message}")]
+    MimiLoad {
+        /// Error detail.
+        message: String,
+    },
+    /// Mimi decode failed.
+    #[error("failed to decode Mimi codebooks in Rust: {message}")]
+    MimiDecode {
+        /// Error detail.
+        message: String,
+    },
+    /// WAV encoding failed.
+    #[error("failed to encode CSM WAV: {message}")]
+    WavEncode {
+        /// Error detail.
+        message: String,
+    },
+    /// Runtime reference-audio encode is not implemented.
+    #[error("runtime reference-audio encoding is unsupported: {message}")]
+    ReferenceAudioEncodingUnsupported {
         /// Error detail.
         message: String,
     },
@@ -188,6 +218,27 @@ pub struct CsmVoiceProfileDescriptor {
     pub audio: CsmAudioMetadata,
     /// Optional compact Mimi codebook digest for this prompt.
     pub mimi_tokens_sha256: Option<String>,
+    /// Optional prompt-codebook descriptor.
+    pub prompt_codebooks: Option<CsmVoiceProfileCodebookDescriptor>,
+}
+
+/// Approved voice-profile prompt codebook descriptor.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmVoiceProfileCodebookDescriptor {
+    /// Descriptor source.
+    pub source: String,
+    /// Mimi sample rate.
+    pub sample_rate_hz: u32,
+    /// Codebook count.
+    pub codebook_count: usize,
+    /// Full prompt codebook frame count.
+    pub frame_count: usize,
+    /// Retained prefix frame count in the committed fixture.
+    pub prefix_frame_count: usize,
+    /// Retained prefix codebook count in the committed fixture.
+    pub prefix_codebook_count: usize,
+    /// Full codebook tensor digest.
+    pub tokens_sha256: String,
 }
 
 /// CSM model descriptor exported without loading neural weights.
@@ -248,16 +299,25 @@ fn voice_profile_descriptor(
     prompt: &CsmParityPrompt,
     prefixes: &[CsmMimiCodebookPrefix],
 ) -> CsmVoiceProfileDescriptor {
+    let prefix = prefixes
+        .iter()
+        .find(|prefix| prefix.profile_id == prompt.profile_id);
     CsmVoiceProfileDescriptor {
         profile_id: prompt.profile_id.clone(),
         speaker: prompt.speaker,
         text: prompt.text.clone(),
         prompt_audio_sha256: prompt.audio_sha256.clone(),
         audio: prompt.audio.clone(),
-        mimi_tokens_sha256: prefixes
-            .iter()
-            .find(|prefix| prefix.profile_id == prompt.profile_id)
-            .map(|prefix| prefix.tokens_sha256.clone()),
+        mimi_tokens_sha256: prefix.map(|prefix| prefix.tokens_sha256.clone()),
+        prompt_codebooks: prefix.map(|prefix| CsmVoiceProfileCodebookDescriptor {
+            source: "committed_parity_fixture_digest_and_prefix".to_string(),
+            sample_rate_hz: prefix.sample_rate_hz,
+            codebook_count: prefix.codebook_count,
+            frame_count: prefix.frame_count,
+            prefix_frame_count: prefix.prefix_frame_count,
+            prefix_codebook_count: prefix.prefix_codebook_count,
+            tokens_sha256: prefix.tokens_sha256.clone(),
+        }),
     }
 }
 
@@ -694,6 +754,397 @@ pub fn csm_audio_frame_block(
     Ok(CsmFrameBlock::new(output))
 }
 
+/// Native mono PCM clip for CSM/Mimi output.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsmAudioClip {
+    /// Sample rate in Hz.
+    pub sample_rate_hz: u32,
+    /// Channel count.
+    pub channels: u16,
+    /// Interleaved PCM samples in `[-1.0, 1.0]`.
+    pub samples: Vec<f32>,
+}
+
+impl CsmAudioClip {
+    /// Creates one PCM clip.
+    #[must_use]
+    pub fn new(sample_rate_hz: u32, channels: u16, samples: Vec<f32>) -> Self {
+        Self {
+            sample_rate_hz,
+            channels: channels.max(1),
+            samples,
+        }
+    }
+
+    /// Returns clip length in sample frames.
+    #[must_use]
+    pub fn frames(&self) -> usize {
+        self.samples.len() / usize::from(self.channels)
+    }
+
+    /// Returns clip duration in milliseconds.
+    #[must_use]
+    pub fn duration_ms(&self) -> u64 {
+        let frames = self.frames() as f64;
+        let sample_rate = f64::from(self.sample_rate_hz.max(1));
+        ((frames / sample_rate) * 1000.0).round() as u64
+    }
+
+    /// Returns a stable digest over clip metadata and f32 sample bytes.
+    #[must_use]
+    pub fn digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(self.sample_rate_hz.to_le_bytes());
+        hasher.update(self.channels.to_le_bytes());
+        for sample in &self.samples {
+            hasher.update(sample.to_le_bytes());
+        }
+        format!("sha256:{:x}", hasher.finalize())
+    }
+
+    /// Encodes this clip as browser-playable PCM16 WAV bytes.
+    pub fn to_wav_pcm16(&self) -> Result<Vec<u8>, CsmFrontendError> {
+        csm_encode_wav_pcm16(self)
+    }
+}
+
+/// WAV/PCM16 encoder for browser-playable CSM output.
+pub fn csm_encode_wav_pcm16(clip: &CsmAudioClip) -> Result<Vec<u8>, CsmFrontendError> {
+    let channels = usize::from(clip.channels);
+    if channels == 0 {
+        return Err(CsmFrontendError::WavEncode {
+            message: "channel count must be positive".to_string(),
+        });
+    }
+    if clip.samples.len() % channels != 0 {
+        return Err(CsmFrontendError::WavEncode {
+            message: "interleaved sample length is not divisible by channels".to_string(),
+        });
+    }
+
+    let bytes_per_sample = 2usize;
+    let data_len = clip
+        .samples
+        .len()
+        .checked_mul(bytes_per_sample)
+        .ok_or_else(|| CsmFrontendError::WavEncode {
+            message: "wav data too large".to_string(),
+        })?;
+    let data_len_u32 = u32::try_from(data_len).map_err(|error| CsmFrontendError::WavEncode {
+        message: error.to_string(),
+    })?;
+    let riff_len = 36u32
+        .checked_add(data_len_u32)
+        .ok_or_else(|| CsmFrontendError::WavEncode {
+            message: "wav riff length overflow".to_string(),
+        })?;
+    let byte_rate = clip
+        .sample_rate_hz
+        .checked_mul(u32::from(clip.channels))
+        .and_then(|value| value.checked_mul(bytes_per_sample as u32))
+        .ok_or_else(|| CsmFrontendError::WavEncode {
+            message: "wav byte rate overflow".to_string(),
+        })?;
+    let block_align = clip
+        .channels
+        .checked_mul(bytes_per_sample as u16)
+        .ok_or_else(|| CsmFrontendError::WavEncode {
+            message: "wav block align overflow".to_string(),
+        })?;
+
+    let mut out = Vec::with_capacity(44 + data_len);
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&riff_len.to_le_bytes());
+    out.extend_from_slice(b"WAVE");
+    out.extend_from_slice(b"fmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&clip.channels.to_le_bytes());
+    out.extend_from_slice(&clip.sample_rate_hz.to_le_bytes());
+    out.extend_from_slice(&byte_rate.to_le_bytes());
+    out.extend_from_slice(&block_align.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_len_u32.to_le_bytes());
+
+    for sample in &clip.samples {
+        let pcm = (sample.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16;
+        out.extend_from_slice(&pcm.to_le_bytes());
+    }
+    Ok(out)
+}
+
+/// Hashes encoded PCM16 WAV bytes for one clip.
+pub fn csm_wav_pcm16_digest(clip: &CsmAudioClip) -> Result<String, CsmFrontendError> {
+    Ok(sha256_digest(&clip.to_wav_pcm16()?))
+}
+
+/// Decode report for one Rust Mimi run.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsmMimiDecodeReport {
+    /// Output clip.
+    pub clip: CsmAudioClip,
+    /// Clip digest over f32 samples.
+    pub clip_digest: String,
+    /// Digest of browser-playable PCM16 WAV bytes.
+    pub wav_pcm16_digest: String,
+    /// Decoded input frame count after trailing EOS removal.
+    pub decoded_codebook_frames: usize,
+    /// Mimi weight digest.
+    pub mimi_weight_digest: String,
+    /// Execution engine label.
+    pub execution_engine: String,
+}
+
+/// Rust Mimi decoder backed by Kyutai's Rust `moshi` crate.
+pub struct CsmMimiDecoder {
+    model: moshi::mimi::Mimi,
+    mimi_weight_digest: String,
+}
+
+impl fmt::Debug for CsmMimiDecoder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CsmMimiDecoder")
+            .field("mimi_weight_digest", &self.mimi_weight_digest)
+            .field("execution_engine", &"rust_moshi_mimi_cpu")
+            .finish_non_exhaustive()
+    }
+}
+
+impl CsmMimiDecoder {
+    /// Loads the Mimi safetensors file into the Rust CPU decoder.
+    pub fn from_safetensors_file(
+        path: impl AsRef<Path>,
+        expected_sha256: Option<&str>,
+    ) -> Result<Self, CsmFrontendError> {
+        let path = path.as_ref();
+        let bytes = fs::read(path).map_err(|error| CsmFrontendError::ArtifactRead {
+            artifact: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+        let mimi_weight_digest = sha256_digest(&bytes);
+        if let Some(expected) = expected_sha256
+            && mimi_weight_digest != expected
+        {
+            return Err(CsmFrontendError::ArtifactDigestMismatch {
+                artifact: "mimi_weight".to_string(),
+                expected: expected.to_string(),
+                actual: mimi_weight_digest,
+            });
+        }
+        let path = path.to_str().ok_or_else(|| CsmFrontendError::MimiLoad {
+            message: "Mimi weight path is not valid UTF-8".to_string(),
+        })?;
+        let model = moshi::mimi::load(
+            path,
+            Some(CSM_AUDIO_CODEBOOK_LANES),
+            &moshi::candle::Device::Cpu,
+        )
+        .map_err(|error| CsmFrontendError::MimiLoad {
+            message: error.to_string(),
+        })?;
+        if model.config().sample_rate.round() as u32 != CSM_SAMPLE_RATE_HZ {
+            return Err(CsmFrontendError::MimiLoad {
+                message: format!(
+                    "expected Mimi sample_rate={}, got {}",
+                    CSM_SAMPLE_RATE_HZ,
+                    model.config().sample_rate
+                ),
+            });
+        }
+        if model.config().quantizer_n_q != CSM_AUDIO_CODEBOOK_LANES {
+            return Err(CsmFrontendError::MimiLoad {
+                message: format!(
+                    "expected {} codebooks, got {}",
+                    CSM_AUDIO_CODEBOOK_LANES,
+                    model.config().quantizer_n_q
+                ),
+            });
+        }
+        Ok(Self {
+            model,
+            mimi_weight_digest,
+        })
+    }
+
+    /// Returns the loaded Mimi weight digest.
+    #[must_use]
+    pub fn mimi_weight_digest(&self) -> &str {
+        &self.mimi_weight_digest
+    }
+
+    /// Decodes 32-codebook generated CSM frames into mono 24 kHz PCM.
+    pub fn decode_codebook_frames(
+        &mut self,
+        frames: &[[u32; CSM_AUDIO_CODEBOOK_LANES]],
+    ) -> Result<CsmMimiDecodeReport, CsmFrontendError> {
+        let frames = strip_trailing_codebook_eos_frames(frames);
+        if frames.is_empty() {
+            return Err(CsmFrontendError::AudioCodebooks {
+                message: "no non-EOS Mimi codebook frames to decode".to_string(),
+            });
+        }
+        let tensor_data = codebook_frames_to_bkt_tensor_data(frames)?;
+        let codes = moshi::candle::Tensor::from_vec(
+            tensor_data,
+            (1, CSM_AUDIO_CODEBOOK_LANES, frames.len()),
+            &moshi::candle::Device::Cpu,
+        )
+        .map_err(|error| CsmFrontendError::MimiDecode {
+            message: error.to_string(),
+        })?;
+        let decoded = self
+            .model
+            .decode(&codes)
+            .map_err(|error| CsmFrontendError::MimiDecode {
+                message: error.to_string(),
+            })?;
+        let samples = decoded
+            .flatten_all()
+            .and_then(|tensor| tensor.to_vec1::<f32>())
+            .map_err(|error| CsmFrontendError::MimiDecode {
+                message: error.to_string(),
+            })?;
+        let clip = CsmAudioClip::new(CSM_SAMPLE_RATE_HZ, 1, samples);
+        let clip_digest = clip.digest();
+        let wav_pcm16_digest = csm_wav_pcm16_digest(&clip)?;
+        Ok(CsmMimiDecodeReport {
+            clip,
+            clip_digest,
+            wav_pcm16_digest,
+            decoded_codebook_frames: frames.len(),
+            mimi_weight_digest: self.mimi_weight_digest.clone(),
+            execution_engine: "rust_moshi_mimi_cpu".to_string(),
+        })
+    }
+}
+
+fn strip_trailing_codebook_eos_frames(
+    frames: &[[u32; CSM_AUDIO_CODEBOOK_LANES]],
+) -> &[[u32; CSM_AUDIO_CODEBOOK_LANES]] {
+    let mut end = frames.len();
+    while end > 0
+        && frames[end - 1]
+            .iter()
+            .all(|token| *token == CSM_CODEBOOK_EOS_TOKEN_ID)
+    {
+        end -= 1;
+    }
+    &frames[..end]
+}
+
+fn codebook_frames_to_bkt_tensor_data(
+    frames: &[[u32; CSM_AUDIO_CODEBOOK_LANES]],
+) -> Result<Vec<u32>, CsmFrontendError> {
+    let mut data = Vec::with_capacity(frames.len() * CSM_AUDIO_CODEBOOK_LANES);
+    for codebook in 0..CSM_AUDIO_CODEBOOK_LANES {
+        for frame in frames {
+            let token = frame[codebook];
+            if token > CSM_CODEBOOK_PAD_TOKEN_ID {
+                return Err(CsmFrontendError::AudioCodebooks {
+                    message: format!("audio token {token} exceeds CSM codebook vocab"),
+                });
+            }
+            data.push(token);
+        }
+    }
+    Ok(data)
+}
+
+/// Converts the frozen deterministic generation case into frame-major codebooks.
+pub fn csm_generation_case_codebook_frames(
+    case: &CsmDeterministicGenerationCase,
+) -> Result<Vec<[u32; CSM_AUDIO_CODEBOOK_LANES]>, CsmFrontendError> {
+    case.frames
+        .iter()
+        .map(|frame| {
+            let array: [u32; CSM_AUDIO_CODEBOOK_LANES] =
+                frame
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| CsmFrontendError::AudioCodebooks {
+                        message: format!(
+                            "expected {} codebooks, got {}",
+                            CSM_AUDIO_CODEBOOK_LANES,
+                            frame.len()
+                        ),
+                    })?;
+            if let Some(token) = array
+                .iter()
+                .find(|token| **token > CSM_CODEBOOK_PAD_TOKEN_ID)
+            {
+                return Err(CsmFrontendError::AudioCodebooks {
+                    message: format!("audio token {token} exceeds CSM codebook vocab"),
+                });
+            }
+            Ok(array)
+        })
+        .collect()
+}
+
+/// Returns local HF cache candidates for the Mimi safetensors weight.
+#[must_use]
+pub fn csm_default_mimi_weight_candidates(expected_sha256: Option<&str>) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(hf_home) = env::var("HF_HOME") {
+        roots.push(PathBuf::from(hf_home).join("hub"));
+    }
+    if let Ok(home) = env::var("HOME") {
+        roots.push(
+            PathBuf::from(home)
+                .join(".cache")
+                .join("huggingface")
+                .join("hub"),
+        );
+    }
+
+    let mut candidates = Vec::new();
+    for root in roots {
+        let repo = root.join("models--kyutai--moshiko-pytorch-bf16");
+        if let Some(hex) = expected_sha256.and_then(|digest| digest.strip_prefix("sha256:")) {
+            let blob = repo.join("blobs").join(hex);
+            if blob.is_file() {
+                candidates.push(blob);
+            }
+        }
+        let snapshots = repo.join("snapshots");
+        let Ok(entries) = fs::read_dir(snapshots) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let candidate = entry.path().join(CSM_MIMI_WEIGHT);
+            if candidate.is_file() {
+                candidates.push(candidate);
+            }
+        }
+    }
+    candidates.sort();
+    candidates.dedup();
+    candidates
+}
+
+/// Explicit capability/refusal publication for CSM runtime reference-audio encoding.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CsmCapabilityRefusal {
+    /// Stable refusal code.
+    pub code: String,
+    /// Human-readable reason.
+    pub reason: String,
+    /// Required future phase.
+    pub required_phase: String,
+}
+
+/// Returns the current Rust Mimi encode refusal.
+#[must_use]
+pub fn csm_reference_audio_encoding_refusal() -> CsmCapabilityRefusal {
+    CsmCapabilityRefusal {
+        code: CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE.to_string(),
+        reason: "Runtime reference-audio encoding is not implemented in the Rust CSM path; approved voice profiles must use precomputed prompt-codebook descriptors"
+            .to_string(),
+        required_phase: "rust_mimi_encode_or_prompt_codebook_refresh".to_string(),
+    }
+}
+
 /// One prepared context or generation segment.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CsmPromptSegment {
@@ -934,7 +1385,8 @@ mod tests {
                 .voice_profiles
                 .iter()
                 .any(|profile| profile.profile_id == "conversational_a"
-                    && profile.mimi_tokens_sha256.is_some())
+                    && profile.mimi_tokens_sha256.is_some()
+                    && profile.prompt_codebooks.is_some())
         );
     }
 
@@ -1008,6 +1460,49 @@ mod tests {
                 .all(|value| *value)
         );
         assert!(!block.frames[2].mask[CSM_TEXT_LANE_INDEX]);
+    }
+
+    #[test]
+    fn csm_generation_case_codebook_frames_have_32_lanes() {
+        let fixture = csm_python_parity_fixture().expect("fixture should parse");
+
+        let frames = csm_generation_case_codebook_frames(&fixture.deterministic_generation_case)
+            .expect("generation case frames");
+
+        assert_eq!(
+            frames.len(),
+            fixture
+                .deterministic_generation_case
+                .generated_prefix_frame_count
+        );
+        assert_eq!(frames[0][0], 420);
+        assert_eq!(frames[0][CSM_AUDIO_CODEBOOK_LANES - 1], 434);
+    }
+
+    #[test]
+    fn csm_wav_pcm16_is_browser_playable() {
+        let clip = CsmAudioClip::new(CSM_SAMPLE_RATE_HZ, 1, vec![-1.0, -0.5, 0.0, 0.5, 1.0]);
+
+        let wav = clip.to_wav_pcm16().expect("wav bytes");
+
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
+        assert_eq!(&wav[12..16], b"fmt ");
+        assert_eq!(&wav[36..40], b"data");
+        assert_eq!(clip.frames(), 5);
+        assert_eq!(clip.sample_rate_hz, CSM_SAMPLE_RATE_HZ);
+        assert_eq!(
+            csm_wav_pcm16_digest(&clip).expect("wav digest"),
+            sha256_digest(&wav)
+        );
+    }
+
+    #[test]
+    fn csm_reference_audio_encoding_refusal_is_specific() {
+        let refusal = csm_reference_audio_encoding_refusal();
+
+        assert_eq!(refusal.code, CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE);
+        assert!(refusal.reason.contains("Runtime reference-audio encoding"));
     }
 
     #[test]
@@ -1125,5 +1620,55 @@ mod tests {
                 .expect("encode segment");
             assert_eq!(actual, example.encoded_token_ids);
         }
+    }
+
+    #[test]
+    fn csm_mimi_decode_generated_prefix_when_weight_cache_is_present() {
+        let fixture = csm_python_parity_fixture().expect("fixture should parse");
+        let weight =
+            match csm_default_mimi_weight_candidates(Some(&fixture.model.mimi_weight_digest))
+                .into_iter()
+                .next()
+            {
+                Some(weight) => weight,
+                None => {
+                    eprintln!(
+                        "skipping local Mimi decode parity test: matching weight not present"
+                    );
+                    return;
+                }
+            };
+        let mut decoder = match CsmMimiDecoder::from_safetensors_file(
+            &weight,
+            Some(&fixture.model.mimi_weight_digest),
+        ) {
+            Ok(decoder) => decoder,
+            Err(error) => {
+                eprintln!("skipping local Mimi decode parity test: {error}");
+                return;
+            }
+        };
+        let frames = csm_generation_case_codebook_frames(&fixture.deterministic_generation_case)
+            .expect("generation case frames");
+
+        let report = decoder
+            .decode_codebook_frames(&frames)
+            .expect("Rust Mimi decode");
+
+        assert_eq!(report.decoded_codebook_frames, frames.len());
+        assert_eq!(report.clip.sample_rate_hz, CSM_SAMPLE_RATE_HZ);
+        assert_eq!(report.clip.channels, 1);
+        assert!(!report.clip.samples.is_empty());
+        assert!(report.clip.duration_ms() > 0);
+        assert_eq!(report.mimi_weight_digest, fixture.model.mimi_weight_digest);
+        assert_eq!(report.execution_engine, "rust_moshi_mimi_cpu");
+        assert_eq!(
+            report.clip_digest,
+            "sha256:30350d2c6648102458e2eedb3c2388894b162452de6fbce931f1058f95d9c509"
+        );
+        assert_eq!(
+            report.wav_pcm16_digest,
+            "sha256:8a23a6965b90c0faf627f3eb203c45c8fafc4200c7d8e96231660c4cd931e0cd"
+        );
     }
 }

@@ -17,6 +17,7 @@ path = "src/lib.rs"
 fancy-regex = "0.16.2"
 half = "2.4.1"
 hex = { workspace = true }
+moshi = "0.6.4"
 psionic-catalog = { path = "../psionic-catalog" }
 psionic-core = { path = "../psionic-core" }
 psionic-ir = { path = "../psionic-ir" }

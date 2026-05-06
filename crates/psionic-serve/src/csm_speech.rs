@@ -12,7 +12,8 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CsmModelArtifactDescriptor, CsmPythonParityFixture, csm_python_parity_fixture,
+    CsmCapabilityRefusal, CsmModelArtifactDescriptor, CsmPythonParityFixture,
+    csm_python_parity_fixture, csm_reference_audio_encoding_refusal,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -137,6 +138,7 @@ struct CsmSpeechHealthResponse {
     voice_profiles: Vec<CsmVoiceProfilePublication>,
     artifact_digests: CsmArtifactDigestPublication,
     artifact_descriptor: CsmArtifactDescriptorPublication,
+    codec_capabilities: CsmCodecCapabilityPublication,
     execution_refusal: CsmSpeechRefusalPublication,
 }
 
@@ -160,6 +162,7 @@ struct CsmSpeechModelCard {
     psionic_voice_profiles: Vec<CsmVoiceProfilePublication>,
     psionic_artifact_digests: CsmArtifactDigestPublication,
     psionic_artifact_descriptor: CsmArtifactDescriptorPublication,
+    psionic_codec_capabilities: CsmCodecCapabilityPublication,
     psionic_execution_refusal: CsmSpeechRefusalPublication,
 }
 
@@ -170,6 +173,18 @@ struct CsmVoiceProfilePublication {
     source: &'static str,
     prompt_audio_sha256: String,
     mimi_tokens_sha256: Option<String>,
+    prompt_codebooks: Option<CsmPromptCodebookPublication>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CsmPromptCodebookPublication {
+    source: String,
+    sample_rate_hz: u32,
+    codebook_count: usize,
+    frame_count: usize,
+    prefix_frame_count: usize,
+    prefix_codebook_count: usize,
+    tokens_sha256: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -201,6 +216,14 @@ struct CsmArtifactDescriptorPublication {
 }
 
 #[derive(Clone, Debug, Serialize)]
+struct CsmCodecCapabilityPublication {
+    mimi_decode: &'static str,
+    mimi_decode_engine: &'static str,
+    reference_audio_encode: &'static str,
+    reference_audio_encode_refusal: CsmCapabilityRefusal,
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct CsmSpeechRefusalPublication {
     code: &'static str,
     reason: &'static str,
@@ -210,29 +233,32 @@ struct CsmSpeechRefusalPublication {
 fn pending_execution_refusal() -> CsmSpeechRefusalPublication {
     CsmSpeechRefusalPublication {
         code: "rust_csm_generation_not_implemented",
-        reason: "Rust CSM tokenizer, Mimi codec, safetensors binding, and generation loop are still pending",
-        pending_phases: vec![
-            "rust_tokenizer_prompt_framing",
-            "rust_mimi_codec",
-            "rust_csm_generation_loop",
-        ],
+        reason: "Rust CSM model safetensors binding and generation loop are still pending; Rust tokenizer/framing and Mimi decode have landed",
+        pending_phases: vec!["rust_csm_generation_loop"],
     }
 }
 
-fn voice_profiles(fixture: &CsmPythonParityFixture) -> Vec<CsmVoiceProfilePublication> {
-    fixture
-        .prompts
+fn voice_profiles(descriptor: &CsmModelArtifactDescriptor) -> Vec<CsmVoiceProfilePublication> {
+    descriptor
+        .voice_profiles
         .iter()
-        .map(|prompt| CsmVoiceProfilePublication {
-            id: prompt.profile_id.clone(),
-            speaker: prompt.speaker,
+        .map(|profile| CsmVoiceProfilePublication {
+            id: profile.profile_id.clone(),
+            speaker: profile.speaker,
             source: "committed_parity_fixture",
-            prompt_audio_sha256: prompt.audio_sha256.clone(),
-            mimi_tokens_sha256: fixture
-                .mimi_codebook_prefixes
-                .iter()
-                .find(|prefix| prefix.profile_id == prompt.profile_id)
-                .map(|prefix| prefix.tokens_sha256.clone()),
+            prompt_audio_sha256: profile.prompt_audio_sha256.clone(),
+            mimi_tokens_sha256: profile.mimi_tokens_sha256.clone(),
+            prompt_codebooks: profile.prompt_codebooks.as_ref().map(|codebooks| {
+                CsmPromptCodebookPublication {
+                    source: codebooks.source.clone(),
+                    sample_rate_hz: codebooks.sample_rate_hz,
+                    codebook_count: codebooks.codebook_count,
+                    frame_count: codebooks.frame_count,
+                    prefix_frame_count: codebooks.prefix_frame_count,
+                    prefix_codebook_count: codebooks.prefix_codebook_count,
+                    tokens_sha256: codebooks.tokens_sha256.clone(),
+                }
+            }),
         })
         .collect()
 }
@@ -266,6 +292,15 @@ fn artifact_descriptor(
     }
 }
 
+fn codec_capabilities() -> CsmCodecCapabilityPublication {
+    CsmCodecCapabilityPublication {
+        mimi_decode: "implemented",
+        mimi_decode_engine: "rust_moshi_mimi_cpu",
+        reference_audio_encode: "refused",
+        reference_audio_encode_refusal: csm_reference_audio_encoding_refusal(),
+    }
+}
+
 async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechHealthResponse> {
     Json(CsmSpeechHealthResponse {
         status: "degraded",
@@ -276,9 +311,10 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
         supported_endpoints: vec![CSM_SPEECH_ROUTE_OPENAI, CSM_SPEECH_ROUTE_PSIONIC],
         supported_response_formats: vec![CSM_SPEECH_RESPONSE_FORMAT_WAV],
-        voice_profiles: voice_profiles(&state.fixture),
+        voice_profiles: voice_profiles(&state.descriptor),
         artifact_digests: artifact_digests(&state.descriptor),
         artifact_descriptor: artifact_descriptor(&state.descriptor),
+        codec_capabilities: codec_capabilities(),
         execution_refusal: pending_execution_refusal(),
     })
 }
@@ -296,9 +332,10 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
             psionic_served_backend: CSM_SPEECH_SERVED_BACKEND,
             psionic_execution_mode: CSM_SPEECH_EXECUTION_MODE,
             psionic_execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
-            psionic_voice_profiles: voice_profiles(&state.fixture),
+            psionic_voice_profiles: voice_profiles(&state.descriptor),
             psionic_artifact_digests: artifact_digests(&state.descriptor),
             psionic_artifact_descriptor: artifact_descriptor(&state.descriptor),
+            psionic_codec_capabilities: codec_capabilities(),
             psionic_execution_refusal: pending_execution_refusal(),
         }],
     })
@@ -558,7 +595,7 @@ impl CsmSpeechHttpError {
     const fn rust_generation_not_implemented() -> Self {
         Self {
             status: StatusCode::SERVICE_UNAVAILABLE,
-            message: "Rust CSM generation is not implemented yet; tokenizer, Mimi, and model execution phases are required before audio bytes can be served",
+            message: "Rust CSM generation is not implemented yet; CSM model safetensors binding and the generation loop are required before audio bytes can be served",
             kind: "backend_unavailable",
             code: "rust_csm_generation_not_implemented",
         }
@@ -702,12 +739,24 @@ mod tests {
             payload["artifact_descriptor"]["frame_contract"]["frame_lanes"],
             serde_json::json!(33)
         );
+        assert_eq!(
+            payload["codec_capabilities"]["mimi_decode"],
+            serde_json::json!("implemented")
+        );
+        assert_eq!(
+            payload["codec_capabilities"]["reference_audio_encode_refusal"]["code"],
+            serde_json::json!("rust_mimi_encode_not_implemented")
+        );
         assert!(
             payload["voice_profiles"]
                 .as_array()
                 .is_some_and(|profiles| profiles
                     .iter()
                     .any(|profile| { profile["id"] == serde_json::json!("conversational_a") }))
+        );
+        assert_eq!(
+            payload["voice_profiles"][0]["prompt_codebooks"]["codebook_count"],
+            serde_json::json!(32)
         );
         Ok(())
     }
