@@ -72,7 +72,7 @@ find_hf_blob_or_matching_file() {
       printf "%s" "$candidate"
       return 0
     fi
-  done < <(find "$snapshots" -type f -name "$file_name" -print0)
+  done < <(find -L "$snapshots" -type f -name "$file_name" -print0)
 
   return 1
 }
@@ -94,7 +94,7 @@ find_hf_snapshot_file() {
       printf "%s\t%s" "$candidate" "$snapshot"
       return 0
     fi
-  done < <(find "$snapshots" -type f -name "$file_name" -print0)
+  done < <(find -L "$snapshots" -type f -name "$file_name" -print0)
 
   return 1
 }
