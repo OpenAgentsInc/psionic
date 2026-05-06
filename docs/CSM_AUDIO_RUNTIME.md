@@ -6,7 +6,7 @@ This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 1:
+The current implementation state is phase 2:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -15,13 +15,18 @@ The current implementation state is phase 1:
 - The fixture freezes prompt audio hashes, Llama tokenizer examples, 33-lane
   CSM text-frame masks, compact Mimi prompt-codebook prefixes, and a
   three-frame greedy generated-codebook prefix.
+- `psionic-models` now owns the Rust CSM frontend contract:
+  tokenizer loading from cached Hugging Face `tokenizer.json`, speaker-tag
+  text encoding, BOS/EOS template installation, 33-lane text/audio frame
+  construction, prompt-window validation, segment-boundary context truncation,
+  CSM `config.json` parsing, and artifact/voice-profile descriptors.
 - `psionic-serve` exposes a Rust-only CSM speech API surface through
   `psionic-csm-speech-server`.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
   `POST /psionic/csm/speech`.
 - The speech request route currently validates request shape and then refuses
-  with `rust_csm_generation_not_implemented` until the Rust tokenizer, Mimi,
-  safetensors, and generation phases land.
+  with `rust_csm_generation_not_implemented` until the Rust Mimi, safetensors,
+  and generation phases land.
 - The local Python repo at `/Users/christopherdavid/code/csm` remains a
   reference harness and parity source only. It is not a production Psionic
   runtime, it is not embedded in Lyra, and it is not called by the Psionic
@@ -83,6 +88,37 @@ The response also includes execution and artifact headers such as
 `x-psionic-model-id`, `x-psionic-execution-engine`,
 `x-psionic-csm-voice-profile-id`, and CSM artifact digest headers.
 
+The `/health` and `/v1/models` surfaces now also publish a Rust-built artifact
+descriptor containing:
+
+- CSM, Llama-tokenizer, and Mimi repo ids
+- Mimi weight filename
+- config, model, tokenizer, and Mimi weight digests
+- admitted prompt voice profiles
+- frame contract: 33 lanes, 32 audio lanes, text lane 32, max sequence length
+  2048, 80 ms generation frames, 24 kHz runtime audio
+
+## Rust Frontend Contract
+
+The Rust model frontend lives in `crates/psionic-models/src/csm.rs`.
+
+It provides:
+
+- `CsmLlamaTextTokenizer::from_tokenizer_json_file(...)`
+- `CsmLlamaTextTokenizer::from_default_hf_cache(...)`
+- `csm_format_segment_text(speaker, text)` using `[{speaker}]{text}`
+- `csm_text_frame_block(...)`
+- `csm_audio_frame_block(...)`, including the all-zero codebook EOS frame
+- `CsmPromptSegment`
+- `csm_build_prompt_frame_plan(...)`
+- `CsmModelConfig::from_json_str(...)`
+- `CsmModelArtifactDescriptor::from_fixture(...)`
+
+Tokenizer loading is native Rust through the `tokenizers` crate. The served
+path does not start Python and does not call the local reference repo. When the
+matching gated Llama tokenizer JSON is present in the local Hugging Face cache,
+the focused test compares Rust token IDs with the frozen Python fixture.
+
 ## Current Fixture Contents
 
 The fixture binds:
@@ -106,6 +142,12 @@ Run the focused fixture validation with:
 cargo test -p psionic-models csm_python_parity_fixture
 ```
 
+Run the Rust frontend/tokenizer/framing tests with:
+
+```bash
+cargo test -p psionic-models csm_
+```
+
 Run the served API/refusal tests with:
 
 ```bash
@@ -122,16 +164,26 @@ The validator checks:
 - deterministic generation frame dimensions and token bounds
 - explicit secret-redaction markers
 
+The frontend tests additionally check:
+
+- speaker-tag formatting, including empty text
+- CSM config parsing
+- text-frame construction against the frozen fixture
+- audio-frame EOS construction
+- multi-segment prompt assembly
+- max-context refusal
+- segment-boundary context truncation
+- real tokenizer parity when the matching local HF tokenizer JSON is available
+
 ## Next Phases
 
 The phase sequence lives in GitHub under `OpenAgentsInc/psionic#959`.
 
 Next work:
 
-1. Implement Rust tokenizer, prompt framing, and artifact descriptors.
-2. Implement Mimi decode and approved voice-profile codebook support.
-3. Implement CPU CSM generation with parity tests.
-4. Add accelerated serving, residency/refusal truth, and streaming chunks.
+1. Implement Mimi decode and approved voice-profile codebook support.
+2. Implement CPU CSM generation with parity tests.
+3. Add accelerated serving, residency/refusal truth, and streaming chunks.
 
 Cartesia remains Lyra's production TTS provider until CSM has measured quality,
 latency, approved voice-profile governance, and watermark posture.

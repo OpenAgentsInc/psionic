@@ -11,7 +11,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use psionic_models::{CsmPythonParityFixture, csm_python_parity_fixture};
+use psionic_models::{
+    CsmModelArtifactDescriptor, CsmPythonParityFixture, csm_python_parity_fixture,
+};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
@@ -78,6 +80,7 @@ pub struct CsmSpeechServer {
 struct CsmSpeechState {
     model_id: String,
     fixture: CsmPythonParityFixture,
+    descriptor: CsmModelArtifactDescriptor,
 }
 
 impl CsmSpeechServer {
@@ -85,10 +88,14 @@ impl CsmSpeechServer {
         let fixture = csm_python_parity_fixture().map_err(|error| {
             CsmSpeechServerError::Config(format!("failed to load CSM parity fixture: {error}"))
         })?;
+        let descriptor = CsmModelArtifactDescriptor::from_fixture(&fixture).map_err(|error| {
+            CsmSpeechServerError::Config(format!("failed to build CSM descriptor: {error}"))
+        })?;
         Ok(Self {
             state: Arc::new(CsmSpeechState {
                 model_id: config.model_id,
                 fixture,
+                descriptor,
             }),
         })
     }
@@ -129,6 +136,7 @@ struct CsmSpeechHealthResponse {
     supported_response_formats: Vec<&'static str>,
     voice_profiles: Vec<CsmVoiceProfilePublication>,
     artifact_digests: CsmArtifactDigestPublication,
+    artifact_descriptor: CsmArtifactDescriptorPublication,
     execution_refusal: CsmSpeechRefusalPublication,
 }
 
@@ -151,6 +159,7 @@ struct CsmSpeechModelCard {
     psionic_execution_engine: &'static str,
     psionic_voice_profiles: Vec<CsmVoiceProfilePublication>,
     psionic_artifact_digests: CsmArtifactDigestPublication,
+    psionic_artifact_descriptor: CsmArtifactDescriptorPublication,
     psionic_execution_refusal: CsmSpeechRefusalPublication,
 }
 
@@ -160,6 +169,7 @@ struct CsmVoiceProfilePublication {
     speaker: u32,
     source: &'static str,
     prompt_audio_sha256: String,
+    mimi_tokens_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -168,6 +178,26 @@ struct CsmArtifactDigestPublication {
     csm_model_digest: String,
     llama_tokenizer_digest: String,
     mimi_weight_digest: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CsmFrameContractPublication {
+    frame_lanes: usize,
+    audio_codebook_lanes: usize,
+    text_lane_index: usize,
+    max_seq_len: usize,
+    generation_frame_ms: u64,
+    sample_rate_hz: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CsmArtifactDescriptorPublication {
+    model_id: String,
+    csm_repo: String,
+    llama_tokenizer_repo: String,
+    mimi_repo: String,
+    mimi_weight: String,
+    frame_contract: CsmFrameContractPublication,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -198,16 +228,41 @@ fn voice_profiles(fixture: &CsmPythonParityFixture) -> Vec<CsmVoiceProfilePublic
             speaker: prompt.speaker,
             source: "committed_parity_fixture",
             prompt_audio_sha256: prompt.audio_sha256.clone(),
+            mimi_tokens_sha256: fixture
+                .mimi_codebook_prefixes
+                .iter()
+                .find(|prefix| prefix.profile_id == prompt.profile_id)
+                .map(|prefix| prefix.tokens_sha256.clone()),
         })
         .collect()
 }
 
-fn artifact_digests(fixture: &CsmPythonParityFixture) -> CsmArtifactDigestPublication {
+fn artifact_digests(descriptor: &CsmModelArtifactDescriptor) -> CsmArtifactDigestPublication {
     CsmArtifactDigestPublication {
-        csm_config_digest: fixture.model.csm_config_digest.clone(),
-        csm_model_digest: fixture.model.csm_model_digest.clone(),
-        llama_tokenizer_digest: fixture.model.llama_tokenizer_digest.clone(),
-        mimi_weight_digest: fixture.model.mimi_weight_digest.clone(),
+        csm_config_digest: descriptor.digests.csm_config_digest.clone(),
+        csm_model_digest: descriptor.digests.csm_model_digest.clone(),
+        llama_tokenizer_digest: descriptor.digests.llama_tokenizer_digest.clone(),
+        mimi_weight_digest: descriptor.digests.mimi_weight_digest.clone(),
+    }
+}
+
+fn artifact_descriptor(
+    descriptor: &CsmModelArtifactDescriptor,
+) -> CsmArtifactDescriptorPublication {
+    CsmArtifactDescriptorPublication {
+        model_id: descriptor.model_id.clone(),
+        csm_repo: descriptor.csm_repo.clone(),
+        llama_tokenizer_repo: descriptor.llama_tokenizer_repo.clone(),
+        mimi_repo: descriptor.mimi_repo.clone(),
+        mimi_weight: descriptor.mimi_weight.clone(),
+        frame_contract: CsmFrameContractPublication {
+            frame_lanes: descriptor.frame_contract.frame_lanes,
+            audio_codebook_lanes: descriptor.frame_contract.audio_codebook_lanes,
+            text_lane_index: descriptor.frame_contract.text_lane_index,
+            max_seq_len: descriptor.frame_contract.max_seq_len,
+            generation_frame_ms: descriptor.frame_contract.generation_frame_ms,
+            sample_rate_hz: descriptor.frame_contract.sample_rate_hz,
+        },
     }
 }
 
@@ -222,7 +277,8 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         supported_endpoints: vec![CSM_SPEECH_ROUTE_OPENAI, CSM_SPEECH_ROUTE_PSIONIC],
         supported_response_formats: vec![CSM_SPEECH_RESPONSE_FORMAT_WAV],
         voice_profiles: voice_profiles(&state.fixture),
-        artifact_digests: artifact_digests(&state.fixture),
+        artifact_digests: artifact_digests(&state.descriptor),
+        artifact_descriptor: artifact_descriptor(&state.descriptor),
         execution_refusal: pending_execution_refusal(),
     })
 }
@@ -241,7 +297,8 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
             psionic_execution_mode: CSM_SPEECH_EXECUTION_MODE,
             psionic_execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
             psionic_voice_profiles: voice_profiles(&state.fixture),
-            psionic_artifact_digests: artifact_digests(&state.fixture),
+            psionic_artifact_digests: artifact_digests(&state.descriptor),
+            psionic_artifact_descriptor: artifact_descriptor(&state.descriptor),
             psionic_execution_refusal: pending_execution_refusal(),
         }],
     })
@@ -403,22 +460,22 @@ fn insert_csm_execution_headers(
     insert_header(
         headers,
         "x-psionic-artifact-csm-config-digest",
-        state.fixture.model.csm_config_digest.as_str(),
+        state.descriptor.digests.csm_config_digest.as_str(),
     );
     insert_header(
         headers,
         "x-psionic-artifact-csm-model-digest",
-        state.fixture.model.csm_model_digest.as_str(),
+        state.descriptor.digests.csm_model_digest.as_str(),
     );
     insert_header(
         headers,
         "x-psionic-artifact-llama-tokenizer-digest",
-        state.fixture.model.llama_tokenizer_digest.as_str(),
+        state.descriptor.digests.llama_tokenizer_digest.as_str(),
     );
     insert_header(
         headers,
         "x-psionic-artifact-mimi-weight-digest",
-        state.fixture.model.mimi_weight_digest.as_str(),
+        state.descriptor.digests.mimi_weight_digest.as_str(),
     );
 }
 
@@ -640,6 +697,10 @@ mod tests {
         assert_eq!(
             payload["execution_refusal"]["code"],
             serde_json::json!("rust_csm_generation_not_implemented")
+        );
+        assert_eq!(
+            payload["artifact_descriptor"]["frame_contract"]["frame_lanes"],
+            serde_json::json!(33)
         );
         assert!(
             payload["voice_profiles"]

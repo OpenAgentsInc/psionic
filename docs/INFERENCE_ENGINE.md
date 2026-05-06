@@ -43,15 +43,16 @@ into one generic engine claim.
 ## Current Bounded Lanes
 
 - `CSM` has one new speech-generation lane in `partial` status. The current
-  landed surface is a Python-reference parity corpus plus a Rust-only
+  landed surface is a Python-reference parity corpus, a Rust CSM
+  tokenizer/framing/artifact-descriptor frontend, and a Rust-only
   `psionic-csm-speech-server` API/refusal surface. The server does not call
   Python and currently refuses generation with
-  `rust_csm_generation_not_implemented` until the Rust tokenizer, Mimi codec,
-  safetensors, and generation phases land. The canonical doc is
+  `rust_csm_generation_not_implemented` until the Rust Mimi codec, safetensors,
+  and generation phases land. The canonical doc is
   `docs/CSM_AUDIO_RUNTIME.md`; the committed fixture is
   `fixtures/csm/python_reference/csm_python_parity_v1.json`, and
-  `psionic-models` validates it. The Python CSM repo remains a parity source,
-  not production runtime.
+  `psionic-models` validates it and builds the Rust frontend contract from it.
+  The Python CSM repo remains a parity source, not production runtime.
 - Generic OpenAI-compatible GGUF serving may expose different runtime truth per
   loaded model inside the same process. Publication must stay model-specific in
   `/health`, `/v1/models`, and response headers.
