@@ -1,12 +1,12 @@
 # CSM Audio Runtime
 
-Status: partial
+Status: deployed for OpenAgents-operated Lyra production dogfood
 
 This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
 CSM is a contextual speech generator. It is not the Lyra conversation runtime,
 STT engine, LLM, transport, or product authority layer.
 
-The current implementation state is phase 7:
+The current implementation state is phase 8:
 
 - Psionic has a committed Python-reference parity corpus at
   `fixtures/csm/python_reference/csm_python_parity_v1.json`.
@@ -39,8 +39,9 @@ The current implementation state is phase 7:
   committed source prompt `conversational_a`, is admitted for
   OpenAgents-operated Lyra production dogfood, and is not a public
   voice-cloning or arbitrary reference-audio consent grant.
-- `psionic-serve` exposes a Rust-only CSM speech API surface through
-  `psionic-csm-speech-server`.
+- `psionic-serve` exposes a Rust-only CSM speech API surface, and the focused
+  `psionic-csm-speech` crate builds the production Cloud Run binary without
+  compiling unrelated serving surfaces or platform-specific Metal code.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
   `POST /psionic/csm/speech`.
 - On hosts with the gated artifacts in the local Hugging Face cache, the server
@@ -82,7 +83,7 @@ full model weights, or full codebook tensors.
 Start the current Rust CSM speech server with:
 
 ```bash
-cargo run -p psionic-serve --bin psionic-csm-speech-server -- --host 127.0.0.1 --port 8081
+cargo run -p psionic-csm-speech --bin psionic-csm-speech-server -- --host 127.0.0.1 --port 8081
 ```
 
 Useful environment controls:
@@ -198,6 +199,10 @@ Default deployment settings:
 - project: `openagents-lyra`
 - region: `us-central1`
 - service: `psionic-csm-speech`
+- current ready revision: `psionic-csm-speech-00001-jtd`
+- current image tag: `1bd449c4`
+- current public service URL:
+  `https://psionic-csm-speech-ycgawzh3ta-uc.a.run.app`
 - image:
   `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:<git-sha>`
 - service account:
@@ -226,6 +231,24 @@ No Hugging Face token, provider key, Python virtualenv, Python CSM repo, or raw
 prompt audio is uploaded by this deploy path. The script finishes only after
 `/health` reports `runtime.state=ready` and a production
 `POST /v1/audio/speech` smoke returns a non-empty WAV.
+
+2026-05-06 production deployment evidence:
+
+- build id: `cbd3ec86-0a68-4f1d-b254-00882eb9f9b2`
+- revision: `psionic-csm-speech-00001-jtd`
+- image digest:
+  `sha256:d17850fab527252cefa26f48a4a46ffd10855a89bd578094c17cbf46e8c55c3c`
+- `/health`: `status=ok`, `runtime.state=ready`, `residency=warm_cpu`,
+  `execution_engine=rust_candle_csm_cpu`, `load_latency_ms=146371`,
+  `accelerated_backend=unavailable_fail_closed`
+- speech smoke: `POST /v1/audio/speech` returned `audio/wav`, 7724 bytes,
+  160 ms output, 2 generated CSM frames, `full_generation_latency_ms=5128`,
+  governed voice profile `lyra/default_female_v1`, and watermarking posture
+  `unsupported_operator_accepted_limited_dogfood`
+- downstream Lyra production smoke: `lyra-control-00030-zmd` called this
+  service through `LYRA_TTS_PROVIDER=psionic`; public one-shot and `/audio`
+  smokes returned `audio/wav` assistant audio through
+  `https://lyra.openagents.com`.
 
 ## Voice Profile Governance
 
@@ -415,6 +438,12 @@ Run the served API/refusal tests with:
 
 ```bash
 cargo test -p psionic-serve csm_
+```
+
+Run the focused production-server crate tests with:
+
+```bash
+cargo test -p psionic-csm-speech csm_
 ```
 
 The validator checks:
