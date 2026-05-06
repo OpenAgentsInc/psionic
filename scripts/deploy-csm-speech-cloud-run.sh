@@ -236,7 +236,7 @@ build_image() {
 FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY . .
-RUN cargo build --release -p psionic-serve --bin psionic-csm-speech-server
+RUN cargo build --release -p psionic-csm-speech --bin psionic-csm-speech-server
 
 FROM debian:bookworm-slim
 RUN apt-get update \

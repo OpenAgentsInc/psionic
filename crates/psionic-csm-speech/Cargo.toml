@@ -1,0 +1,32 @@
+[package]
+name = "psionic-csm-speech"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Narrow CSM speech serving surface for Lyra production"
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = "0.8"
+candle-transformers = "0.9.2"
+futures-util = "0.3"
+hyper = "1"
+hyper-util = { version = "0.1", features = ["server", "service", "tokio", "http1", "http2"] }
+moshi = "0.6.4"
+psionic-observe = { path = "../psionic-observe" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokenizers = { version = "0.23.1", default-features = false, features = ["onig"] }
+tower = "0.5"
+tower-service = "0.3"
+
+[dev-dependencies]
+reqwest = { workspace = true }
+tempfile = "3"

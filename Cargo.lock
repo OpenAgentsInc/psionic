@@ -4559,6 +4559,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "psionic-csm-speech"
+version = "0.1.1"
+dependencies = [
+ "axum",
+ "candle-transformers",
+ "futures-util",
+ "hyper",
+ "hyper-util",
+ "moshi",
+ "psionic-observe",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokenizers",
+ "tokio",
+ "tower",
+ "tower-service",
+]
+
+[[package]]
 name = "psionic-data"
 version = "0.1.1"
 dependencies = [
