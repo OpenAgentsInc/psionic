@@ -414,7 +414,7 @@ pub fn execute_psionic_train_validator_replay(
         .join("windows")
         .join(contribution_receipt.window_id.as_str())
         .join("validators")
-        .join(challenge_id);
+        .join(validator_challenge_dir_name(challenge_id));
     fs::create_dir_all(&validator_root).map_err(|error| {
         PsionicTrainValidatorReplayError::Write {
             path: validator_root.display().to_string(),
@@ -1237,8 +1237,7 @@ fn materialize_validator_artifact_binding(
                 Err(error) => last_validation_error = Some(error),
             }
         }
-        if let Some(rebased_path) =
-            rebase_validator_artifact_path(desired_path.as_path(), run_root)
+        if let Some(rebased_path) = rebase_validator_artifact_path(desired_path.as_path(), run_root)
         {
             let rebased_display = rebased_path.display().to_string();
             if !attempted_paths.contains(&rebased_display) {
@@ -1395,7 +1394,10 @@ fn validator_local_checkpoint_artifact_candidates(
             );
             push_optional_validator_candidate(
                 &mut candidates,
-                surface.artifacts.grouped_stage_recovery_receipt_path.as_deref(),
+                surface
+                    .artifacts
+                    .grouped_stage_recovery_receipt_path
+                    .as_deref(),
             );
         }
         if field.contains("checkpoint_handoff_receipt")
@@ -1403,7 +1405,10 @@ fn validator_local_checkpoint_artifact_candidates(
         {
             push_optional_validator_candidate(
                 &mut candidates,
-                surface.artifacts.peer_checkpoint_handoff_receipt_path.as_deref(),
+                surface
+                    .artifacts
+                    .peer_checkpoint_handoff_receipt_path
+                    .as_deref(),
             );
         }
         if field.contains("checkpoint_failure_drill")
@@ -1769,6 +1774,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", digest.finalize())
 }
 
+fn validator_challenge_dir_name(challenge_id: &str) -> String {
+    let digest = sha256_hex(challenge_id.as_bytes());
+    format!("challenge-{}", &digest[..32])
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -1780,10 +1790,10 @@ mod tests {
     use super::{
         build_validator_quality_drift_signal, build_validator_rollback_signal,
         classify_validator_result, execute_psionic_train_validator_replay,
-        materialize_validator_artifact_binding, stable_digest, PsionicTrainValidatorHook,
-        PsionicTrainValidatorQualityDriftState, PsionicTrainValidatorReplayReasonCode,
-        PsionicTrainValidatorRollbackPosture, PsionicTrainValidatorScoreReceipt,
-        TrainingExecutionValidatorDisposition,
+        materialize_validator_artifact_binding, stable_digest, validator_challenge_dir_name,
+        PsionicTrainValidatorHook, PsionicTrainValidatorQualityDriftState,
+        PsionicTrainValidatorReplayReasonCode, PsionicTrainValidatorRollbackPosture,
+        PsionicTrainValidatorScoreReceipt, TrainingExecutionValidatorDisposition,
         PSIONIC_TRAIN_VALIDATOR_SCORE_RECEIPT_SCHEMA_VERSION,
     };
     use crate::{
@@ -2131,6 +2141,26 @@ mod tests {
     }
 
     #[test]
+    fn validator_challenge_dir_name_bounds_long_sample_challenge_ids() {
+        let challenge_id = format!(
+            "challenge.training.{}.window.{}.sample.{}.a1",
+            "run.cs336.a1.audit_twentyk_refresh_20260508161709_20260508161710_f23e539b_0001.20260508161710.e3b22028",
+            "window.cs336.a1.audit_twentyk_refresh_20260508161709_20260508161710_f23e539b_0001.20260508161710.e3b22028.0001",
+            "assign-cdea3f71864649df8f546340"
+        );
+
+        let dir_name = validator_challenge_dir_name(challenge_id.as_str());
+
+        assert!(dir_name.starts_with("challenge-"));
+        assert_eq!(dir_name.len(), "challenge-".len() + 32);
+        assert!(dir_name.len() < 255);
+        assert_eq!(
+            dir_name,
+            validator_challenge_dir_name(challenge_id.as_str())
+        );
+    }
+
+    #[test]
     fn clean_accepted_checkpoint_is_accepted() {
         let receipt = succeeded_contribution();
         let surface =
@@ -2453,8 +2483,7 @@ mod tests {
 
     #[test]
     fn validator_replay_rebases_stale_absolute_paths_into_local_run_root() {
-        let run_root =
-            temp_root("run.cs336.a1.validator-replay-rebases-stale-absolute-paths");
+        let run_root = temp_root("run.cs336.a1.validator-replay-rebases-stale-absolute-paths");
         let rebased_path = run_root.join(
             "windows/window-0001/contributions/contribution-0001/retained_artifacts/current_status/current_run_status.json",
         );
@@ -2464,12 +2493,13 @@ mod tests {
                 .expect("rebased artifact parent should exist"),
         )
         .expect("rebased artifact parent should create");
-        fs::write(&rebased_path, br#"{"status":"ok"}"#)
-            .expect("rebased artifact should write");
+        fs::write(&rebased_path, br#"{"status":"ok"}"#).expect("rebased artifact should write");
 
-        let mut binding =
-            build_psionic_train_artifact_binding_from_path("current_status", rebased_path.as_path())
-                .expect("current status binding should build");
+        let mut binding = build_psionic_train_artifact_binding_from_path(
+            "current_status",
+            rebased_path.as_path(),
+        )
+        .expect("current status binding should build");
         let stale_path = format!(
             "/Users/sasquatchorwell/.openagents/pylon/training/runs/{}/windows/window-0001/contributions/contribution-0001/retained_artifacts/current_status/current_run_status.json",
             run_root
