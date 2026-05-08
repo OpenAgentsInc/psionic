@@ -15,6 +15,13 @@ consume. Upstream systems such as `llama.cpp`, `vLLM`, `SGLang`, MLX, and
 other reference repos are inputs for specific layers or hardware classes, not
 the identity of the shipped Psionic stack.
 
+Blueprint boundary: Psionic can execute model calls, optimizer jobs, evals,
+training work, and runtime experiments for higher-level systems. It does not
+own Autopilot business program authority. Blueprint owns Program Types, Module
+Versions, Program Runs, Optimizer Runs, RLM execution-strategy policy,
+promotion gates, Action Submissions, evidence, and receipts for Autopilot CRM,
+CEO, Voice, Memory, legal, and source-system workflows.
+
 The training side now also carries one bounded `gemma4:e4b` CUDA adapter-SFT
 trainer above the shared adapter substrate: LM-head-only final-hidden-state
 supervision, frozen-base semantics, typed export, exact checkpoint resume,
@@ -38,6 +45,8 @@ promotion decision that refuses held-out regressions or failed operator review.
 - Inference mesh ownership: [docs/INFERENCE_MESH_OWNERSHIP.md](docs/INFERENCE_MESH_OWNERSHIP.md)
 - Mesh lane service mode: [docs/MESH_LANE_SERVICE_MODE.md](docs/MESH_LANE_SERVICE_MODE.md)
 - Optimizer substrate: [docs/OPTIMIZER_SUBSTRATE.md](docs/OPTIMIZER_SUBSTRATE.md)
+- Blueprint program integration boundary: Blueprint owns business-facing
+  Program records; Psionic supplies execution and optimization evidence.
 - Forge-facing eval pack publication: [docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md](docs/PSION_FORGE_EVAL_PACK_MANIFESTS.md)
 - Hermes user guide: [docs/hermes/README.md](docs/hermes/README.md)
 - Training system: [docs/TRAIN_SYSTEM.md](docs/TRAIN_SYSTEM.md)

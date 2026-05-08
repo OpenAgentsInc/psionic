@@ -12,6 +12,12 @@ This eval surface keeps those module families independent so GEPA, validator
 gates, and later XTRAIN jobs can improve bounded behavior instead of rewarding
 tool emission or general agent noise.
 
+For Autopilot business behavior, Blueprint is the canonical program catalog.
+These compiled-agent evals can inform Blueprint Module Versions or Optimizer
+Runs, but they do not by themselves authorize CRM, CEO, Voice, Memory, legal,
+source-system, or approval behavior. Blueprint owns Program Types, Program
+Runs, promotion gates, evidence, and receipts for that layer.
+
 ## Canonical Report
 
 The committed report lives at:

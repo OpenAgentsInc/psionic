@@ -8,6 +8,12 @@ This document records the first Psionic artifact that carries one pretraining
 program across dense ranks, contributor windows, validators, checkpoint
 writers, eval workers, and data builders under one shared run id.
 
+Terminology note: "program" in this document means a Psionic training or
+execution program. It is not the same as a Blueprint Program Type or Program
+Run. When Psionic work supports Autopilot, Blueprint remains the business
+program authority and should reference Psionic run graphs as execution
+evidence.
+
 ## What Landed
 
 The issue added `crates/psionic-train/src/cross_provider_program_run_graph.rs`
