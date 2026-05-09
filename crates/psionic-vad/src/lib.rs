@@ -5,8 +5,21 @@
 //! rather than embedding Silero, Candle, ONNX, or browser-side VAD logic as its
 //! product path.
 
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::Path,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
+use axum::{
+    Json, Router,
+    extract::State,
+    http::StatusCode,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -721,6 +734,107 @@ pub struct VadWorkerHealth {
     pub config_digest: String,
 }
 
+/// HTTP worker service config.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VadServiceConfig {
+    /// Host/IP to bind.
+    pub host: String,
+    /// Port to bind.
+    pub port: u16,
+    /// Maximum accepted input samples in one chunk request.
+    pub max_chunk_samples: usize,
+}
+
+impl Default for VadServiceConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 8082,
+            max_chunk_samples: 48_000 * 5,
+        }
+    }
+}
+
+impl VadServiceConfig {
+    /// Builds config from env.
+    #[must_use]
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+        if let Ok(host) = std::env::var("PSIONIC_VAD_HOST") {
+            config.host = host;
+        }
+        if let Ok(port) = std::env::var("PSIONIC_VAD_PORT")
+            && let Ok(port) = port.parse()
+        {
+            config.port = port;
+        }
+        if let Ok(max_chunk_samples) = std::env::var("PSIONIC_VAD_MAX_CHUNK_SAMPLES")
+            && let Ok(max_chunk_samples) = max_chunk_samples.parse()
+        {
+            config.max_chunk_samples = max_chunk_samples;
+        }
+        config
+    }
+
+    /// Socket address.
+    pub fn socket_addr(&self) -> Result<SocketAddr, VadError> {
+        let ip: IpAddr = self.host.parse().map_err(|_| VadError::InvalidRequest {
+            reason: "invalid host",
+        })?;
+        Ok(SocketAddr::new(ip, self.port))
+    }
+}
+
+/// HTTP service health response.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadServiceHealth {
+    /// Service name.
+    pub service: String,
+    /// Status.
+    pub status: String,
+    /// Worker health.
+    pub worker: VadWorkerHealth,
+    /// Maximum accepted chunk samples.
+    pub max_chunk_samples: usize,
+    /// Runtime dependencies.
+    pub runtime_dependencies: Vec<String>,
+}
+
+/// Flush request.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VadFlushRequest {
+    /// Session id.
+    pub session_id: String,
+    /// Caller-provided chunk index for the terminal response.
+    pub chunk_index: u64,
+}
+
+/// Error shape returned by the HTTP API.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VadApiError {
+    /// Stable code.
+    pub code: String,
+    /// Human-readable message.
+    pub message: String,
+    /// Whether caller may retry.
+    pub recoverable: bool,
+}
+
+/// One API wrapper with elapsed service latency.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadApiResponse<T> {
+    /// Wrapped response.
+    pub data: T,
+    /// Service latency in milliseconds.
+    pub service_latency_ms: u128,
+}
+
+#[derive(Clone)]
+struct VadServiceState {
+    worker: Arc<Mutex<PsionicVadWorker>>,
+    config: VadServiceConfig,
+}
+
 /// State returned for one chunk.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VadChunkResponse {
@@ -828,6 +942,27 @@ pub enum VadError {
         /// Refusal reason.
         reason: &'static str,
     },
+}
+
+impl VadError {
+    fn api_code(&self) -> &'static str {
+        match self {
+            Self::UnsupportedInferenceSampleRate { .. } => "unsupported_inference_sample_rate",
+            Self::UnsupportedInputSampleRate { .. } => "unsupported_input_sample_rate",
+            Self::InvalidConfig { .. } => "invalid_config",
+            Self::InvalidRequest { .. } => "invalid_request",
+            Self::UnknownSession { .. } => "unknown_session",
+            Self::BufferLimit { .. } => "buffer_limit",
+            Self::ArtifactManifest { .. } => "artifact_manifest",
+        }
+    }
+
+    fn recoverable(&self) -> bool {
+        matches!(
+            self,
+            Self::UnknownSession { .. } | Self::BufferLimit { .. } | Self::InvalidRequest { .. }
+        )
+    }
 }
 
 /// Psionic-owned VAD worker.
@@ -956,6 +1091,133 @@ impl PsionicVadWorker {
             final_chunk: true,
         })
     }
+}
+
+/// Builds the Psionic VAD HTTP router.
+pub fn vad_router(config: VadServiceConfig) -> Result<Router, VadError> {
+    let worker = PsionicVadWorker::default_worker()?;
+    Ok(vad_router_with_worker(config, worker))
+}
+
+/// Builds the Psionic VAD HTTP router with an explicit worker.
+#[must_use]
+pub fn vad_router_with_worker(config: VadServiceConfig, worker: PsionicVadWorker) -> Router {
+    let state = VadServiceState {
+        worker: Arc::new(Mutex::new(worker)),
+        config,
+    };
+    Router::new()
+        .route("/health", get(health_handler))
+        .route("/ready", get(health_handler))
+        .route("/v1/vad/session", post(start_session_handler))
+        .route("/v1/vad/chunk", post(chunk_handler))
+        .route("/v1/vad/flush", post(flush_handler))
+        .with_state(state)
+}
+
+async fn health_handler(
+    State(state): State<VadServiceState>,
+) -> Result<Json<VadApiResponse<VadServiceHealth>>, (StatusCode, Json<VadApiError>)> {
+    let started = Instant::now();
+    let worker = lock_worker(&state)?;
+    let health = VadServiceHealth {
+        service: "psionic-vad-worker".to_string(),
+        status: "ready".to_string(),
+        worker: worker.health(),
+        max_chunk_samples: state.config.max_chunk_samples,
+        runtime_dependencies: vec!["psionic-vad".to_string()],
+    };
+    Ok(Json(VadApiResponse {
+        data: health,
+        service_latency_ms: started.elapsed().as_millis(),
+    }))
+}
+
+async fn start_session_handler(
+    State(state): State<VadServiceState>,
+    Json(request): Json<VadSessionConfig>,
+) -> Result<Json<VadApiResponse<VadWorkerHealth>>, (StatusCode, Json<VadApiError>)> {
+    let started = Instant::now();
+    let mut worker = lock_worker(&state)?;
+    let health = worker.start_session(request).map_err(api_error)?;
+    Ok(Json(VadApiResponse {
+        data: health,
+        service_latency_ms: started.elapsed().as_millis(),
+    }))
+}
+
+async fn chunk_handler(
+    State(state): State<VadServiceState>,
+    Json(request): Json<VadChunkRequest>,
+) -> Result<Json<VadApiResponse<VadChunkResponse>>, (StatusCode, Json<VadApiError>)> {
+    let started = Instant::now();
+    if request.pcm_s16le.len() > state.config.max_chunk_samples {
+        return Err(api_error(VadError::InvalidRequest {
+            reason: "chunk exceeds max_chunk_samples",
+        }));
+    }
+    let mut worker = lock_worker(&state)?;
+    let response = worker.infer_chunk(request).map_err(api_error)?;
+    Ok(Json(VadApiResponse {
+        data: response,
+        service_latency_ms: started.elapsed().as_millis(),
+    }))
+}
+
+async fn flush_handler(
+    State(state): State<VadServiceState>,
+    Json(request): Json<VadFlushRequest>,
+) -> Result<Json<VadApiResponse<VadChunkResponse>>, (StatusCode, Json<VadApiError>)> {
+    let started = Instant::now();
+    let mut worker = lock_worker(&state)?;
+    let response = worker
+        .flush_session(request.session_id.as_str(), request.chunk_index)
+        .map_err(api_error)?;
+    Ok(Json(VadApiResponse {
+        data: response,
+        service_latency_ms: started.elapsed().as_millis(),
+    }))
+}
+
+fn lock_worker(
+    state: &VadServiceState,
+) -> Result<std::sync::MutexGuard<'_, PsionicVadWorker>, (StatusCode, Json<VadApiError>)> {
+    state.worker.lock().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(VadApiError {
+                code: "worker_lock_poisoned".to_string(),
+                message: "VAD worker lock is poisoned".to_string(),
+                recoverable: false,
+            }),
+        )
+    })
+}
+
+fn api_error(error: VadError) -> (StatusCode, Json<VadApiError>) {
+    let status = match error {
+        VadError::UnknownSession { .. } => StatusCode::NOT_FOUND,
+        VadError::InvalidRequest { .. }
+        | VadError::UnsupportedInputSampleRate { .. }
+        | VadError::UnsupportedInferenceSampleRate { .. }
+        | VadError::InvalidConfig { .. }
+        | VadError::BufferLimit { .. }
+        | VadError::ArtifactManifest { .. } => StatusCode::BAD_REQUEST,
+    };
+    (
+        status,
+        Json(VadApiError {
+            code: error.api_code().to_string(),
+            message: error.to_string(),
+            recoverable: error.recoverable(),
+        }),
+    )
+}
+
+/// Default service address used by the local binary.
+#[must_use]
+pub fn default_vad_socket_addr() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8082)
 }
 
 #[derive(Debug)]

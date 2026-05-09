@@ -100,6 +100,7 @@ Run:
 cargo test -p psionic-vad
 cargo run -p psionic-vad --example psionic_vad_fixture_smoke
 cargo run -p psionic-vad --example psionic_vad_benchmark
+cargo run -p psionic-vad --bin psionic-vad-worker -- --host 127.0.0.1 --port 8082
 ```
 
 The smoke uses a synthetic fixture and prints machine-readable response frames.
@@ -129,6 +130,48 @@ The default MVP gate requires every retained fixture case to match its expected
 outcome. Future corpus additions should cover real redacted replay artifacts,
 name/entity stress, accented speech, noisy laptop microphones, pauses,
 corrections, and Autopilot business-outcome replay.
+
+## Service Surface
+
+The local service binary is:
+
+```bash
+cargo run -p psionic-vad --bin psionic-vad-worker -- --host 127.0.0.1 --port 8082
+```
+
+Environment controls:
+
+- `PSIONIC_VAD_HOST`, default `127.0.0.1`
+- `PSIONIC_VAD_PORT`, default `8082`
+- `PSIONIC_VAD_MAX_CHUNK_SAMPLES`, default `240000`
+
+Endpoints:
+
+- `GET /health`
+- `GET /ready`
+- `POST /v1/vad/session`
+- `POST /v1/vad/chunk`
+- `POST /v1/vad/flush`
+
+`/health` and `/ready` return service status, worker health, artifact id,
+execution engine, active session count, config digest, runtime dependencies,
+and request limit posture.
+
+`POST /v1/vad/session` accepts a `VadSessionConfig`.
+
+`POST /v1/vad/chunk` accepts a `VadChunkRequest` and returns a
+`VadChunkResponse` wrapped with service latency. Requests fail closed when the
+chunk exceeds `max_chunk_samples`, sample rate is unsupported, channels are
+invalid, or the session buffer limit is exceeded.
+
+`POST /v1/vad/flush` accepts a `VadFlushRequest` and finalizes session state
+for the current turn.
+
+The service currently uses one in-process worker protected by a mutex. That is
+sufficient for local shadow-mode integration and fixture smokes. A future
+deployment pass should add explicit worker-pool concurrency limits, queue-depth
+metrics, and production deployment manifests once Autopilot starts calling this
+service continuously.
 
 ## Next Steps
 
