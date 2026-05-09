@@ -99,10 +99,36 @@ Run:
 ```bash
 cargo test -p psionic-vad
 cargo run -p psionic-vad --example psionic_vad_fixture_smoke
+cargo run -p psionic-vad --example psionic_vad_benchmark
 ```
 
 The smoke uses a synthetic fixture and prints machine-readable response frames.
 It does not require private audio or provider credentials.
+
+## Corpus And Benchmark Gate
+
+The current retained corpus is:
+
+- `fixtures/vad/corpus/psionic_vad_fixture_corpus.v1.json`
+
+The corpus stores descriptors, not raw private audio. Each case defines sample
+rate, synthetic segments, and an expected `speech` or `no_speech` outcome. The
+benchmark runner generates audio deterministically, runs the Psionic VAD
+worker, and emits:
+
+- per-case generated audio digest;
+- processed frame count;
+- max smoothed speech probability;
+- first start/end sample;
+- endpoint reason;
+- expected versus detected outcome;
+- summary false-positive and false-negative counts;
+- default promotion-gate verdict.
+
+The default MVP gate requires every retained fixture case to match its expected
+outcome. Future corpus additions should cover real redacted replay artifacts,
+name/entity stress, accented speech, noisy laptop microphones, pauses,
+corrections, and Autopilot business-outcome replay.
 
 ## Next Steps
 

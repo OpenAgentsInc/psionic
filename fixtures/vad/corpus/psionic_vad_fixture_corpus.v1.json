@@ -1,0 +1,133 @@
+{
+  "corpus_id": "psionic_vad_fixture_corpus",
+  "version": "v1",
+  "policy": "Synthetic descriptor corpus only. No private raw audio is retained.",
+  "cases": [
+    {
+      "case_id": "silence_900ms",
+      "description": "Digital silence should never create an accepted speech endpoint.",
+      "input_sample_rate_hz": 48000,
+      "segments": [
+        {
+          "kind": "silence",
+          "duration_ms": 900
+        }
+      ],
+      "expected": "no_speech"
+    },
+    {
+      "case_id": "short_tone_40ms",
+      "description": "Very short voiced burst below min speech duration should remain no-speech.",
+      "input_sample_rate_hz": 48000,
+      "segments": [
+        {
+          "kind": "silence",
+          "duration_ms": 120
+        },
+        {
+          "kind": "tone",
+          "duration_ms": 40,
+          "frequency_hz": 190.0,
+          "amplitude": 11000
+        },
+        {
+          "kind": "silence",
+          "duration_ms": 260
+        }
+      ],
+      "expected": "no_speech"
+    },
+    {
+      "case_id": "speech_520ms",
+      "description": "Normal half-second voiced segment should endpoint as speech.",
+      "input_sample_rate_hz": 48000,
+      "segments": [
+        {
+          "kind": "silence",
+          "duration_ms": 120
+        },
+        {
+          "kind": "tone",
+          "duration_ms": 520,
+          "frequency_hz": 180.0,
+          "amplitude": 12000
+        },
+        {
+          "kind": "silence",
+          "duration_ms": 320
+        }
+      ],
+      "expected": "speech"
+    },
+    {
+      "case_id": "speech_pause_speech",
+      "description": "Two voiced clauses with a short hesitation should still produce speech.",
+      "input_sample_rate_hz": 48000,
+      "segments": [
+        {
+          "kind": "silence",
+          "duration_ms": 100
+        },
+        {
+          "kind": "tone",
+          "duration_ms": 300,
+          "frequency_hz": 210.0,
+          "amplitude": 10000
+        },
+        {
+          "kind": "silence",
+          "duration_ms": 70
+        },
+        {
+          "kind": "tone",
+          "duration_ms": 320,
+          "frequency_hz": 170.0,
+          "amplitude": 10500
+        },
+        {
+          "kind": "silence",
+          "duration_ms": 300
+        }
+      ],
+      "expected": "speech"
+    },
+    {
+      "case_id": "low_noise_800ms",
+      "description": "Low-amplitude laptop/background noise should remain no-speech.",
+      "input_sample_rate_hz": 48000,
+      "segments": [
+        {
+          "kind": "noise",
+          "duration_ms": 800,
+          "amplitude": 250,
+          "seed": 1007
+        }
+      ],
+      "expected": "no_speech"
+    },
+    {
+      "case_id": "noisy_speech_640ms",
+      "description": "Voiced segment after background noise should still endpoint as speech.",
+      "input_sample_rate_hz": 48000,
+      "segments": [
+        {
+          "kind": "noise",
+          "duration_ms": 160,
+          "amplitude": 700,
+          "seed": 2026
+        },
+        {
+          "kind": "tone",
+          "duration_ms": 640,
+          "frequency_hz": 165.0,
+          "amplitude": 9000
+        },
+        {
+          "kind": "silence",
+          "duration_ms": 320
+        }
+      ],
+      "expected": "speech"
+    }
+  ]
+}

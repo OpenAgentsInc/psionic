@@ -311,6 +311,338 @@ pub fn load_model_artifact_manifest(
     })
 }
 
+/// Synthetic VAD benchmark corpus.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadBenchmarkCorpus {
+    /// Corpus id.
+    pub corpus_id: String,
+    /// Corpus version.
+    pub version: String,
+    /// Corpus policy note.
+    pub policy: String,
+    /// Cases in this corpus.
+    pub cases: Vec<VadBenchmarkCase>,
+}
+
+/// One synthetic benchmark case.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadBenchmarkCase {
+    /// Case id.
+    pub case_id: String,
+    /// Case description.
+    pub description: String,
+    /// Input sample rate.
+    pub input_sample_rate_hz: u32,
+    /// Segments used to generate deterministic audio.
+    pub segments: Vec<VadSyntheticSegment>,
+    /// Expected outcome.
+    pub expected: VadExpectedOutcome,
+}
+
+/// One synthetic audio segment.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum VadSyntheticSegment {
+    /// Digital silence.
+    Silence {
+        /// Duration in milliseconds.
+        duration_ms: u32,
+    },
+    /// Sine tone used as deterministic voiced speech proxy.
+    Tone {
+        /// Duration in milliseconds.
+        duration_ms: u32,
+        /// Frequency in Hz.
+        frequency_hz: f32,
+        /// Peak amplitude in i16 scale.
+        amplitude: i16,
+    },
+    /// Deterministic low-amplitude noise.
+    Noise {
+        /// Duration in milliseconds.
+        duration_ms: u32,
+        /// Peak amplitude in i16 scale.
+        amplitude: i16,
+        /// Seed for deterministic noise.
+        seed: u64,
+    },
+}
+
+/// Expected benchmark outcome.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VadExpectedOutcome {
+    /// Should detect accepted speech end.
+    Speech,
+    /// Should end as no speech.
+    NoSpeech,
+}
+
+/// Benchmark report.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadBenchmarkReport {
+    /// Corpus id.
+    pub corpus_id: String,
+    /// Corpus version.
+    pub version: String,
+    /// Worker execution engine.
+    pub execution_engine: String,
+    /// Model artifact id.
+    pub model_artifact_id: String,
+    /// Per-case results.
+    pub cases: Vec<VadBenchmarkCaseResult>,
+    /// Summary.
+    pub summary: VadBenchmarkSummary,
+}
+
+/// Per-case benchmark result.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadBenchmarkCaseResult {
+    /// Case id.
+    pub case_id: String,
+    /// Expected outcome.
+    pub expected: VadExpectedOutcome,
+    /// Detected outcome.
+    pub detected: VadExpectedOutcome,
+    /// Whether detected outcome matched expected outcome.
+    pub outcome_match: bool,
+    /// Number of frames processed.
+    pub processed_frames: usize,
+    /// Highest smoothed speech probability observed.
+    pub max_smoothed_probability: f32,
+    /// First speech start sample.
+    pub first_start_sample: Option<u64>,
+    /// First speech end sample.
+    pub first_end_sample: Option<u64>,
+    /// Endpoint reason.
+    pub endpoint_reason: Option<String>,
+    /// Deterministic audio digest.
+    pub generated_audio_digest: String,
+}
+
+/// Benchmark summary.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VadBenchmarkSummary {
+    /// Total case count.
+    pub total_cases: usize,
+    /// Matched case count.
+    pub matched_cases: usize,
+    /// Speech false negative count.
+    pub false_negative_speech: usize,
+    /// No-speech false positive count.
+    pub false_positive_speech: usize,
+    /// Whether this report passes the default promotion gate.
+    pub default_gate_passed: bool,
+}
+
+/// Loads one benchmark corpus from JSON.
+pub fn load_benchmark_corpus(path: impl AsRef<Path>) -> Result<VadBenchmarkCorpus, VadError> {
+    let bytes = fs::read(path).map_err(|_| VadError::InvalidRequest {
+        reason: "benchmark corpus could not be read",
+    })?;
+    serde_json::from_slice(bytes.as_slice()).map_err(|_| VadError::InvalidRequest {
+        reason: "benchmark corpus could not be parsed",
+    })
+}
+
+/// Runs one benchmark corpus.
+pub fn run_benchmark_corpus(corpus: &VadBenchmarkCorpus) -> Result<VadBenchmarkReport, VadError> {
+    let config = VadWorkerConfig::default();
+    let mut results = Vec::new();
+    for case in &corpus.cases {
+        results.push(run_benchmark_case(&config, case)?);
+    }
+    let matched_cases = results.iter().filter(|result| result.outcome_match).count();
+    let false_negative_speech = results
+        .iter()
+        .filter(|result| {
+            result.expected == VadExpectedOutcome::Speech
+                && result.detected == VadExpectedOutcome::NoSpeech
+        })
+        .count();
+    let false_positive_speech = results
+        .iter()
+        .filter(|result| {
+            result.expected == VadExpectedOutcome::NoSpeech
+                && result.detected == VadExpectedOutcome::Speech
+        })
+        .count();
+    Ok(VadBenchmarkReport {
+        corpus_id: corpus.corpus_id.clone(),
+        version: corpus.version.clone(),
+        execution_engine: config.execution_engine.clone(),
+        model_artifact_id: config.model_artifact_id.clone(),
+        summary: VadBenchmarkSummary {
+            total_cases: results.len(),
+            matched_cases,
+            false_negative_speech,
+            false_positive_speech,
+            default_gate_passed: matched_cases == results.len(),
+        },
+        cases: results,
+    })
+}
+
+fn run_benchmark_case(
+    config: &VadWorkerConfig,
+    case: &VadBenchmarkCase,
+) -> Result<VadBenchmarkCaseResult, VadError> {
+    let samples = generate_case_audio(case)?;
+    let generated_audio_digest = digest_pcm(case.input_sample_rate_hz, samples.as_slice());
+    let mut worker = PsionicVadWorker::new(config.clone())?;
+    worker.start_session(VadSessionConfig::mono(
+        case.case_id.clone(),
+        case.input_sample_rate_hz,
+    ))?;
+    let chunk_size = ((case.input_sample_rate_hz as usize * 20) / 1000).max(1);
+    let mut max_smoothed_probability = 0.0_f32;
+    let mut processed_frames = 0_usize;
+    let mut first_start_sample = None;
+    let mut first_end_sample = None;
+    let mut endpoint_reason = None;
+    for (chunk_index, chunk) in samples.chunks(chunk_size).enumerate() {
+        let response = worker.infer_chunk(VadChunkRequest::mono(
+            case.case_id.clone(),
+            chunk_index as u64,
+            case.input_sample_rate_hz,
+            chunk.to_vec(),
+            false,
+        ))?;
+        max_smoothed_probability = max_smoothed_probability.max(response.smoothed_probability);
+        processed_frames += response.processed_frames;
+        capture_endpoint(
+            response.event.as_ref(),
+            &mut first_start_sample,
+            &mut first_end_sample,
+            &mut endpoint_reason,
+        );
+    }
+    let response = worker.flush_session(&case.case_id, (samples.len() / chunk_size) as u64)?;
+    max_smoothed_probability = max_smoothed_probability.max(response.smoothed_probability);
+    processed_frames += response.processed_frames;
+    capture_endpoint(
+        response.event.as_ref(),
+        &mut first_start_sample,
+        &mut first_end_sample,
+        &mut endpoint_reason,
+    );
+    let detected = if first_end_sample.is_some() {
+        VadExpectedOutcome::Speech
+    } else {
+        VadExpectedOutcome::NoSpeech
+    };
+    Ok(VadBenchmarkCaseResult {
+        case_id: case.case_id.clone(),
+        expected: case.expected.clone(),
+        detected: detected.clone(),
+        outcome_match: detected == case.expected,
+        processed_frames,
+        max_smoothed_probability,
+        first_start_sample,
+        first_end_sample,
+        endpoint_reason,
+        generated_audio_digest,
+    })
+}
+
+fn capture_endpoint(
+    event: Option<&VadEndpointEvent>,
+    first_start_sample: &mut Option<u64>,
+    first_end_sample: &mut Option<u64>,
+    endpoint_reason: &mut Option<String>,
+) {
+    match event {
+        Some(VadEndpointEvent::SpeechStart {
+            start_sample,
+            reason,
+        }) => {
+            if first_start_sample.is_none() {
+                *first_start_sample = Some(*start_sample);
+                *endpoint_reason = Some(reason.clone());
+            }
+        }
+        Some(VadEndpointEvent::SpeechEnd {
+            start_sample,
+            end_sample,
+            reason,
+        }) => {
+            if first_start_sample.is_none() {
+                *first_start_sample = Some(*start_sample);
+            }
+            if first_end_sample.is_none() {
+                *first_end_sample = Some(*end_sample);
+                *endpoint_reason = Some(reason.clone());
+            }
+        }
+        Some(VadEndpointEvent::NoSpeech { reason }) => {
+            if endpoint_reason.is_none() {
+                *endpoint_reason = Some(reason.clone());
+            }
+        }
+        None => {}
+    }
+}
+
+fn generate_case_audio(case: &VadBenchmarkCase) -> Result<Vec<i16>, VadError> {
+    validate_input_rate(case.input_sample_rate_hz)?;
+    let mut samples = Vec::new();
+    for segment in &case.segments {
+        match segment {
+            VadSyntheticSegment::Silence { duration_ms } => {
+                samples.extend(vec![
+                    0_i16;
+                    samples_for_duration(
+                        case.input_sample_rate_hz,
+                        *duration_ms
+                    )
+                ]);
+            }
+            VadSyntheticSegment::Tone {
+                duration_ms,
+                frequency_hz,
+                amplitude,
+            } => {
+                let count = samples_for_duration(case.input_sample_rate_hz, *duration_ms);
+                for index in 0..count {
+                    let phase = (index as f32 / case.input_sample_rate_hz as f32)
+                        * 2.0
+                        * std::f32::consts::PI
+                        * *frequency_hz;
+                    samples.push((phase.sin() * f32::from(*amplitude)) as i16);
+                }
+            }
+            VadSyntheticSegment::Noise {
+                duration_ms,
+                amplitude,
+                seed,
+            } => {
+                let count = samples_for_duration(case.input_sample_rate_hz, *duration_ms);
+                let mut state = *seed;
+                for _ in 0..count {
+                    state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    let centered = (((state >> 32) as i32) % 2001) - 1000;
+                    let sample = centered as f32 / 1000.0 * f32::from(*amplitude);
+                    samples.push(sample as i16);
+                }
+            }
+        }
+    }
+    Ok(samples)
+}
+
+fn samples_for_duration(sample_rate_hz: u32, duration_ms: u32) -> usize {
+    ((u64::from(sample_rate_hz) * u64::from(duration_ms)) / 1000) as usize
+}
+
+fn digest_pcm(sample_rate_hz: u32, samples: &[i16]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(sample_rate_hz.to_le_bytes());
+    for sample in samples {
+        hasher.update(sample.to_le_bytes());
+    }
+    format!("sha256:{:x}", hasher.finalize())
+}
+
 /// Per-session controls.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VadSessionConfig {
@@ -1059,5 +1391,21 @@ mod tests {
         assert_eq!(manifest.artifact_id, PSIONIC_VAD_MODEL_ARTIFACT_ID);
         assert!(!manifest.provider_keys_required);
         assert!(!manifest.raw_audio_retention_required);
+    }
+
+    #[test]
+    fn fixture_corpus_passes_default_gate() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/vad/corpus/psionic_vad_fixture_corpus.v1.json");
+        let corpus = match load_benchmark_corpus(path) {
+            Ok(corpus) => corpus,
+            Err(error) => panic!("corpus load failed: {error}"),
+        };
+        let report = match run_benchmark_corpus(&corpus) {
+            Ok(report) => report,
+            Err(error) => panic!("benchmark failed: {error}"),
+        };
+        assert_eq!(report.summary.total_cases, corpus.cases.len());
+        assert!(report.summary.default_gate_passed);
     }
 }
