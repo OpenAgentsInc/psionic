@@ -5,7 +5,7 @@
 //! rather than embedding Silero, Candle, ONNX, or browser-side VAD logic as its
 //! product path.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,6 +19,9 @@ pub const PSIONIC_VAD_EXECUTION_ENGINE: &str = "psionic_silero_style_vad_mvp";
 
 /// Current built-in model artifact id.
 pub const PSIONIC_VAD_MODEL_ARTIFACT_ID: &str = "psionic-vad/silero-style-mvp-v0";
+
+/// Current artifact manifest schema version.
+pub const PSIONIC_VAD_ARTIFACT_SCHEMA_VERSION: &str = "psionic.vad.artifact.v1";
 
 /// Default sample rate used by the Silero reference stream shape.
 pub const DEFAULT_INFERENCE_SAMPLE_RATE_HZ: u32 = 16_000;
@@ -128,6 +131,184 @@ impl VadWorkerConfig {
         }
         Ok(())
     }
+}
+
+/// Model/reference artifact manifest used to validate Psionic VAD startup.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VadModelArtifactManifest {
+    /// Manifest schema version.
+    pub schema_version: String,
+    /// Stable artifact id.
+    pub artifact_id: String,
+    /// Human-readable artifact version.
+    pub artifact_version: String,
+    /// Artifact kind.
+    pub artifact_kind: String,
+    /// Execution engine this artifact admits.
+    pub execution_engine: String,
+    /// License posture.
+    pub license: VadArtifactLicense,
+    /// Source references used to build the artifact.
+    pub source_references: Vec<VadArtifactSourceReference>,
+    /// Inference sample rate.
+    pub inference_sample_rate_hz: u32,
+    /// Frame size.
+    pub frame_size_samples: usize,
+    /// Context size.
+    pub context_size_samples: usize,
+    /// Digest over the admitted runtime parameters.
+    pub parameter_digest: String,
+    /// Whether provider keys are required.
+    pub provider_keys_required: bool,
+    /// Whether private raw audio retention is required.
+    pub raw_audio_retention_required: bool,
+    /// Runtime dependencies exposed to callers.
+    pub runtime_dependencies: Vec<String>,
+    /// Artifact update policy.
+    pub update_policy: String,
+}
+
+impl VadModelArtifactManifest {
+    /// Returns the built-in MVP artifact manifest.
+    #[must_use]
+    pub fn builtin() -> Self {
+        let config = VadWorkerConfig::default();
+        Self {
+            schema_version: PSIONIC_VAD_ARTIFACT_SCHEMA_VERSION.to_string(),
+            artifact_id: PSIONIC_VAD_MODEL_ARTIFACT_ID.to_string(),
+            artifact_version: "v0".to_string(),
+            artifact_kind: "owned_silero_style_signal_vad_mvp".to_string(),
+            execution_engine: PSIONIC_VAD_EXECUTION_ENGINE.to_string(),
+            license: VadArtifactLicense {
+                spdx_expression: "Apache-2.0 AND MIT-reference-notice".to_string(),
+                notice: "Silero VAD reference material is MIT licensed by the Silero Team. Psionic does not vendor the full Silero repository and does not expose Silero, Candle, or ONNX as the Autopilot product runtime.".to_string(),
+                required_attribution: vec![
+                    "Silero VAD reference: Copyright (c) 2020-present Silero Team, MIT License".to_string(),
+                ],
+            },
+            source_references: vec![
+                VadArtifactSourceReference {
+                    name: "silero-vad".to_string(),
+                    reference_type: "architecture_and_threshold_reference".to_string(),
+                    path_or_url: "../competition/repos/silero-vad".to_string(),
+                    license: "MIT".to_string(),
+                    used_for: "VAD threshold, hysteresis, frame cadence, context/state shape, min speech, min silence, and speech padding reference".to_string(),
+                },
+                VadArtifactSourceReference {
+                    name: "candle silero-vad example".to_string(),
+                    reference_type: "stream_state_reference_only".to_string(),
+                    path_or_url: "../competition/repos/candle/candle-examples/examples/silero-vad".to_string(),
+                    license: "Apache-2.0".to_string(),
+                    used_for: "Rust stream-state pattern reference only; not a product runtime dependency".to_string(),
+                },
+            ],
+            inference_sample_rate_hz: config.inference_sample_rate_hz,
+            frame_size_samples: config.frame_size_samples,
+            context_size_samples: config.context_size_samples,
+            parameter_digest: config.digest(),
+            provider_keys_required: false,
+            raw_audio_retention_required: false,
+            runtime_dependencies: vec!["psionic-vad".to_string()],
+            update_policy: "changes require corpus, replay, shadow, fallback, and release gates before Autopilot primary endpointing".to_string(),
+        }
+    }
+
+    /// Stable digest over the manifest itself.
+    #[must_use]
+    pub fn digest(&self) -> String {
+        let encoded = serde_json::to_vec(self).unwrap_or_default();
+        let mut hasher = Sha256::new();
+        hasher.update(encoded);
+        format!("sha256:{:x}", hasher.finalize())
+    }
+
+    /// Validates this manifest against a worker config.
+    pub fn validate_for_config(&self, config: &VadWorkerConfig) -> Result<(), VadError> {
+        if self.schema_version != PSIONIC_VAD_ARTIFACT_SCHEMA_VERSION {
+            return Err(VadError::ArtifactManifest {
+                reason: "unsupported schema version",
+            });
+        }
+        if self.artifact_id != config.model_artifact_id {
+            return Err(VadError::ArtifactManifest {
+                reason: "artifact id does not match worker config",
+            });
+        }
+        if self.execution_engine != config.execution_engine {
+            return Err(VadError::ArtifactManifest {
+                reason: "execution engine does not match worker config",
+            });
+        }
+        if self.inference_sample_rate_hz != config.inference_sample_rate_hz {
+            return Err(VadError::ArtifactManifest {
+                reason: "inference sample rate does not match worker config",
+            });
+        }
+        if self.frame_size_samples != config.frame_size_samples {
+            return Err(VadError::ArtifactManifest {
+                reason: "frame size does not match worker config",
+            });
+        }
+        if self.context_size_samples != config.context_size_samples {
+            return Err(VadError::ArtifactManifest {
+                reason: "context size does not match worker config",
+            });
+        }
+        if self.parameter_digest != config.digest() {
+            return Err(VadError::ArtifactManifest {
+                reason: "parameter digest does not match worker config",
+            });
+        }
+        if self.provider_keys_required {
+            return Err(VadError::ArtifactManifest {
+                reason: "VAD artifacts must not require provider keys",
+            });
+        }
+        if self.raw_audio_retention_required {
+            return Err(VadError::ArtifactManifest {
+                reason: "VAD artifacts must not require raw audio retention",
+            });
+        }
+        Ok(())
+    }
+}
+
+/// License metadata for one VAD artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VadArtifactLicense {
+    /// SPDX expression or bounded internal expression.
+    pub spdx_expression: String,
+    /// Human-readable notice.
+    pub notice: String,
+    /// Required attribution lines.
+    pub required_attribution: Vec<String>,
+}
+
+/// Source reference used by one VAD artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VadArtifactSourceReference {
+    /// Reference name.
+    pub name: String,
+    /// Reference type.
+    pub reference_type: String,
+    /// Local path or URL.
+    pub path_or_url: String,
+    /// Source license.
+    pub license: String,
+    /// What this source was used for.
+    pub used_for: String,
+}
+
+/// Loads one artifact manifest from JSON.
+pub fn load_model_artifact_manifest(
+    path: impl AsRef<Path>,
+) -> Result<VadModelArtifactManifest, VadError> {
+    let bytes = fs::read(path).map_err(|_| VadError::ArtifactManifest {
+        reason: "artifact manifest could not be read",
+    })?;
+    serde_json::from_slice(bytes.as_slice()).map_err(|_| VadError::ArtifactManifest {
+        reason: "artifact manifest could not be parsed",
+    })
 }
 
 /// Per-session controls.
@@ -309,6 +490,12 @@ pub enum VadError {
         /// Session id.
         session_id: String,
     },
+    /// Artifact manifest validation failed.
+    #[error("VAD artifact manifest validation failed: {reason}")]
+    ArtifactManifest {
+        /// Refusal reason.
+        reason: &'static str,
+    },
 }
 
 /// Psionic-owned VAD worker.
@@ -322,6 +509,20 @@ impl PsionicVadWorker {
     /// Creates a worker.
     pub fn new(config: VadWorkerConfig) -> Result<Self, VadError> {
         config.validate()?;
+        VadModelArtifactManifest::builtin().validate_for_config(&config)?;
+        Ok(Self {
+            config,
+            sessions: BTreeMap::new(),
+        })
+    }
+
+    /// Creates a worker after validating an explicit artifact manifest.
+    pub fn new_with_artifact(
+        config: VadWorkerConfig,
+        artifact_manifest: &VadModelArtifactManifest,
+    ) -> Result<Self, VadError> {
+        config.validate()?;
+        artifact_manifest.validate_for_config(&config)?;
         Ok(Self {
             config,
             sessions: BTreeMap::new(),
@@ -841,5 +1042,22 @@ mod tests {
                 sample_rate_hz: 44_100
             }
         );
+    }
+
+    #[test]
+    fn fixture_manifest_validates_default_config() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/vad/model_artifacts/silero_style_vad_mvp_manifest.v1.json");
+        let manifest = match load_model_artifact_manifest(path) {
+            Ok(manifest) => manifest,
+            Err(error) => panic!("manifest load failed: {error}"),
+        };
+        let config = VadWorkerConfig::default();
+        if let Err(error) = manifest.validate_for_config(&config) {
+            panic!("manifest validation failed: {error}");
+        }
+        assert_eq!(manifest.artifact_id, PSIONIC_VAD_MODEL_ARTIFACT_ID);
+        assert!(!manifest.provider_keys_required);
+        assert!(!manifest.raw_audio_retention_required);
     }
 }

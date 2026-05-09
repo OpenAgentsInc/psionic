@@ -29,6 +29,28 @@ does not expose Silero internals to Autopilot. Future issues will replace or
 back this MVP with a stronger model artifact while preserving the same worker
 contract.
 
+## Artifact Manifest
+
+The current retained artifact manifest is:
+
+- `fixtures/vad/model_artifacts/silero_style_vad_mvp_manifest.v1.json`
+
+It pins:
+
+- artifact id: `psionic-vad/silero-style-mvp-v0`
+- execution engine: `psionic_silero_style_vad_mvp`
+- schema: `psionic.vad.artifact.v1`
+- 16 kHz inference, 512-sample frames, and 64-sample context
+- parameter digest:
+  `sha256:aa67063258e45a67a7c82b92ddace04c4bee9579a22fca4f53ef4aa206d2977f`
+- provider keys: not required
+- raw private audio retention: not required
+- Silero MIT attribution for reference material
+
+Startup validation must reject mismatched artifact ids, execution engines,
+sample rates, frame sizes, context sizes, parameter digests, provider-key
+requirements, and raw-audio-retention requirements.
+
 ## Ownership Boundary
 
 ```text
@@ -91,4 +113,3 @@ The next implementation issues should add:
 3. local service surface with health/readiness;
 4. Autopilot `psionic_silero_shadow` integration;
 5. promotion gates before any `psionic_silero_primary` endpointing mode.
-

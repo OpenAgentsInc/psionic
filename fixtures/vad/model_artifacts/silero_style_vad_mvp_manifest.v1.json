@@ -1,0 +1,40 @@
+{
+  "schema_version": "psionic.vad.artifact.v1",
+  "artifact_id": "psionic-vad/silero-style-mvp-v0",
+  "artifact_version": "v0",
+  "artifact_kind": "owned_silero_style_signal_vad_mvp",
+  "execution_engine": "psionic_silero_style_vad_mvp",
+  "license": {
+    "spdx_expression": "Apache-2.0 AND MIT-reference-notice",
+    "notice": "Silero VAD reference material is MIT licensed by the Silero Team. Psionic does not vendor the full Silero repository and does not expose Silero, Candle, or ONNX as the Autopilot product runtime.",
+    "required_attribution": [
+      "Silero VAD reference: Copyright (c) 2020-present Silero Team, MIT License"
+    ]
+  },
+  "source_references": [
+    {
+      "name": "silero-vad",
+      "reference_type": "architecture_and_threshold_reference",
+      "path_or_url": "../competition/repos/silero-vad",
+      "license": "MIT",
+      "used_for": "VAD threshold, hysteresis, frame cadence, context/state shape, min speech, min silence, and speech padding reference"
+    },
+    {
+      "name": "candle silero-vad example",
+      "reference_type": "stream_state_reference_only",
+      "path_or_url": "../competition/repos/candle/candle-examples/examples/silero-vad",
+      "license": "Apache-2.0",
+      "used_for": "Rust stream-state pattern reference only; not a product runtime dependency"
+    }
+  ],
+  "inference_sample_rate_hz": 16000,
+  "frame_size_samples": 512,
+  "context_size_samples": 64,
+  "parameter_digest": "sha256:aa67063258e45a67a7c82b92ddace04c4bee9579a22fca4f53ef4aa206d2977f",
+  "provider_keys_required": false,
+  "raw_audio_retention_required": false,
+  "runtime_dependencies": [
+    "psionic-vad"
+  ],
+  "update_policy": "changes require corpus, replay, shadow, fallback, and release gates before Autopilot primary endpointing"
+}
