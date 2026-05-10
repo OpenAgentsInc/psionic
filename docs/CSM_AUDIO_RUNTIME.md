@@ -126,6 +126,10 @@ Useful environment controls:
   `nvidia-l4`.
 - `PSIONIC_CSM_CUDA_COMPUTE_CAP` defaults to `89` for L4 so Cloud Build can
   compile CUDA kernels without `nvidia-smi` in the builder.
+- CUDA runtime images must expose `LD_LIBRARY_PATH` with
+  `/usr/local/nvidia/lib64` before `/usr/local/cuda/lib64`; Cloud Run GPU
+  provides `libcuda.so.1` through the NVIDIA driver mount, not the CUDA toolkit
+  directory.
 - `PSIONIC_CSM_HOST`, `PSIONIC_CSM_PORT`, and `PSIONIC_CSM_MODEL_ID` mirror the
   command-line host, port, and model controls.
 - `PSIONIC_CSM_RUNTIME_IMAGE_REF` optionally records the deploy image or source
@@ -349,6 +353,9 @@ Default deployment settings:
   `PSIONIC_CSM_GPU_MODEL=nvidia-l4`,
   `PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=false`, and
   `PSIONIC_CSM_MODEL_ID=sesame/csm-1b`
+- CUDA runtime env also sets
+  `LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64` so the
+  Cloud Run GPU driver-provided `libcuda.so.1` is visible before process start.
 
 The script stages only the minimal gated Hugging Face cache objects required by
 the Rust server:

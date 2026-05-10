@@ -278,7 +278,7 @@ ENV PSIONIC_CSM_PORT=8081
 ENV PSIONIC_CSM_RUNTIME=true
 ENV PSIONIC_CSM_BACKEND=cuda
 ENV HF_HOME=/root/.cache/huggingface
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64
 EXPOSE 8081
 ENTRYPOINT ["/usr/local/bin/psionic-csm-speech-server"]
 DOCKERFILE
@@ -343,7 +343,7 @@ deploy_service() {
     --add-volume "name=hf-cache,type=cloud-storage,bucket=${ARTIFACT_BUCKET},readonly=true,mount-options=implicit-dirs" \
     --add-volume-mount "volume=hf-cache,mount-path=/root/.cache/huggingface" \
     --startup-probe "tcpSocket.port=${PORT},periodSeconds=10,timeoutSeconds=5,failureThreshold=120" \
-    --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},PSIONIC_CSM_STARTUP_LOAD_MODE=${STARTUP_LOAD_MODE},PSIONIC_CSM_GPU_MODEL=${GPU_TYPE},PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=${CPU_FALLBACK_ON_ACCELERATOR_FAILURE},PSIONIC_CSM_RUNTIME_IMAGE_REF=${IMAGE},HF_HOME=/root/.cache/huggingface"
+    --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},PSIONIC_CSM_STARTUP_LOAD_MODE=${STARTUP_LOAD_MODE},PSIONIC_CSM_GPU_MODEL=${GPU_TYPE},PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=${CPU_FALLBACK_ON_ACCELERATOR_FAILURE},PSIONIC_CSM_RUNTIME_IMAGE_REF=${IMAGE},HF_HOME=/root/.cache/huggingface,LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64"
   )
 
   if [[ "$BACKEND" == cuda* ]]; then
