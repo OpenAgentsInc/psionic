@@ -32,6 +32,7 @@ pub const CSM_SPEECH_MODEL_ID: &str = "sesame/csm-1b";
 pub const CSM_SPEECH_PRODUCT_ID: &str = "psionic.csm_speech";
 pub const CSM_SPEECH_ROUTE_OPENAI: &str = "/v1/audio/speech";
 pub const CSM_SPEECH_ROUTE_PSIONIC: &str = "/psionic/csm/speech";
+pub const CSM_SPEECH_ROUTE_WORKER_METADATA: &str = "/psionic/csm/worker/metadata";
 pub const CSM_SPEECH_RESPONSE_FORMAT_WAV: &str = "wav";
 pub const CSM_SPEECH_SERVED_BACKEND: &str = "cpu";
 pub const CSM_SPEECH_EXECUTION_MODE: &str = "native";
@@ -39,6 +40,8 @@ pub const CSM_SPEECH_EXECUTION_ENGINE: &str = CSM_CPU_EXECUTION_ENGINE;
 pub const CSM_SPEECH_RESIDENCY_MODE: &str = "warm_cpu";
 const CSM_SPEECH_DEFAULT_AUDIO_LENGTH_MS: u64 = 240;
 const CSM_SPEECH_MAX_AUDIO_LENGTH_MS: u64 = 2_000;
+const CSM_SPEECH_DEFAULT_TIMEOUT_MS: u64 = 10_000;
+const CSM_SPEECH_MAX_TIMEOUT_MS: u64 = 30_000;
 const CSM_SPEECH_STREAM_BOUNDARY: &str = "psionic-csm-stream";
 const CSM_SPEECH_STREAM_CHUNK_BYTES: usize = 16 * 1024;
 
@@ -147,6 +150,7 @@ impl CsmSpeechServer {
         Router::new()
             .route("/health", get(csm_health))
             .route("/v1/models", get(csm_models))
+            .route(CSM_SPEECH_ROUTE_WORKER_METADATA, get(csm_worker_metadata))
             .route(CSM_SPEECH_ROUTE_OPENAI, post(csm_audio_speech))
             .route(CSM_SPEECH_ROUTE_PSIONIC, post(csm_audio_speech))
             .with_state(Arc::clone(&self.state))
@@ -380,6 +384,7 @@ struct CsmSpeechHealthResponse {
     artifact_digests: CsmArtifactDigestPublication,
     artifact_descriptor: CsmArtifactDescriptorPublication,
     runtime: CsmRuntimeStatus,
+    worker: CsmWorkerMetadataPublication,
     codec_capabilities: CsmCodecCapabilityPublication,
     safety_capabilities: CsmSafetyCapabilityPublication,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -407,6 +412,7 @@ struct CsmSpeechModelCard {
     psionic_artifact_digests: CsmArtifactDigestPublication,
     psionic_artifact_descriptor: CsmArtifactDescriptorPublication,
     psionic_runtime: CsmRuntimeStatus,
+    psionic_worker: CsmWorkerMetadataPublication,
     psionic_codec_capabilities: CsmCodecCapabilityPublication,
     psionic_safety_capabilities: CsmSafetyCapabilityPublication,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -466,12 +472,29 @@ struct CsmFrameContractPublication {
 
 #[derive(Clone, Debug, Serialize)]
 struct CsmArtifactDescriptorPublication {
+    artifact_id: String,
     model_id: String,
     csm_repo: String,
     llama_tokenizer_repo: String,
     mimi_repo: String,
     mimi_weight: String,
     frame_contract: CsmFrameContractPublication,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CsmWorkerMetadataPublication {
+    worker_id: &'static str,
+    rpc_schema: &'static str,
+    request_fields: Vec<&'static str>,
+    response_metadata_fields: Vec<&'static str>,
+    idempotency_key: &'static str,
+    cancellation: &'static str,
+    timeout_ms_default: u64,
+    timeout_ms_max: u64,
+    queue_depth: u64,
+    in_flight_requests: u64,
+    metrics: Vec<&'static str>,
+    business_authority: &'static str,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -550,10 +573,18 @@ fn artifact_digests(descriptor: &CsmModelArtifactDescriptor) -> CsmArtifactDiges
     }
 }
 
+fn csm_artifact_id(descriptor: &CsmModelArtifactDescriptor) -> String {
+    format!(
+        "{}@{}",
+        descriptor.model_id, descriptor.digests.csm_model_digest
+    )
+}
+
 fn artifact_descriptor(
     descriptor: &CsmModelArtifactDescriptor,
 ) -> CsmArtifactDescriptorPublication {
     CsmArtifactDescriptorPublication {
+        artifact_id: csm_artifact_id(descriptor),
         model_id: descriptor.model_id.clone(),
         csm_repo: descriptor.csm_repo.clone(),
         llama_tokenizer_repo: descriptor.llama_tokenizer_repo.clone(),
@@ -567,6 +598,52 @@ fn artifact_descriptor(
             generation_frame_ms: descriptor.frame_contract.generation_frame_ms,
             sample_rate_hz: descriptor.frame_contract.sample_rate_hz,
         },
+    }
+}
+
+fn worker_metadata() -> CsmWorkerMetadataPublication {
+    CsmWorkerMetadataPublication {
+        worker_id: "psionic.csm_speech.worker.v1",
+        rpc_schema: "psionic.csm.speech.worker.v1",
+        request_fields: vec![
+            "request_id",
+            "input",
+            "voice_profile_id",
+            "artifact_id",
+            "max_audio_length_ms",
+            "timeout_ms",
+            "cancellation_id",
+            "stream",
+        ],
+        response_metadata_fields: vec![
+            "request_id",
+            "cancellation_id",
+            "artifact_id",
+            "voice_profile_id",
+            "generated_frame_count",
+            "first_audio_latency_ms",
+            "full_generation_latency_ms",
+            "output_duration_ms",
+            "wav_pcm16_digest",
+            "codebook_frames_sha256",
+            "chunk_count",
+        ],
+        idempotency_key: "request_id",
+        cancellation: "bounded_admission_only_current_generation_not_preemptible",
+        timeout_ms_default: CSM_SPEECH_DEFAULT_TIMEOUT_MS,
+        timeout_ms_max: CSM_SPEECH_MAX_TIMEOUT_MS,
+        queue_depth: 0,
+        in_flight_requests: 0,
+        metrics: vec![
+            "queue_depth",
+            "in_flight_requests",
+            "first_audio_latency_ms",
+            "full_generation_latency_ms",
+            "output_duration_ms",
+            "failure_code",
+            "runtime_state",
+        ],
+        business_authority: "none_provider_output_is_evidence_not_instruction",
     }
 }
 
@@ -623,6 +700,7 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         artifact_digests: artifact_digests(&state.descriptor),
         artifact_descriptor: artifact_descriptor(&state.descriptor),
         runtime: runtime.clone(),
+        worker: worker_metadata(),
         codec_capabilities: codec_capabilities(),
         safety_capabilities: safety_capabilities(),
         execution_refusal: runtime.refusal,
@@ -647,6 +725,7 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
             psionic_artifact_digests: artifact_digests(&state.descriptor),
             psionic_artifact_descriptor: artifact_descriptor(&state.descriptor),
             psionic_runtime: runtime.clone(),
+            psionic_worker: worker_metadata(),
             psionic_codec_capabilities: codec_capabilities(),
             psionic_safety_capabilities: safety_capabilities(),
             psionic_execution_refusal: runtime.refusal,
@@ -654,11 +733,21 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
     })
 }
 
+async fn csm_worker_metadata(
+    State(state): State<Arc<CsmSpeechState>>,
+) -> Json<CsmSpeechHealthResponse> {
+    csm_health(State(state)).await
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct CsmSpeechRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    request_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     model: Option<String>,
     input: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    artifact_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     voice: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -667,6 +756,10 @@ struct CsmSpeechRequest {
     response_format: Option<String>,
     #[serde(default)]
     stream: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cancellation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    timeout_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     psionic_csm: Option<CsmGenerationParams>,
 }
@@ -686,6 +779,8 @@ struct CsmGenerationParams {
 #[derive(Clone, Debug)]
 struct ValidatedCsmSpeechRequest {
     model: String,
+    artifact_id: String,
+    request_id: String,
     input: String,
     voice_profile_id: String,
     source_prompt_profile_id: String,
@@ -693,6 +788,8 @@ struct ValidatedCsmSpeechRequest {
     watermarking: String,
     speaker: u32,
     stream: bool,
+    cancellation_id: Option<String>,
+    timeout_ms: u64,
     max_audio_length_ms: u64,
     sampling: CsmSamplingStrategy,
     context_policy: CsmServedContextPolicy,
@@ -712,6 +809,40 @@ impl ValidatedCsmSpeechRequest {
         let model = request.model.unwrap_or_else(|| state.model_id.clone());
         if model != state.model_id {
             return Err(CsmSpeechHttpError::model_unavailable());
+        }
+        let artifact_id = csm_artifact_id(&state.descriptor);
+        if let Some(requested_artifact_id) = request.artifact_id.as_deref()
+            && requested_artifact_id != artifact_id
+            && requested_artifact_id != state.descriptor.digests.csm_model_digest
+        {
+            return Err(CsmSpeechHttpError::invalid_request(
+                "requested CSM artifact is not loaded by this worker",
+                "artifact_unavailable",
+            ));
+        }
+        let request_id = request
+            .request_id
+            .unwrap_or_else(|| format!("psionic_csm_req_{}", current_unix_ms()));
+        if request_id.trim().is_empty() {
+            return Err(CsmSpeechHttpError::invalid_request(
+                "request_id must not be empty when provided",
+                "empty_request_id",
+            ));
+        }
+        if let Some(cancellation_id) = request.cancellation_id.as_deref()
+            && cancellation_id.trim().is_empty()
+        {
+            return Err(CsmSpeechHttpError::invalid_request(
+                "cancellation_id must not be empty when provided",
+                "empty_cancellation_id",
+            ));
+        }
+        let timeout_ms = request.timeout_ms.unwrap_or(CSM_SPEECH_DEFAULT_TIMEOUT_MS);
+        if !(1..=CSM_SPEECH_MAX_TIMEOUT_MS).contains(&timeout_ms) {
+            return Err(CsmSpeechHttpError::invalid_request(
+                "timeout_ms must be between 1 and 30000",
+                "invalid_timeout_ms",
+            ));
         }
         if request.input.trim().is_empty() {
             return Err(CsmSpeechHttpError::invalid_request(
@@ -775,6 +906,8 @@ impl ValidatedCsmSpeechRequest {
         let sampling = csm_sampling_strategy(&params)?;
         Ok(Self {
             model,
+            artifact_id,
+            request_id,
             input: request.input,
             voice_profile_id,
             source_prompt_profile_id: governed_profile.source_prompt_profile_id.clone(),
@@ -782,6 +915,8 @@ impl ValidatedCsmSpeechRequest {
             watermarking: governed_profile.watermark_policy.status.clone(),
             speaker: prompt.speaker,
             stream,
+            cancellation_id: request.cancellation_id,
+            timeout_ms,
             max_audio_length_ms,
             sampling,
             context_policy,
@@ -1189,6 +1324,20 @@ fn insert_csm_execution_headers(
     request: &ValidatedCsmSpeechRequest,
 ) {
     insert_header(headers, "x-psionic-model-id", request.model.as_str());
+    insert_header(headers, "x-psionic-request-id", request.request_id.as_str());
+    if let Some(cancellation_id) = request.cancellation_id.as_deref() {
+        insert_header(headers, "x-psionic-cancellation-id", cancellation_id);
+    }
+    insert_header(
+        headers,
+        "x-psionic-timeout-ms",
+        request.timeout_ms.to_string().as_str(),
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-artifact-id",
+        request.artifact_id.as_str(),
+    );
     insert_header(
         headers,
         "x-psionic-served-backend",
@@ -1385,6 +1534,7 @@ mod tests {
                     .uri(CSM_SPEECH_ROUTE_OPENAI)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
+                        "request_id": "req_test_disabled_1",
                         "model": CSM_SPEECH_MODEL_ID,
                         "input": "hello from psionic",
                         "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
@@ -1409,6 +1559,19 @@ mod tests {
         assert_eq!(
             response
                 .headers()
+                .get("x-psionic-request-id")
+                .and_then(|value| value.to_str().ok()),
+            Some("req_test_disabled_1")
+        );
+        assert!(
+            response
+                .headers()
+                .get("x-psionic-csm-artifact-id")
+                .is_some()
+        );
+        assert_eq!(
+            response
+                .headers()
                 .get("x-psionic-csm-voice-profile-id")
                 .and_then(|value| value.to_str().ok()),
             Some(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
@@ -1427,6 +1590,82 @@ mod tests {
             serde_json::json!("runtime_disabled")
         );
         assert!(!String::from_utf8(body.to_vec())?.contains("/Users/"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn csm_worker_metadata_publishes_rpc_contract_and_metrics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let server = CsmSpeechServer::from_config(disabled_runtime_config())?;
+        let response = server
+            .router()
+            .oneshot(
+                Request::builder()
+                    .uri(CSM_SPEECH_ROUTE_WORKER_METADATA)
+                    .body(Body::empty())
+                    .expect("worker metadata request"),
+            )
+            .await?;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX).await?;
+        let payload: serde_json::Value = serde_json::from_slice(&body)?;
+        assert_eq!(
+            payload["worker"]["rpc_schema"],
+            serde_json::json!("psionic.csm.speech.worker.v1")
+        );
+        assert!(
+            payload["worker"]["request_fields"]
+                .as_array()
+                .is_some_and(|fields| fields.contains(&serde_json::json!("request_id"))
+                    && fields.contains(&serde_json::json!("cancellation_id"))
+                    && fields.contains(&serde_json::json!("timeout_ms"))
+                    && fields.contains(&serde_json::json!("artifact_id")))
+        );
+        assert!(
+            payload["worker"]["metrics"]
+                .as_array()
+                .is_some_and(
+                    |metrics| metrics.contains(&serde_json::json!("queue_depth"))
+                        && metrics.contains(&serde_json::json!("full_generation_latency_ms"))
+                )
+        );
+        assert_eq!(
+            payload["worker"]["business_authority"],
+            serde_json::json!("none_provider_output_is_evidence_not_instruction")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn csm_speech_route_validates_worker_request_controls()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let server = CsmSpeechServer::from_config(disabled_runtime_config())?;
+        let response = server
+            .router()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(CSM_SPEECH_ROUTE_PSIONIC)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(serde_json::to_vec(&serde_json::json!({
+                        "request_id": "req_worker_controls",
+                        "input": "hello",
+                        "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
+                        "artifact_id": "wrong-artifact",
+                        "timeout_ms": 100,
+                        "cancellation_id": "cancel_worker_controls"
+                    }))?))?,
+            )
+            .await?;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), usize::MAX).await?;
+        let payload: serde_json::Value = serde_json::from_slice(&body)?;
+        assert_eq!(
+            payload["error"]["code"],
+            serde_json::json!("artifact_unavailable")
+        );
         Ok(())
     }
 

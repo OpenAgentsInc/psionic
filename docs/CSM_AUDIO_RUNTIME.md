@@ -1,10 +1,10 @@
 # CSM Audio Runtime
 
-Status: deployed for OpenAgents-operated Lyra production dogfood
+Status: Psionic-owned CSM speech worker for Autopilot shadow/canary use
 
-This document tracks the Psionic-owned CSM speech-generation lane for Lyra.
-CSM is a contextual speech generator. It is not the Lyra conversation runtime,
-STT engine, LLM, transport, or product authority layer.
+This document tracks the Psionic-owned CSM speech-generation lane for
+Autopilot. CSM is a contextual speech generator. It is not the Autopilot
+conversation runtime, STT engine, LLM, transport, or product authority layer.
 
 The current implementation state is phase 8:
 
@@ -44,6 +44,10 @@ The current implementation state is phase 8:
   compiling unrelated serving surfaces or platform-specific Metal code.
 - That server publishes `/health`, `/v1/models`, `POST /v1/audio/speech`, and
   `POST /psionic/csm/speech`.
+- The server now also publishes `GET /psionic/csm/worker/metadata` and accepts
+  worker fields for `request_id`, `artifact_id`, `timeout_ms`, and
+  `cancellation_id` so Autopilot can use one stable Rust RPC boundary for
+  shadow/canary evaluation.
 - On hosts with the gated artifacts in the local Hugging Face cache, the server
   warm-loads the Rust tokenizer, CSM model, and Mimi decoder at startup and can
   answer repeated short `wav` speech requests.
@@ -99,16 +103,24 @@ The current endpoints are:
 
 - `GET /health`
 - `GET /v1/models`
+- `GET /psionic/csm/worker/metadata`
 - `POST /v1/audio/speech`
 - `POST /psionic/csm/speech`
 
 The request shape accepts:
 
+- `request_id`, the idempotency key Autopilot should reuse for retry-safe
+  worker calls
 - `model`, defaulting to `sesame/csm-1b`
 - `input`
+- `artifact_id`, optional, which must match the loaded CSM artifact id or CSM
+  model digest
 - `voice` or `voice_profile_id`
 - `response_format`, currently only `wav`
 - `stream`, returning buffered multipart audio chunks when `true`
+- `cancellation_id`, optional, currently admitted as trace metadata while
+  in-flight Rust CPU generation remains non-preemptible
+- `timeout_ms`, defaulting to 10000 and capped at 30000
 - `psionic_csm.temperature`
 - `psionic_csm.top_k`
 - `psionic_csm.max_audio_length_ms`, currently `80..=2000` on warm CPU
@@ -139,11 +151,71 @@ Ready responses publish:
 - `residency = warm_cpu`
 
 The response also includes execution and artifact headers such as
-`x-psionic-model-id`, `x-psionic-execution-engine`,
+`x-psionic-model-id`, `x-psionic-request-id`, `x-psionic-cancellation-id`,
+`x-psionic-timeout-ms`, `x-psionic-csm-artifact-id`,
+`x-psionic-execution-engine`,
 `x-psionic-csm-voice-profile-id`, CSM artifact digest headers,
 `x-psionic-first-audio-latency-ms`,
 `x-psionic-full-generation-latency-ms`, `x-psionic-output-duration-ms`,
 `x-psionic-csm-frames-sha256`, and `x-psionic-csm-wav-pcm16-digest`.
+
+## Worker RPC Boundary
+
+Autopilot should treat `POST /psionic/csm/speech` as the Psionic worker RPC
+surface and `GET /psionic/csm/worker/metadata` as the worker contract surface.
+The OpenAI-compatible `POST /v1/audio/speech` route remains compatibility
+surface only.
+
+Worker request fields:
+
+```text
+request_id
+input
+voice_profile_id
+artifact_id
+max_audio_length_ms
+timeout_ms
+cancellation_id
+stream
+```
+
+Worker response metadata fields:
+
+```text
+request_id
+cancellation_id
+artifact_id
+voice_profile_id
+generated_frame_count
+first_audio_latency_ms
+full_generation_latency_ms
+output_duration_ms
+wav_pcm16_digest
+codebook_frames_sha256
+chunk_count
+```
+
+Current worker metrics:
+
+```text
+queue_depth
+in_flight_requests
+first_audio_latency_ms
+full_generation_latency_ms
+output_duration_ms
+failure_code
+runtime_state
+```
+
+The current Rust CPU generator is serialized through the resident runtime
+lock. `cancellation_id` is therefore trace metadata and admission control for
+now, not preemptive cancellation of a running Candle generation. Autopilot
+must still be prepared to abandon stale responses client-side and fall back to
+the current TTS provider when the worker exceeds its own timeout.
+
+Provider output is evidence, not instruction. This RPC boundary carries no
+browser-facing UI authority, CRM authority, Blueprint authority, or product
+routing authority.
 
 The `/health` and `/v1/models` surfaces now also publish a Rust-built artifact
 descriptor containing:
