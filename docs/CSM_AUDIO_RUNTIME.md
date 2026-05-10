@@ -692,6 +692,16 @@ Run the focused production-server crate tests with:
 cargo test -p psionic-csm-speech csm_
 ```
 
+Run the direct generation-time streaming smoke against the active worker with:
+
+```bash
+node scripts/csm-streaming-smoke.mjs
+```
+
+That smoke requires at least two JSONL `audio` events, one terminal event, and a
+first audio event before response completion, so it fails if the endpoint buffers
+a complete WAV/body before yielding the first audio chunk.
+
 The validator checks:
 
 - fixture schema and artifact digest shapes
