@@ -7,26 +7,31 @@ use std::{
 
 use axum::{
     Json, Router,
-    body::Body,
+    body::{Body, Bytes},
     extract::State,
     http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use futures_util::StreamExt;
 use psionic_models::{
     CSM_AUDIO_CODEBOOK_LANES, CSM_CPU_EXECUTION_ENGINE, CSM_MIMI_CPU_EXECUTION_ENGINE,
     CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID, CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION,
     CSM_WATERMARK_OPERATOR_DOGFOOD, CsmCapabilityRefusal, CsmContextWindowPolicy,
-    CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError, CsmGenerationWindow,
-    CsmLlamaTextTokenizer, CsmMimiCodebookPrefix, CsmMimiDecoder, CsmModelArtifactDescriptor,
-    CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture, CsmRuntimeBackend,
-    CsmSamplingStrategy, CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan,
-    csm_default_config_candidates, csm_default_mimi_weight_candidates,
+    CsmCpuGeneratedWindow, CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError,
+    CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiCodebookPrefix, CsmMimiDecoder,
+    CsmModelArtifactDescriptor, CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture,
+    CsmRuntimeBackend, CsmSamplingStrategy, CsmVoiceProfileGovernanceManifest,
+    csm_build_prompt_frame_plan, csm_default_config_candidates, csm_default_mimi_weight_candidates,
     csm_default_model_weight_candidates, csm_python_parity_fixture,
     csm_reference_audio_encoding_refusal, csm_voice_profile_governance_manifest,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::tokio_runtime_telemetry_axum::serve_with_runtime_telemetry;
 
@@ -52,7 +57,7 @@ const CSM_SPEECH_MAX_AUDIO_LENGTH_MS: u64 = 20_000;
 const CSM_SPEECH_DEFAULT_TIMEOUT_MS: u64 = 10_000;
 const CSM_SPEECH_MAX_TIMEOUT_MS: u64 = 30_000;
 const CSM_SPEECH_STREAM_BOUNDARY: &str = "psionic-csm-stream";
-const CSM_SPEECH_STREAM_CHUNK_BYTES: usize = 16 * 1024;
+const CSM_SPEECH_STREAM_WINDOW_FRAMES: usize = 8;
 
 #[derive(Clone, Debug)]
 pub struct CsmSpeechServerConfig {
@@ -1106,6 +1111,8 @@ struct CsmSpeechRequest {
     #[serde(default)]
     stream: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    stream_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     cancellation_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timeout_ms: Option<u64>,
@@ -1141,6 +1148,7 @@ struct ValidatedCsmSpeechRequest {
     watermarking_refusal_code: String,
     speaker: u32,
     stream: bool,
+    stream_format: CsmSpeechStreamFormat,
     cancellation_id: Option<String>,
     timeout_ms: u64,
     max_audio_length_ms: u64,
@@ -1152,6 +1160,12 @@ struct ValidatedCsmSpeechRequest {
 enum CsmServedContextPolicy {
     None,
     PromptProfileOnly,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CsmSpeechStreamFormat {
+    MultipartMixed,
+    JsonlBase64,
 }
 
 impl ValidatedCsmSpeechRequest {
@@ -1204,6 +1218,20 @@ impl ValidatedCsmSpeechRequest {
             ));
         }
         let stream = request.stream;
+        let stream_format = match request
+            .stream_format
+            .as_deref()
+            .unwrap_or("multipart_mixed")
+        {
+            "multipart_mixed" => CsmSpeechStreamFormat::MultipartMixed,
+            "jsonl_base64" => CsmSpeechStreamFormat::JsonlBase64,
+            _ => {
+                return Err(CsmSpeechHttpError::invalid_request(
+                    "stream_format must be multipart_mixed or jsonl_base64",
+                    "invalid_stream_format",
+                ));
+            }
+        };
         let response_format = request
             .response_format
             .unwrap_or_else(|| String::from(CSM_SPEECH_RESPONSE_FORMAT_WAV));
@@ -1272,6 +1300,7 @@ impl ValidatedCsmSpeechRequest {
             watermarking_refusal_code: governed_profile.watermark_policy.refusal_code.clone(),
             speaker: prompt.speaker,
             stream,
+            stream_format,
             cancellation_id: request.cancellation_id,
             timeout_ms,
             max_audio_length_ms,
@@ -1351,6 +1380,36 @@ struct CsmSpeechSynthesis {
     first_audio_latency_ms: u128,
     full_generation_latency_ms: u128,
     output_duration_ms: u64,
+}
+
+#[derive(Debug)]
+struct CsmSpeechStreamChunk {
+    index: usize,
+    wav_bytes: Vec<u8>,
+    duration_ms: u64,
+    generated_frame_count: usize,
+    final_chunk: bool,
+    elapsed_ms: u128,
+}
+
+#[derive(Debug)]
+struct CsmSpeechStreamingSummary {
+    codebook_frames_sha256: String,
+    wav_pcm16_digest: String,
+    backend: String,
+    execution_engine: String,
+    residency: String,
+    accelerated_backend: String,
+    gpu_model: String,
+    cpu_fallback_reason: Option<String>,
+    generated_frame_count: usize,
+    prompt_frame_count: usize,
+    hit_eos: bool,
+    first_audio_latency_ms: u128,
+    full_generation_latency_ms: u128,
+    output_duration_ms: u64,
+    wav_bytes: usize,
+    chunk_count: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1459,6 +1518,113 @@ impl CsmSpeechState {
         })
     }
 
+    fn synthesize_streaming_windows<F>(
+        &self,
+        request: &ValidatedCsmSpeechRequest,
+        mut on_chunk: F,
+    ) -> Result<CsmSpeechStreamingSummary, CsmSpeechHttpError>
+    where
+        F: FnMut(CsmSpeechStreamChunk) -> Result<(), CsmSpeechHttpError>,
+    {
+        let started = Instant::now();
+        let mut runtime = self.runtime.lock().map_err(|_| {
+            CsmSpeechHttpError::runtime_unavailable(
+                "runtime_lock_poisoned",
+                "CSM runtime lock is poisoned and requests fail closed",
+            )
+        })?;
+        let runtime_status = runtime.status.clone();
+        let Some(engine) = runtime.engine.as_mut() else {
+            let (code, reason) = runtime
+                .status
+                .refusal
+                .as_ref()
+                .map(|refusal| (refusal.code, refusal.reason.clone()))
+                .unwrap_or((
+                    "runtime_unavailable",
+                    "CSM runtime is unavailable and requests fail closed".to_string(),
+                ));
+            return Err(CsmSpeechHttpError::runtime_unavailable(code, reason));
+        };
+
+        let target =
+            CsmPromptSegment::encode_text_only(&engine.tokenizer, request.speaker, &request.input)
+                .map_err(runtime_generation_error)?;
+        let context = self.prompt_profile_context_segments(request, &engine.tokenizer)?;
+        let plan = csm_build_prompt_frame_plan(
+            &context,
+            &target,
+            CsmGenerationWindow::new(request.max_audio_length_ms),
+            CsmContextWindowPolicy::Reject,
+        )
+        .map_err(runtime_generation_error)?;
+
+        let mut wav_hasher = Sha256::new();
+        let mut first_audio_latency_ms = None;
+        let mut output_duration_ms = 0_u64;
+        let mut wav_bytes = 0_usize;
+        let mut chunk_count = 0_usize;
+
+        let generator = &mut engine.generator;
+        let mimi = &mut engine.mimi;
+        let report = generator
+            .generate_codebook_frames_with_window_callback(
+                &CsmCpuGenerationRequest {
+                    prompt: plan,
+                    sampling: request.sampling.clone(),
+                },
+                CSM_SPEECH_STREAM_WINDOW_FRAMES,
+                |window: CsmCpuGeneratedWindow| {
+                    let decode = mimi.decode_codebook_frames(&window.codebook_frames)?;
+                    let wav_chunk = decode.clip.to_wav_pcm16()?;
+                    let elapsed_ms = started.elapsed().as_millis();
+                    first_audio_latency_ms.get_or_insert(elapsed_ms);
+                    wav_hasher.update(&wav_chunk);
+                    output_duration_ms =
+                        output_duration_ms.saturating_add(decode.clip.duration_ms());
+                    wav_bytes = wav_bytes.saturating_add(wav_chunk.len());
+                    let index = chunk_count;
+                    chunk_count = chunk_count.saturating_add(1);
+                    on_chunk(CsmSpeechStreamChunk {
+                        index,
+                        wav_bytes: wav_chunk,
+                        duration_ms: decode.clip.duration_ms(),
+                        generated_frame_count: window
+                            .start_frame_index
+                            .saturating_add(window.codebook_frames.len()),
+                        final_chunk: window.final_window,
+                        elapsed_ms,
+                    })
+                    .map_err(|error| CsmFrontendError::CsmGeneration {
+                        message: error.message,
+                    })?;
+                    Ok(())
+                },
+            )
+            .map_err(runtime_generation_error)?;
+
+        let full_generation_latency_ms = started.elapsed().as_millis();
+
+        Ok(CsmSpeechStreamingSummary {
+            codebook_frames_sha256: report.frames_sha256,
+            wav_pcm16_digest: format!("sha256:{:x}", wav_hasher.finalize()),
+            backend: runtime_status.backend,
+            execution_engine: runtime_status.execution_engine,
+            residency: runtime_status.residency,
+            accelerated_backend: runtime_status.accelerated_backend,
+            gpu_model: runtime_status.gpu_model,
+            cpu_fallback_reason: runtime_status.cpu_fallback_reason,
+            generated_frame_count: report.generated_frame_count,
+            prompt_frame_count: report.prompt_frame_count,
+            hit_eos: report.hit_eos,
+            first_audio_latency_ms: first_audio_latency_ms.unwrap_or(full_generation_latency_ms),
+            full_generation_latency_ms,
+            output_duration_ms,
+            wav_bytes,
+            chunk_count,
+        })
+    }
+
     fn prompt_profile_context_segments(
         &self,
         request: &ValidatedCsmSpeechRequest,
@@ -1562,6 +1728,10 @@ async fn csm_audio_speech(
     Json(request): Json<CsmSpeechRequest>,
 ) -> Result<Response, CsmSpeechHttpError> {
     let validated = ValidatedCsmSpeechRequest::from_request(&state, request)?;
+    if validated.stream {
+        return csm_generation_time_streaming_response(state, validated).await;
+    }
+
     let state_for_runtime = Arc::clone(&state);
     let request_for_runtime = validated.clone();
     let synthesis = match tokio::task::spawn_blocking(move || {
@@ -1586,11 +1756,129 @@ async fn csm_audio_speech(
         }
     };
 
-    let mut response = if validated.stream {
-        csm_streaming_response(&validated, synthesis)?
-    } else {
-        csm_wav_response(synthesis)?
+    let mut response = csm_wav_response(synthesis)?;
+    insert_csm_execution_headers(response.headers_mut(), &state, &validated);
+    Ok(response)
+}
+
+async fn csm_generation_time_streaming_response(
+    state: Arc<CsmSpeechState>,
+    validated: ValidatedCsmSpeechRequest,
+) -> Result<Response, CsmSpeechHttpError> {
+    let (tx, rx) = mpsc::channel::<Result<Bytes, std::convert::Infallible>>(16);
+    let state_for_runtime = Arc::clone(&state);
+    let request_for_runtime = validated.clone();
+    let request_for_terminal = validated.clone();
+    tokio::task::spawn_blocking(move || {
+        let send_bytes = |tx: &mpsc::Sender<Result<Bytes, std::convert::Infallible>>,
+                          bytes: Vec<u8>| {
+            tx.blocking_send(Ok(Bytes::from(bytes))).is_ok()
+        };
+
+        if !send_bytes(
+            &tx,
+            csm_stream_start_part(request_for_runtime.stream_format),
+        ) {
+            return;
+        }
+
+        let synthesis =
+            state_for_runtime.synthesize_streaming_windows(&request_for_runtime, |chunk| {
+                let part = csm_stream_audio_part(request_for_runtime.stream_format, &chunk);
+                if tx.blocking_send(Ok(Bytes::from(part))).is_err() {
+                    return Err(CsmSpeechHttpError::runtime_unavailable(
+                        "stream_client_closed",
+                        "CSM streaming client closed before all generated chunks were delivered",
+                    ));
+                }
+                Ok(())
+            });
+
+        match synthesis {
+            Ok(summary) => {
+                let terminal = CsmSpeechStreamTerminalMetadata {
+                    event: "terminal",
+                    model: request_for_terminal.model.clone(),
+                    artifact_id: request_for_terminal.artifact_id.clone(),
+                    governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
+                    license_posture: CSM_LICENSE_POSTURE,
+                    voice_profile_id: request_for_terminal.voice_profile_id.clone(),
+                    runtime_admission: request_for_terminal.runtime_admission.clone(),
+                    watermarking: request_for_terminal.watermarking.clone(),
+                    watermarking_refusal_code: request_for_terminal
+                        .watermarking_refusal_code
+                        .clone(),
+                    backend: summary.backend,
+                    execution_engine: summary.execution_engine,
+                    residency: summary.residency,
+                    accelerated_backend: summary.accelerated_backend,
+                    gpu_model: summary.gpu_model,
+                    cpu_fallback_reason: summary.cpu_fallback_reason,
+                    generated_frame_count: summary.generated_frame_count,
+                    prompt_frame_count: summary.prompt_frame_count,
+                    hit_eos: summary.hit_eos,
+                    first_audio_latency_ms: summary.first_audio_latency_ms,
+                    full_generation_latency_ms: summary.full_generation_latency_ms,
+                    output_duration_ms: summary.output_duration_ms,
+                    wav_bytes: summary.wav_bytes,
+                    chunk_count: summary.chunk_count,
+                    codebook_frames_sha256: summary.codebook_frames_sha256,
+                    wav_pcm16_digest: summary.wav_pcm16_digest,
+                };
+                match csm_stream_terminal_part(request_for_terminal.stream_format, &terminal) {
+                    Ok(part) => {
+                        let _ = send_bytes(&tx, part);
+                    }
+                    Err(error) => {
+                        let _ = send_bytes(
+                            &tx,
+                            csm_stream_error_part(request_for_terminal.stream_format, &error),
+                        );
+                    }
+                }
+            }
+            Err(error) => {
+                let _ = send_bytes(
+                    &tx,
+                    csm_stream_error_part(request_for_terminal.stream_format, &error),
+                );
+            }
+        }
+        let _ = send_bytes(
+            &tx,
+            csm_stream_close_part(request_for_terminal.stream_format),
+        );
+    });
+
+    let stream = ReceiverStream::new(rx).map(|result| result);
+    let content_type = match validated.stream_format {
+        CsmSpeechStreamFormat::MultipartMixed => {
+            format!("multipart/mixed; boundary={CSM_SPEECH_STREAM_BOUNDARY}")
+        }
+        CsmSpeechStreamFormat::JsonlBase64 => "application/x-ndjson".to_string(),
     };
+    let mut response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .header("x-psionic-streaming-mode", "generation_time_windowed")
+        .header(
+            "x-psionic-stream-format",
+            match validated.stream_format {
+                CsmSpeechStreamFormat::MultipartMixed => "multipart_mixed",
+                CsmSpeechStreamFormat::JsonlBase64 => "jsonl_base64",
+            },
+        )
+        .header(
+            "x-psionic-stream-window-frames",
+            CSM_SPEECH_STREAM_WINDOW_FRAMES.to_string(),
+        )
+        .body(Body::from_stream(stream))
+        .map_err(|_| {
+            CsmSpeechHttpError::runtime_unavailable(
+                "response_build_failed",
+                "failed to build generation-time CSM stream response",
+            )
+        })?;
     insert_csm_execution_headers(response.headers_mut(), &state, &validated);
     Ok(response)
 }
@@ -1611,94 +1899,223 @@ fn csm_wav_response(synthesis: CsmSpeechSynthesis) -> Result<Response, CsmSpeech
     Ok(response)
 }
 
-fn csm_streaming_response(
-    request: &ValidatedCsmSpeechRequest,
-    synthesis: CsmSpeechSynthesis,
-) -> Result<Response, CsmSpeechHttpError> {
-    let chunks = synthesis
-        .wav_bytes
-        .chunks(CSM_SPEECH_STREAM_CHUNK_BYTES)
-        .collect::<Vec<_>>();
-    let chunk_count = chunks.len();
-    let terminal = CsmSpeechStreamTerminalMetadata {
-        event: "terminal",
-        model: request.model.clone(),
-        artifact_id: request.artifact_id.clone(),
-        governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
-        license_posture: CSM_LICENSE_POSTURE,
-        voice_profile_id: request.voice_profile_id.clone(),
-        runtime_admission: request.runtime_admission.clone(),
-        watermarking: request.watermarking.clone(),
-        watermarking_refusal_code: request.watermarking_refusal_code.clone(),
-        backend: synthesis.backend.clone(),
-        execution_engine: synthesis.execution_engine.clone(),
-        residency: synthesis.residency.clone(),
-        accelerated_backend: synthesis.accelerated_backend.clone(),
-        gpu_model: synthesis.gpu_model.clone(),
-        cpu_fallback_reason: synthesis.cpu_fallback_reason.clone(),
-        generated_frame_count: synthesis.generated_frame_count,
-        prompt_frame_count: synthesis.prompt_frame_count,
-        hit_eos: synthesis.hit_eos,
-        first_audio_latency_ms: synthesis.first_audio_latency_ms,
-        full_generation_latency_ms: synthesis.full_generation_latency_ms,
-        output_duration_ms: synthesis.output_duration_ms,
-        wav_bytes: synthesis.wav_bytes.len(),
-        chunk_count,
-        codebook_frames_sha256: synthesis.codebook_frames_sha256.clone(),
-        wav_pcm16_digest: synthesis.wav_pcm16_digest.clone(),
-    };
-    let body = csm_multipart_stream_body(chunks, &terminal)?;
-    let mut response = Response::builder()
-        .status(StatusCode::OK)
-        .header(
-            header::CONTENT_TYPE,
-            format!("multipart/mixed; boundary={CSM_SPEECH_STREAM_BOUNDARY}"),
-        )
-        .body(Body::from(body))
-        .map_err(|_| {
-            CsmSpeechHttpError::runtime_unavailable(
-                "response_build_failed",
-                "failed to build CSM stream response",
-            )
-        })?;
-    insert_synthesis_headers(response.headers_mut(), &synthesis, chunk_count);
-    insert_csm_success_headers(response.headers_mut(), &synthesis);
-    Ok(response)
-}
-
+#[cfg(test)]
 fn csm_multipart_stream_body(
     chunks: Vec<&[u8]>,
     terminal: &CsmSpeechStreamTerminalMetadata,
 ) -> Result<Vec<u8>, CsmSpeechHttpError> {
     let mut body = Vec::new();
-    body.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
-    body.extend_from_slice(b"Content-Type: application/json\r\n\r\n");
-    body.extend_from_slice(
-        br#"{"event":"start","encoding":"wav","chunk_transport":"multipart_mixed"}"#,
-    );
-    body.extend_from_slice(b"\r\n");
+    body.extend_from_slice(&csm_multipart_stream_start_part());
     for (index, chunk) in chunks.iter().enumerate() {
-        body.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
-        body.extend_from_slice(b"Content-Type: audio/wav\r\n");
-        body.extend_from_slice(format!("X-Psionic-Chunk-Index: {index}\r\n").as_bytes());
-        body.extend_from_slice(
-            format!("X-Psionic-Chunk-Bytes: {}\r\n\r\n", chunk.len()).as_bytes(),
-        );
-        body.extend_from_slice(chunk);
-        body.extend_from_slice(b"\r\n");
+        body.extend_from_slice(&csm_multipart_stream_audio_bytes(
+            index, chunk, None, false, None, None,
+        ));
     }
-    body.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
-    body.extend_from_slice(b"Content-Type: application/json\r\n\r\n");
+    body.extend_from_slice(&csm_multipart_stream_terminal_part(terminal)?);
+    body.extend_from_slice(&csm_multipart_stream_close_part());
+    Ok(body)
+}
+
+fn csm_multipart_stream_start_part() -> Vec<u8> {
+    let mut part = Vec::new();
+    part.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
+    part.extend_from_slice(b"Content-Type: application/json\r\n\r\n");
+    part.extend_from_slice(
+        br#"{"event":"start","encoding":"wav","chunk_transport":"multipart_mixed","streaming_mode":"generation_time_windowed"}"#,
+    );
+    part.extend_from_slice(b"\r\n");
+    part
+}
+
+fn csm_stream_start_part(format: CsmSpeechStreamFormat) -> Vec<u8> {
+    match format {
+        CsmSpeechStreamFormat::MultipartMixed => csm_multipart_stream_start_part(),
+        CsmSpeechStreamFormat::JsonlBase64 => {
+            br#"{"event":"start","encoding":"wav","chunk_transport":"jsonl_base64","streaming_mode":"generation_time_windowed"}"#
+                .iter()
+                .copied()
+                .chain(std::iter::once(b'\n'))
+                .collect()
+        }
+    }
+}
+
+fn csm_multipart_stream_audio_part(chunk: &CsmSpeechStreamChunk) -> Vec<u8> {
+    csm_multipart_stream_audio_bytes(
+        chunk.index,
+        &chunk.wav_bytes,
+        Some(chunk.duration_ms),
+        chunk.final_chunk,
+        Some(chunk.generated_frame_count),
+        Some(chunk.elapsed_ms),
+    )
+}
+
+fn csm_stream_audio_part(format: CsmSpeechStreamFormat, chunk: &CsmSpeechStreamChunk) -> Vec<u8> {
+    match format {
+        CsmSpeechStreamFormat::MultipartMixed => csm_multipart_stream_audio_part(chunk),
+        CsmSpeechStreamFormat::JsonlBase64 => {
+            let payload = serde_json::json!({
+                "event": "audio",
+                "content_type": "audio/wav",
+                "encoding": "wav",
+                "chunk_index": chunk.index,
+                "chunk_bytes": chunk.wav_bytes.len(),
+                "duration_ms": chunk.duration_ms,
+                "generated_frame_count": chunk.generated_frame_count,
+                "elapsed_ms": chunk.elapsed_ms,
+                "final_chunk": chunk.final_chunk,
+                "data_base64": BASE64_STANDARD.encode(&chunk.wav_bytes),
+            });
+            serde_json::to_vec(&payload)
+                .unwrap_or_else(|_| {
+                    br#"{"event":"error","error":{"code":"json_encode_failed"}}"#.to_vec()
+                })
+                .into_iter()
+                .chain(std::iter::once(b'\n'))
+                .collect()
+        }
+    }
+}
+
+fn csm_multipart_stream_audio_bytes(
+    index: usize,
+    chunk: &[u8],
+    duration_ms: Option<u64>,
+    final_chunk: bool,
+    generated_frame_count: Option<usize>,
+    elapsed_ms: Option<u128>,
+) -> Vec<u8> {
+    let mut part = Vec::new();
+    part.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
+    part.extend_from_slice(b"Content-Type: audio/wav\r\n");
+    part.extend_from_slice(format!("X-Psionic-Chunk-Index: {index}\r\n").as_bytes());
+    part.extend_from_slice(format!("X-Psionic-Chunk-Bytes: {}\r\n", chunk.len()).as_bytes());
+    part.extend_from_slice(format!("X-Psionic-Final-Chunk: {final_chunk}\r\n").as_bytes());
+    if let Some(duration_ms) = duration_ms {
+        part.extend_from_slice(
+            format!("X-Psionic-Chunk-Duration-Ms: {duration_ms}\r\n").as_bytes(),
+        );
+    }
+    if let Some(generated_frame_count) = generated_frame_count {
+        part.extend_from_slice(
+            format!("X-Psionic-Generated-Frame-Count: {generated_frame_count}\r\n").as_bytes(),
+        );
+    }
+    if let Some(elapsed_ms) = elapsed_ms {
+        part.extend_from_slice(format!("X-Psionic-Chunk-Elapsed-Ms: {elapsed_ms}\r\n").as_bytes());
+    }
+    part.extend_from_slice(b"\r\n");
+    part.extend_from_slice(chunk);
+    part.extend_from_slice(b"\r\n");
+    part
+}
+
+fn csm_multipart_stream_terminal_part(
+    terminal: &CsmSpeechStreamTerminalMetadata,
+) -> Result<Vec<u8>, CsmSpeechHttpError> {
+    let mut part = Vec::new();
+    part.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
+    part.extend_from_slice(b"Content-Type: application/json\r\n\r\n");
     let terminal_json = serde_json::to_vec(terminal).map_err(|_| {
         CsmSpeechHttpError::runtime_unavailable(
             "terminal_metadata_failed",
             "failed to serialize CSM stream terminal metadata",
         )
     })?;
-    body.extend_from_slice(&terminal_json);
-    body.extend_from_slice(b"\r\n");
-    body.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}--\r\n").as_bytes());
-    Ok(body)
+    part.extend_from_slice(&terminal_json);
+    part.extend_from_slice(b"\r\n");
+    Ok(part)
+}
+
+fn csm_stream_terminal_part(
+    format: CsmSpeechStreamFormat,
+    terminal: &CsmSpeechStreamTerminalMetadata,
+) -> Result<Vec<u8>, CsmSpeechHttpError> {
+    match format {
+        CsmSpeechStreamFormat::MultipartMixed => csm_multipart_stream_terminal_part(terminal),
+        CsmSpeechStreamFormat::JsonlBase64 => {
+            let mut value = serde_json::to_value(terminal).map_err(|_| {
+                CsmSpeechHttpError::runtime_unavailable(
+                    "terminal_metadata_failed",
+                    "failed to serialize CSM stream terminal metadata",
+                )
+            })?;
+            if let Some(object) = value.as_object_mut() {
+                object.insert(
+                    "chunk_transport".to_string(),
+                    serde_json::json!("jsonl_base64"),
+                );
+            }
+            let mut line = serde_json::to_vec(&value).map_err(|_| {
+                CsmSpeechHttpError::runtime_unavailable(
+                    "terminal_metadata_failed",
+                    "failed to serialize CSM stream terminal metadata",
+                )
+            })?;
+            line.push(b'\n');
+            Ok(line)
+        }
+    }
+}
+
+fn csm_multipart_stream_error_part(error: &CsmSpeechHttpError) -> Vec<u8> {
+    let mut part = Vec::new();
+    part.extend_from_slice(format!("--{CSM_SPEECH_STREAM_BOUNDARY}\r\n").as_bytes());
+    part.extend_from_slice(b"Content-Type: application/json\r\n\r\n");
+    let payload = serde_json::json!({
+        "event": "error",
+        "error": {
+            "message": error.message,
+            "type": error.kind,
+            "code": error.code,
+            "served_backend": CSM_SPEECH_DEFAULT_BACKEND,
+            "execution_mode": CSM_SPEECH_EXECUTION_MODE,
+            "execution_engine": CSM_SPEECH_DEFAULT_EXECUTION_ENGINE
+        }
+    });
+    let payload = serde_json::to_vec(&payload)
+        .unwrap_or_else(|_| br#"{"event":"error","error":{"code":"stream_error"}}"#.to_vec());
+    part.extend_from_slice(&payload);
+    part.extend_from_slice(b"\r\n");
+    part
+}
+
+fn csm_stream_error_part(format: CsmSpeechStreamFormat, error: &CsmSpeechHttpError) -> Vec<u8> {
+    match format {
+        CsmSpeechStreamFormat::MultipartMixed => csm_multipart_stream_error_part(error),
+        CsmSpeechStreamFormat::JsonlBase64 => {
+            let payload = serde_json::json!({
+                "event": "error",
+                "error": {
+                    "message": error.message,
+                    "type": error.kind,
+                    "code": error.code,
+                    "served_backend": CSM_SPEECH_DEFAULT_BACKEND,
+                    "execution_mode": CSM_SPEECH_EXECUTION_MODE,
+                    "execution_engine": CSM_SPEECH_DEFAULT_EXECUTION_ENGINE
+                }
+            });
+            serde_json::to_vec(&payload)
+                .unwrap_or_else(|_| {
+                    br#"{"event":"error","error":{"code":"stream_error"}}"#.to_vec()
+                })
+                .into_iter()
+                .chain(std::iter::once(b'\n'))
+                .collect()
+        }
+    }
+}
+
+fn csm_multipart_stream_close_part() -> Vec<u8> {
+    format!("--{CSM_SPEECH_STREAM_BOUNDARY}--\r\n").into_bytes()
+}
+
+fn csm_stream_close_part(format: CsmSpeechStreamFormat) -> Vec<u8> {
+    match format {
+        CsmSpeechStreamFormat::MultipartMixed => csm_multipart_stream_close_part(),
+        CsmSpeechStreamFormat::JsonlBase64 => Vec::new(),
+    }
 }
 
 fn insert_synthesis_headers(
@@ -2546,6 +2963,64 @@ mod tests {
         assert!(text.contains("X-Psionic-Chunk-Index: 0"));
         assert!(text.contains("\"event\":\"terminal\""));
         assert!(body.windows(4).any(|window| window == b"RIFF"));
+        Ok(())
+    }
+
+    #[test]
+    fn csm_jsonl_stream_parts_carry_base64_audio_and_terminal_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let chunk = CsmSpeechStreamChunk {
+            index: 0,
+            wav_bytes: b"RIFF".to_vec(),
+            duration_ms: 160,
+            generated_frame_count: 8,
+            final_chunk: true,
+            elapsed_ms: 42,
+        };
+        let audio_line = csm_stream_audio_part(CsmSpeechStreamFormat::JsonlBase64, &chunk);
+        let audio_json = serde_json::from_slice::<serde_json::Value>(&audio_line)?;
+
+        assert_eq!(audio_json["event"], "audio");
+        assert_eq!(audio_json["chunk_transport"], serde_json::Value::Null);
+        assert_eq!(audio_json["chunk_index"], 0);
+        assert_eq!(audio_json["data_base64"], "UklGRg==");
+        assert_eq!(audio_json["final_chunk"], true);
+
+        let terminal = CsmSpeechStreamTerminalMetadata {
+            event: "terminal",
+            model: CSM_SPEECH_MODEL_ID.to_string(),
+            artifact_id: format!("{CSM_SPEECH_MODEL_ID}@sha256:test"),
+            governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
+            license_posture: CSM_LICENSE_POSTURE,
+            voice_profile_id: CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID.to_string(),
+            runtime_admission: "admitted_openagents_operated_autopilot_production_dogfood"
+                .to_string(),
+            watermarking: CSM_WATERMARK_OPERATOR_DOGFOOD.to_string(),
+            watermarking_refusal_code: "csm_watermarking_unavailable".to_string(),
+            backend: CSM_SPEECH_DEFAULT_BACKEND.to_string(),
+            execution_engine: CSM_SPEECH_DEFAULT_EXECUTION_ENGINE.to_string(),
+            residency: CSM_SPEECH_DEFAULT_RESIDENCY_MODE.to_string(),
+            accelerated_backend: "unavailable_fail_closed".to_string(),
+            gpu_model: "none".to_string(),
+            cpu_fallback_reason: None,
+            generated_frame_count: 8,
+            prompt_frame_count: 6,
+            hit_eos: false,
+            first_audio_latency_ms: 42,
+            full_generation_latency_ms: 84,
+            output_duration_ms: 160,
+            wav_bytes: 4,
+            chunk_count: 1,
+            codebook_frames_sha256: "sha256:frames".to_string(),
+            wav_pcm16_digest: "sha256:wav".to_string(),
+        };
+        let terminal_line = csm_stream_terminal_part(CsmSpeechStreamFormat::JsonlBase64, &terminal)
+            .expect("JSONL terminal metadata");
+        let terminal_json = serde_json::from_slice::<serde_json::Value>(&terminal_line)?;
+
+        assert_eq!(terminal_json["event"], "terminal");
+        assert_eq!(terminal_json["chunk_transport"], "jsonl_base64");
+        assert_eq!(terminal_json["chunk_count"], 1);
         Ok(())
     }
 }

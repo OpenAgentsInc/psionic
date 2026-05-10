@@ -62,9 +62,13 @@ The current implementation state is phase 8:
 - On hosts with the gated artifacts in the local Hugging Face cache, the server
   warm-loads the Rust tokenizer, CSM model, and Mimi decoder at startup and can
   answer repeated short `wav` speech requests.
-- `stream=true` returns a buffered `multipart/mixed` response with ordered
-  `audio/wav` chunks and terminal JSON metadata. This is not frame-by-frame
-  low-latency decode yet; it is the first OpenAgents-compatible chunked transport.
+- `stream=true` now returns a generation-time windowed response instead of
+  waiting for a full WAV before building the body. The default stream format is
+  `multipart_mixed`; Autopilot may request `stream_format=jsonl_base64` to
+  receive newline-delimited audio events that carry base64 WAV chunks and
+  terminal JSON metadata. This is the first low-latency serving primitive; it
+  still uses bounded CSM/Mimi decode windows rather than final production
+  chunking, cancellation, and canary evidence.
 - CUDA CSM acceleration is admitted behind explicit backend truth. A CUDA
   worker must publish `served_backend = cuda`, `runtime.backend = cuda`,
   `execution_engine = rust_candle_csm_cuda`, and
@@ -226,7 +230,9 @@ The request shape accepts:
   model digest
 - `voice` or `voice_profile_id`
 - `response_format`, currently only `wav`
-- `stream`, returning buffered multipart audio chunks when `true`
+- `stream`, returning generation-time audio chunks when `true`
+- `stream_format`, optional, `multipart_mixed` or `jsonl_base64`; Autopilot uses
+  `jsonl_base64` so its gateway can parse and forward chunks incrementally
 - `cancellation_id`, optional, currently admitted as trace metadata while
   in-flight Rust CPU generation remains non-preemptible
 - `timeout_ms`, defaulting to 10000 and capped at 30000
@@ -382,7 +388,7 @@ curl -D /tmp/psionic-csm-wav.headers \
   -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"prompt_profile_only"}}'
 ```
 
-Buffered multipart stream request:
+Generation-time multipart stream request:
 
 ```bash
 curl -D /tmp/psionic-csm-stream.headers \
@@ -390,6 +396,15 @@ curl -D /tmp/psionic-csm-stream.headers \
   -X POST http://127.0.0.1:8081/v1/audio/speech \
   -H 'Content-Type: application/json' \
   -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"prompt_profile_only"}}'
+```
+
+Generation-time JSONL stream request for Autopilot gateway consumption:
+
+```bash
+curl -N -D /tmp/psionic-csm-jsonl.headers \
+  -X POST http://127.0.0.1:8081/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","stream":true,"stream_format":"jsonl_base64","psionic_csm":{"max_audio_length_ms":160,"context_policy":"prompt_profile_only"}}'
 ```
 
 ## Cloud Run Deployment
@@ -558,11 +573,11 @@ The first CSM generation engine is:
 
 The path is intentionally bounded. It proves that Psionic can load the gated
 CSM weights and produce audio frames entirely in Rust. The HTTP server now
-keeps that CPU path warm and serves short WAV responses plus buffered multipart
-chunks. It is still correctness-first rather than production-latency-ready.
-Metal/CUDA acceleration, true frame-by-frame audio streaming, prompt-codebook
-context use, production voice consent, and production watermark posture remain
-separate cutover gates.
+keeps that CPU path warm and serves short WAV responses plus generation-time
+multipart or JSONL chunks. It is still correctness-first rather than
+production-latency-ready. Metal/CUDA acceleration, smaller chunk tuning,
+preemptive cancellation, prompt-codebook context use, production voice consent,
+and production watermark posture remain separate cutover gates.
 
 Exact replay of the committed Python generation fixture remains unavailable
 because the fixture stores only compact prompt-codebook prefixes, not the full
@@ -635,7 +650,7 @@ It records a warm CPU server on `127.0.0.1:18083` with:
 - `runtime.residency = warm_cpu`
 - one-shot `POST /v1/audio/speech` returning `200` and `audio/wav`
 - playable WAV output: RIFF/WAVE, PCM16 mono, 24 kHz
-- buffered multipart stream returning `200` and
+- generation-time multipart stream returning `200` and
   `multipart/mixed; boundary=psionic-csm-stream`
 - output duration: `160 ms`
 - generated CSM frame count: `2`
@@ -704,8 +719,9 @@ The frontend tests additionally check:
 - Rust CPU CSM generation and Rust Mimi decode when the matching local CSM,
   Llama-tokenizer, and Mimi artifacts are available
 - warm CSM speech serving when the matching local artifacts are available
-- buffered multipart stream framing with ordered binary WAV chunks and terminal
-  metadata
+- generation-time multipart stream framing with ordered binary WAV chunks and
+  terminal metadata
+- JSONL base64 stream framing for Autopilot gateway consumption
 - governed OpenAgents voice-profile admission and raw fixture prompt refusal
 - explicit fixture-gap truth for exact deterministic prompted replay
 - explicit refusal truth for runtime reference-audio encoding

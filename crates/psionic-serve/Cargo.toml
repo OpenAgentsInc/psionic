@@ -25,6 +25,7 @@ csm-metal = ["psionic-models/csm-metal"]
 
 [dependencies]
 axum = "0.8"
+base64 = "0.22"
 futures-util = "0.3"
 hex = { workspace = true }
 hyper = "1"

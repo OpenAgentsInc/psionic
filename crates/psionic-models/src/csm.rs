@@ -1463,6 +1463,17 @@ pub struct CsmCpuGenerationReport {
     pub latency_ms: u128,
 }
 
+/// One generated CSM codebook window emitted before full turn completion.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CsmCpuGeneratedWindow {
+    /// Zero-based index of the first generated frame in this window.
+    pub start_frame_index: usize,
+    /// Generated 32-codebook audio frames in this window.
+    pub codebook_frames: Vec<[u32; CSM_AUDIO_CODEBOOK_LANES]>,
+    /// True when this is the final emitted window for this request.
+    pub final_window: bool,
+}
+
 /// Rust CPU CSM one-shot generation plus Mimi decode evidence.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CsmCpuSpeechSynthesisReport {
@@ -1570,6 +1581,25 @@ impl CsmCpuGenerator {
         &mut self,
         request: &CsmCpuGenerationRequest,
     ) -> Result<CsmCpuGenerationReport, CsmFrontendError> {
+        self.generate_codebook_frames_with_window_callback(
+            request,
+            request.prompt.max_generation_len.max(1),
+            |_| Ok(()),
+        )
+    }
+
+    /// Generates CSM codebook frames and calls `on_window` as soon as each
+    /// generated codebook window is available. This lets serving layers decode
+    /// and flush audio before full response generation completes.
+    pub fn generate_codebook_frames_with_window_callback<F>(
+        &mut self,
+        request: &CsmCpuGenerationRequest,
+        window_frame_count: usize,
+        mut on_window: F,
+    ) -> Result<CsmCpuGenerationReport, CsmFrontendError>
+    where
+        F: FnMut(CsmCpuGeneratedWindow) -> Result<(), CsmFrontendError>,
+    {
         let started = Instant::now();
         self.model.clear_kv_cache();
         let mut lp = request.sampling.logits_processor()?;
@@ -1583,6 +1613,8 @@ impl CsmCpuGenerator {
             csm_frame_block_to_candle_tensors(&request.prompt.frames, &self.device)?;
         let mut input_pos = 0usize;
         let mut generated = Vec::with_capacity(request.prompt.max_generation_len);
+        let mut pending_window = Vec::with_capacity(window_frame_count.max(1));
+        let window_frame_count = window_frame_count.max(1);
         let mut hit_eos = false;
 
         for _ in 0..request.prompt.max_generation_len {
@@ -1606,6 +1638,15 @@ impl CsmCpuGenerator {
                 break;
             }
             generated.push(frame);
+            pending_window.push(frame);
+            if pending_window.len() >= window_frame_count {
+                let start_frame_index = generated.len().saturating_sub(pending_window.len());
+                on_window(CsmCpuGeneratedWindow {
+                    start_frame_index,
+                    codebook_frames: std::mem::take(&mut pending_window),
+                    final_window: false,
+                })?;
+            }
             let (next_tokens, next_mask) = self
                 .model
                 .audio_tokens_and_mask(frame.to_vec())
@@ -1614,6 +1655,15 @@ impl CsmCpuGenerator {
                 })?;
             tokens = next_tokens;
             tokens_mask = next_mask;
+        }
+
+        if !pending_window.is_empty() {
+            let start_frame_index = generated.len().saturating_sub(pending_window.len());
+            on_window(CsmCpuGeneratedWindow {
+                start_frame_index,
+                codebook_frames: pending_window,
+                final_window: true,
+            })?;
         }
 
         let frames_sha256 = csm_codebook_frames_digest(&generated);
