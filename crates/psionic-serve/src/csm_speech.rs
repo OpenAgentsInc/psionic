@@ -14,16 +14,16 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CSM_CPU_EXECUTION_ENGINE, CSM_MIMI_CPU_EXECUTION_ENGINE,
+    CSM_AUDIO_CODEBOOK_LANES, CSM_CPU_EXECUTION_ENGINE, CSM_MIMI_CPU_EXECUTION_ENGINE,
     CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID, CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION,
     CSM_WATERMARK_OPERATOR_DOGFOOD, CsmCapabilityRefusal, CsmContextWindowPolicy,
     CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError, CsmGenerationWindow,
-    CsmLlamaTextTokenizer, CsmMimiDecoder, CsmModelArtifactDescriptor, CsmModelConfig,
-    CsmPromptSegment, CsmPythonParityFixture, CsmRuntimeBackend, CsmSamplingStrategy,
-    CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan, csm_default_config_candidates,
-    csm_default_mimi_weight_candidates, csm_default_model_weight_candidates,
-    csm_python_parity_fixture, csm_reference_audio_encoding_refusal,
-    csm_voice_profile_governance_manifest,
+    CsmLlamaTextTokenizer, CsmMimiCodebookPrefix, CsmMimiDecoder, CsmModelArtifactDescriptor,
+    CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture, CsmRuntimeBackend,
+    CsmSamplingStrategy, CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan,
+    csm_default_config_candidates, csm_default_mimi_weight_candidates,
+    csm_default_model_weight_candidates, csm_python_parity_fixture,
+    csm_reference_audio_encoding_refusal, csm_voice_profile_governance_manifest,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -1133,6 +1133,7 @@ struct ValidatedCsmSpeechRequest {
     input: String,
     voice_profile_id: String,
     source_prompt_profile_id: String,
+    source_prompt_text: String,
     voice_approval_status: String,
     runtime_admission: String,
     consent_posture: String,
@@ -1263,6 +1264,7 @@ impl ValidatedCsmSpeechRequest {
             input: request.input,
             voice_profile_id,
             source_prompt_profile_id: governed_profile.source_prompt_profile_id.clone(),
+            source_prompt_text: prompt.text.clone(),
             voice_approval_status: governed_profile.approval_status.clone(),
             runtime_admission: governed_profile.runtime_admission.clone(),
             consent_posture: governed_profile.consent_posture.clone(),
@@ -1383,12 +1385,6 @@ impl CsmSpeechState {
         &self,
         request: &ValidatedCsmSpeechRequest,
     ) -> Result<CsmSpeechSynthesis, CsmSpeechHttpError> {
-        if request.context_policy == CsmServedContextPolicy::PromptProfileOnly {
-            return Err(CsmSpeechHttpError::invalid_request(
-                "prompt_profile_only context requires full prompt codebooks or Rust Mimi encode; this server currently supports context_policy=none",
-                "prompt_profile_context_unavailable",
-            ));
-        }
         let started = Instant::now();
         let mut runtime = self.runtime.lock().map_err(|_| {
             CsmSpeechHttpError::runtime_unavailable(
@@ -1413,8 +1409,9 @@ impl CsmSpeechState {
         let target =
             CsmPromptSegment::encode_text_only(&engine.tokenizer, request.speaker, &request.input)
                 .map_err(runtime_generation_error)?;
+        let context = self.prompt_profile_context_segments(request, &engine.tokenizer)?;
         let plan = csm_build_prompt_frame_plan(
-            &[],
+            &context,
             &target,
             CsmGenerationWindow::new(request.max_audio_length_ms),
             CsmContextWindowPolicy::Reject,
@@ -1459,6 +1456,68 @@ impl CsmSpeechState {
             output_duration_ms,
         })
     }
+
+    fn prompt_profile_context_segments(
+        &self,
+        request: &ValidatedCsmSpeechRequest,
+        tokenizer: &CsmLlamaTextTokenizer,
+    ) -> Result<Vec<CsmPromptSegment>, CsmSpeechHttpError> {
+        match request.context_policy {
+            CsmServedContextPolicy::None => Ok(Vec::new()),
+            CsmServedContextPolicy::PromptProfileOnly => {
+                let Some(prefix) = self
+                    .fixture
+                    .mimi_codebook_prefixes
+                    .iter()
+                    .find(|prefix| prefix.profile_id == request.source_prompt_profile_id)
+                else {
+                    return Err(CsmSpeechHttpError::runtime_unavailable(
+                        "prompt_profile_context_unavailable",
+                        "governed CSM voice profile does not have committed prompt codebooks",
+                    ));
+                };
+                let frames = full_prompt_codebook_frames(prefix)?;
+                let text_token_ids = tokenizer
+                    .encode_segment_text(request.speaker, &request.source_prompt_text)
+                    .map_err(runtime_generation_error)?;
+                Ok(vec![CsmPromptSegment::with_audio_codebooks(
+                    request.speaker,
+                    request.source_prompt_text.clone(),
+                    text_token_ids,
+                    frames,
+                )])
+            }
+        }
+    }
+}
+
+fn full_prompt_codebook_frames(
+    prefix: &CsmMimiCodebookPrefix,
+) -> Result<Vec<[u32; CSM_AUDIO_CODEBOOK_LANES]>, CsmSpeechHttpError> {
+    if prefix.codebook_count != CSM_AUDIO_CODEBOOK_LANES
+        || prefix.prefix_codebook_count != CSM_AUDIO_CODEBOOK_LANES
+        || prefix.prefix_frame_count != prefix.frame_count
+        || prefix.prefix_by_codebook.len() != CSM_AUDIO_CODEBOOK_LANES
+    {
+        return Err(CsmSpeechHttpError::runtime_unavailable(
+            "prompt_profile_context_unavailable",
+            "prompt_profile_only requires full committed 32-codebook prompt context",
+        ));
+    }
+
+    let mut frames = vec![[0_u32; CSM_AUDIO_CODEBOOK_LANES]; prefix.frame_count];
+    for (codebook_index, row) in prefix.prefix_by_codebook.iter().enumerate() {
+        if row.len() != prefix.frame_count {
+            return Err(CsmSpeechHttpError::runtime_unavailable(
+                "prompt_profile_context_unavailable",
+                "prompt profile codebook row length does not match frame count",
+            ));
+        }
+        for (frame_index, token) in row.iter().enumerate() {
+            frames[frame_index][codebook_index] = *token;
+        }
+    }
+    Ok(frames)
 }
 
 fn runtime_generation_error(error: CsmFrontendError) -> CsmSpeechHttpError {
@@ -2379,13 +2438,13 @@ mod tests {
                     .uri(CSM_SPEECH_ROUTE_OPENAI)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
-                        "model": CSM_SPEECH_MODEL_ID,
-                        "input": "hello from psionic",
-                        "voice_profile_id": CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
+                    "model": CSM_SPEECH_MODEL_ID,
+                    "input": "hello from psionic",
+                    "voice_profile_id": CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
                         "response_format": "wav",
                         "psionic_csm": {
                             "max_audio_length_ms": 160,
-                            "context_policy": "none"
+                            "context_policy": "prompt_profile_only"
                         }
                     }))?))?,
             )
@@ -2422,6 +2481,26 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX).await?;
         assert!(body.starts_with(b"RIFF"));
         assert!(body.len() > 44);
+        Ok(())
+    }
+
+    #[test]
+    fn csm_prompt_profile_only_has_full_default_female_context_codebooks()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = csm_python_parity_fixture()?;
+        let prefix = fixture
+            .mimi_codebook_prefixes
+            .iter()
+            .find(|prefix| prefix.profile_id == "conversational_b")
+            .expect("default female source prompt codebooks");
+        let frames = full_prompt_codebook_frames(prefix).expect("full prompt codebooks");
+
+        assert_eq!(prefix.prefix_codebook_count, CSM_AUDIO_CODEBOOK_LANES);
+        assert_eq!(prefix.prefix_frame_count, prefix.frame_count);
+        assert_eq!(frames.len(), 375);
+        assert_eq!(frames[0][0], 1049);
+        assert_eq!(frames[0][31], 1902);
+        assert_eq!(frames[374].len(), CSM_AUDIO_CODEBOOK_LANES);
         Ok(())
     }
 

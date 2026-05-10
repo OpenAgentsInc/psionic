@@ -16,10 +16,10 @@ The fixture records small, reviewable values derived from the Python reference:
   `conversational_b`
 - Llama tokenizer outputs for two short speaker-prefixed utterances
 - 33-lane text frame and mask examples
-- compact Mimi codebook prefixes plus full prompt-codebook digests
+- full precomputed Mimi prompt codebooks for the two governed source prompts
 - a three-frame greedy CSM generation prefix for one short utterance
 
 The fixture does not contain Hugging Face tokens, provider keys, full prompt
-audio, full model weights, or large codebook tensors. It is a parity target for
-Rust implementation work, not a production Python runtime.
-
+audio, or full model weights. It now includes full prompt codebooks so the Rust
+served path can use `prompt_profile_only` context and keep the governed
+OpenAgents voice profile stable without calling Python at request time.

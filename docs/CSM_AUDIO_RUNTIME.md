@@ -229,7 +229,9 @@ The request shape accepts:
 - `psionic_csm.temperature`
 - `psionic_csm.top_k`
 - `psionic_csm.max_audio_length_ms`, currently `80..=10000` on warm CPU/GPU
-- `psionic_csm.context_policy`, currently `none` for served requests
+- `psionic_csm.context_policy`, currently `prompt_profile_only` for governed
+  Autopilot speech so CSM receives the approved source prompt codebooks for
+  stable speaker identity; `none` remains available for diagnostics only
 
 If no voice is provided, the server defaults to `openagents/default_female_v1`.
 Requests for raw fixture prompt ids such as `conversational_a` or
@@ -371,7 +373,7 @@ curl -D /tmp/psionic-csm-wav.headers \
   -o /tmp/psionic-csm.wav \
   -X POST http://127.0.0.1:8081/v1/audio/speech \
   -H 'Content-Type: application/json' \
-  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"prompt_profile_only"}}'
 ```
 
 Buffered multipart stream request:
@@ -381,7 +383,7 @@ curl -D /tmp/psionic-csm-stream.headers \
   -o /tmp/psionic-csm.multipart \
   -X POST http://127.0.0.1:8081/v1/audio/speech \
   -H 'Content-Type: application/json' \
-  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+  -d '{"model":"sesame/csm-1b","input":"hello from psionic","voice_profile_id":"openagents/default_female_v1","response_format":"wav","stream":true,"psionic_csm":{"max_audio_length_ms":160,"context_policy":"prompt_profile_only"}}'
 ```
 
 ## Cloud Run Deployment
@@ -675,7 +677,8 @@ The validator checks:
 - required prompt profile ids
 - prompt WAV metadata
 - tokenizer frame dimensions and text-lane mask semantics
-- Mimi codebook prefix dimensions and token bounds
+- full committed Mimi prompt-codebook dimensions and token bounds for governed
+  `prompt_profile_only` speech context
 - deterministic generation frame dimensions and token bounds
 - explicit secret-redaction markers
 

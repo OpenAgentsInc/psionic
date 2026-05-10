@@ -439,7 +439,7 @@ smoke_speech() {
     -o "$wav_file" \
     -X POST "${url}/v1/audio/speech" \
     -H 'Content-Type: application/json' \
-    -d '{"model":"sesame/csm-1b","input":"hello from psionic production","voice_profile_id":"openagents/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+    -d '{"model":"sesame/csm-1b","input":"hello from psionic production","voice_profile_id":"openagents/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"prompt_profile_only"}}'
 
   local bytes
   bytes="$(wc -c <"$wav_file" | tr -d ' ')"
