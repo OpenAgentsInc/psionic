@@ -4897,6 +4897,7 @@ name = "psionic-csm-speech"
 version = "0.1.1"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "candle-transformers",
  "futures-util",
  "hyper",
@@ -4911,6 +4912,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokenizers",
  "tokio",
+ "tokio-stream",
  "tower",
  "tower-service",
 ]
