@@ -20,6 +20,8 @@ tokio-runtime-telemetry-cpu = [
   "tokio-runtime-telemetry",
   "psionic-observe/tokio-runtime-telemetry-cpu",
 ]
+csm-cuda = ["psionic-models/csm-cuda"]
+csm-metal = ["psionic-models/csm-metal"]
 
 [dependencies]
 axum = "0.8"

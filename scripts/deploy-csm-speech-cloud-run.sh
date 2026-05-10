@@ -22,6 +22,10 @@ REQUEST_TIMEOUT="${PSIONIC_CSM_CLOUD_RUN_TIMEOUT:-300}"
 PORT="${PSIONIC_CSM_PORT:-8081}"
 MODEL_ID="${PSIONIC_CSM_MODEL_ID:-sesame/csm-1b}"
 BACKEND="${PSIONIC_CSM_BACKEND:-cpu}"
+CPU_FALLBACK_ON_ACCELERATOR_FAILURE="${PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE:-false}"
+GPU_COUNT="${PSIONIC_CSM_CLOUD_RUN_GPU_COUNT:-}"
+GPU_TYPE="${PSIONIC_CSM_CLOUD_RUN_GPU_TYPE:-nvidia-l4}"
+GPU_ZONAL_REDUNDANCY="${PSIONIC_CSM_CLOUD_RUN_GPU_ZONAL_REDUNDANCY:-false}"
 TAG="${PSIONIC_CSM_IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${SERVICE}:${TAG}"
 SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -232,7 +236,45 @@ build_image() {
   trap 'rm -rf "$tmp_context"' RETURN
 
   git archive HEAD | tar -x -C "$tmp_context"
-  cat >"${tmp_context}/Dockerfile" <<'DOCKERFILE'
+  if [[ "$BACKEND" == cuda* ]]; then
+    cat >"${tmp_context}/Dockerfile" <<'DOCKERFILE'
+FROM nvidia/cuda:12.4.1-devel-debian12 AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    clang \
+    cmake \
+    curl \
+    build-essential \
+    git \
+    libssl-dev \
+    pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain stable
+ENV PATH=/root/.cargo/bin:/usr/local/cuda/bin:${PATH}
+ENV CUDA_ROOT=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64
+WORKDIR /app
+COPY . .
+RUN cargo build --release -p psionic-csm-speech --bin psionic-csm-speech-server --features csm-cuda
+
+FROM nvidia/cuda:12.4.1-runtime-debian12
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/psionic-csm-speech-server /usr/local/bin/psionic-csm-speech-server
+ENV PSIONIC_CSM_HOST=0.0.0.0
+ENV PSIONIC_CSM_PORT=8081
+ENV PSIONIC_CSM_RUNTIME=true
+ENV PSIONIC_CSM_BACKEND=cuda
+ENV HF_HOME=/root/.cache/huggingface
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64
+EXPOSE 8081
+ENTRYPOINT ["/usr/local/bin/psionic-csm-speech-server"]
+DOCKERFILE
+  else
+    cat >"${tmp_context}/Dockerfile" <<'DOCKERFILE'
 FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY . .
@@ -251,6 +293,7 @@ ENV HF_HOME=/root/.cache/huggingface
 EXPOSE 8081
 ENTRYPOINT ["/usr/local/bin/psionic-csm-speech-server"]
 DOCKERFILE
+  fi
 
   gcloud builds submit "$tmp_context" \
     --project "$PROJECT_ID" \
@@ -262,7 +305,13 @@ DOCKERFILE
 }
 
 deploy_service() {
-  gcloud run deploy "$SERVICE" \
+  local gpu_count="$GPU_COUNT"
+  if [[ -z "$gpu_count" && "$BACKEND" == cuda* ]]; then
+    gpu_count="1"
+  fi
+
+  local deploy_args=(
+    "$SERVICE"
     --project "$PROJECT_ID" \
     --region "$REGION" \
     --platform managed \
@@ -283,7 +332,19 @@ deploy_service() {
     --add-volume "name=hf-cache,type=cloud-storage,bucket=${ARTIFACT_BUCKET},readonly=true,mount-options=implicit-dirs" \
     --add-volume-mount "volume=hf-cache,mount-path=/root/.cache/huggingface" \
     --startup-probe "tcpSocket.port=${PORT},periodSeconds=10,timeoutSeconds=5,failureThreshold=120" \
-    --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},HF_HOME=/root/.cache/huggingface"
+    --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},PSIONIC_CSM_GPU_MODEL=${GPU_TYPE},PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=${CPU_FALLBACK_ON_ACCELERATOR_FAILURE},PSIONIC_CSM_RUNTIME_IMAGE_REF=${IMAGE},HF_HOME=/root/.cache/huggingface"
+  )
+
+  if [[ "$BACKEND" == cuda* ]]; then
+    deploy_args+=(--gpu "$gpu_count" --gpu-type "$GPU_TYPE")
+    if [[ "$GPU_ZONAL_REDUNDANCY" =~ ^(1|true|yes|on)$ ]]; then
+      deploy_args+=(--gpu-zonal-redundancy)
+    else
+      deploy_args+=(--no-gpu-zonal-redundancy)
+    fi
+  fi
+
+  gcloud run deploy "${deploy_args[@]}"
 }
 
 service_url() {
@@ -305,6 +366,13 @@ wait_for_ready_runtime() {
       local runtime_state
       runtime_state="$(jq -r '.runtime.state // empty' "$health_file")"
       if [[ "$runtime_state" == "ready" ]]; then
+        local served_backend
+        served_backend="$(jq -r '.served_backend // empty' "$health_file")"
+        if [[ "$BACKEND" == cuda* && "$served_backend" != "cuda" ]]; then
+          echo "runtime became ready but did not serve CUDA: ${served_backend}" >&2
+          jq '{status,model,served_backend,execution_engine,runtime:.runtime}' "$health_file" >&2
+          exit 1
+        fi
         jq '{status,model,served_backend,execution_engine,runtime:.runtime}' "$health_file"
         return 0
       fi
@@ -342,6 +410,11 @@ smoke_speech() {
   fi
 
   echo "speech smoke ok: ${bytes} wav bytes"
+  if [[ "$BACKEND" == cuda* ]] && ! grep -iq '^x-psionic-served-backend: cuda' "$headers_file"; then
+    echo "speech smoke did not publish CUDA served backend" >&2
+    cat "$headers_file" >&2
+    exit 1
+  fi
   grep -i '^x-psionic-' "$headers_file" || true
 }
 

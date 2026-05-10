@@ -20,10 +20,12 @@ The current admitted runtime is:
 - Rust HTTP worker surface in `psionic-serve`;
 - Rust tokenizer, prompt framing, artifact descriptor, and voice-profile
   governance in `psionic-models`;
-- Rust Candle CSM CPU generation;
-- Rust `moshi` Mimi decode to 24 kHz mono PCM16 WAV;
-- warm CPU residency, one request at a time, fail-closed unsupported backend
-  publication;
+- Rust Candle CSM generation with CPU as the portable fallback and CUDA as the
+  admitted Cloud Run GPU backend;
+- Rust `moshi` Mimi decode to 24 kHz mono PCM16 WAV on the same requested
+  backend when supported;
+- warm CPU or warm CUDA residency, one request at a time, fail-closed
+  unsupported backend publication;
 - worker metadata, request id, artifact id, timeout, cancellation id, latency,
   digest, and refusal metadata for Autopilot shadow/canary evaluation.
 
@@ -93,8 +95,9 @@ audio presence or transcript similarity.
 | --- | --- | --- |
 | Python `run_csm.py` demo wrapper | Rejected for production | Useful as reference fixture input, but it would make Python environment, Torch/Moshi package state, local repo layout, and demo assumptions part of the product runtime. |
 | Python sidecar called by Rust | Rejected for production | It hides latency, cancellation, artifact verification, tokenizer, voice governance, and telemetry behind a process seam that Psionic cannot fully own. |
-| Rust Candle CPU CSM + Rust Mimi decode | Admitted current worker MVP | It proves native Rust artifact loading, generation, decode, headers, refusals, and Autopilot worker metadata. It is correctness-first and latency-limited. |
-| Rust Candle CUDA/Metal acceleration | Target next acceleration lane | Keeps model execution in Rust while reducing full-generation latency. Needs artifact, memory, stream, and fallback gates before canary. |
+| Rust Candle CPU CSM + Rust Mimi decode | Admitted fallback worker MVP | It proves native Rust artifact loading, generation, decode, headers, refusals, and Autopilot worker metadata. It is correctness-first and latency-limited. |
+| Rust Candle CUDA CSM + Rust Mimi decode | Admitted Cloud Run GPU lane | Keeps model execution in Rust while reducing full-generation latency. It must publish CUDA backend evidence and fail closed unless explicit CPU fallback is enabled. |
+| Rust Candle Metal CSM + Rust Mimi decode | Local experiment lane | Useful for Apple-silicon development, but not the production Cloud Run path. |
 | Full Psionic-native compiled runtime | Long-term target | Best fit for scheduler, batching, graph ownership, fusion, and cross-hardware execution. It should follow the verified Rust worker contract rather than replace it with a new product API. |
 | Third-party hosted TTS or OpenAI TTS | Baseline/fallback only | Useful as quality and latency baseline while CSM matures. It must not become architectural authority. |
 
@@ -154,7 +157,7 @@ lane, not a current CPU guarantee.
 
 ## Quantization, GPU, And Memory Profile
 
-The current worker is warm CPU. Existing smoke evidence shows correctness with
+The fallback worker is warm CPU. Existing smoke evidence shows correctness with
 multi-second generation:
 
 - retained local one-shot smoke: about `2702 ms` full generation for 160 ms of
@@ -166,9 +169,14 @@ multi-second generation:
 Those measurements are useful for correctness and deployment proof, not final
 product latency.
 
-Acceleration work must report:
+The GPU worker must report:
 
 - model artifact id and digest;
+- requested backend;
+- served backend;
+- execution engine;
+- accelerated backend;
+- GPU model;
 - memory required to load CSM and Mimi together;
 - first-audio latency;
 - full-generation latency;
@@ -176,6 +184,10 @@ Acceleration work must report:
 - generated frame count;
 - GPU or accelerator utilization where available;
 - fallback/refusal state when accelerator artifacts or devices are absent.
+
+CUDA releases use
+`PSIONIC_CSM_BACKEND=cuda scripts/deploy-csm-speech-cloud-run.sh`. The deploy
+blocks if `/health` becomes ready as any backend other than CUDA.
 
 Quantization is allowed only if it preserves artifact identity, fixture
 comparability, and promotion evidence. A quantized CSM artifact must publish a
@@ -221,8 +233,9 @@ owns the CSM worker runtime and execution evidence.
    request when gated artifacts are present.
 3. Add scheduler/backpressure state around the CPU worker before increasing
    concurrency.
-4. Add acceleration spikes for Rust Candle CUDA and Metal CSM execution with
-   identical worker metadata output.
+4. Keep the CUDA Cloud Run lane benchmarked with
+   `scripts/csm-speech-benchmark.mjs` and promote only with backend headers,
+   no silent CPU fallback, and documented latency evidence.
 5. Add first-audio streaming design for real chunks, not only buffered
    multipart WAV chunks.
 6. Add Rust Mimi encode or an equivalent governed profile-building path before

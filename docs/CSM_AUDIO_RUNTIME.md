@@ -28,11 +28,13 @@ The current implementation state is phase 8:
   `moshi` crate: it loads Kyutai Mimi safetensors, validates weight digests,
   accepts 32-codebook RVQ frames, strips trailing all-zero EOS frames, decodes
   to 24 kHz mono samples, and writes browser-playable PCM16 WAV bytes.
-- `psionic-models` now owns the first Rust CPU CSM generation path through an
-  in-process Rust Candle CSM model: it loads `sesame/csm-1b` safetensors,
-  validates model/config digests, accepts Rust-built prompt frames, generates
-  32-codebook audio frames, records deterministic frame digests, and can decode
-  the generated frames through Rust Mimi into WAV-ready PCM.
+- `psionic-models` now owns the Rust CSM generation path through an in-process
+  Rust Candle CSM model: it loads `sesame/csm-1b` safetensors, validates
+  model/config digests, accepts Rust-built prompt frames, generates 32-codebook
+  audio frames, records deterministic frame digests, and can decode the
+  generated frames through Rust Mimi into WAV-ready PCM. CPU is the portable
+  fallback; CUDA is the admitted accelerator backend for the Cloud Run GPU
+  worker.
 - Approved voice profiles publish precomputed prompt-codebook descriptors with
   provenance, sample rate, codebook count, frame counts, and token digests.
 - Psionic has a committed voice-profile governance manifest at
@@ -63,9 +65,12 @@ The current implementation state is phase 8:
 - `stream=true` returns a buffered `multipart/mixed` response with ordered
   `audio/wav` chunks and terminal JSON metadata. This is not frame-by-frame
   low-latency decode yet; it is the first OpenAgents-compatible chunked transport.
-- Metal/CUDA CSM acceleration is not claimed. The server publishes
-  `accelerated_backend = unavailable_fail_closed` while the admitted live
-  backend is warm CPU.
+- CUDA CSM acceleration is admitted behind explicit backend truth. A CUDA
+  worker must publish `served_backend = cuda`, `runtime.backend = cuda`,
+  `execution_engine = rust_candle_csm_cuda`, and
+  `accelerated_backend = cuda`. CPU fallback is allowed only when
+  `PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=true` is deliberately set
+  and must publish a CPU fallback reason.
 - The local Python repo at `/Users/christopherdavid/code/csm` remains a
   reference harness and parity source only. It is not a production Psionic
   runtime, it is not embedded in Autopilot, and it is not called by the
@@ -103,8 +108,17 @@ Useful environment controls:
 
 - `PSIONIC_CSM_RUNTIME=disabled` starts the API in fail-closed publication mode
   without loading gated artifacts.
-- `PSIONIC_CSM_BACKEND=cpu` is the only admitted live backend today. Other
-  values fail closed with `unsupported_backend`.
+- `PSIONIC_CSM_BACKEND=cpu` runs the portable warm CPU backend.
+- `PSIONIC_CSM_BACKEND=cuda` or `cuda:<ordinal>` runs the CUDA backend and
+  fails closed if the CUDA device cannot initialize unless explicit CPU
+  fallback is enabled.
+- `PSIONIC_CSM_BACKEND=metal` or `metal:<ordinal>` is available for local
+  Apple-silicon experiments but is not the production Cloud Run path.
+- `PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=true` permits explicit CPU
+  fallback after accelerator initialization or load failure. It is off by
+  default; GPU releases should keep it off.
+- `PSIONIC_CSM_GPU_MODEL` publishes the expected accelerator class, such as
+  `nvidia-l4`.
 - `PSIONIC_CSM_HOST`, `PSIONIC_CSM_PORT`, and `PSIONIC_CSM_MODEL_ID` mirror the
   command-line host, port, and model controls.
 - `PSIONIC_CSM_RUNTIME_IMAGE_REF` optionally records the deploy image or source
@@ -304,8 +318,6 @@ Default deployment settings:
 - project: `openagents-lyra`
 - region: `us-central1`
 - service: `psionic-csm-speech`
-- current ready revision: `psionic-csm-speech-00001-jtd`
-- current image tag: `1bd449c4`
 - current public service URL:
   `https://psionic-csm-speech-ycgawzh3ta-uc.a.run.app`
 - image:
@@ -314,15 +326,20 @@ Default deployment settings:
   `psionic-csm-speech@openagents-lyra.iam.gserviceaccount.com`
 - private artifact bucket:
   `openagents-lyra-psionic-csm-artifacts`
-- Cloud Run shape: 8 CPU, 32 GiB memory, min 1, max 1, concurrency 1,
+- Cloud Run CPU shape: 8 CPU, 32 GiB memory, min 1, max 3, concurrency 1,
   CPU always allocated
+- Cloud Run GPU shape when `PSIONIC_CSM_BACKEND=cuda`: 1 `nvidia-l4` GPU by
+  default, gen2 execution, GPU zonal redundancy disabled by default for faster
+  availability, and no CPU fallback unless explicitly enabled
 - artifact mount:
   `gs://openagents-lyra-psionic-csm-artifacts` mounted read-only at
   `/root/.cache/huggingface`
 - runtime env:
   `HF_HOME=/root/.cache/huggingface`,
   `PSIONIC_CSM_RUNTIME=true`,
-  `PSIONIC_CSM_BACKEND=cpu`, and
+  `PSIONIC_CSM_BACKEND=cpu` or `cuda`,
+  `PSIONIC_CSM_GPU_MODEL=nvidia-l4`,
+  `PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=false`, and
   `PSIONIC_CSM_MODEL_ID=sesame/csm-1b`
 
 The script stages only the minimal gated Hugging Face cache objects required by
@@ -336,6 +353,16 @@ No Hugging Face token, provider key, Python virtualenv, Python CSM repo, or raw
 prompt audio is uploaded by this deploy path. The script finishes only after
 `/health` reports `runtime.state=ready` and a production
 `POST /v1/audio/speech` smoke returns a non-empty WAV.
+
+GPU deployment uses:
+
+```bash
+PSIONIC_CSM_BACKEND=cuda scripts/deploy-csm-speech-cloud-run.sh
+```
+
+The script builds with the `csm-cuda` Cargo feature in a CUDA devel image,
+deploys with Cloud Run GPU flags, and blocks the release if the ready service
+does not publish `served_backend = cuda`.
 
 2026-05-06 production deployment evidence:
 

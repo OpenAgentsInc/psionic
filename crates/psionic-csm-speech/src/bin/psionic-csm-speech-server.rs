@@ -4,7 +4,8 @@ use std::{
     process::ExitCode,
 };
 
-use psionic_csm_speech::{CSM_SPEECH_EXECUTION_ENGINE, CsmSpeechServer, CsmSpeechServerConfig};
+use psionic_csm_speech::CsmRuntimeBackend;
+use psionic_csm_speech::{CsmSpeechServer, CsmSpeechServerConfig};
 use psionic_observe::{TokioRuntimeTelemetryConfig, build_main_runtime};
 use tokio::net::TcpListener;
 
@@ -42,7 +43,9 @@ async fn run() -> Result<(), String> {
             .local_addr()
             .map_err(|error| format!("failed to query listener address: {error}"))?,
         config.model_id,
-        CSM_SPEECH_EXECUTION_ENGINE,
+        CsmRuntimeBackend::parse(&config.backend)
+            .map(|backend| backend.execution_engine().to_string())
+            .unwrap_or_else(|_| "unsupported_backend".to_string()),
     );
     server
         .serve(listener)

@@ -14,15 +14,16 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CSM_CPU_EXECUTION_ENGINE, CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
-    CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION, CSM_WATERMARK_OPERATOR_DOGFOOD,
-    CsmCapabilityRefusal, CsmContextWindowPolicy, CsmCpuGenerationRequest, CsmCpuGenerator,
-    CsmFrontendError, CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiDecoder,
-    CsmModelArtifactDescriptor, CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture,
-    CsmSamplingStrategy, CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan,
-    csm_default_config_candidates, csm_default_mimi_weight_candidates,
-    csm_default_model_weight_candidates, csm_python_parity_fixture,
-    csm_reference_audio_encoding_refusal, csm_voice_profile_governance_manifest,
+    CSM_CPU_EXECUTION_ENGINE, CSM_MIMI_CPU_EXECUTION_ENGINE,
+    CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID, CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION,
+    CSM_WATERMARK_OPERATOR_DOGFOOD, CsmCapabilityRefusal, CsmContextWindowPolicy,
+    CsmCpuGenerationRequest, CsmCpuGenerator, CsmFrontendError, CsmGenerationWindow,
+    CsmLlamaTextTokenizer, CsmMimiDecoder, CsmModelArtifactDescriptor, CsmModelConfig,
+    CsmPromptSegment, CsmPythonParityFixture, CsmRuntimeBackend, CsmSamplingStrategy,
+    CsmVoiceProfileGovernanceManifest, csm_build_prompt_frame_plan, csm_default_config_candidates,
+    csm_default_mimi_weight_candidates, csm_default_model_weight_candidates,
+    csm_python_parity_fixture, csm_reference_audio_encoding_refusal,
+    csm_voice_profile_governance_manifest,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -35,10 +36,10 @@ pub const CSM_SPEECH_ROUTE_OPENAI: &str = "/v1/audio/speech";
 pub const CSM_SPEECH_ROUTE_PSIONIC: &str = "/psionic/csm/speech";
 pub const CSM_SPEECH_ROUTE_WORKER_METADATA: &str = "/psionic/csm/worker/metadata";
 pub const CSM_SPEECH_RESPONSE_FORMAT_WAV: &str = "wav";
-pub const CSM_SPEECH_SERVED_BACKEND: &str = "cpu";
+pub const CSM_SPEECH_DEFAULT_BACKEND: &str = "cpu";
 pub const CSM_SPEECH_EXECUTION_MODE: &str = "native";
-pub const CSM_SPEECH_EXECUTION_ENGINE: &str = CSM_CPU_EXECUTION_ENGINE;
-pub const CSM_SPEECH_RESIDENCY_MODE: &str = "warm_cpu";
+pub const CSM_SPEECH_DEFAULT_EXECUTION_ENGINE: &str = CSM_CPU_EXECUTION_ENGINE;
+pub const CSM_SPEECH_DEFAULT_RESIDENCY_MODE: &str = "warm_cpu";
 pub const CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION: &str = "psionic.csm.artifact_governance.v1";
 pub const CSM_LICENSE_POSTURE: &str =
     "license_review_required_before_public_or_customer_use_operator_dogfood_only";
@@ -60,6 +61,8 @@ pub struct CsmSpeechServerConfig {
     pub model_id: String,
     pub runtime_enabled: bool,
     pub backend: String,
+    pub cpu_fallback_on_accelerator_failure: bool,
+    pub gpu_model: String,
     pub runtime_image_ref: String,
 }
 
@@ -70,7 +73,9 @@ impl Default for CsmSpeechServerConfig {
             port: 8081,
             model_id: String::from(CSM_SPEECH_MODEL_ID),
             runtime_enabled: true,
-            backend: String::from(CSM_SPEECH_SERVED_BACKEND),
+            backend: String::from(CSM_SPEECH_DEFAULT_BACKEND),
+            cpu_fallback_on_accelerator_failure: false,
+            gpu_model: String::from("not_configured"),
             runtime_image_ref: String::from(CSM_RUNTIME_IMAGE_REF_UNSET),
         }
     }
@@ -99,6 +104,15 @@ impl CsmSpeechServerConfig {
         }
         if let Ok(backend) = env::var("PSIONIC_CSM_BACKEND") {
             config.backend = backend;
+        }
+        if let Ok(fallback) = env::var("PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE") {
+            config.cpu_fallback_on_accelerator_failure = matches!(
+                fallback.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            );
+        }
+        if let Ok(gpu_model) = env::var("PSIONIC_CSM_GPU_MODEL") {
+            config.gpu_model = gpu_model;
         }
         if let Ok(runtime_image_ref) = env::var("PSIONIC_CSM_RUNTIME_IMAGE_REF") {
             config.runtime_image_ref = runtime_image_ref;
@@ -199,9 +213,10 @@ struct CsmResidentSpeechEngine {
 
 #[derive(Clone, Debug, Serialize)]
 struct CsmRuntimeStatus {
-    residency: &'static str,
-    backend: &'static str,
-    execution_engine: &'static str,
+    requested_backend: String,
+    residency: String,
+    backend: String,
+    execution_engine: String,
     state: &'static str,
     loaded_at_unix_ms: Option<u128>,
     load_latency_ms: Option<u128>,
@@ -209,7 +224,9 @@ struct CsmRuntimeStatus {
     csm_config_loaded: bool,
     csm_model_loaded: bool,
     mimi_loaded: bool,
-    accelerated_backend: &'static str,
+    accelerated_backend: String,
+    gpu_model: String,
+    cpu_fallback_reason: Option<String>,
     refusal: Option<CsmSpeechRefusalPublication>,
 }
 
@@ -221,16 +238,68 @@ impl CsmSpeechRuntimeSlot {
     ) -> Self {
         if !config.runtime_enabled {
             return Self::unavailable(
+                config.backend.as_str(),
                 "runtime_disabled",
                 "CSM runtime loading is disabled by server configuration",
                 vec!["enable_rust_csm_runtime"],
             );
         }
-        if config.backend != CSM_SPEECH_SERVED_BACKEND {
+        let requested_backend = match CsmRuntimeBackend::parse(&config.backend) {
+            Ok(backend) => backend,
+            Err(_) => {
+                return Self::unavailable(
+                    config.backend.as_str(),
+                    "unsupported_backend",
+                    "CSM speech supports cpu, cuda, cuda:<ordinal>, metal, or metal:<ordinal> backends",
+                    vec!["choose_supported_backend"],
+                );
+            }
+        };
+        let mut active_backend = requested_backend.clone();
+        let mut cpu_fallback_reason = None;
+        let requested_backend_label = requested_backend.label().to_string();
+
+        if let Err(error) = requested_backend.device()
+            && requested_backend.is_accelerated()
+        {
+            if config.cpu_fallback_on_accelerator_failure {
+                cpu_fallback_reason = Some(format!(
+                    "requested backend {} failed device initialization and explicit CPU fallback is enabled: {error}",
+                    requested_backend.label()
+                ));
+                active_backend = CsmRuntimeBackend::Cpu;
+            } else {
+                return Self::unavailable(
+                    requested_backend.label(),
+                    "accelerator_unavailable",
+                    "requested CSM accelerator backend failed device initialization and CPU fallback is disabled",
+                    vec!["deploy_gpu_runtime_or_enable_explicit_cpu_fallback"],
+                );
+            }
+        }
+
+        if active_backend.is_accelerated() {
+            // Reinitialize once here so startup fails before artifact hydration if the
+            // accelerator backend is not usable inside the runtime image.
+            if active_backend.device().is_err() {
+                return Self::unavailable(
+                    active_backend.label(),
+                    "accelerator_unavailable",
+                    "requested CSM accelerator backend failed device initialization",
+                    vec!["deploy_gpu_runtime_or_enable_explicit_cpu_fallback"],
+                );
+            }
+        }
+
+        if requested_backend.is_accelerated()
+            && active_backend == CsmRuntimeBackend::Cpu
+            && !config.cpu_fallback_on_accelerator_failure
+        {
             return Self::unavailable(
+                requested_backend.label(),
                 "unsupported_backend",
-                "CSM speech currently supports the Rust CPU backend only",
-                vec!["cpu_backend_or_future_accelerated_backend"],
+                "CSM accelerator backend cannot silently fall back to CPU",
+                vec!["enable_explicit_cpu_fallback_or_deploy_gpu_runtime"],
             );
         }
 
@@ -243,6 +312,7 @@ impl CsmSpeechRuntimeSlot {
             Ok(tokenizer) => tokenizer,
             Err(_) => {
                 return Self::unavailable(
+                    active_backend.label(),
                     "llama_tokenizer_unavailable",
                     "matching Llama tokenizer artifact is unavailable in the local Hugging Face cache",
                     vec!["hydrate_gated_hf_artifacts"],
@@ -256,6 +326,7 @@ impl CsmSpeechRuntimeSlot {
                 .next()
         else {
             return Self::unavailable(
+                active_backend.label(),
                 "csm_config_unavailable",
                 "matching CSM config artifact is unavailable in the local Hugging Face cache",
                 vec!["hydrate_gated_hf_artifacts"],
@@ -268,6 +339,7 @@ impl CsmSpeechRuntimeSlot {
             Ok(config) => config,
             Err(_) => {
                 return Self::unavailable(
+                    active_backend.label(),
                     "csm_config_invalid",
                     "matching CSM config artifact failed Rust digest or contract validation",
                     vec!["refresh_csm_artifact_cache"],
@@ -281,48 +353,74 @@ impl CsmSpeechRuntimeSlot {
                 .next()
         else {
             return Self::unavailable(
+                active_backend.label(),
                 "csm_model_unavailable",
                 "matching CSM model artifact is unavailable in the local Hugging Face cache",
                 vec!["hydrate_gated_hf_artifacts"],
             );
         };
-        let generator = match CsmCpuGenerator::from_safetensors_file(
-            &model_config,
-            config_digest,
-            &model_path,
-            Some(&descriptor.digests.csm_model_digest),
-        ) {
-            Ok(generator) => generator,
-            Err(_) => {
-                return Self::unavailable(
-                    "csm_model_load_failed",
-                    "matching CSM model artifact failed Rust loading or digest validation",
-                    vec!["refresh_csm_artifact_cache"],
-                );
-            }
-        };
-
         let Some(mimi_path) =
             csm_default_mimi_weight_candidates(Some(&fixture.model.mimi_weight_digest))
                 .into_iter()
                 .next()
         else {
             return Self::unavailable(
+                active_backend.label(),
                 "mimi_model_unavailable",
                 "matching Mimi artifact is unavailable in the local Hugging Face cache",
                 vec!["hydrate_gated_hf_artifacts"],
             );
         };
-        let mimi = match CsmMimiDecoder::from_safetensors_file(
-            &mimi_path,
-            Some(&fixture.model.mimi_weight_digest),
-        ) {
-            Ok(mimi) => mimi,
+        let load_engine_for_backend =
+            |backend: CsmRuntimeBackend| -> Result<CsmResidentSpeechEngine, CsmFrontendError> {
+                let generator = CsmCpuGenerator::from_safetensors_file_with_backend(
+                    &model_config,
+                    config_digest.clone(),
+                    &model_path,
+                    Some(&descriptor.digests.csm_model_digest),
+                    backend.clone(),
+                )?;
+                let mimi = CsmMimiDecoder::from_safetensors_file_with_backend(
+                    &mimi_path,
+                    Some(&fixture.model.mimi_weight_digest),
+                    backend,
+                )?;
+                Ok(CsmResidentSpeechEngine {
+                    tokenizer: tokenizer.clone(),
+                    generator,
+                    mimi,
+                })
+            };
+        let engine = match load_engine_for_backend(active_backend.clone()) {
+            Ok(engine) => engine,
+            Err(error)
+                if requested_backend.is_accelerated()
+                    && active_backend.is_accelerated()
+                    && config.cpu_fallback_on_accelerator_failure =>
+            {
+                cpu_fallback_reason = Some(format!(
+                    "requested backend {} failed model or Mimi load and explicit CPU fallback is enabled: {error}",
+                    requested_backend.label()
+                ));
+                active_backend = CsmRuntimeBackend::Cpu;
+                match load_engine_for_backend(active_backend.clone()) {
+                    Ok(engine) => engine,
+                    Err(_) => {
+                        return Self::unavailable(
+                            active_backend.label(),
+                            "csm_cpu_fallback_load_failed",
+                            "matching CSM or Mimi artifact failed Rust CPU fallback loading or digest validation",
+                            vec!["refresh_csm_artifact_cache", "refresh_mimi_artifact_cache"],
+                        );
+                    }
+                }
+            }
             Err(_) => {
                 return Self::unavailable(
-                    "mimi_model_load_failed",
-                    "matching Mimi artifact failed Rust loading or digest validation",
-                    vec!["refresh_mimi_artifact_cache"],
+                    active_backend.label(),
+                    "csm_runtime_load_failed",
+                    "matching CSM or Mimi artifact failed Rust loading or digest validation",
+                    vec!["refresh_csm_artifact_cache", "refresh_mimi_artifact_cache"],
                 );
             }
         };
@@ -330,9 +428,10 @@ impl CsmSpeechRuntimeSlot {
         let load_latency_ms = started.elapsed().as_millis();
         Self {
             status: CsmRuntimeStatus {
-                residency: CSM_SPEECH_RESIDENCY_MODE,
-                backend: CSM_SPEECH_SERVED_BACKEND,
-                execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
+                requested_backend: requested_backend_label,
+                residency: active_backend.residency_mode().to_string(),
+                backend: active_backend.label().to_string(),
+                execution_engine: active_backend.execution_engine().to_string(),
                 state: "ready",
                 loaded_at_unix_ms: Some(loaded_at_unix_ms),
                 load_latency_ms: Some(load_latency_ms),
@@ -340,27 +439,31 @@ impl CsmSpeechRuntimeSlot {
                 csm_config_loaded: true,
                 csm_model_loaded: true,
                 mimi_loaded: true,
-                accelerated_backend: "unavailable_fail_closed",
+                accelerated_backend: active_backend.accelerated_backend().to_string(),
+                gpu_model: if active_backend.is_accelerated() {
+                    config.gpu_model.clone()
+                } else {
+                    String::from("none")
+                },
+                cpu_fallback_reason,
                 refusal: None,
             },
-            engine: Some(CsmResidentSpeechEngine {
-                tokenizer,
-                generator,
-                mimi,
-            }),
+            engine: Some(engine),
         }
     }
 
     fn unavailable(
+        requested_backend: &str,
         code: &'static str,
         reason: &'static str,
         pending_phases: Vec<&'static str>,
     ) -> Self {
         Self {
             status: CsmRuntimeStatus {
-                residency: "unavailable",
-                backend: CSM_SPEECH_SERVED_BACKEND,
-                execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
+                requested_backend: requested_backend.to_string(),
+                residency: "unavailable".to_string(),
+                backend: CSM_SPEECH_DEFAULT_BACKEND.to_string(),
+                execution_engine: CSM_SPEECH_DEFAULT_EXECUTION_ENGINE.to_string(),
                 state: "unavailable",
                 loaded_at_unix_ms: None,
                 load_latency_ms: None,
@@ -368,7 +471,9 @@ impl CsmSpeechRuntimeSlot {
                 csm_config_loaded: false,
                 csm_model_loaded: false,
                 mimi_loaded: false,
-                accelerated_backend: "unavailable_fail_closed",
+                accelerated_backend: "unavailable_fail_closed".to_string(),
+                gpu_model: "none".to_string(),
+                cpu_fallback_reason: None,
                 refusal: Some(CsmSpeechRefusalPublication {
                     code,
                     reason,
@@ -390,9 +495,9 @@ struct CsmSpeechHealthResponse {
     status: &'static str,
     model: String,
     capability: &'static str,
-    served_backend: &'static str,
+    served_backend: String,
     execution_mode: &'static str,
-    execution_engine: &'static str,
+    execution_engine: String,
     supported_endpoints: Vec<&'static str>,
     supported_response_formats: Vec<&'static str>,
     voice_profiles: Vec<CsmVoiceProfilePublication>,
@@ -421,9 +526,9 @@ struct CsmSpeechModelCard {
     psionic_capability: &'static str,
     psionic_supported_endpoints: Vec<&'static str>,
     psionic_supported_response_formats: Vec<&'static str>,
-    psionic_served_backend: &'static str,
+    psionic_served_backend: String,
     psionic_execution_mode: &'static str,
-    psionic_execution_engine: &'static str,
+    psionic_execution_engine: String,
     psionic_voice_profiles: Vec<CsmVoiceProfilePublication>,
     psionic_artifact_digests: CsmArtifactDigestPublication,
     psionic_artifact_descriptor: CsmArtifactDescriptorPublication,
@@ -759,10 +864,15 @@ fn worker_metadata() -> CsmWorkerMetadataPublication {
     }
 }
 
-fn codec_capabilities() -> CsmCodecCapabilityPublication {
+fn codec_capabilities(runtime: &CsmRuntimeStatus) -> CsmCodecCapabilityPublication {
+    let mimi_decode_engine = match runtime.backend.as_str() {
+        "cuda" => "rust_moshi_mimi_cuda",
+        "metal" => "rust_moshi_mimi_metal",
+        _ => CSM_MIMI_CPU_EXECUTION_ENGINE,
+    };
     CsmCodecCapabilityPublication {
         mimi_decode: "implemented",
-        mimi_decode_engine: "rust_moshi_mimi_cpu",
+        mimi_decode_engine,
         reference_audio_encode: "refused",
         reference_audio_encode_refusal: csm_reference_audio_encoding_refusal(),
     }
@@ -784,6 +894,7 @@ fn runtime_snapshot(state: &CsmSpeechState) -> CsmRuntimeStatus {
         Ok(runtime) => runtime.status.clone(),
         Err(_) => {
             CsmSpeechRuntimeSlot::unavailable(
+                CSM_SPEECH_DEFAULT_BACKEND,
                 "runtime_lock_poisoned",
                 "CSM runtime lock is poisoned and requests fail closed",
                 vec!["restart_server"],
@@ -803,9 +914,9 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         },
         model: state.model_id.clone(),
         capability: "speech_generation",
-        served_backend: CSM_SPEECH_SERVED_BACKEND,
+        served_backend: runtime.backend.clone(),
         execution_mode: CSM_SPEECH_EXECUTION_MODE,
-        execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
+        execution_engine: runtime.execution_engine.clone(),
         supported_endpoints: vec![CSM_SPEECH_ROUTE_OPENAI, CSM_SPEECH_ROUTE_PSIONIC],
         supported_response_formats: vec![CSM_SPEECH_RESPONSE_FORMAT_WAV],
         voice_profiles: voice_profiles(&state.governance, &state.descriptor),
@@ -814,7 +925,7 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         governance: governance_publication(&state),
         runtime: runtime.clone(),
         worker: worker_metadata(),
-        codec_capabilities: codec_capabilities(),
+        codec_capabilities: codec_capabilities(&runtime),
         safety_capabilities: safety_capabilities(),
         execution_refusal: runtime.refusal,
     })
@@ -831,16 +942,16 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
             psionic_capability: "speech_generation",
             psionic_supported_endpoints: vec![CSM_SPEECH_ROUTE_OPENAI, CSM_SPEECH_ROUTE_PSIONIC],
             psionic_supported_response_formats: vec![CSM_SPEECH_RESPONSE_FORMAT_WAV],
-            psionic_served_backend: CSM_SPEECH_SERVED_BACKEND,
+            psionic_served_backend: runtime.backend.clone(),
             psionic_execution_mode: CSM_SPEECH_EXECUTION_MODE,
-            psionic_execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
+            psionic_execution_engine: runtime.execution_engine.clone(),
             psionic_voice_profiles: voice_profiles(&state.governance, &state.descriptor),
             psionic_artifact_digests: artifact_digests(&state.descriptor),
             psionic_artifact_descriptor: artifact_descriptor(&state.descriptor),
             psionic_governance: governance_publication(&state),
             psionic_runtime: runtime.clone(),
             psionic_worker: worker_metadata(),
-            psionic_codec_capabilities: codec_capabilities(),
+            psionic_codec_capabilities: codec_capabilities(&runtime),
             psionic_safety_capabilities: safety_capabilities(),
             psionic_execution_refusal: runtime.refusal,
         }],
@@ -1065,7 +1176,7 @@ fn validate_params(params: &CsmGenerationParams) -> Result<(), CsmSpeechHttpErro
         && !(80..=CSM_SPEECH_MAX_AUDIO_LENGTH_MS).contains(&max_audio_length_ms)
     {
         return Err(CsmSpeechHttpError::invalid_request(
-            "max_audio_length_ms must be between 80 and 2000 on the warm Rust CPU CSM server",
+            "max_audio_length_ms must be between 80 and 2000 on the Rust CSM speech server",
             "invalid_max_audio_length_ms",
         ));
     }
@@ -1100,6 +1211,12 @@ struct CsmSpeechSynthesis {
     wav_bytes: Vec<u8>,
     codebook_frames_sha256: String,
     wav_pcm16_digest: String,
+    backend: String,
+    execution_engine: String,
+    residency: String,
+    accelerated_backend: String,
+    gpu_model: String,
+    cpu_fallback_reason: Option<String>,
     generated_frame_count: usize,
     prompt_frame_count: usize,
     hit_eos: bool,
@@ -1119,9 +1236,12 @@ struct CsmSpeechStreamTerminalMetadata {
     runtime_admission: String,
     watermarking: String,
     watermarking_refusal_code: String,
-    backend: &'static str,
-    execution_engine: &'static str,
-    residency: &'static str,
+    backend: String,
+    execution_engine: String,
+    residency: String,
+    accelerated_backend: String,
+    gpu_model: String,
+    cpu_fallback_reason: Option<String>,
     generated_frame_count: usize,
     prompt_frame_count: usize,
     hit_eos: bool,
@@ -1152,6 +1272,7 @@ impl CsmSpeechState {
                 "CSM runtime lock is poisoned and requests fail closed",
             )
         })?;
+        let runtime_status = runtime.status.clone();
         let Some(engine) = runtime.engine.as_mut() else {
             let (code, reason) = runtime
                 .status
@@ -1200,6 +1321,12 @@ impl CsmSpeechState {
             wav_bytes,
             codebook_frames_sha256: report.generation.frames_sha256,
             wav_pcm16_digest: report.decode.wav_pcm16_digest,
+            backend: runtime_status.backend,
+            execution_engine: runtime_status.execution_engine,
+            residency: runtime_status.residency,
+            accelerated_backend: runtime_status.accelerated_backend,
+            gpu_model: runtime_status.gpu_model,
+            cpu_fallback_reason: runtime_status.cpu_fallback_reason,
             generated_frame_count: report.generation.generated_frame_count,
             prompt_frame_count: report.generation.prompt_frame_count,
             hit_eos: report.generation.hit_eos,
@@ -1280,7 +1407,6 @@ async fn csm_audio_speech(
         csm_wav_response(synthesis)?
     };
     insert_csm_execution_headers(response.headers_mut(), &state, &validated);
-    insert_csm_success_headers(response.headers_mut());
     Ok(response)
 }
 
@@ -1296,6 +1422,7 @@ fn csm_wav_response(synthesis: CsmSpeechSynthesis) -> Result<Response, CsmSpeech
             )
         })?;
     insert_synthesis_headers(response.headers_mut(), &synthesis, 1);
+    insert_csm_success_headers(response.headers_mut(), &synthesis);
     Ok(response)
 }
 
@@ -1318,9 +1445,12 @@ fn csm_streaming_response(
         runtime_admission: request.runtime_admission.clone(),
         watermarking: request.watermarking.clone(),
         watermarking_refusal_code: request.watermarking_refusal_code.clone(),
-        backend: CSM_SPEECH_SERVED_BACKEND,
-        execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
-        residency: CSM_SPEECH_RESIDENCY_MODE,
+        backend: synthesis.backend.clone(),
+        execution_engine: synthesis.execution_engine.clone(),
+        residency: synthesis.residency.clone(),
+        accelerated_backend: synthesis.accelerated_backend.clone(),
+        gpu_model: synthesis.gpu_model.clone(),
+        cpu_fallback_reason: synthesis.cpu_fallback_reason.clone(),
         generated_frame_count: synthesis.generated_frame_count,
         prompt_frame_count: synthesis.prompt_frame_count,
         hit_eos: synthesis.hit_eos,
@@ -1347,6 +1477,7 @@ fn csm_streaming_response(
             )
         })?;
     insert_synthesis_headers(response.headers_mut(), &synthesis, chunk_count);
+    insert_csm_success_headers(response.headers_mut(), &synthesis);
     Ok(response)
 }
 
@@ -1437,17 +1568,23 @@ fn insert_synthesis_headers(
     );
 }
 
-fn insert_csm_success_headers(headers: &mut HeaderMap) {
-    insert_header(
-        headers,
-        "x-psionic-residency-mode",
-        CSM_SPEECH_RESIDENCY_MODE,
-    );
+fn insert_csm_success_headers(headers: &mut HeaderMap, synthesis: &CsmSpeechSynthesis) {
+    insert_header(headers, "x-psionic-residency-mode", &synthesis.residency);
     insert_header(
         headers,
         "x-psionic-accelerated-backend",
-        "unavailable_fail_closed",
+        &synthesis.accelerated_backend,
     );
+    insert_header(headers, "x-psionic-generation-backend", &synthesis.backend);
+    insert_header(
+        headers,
+        "x-psionic-generation-execution-engine",
+        &synthesis.execution_engine,
+    );
+    insert_header(headers, "x-psionic-gpu-model", &synthesis.gpu_model);
+    if let Some(reason) = synthesis.cpu_fallback_reason.as_deref() {
+        insert_header(headers, "x-psionic-cpu-fallback-reason", reason);
+    }
 }
 
 fn insert_csm_execution_headers(
@@ -1455,6 +1592,7 @@ fn insert_csm_execution_headers(
     state: &CsmSpeechState,
     request: &ValidatedCsmSpeechRequest,
 ) {
+    let runtime = runtime_snapshot(state);
     insert_header(headers, "x-psionic-model-id", request.model.as_str());
     insert_header(headers, "x-psionic-request-id", request.request_id.as_str());
     if let Some(cancellation_id) = request.cancellation_id.as_deref() {
@@ -1488,7 +1626,7 @@ fn insert_csm_execution_headers(
     insert_header(
         headers,
         "x-psionic-served-backend",
-        CSM_SPEECH_SERVED_BACKEND,
+        runtime.backend.as_str(),
     );
     insert_header(
         headers,
@@ -1498,8 +1636,14 @@ fn insert_csm_execution_headers(
     insert_header(
         headers,
         "x-psionic-execution-engine",
-        CSM_SPEECH_EXECUTION_ENGINE,
+        runtime.execution_engine.as_str(),
     );
+    insert_header(
+        headers,
+        "x-psionic-requested-backend",
+        runtime.requested_backend.as_str(),
+    );
+    insert_header(headers, "x-psionic-runtime-state", runtime.state);
     insert_header(
         headers,
         "x-psionic-csm-voice-profile-id",
@@ -1663,9 +1807,9 @@ impl IntoResponse for CsmSpeechHttpError {
                     message: self.message,
                     kind: self.kind,
                     code: self.code,
-                    served_backend: CSM_SPEECH_SERVED_BACKEND,
+                    served_backend: CSM_SPEECH_DEFAULT_BACKEND,
                     execution_mode: CSM_SPEECH_EXECUTION_MODE,
-                    execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
+                    execution_engine: CSM_SPEECH_DEFAULT_EXECUTION_ENGINE,
                 },
             }),
         )
@@ -1726,7 +1870,7 @@ mod tests {
                 .headers()
                 .get("x-psionic-execution-engine")
                 .and_then(|value| value.to_str().ok()),
-            Some(CSM_SPEECH_EXECUTION_ENGINE)
+            Some(CSM_SPEECH_DEFAULT_EXECUTION_ENGINE)
         );
         assert_eq!(
             response
@@ -1959,7 +2103,10 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX).await?;
         let payload: serde_json::Value = serde_json::from_slice(&body)?;
         assert_eq!(payload["status"], serde_json::json!("degraded"));
-        assert_eq!(payload["execution_engine"], CSM_SPEECH_EXECUTION_ENGINE);
+        assert_eq!(
+            payload["execution_engine"],
+            CSM_SPEECH_DEFAULT_EXECUTION_ENGINE
+        );
         assert_eq!(
             payload["runtime"]["state"],
             serde_json::json!("unavailable")
@@ -2116,7 +2263,7 @@ mod tests {
                 .headers()
                 .get("x-psionic-residency-mode")
                 .and_then(|value| value.to_str().ok()),
-            Some(CSM_SPEECH_RESIDENCY_MODE)
+            Some(CSM_SPEECH_DEFAULT_RESIDENCY_MODE)
         );
         assert_eq!(
             response
@@ -2147,12 +2294,16 @@ mod tests {
             governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
             license_posture: CSM_LICENSE_POSTURE,
             voice_profile_id: CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID.to_string(),
-            runtime_admission: "admitted_openagents_operated_autopilot_production_dogfood".to_string(),
+            runtime_admission: "admitted_openagents_operated_autopilot_production_dogfood"
+                .to_string(),
             watermarking: CSM_WATERMARK_OPERATOR_DOGFOOD.to_string(),
             watermarking_refusal_code: "csm_watermarking_unavailable".to_string(),
-            backend: CSM_SPEECH_SERVED_BACKEND,
-            execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
-            residency: CSM_SPEECH_RESIDENCY_MODE,
+            backend: CSM_SPEECH_DEFAULT_BACKEND.to_string(),
+            execution_engine: CSM_SPEECH_DEFAULT_EXECUTION_ENGINE.to_string(),
+            residency: CSM_SPEECH_DEFAULT_RESIDENCY_MODE.to_string(),
+            accelerated_backend: "unavailable_fail_closed".to_string(),
+            gpu_model: "none".to_string(),
+            cpu_fallback_reason: None,
             generated_frame_count: 2,
             prompt_frame_count: 6,
             hit_eos: false,

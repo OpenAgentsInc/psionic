@@ -58,6 +58,16 @@ pub const CSM_MIMI_WEIGHT: &str = "tokenizer-e351c8d8-checkpoint125.safetensors"
 pub const CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE: &str = "rust_mimi_encode_not_implemented";
 /// First Rust CPU CSM generation engine label.
 pub const CSM_CPU_EXECUTION_ENGINE: &str = "rust_candle_csm_cpu";
+/// First Rust CUDA CSM generation engine label.
+pub const CSM_CUDA_EXECUTION_ENGINE: &str = "rust_candle_csm_cuda";
+/// First Rust Metal CSM generation engine label.
+pub const CSM_METAL_EXECUTION_ENGINE: &str = "rust_candle_csm_metal";
+/// Rust CPU Mimi decode engine label.
+pub const CSM_MIMI_CPU_EXECUTION_ENGINE: &str = "rust_moshi_mimi_cpu";
+/// Rust CUDA Mimi decode engine label.
+pub const CSM_MIMI_CUDA_EXECUTION_ENGINE: &str = "rust_moshi_mimi_cuda";
+/// Rust Metal Mimi decode engine label.
+pub const CSM_MIMI_METAL_EXECUTION_ENGINE: &str = "rust_moshi_mimi_metal";
 /// Machine-readable CSM voice-profile governance schema.
 pub const CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION: &str = "psionic.csm.voice_profiles.v1";
 /// First governed OpenAgents CSM voice profile.
@@ -196,6 +206,126 @@ pub enum CsmFrontendError {
         /// Error detail.
         message: String,
     },
+}
+
+/// Admitted Rust-native execution backend for CSM speech generation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "backend", rename_all = "snake_case")]
+pub enum CsmRuntimeBackend {
+    /// CPU execution through Candle and Moshi.
+    Cpu,
+    /// CUDA execution through Candle and Moshi.
+    Cuda {
+        /// CUDA device ordinal.
+        device_ordinal: usize,
+    },
+    /// Metal execution through Candle and Moshi.
+    Metal {
+        /// Metal device ordinal.
+        device_ordinal: usize,
+    },
+}
+
+impl CsmRuntimeBackend {
+    /// Parses backend labels accepted by the CSM speech worker.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let normalized = value.trim().to_ascii_lowercase();
+        match normalized.as_str() {
+            "" | "cpu" => Ok(Self::Cpu),
+            "cuda" => Ok(Self::Cuda { device_ordinal: 0 }),
+            "metal" => Ok(Self::Metal { device_ordinal: 0 }),
+            _ if normalized.starts_with("cuda:") => {
+                let ordinal = normalized
+                    .trim_start_matches("cuda:")
+                    .parse::<usize>()
+                    .map_err(|error| format!("invalid CUDA device ordinal: {error}"))?;
+                Ok(Self::Cuda {
+                    device_ordinal: ordinal,
+                })
+            }
+            _ if normalized.starts_with("metal:") => {
+                let ordinal = normalized
+                    .trim_start_matches("metal:")
+                    .parse::<usize>()
+                    .map_err(|error| format!("invalid Metal device ordinal: {error}"))?;
+                Ok(Self::Metal {
+                    device_ordinal: ordinal,
+                })
+            }
+            _ => Err(format!("unsupported CSM backend `{value}`")),
+        }
+    }
+
+    /// Stable backend label for headers, health checks, and evidence.
+    #[must_use]
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Cuda { .. } => "cuda",
+            Self::Metal { .. } => "metal",
+        }
+    }
+
+    /// Stable execution engine label for CSM generation.
+    #[must_use]
+    pub fn execution_engine(&self) -> &'static str {
+        match self {
+            Self::Cpu => CSM_CPU_EXECUTION_ENGINE,
+            Self::Cuda { .. } => CSM_CUDA_EXECUTION_ENGINE,
+            Self::Metal { .. } => CSM_METAL_EXECUTION_ENGINE,
+        }
+    }
+
+    /// Stable execution engine label for Mimi decode.
+    #[must_use]
+    pub fn mimi_execution_engine(&self) -> &'static str {
+        match self {
+            Self::Cpu => CSM_MIMI_CPU_EXECUTION_ENGINE,
+            Self::Cuda { .. } => CSM_MIMI_CUDA_EXECUTION_ENGINE,
+            Self::Metal { .. } => CSM_MIMI_METAL_EXECUTION_ENGINE,
+        }
+    }
+
+    /// Residency label for served runtime status.
+    #[must_use]
+    pub fn residency_mode(&self) -> &'static str {
+        match self {
+            Self::Cpu => "warm_cpu",
+            Self::Cuda { .. } => "warm_cuda",
+            Self::Metal { .. } => "warm_metal",
+        }
+    }
+
+    /// Accelerator publication label.
+    #[must_use]
+    pub fn accelerated_backend(&self) -> &'static str {
+        match self {
+            Self::Cpu => "unavailable_fail_closed",
+            Self::Cuda { .. } => "cuda",
+            Self::Metal { .. } => "metal",
+        }
+    }
+
+    /// True when the backend is not CPU.
+    #[must_use]
+    pub fn is_accelerated(&self) -> bool {
+        !matches!(self, Self::Cpu)
+    }
+
+    /// Builds the Candle device for this backend.
+    pub fn device(&self) -> Result<moshi::candle::Device, CsmFrontendError> {
+        match self {
+            Self::Cpu => Ok(moshi::candle::Device::Cpu),
+            Self::Cuda { device_ordinal } => moshi::candle::Device::new_cuda(*device_ordinal)
+                .map_err(|error| CsmFrontendError::CsmModelLoad {
+                    message: format!("failed to initialize CUDA device {device_ordinal}: {error}"),
+                }),
+            Self::Metal { device_ordinal } => moshi::candle::Device::new_metal(*device_ordinal)
+                .map_err(|error| CsmFrontendError::CsmModelLoad {
+                    message: format!("failed to initialize Metal device {device_ordinal}: {error}"),
+                }),
+        }
+    }
 }
 
 /// Complete artifact identity needed before loading CSM weights.
@@ -1347,6 +1477,8 @@ pub struct CsmCpuGenerator {
     model: candle_csm::Model,
     config_digest: String,
     model_digest: String,
+    backend: CsmRuntimeBackend,
+    device: moshi::candle::Device,
 }
 
 impl fmt::Debug for CsmCpuGenerator {
@@ -1354,7 +1486,8 @@ impl fmt::Debug for CsmCpuGenerator {
         f.debug_struct("CsmCpuGenerator")
             .field("config_digest", &self.config_digest)
             .field("model_digest", &self.model_digest)
-            .field("execution_engine", &CSM_CPU_EXECUTION_ENGINE)
+            .field("backend", &self.backend.label())
+            .field("execution_engine", &self.backend.execution_engine())
             .finish_non_exhaustive()
     }
 }
@@ -1366,6 +1499,23 @@ impl CsmCpuGenerator {
         config_digest: impl Into<String>,
         path: impl AsRef<Path>,
         expected_model_sha256: Option<&str>,
+    ) -> Result<Self, CsmFrontendError> {
+        Self::from_safetensors_file_with_backend(
+            config,
+            config_digest,
+            path,
+            expected_model_sha256,
+            CsmRuntimeBackend::Cpu,
+        )
+    }
+
+    /// Loads the CSM safetensors file into the requested Rust backend.
+    pub fn from_safetensors_file_with_backend(
+        config: &CsmModelConfig,
+        config_digest: impl Into<String>,
+        path: impl AsRef<Path>,
+        expected_model_sha256: Option<&str>,
+        backend: CsmRuntimeBackend,
     ) -> Result<Self, CsmFrontendError> {
         config.validate()?;
         let path = path.as_ref();
@@ -1383,12 +1533,13 @@ impl CsmCpuGenerator {
                 actual: model_digest,
             });
         }
+        let device = backend.device()?;
         let weights = [path];
         let vb = unsafe {
             moshi::candle_nn::VarBuilder::from_mmaped_safetensors(
                 &weights,
                 moshi::candle::DType::F32,
-                &moshi::candle::Device::Cpu,
+                &device,
             )
         }
         .map_err(|error| CsmFrontendError::CsmModelLoad {
@@ -1403,6 +1554,8 @@ impl CsmCpuGenerator {
             model,
             config_digest: config_digest.into(),
             model_digest,
+            backend,
+            device,
         })
     }
 
@@ -1427,7 +1580,7 @@ impl CsmCpuGenerator {
             });
         }
         let (mut tokens, mut tokens_mask) =
-            csm_frame_block_to_candle_tensors(&request.prompt.frames)?;
+            csm_frame_block_to_candle_tensors(&request.prompt.frames, &self.device)?;
         let mut input_pos = 0usize;
         let mut generated = Vec::with_capacity(request.prompt.max_generation_len);
         let mut hit_eos = false;
@@ -1472,8 +1625,8 @@ impl CsmCpuGenerator {
             hit_eos,
             prompt_frame_count,
             max_generation_len: request.prompt.max_generation_len,
-            backend: "cpu".to_string(),
-            execution_engine: CSM_CPU_EXECUTION_ENGINE.to_string(),
+            backend: self.backend.label().to_string(),
+            execution_engine: self.backend.execution_engine().to_string(),
             csm_config_digest: self.config_digest.clone(),
             csm_model_digest: self.model_digest.clone(),
             latency_ms: started.elapsed().as_millis(),
@@ -1494,6 +1647,7 @@ impl CsmCpuGenerator {
 
 fn csm_frame_block_to_candle_tensors(
     block: &CsmFrameBlock,
+    device: &moshi::candle::Device,
 ) -> Result<(moshi::candle::Tensor, moshi::candle::Tensor), CsmFrontendError> {
     let frame_count = block.len();
     if frame_count == 0 {
@@ -1512,22 +1666,14 @@ fn csm_frame_block_to_candle_tensors(
         tokens.extend_from_slice(&frame.tokens);
         mask.extend(frame.mask.iter().map(|enabled| u8::from(*enabled)));
     }
-    let tokens = moshi::candle::Tensor::from_vec(
-        tokens,
-        (1, frame_count, CSM_FRAME_LANES),
-        &moshi::candle::Device::Cpu,
-    )
-    .map_err(|error| CsmFrontendError::CsmGeneration {
-        message: error.to_string(),
-    })?;
-    let mask = moshi::candle::Tensor::from_vec(
-        mask,
-        (1, frame_count, CSM_FRAME_LANES),
-        &moshi::candle::Device::Cpu,
-    )
-    .map_err(|error| CsmFrontendError::CsmGeneration {
-        message: error.to_string(),
-    })?;
+    let tokens = moshi::candle::Tensor::from_vec(tokens, (1, frame_count, CSM_FRAME_LANES), device)
+        .map_err(|error| CsmFrontendError::CsmGeneration {
+            message: error.to_string(),
+        })?;
+    let mask = moshi::candle::Tensor::from_vec(mask, (1, frame_count, CSM_FRAME_LANES), device)
+        .map_err(|error| CsmFrontendError::CsmGeneration {
+            message: error.to_string(),
+        })?;
     Ok((tokens, mask))
 }
 
@@ -1581,13 +1727,16 @@ pub struct CsmMimiDecodeReport {
 pub struct CsmMimiDecoder {
     model: moshi::mimi::Mimi,
     mimi_weight_digest: String,
+    backend: CsmRuntimeBackend,
+    device: moshi::candle::Device,
 }
 
 impl fmt::Debug for CsmMimiDecoder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CsmMimiDecoder")
             .field("mimi_weight_digest", &self.mimi_weight_digest)
-            .field("execution_engine", &"rust_moshi_mimi_cpu")
+            .field("backend", &self.backend.label())
+            .field("execution_engine", &self.backend.mimi_execution_engine())
             .finish_non_exhaustive()
     }
 }
@@ -1597,6 +1746,15 @@ impl CsmMimiDecoder {
     pub fn from_safetensors_file(
         path: impl AsRef<Path>,
         expected_sha256: Option<&str>,
+    ) -> Result<Self, CsmFrontendError> {
+        Self::from_safetensors_file_with_backend(path, expected_sha256, CsmRuntimeBackend::Cpu)
+    }
+
+    /// Loads the Mimi safetensors file into the requested Rust backend.
+    pub fn from_safetensors_file_with_backend(
+        path: impl AsRef<Path>,
+        expected_sha256: Option<&str>,
+        backend: CsmRuntimeBackend,
     ) -> Result<Self, CsmFrontendError> {
         let path = path.as_ref();
         let bytes = fs::read(path).map_err(|error| CsmFrontendError::ArtifactRead {
@@ -1616,14 +1774,17 @@ impl CsmMimiDecoder {
         let path = path.to_str().ok_or_else(|| CsmFrontendError::MimiLoad {
             message: "Mimi weight path is not valid UTF-8".to_string(),
         })?;
-        let model = moshi::mimi::load(
-            path,
-            Some(CSM_AUDIO_CODEBOOK_LANES),
-            &moshi::candle::Device::Cpu,
-        )
-        .map_err(|error| CsmFrontendError::MimiLoad {
-            message: error.to_string(),
-        })?;
+        let device = backend
+            .device()
+            .map_err(|error| CsmFrontendError::MimiLoad {
+                message: error.to_string(),
+            })?;
+        let model =
+            moshi::mimi::load(path, Some(CSM_AUDIO_CODEBOOK_LANES), &device).map_err(|error| {
+                CsmFrontendError::MimiLoad {
+                    message: error.to_string(),
+                }
+            })?;
         if model.config().sample_rate.round() as u32 != CSM_SAMPLE_RATE_HZ {
             return Err(CsmFrontendError::MimiLoad {
                 message: format!(
@@ -1645,6 +1806,8 @@ impl CsmMimiDecoder {
         Ok(Self {
             model,
             mimi_weight_digest,
+            backend,
+            device,
         })
     }
 
@@ -1669,7 +1832,7 @@ impl CsmMimiDecoder {
         let codes = moshi::candle::Tensor::from_vec(
             tensor_data,
             (1, CSM_AUDIO_CODEBOOK_LANES, frames.len()),
-            &moshi::candle::Device::Cpu,
+            &self.device,
         )
         .map_err(|error| CsmFrontendError::MimiDecode {
             message: error.to_string(),
@@ -1695,7 +1858,7 @@ impl CsmMimiDecoder {
             wav_pcm16_digest,
             decoded_codebook_frames: frames.len(),
             mimi_weight_digest: self.mimi_weight_digest.clone(),
-            execution_engine: "rust_moshi_mimi_cpu".to_string(),
+            execution_engine: self.backend.mimi_execution_engine().to_string(),
         })
     }
 }
@@ -2353,6 +2516,27 @@ mod tests {
     }
 
     #[test]
+    fn csm_runtime_backend_parse_and_labels_are_stable() {
+        assert_eq!(
+            CsmRuntimeBackend::parse("cpu")
+                .expect("cpu")
+                .execution_engine(),
+            CSM_CPU_EXECUTION_ENGINE
+        );
+        assert_eq!(
+            CsmRuntimeBackend::parse("cuda").expect("cuda").label(),
+            "cuda"
+        );
+        assert_eq!(
+            CsmRuntimeBackend::parse("cuda:2")
+                .expect("cuda ordinal")
+                .residency_mode(),
+            "warm_cuda"
+        );
+        assert!(CsmRuntimeBackend::parse("bogus").is_err());
+    }
+
+    #[test]
     fn csm_codebook_frame_digest_is_stable() {
         let fixture = csm_python_parity_fixture().expect("fixture should parse");
         let frames = csm_generation_case_codebook_frames(&fixture.deterministic_generation_case)
@@ -2546,7 +2730,7 @@ mod tests {
         assert!(!report.clip.samples.is_empty());
         assert!(report.clip.duration_ms() > 0);
         assert_eq!(report.mimi_weight_digest, fixture.model.mimi_weight_digest);
-        assert_eq!(report.execution_engine, "rust_moshi_mimi_cpu");
+        assert_eq!(report.execution_engine, CSM_MIMI_CPU_EXECUTION_ENGINE);
         assert_eq!(
             report.clip_digest,
             "sha256:30350d2c6648102458e2eedb3c2388894b162452de6fbce931f1058f95d9c509"

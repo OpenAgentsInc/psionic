@@ -1,0 +1,29 @@
+{
+  "schema_version": "psionic.csm.speech_benchmark_corpus.v1",
+  "cases": [
+    {
+      "id": "short_ack",
+      "input": "I'm Autopilot.",
+      "max_audio_length_ms": 800,
+      "expected_business_outcome": "generic_acknowledgement"
+    },
+    {
+      "id": "generic_intro",
+      "input": "I'm Autopilot, your voice-driven operating surface.",
+      "max_audio_length_ms": 1200,
+      "expected_business_outcome": "generic_intro"
+    },
+    {
+      "id": "crm_safe_ack",
+      "input": "I can help you review CRM contacts and prepare outreach.",
+      "max_audio_length_ms": 1200,
+      "expected_business_outcome": "crm_safe_acknowledgement"
+    },
+    {
+      "id": "failure_ack",
+      "input": "I could not complete that safely yet.",
+      "max_audio_length_ms": 800,
+      "expected_business_outcome": "safe_failure_acknowledgement"
+    }
+  ]
+}
