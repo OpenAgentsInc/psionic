@@ -62,8 +62,9 @@ into one generic engine claim.
   reference-audio encoding, ungoverned voice ids, and unavailable watermarking
   fail closed. The Rust Mimi decode path uses the Rust
   `moshi` crate in-process and publishes `rust_moshi_mimi_cpu` capability
-  truth. The canonical doc is
-  `docs/CSM_AUDIO_RUNTIME.md`; the committed fixture is
+  truth. The canonical runtime doc is
+  `docs/CSM_AUDIO_RUNTIME.md`; the production runtime decision record is
+  `docs/CSM_RUST_RUNTIME_DECISION_RECORD.md`; the committed fixture is
   `fixtures/csm/python_reference/csm_python_parity_v1.json`, and
   `psionic-models` validates it and builds the Rust frontend contract from it.
   The Python CSM repo remains a parity source, not production runtime.

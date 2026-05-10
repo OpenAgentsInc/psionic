@@ -5,6 +5,8 @@ Status: Psionic-owned CSM speech worker for Autopilot shadow/canary use
 This document tracks the Psionic-owned CSM speech-generation lane for
 Autopilot. CSM is a contextual speech generator. It is not the Autopilot
 conversation runtime, STT engine, LLM, transport, or product authority layer.
+The production runtime decision is recorded in
+[CSM Rust Runtime Decision Record](CSM_RUST_RUNTIME_DECISION_RECORD.md).
 
 The current implementation state is phase 8:
 
@@ -59,8 +61,8 @@ The current implementation state is phase 8:
   backend is warm CPU.
 - The local Python repo at `/Users/christopherdavid/code/csm` remains a
   reference harness and parity source only. It is not a production Psionic
-  runtime, it is not embedded in Lyra, and it is not called by the Psionic
-  service path.
+  runtime, it is not embedded in Autopilot, and it is not called by the
+  Psionic service path.
 - There is no Python worker in this path. Psionic does not shell to Python,
   proxy to the local CSM repo, embed Python, or depend on the Python Moshi
   package at runtime.
@@ -233,7 +235,7 @@ descriptor containing:
 - safety capability truth: watermarking is published as
   `unsupported_operator_accepted_limited_dogfood` with
   `csm_watermarking_unavailable`, so CSM output is admitted only for
-  OpenAgents-operated Lyra dogfood and remains unavailable for arbitrary
+  OpenAgents-operated Autopilot dogfood and remains unavailable for arbitrary
   public voice cloning
 - runtime truth: `ready`/`unavailable`, warm-load latency, backend,
   residency, artifact availability, and accelerated-backend refusal truth
