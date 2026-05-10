@@ -7,6 +7,8 @@ Autopilot. CSM is a contextual speech generator. It is not the Autopilot
 conversation runtime, STT engine, LLM, transport, or product authority layer.
 The production runtime decision is recorded in
 [CSM Rust Runtime Decision Record](CSM_RUST_RUNTIME_DECISION_RECORD.md).
+Artifact, license, voice-profile, and watermark governance is recorded in
+[CSM Artifact Governance](CSM_ARTIFACT_GOVERNANCE.md).
 
 The current implementation state is phase 8:
 
@@ -50,6 +52,11 @@ The current implementation state is phase 8:
   worker fields for `request_id`, `artifact_id`, `timeout_ms`, and
   `cancellation_id` so Autopilot can use one stable Rust RPC boundary for
   shadow/canary evaluation.
+- The worker metadata, health response, model card, response headers, and
+  stream terminal metadata now publish artifact governance fields including
+  artifact id/hash, license posture, runtime image ref, quantization posture,
+  governed voice profile ids, watermark status, promotion gate, and rollback
+  target.
 - On hosts with the gated artifacts in the local Hugging Face cache, the server
   warm-loads the Rust tokenizer, CSM model, and Mimi decoder at startup and can
   answer repeated short `wav` speech requests.
@@ -100,6 +107,9 @@ Useful environment controls:
   values fail closed with `unsupported_backend`.
 - `PSIONIC_CSM_HOST`, `PSIONIC_CSM_PORT`, and `PSIONIC_CSM_MODEL_ID` mirror the
   command-line host, port, and model controls.
+- `PSIONIC_CSM_RUNTIME_IMAGE_REF` optionally records the deploy image or source
+  snapshot for governance publication. Local runs default to
+  `not_configured_local_runtime`.
 
 The current endpoints are:
 
@@ -155,8 +165,14 @@ Ready responses publish:
 The response also includes execution and artifact headers such as
 `x-psionic-model-id`, `x-psionic-request-id`, `x-psionic-cancellation-id`,
 `x-psionic-timeout-ms`, `x-psionic-csm-artifact-id`,
-`x-psionic-execution-engine`,
-`x-psionic-csm-voice-profile-id`, CSM artifact digest headers,
+`x-psionic-csm-governance-schema`, `x-psionic-csm-license-posture`,
+`x-psionic-csm-runtime-image-ref`, `x-psionic-execution-engine`,
+`x-psionic-csm-voice-profile-id`,
+`x-psionic-csm-voice-approval-status`,
+`x-psionic-csm-runtime-admission`, `x-psionic-csm-consent-posture`,
+`x-psionic-csm-watermarking`, `x-psionic-csm-watermark-refusal-code`,
+`x-psionic-csm-promotion-gate`, `x-psionic-csm-rollback-target`, CSM artifact
+digest headers,
 `x-psionic-first-audio-latency-ms`,
 `x-psionic-full-generation-latency-ms`, `x-psionic-output-duration-ms`,
 `x-psionic-csm-frames-sha256`, and `x-psionic-csm-wav-pcm16-digest`.
@@ -195,6 +211,18 @@ output_duration_ms
 wav_pcm16_digest
 codebook_frames_sha256
 chunk_count
+```
+
+Worker governance metadata fields:
+
+```text
+artifact_id
+artifact_hash
+license_posture
+runtime_image_ref
+voice_profile_id
+watermark_status
+rollback_target
 ```
 
 Current worker metrics:
@@ -237,6 +265,9 @@ descriptor containing:
   `csm_watermarking_unavailable`, so CSM output is admitted only for
   OpenAgents-operated Autopilot dogfood and remains unavailable for arbitrary
   public voice cloning
+- artifact governance truth: license posture, runtime image ref, quantization,
+  allowed voice profile ids, disallowed voice use cases, canary/primary
+  promotion gate, missing governance blocks, and rollback target
 - runtime truth: `ready`/`unavailable`, warm-load latency, backend,
   residency, artifact availability, and accelerated-backend refusal truth
 

@@ -14,7 +14,8 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CSM_CPU_EXECUTION_ENGINE, CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID, CSM_WATERMARK_OPERATOR_DOGFOOD,
+    CSM_CPU_EXECUTION_ENGINE, CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
+    CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION, CSM_WATERMARK_OPERATOR_DOGFOOD,
     CsmCapabilityRefusal, CsmContextWindowPolicy, CsmCpuGenerationRequest, CsmCpuGenerator,
     CsmFrontendError, CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiDecoder,
     CsmModelArtifactDescriptor, CsmModelConfig, CsmPromptSegment, CsmPythonParityFixture,
@@ -38,6 +39,13 @@ pub const CSM_SPEECH_SERVED_BACKEND: &str = "cpu";
 pub const CSM_SPEECH_EXECUTION_MODE: &str = "native";
 pub const CSM_SPEECH_EXECUTION_ENGINE: &str = CSM_CPU_EXECUTION_ENGINE;
 pub const CSM_SPEECH_RESIDENCY_MODE: &str = "warm_cpu";
+pub const CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION: &str = "psionic.csm.artifact_governance.v1";
+pub const CSM_LICENSE_POSTURE: &str =
+    "license_review_required_before_public_or_customer_use_operator_dogfood_only";
+pub const CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE: &str =
+    "blocked_without_artifact_license_voice_profile_watermark_and_runtime_image_governance";
+pub const CSM_RUNTIME_IMAGE_REF_UNSET: &str = "not_configured_local_runtime";
+pub const CSM_ROLLBACK_TARGET_UNSET: &str = "fallback_to_current_autopilot_tts_provider";
 const CSM_SPEECH_DEFAULT_AUDIO_LENGTH_MS: u64 = 240;
 const CSM_SPEECH_MAX_AUDIO_LENGTH_MS: u64 = 2_000;
 const CSM_SPEECH_DEFAULT_TIMEOUT_MS: u64 = 10_000;
@@ -52,6 +60,7 @@ pub struct CsmSpeechServerConfig {
     pub model_id: String,
     pub runtime_enabled: bool,
     pub backend: String,
+    pub runtime_image_ref: String,
 }
 
 impl Default for CsmSpeechServerConfig {
@@ -62,6 +71,7 @@ impl Default for CsmSpeechServerConfig {
             model_id: String::from(CSM_SPEECH_MODEL_ID),
             runtime_enabled: true,
             backend: String::from(CSM_SPEECH_SERVED_BACKEND),
+            runtime_image_ref: String::from(CSM_RUNTIME_IMAGE_REF_UNSET),
         }
     }
 }
@@ -90,6 +100,9 @@ impl CsmSpeechServerConfig {
         if let Ok(backend) = env::var("PSIONIC_CSM_BACKEND") {
             config.backend = backend;
         }
+        if let Ok(runtime_image_ref) = env::var("PSIONIC_CSM_RUNTIME_IMAGE_REF") {
+            config.runtime_image_ref = runtime_image_ref;
+        }
         config
     }
 
@@ -111,6 +124,7 @@ struct CsmSpeechState {
     fixture: CsmPythonParityFixture,
     descriptor: CsmModelArtifactDescriptor,
     governance: CsmVoiceProfileGovernanceManifest,
+    runtime_image_ref: String,
     runtime: Mutex<CsmSpeechRuntimeSlot>,
 }
 
@@ -141,6 +155,7 @@ impl CsmSpeechServer {
                 fixture,
                 descriptor,
                 governance,
+                runtime_image_ref: config.runtime_image_ref,
                 runtime: Mutex::new(runtime),
             }),
         })
@@ -383,6 +398,7 @@ struct CsmSpeechHealthResponse {
     voice_profiles: Vec<CsmVoiceProfilePublication>,
     artifact_digests: CsmArtifactDigestPublication,
     artifact_descriptor: CsmArtifactDescriptorPublication,
+    governance: CsmArtifactGovernancePublication,
     runtime: CsmRuntimeStatus,
     worker: CsmWorkerMetadataPublication,
     codec_capabilities: CsmCodecCapabilityPublication,
@@ -411,6 +427,7 @@ struct CsmSpeechModelCard {
     psionic_voice_profiles: Vec<CsmVoiceProfilePublication>,
     psionic_artifact_digests: CsmArtifactDigestPublication,
     psionic_artifact_descriptor: CsmArtifactDescriptorPublication,
+    psionic_governance: CsmArtifactGovernancePublication,
     psionic_runtime: CsmRuntimeStatus,
     psionic_worker: CsmWorkerMetadataPublication,
     psionic_codec_capabilities: CsmCodecCapabilityPublication,
@@ -494,7 +511,33 @@ struct CsmWorkerMetadataPublication {
     queue_depth: u64,
     in_flight_requests: u64,
     metrics: Vec<&'static str>,
+    governance_fields: Vec<&'static str>,
     business_authority: &'static str,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CsmArtifactGovernancePublication {
+    schema_version: &'static str,
+    voice_profile_governance_schema_version: &'static str,
+    artifact_id: String,
+    artifact_hash: String,
+    model_id: String,
+    model_version: String,
+    source_repositories: Vec<String>,
+    license_posture: &'static str,
+    runtime_image_ref: String,
+    quantization: &'static str,
+    tokenizer_dependency: String,
+    audio_codec_dependency: String,
+    allowed_voice_profile_ids: Vec<String>,
+    disallowed_voice_use_cases: Vec<&'static str>,
+    watermark_status: String,
+    watermark_refusal_code: String,
+    canary_promotion: &'static str,
+    primary_promotion: &'static str,
+    rollback_target: &'static str,
+    missing_governance_blocks: Vec<&'static str>,
+    autopilot_consumption: Vec<&'static str>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -601,6 +644,66 @@ fn artifact_descriptor(
     }
 }
 
+fn governance_publication(state: &CsmSpeechState) -> CsmArtifactGovernancePublication {
+    CsmArtifactGovernancePublication {
+        schema_version: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
+        voice_profile_governance_schema_version: CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION,
+        artifact_id: csm_artifact_id(&state.descriptor),
+        artifact_hash: state.descriptor.digests.csm_model_digest.clone(),
+        model_id: state.descriptor.model_id.clone(),
+        model_version: "csm_1b_committed_fixture_descriptor_v1".to_string(),
+        source_repositories: vec![
+            state.descriptor.csm_repo.clone(),
+            state.descriptor.llama_tokenizer_repo.clone(),
+            state.descriptor.mimi_repo.clone(),
+        ],
+        license_posture: CSM_LICENSE_POSTURE,
+        runtime_image_ref: state.runtime_image_ref.clone(),
+        quantization: "none_full_precision_safetensors",
+        tokenizer_dependency: format!(
+            "{}@{}",
+            state.descriptor.llama_tokenizer_repo, state.descriptor.digests.llama_tokenizer_digest
+        ),
+        audio_codec_dependency: format!(
+            "{}:{}@{}",
+            state.descriptor.mimi_repo,
+            state.descriptor.mimi_weight,
+            state.descriptor.digests.mimi_weight_digest
+        ),
+        allowed_voice_profile_ids: state
+            .governance
+            .profiles
+            .iter()
+            .map(|profile| profile.profile_id.clone())
+            .collect(),
+        disallowed_voice_use_cases: vec![
+            "public_user_voice_clone",
+            "customer_voice_clone",
+            "contact_voice_clone",
+            "arbitrary_reference_audio_upload",
+        ],
+        watermark_status: state.governance.watermark_policy.status.clone(),
+        watermark_refusal_code: state.governance.watermark_policy.refusal_code.clone(),
+        canary_promotion: CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE,
+        primary_promotion: CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE,
+        rollback_target: CSM_ROLLBACK_TARGET_UNSET,
+        missing_governance_blocks: vec![
+            "license_review",
+            "private_watermark_or_equivalent_voice_safety_control",
+            "runtime_image_ref",
+            "autopilot_shadow_business_outcome_evidence",
+        ],
+        autopilot_consumption: vec![
+            "artifact_id",
+            "license_posture",
+            "voice_profile_id",
+            "watermark_status",
+            "runtime_image_ref",
+            "rollback_target",
+        ],
+    }
+}
+
 fn worker_metadata() -> CsmWorkerMetadataPublication {
     CsmWorkerMetadataPublication {
         worker_id: "psionic.csm_speech.worker.v1",
@@ -642,6 +745,15 @@ fn worker_metadata() -> CsmWorkerMetadataPublication {
             "output_duration_ms",
             "failure_code",
             "runtime_state",
+        ],
+        governance_fields: vec![
+            "artifact_id",
+            "artifact_hash",
+            "license_posture",
+            "runtime_image_ref",
+            "voice_profile_id",
+            "watermark_status",
+            "rollback_target",
         ],
         business_authority: "none_provider_output_is_evidence_not_instruction",
     }
@@ -699,6 +811,7 @@ async fn csm_health(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechH
         voice_profiles: voice_profiles(&state.governance, &state.descriptor),
         artifact_digests: artifact_digests(&state.descriptor),
         artifact_descriptor: artifact_descriptor(&state.descriptor),
+        governance: governance_publication(&state),
         runtime: runtime.clone(),
         worker: worker_metadata(),
         codec_capabilities: codec_capabilities(),
@@ -724,6 +837,7 @@ async fn csm_models(State(state): State<Arc<CsmSpeechState>>) -> Json<CsmSpeechM
             psionic_voice_profiles: voice_profiles(&state.governance, &state.descriptor),
             psionic_artifact_digests: artifact_digests(&state.descriptor),
             psionic_artifact_descriptor: artifact_descriptor(&state.descriptor),
+            psionic_governance: governance_publication(&state),
             psionic_runtime: runtime.clone(),
             psionic_worker: worker_metadata(),
             psionic_codec_capabilities: codec_capabilities(),
@@ -785,7 +899,10 @@ struct ValidatedCsmSpeechRequest {
     voice_profile_id: String,
     source_prompt_profile_id: String,
     voice_approval_status: String,
+    runtime_admission: String,
+    consent_posture: String,
     watermarking: String,
+    watermarking_refusal_code: String,
     speaker: u32,
     stream: bool,
     cancellation_id: Option<String>,
@@ -912,7 +1029,10 @@ impl ValidatedCsmSpeechRequest {
             voice_profile_id,
             source_prompt_profile_id: governed_profile.source_prompt_profile_id.clone(),
             voice_approval_status: governed_profile.approval_status.clone(),
+            runtime_admission: governed_profile.runtime_admission.clone(),
+            consent_posture: governed_profile.consent_posture.clone(),
             watermarking: governed_profile.watermark_policy.status.clone(),
+            watermarking_refusal_code: governed_profile.watermark_policy.refusal_code.clone(),
             speaker: prompt.speaker,
             stream,
             cancellation_id: request.cancellation_id,
@@ -992,7 +1112,13 @@ struct CsmSpeechSynthesis {
 struct CsmSpeechStreamTerminalMetadata {
     event: &'static str,
     model: String,
+    artifact_id: String,
+    governance_schema: &'static str,
+    license_posture: &'static str,
     voice_profile_id: String,
+    runtime_admission: String,
+    watermarking: String,
+    watermarking_refusal_code: String,
     backend: &'static str,
     execution_engine: &'static str,
     residency: &'static str,
@@ -1185,7 +1311,13 @@ fn csm_streaming_response(
     let terminal = CsmSpeechStreamTerminalMetadata {
         event: "terminal",
         model: request.model.clone(),
+        artifact_id: request.artifact_id.clone(),
+        governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
+        license_posture: CSM_LICENSE_POSTURE,
         voice_profile_id: request.voice_profile_id.clone(),
+        runtime_admission: request.runtime_admission.clone(),
+        watermarking: request.watermarking.clone(),
+        watermarking_refusal_code: request.watermarking_refusal_code.clone(),
         backend: CSM_SPEECH_SERVED_BACKEND,
         execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
         residency: CSM_SPEECH_RESIDENCY_MODE,
@@ -1340,6 +1472,21 @@ fn insert_csm_execution_headers(
     );
     insert_header(
         headers,
+        "x-psionic-csm-governance-schema",
+        CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-license-posture",
+        CSM_LICENSE_POSTURE,
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-runtime-image-ref",
+        state.runtime_image_ref.as_str(),
+    );
+    insert_header(
+        headers,
         "x-psionic-served-backend",
         CSM_SPEECH_SERVED_BACKEND,
     );
@@ -1370,8 +1517,33 @@ fn insert_csm_execution_headers(
     );
     insert_header(
         headers,
+        "x-psionic-csm-runtime-admission",
+        request.runtime_admission.as_str(),
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-consent-posture",
+        request.consent_posture.as_str(),
+    );
+    insert_header(
+        headers,
         "x-psionic-csm-watermarking",
         request.watermarking.as_str(),
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-watermark-refusal-code",
+        request.watermarking_refusal_code.as_str(),
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-promotion-gate",
+        CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE,
+    );
+    insert_header(
+        headers,
+        "x-psionic-csm-rollback-target",
+        CSM_ROLLBACK_TARGET_UNSET,
     );
     insert_header(
         headers,
@@ -1572,6 +1744,27 @@ mod tests {
         assert_eq!(
             response
                 .headers()
+                .get("x-psionic-csm-governance-schema")
+                .and_then(|value| value.to_str().ok()),
+            Some(CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION)
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-psionic-csm-license-posture")
+                .and_then(|value| value.to_str().ok()),
+            Some(CSM_LICENSE_POSTURE)
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-psionic-csm-runtime-image-ref")
+                .and_then(|value| value.to_str().ok()),
+            Some(CSM_RUNTIME_IMAGE_REF_UNSET)
+        );
+        assert_eq!(
+            response
+                .headers()
                 .get("x-psionic-csm-voice-profile-id")
                 .and_then(|value| value.to_str().ok()),
             Some(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
@@ -1582,6 +1775,20 @@ mod tests {
                 .get("x-psionic-csm-source-prompt-profile-id")
                 .and_then(|value| value.to_str().ok()),
             Some("conversational_a")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-psionic-csm-watermark-refusal-code")
+                .and_then(|value| value.to_str().ok()),
+            Some("csm_watermarking_unavailable")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-psionic-csm-promotion-gate")
+                .and_then(|value| value.to_str().ok()),
+            Some(CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE)
         );
         let body = to_bytes(response.into_body(), usize::MAX).await?;
         let payload: serde_json::Value = serde_json::from_slice(&body)?;
@@ -1628,6 +1835,15 @@ mod tests {
                 .is_some_and(
                     |metrics| metrics.contains(&serde_json::json!("queue_depth"))
                         && metrics.contains(&serde_json::json!("full_generation_latency_ms"))
+                )
+        );
+        assert!(
+            payload["worker"]["governance_fields"]
+                .as_array()
+                .is_some_and(
+                    |fields| fields.contains(&serde_json::json!("license_posture"))
+                        && fields.contains(&serde_json::json!("watermark_status"))
+                        && fields.contains(&serde_json::json!("rollback_target"))
                 )
         );
         assert_eq!(
@@ -1772,6 +1988,29 @@ mod tests {
             payload["safety_capabilities"]["watermarking_refusal"]["code"],
             serde_json::json!("csm_watermarking_unavailable")
         );
+        assert_eq!(
+            payload["governance"]["schema_version"],
+            serde_json::json!(CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION)
+        );
+        assert_eq!(
+            payload["governance"]["license_posture"],
+            serde_json::json!(CSM_LICENSE_POSTURE)
+        );
+        assert_eq!(
+            payload["governance"]["canary_promotion"],
+            serde_json::json!(CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE)
+        );
+        assert_eq!(
+            payload["governance"]["runtime_image_ref"],
+            serde_json::json!(CSM_RUNTIME_IMAGE_REF_UNSET)
+        );
+        assert!(
+            payload["governance"]["disallowed_voice_use_cases"]
+                .as_array()
+                .is_some_and(
+                    |use_cases| use_cases.contains(&serde_json::json!("customer_voice_clone"))
+                )
+        );
         assert!(
             payload["voice_profiles"]
                 .as_array()
@@ -1821,6 +2060,10 @@ mod tests {
         assert_eq!(
             payload["data"][0]["psionic_safety_capabilities"]["watermarking_refusal"]["code"],
             serde_json::json!("csm_watermarking_unavailable")
+        );
+        assert_eq!(
+            payload["data"][0]["psionic_governance"]["primary_promotion"],
+            serde_json::json!(CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE)
         );
         Ok(())
     }
@@ -1900,7 +2143,13 @@ mod tests {
         let terminal = CsmSpeechStreamTerminalMetadata {
             event: "terminal",
             model: CSM_SPEECH_MODEL_ID.to_string(),
+            artifact_id: format!("{CSM_SPEECH_MODEL_ID}@sha256:test"),
+            governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
+            license_posture: CSM_LICENSE_POSTURE,
             voice_profile_id: CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID.to_string(),
+            runtime_admission: "admitted_openagents_operated_lyra_production_dogfood".to_string(),
+            watermarking: CSM_WATERMARK_OPERATOR_DOGFOOD.to_string(),
+            watermarking_refusal_code: "csm_watermarking_unavailable".to_string(),
             backend: CSM_SPEECH_SERVED_BACKEND,
             execution_engine: CSM_SPEECH_EXECUTION_ENGINE,
             residency: CSM_SPEECH_RESIDENCY_MODE,
