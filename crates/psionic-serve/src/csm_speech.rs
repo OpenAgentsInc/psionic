@@ -57,7 +57,7 @@ const CSM_SPEECH_MAX_AUDIO_LENGTH_MS: u64 = 20_000;
 const CSM_SPEECH_DEFAULT_TIMEOUT_MS: u64 = 10_000;
 const CSM_SPEECH_MAX_TIMEOUT_MS: u64 = 30_000;
 const CSM_SPEECH_STREAM_BOUNDARY: &str = "psionic-csm-stream";
-const CSM_SPEECH_STREAM_WINDOW_FRAMES: usize = 1;
+const CSM_SPEECH_STREAM_WINDOW_FRAMES: usize = 2;
 
 #[derive(Clone, Debug)]
 pub struct CsmSpeechServerConfig {
