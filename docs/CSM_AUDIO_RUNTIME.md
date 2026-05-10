@@ -90,7 +90,7 @@ zone: us-east4-a
 accelerator: NVIDIA L4
 static IP: 34.48.128.199
 endpoint: http://34.48.128.199:8081/v1/audio/speech
-image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:54ebb23e
+image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:1bae791b
 ```
 
 This is the active owned GPU route because Cloud Run GPU allocation quota is
@@ -128,19 +128,21 @@ runtime.refusal = null
 2026-05-10 update:
 
 - active image:
-  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:54ebb23e`
+  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:1bae791b`
 - runtime health: `served_backend=cuda`, `runtime.residency=warm_cuda`,
   `runtime.execution_engine=rust_candle_csm_cuda`,
   `runtime.gpu_model=nvidia-l4-gce`, `runtime.refusal=null`
 - startup metadata was updated to restart this image with the host-driver
   `LD_LIBRARY_PATH` shown above rather than the Cloud Run CUDA compatibility
   path.
-- direct production speech smoke with `max_audio_length_ms=4500` returned
-  `audio/wav`, 215084 bytes, `x-psionic-output-duration-ms=4480`,
+- direct production speech smoke with `context_policy=prompt_profile_only` and
+  `max_audio_length_ms=1200` returned `audio/wav`, 57644 bytes,
+  `x-psionic-output-duration-ms=1200`,
+  `x-psionic-csm-prompt-frame-count=510`,
   `x-psionic-generation-backend=cuda`,
   `x-psionic-generation-execution-engine=rust_candle_csm_cuda`,
   `x-psionic-gpu-model=nvidia-l4-gce`, and
-  `x-psionic-csm-runtime-image-ref=...:54ebb23e`.
+  `x-psionic-csm-runtime-image-ref=...:1bae791b`.
 
 ## Fixture Source
 
@@ -489,7 +491,7 @@ The served voice-profile contract is now:
 - disallowed surfaces: `public_user_voice_clone` and
   `arbitrary_reference_audio_upload`
 - source provenance:
-  `committed_csm_parity_fixture_prompt_conversational_b`
+  `committed_csm_parity_fixture_prompt_with_full_precomputed_codebooks`
 - consent posture:
   `openagents_operated_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload`
 
