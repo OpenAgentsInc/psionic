@@ -370,10 +370,16 @@ impl CsmSpeechRuntimeSlot {
                 ));
                 active_backend = CsmRuntimeBackend::Cpu;
             } else {
+                eprintln!(
+                    "psionic csm speech accelerated device initialization failed backend={} fallback=disabled error={error}",
+                    requested_backend.label()
+                );
                 return Self::unavailable(
                     requested_backend.label(),
                     "accelerator_unavailable",
-                    "requested CSM accelerator backend failed device initialization and CPU fallback is disabled",
+                    format!(
+                        "requested CSM accelerator backend failed device initialization and CPU fallback is disabled: {error}"
+                    ),
                     vec!["deploy_gpu_runtime_or_enable_explicit_cpu_fallback"],
                 );
             }
@@ -382,11 +388,17 @@ impl CsmSpeechRuntimeSlot {
         if active_backend.is_accelerated() {
             // Reinitialize once here so startup fails before artifact hydration if the
             // accelerator backend is not usable inside the runtime image.
-            if active_backend.device().is_err() {
+            if let Err(error) = active_backend.device() {
+                eprintln!(
+                    "psionic csm speech accelerated device recheck failed backend={} error={error}",
+                    active_backend.label()
+                );
                 return Self::unavailable(
                     active_backend.label(),
                     "accelerator_unavailable",
-                    "requested CSM accelerator backend failed device initialization",
+                    format!(
+                        "requested CSM accelerator backend failed device initialization: {error}"
+                    ),
                     vec!["deploy_gpu_runtime_or_enable_explicit_cpu_fallback"],
                 );
             }
@@ -567,7 +579,7 @@ impl CsmSpeechRuntimeSlot {
     fn unavailable(
         requested_backend: &str,
         code: &'static str,
-        reason: &'static str,
+        reason: impl Into<String>,
         pending_phases: Vec<&'static str>,
     ) -> Self {
         Self {
@@ -588,7 +600,7 @@ impl CsmSpeechRuntimeSlot {
                 cpu_fallback_reason: None,
                 refusal: Some(CsmSpeechRefusalPublication {
                     code,
-                    reason,
+                    reason: reason.into(),
                     pending_phases,
                 }),
             },
@@ -774,7 +786,7 @@ struct CsmSafetyCapabilityPublication {
 #[derive(Clone, Debug, Serialize)]
 struct CsmSpeechRefusalPublication {
     code: &'static str,
-    reason: &'static str,
+    reason: String,
     pending_phases: Vec<&'static str>,
 }
 
@@ -1390,10 +1402,10 @@ impl CsmSpeechState {
                 .status
                 .refusal
                 .as_ref()
-                .map(|refusal| (refusal.code, refusal.reason))
+                .map(|refusal| (refusal.code, refusal.reason.clone()))
                 .unwrap_or((
                     "runtime_unavailable",
-                    "CSM runtime is unavailable and requests fail closed",
+                    "CSM runtime is unavailable and requests fail closed".to_string(),
                 ));
             return Err(CsmSpeechHttpError::runtime_unavailable(code, reason));
         };
