@@ -1641,10 +1641,11 @@ impl CsmCpuGenerator {
             pending_window.push(frame);
             if pending_window.len() >= window_frame_count {
                 let start_frame_index = generated.len().saturating_sub(pending_window.len());
+                let final_window = generated.len() >= request.prompt.max_generation_len;
                 on_window(CsmCpuGeneratedWindow {
                     start_frame_index,
                     codebook_frames: std::mem::take(&mut pending_window),
-                    final_window: false,
+                    final_window,
                 })?;
             }
             let (next_tokens, next_mask) = self
