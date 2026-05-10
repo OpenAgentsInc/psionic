@@ -34,6 +34,7 @@ GPU_COUNT="${PSIONIC_CSM_CLOUD_RUN_GPU_COUNT:-}"
 GPU_TYPE="${PSIONIC_CSM_CLOUD_RUN_GPU_TYPE:-nvidia-l4}"
 GPU_ZONAL_REDUNDANCY="${PSIONIC_CSM_CLOUD_RUN_GPU_ZONAL_REDUNDANCY:-false}"
 CUDA_COMPUTE_CAP="${PSIONIC_CSM_CUDA_COMPUTE_CAP:-89}"
+CUDA_RUNTIME_LIBRARY_PATH="${PSIONIC_CSM_CUDA_RUNTIME_LIBRARY_PATH:-/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/local/cuda/compat:/usr/local/cuda/lib64}"
 TAG="${PSIONIC_CSM_IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${SERVICE}:${TAG}"
 SA_EMAIL="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -270,7 +271,7 @@ RUN cargo build --release -p psionic-csm-speech --bin psionic-csm-speech-server 
 
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates cuda-compat-12-4 \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/psionic-csm-speech-server /usr/local/bin/psionic-csm-speech-server
 ENV PSIONIC_CSM_HOST=0.0.0.0
@@ -278,11 +279,14 @@ ENV PSIONIC_CSM_PORT=8081
 ENV PSIONIC_CSM_RUNTIME=true
 ENV PSIONIC_CSM_BACKEND=cuda
 ENV HF_HOME=/root/.cache/huggingface
-ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV LD_LIBRARY_PATH=__CUDA_RUNTIME_LIBRARY_PATH__
 EXPOSE 8081
 ENTRYPOINT ["/usr/local/bin/psionic-csm-speech-server"]
 DOCKERFILE
     sed -i.bak "s/__CUDA_COMPUTE_CAP__/${CUDA_COMPUTE_CAP}/g" "${tmp_context}/Dockerfile"
+    sed -i.bak "s|__CUDA_RUNTIME_LIBRARY_PATH__|${CUDA_RUNTIME_LIBRARY_PATH}|g" "${tmp_context}/Dockerfile"
     rm -f "${tmp_context}/Dockerfile.bak"
   else
     cat >"${tmp_context}/Dockerfile" <<'DOCKERFILE'
@@ -343,7 +347,7 @@ deploy_service() {
     --add-volume "name=hf-cache,type=cloud-storage,bucket=${ARTIFACT_BUCKET},readonly=true,mount-options=implicit-dirs" \
     --add-volume-mount "volume=hf-cache,mount-path=/root/.cache/huggingface" \
     --startup-probe "tcpSocket.port=${PORT},periodSeconds=10,timeoutSeconds=5,failureThreshold=120" \
-    --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},PSIONIC_CSM_STARTUP_LOAD_MODE=${STARTUP_LOAD_MODE},PSIONIC_CSM_GPU_MODEL=${GPU_TYPE},PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=${CPU_FALLBACK_ON_ACCELERATOR_FAILURE},PSIONIC_CSM_RUNTIME_IMAGE_REF=${IMAGE},HF_HOME=/root/.cache/huggingface,LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/cuda/lib64"
+    --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},PSIONIC_CSM_STARTUP_LOAD_MODE=${STARTUP_LOAD_MODE},PSIONIC_CSM_GPU_MODEL=${GPU_TYPE},PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=${CPU_FALLBACK_ON_ACCELERATOR_FAILURE},PSIONIC_CSM_RUNTIME_IMAGE_REF=${IMAGE},HF_HOME=/root/.cache/huggingface,NVIDIA_VISIBLE_DEVICES=all,NVIDIA_DRIVER_CAPABILITIES=compute,LD_LIBRARY_PATH=${CUDA_RUNTIME_LIBRARY_PATH}"
   )
 
   if [[ "$BACKEND" == cuda* ]]; then

@@ -197,10 +197,13 @@ release automation still waits for `runtime.state=ready`, `served_backend=cuda`,
 and CUDA response headers before admitting the revision.
 
 The CUDA runtime image must also keep the Cloud Run GPU driver path in
-`LD_LIBRARY_PATH`: `/usr/local/nvidia/lib64:/usr/local/cuda/lib64`. The CUDA
-toolkit runtime image contains cuBLAS/cuRAND, but Cloud Run exposes
+`LD_LIBRARY_PATH`:
+`/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/local/cuda/compat:/usr/local/cuda/lib64`.
+The CUDA toolkit runtime image contains cuBLAS/cuRAND, but Cloud Run exposes
 `libcuda.so.1` through the NVIDIA driver mount. Missing that path prevents the
-Rust binary from starting before any application logs can be emitted.
+Rust binary from starting before any application logs can be emitted. The
+runtime image includes `cuda-compat-12-4` as a secondary compatibility path,
+with the real Cloud Run driver path still ordered first.
 
 Quantization is allowed only if it preserves artifact identity, fixture
 comparability, and promotion evidence. A quantized CSM artifact must publish a
