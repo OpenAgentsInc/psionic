@@ -701,8 +701,8 @@ node scripts/csm-streaming-smoke.mjs
 That smoke requires at least two JSONL `audio` events, one terminal event, and a
 first audio event before response completion, so it fails if the endpoint buffers
 a complete WAV/body before yielding the first audio chunk.
-The production streaming window is currently 2 generated CSM frames per emitted
-audio chunk so Autopilot receives roughly 160 ms windows instead of the earlier
+The production streaming window is currently 1 generated CSM frame per emitted
+audio chunk so Autopilot receives roughly 80 ms windows instead of the earlier
 8-frame/640 ms cadence.
 
 The validator checks:
