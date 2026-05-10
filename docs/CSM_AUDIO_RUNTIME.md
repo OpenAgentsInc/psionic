@@ -114,6 +114,11 @@ Useful environment controls:
   fallback is enabled.
 - `PSIONIC_CSM_BACKEND=metal` or `metal:<ordinal>` is available for local
   Apple-silicon experiments but is not the production Cloud Run path.
+- `PSIONIC_CSM_STARTUP_LOAD_MODE=sync|background` controls whether CSM/Mimi
+  artifacts load before the server starts accepting traffic or in a background
+  loader after the HTTP server is bound. CPU/local runs default to `sync`.
+  CUDA Cloud Run deployments default to `background` so startup probes see a
+  live process while `/health` reports `runtime.state=loading`.
 - `PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=true` permits explicit CPU
   fallback after accelerator initialization or load failure. It is off by
   default; GPU releases should keep it off.
@@ -340,6 +345,7 @@ Default deployment settings:
   `HF_HOME=/root/.cache/huggingface`,
   `PSIONIC_CSM_RUNTIME=true`,
   `PSIONIC_CSM_BACKEND=cpu` or `cuda`,
+  `PSIONIC_CSM_STARTUP_LOAD_MODE=sync` for CPU or `background` for CUDA,
   `PSIONIC_CSM_GPU_MODEL=nvidia-l4`,
   `PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=false`, and
   `PSIONIC_CSM_MODEL_ID=sesame/csm-1b`
@@ -365,6 +371,12 @@ PSIONIC_CSM_BACKEND=cuda scripts/deploy-csm-speech-cloud-run.sh
 The script builds with the `csm-cuda` Cargo feature in a CUDA devel image,
 deploys with Cloud Run GPU flags, and blocks the release if the ready service
 does not publish `served_backend = cuda`.
+
+GPU startup is two-phase. The container binds the HTTP server first, publishes
+`runtime.state=loading`, and then hydrates the tokenizer, CSM weights, and Mimi
+decoder in a background loader. The release script still waits for
+`runtime.state=ready` before running the speech smoke, so a deployment is not
+considered promoted until the real CUDA-backed model is loaded and serving.
 
 2026-05-06 production deployment evidence:
 

@@ -61,6 +61,7 @@ pub struct CsmSpeechServerConfig {
     pub model_id: String,
     pub runtime_enabled: bool,
     pub backend: String,
+    pub startup_load_mode: String,
     pub cpu_fallback_on_accelerator_failure: bool,
     pub gpu_model: String,
     pub runtime_image_ref: String,
@@ -74,6 +75,7 @@ impl Default for CsmSpeechServerConfig {
             model_id: String::from(CSM_SPEECH_MODEL_ID),
             runtime_enabled: true,
             backend: String::from(CSM_SPEECH_DEFAULT_BACKEND),
+            startup_load_mode: String::from("sync"),
             cpu_fallback_on_accelerator_failure: false,
             gpu_model: String::from("not_configured"),
             runtime_image_ref: String::from(CSM_RUNTIME_IMAGE_REF_UNSET),
@@ -104,6 +106,9 @@ impl CsmSpeechServerConfig {
         }
         if let Ok(backend) = env::var("PSIONIC_CSM_BACKEND") {
             config.backend = backend;
+        }
+        if let Ok(startup_load_mode) = env::var("PSIONIC_CSM_STARTUP_LOAD_MODE") {
+            config.startup_load_mode = startup_load_mode;
         }
         if let Ok(fallback) = env::var("PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE") {
             config.cpu_fallback_on_accelerator_failure = matches!(
@@ -162,17 +167,61 @@ impl CsmSpeechServer {
                     "failed to validate CSM voice-profile governance manifest: {error}"
                 ))
             })?;
-        let runtime = CsmSpeechRuntimeSlot::load(&config, &fixture, &descriptor);
-        Ok(Self {
-            state: Arc::new(CsmSpeechState {
-                model_id: config.model_id,
-                fixture,
-                descriptor,
-                governance,
-                runtime_image_ref: config.runtime_image_ref,
-                runtime: Mutex::new(runtime),
-            }),
-        })
+        let background_load = matches!(
+            config.startup_load_mode.to_ascii_lowercase().as_str(),
+            "background" | "async" | "deferred"
+        );
+        let runtime = if background_load {
+            CsmSpeechRuntimeSlot::loading(&config)
+        } else {
+            CsmSpeechRuntimeSlot::load(&config, &fixture, &descriptor)
+        };
+        let state = Arc::new(CsmSpeechState {
+            model_id: config.model_id.clone(),
+            fixture: fixture.clone(),
+            descriptor: descriptor.clone(),
+            governance,
+            runtime_image_ref: config.runtime_image_ref.clone(),
+            runtime: Mutex::new(runtime),
+        });
+
+        if background_load {
+            let state_for_loader = Arc::clone(&state);
+            std::thread::Builder::new()
+                .name(String::from("psionic-csm-runtime-loader"))
+                .spawn(move || {
+                    eprintln!(
+                        "psionic csm speech runtime loading started backend={} mode=background",
+                        config.backend
+                    );
+                    let loaded =
+                        CsmSpeechRuntimeSlot::load(&config, &state_for_loader.fixture, &state_for_loader.descriptor);
+                    let state_label = loaded.status.state;
+                    let backend_label = loaded.status.backend.clone();
+                    let engine_label = loaded.status.execution_engine.clone();
+                    match state_for_loader.runtime.lock() {
+                        Ok(mut slot) => {
+                            *slot = loaded;
+                            eprintln!(
+                                "psionic csm speech runtime loading finished state={} backend={} execution_engine={}",
+                                state_label, backend_label, engine_label
+                            );
+                        }
+                        Err(_) => {
+                            eprintln!(
+                                "psionic csm speech runtime loading finished but runtime lock is poisoned"
+                            );
+                        }
+                    }
+                })
+                .map_err(|error| {
+                    CsmSpeechServerError::Config(format!(
+                        "failed to spawn CSM background runtime loader: {error}"
+                    ))
+                })?;
+        }
+
+        Ok(Self { state })
     }
 
     pub fn router(&self) -> Router {
@@ -231,6 +280,58 @@ struct CsmRuntimeStatus {
 }
 
 impl CsmSpeechRuntimeSlot {
+    fn loading(config: &CsmSpeechServerConfig) -> Self {
+        let requested_backend = CsmRuntimeBackend::parse(&config.backend).ok();
+        let backend_label = requested_backend
+            .as_ref()
+            .map(CsmRuntimeBackend::label)
+            .unwrap_or(config.backend.as_str())
+            .to_string();
+        let execution_engine = requested_backend
+            .as_ref()
+            .map(CsmRuntimeBackend::execution_engine)
+            .unwrap_or("unsupported_backend")
+            .to_string();
+        let residency = requested_backend
+            .as_ref()
+            .map(CsmRuntimeBackend::residency_mode)
+            .unwrap_or("loading")
+            .to_string();
+        let accelerated_backend = requested_backend
+            .as_ref()
+            .map(CsmRuntimeBackend::accelerated_backend)
+            .unwrap_or("unknown")
+            .to_string();
+        let gpu_model = if requested_backend
+            .as_ref()
+            .is_some_and(CsmRuntimeBackend::is_accelerated)
+        {
+            config.gpu_model.clone()
+        } else {
+            String::from("none")
+        };
+        Self {
+            status: CsmRuntimeStatus {
+                requested_backend: backend_label.clone(),
+                residency,
+                backend: backend_label,
+                execution_engine,
+                state: "loading",
+                loaded_at_unix_ms: None,
+                load_latency_ms: None,
+                tokenizer_loaded: false,
+                csm_config_loaded: false,
+                csm_model_loaded: false,
+                mimi_loaded: false,
+                accelerated_backend,
+                gpu_model,
+                cpu_fallback_reason: None,
+                refusal: None,
+            },
+            engine: None,
+        }
+    }
+
     fn load(
         config: &CsmSpeechServerConfig,
         fixture: &CsmPythonParityFixture,

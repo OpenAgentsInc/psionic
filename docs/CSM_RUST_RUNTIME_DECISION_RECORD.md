@@ -189,6 +189,13 @@ CUDA releases use
 `PSIONIC_CSM_BACKEND=cuda scripts/deploy-csm-speech-cloud-run.sh`. The deploy
 blocks if `/health` becomes ready as any backend other than CUDA.
 
+CUDA Cloud Run startup uses `PSIONIC_CSM_STARTUP_LOAD_MODE=background`. The
+server binds first and reports `runtime.state=loading` while the background
+loader hydrates CSM and Mimi on the requested accelerator. This keeps Cloud Run
+startup probing separate from model-load latency without weakening promotion:
+release automation still waits for `runtime.state=ready`, `served_backend=cuda`,
+and CUDA response headers before admitting the revision.
+
 Quantization is allowed only if it preserves artifact identity, fixture
 comparability, and promotion evidence. A quantized CSM artifact must publish a
 new artifact id and cannot silently replace the full-precision artifact.
