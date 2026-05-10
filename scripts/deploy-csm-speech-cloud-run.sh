@@ -238,7 +238,7 @@ build_image() {
   git archive HEAD | tar -x -C "$tmp_context"
   if [[ "$BACKEND" == cuda* ]]; then
     cat >"${tmp_context}/Dockerfile" <<'DOCKERFILE'
-FROM nvidia/cuda:12.4.1-devel-debian12 AS builder
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -259,7 +259,7 @@ WORKDIR /app
 COPY . .
 RUN cargo build --release -p psionic-csm-speech --bin psionic-csm-speech-server --features csm-cuda
 
-FROM nvidia/cuda:12.4.1-runtime-debian12
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
