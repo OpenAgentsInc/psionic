@@ -94,7 +94,7 @@ zone: us-east4-a
 accelerator: NVIDIA L4
 static IP: 34.48.128.199
 endpoint: http://34.48.128.199:8081/v1/audio/speech
-image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:37a9054f
+image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:211f4ca0
 ```
 
 This is the active owned GPU route because Cloud Run GPU allocation quota is
@@ -132,7 +132,7 @@ runtime.refusal = null
 2026-05-10 update:
 
 - active image:
-  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:37a9054f`
+  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:211f4ca0`
 - runtime health: `served_backend=cuda`, `runtime.residency=warm_cuda`,
   `runtime.execution_engine=rust_candle_csm_cuda`,
   `runtime.gpu_model=nvidia-l4-gce`, `runtime.refusal=null`
@@ -140,15 +140,15 @@ runtime.refusal = null
   `LD_LIBRARY_PATH` shown above rather than the Cloud Run CUDA compatibility
   path.
 - direct production speech smoke with `context_policy=prompt_profile_only` and
-  `max_audio_length_ms=15000` returned `audio/wav`, 718124 bytes,
-  `x-psionic-output-duration-ms=14960`,
-  `x-psionic-csm-prompt-frame-count=542`,
+  `max_audio_length_ms=160` returned `audio/wav`, 7724 bytes,
   `x-psionic-generation-backend=cuda`,
   `x-psionic-generation-execution-engine=rust_candle_csm_cuda`,
   `x-psionic-gpu-model=nvidia-l4-gce`, and
-  `x-psionic-csm-runtime-image-ref=...:37a9054f`. This proves the current
-  worker accepts the 15000 ms bounded-answer window used by Autopilot instead
-  of failing closed at the previous 10000 ms limit.
+  `x-psionic-csm-runtime-image-ref=...:211f4ca0`.
+- direct production JSONL streaming smoke with `stream=true`,
+  `stream_format=jsonl_base64`, and `max_audio_length_ms=2000` returned 4
+  `audio` events plus 1 terminal event before the worker was reconnected to
+  Autopilot production.
 
 ## Fixture Source
 
