@@ -119,6 +119,8 @@ Useful environment controls:
   default; GPU releases should keep it off.
 - `PSIONIC_CSM_GPU_MODEL` publishes the expected accelerator class, such as
   `nvidia-l4`.
+- `PSIONIC_CSM_CUDA_COMPUTE_CAP` defaults to `89` for L4 so Cloud Build can
+  compile CUDA kernels without `nvidia-smi` in the builder.
 - `PSIONIC_CSM_HOST`, `PSIONIC_CSM_PORT`, and `PSIONIC_CSM_MODEL_ID` mirror the
   command-line host, port, and model controls.
 - `PSIONIC_CSM_RUNTIME_IMAGE_REF` optionally records the deploy image or source
