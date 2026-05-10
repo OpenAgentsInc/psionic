@@ -230,7 +230,9 @@ The request shape accepts:
 - `timeout_ms`, defaulting to 10000 and capped at 30000
 - `psionic_csm.temperature`
 - `psionic_csm.top_k`
-- `psionic_csm.max_audio_length_ms`, currently `80..=10000` on warm CPU/GPU
+- `psionic_csm.max_audio_length_ms`, currently `80..=20000` on warm CPU/GPU.
+  Autopilot production currently uses a 15000 ms budget for bounded generic
+  spoken answers while CRM/action acknowledgements remain shorter.
 - `psionic_csm.context_policy`, currently `prompt_profile_only` for governed
   Autopilot speech so CSM receives the approved source prompt codebooks for
   stable speaker identity; `none` remains available for diagnostics only

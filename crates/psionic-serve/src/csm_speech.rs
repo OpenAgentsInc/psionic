@@ -48,7 +48,7 @@ pub const CSM_PROMOTION_BLOCKED_WITHOUT_GOVERNANCE: &str =
 pub const CSM_RUNTIME_IMAGE_REF_UNSET: &str = "not_configured_local_runtime";
 pub const CSM_ROLLBACK_TARGET_UNSET: &str = "fallback_to_current_autopilot_tts_provider";
 const CSM_SPEECH_DEFAULT_AUDIO_LENGTH_MS: u64 = 240;
-const CSM_SPEECH_MAX_AUDIO_LENGTH_MS: u64 = 10_000;
+const CSM_SPEECH_MAX_AUDIO_LENGTH_MS: u64 = 20_000;
 const CSM_SPEECH_DEFAULT_TIMEOUT_MS: u64 = 10_000;
 const CSM_SPEECH_MAX_TIMEOUT_MS: u64 = 30_000;
 const CSM_SPEECH_STREAM_BOUNDARY: &str = "psionic-csm-stream";
@@ -1302,7 +1302,9 @@ fn validate_params(params: &CsmGenerationParams) -> Result<(), CsmSpeechHttpErro
         && !(80..=CSM_SPEECH_MAX_AUDIO_LENGTH_MS).contains(&max_audio_length_ms)
     {
         return Err(CsmSpeechHttpError::invalid_request(
-            "max_audio_length_ms must be between 80 and 10000 on the Rust CSM speech server",
+            format!(
+                "max_audio_length_ms must be between 80 and {CSM_SPEECH_MAX_AUDIO_LENGTH_MS} on the Rust CSM speech server"
+            ),
             "invalid_max_audio_length_ms",
         ));
     }
@@ -2024,10 +2026,10 @@ mod tests {
     #[test]
     fn csm_generation_params_allow_current_autopilot_ack_window() {
         validate_params(&CsmGenerationParams {
-            max_audio_length_ms: Some(4_500),
+            max_audio_length_ms: Some(15_000),
             ..CsmGenerationParams::default()
         })
-        .expect("current Autopilot CSM ack window should be accepted");
+        .expect("current Autopilot bounded answer window should be accepted");
 
         let error = validate_params(&CsmGenerationParams {
             max_audio_length_ms: Some(CSM_SPEECH_MAX_AUDIO_LENGTH_MS + 1),
@@ -2035,7 +2037,7 @@ mod tests {
         })
         .expect_err("overlarge CSM ack window should fail closed");
         assert_eq!(error.code, "invalid_max_audio_length_ms");
-        assert!(error.message.contains("10000"));
+        assert!(error.message.contains("20000"));
     }
 
     #[tokio::test]
