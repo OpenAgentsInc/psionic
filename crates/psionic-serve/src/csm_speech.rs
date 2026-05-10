@@ -499,6 +499,10 @@ impl CsmSpeechRuntimeSlot {
                     && active_backend.is_accelerated()
                     && config.cpu_fallback_on_accelerator_failure =>
             {
+                eprintln!(
+                    "psionic csm speech accelerated runtime load failed backend={} fallback=cpu error={error}",
+                    requested_backend.label()
+                );
                 cpu_fallback_reason = Some(format!(
                     "requested backend {} failed model or Mimi load and explicit CPU fallback is enabled: {error}",
                     requested_backend.label()
@@ -506,7 +510,10 @@ impl CsmSpeechRuntimeSlot {
                 active_backend = CsmRuntimeBackend::Cpu;
                 match load_engine_for_backend(active_backend.clone()) {
                     Ok(engine) => engine,
-                    Err(_) => {
+                    Err(error) => {
+                        eprintln!(
+                            "psionic csm speech CPU fallback runtime load failed after accelerator failure error={error}"
+                        );
                         return Self::unavailable(
                             active_backend.label(),
                             "csm_cpu_fallback_load_failed",
@@ -516,7 +523,11 @@ impl CsmSpeechRuntimeSlot {
                     }
                 }
             }
-            Err(_) => {
+            Err(error) => {
+                eprintln!(
+                    "psionic csm speech runtime load failed backend={} error={error}",
+                    active_backend.label()
+                );
                 return Self::unavailable(
                     active_backend.label(),
                     "csm_runtime_load_failed",
