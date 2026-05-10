@@ -13,9 +13,13 @@ Run against a local or deployed CSM speech worker:
 
 ```sh
 node scripts/csm-speech-benchmark.mjs \
-  --url https://psionic-csm-speech-ycgawzh3ta-uc.a.run.app \
+  --url http://34.48.128.199:8081 \
   --repeat 3
 ```
+
+`http://34.48.128.199:8081` is the current static-address GCE L4 worker. Use
+the Cloud Run URL only after Cloud Run GPU quota is granted and the candidate
+revision publishes CUDA health and speech-response headers.
 
 The script reads
 `fixtures/csm/benchmarks/csm_speech_benchmark_corpus.v1.json` and writes a
@@ -41,7 +45,9 @@ GPU-backed CSM may be promoted as the Autopilot primary TTS path only when:
   `runtime.execution_engine = rust_candle_csm_cuda`, and
   `runtime.accelerated_backend = cuda`;
 - benchmark responses publish `x-psionic-served-backend: cuda` and
-  `x-psionic-accelerated-backend: cuda`;
+  `x-psionic-accelerated-backend: cuda`, plus
+  `x-psionic-generation-execution-engine: rust_candle_csm_cuda`;
+- current GCE production must publish `x-psionic-gpu-model: nvidia-l4-gce`;
 - `cpu_fallback_count = 0` unless the release explicitly declares a fallback
   drill;
 - the benchmark corpus has `success_rate = 1.0`;

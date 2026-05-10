@@ -33,8 +33,8 @@ The current implementation state is phase 8:
   model/config digests, accepts Rust-built prompt frames, generates 32-codebook
   audio frames, records deterministic frame digests, and can decode the
   generated frames through Rust Mimi into WAV-ready PCM. CPU is the portable
-  fallback; CUDA is the admitted accelerator backend for the Cloud Run GPU
-  worker.
+  fallback; CUDA is the admitted accelerator backend for the owned Psionic CSM
+  GPU worker.
 - Approved voice profiles publish precomputed prompt-codebook descriptors with
   provenance, sample rate, codebook count, frame counts, and token digests.
 - Psionic has a committed voice-profile governance manifest at
@@ -78,6 +78,52 @@ The current implementation state is phase 8:
 - There is no Python worker in this path. Psionic does not shell to Python,
   proxy to the local CSM repo, embed Python, or depend on the Python Moshi
   package at runtime.
+
+## Current Production GPU Worker
+
+The current Autopilot production dogfood worker is:
+
+```text
+service: psionic-csm-gpu-1
+platform: GCE
+zone: us-east4-a
+accelerator: NVIDIA L4
+static IP: 34.48.128.199
+endpoint: http://34.48.128.199:8081/v1/audio/speech
+image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:f25687b2
+```
+
+This is the active owned GPU route because Cloud Run GPU allocation quota is
+not yet available for the `psionic-csm-speech` service. Cloud Run remains the
+preferred managed target once quota is granted, but production must not claim
+Cloud Run GPU residency until `/health` and speech-response headers prove
+CUDA execution on that platform.
+
+The GCE container must prefer host-driver libraries and avoid forcing the
+container's `cuda-compat-12-4` driver shim ahead of the host driver. The active
+GCE runtime uses:
+
+```text
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib
+```
+
+Do not use the Cloud Run-oriented
+`/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/local/cuda/compat:/usr/local/cuda/lib64`
+path on the current Deep Learning VM. That path caused the container to load a
+driver shim that mismatched the host NVIDIA 580 driver and forced a fail-closed
+CUDA initialization error.
+
+The worker is healthy only when `/health` reports:
+
+```text
+status = ok
+served_backend = cuda
+runtime.backend = cuda
+runtime.execution_engine = rust_candle_csm_cuda
+runtime.residency = warm_cuda
+runtime.gpu_model = nvidia-l4-gce
+runtime.refusal = null
+```
 
 ## Fixture Source
 
@@ -126,13 +172,15 @@ Useful environment controls:
   `nvidia-l4`.
 - `PSIONIC_CSM_CUDA_COMPUTE_CAP` defaults to `89` for L4 so Cloud Build can
   compile CUDA kernels without `nvidia-smi` in the builder.
-- CUDA runtime images must expose `LD_LIBRARY_PATH` with NVIDIA driver mount
-  paths before CUDA toolkit paths:
+- Cloud Run CUDA runtime images must expose `LD_LIBRARY_PATH` with NVIDIA
+  driver mount paths before CUDA toolkit paths:
   `/usr/local/nvidia/lib64:/usr/local/nvidia/lib:/usr/local/cuda/compat:/usr/local/cuda/lib64`.
   Cloud Run GPU provides `libcuda.so.1` through the NVIDIA driver mount, not
   the CUDA toolkit directory. The runtime image also installs
   `cuda-compat-12-4` so the process can report a fail-closed health state
   instead of failing before application logs if the driver mount is absent.
+- GCE Deep Learning VM containers should prefer the host driver path described
+  in Current Production GPU Worker instead of the Cloud Run compat path.
 - `PSIONIC_CSM_HOST`, `PSIONIC_CSM_PORT`, and `PSIONIC_CSM_MODEL_ID` mirror the
   command-line host, port, and model controls.
 - `PSIONIC_CSM_RUNTIME_IMAGE_REF` optionally records the deploy image or source
