@@ -94,7 +94,7 @@ zone: us-east4-a
 accelerator: NVIDIA L4
 static IP: 34.48.128.199
 endpoint: http://34.48.128.199:8081/v1/audio/speech
-image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:211f4ca0
+image: us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:3c6f4159
 ```
 
 This is the active owned GPU route because Cloud Run GPU allocation quota is
@@ -132,7 +132,7 @@ runtime.refusal = null
 2026-05-10 update:
 
 - active image:
-  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:211f4ca0`
+  `us-central1-docker.pkg.dev/openagents-lyra/lyra/psionic-csm-speech:3c6f4159`
 - runtime health: `served_backend=cuda`, `runtime.residency=warm_cuda`,
   `runtime.execution_engine=rust_candle_csm_cuda`,
   `runtime.gpu_model=nvidia-l4-gce`, `runtime.refusal=null`
@@ -144,11 +144,12 @@ runtime.refusal = null
   `x-psionic-generation-backend=cuda`,
   `x-psionic-generation-execution-engine=rust_candle_csm_cuda`,
   `x-psionic-gpu-model=nvidia-l4-gce`, and
-  `x-psionic-csm-runtime-image-ref=...:211f4ca0`.
+  `x-psionic-csm-runtime-image-ref=...:3c6f4159`.
 - direct production JSONL streaming smoke with `stream=true`,
-  `stream_format=jsonl_base64`, and `max_audio_length_ms=2000` returned 4
-  `audio` events plus 1 terminal event before the worker was reconnected to
-  Autopilot production.
+  `stream_format=jsonl_base64`, and `max_audio_length_ms=2000` returned 13
+  `audio` events plus 1 terminal event from the 2-frame generation-time window.
+  A 1-frame window produced more chunks but caused Autopilot gateway timeouts,
+  so production stayed on the 2-frame window.
 
 ## Fixture Source
 
