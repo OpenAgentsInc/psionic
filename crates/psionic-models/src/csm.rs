@@ -58,15 +58,15 @@ pub const CSM_MIMI_WEIGHT: &str = "tokenizer-e351c8d8-checkpoint125.safetensors"
 pub const CSM_REFERENCE_AUDIO_ENCODING_UNSUPPORTED_CODE: &str = "rust_mimi_encode_not_implemented";
 /// First Rust CPU CSM generation engine label.
 pub const CSM_CPU_EXECUTION_ENGINE: &str = "rust_candle_csm_cpu";
-/// Machine-readable Lyra voice-profile governance schema.
+/// Machine-readable CSM voice-profile governance schema.
 pub const CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION: &str = "psionic.csm.voice_profiles.v1";
-/// First governed Lyra CSM voice profile.
-pub const CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID: &str = "lyra/default_female_v1";
+/// First governed OpenAgents CSM voice profile.
+pub const CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID: &str = "openagents/default_female_v1";
 /// Internal development admission for governed CSM voice profiles.
 pub const CSM_RUNTIME_ADMISSION_INTERNAL_DEVELOPMENT: &str = "admitted_internal_development";
 /// Operator-approved production dogfood admission for governed CSM voice profiles.
-pub const CSM_RUNTIME_ADMISSION_OPERATOR_LYRA_DOGFOOD: &str =
-    "admitted_openagents_operated_lyra_production_dogfood";
+pub const CSM_RUNTIME_ADMISSION_OPERATOR_AUTOPILOT_DOGFOOD: &str =
+    "admitted_openagents_operated_autopilot_production_dogfood";
 /// Watermark status used when output is admitted for bounded operator dogfood only.
 pub const CSM_WATERMARK_OPERATOR_DOGFOOD: &str = "unsupported_operator_accepted_limited_dogfood";
 const CSM_VOICE_PROFILE_GOVERNANCE_JSON: &str =
@@ -285,7 +285,7 @@ pub struct CsmVoiceProfileCodebookDescriptor {
     pub tokens_sha256: String,
 }
 
-/// Machine-readable CSM voice governance manifest for served Lyra profiles.
+/// Machine-readable CSM voice governance manifest for served OpenAgents profiles.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CsmVoiceProfileGovernanceManifest {
     /// Manifest schema version.
@@ -412,7 +412,7 @@ impl CsmVoiceProfileGovernanceManifest {
         Ok(())
     }
 
-    /// Finds a governed profile by public Lyra profile id.
+    /// Finds a governed profile by public OpenAgents profile id.
     #[must_use]
     pub fn find_profile(&self, profile_id: &str) -> Option<&CsmVoiceProfileGovernanceDescriptor> {
         self.profiles
@@ -436,10 +436,10 @@ pub struct CsmWatermarkGovernancePolicy {
     pub production_cutover: String,
 }
 
-/// Governed Lyra-facing voice profile.
+/// Governed OpenAgents-facing voice profile.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CsmVoiceProfileGovernanceDescriptor {
-    /// Public Lyra voice profile id.
+    /// Public OpenAgents voice profile id.
     pub profile_id: String,
     /// Human-readable name.
     pub display_name: String,
@@ -501,7 +501,7 @@ impl CsmVoiceProfileGovernanceDescriptor {
         if !matches!(
             self.runtime_admission.as_str(),
             CSM_RUNTIME_ADMISSION_INTERNAL_DEVELOPMENT
-                | CSM_RUNTIME_ADMISSION_OPERATOR_LYRA_DOGFOOD
+                | CSM_RUNTIME_ADMISSION_OPERATOR_AUTOPILOT_DOGFOOD
         ) {
             return Err(CsmFrontendError::DescriptorContract {
                 message: format!(
@@ -538,7 +538,7 @@ impl CsmVoiceProfileGovernanceDescriptor {
         matches!(
             self.runtime_admission.as_str(),
             CSM_RUNTIME_ADMISSION_INTERNAL_DEVELOPMENT
-                | CSM_RUNTIME_ADMISSION_OPERATOR_LYRA_DOGFOOD
+                | CSM_RUNTIME_ADMISSION_OPERATOR_AUTOPILOT_DOGFOOD
         )
     }
 }
@@ -2166,7 +2166,7 @@ mod tests {
     }
 
     #[test]
-    fn csm_voice_profile_governance_manifest_admits_lyra_default_female() {
+    fn csm_voice_profile_governance_manifest_admits_openagents_default_female() {
         let fixture = csm_python_parity_fixture().expect("fixture should parse");
         let descriptor =
             CsmModelArtifactDescriptor::from_fixture(&fixture).expect("descriptor should build");
@@ -2185,10 +2185,10 @@ mod tests {
             "not_a_production_safety_control"
         );
         let profile = manifest
-            .find_profile(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
-            .expect("default Lyra voice profile");
+            .find_profile(CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID)
+            .expect("default OpenAgents voice profile");
         assert!(profile.is_runtime_admitted());
-        assert_eq!(profile.source_prompt_profile_id, "conversational_a");
+        assert_eq!(profile.source_prompt_profile_id, "conversational_b");
         assert_eq!(
             profile.approval_status,
             "approved_openagents_operated_dogfood"
@@ -2201,7 +2201,7 @@ mod tests {
             profile
                 .allowed_product_surfaces
                 .iter()
-                .any(|surface| surface == "lyra_production_dogfood")
+                .any(|surface| surface == "autopilot_production_dogfood")
         );
         assert!(
             profile
@@ -2619,8 +2619,8 @@ mod tests {
             Some(&fixture.model.mimi_weight_digest),
         )
         .expect("Rust Mimi model");
-        let target =
-            CsmPromptSegment::encode_text_only(&tokenizer, 0, "Hello from Lyra.").expect("target");
+        let target = CsmPromptSegment::encode_text_only(&tokenizer, 1, "Hello from Autopilot.")
+            .expect("target");
         let plan = csm_build_prompt_frame_plan(
             &[],
             &target,

@@ -15,7 +15,7 @@ BUILD_MACHINE_TYPE="${PSIONIC_CSM_BUILD_MACHINE_TYPE:-e2-highcpu-32}"
 BUILD_DISK_SIZE="${PSIONIC_CSM_BUILD_DISK_SIZE:-200}"
 CPU="${PSIONIC_CSM_CLOUD_RUN_CPU:-8}"
 MEMORY="${PSIONIC_CSM_CLOUD_RUN_MEMORY:-32Gi}"
-MAX_INSTANCES="${PSIONIC_CSM_CLOUD_RUN_MAX_INSTANCES:-1}"
+MAX_INSTANCES="${PSIONIC_CSM_CLOUD_RUN_MAX_INSTANCES:-3}"
 MIN_INSTANCES="${PSIONIC_CSM_CLOUD_RUN_MIN_INSTANCES:-1}"
 CONCURRENCY="${PSIONIC_CSM_CLOUD_RUN_CONCURRENCY:-1}"
 REQUEST_TIMEOUT="${PSIONIC_CSM_CLOUD_RUN_TIMEOUT:-300}"
@@ -332,7 +332,7 @@ smoke_speech() {
     -o "$wav_file" \
     -X POST "${url}/v1/audio/speech" \
     -H 'Content-Type: application/json' \
-    -d '{"model":"sesame/csm-1b","input":"hello from psionic production","voice_profile_id":"lyra/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
+    -d '{"model":"sesame/csm-1b","input":"hello from psionic production","voice_profile_id":"openagents/default_female_v1","response_format":"wav","psionic_csm":{"max_audio_length_ms":160,"context_policy":"none"}}'
 
   local bytes
   bytes="$(wc -c <"$wav_file" | tr -d ' ')"

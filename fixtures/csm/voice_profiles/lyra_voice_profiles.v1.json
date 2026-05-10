@@ -7,19 +7,19 @@
     "refusal_code": "csm_watermarking_unavailable",
     "required_phase": "private_watermark_or_equivalent_voice_safety_control_before_public_voice_clone",
     "public_demo_key_status": "not_a_production_safety_control",
-    "production_cutover": "admitted_for_openagents_operated_lyra_dogfood_only"
+    "production_cutover": "admitted_for_openagents_operated_autopilot_dogfood_only"
   },
   "profiles": [
     {
-      "profile_id": "lyra/default_female_v1",
-      "display_name": "Lyra default female v1",
+      "profile_id": "openagents/default_female_v1",
+      "display_name": "OpenAgents default female v1",
       "approval_status": "approved_openagents_operated_dogfood",
-      "runtime_admission": "admitted_openagents_operated_lyra_production_dogfood",
-      "source_prompt_profile_id": "conversational_a",
-      "speaker": 0,
-      "prompt_transcript_sha256": "sha256:8e4b68dcd2d4d0a2948e76d5ecab53093c8b042f4f1f45168ce1a498656f4f9e",
-      "prompt_audio_sha256": "sha256:356648c1bc6c1da7883004557e9b21a2ef7d01682d8b9d02d6dcb950b348b04f",
-      "prompt_codebook_tokens_sha256": "sha256:30c8683dbb8552c199bff785e48b85cbb3f47b066038e634bf2b62e329bf3614",
+      "runtime_admission": "admitted_openagents_operated_autopilot_production_dogfood",
+      "source_prompt_profile_id": "conversational_b",
+      "speaker": 1,
+      "prompt_transcript_sha256": "sha256:fccceaf148763708aa50bf0e77a7d07a0979ff3eef2b7a4f0379efb3c89b240a",
+      "prompt_audio_sha256": "sha256:c247153011385d33aaeed193adfec562c32182e2facd30cc8cd0b3e820e94afb",
+      "prompt_codebook_tokens_sha256": "sha256:cb05358f772107811fb6b9d999c3abe912cd5c4bc76a06bb266d112d72f20a04",
       "csm_config_digest": "sha256:b203c014cb5a2f7b4f98d2e945f091182aceb17fa530ce968e8c3437e01a9b70",
       "csm_model_digest": "sha256:2e7721144afe38b906d4f1048671da639fe142423f4a26283606ecebe894f4bf",
       "llama_tokenizer_digest": "sha256:79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
@@ -30,12 +30,12 @@
         "mimi": "kyutai_moshiko_pytorch_bf16_tokenizer_e351c8d8_checkpoint125",
         "prompt_codebooks": "precomputed_digest_and_prefix_only_until_full_codebooks_or_rust_encode"
       },
-      "source_provenance": "committed_csm_parity_fixture_prompt_conversational_a",
+      "source_provenance": "committed_csm_parity_fixture_prompt_conversational_b",
       "consent_posture": "openagents_operated_placeholder_from_committed_reference_prompt_not_arbitrary_user_upload",
       "allowed_product_surfaces": [
         "psionic_local_development",
-        "lyra_internal_development",
-        "lyra_production_dogfood"
+        "autopilot_internal_development",
+        "autopilot_production_dogfood"
       ],
       "disallowed_product_surfaces": [
         "public_user_voice_clone",
@@ -48,7 +48,7 @@
         "refusal_code": "csm_watermarking_unavailable",
         "required_phase": "private_watermark_or_equivalent_voice_safety_control_before_public_voice_clone",
         "public_demo_key_status": "not_a_production_safety_control",
-        "production_cutover": "admitted_for_openagents_operated_lyra_dogfood_only"
+        "production_cutover": "admitted_for_openagents_operated_autopilot_dogfood_only"
       }
     }
   ]

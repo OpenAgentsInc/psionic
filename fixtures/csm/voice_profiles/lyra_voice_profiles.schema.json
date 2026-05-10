@@ -64,7 +64,7 @@
         "production_cutover": {
           "enum": [
             "blocked_until_private_watermark_or_equivalent_control",
-            "admitted_for_openagents_operated_lyra_dogfood_only"
+            "admitted_for_openagents_operated_autopilot_dogfood_only"
           ]
         }
       }
@@ -110,7 +110,7 @@
         "runtime_admission": {
           "enum": [
             "admitted_internal_development",
-            "admitted_openagents_operated_lyra_production_dogfood"
+            "admitted_openagents_operated_autopilot_production_dogfood"
           ]
         },
         "source_prompt_profile_id": {

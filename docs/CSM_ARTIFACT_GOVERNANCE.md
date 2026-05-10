@@ -69,11 +69,11 @@ fixture ids are not served voice ids.
 The current profile id is:
 
 ```text
-lyra/default_female_v1
+openagents/default_female_v1
 ```
 
-The id is retained as a stable historical profile id for compatibility. It is
-not a signal that the retired Lyra product owns the active voice system.
+The id is an OpenAgents-owned CSM voice profile id. It is not a raw Sesame
+prompt id and it is not a public voice-cloning permission.
 
 The current policy disallows:
 

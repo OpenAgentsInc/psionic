@@ -14,7 +14,7 @@ use axum::{
     routing::{get, post},
 };
 use psionic_models::{
-    CSM_CPU_EXECUTION_ENGINE, CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
+    CSM_CPU_EXECUTION_ENGINE, CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
     CSM_VOICE_PROFILE_GOVERNANCE_SCHEMA_VERSION, CSM_WATERMARK_OPERATOR_DOGFOOD,
     CsmCapabilityRefusal, CsmContextWindowPolicy, CsmCpuGenerationRequest, CsmCpuGenerator,
     CsmFrontendError, CsmGenerationWindow, CsmLlamaTextTokenizer, CsmMimiDecoder,
@@ -773,7 +773,7 @@ fn safety_capabilities() -> CsmSafetyCapabilityPublication {
         watermarking: CSM_WATERMARK_OPERATOR_DOGFOOD,
         watermarking_refusal: CsmCapabilityRefusal {
             code: "csm_watermarking_unavailable".to_string(),
-            reason: "CSM speech watermarking is not implemented in the Rust serving path; output is admitted only for OpenAgents-operated Lyra dogfood and remains unavailable for arbitrary public voice cloning".to_string(),
+            reason: "CSM speech watermarking is not implemented in the Rust serving path; output is admitted only for OpenAgents-operated Autopilot dogfood and remains unavailable for arbitrary public voice cloning".to_string(),
             required_phase: "private_watermark_or_equivalent_voice_safety_control_before_public_voice_clone".to_string(),
         },
     }
@@ -977,7 +977,7 @@ impl ValidatedCsmSpeechRequest {
         let voice_profile_id = request
             .voice_profile_id
             .or(request.voice)
-            .unwrap_or_else(|| String::from(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID));
+            .unwrap_or_else(|| String::from(CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID));
         let Some(governed_profile) = state.governance.find_profile(&voice_profile_id) else {
             return Err(CsmSpeechHttpError::missing_voice_profile());
         };
@@ -1709,7 +1709,7 @@ mod tests {
                         "request_id": "req_test_disabled_1",
                         "model": CSM_SPEECH_MODEL_ID,
                         "input": "hello from psionic",
-                        "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
+                        "voice_profile_id": CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
                         "response_format": "wav",
                         "psionic_csm": {
                             "temperature": 0.1,
@@ -1767,14 +1767,14 @@ mod tests {
                 .headers()
                 .get("x-psionic-csm-voice-profile-id")
                 .and_then(|value| value.to_str().ok()),
-            Some(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+            Some(CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID)
         );
         assert_eq!(
             response
                 .headers()
                 .get("x-psionic-csm-source-prompt-profile-id")
                 .and_then(|value| value.to_str().ok()),
-            Some("conversational_a")
+            Some("conversational_b")
         );
         assert_eq!(
             response
@@ -1867,7 +1867,7 @@ mod tests {
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
                         "request_id": "req_worker_controls",
                         "input": "hello",
-                        "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
+                        "voice_profile_id": CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
                         "artifact_id": "wrong-artifact",
                         "timeout_ms": 100,
                         "cancellation_id": "cancel_worker_controls"
@@ -1926,7 +1926,7 @@ mod tests {
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
                         "input": "hello",
-                        "voice_profile_id": "conversational_a"
+                        "voice_profile_id": "conversational_b"
                     }))?))?,
             )
             .await?;
@@ -2015,9 +2015,9 @@ mod tests {
             payload["voice_profiles"]
                 .as_array()
                 .is_some_and(|profiles| profiles.iter().any(|profile| {
-                    profile["id"] == serde_json::json!(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+                    profile["id"] == serde_json::json!(CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID)
                         && profile["source_prompt_profile_id"]
-                            == serde_json::json!("conversational_a")
+                            == serde_json::json!("conversational_b")
                         && profile["approval_status"]
                             == serde_json::json!("approved_openagents_operated_dogfood")
                         && profile["watermarking"]
@@ -2055,7 +2055,7 @@ mod tests {
         assert!(endpoints.contains(&serde_json::json!(CSM_SPEECH_ROUTE_PSIONIC)));
         assert_eq!(
             payload["data"][0]["psionic_voice_profiles"][0]["id"],
-            serde_json::json!(CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID)
+            serde_json::json!(CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID)
         );
         assert_eq!(
             payload["data"][0]["psionic_safety_capabilities"]["watermarking_refusal"]["code"],
@@ -2093,7 +2093,7 @@ mod tests {
                     .body(Body::from(serde_json::to_vec(&serde_json::json!({
                         "model": CSM_SPEECH_MODEL_ID,
                         "input": "hello from psionic",
-                        "voice_profile_id": CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID,
+                        "voice_profile_id": CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID,
                         "response_format": "wav",
                         "psionic_csm": {
                             "max_audio_length_ms": 160,
@@ -2146,8 +2146,8 @@ mod tests {
             artifact_id: format!("{CSM_SPEECH_MODEL_ID}@sha256:test"),
             governance_schema: CSM_ARTIFACT_GOVERNANCE_SCHEMA_VERSION,
             license_posture: CSM_LICENSE_POSTURE,
-            voice_profile_id: CSM_LYRA_DEFAULT_FEMALE_PROFILE_ID.to_string(),
-            runtime_admission: "admitted_openagents_operated_lyra_production_dogfood".to_string(),
+            voice_profile_id: CSM_OPENAGENTS_DEFAULT_FEMALE_PROFILE_ID.to_string(),
+            runtime_admission: "admitted_openagents_operated_autopilot_production_dogfood".to_string(),
             watermarking: CSM_WATERMARK_OPERATOR_DOGFOOD.to_string(),
             watermarking_refusal_code: "csm_watermarking_unavailable".to_string(),
             backend: CSM_SPEECH_SERVED_BACKEND,
