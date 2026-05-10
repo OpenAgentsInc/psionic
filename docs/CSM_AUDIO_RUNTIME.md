@@ -380,8 +380,10 @@ PSIONIC_CSM_BACKEND=cuda scripts/deploy-csm-speech-cloud-run.sh
 ```
 
 The script builds with the `csm-cuda` Cargo feature in a CUDA devel image,
-deploys with Cloud Run GPU flags, and blocks the release if the ready service
-does not publish `served_backend = cuda`.
+deploys a tagged no-traffic Cloud Run candidate revision with GPU flags, waits
+on the candidate tag URL, runs the speech smoke against that candidate, and
+only then promotes the exact tested revision to 100% traffic. The release is
+blocked if the ready candidate does not publish `served_backend = cuda`.
 
 GPU startup is two-phase. The container binds the HTTP server first, publishes
 `runtime.state=loading`, and then hydrates the tokenizer, CSM weights, and Mimi

@@ -187,7 +187,10 @@ The GPU worker must report:
 
 CUDA releases use
 `PSIONIC_CSM_BACKEND=cuda scripts/deploy-csm-speech-cloud-run.sh`. The deploy
-blocks if `/health` becomes ready as any backend other than CUDA.
+creates a tagged no-traffic Cloud Run candidate, verifies `/health` and speech
+smoke on the candidate tag URL, and promotes the tested revision only after it
+publishes CUDA backend evidence. The deploy blocks if `/health` becomes ready
+as any backend other than CUDA.
 
 CUDA Cloud Run startup uses `PSIONIC_CSM_STARTUP_LOAD_MODE=background`. The
 server binds first and reports `runtime.state=loading` while the background

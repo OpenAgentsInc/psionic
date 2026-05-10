@@ -22,6 +22,7 @@ REQUEST_TIMEOUT="${PSIONIC_CSM_CLOUD_RUN_TIMEOUT:-300}"
 PORT="${PSIONIC_CSM_PORT:-8081}"
 MODEL_ID="${PSIONIC_CSM_MODEL_ID:-sesame/csm-1b}"
 BACKEND="${PSIONIC_CSM_BACKEND:-cpu}"
+CANDIDATE_TAG="${PSIONIC_CSM_CLOUD_RUN_CANDIDATE_TAG:-csm-candidate}"
 if [[ -n "${PSIONIC_CSM_STARTUP_LOAD_MODE:-}" ]]; then
   STARTUP_LOAD_MODE="$PSIONIC_CSM_STARTUP_LOAD_MODE"
 elif [[ "$BACKEND" == cuda* ]]; then
@@ -347,6 +348,8 @@ deploy_service() {
     --add-volume "name=hf-cache,type=cloud-storage,bucket=${ARTIFACT_BUCKET},readonly=true,mount-options=implicit-dirs" \
     --add-volume-mount "volume=hf-cache,mount-path=/root/.cache/huggingface" \
     --startup-probe "tcpSocket.port=${PORT},periodSeconds=10,timeoutSeconds=5,failureThreshold=120" \
+    --tag "$CANDIDATE_TAG" \
+    --no-traffic \
     --set-env-vars "PSIONIC_CSM_HOST=0.0.0.0,PSIONIC_CSM_PORT=${PORT},PSIONIC_CSM_MODEL_ID=${MODEL_ID},PSIONIC_CSM_RUNTIME=true,PSIONIC_CSM_BACKEND=${BACKEND},PSIONIC_CSM_STARTUP_LOAD_MODE=${STARTUP_LOAD_MODE},PSIONIC_CSM_GPU_MODEL=${GPU_TYPE},PSIONIC_CSM_CPU_FALLBACK_ON_ACCELERATOR_FAILURE=${CPU_FALLBACK_ON_ACCELERATOR_FAILURE},PSIONIC_CSM_RUNTIME_IMAGE_REF=${IMAGE},HF_HOME=/root/.cache/huggingface,NVIDIA_VISIBLE_DEVICES=all,NVIDIA_DRIVER_CAPABILITIES=compute,LD_LIBRARY_PATH=${CUDA_RUNTIME_LIBRARY_PATH}"
   )
 
@@ -367,6 +370,27 @@ service_url() {
     --project "$PROJECT_ID" \
     --region "$REGION" \
     --format 'value(status.url)'
+}
+
+candidate_url() {
+  local url
+  url="$(service_url)"
+  printf "https://%s---%s" "$CANDIDATE_TAG" "${url#https://}"
+}
+
+latest_created_revision() {
+  gcloud run services describe "$SERVICE" \
+    --project "$PROJECT_ID" \
+    --region "$REGION" \
+    --format 'value(status.latestCreatedRevisionName)'
+}
+
+promote_candidate_revision() {
+  local revision="$1"
+  gcloud run services update-traffic "$SERVICE" \
+    --project "$PROJECT_ID" \
+    --region "$REGION" \
+    --to-revisions "${revision}=100"
 }
 
 wait_for_ready_runtime() {
@@ -452,8 +476,10 @@ stage_hf_artifacts
 build_image
 deploy_service
 
-URL="$(service_url)"
+REVISION="$(latest_created_revision)"
+URL="$(candidate_url)"
 wait_for_ready_runtime "$URL"
 smoke_speech "$URL"
+promote_candidate_revision "$REVISION"
 
-echo "$URL"
+service_url
