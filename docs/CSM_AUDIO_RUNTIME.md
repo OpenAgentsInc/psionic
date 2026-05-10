@@ -211,7 +211,7 @@ The request shape accepts:
 - `timeout_ms`, defaulting to 10000 and capped at 30000
 - `psionic_csm.temperature`
 - `psionic_csm.top_k`
-- `psionic_csm.max_audio_length_ms`, currently `80..=2000` on warm CPU
+- `psionic_csm.max_audio_length_ms`, currently `80..=10000` on warm CPU/GPU
 - `psionic_csm.context_policy`, currently `none` for served requests
 
 If no voice is provided, the server defaults to `openagents/default_female_v1`.
