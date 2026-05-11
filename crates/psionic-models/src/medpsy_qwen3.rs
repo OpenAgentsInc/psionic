@@ -1,13 +1,20 @@
-use std::{fs, path::Path};
+use std::{fs, fs::File, path::Path};
 
 use candle::{DType, Device, Tensor};
+use candle::quantized::gguf_file;
 use candle_nn::VarBuilder;
-use candle_transformers::models::qwen3::{Config as Qwen3Config, ModelForCausalLM};
+use candle_transformers::models::{
+    qwen3::{Config as Qwen3Config, ModelForCausalLM},
+    quantized_qwen3::ModelWeights as QuantizedQwen3ModelWeights,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{MedPsyModelSize, TokenId};
+use crate::{
+    medpsy_quantization_admission, MedPsyModelSize, MedPsyQuantizationAdmission,
+    MedPsyQuantizationTier, TokenId,
+};
 
 /// Rust-native MedPsy / Qwen3 safetensors load or generation failure.
 #[derive(Debug, Error)]
@@ -33,6 +40,12 @@ pub enum MedPsyQwen3Error {
     InvalidGenerationRequest {
         /// Refusal detail.
         message: String,
+    },
+    /// The requested medical-domain quantization tier is blocked by policy.
+    #[error("MedPsy quantization tier `{tier}` is blocked by medical-domain policy")]
+    QuantizationBlocked {
+        /// Published tier label.
+        tier: String,
     },
     /// Candle failed during model load.
     #[error("failed to load Rust-native MedPsy Qwen3 model: {message}")]
@@ -153,6 +166,15 @@ pub struct MedPsyQwen3CandleGenerator {
     model_artifact_sha256: String,
 }
 
+/// Rust-native MedPsy / Qwen3 GGUF generator backed by Candle quantized Qwen3.
+pub struct MedPsyQwen3GgufGenerator {
+    backend: MedPsyQwen3RuntimeBackend,
+    device: Device,
+    model: QuantizedQwen3ModelWeights,
+    model_artifact_sha256: String,
+    model_family: String,
+}
+
 impl MedPsyQwen3CandleGenerator {
     /// Loads a published MedPsy safetensors artifact through Candle Qwen3.
     pub fn from_safetensors_file(
@@ -219,6 +241,162 @@ impl MedPsyQwen3CandleGenerator {
     #[must_use]
     pub fn model_artifact_sha256(&self) -> &str {
         self.model_artifact_sha256.as_str()
+    }
+
+    /// Greedy argmax generation over already-tokenized Qwen3 prompt tokens.
+    pub fn generate_greedy_token_ids(
+        &mut self,
+        prompt_tokens: &[TokenId],
+        max_new_tokens: usize,
+        eos_token_ids: &[TokenId],
+    ) -> Result<MedPsyQwen3GenerationReport, MedPsyQwen3Error> {
+        if prompt_tokens.is_empty() {
+            return Err(MedPsyQwen3Error::InvalidGenerationRequest {
+                message: String::from("prompt token list must not be empty"),
+            });
+        }
+        if max_new_tokens == 0 {
+            return Err(MedPsyQwen3Error::InvalidGenerationRequest {
+                message: String::from("max_new_tokens must be greater than zero"),
+            });
+        }
+        self.model.clear_kv_cache();
+        let mut generated = Vec::new();
+        let mut offset = 0usize;
+        let mut input_tokens = prompt_tokens.to_vec();
+        for step in 0..max_new_tokens {
+            let input = tensor_from_tokens(input_tokens.as_slice(), &self.device)?;
+            let logits = self.model.forward(&input, offset).map_err(|error| {
+                MedPsyQwen3Error::Generation {
+                    message: error.to_string(),
+                }
+            })?;
+            let next = argmax_token(&logits)?;
+            generated.push(next);
+            if eos_token_ids.contains(&next) {
+                return Ok(self.report(prompt_tokens, generated, true));
+            }
+            offset = if step == 0 {
+                prompt_tokens.len()
+            } else {
+                offset.saturating_add(1)
+            };
+            input_tokens.clear();
+            input_tokens.push(next);
+        }
+        Ok(self.report(prompt_tokens, generated, false))
+    }
+
+    fn report(
+        &self,
+        prompt_tokens: &[TokenId],
+        generated_tokens: Vec<TokenId>,
+        stopped_on_eos: bool,
+    ) -> MedPsyQwen3GenerationReport {
+        MedPsyQwen3GenerationReport {
+            prompt_tokens: prompt_tokens.to_vec(),
+            generated_tokens,
+            stopped_on_eos,
+            model_artifact_sha256: self.model_artifact_sha256.clone(),
+            backend: self.backend,
+            execution_engine: self.backend.execution_engine().to_string(),
+        }
+    }
+}
+
+impl MedPsyQwen3GgufGenerator {
+    /// Loads an admitted MedPsy Qwen3 GGUF artifact after applying medical quantization policy.
+    pub fn from_admitted_gguf_file(
+        size: MedPsyModelSize,
+        tier: MedPsyQuantizationTier,
+        path: impl AsRef<Path>,
+        expected_sha256: Option<&str>,
+        allow_blocked_medical_quantization: bool,
+    ) -> Result<Self, MedPsyQwen3Error> {
+        if medpsy_quantization_admission(size, tier) == MedPsyQuantizationAdmission::BlockedByDefault
+            && !allow_blocked_medical_quantization
+        {
+            return Err(MedPsyQwen3Error::QuantizationBlocked {
+                tier: tier.as_str().to_string(),
+            });
+        }
+        Self::from_gguf_file(path, expected_sha256)
+    }
+
+    /// Loads a MedPsy Qwen3 GGUF artifact through Candle's Rust quantized Qwen3 path.
+    pub fn from_gguf_file(
+        path: impl AsRef<Path>,
+        expected_sha256: Option<&str>,
+    ) -> Result<Self, MedPsyQwen3Error> {
+        Self::from_gguf_file_with_backend(path, expected_sha256, MedPsyQwen3RuntimeBackend::Cpu)
+    }
+
+    /// Loads a MedPsy Qwen3 GGUF artifact through the requested Rust backend.
+    pub fn from_gguf_file_with_backend(
+        path: impl AsRef<Path>,
+        expected_sha256: Option<&str>,
+        backend: MedPsyQwen3RuntimeBackend,
+    ) -> Result<Self, MedPsyQwen3Error> {
+        let path = path.as_ref();
+        let bytes = fs::read(path).map_err(|error| MedPsyQwen3Error::ArtifactRead {
+            artifact: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+        let model_artifact_sha256 = sha256_digest(bytes.as_slice());
+        if let Some(expected) = expected_sha256 {
+            if model_artifact_sha256 != expected {
+                return Err(MedPsyQwen3Error::ArtifactDigestMismatch {
+                    expected: expected.to_string(),
+                    actual: model_artifact_sha256,
+                });
+            }
+        }
+        let device = backend.device();
+        let mut file = File::open(path).map_err(|error| MedPsyQwen3Error::ArtifactRead {
+            artifact: path.display().to_string(),
+            message: error.to_string(),
+        })?;
+        let content = gguf_file::Content::read(&mut file).map_err(|error| {
+            MedPsyQwen3Error::ModelLoad {
+                message: error.to_string(),
+            }
+        })?;
+        let architecture = content
+            .metadata
+            .get("general.architecture")
+            .and_then(|value| value.to_string().ok().cloned())
+            .unwrap_or_default();
+        if architecture != "qwen3" {
+            return Err(MedPsyQwen3Error::ModelLoad {
+                message: format!(
+                    "MedPsy GGUF expects general.architecture=qwen3, got `{architecture}`"
+                ),
+            });
+        }
+        let model = QuantizedQwen3ModelWeights::from_gguf(content, &mut file, &device).map_err(
+            |error| MedPsyQwen3Error::ModelLoad {
+                message: error.to_string(),
+            },
+        )?;
+        Ok(Self {
+            backend,
+            device,
+            model,
+            model_artifact_sha256,
+            model_family: String::from("medpsy_qwen3"),
+        })
+    }
+
+    /// Returns the stable model artifact digest.
+    #[must_use]
+    pub fn model_artifact_sha256(&self) -> &str {
+        self.model_artifact_sha256.as_str()
+    }
+
+    /// Returns the stable family label.
+    #[must_use]
+    pub fn model_family(&self) -> &str {
+        self.model_family.as_str()
     }
 
     /// Greedy argmax generation over already-tokenized Qwen3 prompt tokens.
@@ -356,6 +534,30 @@ mod tests {
     }
 
     #[test]
+    fn medpsy_qwen3_missing_gguf_fails_closed() {
+        let result = MedPsyQwen3GgufGenerator::from_gguf_file(
+            "/definitely/missing/medpsy-model.gguf",
+            None,
+        );
+        assert!(matches!(result, Err(MedPsyQwen3Error::ArtifactRead { .. })));
+    }
+
+    #[test]
+    fn medpsy_qwen3_blocks_disallowed_medical_quantization_by_default() {
+        let result = MedPsyQwen3GgufGenerator::from_admitted_gguf_file(
+            MedPsyModelSize::OnePointSevenB,
+            MedPsyQuantizationTier::IQ3M,
+            "/definitely/missing/medpsy-model.gguf",
+            None,
+            false,
+        );
+        assert!(matches!(
+            result,
+            Err(MedPsyQwen3Error::QuantizationBlocked { .. })
+        ));
+    }
+
+    #[test]
     fn medpsy_qwen3_real_17b_safetensors_smoke_when_available()
     -> Result<(), Box<dyn std::error::Error>> {
         let Ok(path) = std::env::var("PSIONIC_MEDPSY_17B_SAFETENSORS_PATH") else {
@@ -371,6 +573,25 @@ mod tests {
         assert_eq!(report.prompt_tokens, vec![TokenId(151644)]);
         assert_eq!(report.generated_tokens.len(), 1);
         assert_eq!(report.execution_engine, "rust_candle_qwen3_cpu");
+        Ok(())
+    }
+
+    #[test]
+    fn medpsy_qwen3_real_17b_q4_gguf_smoke_when_available()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let Ok(path) = std::env::var("PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH") else {
+            return Ok(());
+        };
+        if path.trim().is_empty() || !Path::new(path.as_str()).exists() {
+            return Ok(());
+        }
+        let mut generator = MedPsyQwen3GgufGenerator::from_gguf_file(path, None)?;
+        let report =
+            generator.generate_greedy_token_ids(&[TokenId(151644)], 1, &[TokenId(151645)])?;
+        assert_eq!(report.prompt_tokens, vec![TokenId(151644)]);
+        assert_eq!(report.generated_tokens.len(), 1);
+        assert_eq!(report.execution_engine, "rust_candle_qwen3_cpu");
+        assert_eq!(generator.model_family(), "medpsy_qwen3");
         Ok(())
     }
 }

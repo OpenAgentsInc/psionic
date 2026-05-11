@@ -2,8 +2,8 @@
 
 > Status: `implemented_early` for artifact admission, tokenizer/prompt fixture,
 > quantization policy, medical safety metadata, and the first Rust-native
-> Qwen3 BF16 safetensors CPU load/generate path. GGUF quantized execution,
-> OpenAI-compatible serving, and benchmark publication remain planned.
+> Qwen3 BF16 safetensors plus GGUF CPU load/generate paths. OpenAI-compatible
+> serving and benchmark publication remain planned.
 
 This document records the bounded Psionic lane for QVAC MedPsy support.
 
@@ -84,9 +84,13 @@ The first landed scope is metadata and admission only:
 - `MedPsyQwen3CandleGenerator` can load BF16 safetensors through
   Rust-native Candle Qwen3 and run greedy token-id generation on CPU when the
   operator supplies a local `PSIONIC_MEDPSY_17B_SAFETENSORS_PATH` artifact.
+- `MedPsyQwen3GgufGenerator` can load GGUF MedPsy Qwen3 artifacts through
+  Rust-native Candle quantized Qwen3 and run greedy token-id generation on CPU
+  when the operator supplies a local `PSIONIC_MEDPSY_17B_Q4_K_M_GGUF_PATH`
+  artifact.
 
-This landed scope only claims the first BF16 safetensors CPU execution path. It
-does not claim GGUF quantized execution, CUDA/Metal acceleration,
+This landed scope only claims BF16 safetensors and GGUF CPU execution paths when
+the operator supplies local artifacts. It does not claim CUDA/Metal acceleration,
 OpenAI-compatible serving, or benchmark parity yet.
 
 ## Quantization Policy
@@ -142,13 +146,12 @@ The implementation sequence is tracked in GitHub issues:
 ## Claim Boundary
 
 It is honest to say this checkout has initial MedPsy/Qwen3 admission metadata,
-policy fixtures, and a Rust-native Candle Qwen3 BF16 safetensors CPU
-load/generate path that runs when a local artifact is supplied.
+policy fixtures, and Rust-native Candle Qwen3 BF16 safetensors plus GGUF CPU
+load/generate paths that run when local artifacts are supplied.
 
 It is not yet honest to say:
 
 - Psionic serves MedPsy through the OpenAI-compatible server.
-- Psionic supports MedPsy GGUF quantized generation.
 - Psionic supports accelerated CUDA or Metal MedPsy execution.
 - Psionic is competitive with QVAC SDK, `llama.cpp`, vLLM, or Transformers for
   MedPsy.

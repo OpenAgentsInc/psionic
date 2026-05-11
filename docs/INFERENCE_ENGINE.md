@@ -74,10 +74,10 @@ into one generic engine claim.
   `/health`, `/v1/models`, and response headers.
 - `MedPsy` / Qwen3 has one new bounded pilot in `implemented_early` status.
   Psionic now records the QVAC MedPsy Qwen3 family label, tokenizer/prompt
-  fixture, quantization admission policy, medical safety policy, and one
-  Rust-native Candle Qwen3 BF16 safetensors CPU load/generate path. GGUF
-  quantized execution, CUDA/Metal acceleration, OpenAI-compatible serving, and
-  benchmark publication remain planned. The canonical lane doc is
+  fixture, quantization admission policy, medical safety policy, and Rust-native
+  Candle Qwen3 BF16 safetensors plus GGUF CPU load/generate paths. CUDA/Metal
+  acceleration, OpenAI-compatible serving, and benchmark publication remain
+  planned. The canonical lane doc is
   `docs/NON_GPT_OSS_MEDPSY_QWEN_PILOT.md`.
 - `Gemma 4` now has one published bounded Psionic lane on this checkout.
   The canonical publication doc is
